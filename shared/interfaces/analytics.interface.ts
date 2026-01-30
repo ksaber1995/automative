@@ -27,7 +27,7 @@ export interface DashboardMetrics {
 }
 
 export interface MonthlyMetric {
-  month: string;
+  month: number;
   year: number;
   revenue: number;
   expenses: number;

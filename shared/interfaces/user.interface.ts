@@ -13,6 +13,18 @@ export interface User {
   updatedAt: string;
 }
 
+export interface SafeUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  branchId?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserCreateDto {
   email: string;
   password: string;
@@ -39,5 +51,5 @@ export interface LoginDto {
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
-  user: Omit<User, 'password'>;
+  user: SafeUser;
 }

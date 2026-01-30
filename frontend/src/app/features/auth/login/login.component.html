@@ -23,10 +23,16 @@
             class="w-full"
             [class.ng-invalid]="email?.invalid && email?.touched"
           />
-          <small *ngIf="email?.invalid && email?.touched" class="text-red-600">
-            <span *ngIf="email?.errors?.['required']">Email is required</span>
-            <span *ngIf="email?.errors?.['email']">Please enter a valid email</span>
-          </small>
+          @if (email?.invalid && email?.touched) {
+            <small class="text-red-600">
+              @if (email?.errors?.['required']) {
+                <span>Email is required</span>
+              }
+              @if (email?.errors?.['email']) {
+                <span>Please enter a valid email</span>
+              }
+            </small>
+          }
         </div>
 
         <div>
@@ -41,10 +47,16 @@
             inputStyleClass="w-full"
             [class.ng-invalid]="password?.invalid && password?.touched"
           ></p-password>
-          <small *ngIf="password?.invalid && password?.touched" class="text-red-600">
-            <span *ngIf="password?.errors?.['required']">Password is required</span>
-            <span *ngIf="password?.errors?.['minlength']">Password must be at least 6 characters</span>
-          </small>
+          @if (password?.invalid && password?.touched) {
+            <small class="text-red-600">
+              @if (password?.errors?.['required']) {
+                <span>Password is required</span>
+              }
+              @if (password?.errors?.['minlength']) {
+                <span>Password must be at least 6 characters</span>
+              }
+            </small>
+          }
         </div>
 
         <div class="flex items-center justify-between">

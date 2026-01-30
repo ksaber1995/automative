@@ -1,11 +1,14 @@
 <div class="container-custom py-8">
   <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
-  <div *ngIf="loading()" class="flex justify-center items-center py-20">
+  @if (loading()) {
+  <div class="flex justify-center items-center py-20">
     <i class="pi pi-spinner pi-spin text-4xl text-primary-500"></i>
   </div>
+  }
 
-  <div *ngIf="!loading() && dashboardData() as data">
+  @if (!loading() && dashboardData(); as data) {
+  <div>
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <p-card class="bg-gradient-to-br from-blue-50 to-blue-100">
@@ -36,7 +39,8 @@
         <div class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-600 mb-1">Net Profit</div>
-            <div class="text-2xl font-bold" [class.text-green-600]="data.companyWideSummary.netProfit >= 0" [class.text-red-600]="data.companyWideSummary.netProfit < 0">
+            <div class="text-2xl font-bold" [class.text-green-600]="data.companyWideSummary.netProfit >= 0"
+              [class.text-red-600]="data.companyWideSummary.netProfit < 0">
               {{ formatCurrency(data.companyWideSummary.netProfit) }}
             </div>
           </div>
@@ -49,7 +53,8 @@
           <div>
             <div class="text-sm text-gray-600 mb-1">Profit Margin</div>
             <div class="text-2xl font-bold text-purple-600">
-              {{ data.companyWideSummary.totalRevenue > 0 ? ((data.companyWideSummary.netProfit / data.companyWideSummary.totalRevenue) * 100).toFixed(1) : 0 }}%
+              {{ data.companyWideSummary.totalRevenue > 0 ? ((data.companyWideSummary.netProfit /
+              data.companyWideSummary.totalRevenue) * 100).toFixed(1) : 0 }}%
             </div>
           </div>
           <i class="pi pi-percentage text-4xl text-purple-400"></i>
@@ -105,7 +110,8 @@
             <td>{{ formatCurrency(branch.totalRevenue) }}</td>
             <td>{{ formatCurrency(branch.totalExpenses) }}</td>
             <td>
-              <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0" class="font-semibold">
+              <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0"
+                class="font-semibold">
                 {{ formatCurrency(branch.netProfit) }}
               </span>
             </td>
@@ -115,10 +121,8 @@
               </span>
             </td>
             <td>
-              <p-tag
-                [value]="branch.netProfit >= 0 ? 'Profitable' : 'Loss'"
-                [severity]="getProfitSeverity(branch.netProfit)"
-              ></p-tag>
+              <p-tag [value]="branch.netProfit >= 0 ? 'Profitable' : 'Loss'"
+                [severity]="getProfitSeverity(branch.netProfit)"></p-tag>
             </td>
           </tr>
         </ng-template>
@@ -132,18 +136,22 @@
           <div class="p-4 font-semibold text-lg">Top Performing Branches</div>
         </ng-template>
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div *ngFor="let branch of data.topPerformingBranches; let i = index" class="p-4 border rounded-lg">
+          @for (branch of data.topPerformingBranches; track branch.branchId; let i = $index) {
+          <div class="p-4 border rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-2xl font-bold text-gray-300">#{{ i + 1 }}</span>
-              <i class="pi pi-trophy text-2xl" [class.text-yellow-500]="i === 0" [class.text-gray-400]="i === 1" [class.text-orange-600]="i === 2"></i>
+              <i class="pi pi-trophy text-2xl" [class.text-yellow-500]="i === 0" [class.text-gray-400]="i === 1"
+                [class.text-orange-600]="i === 2"></i>
             </div>
             <div class="font-semibold text-lg mb-1">{{ branch.branchName }}</div>
-            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount }} students • {{ branch.courseCount }} courses</div>
+            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount }} students • {{ branch.courseCount }}
+              courses</div>
             <div class="text-green-600 font-semibold">{{ formatCurrency(branch.profit) }}</div>
             <div class="text-xs text-gray-500">{{ branch.profitMargin.toFixed(1) }}% margin</div>
           </div>
+          }
         </div>
       </p-card>
     </div>
   </div>
-</div>
+  }

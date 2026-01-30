@@ -80,19 +80,20 @@ import { Course } from '@shared/interfaces/course.interface';
                     icon="pi pi-pencil"
                     [rounded]="true"
                     [text]="true"
-                    severity="warning"
+                    severity="warn"
                     (onClick)="editCourse(course)"
                     pTooltip="Edit"
                   ></p-button>
-                  <p-button
-                    icon="pi pi-trash"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="danger"
-                    (onClick)="deleteCourse(course)"
-                    pTooltip="Deactivate"
-                    *ngIf="course.isActive"
-                  ></p-button>
+                  @if (course.isActive) {
+                    <p-button
+                      icon="pi pi-trash"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="danger"
+                      (onClick)="deleteCourse(course)"
+                      pTooltip="Deactivate"
+                    ></p-button>
+                  }
                 </div>
               </td>
             </tr>

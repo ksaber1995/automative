@@ -17,7 +17,7 @@ import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 export class OverviewComponent implements OnInit {
   private analyticsService = inject(AnalyticsService);
 
-  dashboardData = signal<DashboardMetrics | null>(null);
+  dashboardData =  signal<DashboardMetrics | null>(null);
   loading = signal(true);
 
   revenueChartData: any;
@@ -149,7 +149,7 @@ export class OverviewComponent implements OnInit {
     }).format(value);
   }
 
-  getProfitSeverity(profit: number): string {
+  getProfitSeverity(profit: number): 'success' | 'danger' {
     return profit >= 0 ? 'success' : 'danger';
   }
 }

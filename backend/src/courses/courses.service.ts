@@ -83,7 +83,7 @@ export class CoursesService {
       FILE_PATHS.COURSES,
       DATA_KEYS.COURSES,
       id,
-      updateCourseDto as any,
+      updateCourseDto,
     );
   }
 
@@ -92,7 +92,7 @@ export class CoursesService {
       FILE_PATHS.COURSES,
       DATA_KEYS.COURSES,
       id,
-      { isActive: false } as any,
+      { isActive: false },
     );
   }
 

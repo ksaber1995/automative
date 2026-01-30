@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class PdfGeneratorService {
@@ -8,7 +8,7 @@ export class PdfGeneratorService {
       const doc = new PDFDocument({ margin: 50 });
       const chunks: Buffer[] = [];
 
-      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
@@ -31,10 +31,10 @@ export class PdfGeneratorService {
       doc.fontSize(10);
       doc.text(`Total Revenue: $${summary.totalRevenue.toFixed(2)}`);
       doc.text(`Total Expenses: $${summary.totalExpenses.toFixed(2)}`);
-      doc.text(`Net Profit: $${summary.netProfit.toFixed(2)}`, {
-        continued: false,
-        color: summary.netProfit >= 0 ? 'green' : 'red'
-      });
+
+      // Set color based on profit
+      doc.fillColor(summary.netProfit >= 0 ? 'green' : 'red');
+      doc.text(`Net Profit: $${summary.netProfit.toFixed(2)}`);
 
       const margin = summary.totalRevenue > 0
         ? ((summary.netProfit / summary.totalRevenue) * 100).toFixed(2)
@@ -73,7 +73,7 @@ export class PdfGeneratorService {
       const doc = new PDFDocument({ margin: 50 });
       const chunks: Buffer[] = [];
 
-      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
@@ -81,6 +81,12 @@ export class PdfGeneratorService {
       doc.fontSize(20).text('Branch Report', { align: 'center' });
       doc.fontSize(16).text(branchData.branch.name, { align: 'center' });
       doc.moveDown();
+
+      // Date range
+      if (startDate && endDate) {
+        doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: 'center' });
+        doc.moveDown();
+      }
 
       // Branch Info
       doc.fontSize(12).text('Branch Information', { underline: true });

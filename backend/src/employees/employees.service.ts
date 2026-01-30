@@ -84,7 +84,7 @@ export class EmployeesService {
       FILE_PATHS.EMPLOYEES,
       DATA_KEYS.EMPLOYEES,
       id,
-      updateEmployeeDto as any,
+      updateEmployeeDto,
     );
   }
 
@@ -96,7 +96,7 @@ export class EmployeesService {
       {
         isActive: false,
         terminationDate: new Date().toISOString(),
-      } as any,
+      },
     );
   }
 }

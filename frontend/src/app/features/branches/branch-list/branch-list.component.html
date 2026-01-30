@@ -61,19 +61,20 @@
                 icon="pi pi-pencil"
                 [rounded]="true"
                 [text]="true"
-                severity="warning"
+                severity="warn"
                 (onClick)="editBranch(branch)"
                 pTooltip="Edit"
               ></p-button>
-              <p-button
-                icon="pi pi-trash"
-                [rounded]="true"
-                [text]="true"
-                severity="danger"
-                (onClick)="deleteBranch(branch)"
-                pTooltip="Deactivate"
-                *ngIf="branch.isActive"
-              ></p-button>
+              @if (branch.isActive) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="deleteBranch(branch)"
+                  pTooltip="Deactivate"
+                ></p-button>
+              }
             </div>
           </td>
         </tr>

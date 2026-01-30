@@ -19,22 +19,22 @@
     "@angular/platform-browser": "^21.0.0",
     "@angular/platform-browser-dynamic": "^21.0.0",
     "@angular/router": "^21.0.0",
-    "primeng": "^21.0.0",
+    "chart.js": "^4.4.0",
+    "file-saver": "^2.0.5",
     "primeicons": "^7.0.0",
+    "primeng": "^21.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.8.0",
-    "zone.js": "~0.15.0",
-    "chart.js": "^4.4.0",
-    "file-saver": "^2.0.5"
+    "zone.js": "~0.15.0"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
     "@types/file-saver": "^2.0.5",
-    "typescript": "~5.7.0",
-    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
-    "autoprefixer": "^10.4.17"
+    "tailwindcss": "^3.4.0",
+    "typescript": "~5.9.0"
   }
 }

@@ -6,6 +6,7 @@ import { DataStoreService } from '../data-store/data-store.service';
 import { FILE_PATHS, DATA_KEYS } from '../data-store/file-paths.constant';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { User, SafeUser, AuthResponse } from '../../../shared/interfaces/user.interface';
 
 @Injectable()
 export class AuthService {
@@ -15,7 +16,7 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<any> {
+  async validateUser(email: string, password: string): Promise<SafeUser | null> {
     const users = await this.dataStore.findBy(
       FILE_PATHS.USERS,
       DATA_KEYS.USERS,
@@ -26,7 +27,7 @@ export class AuthService {
       return null;
     }
 
-    const user = users[0];
+    const user = users[0] as User;
 
     if (!user.isActive) {
       return null;
@@ -38,10 +39,10 @@ export class AuthService {
     }
 
     const { password: _, ...result } = user;
-    return result;
+    return result as SafeUser;
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto): Promise<AuthResponse> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
@@ -56,7 +57,7 @@ export class AuthService {
     };
   }
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto): Promise<AuthResponse> {
     // Check if user already exists
     const existingUsers = await this.dataStore.findBy(
       FILE_PATHS.USERS,
@@ -80,19 +81,19 @@ export class AuthService {
       role: registerDto.role,
       branchId: registerDto.branchId || null,
       isActive: true,
-    });
+    }) as User;
 
-    const { password: _, ...userWithoutPassword } = newUser as any;
+    const { password: _, ...userWithoutPassword } = newUser;
 
-    const tokens = await this.generateTokens(userWithoutPassword);
+    const tokens = await this.generateTokens(userWithoutPassword as SafeUser);
 
     return {
       ...tokens,
-      user: userWithoutPassword,
+      user: userWithoutPassword as SafeUser,
     };
   }
 
-  async getProfile(userId: string) {
+  async getProfile(userId: string): Promise<SafeUser> {
     const user = await this.dataStore.findById(
       FILE_PATHS.USERS,
       DATA_KEYS.USERS,
@@ -103,11 +104,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const { password: _, ...userWithoutPassword } = user as any;
-    return userWithoutPassword;
+    const { password: _, ...userWithoutPassword } = user as User;
+    return userWithoutPassword as SafeUser;
   }
 
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
@@ -119,18 +120,18 @@ export class AuthService {
         payload.sub,
       );
 
-      if (!user || !(user as any).isActive) {
+      if (!user || !(user as User).isActive) {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      const { password: _, ...userWithoutPassword } = user as any;
-      return this.generateTokens(userWithoutPassword);
+      const { password: _, ...userWithoutPassword } = user as User;
+      return this.generateTokens(userWithoutPassword as SafeUser);
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  private async generateTokens(user: any) {
+  private async generateTokens(user: SafeUser): Promise<{ accessToken: string; refreshToken: string }> {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -186,7 +187,7 @@ export class AuthService {
 
     await this.dataStore.update(FILE_PATHS.USERS, DATA_KEYS.USERS, userId, {
       password: hashedPassword,
-    } as any);
+    });
 
     return { message: 'Password changed successfully' };
   }

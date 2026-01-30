@@ -59,7 +59,7 @@ export class BranchesService {
       FILE_PATHS.BRANCHES,
       DATA_KEYS.BRANCHES,
       id,
-      updateBranchDto as any,
+      updateBranchDto,
     );
 
     return branch;
@@ -71,7 +71,7 @@ export class BranchesService {
       FILE_PATHS.BRANCHES,
       DATA_KEYS.BRANCHES,
       id,
-      { isActive: false } as any,
+      { isActive: false },
     );
 
     return branch;

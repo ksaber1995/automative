@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { User, LoginDto, AuthResponse } from '@shared/interfaces/user.interface';
+import { SafeUser, LoginDto, AuthResponse } from '@shared/interfaces/user.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -12,11 +12,11 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
 
-  private currentUserSubject = new BehaviorSubject<User | null>(null);
+  private currentUserSubject = new BehaviorSubject<SafeUser | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
   // Signal for reactive access
-  public currentUser = signal<User | null>(null);
+  public currentUser = signal<SafeUser | null>(null);
 
   constructor() {
     this.loadUserFromStorage();
@@ -69,8 +69,8 @@ export class AuthService {
     this.router.navigate(['/auth/login']);
   }
 
-  getProfile(): Observable<User> {
-    return this.http.get<User>(`${environment.apiUrl}/auth/profile`);
+  getProfile(): Observable<SafeUser> {
+    return this.http.get<SafeUser>(`${environment.apiUrl}/auth/profile`);
   }
 
   getToken(): string | null {

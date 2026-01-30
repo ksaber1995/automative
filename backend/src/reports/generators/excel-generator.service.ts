@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import * as ExcelJS from 'exceljs';
+import ExcelJS from 'exceljs';
 
 @Injectable()
 export class ExcelGeneratorService {
@@ -25,25 +25,25 @@ export class ExcelGeneratorService {
     worksheet.mergeCells('A1:I1');
     const titleRow = worksheet.getRow(1);
     titleRow.font = { size: 16, bold: true };
-    titleRow.alignment = { horizontal: 'center' };
+    titleRow.alignment = { horizontal: 'center' as const };
 
     // Add date range
     if (startDate && endDate) {
       worksheet.insertRow(2, [`Period: ${startDate} to ${endDate}`]);
       worksheet.mergeCells('A2:I2');
       const dateRow = worksheet.getRow(2);
-      dateRow.alignment = { horizontal: 'center' };
+      dateRow.alignment = { horizontal: 'center' as const };
     }
 
     // Style header row
     const headerRow = worksheet.getRow(startDate && endDate ? 3 : 2);
     headerRow.font = { bold: true };
     headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
       fgColor: { argb: 'FFE0E0E0' },
     };
-    headerRow.alignment = { horizontal: 'center' };
+    headerRow.alignment = { horizontal: 'center' as const };
 
     // Add company-wide summary
     const summary = data.companyWideSummary;
@@ -68,8 +68,8 @@ export class ExcelGeneratorService {
     if (totalRow) {
       totalRow.font = { bold: true };
       totalRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
         fgColor: { argb: 'FFF0F0F0' },
       };
     }
@@ -102,18 +102,19 @@ export class ExcelGeneratorService {
     worksheet.getColumn('I').numFmt = '0.00"%"';
 
     // Apply borders
-    worksheet.eachRow((row, rowNumber) => {
+    worksheet.eachRow((row) => {
       row.eachCell((cell) => {
         cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
+          top: { style: 'thin' as const },
+          left: { style: 'thin' as const },
+          bottom: { style: 'thin' as const },
+          right: { style: 'thin' as const },
         };
       });
     });
 
-    return await workbook.xlsx.writeBuffer() as Buffer;
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   async generateBranchReport(branchData: any, startDate?: string, endDate?: string): Promise<Buffer> {
@@ -124,10 +125,19 @@ export class ExcelGeneratorService {
     worksheet.mergeCells('A1:B1');
     worksheet.getCell('A1').value = `Branch Report: ${branchData.branch.name}`;
     worksheet.getCell('A1').font = { size: 16, bold: true };
-    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+    worksheet.getCell('A1').alignment = { horizontal: 'center' as const };
+
+    // Add date range if provided
+    let row = 2;
+    if (startDate && endDate) {
+      worksheet.mergeCells(`A${row}:B${row}`);
+      worksheet.getCell(`A${row}`).value = `Period: ${startDate} to ${endDate}`;
+      worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' as const };
+      row++;
+    }
+    row++; // Skip a row
 
     // Add branch info
-    let row = 3;
     worksheet.getCell(`A${row}`).value = 'Branch Code:';
     worksheet.getCell(`B${row}`).value = branchData.branch.code;
     row++;
@@ -164,6 +174,7 @@ export class ExcelGeneratorService {
       { width: 20 },
     ];
 
-    return await workbook.xlsx.writeBuffer() as Buffer;
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

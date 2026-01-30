@@ -3,16 +3,18 @@ import { Cron } from '@nestjs/schedule';
 import { DataStoreService } from '../data-store/data-store.service';
 import { FILE_PATHS, DATA_KEYS } from '../data-store/file-paths.constant';
 
+interface ExpenseFilters {
+  branchId?: string;
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 @Injectable()
 export class ExpensesService {
   constructor(private dataStore: DataStoreService) {}
 
-  async findAll(filters?: {
-    branchId?: string;
-    type?: string;
-    startDate?: string;
-    endDate?: string;
-  }) {
+  async findAll(filters?: ExpenseFilters): Promise<any[]> {
     let expenses = await this.dataStore.findAll(FILE_PATHS.EXPENSES, DATA_KEYS.EXPENSES);
 
     if (filters) {
@@ -42,7 +44,7 @@ export class ExpensesService {
     return expenses;
   }
 
-  async getRecurring() {
+  async getRecurring(): Promise<any[]> {
     return await this.dataStore.findBy(
       FILE_PATHS.EXPENSES,
       DATA_KEYS.EXPENSES,
@@ -50,7 +52,7 @@ export class ExpensesService {
     );
   }
 
-  async getByType(type: string) {
+  async getByType(type: string): Promise<any[]> {
     return await this.dataStore.findBy(
       FILE_PATHS.EXPENSES,
       DATA_KEYS.EXPENSES,
@@ -61,7 +63,7 @@ export class ExpensesService {
   async distributeSharedExpense(
     expenseAmount: number,
     method: 'EQUAL' | 'PROPORTIONAL' = 'EQUAL',
-  ) {
+  ): Promise<Record<string, number>> {
     const branches = await this.dataStore.findBy(
       FILE_PATHS.BRANCHES,
       DATA_KEYS.BRANCHES,
@@ -82,12 +84,12 @@ export class ExpensesService {
       );
 
       const branchRevenues = new Map<string, number>();
-      let totalRevenue = 0;
+      let totalRevenue: number = 0;
 
       branches.forEach((branch: any) => {
-        const branchRev = revenues
+        const branchRev: number = (revenues as any[])
           .filter((rev: any) => rev.branchId === branch.id)
-          .reduce((sum: number, rev: any) => sum + rev.amount, 0);
+          .reduce((sum: number, rev: any) => sum + (rev.amount as number), 0) as number;
         branchRevenues.set(branch.id, branchRev);
         totalRevenue += branchRev;
       });
@@ -111,7 +113,7 @@ export class ExpensesService {
   }
 
   @Cron('0 0 1 * *') // Run at midnight on the 1st of every month
-  async autoGenerateRecurringExpenses() {
+  async autoGenerateRecurringExpenses(): Promise<{ message: string }> {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
@@ -154,7 +156,7 @@ export class ExpensesService {
     return { message: 'Recurring expenses generated successfully' };
   }
 
-  async calculateTotalSalaries(branchId?: string) {
+  async calculateTotalSalaries(branchId?: string): Promise<number> {
     const employees = await this.dataStore.findBy(
       FILE_PATHS.EMPLOYEES,
       DATA_KEYS.EMPLOYEES,

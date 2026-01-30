@@ -130,10 +130,10 @@ export class DataStoreService {
   /**
    * Create new record
    */
-  async create<T extends { id?: string; createdAt?: string; updatedAt?: string }>(
+  async create<T extends Record<string, any> & { id?: string; createdAt?: string; updatedAt?: string }>(
     filePath: string,
     dataKey: string,
-    data: Partial<T>,
+    data: Omit<T, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string; updatedAt?: string },
   ): Promise<T> {
     const records = await this.readFile<T>(filePath, dataKey);
 
@@ -154,11 +154,11 @@ export class DataStoreService {
   /**
    * Update existing record
    */
-  async update<T extends { id: string; updatedAt?: string }>(
+  async update<T extends Record<string, any> & { id: string; updatedAt?: string }>(
     filePath: string,
     dataKey: string,
     id: string,
-    updateData: Partial<T>,
+    updateData: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>,
   ): Promise<T> {
     const records = await this.readFile<T>(filePath, dataKey);
     const index = records.findIndex((r) => r.id === id);
@@ -218,10 +218,10 @@ export class DataStoreService {
   /**
    * Bulk create records
    */
-  async bulkCreate<T extends { id?: string; createdAt?: string; updatedAt?: string }>(
+  async bulkCreate<T extends Record<string, any> & { id?: string; createdAt?: string; updatedAt?: string }>(
     filePath: string,
     dataKey: string,
-    dataArray: Partial<T>[],
+    dataArray: (Omit<T, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string; updatedAt?: string })[],
   ): Promise<T[]> {
     const records = await this.readFile<T>(filePath, dataKey);
     const now = new Date().toISOString();

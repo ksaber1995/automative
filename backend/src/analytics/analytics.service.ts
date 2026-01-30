@@ -3,16 +3,14 @@ import { DataStoreService } from '../data-store/data-store.service';
 import { FILE_PATHS, DATA_KEYS } from '../data-store/file-paths.constant';
 import { RevenuesService } from '../revenues/revenues.service';
 import { ExpensesService } from '../expenses/expenses.service';
-
-interface FinancialSummary {
-  totalRevenue: number;
-  fixedExpenses: number;
-  variableExpenses: number;
-  salaries: number;
-  sharedExpenses: number;
-  totalExpenses: number;
-  netProfit: number;
-}
+import {
+  FinancialSummary,
+  DashboardMetrics,
+  BranchFinancialSummary,
+  MonthlyMetric,
+  CategoryMetric,
+  BranchPerformance
+} from '../../../shared/interfaces/analytics.interface';
 
 @Injectable()
 export class AnalyticsService {
@@ -22,7 +20,7 @@ export class AnalyticsService {
     private expensesService: ExpensesService,
   ) {}
 
-  async getDashboard(startDate?: string, endDate?: string) {
+  async getDashboard(startDate?: string, endDate?: string): Promise<DashboardMetrics> {
     const companyWideSummary = await this.calculateFinancialSummary(
       null,
       startDate,
@@ -207,7 +205,7 @@ export class AnalyticsService {
     };
   }
 
-  private async getRevenueByMonth(startDate?: string, endDate?: string) {
+  private async getRevenueByMonth(startDate?: string, endDate?: string): Promise<MonthlyMetric[]> {
     const revenues = await this.revenuesService.findAll({ startDate, endDate });
 
     const monthlyData = new Map<string, { revenue: number; expenses: number }>();
@@ -255,7 +253,7 @@ export class AnalyticsService {
     });
   }
 
-  private async getExpensesByCategory(startDate?: string, endDate?: string) {
+  private async getExpensesByCategory(startDate?: string, endDate?: string): Promise<CategoryMetric[]> {
     const expenses = await this.expensesService.findAll({ startDate, endDate });
 
     const categoryTotals = new Map<string, number>();
@@ -274,7 +272,7 @@ export class AnalyticsService {
     }));
   }
 
-  private async getTopPerformingBranches(startDate?: string, endDate?: string) {
+  private async getTopPerformingBranches(startDate?: string, endDate?: string): Promise<BranchPerformance[]> {
     const branches = await this.dataStore.findBy(
       FILE_PATHS.BRANCHES,
       DATA_KEYS.BRANCHES,
@@ -321,11 +319,11 @@ export class AnalyticsService {
     return performances.sort((a, b) => b.profit - a.profit).slice(0, 5);
   }
 
-  async getRevenueTrends(startDate?: string, endDate?: string) {
+  async getRevenueTrends(startDate?: string, endDate?: string): Promise<MonthlyMetric[]> {
     return this.getRevenueByMonth(startDate, endDate);
   }
 
-  async getProfitLoss(branchId?: string, startDate?: string, endDate?: string) {
+  async getProfitLoss(branchId?: string, startDate?: string, endDate?: string): Promise<FinancialSummary> {
     return this.calculateFinancialSummary(branchId || null, startDate, endDate);
   }
 }

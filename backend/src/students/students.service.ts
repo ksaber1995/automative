@@ -73,7 +73,7 @@ export class StudentsService {
       FILE_PATHS.STUDENTS,
       DATA_KEYS.STUDENTS,
       id,
-      updateStudentDto as any,
+      updateStudentDto,
     );
   }
 
@@ -82,7 +82,7 @@ export class StudentsService {
       FILE_PATHS.STUDENTS,
       DATA_KEYS.STUDENTS,
       id,
-      { isActive: false } as any,
+      { isActive: false },
     );
   }
 
@@ -204,7 +204,7 @@ export class StudentsService {
       FILE_PATHS.ENROLLMENTS,
       DATA_KEYS.ENROLLMENTS,
       enrollmentId,
-      { status: 'DROPPED' } as any,
+      { status: 'DROPPED' },
     );
   }
 }

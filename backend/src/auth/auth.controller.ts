@@ -12,6 +12,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthResponse, SafeUser } from '../../../shared/interfaces/user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -19,23 +20,23 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
     return this.authService.login(loginDto);
   }
 
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
+  async register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(registerDto);
   }
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Request() req) {
+  async getProfile(@Request() req): Promise<SafeUser> {
     return this.authService.getProfile(req.user.id);
   }
 
   @Post('refresh')
-  async refresh(@Body('refreshToken') refreshToken: string) {
+  async refresh(@Body('refreshToken') refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
     return this.authService.refreshToken(refreshToken);
   }
 
