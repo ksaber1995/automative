@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataStoreService } from '../data-store/data-store.service';
 import { FILE_PATHS, DATA_KEYS } from '../data-store/file-paths.constant';
+import { CreateRevenueDto } from './dto/create-revenue.dto';
+import { UpdateRevenueDto } from './dto/update-revenue.dto';
 
 interface RevenueFilters {
   branchId?: string;
@@ -62,5 +64,44 @@ export class RevenuesService {
       average,
       byPaymentMethod,
     };
+  }
+
+  async create(createRevenueDto: CreateRevenueDto) {
+    return await this.dataStore.create(
+      FILE_PATHS.REVENUES,
+      DATA_KEYS.REVENUES,
+      createRevenueDto,
+    );
+  }
+
+  async findOne(id: string) {
+    const revenue = await this.dataStore.findById(
+      FILE_PATHS.REVENUES,
+      DATA_KEYS.REVENUES,
+      id,
+    );
+
+    if (!revenue) {
+      throw new NotFoundException(`Revenue with ID ${id} not found`);
+    }
+
+    return revenue;
+  }
+
+  async update(id: string, updateRevenueDto: UpdateRevenueDto) {
+    return await this.dataStore.update(
+      FILE_PATHS.REVENUES,
+      DATA_KEYS.REVENUES,
+      id,
+      updateRevenueDto,
+    );
+  }
+
+  async remove(id: string) {
+    return await this.dataStore.delete(
+      FILE_PATHS.REVENUES,
+      DATA_KEYS.REVENUES,
+      id,
+    );
   }
 }

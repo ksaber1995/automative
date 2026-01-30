@@ -1,0 +1,156 @@
+<div class="container mx-auto p-6 max-w-4xl">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="p-4">
+        <h2 class="text-2xl font-bold">{{ isEditMode() ? 'Edit Revenue' : 'Add New Revenue' }}</h2>
+      </div>
+    </ng-template>
+
+    <form [formGroup]="revenueForm" (ngSubmit)="onSubmit()">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Branch -->
+        <div>
+          <label class="block text-sm font-medium mb-2">
+            Branch <span class="text-red-500">*</span>
+          </label>
+          <select
+            formControlName="branchId"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="branchId?.invalid && branchId?.touched">
+            <option value="">Select Branch</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+          @if (branchId?.invalid && branchId?.touched) {
+            <small class="text-red-500">Branch is required</small>
+          }
+        </div>
+
+        <!-- Date -->
+        <div>
+          <label class="block text-sm font-medium mb-2">
+            Date <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            formControlName="date"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="date?.invalid && date?.touched" />
+          @if (date?.invalid && date?.touched) {
+            <small class="text-red-500">Date is required</small>
+          }
+        </div>
+
+        <!-- Amount -->
+        <div>
+          <label class="block text-sm font-medium mb-2">
+            Amount <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            formControlName="amount"
+            step="0.01"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="amount?.invalid && amount?.touched" />
+          @if (amount?.invalid && amount?.touched) {
+            <small class="text-red-500">Valid amount is required</small>
+          }
+        </div>
+
+        <!-- Payment Method -->
+        <div>
+          <label class="block text-sm font-medium mb-2">
+            Payment Method <span class="text-red-500">*</span>
+          </label>
+          <select
+            formControlName="paymentMethod"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="paymentMethod?.invalid && paymentMethod?.touched">
+            <option value="">Select Payment Method</option>
+            @for (method of paymentMethods; track method) {
+              <option [value]="method">{{ method.replace('_', ' ') }}</option>
+            }
+          </select>
+          @if (paymentMethod?.invalid && paymentMethod?.touched) {
+            <small class="text-red-500">Payment method is required</small>
+          }
+        </div>
+
+        <!-- Description -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium mb-2">
+            Description <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="description"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="description?.invalid && description?.touched" />
+          @if (description?.invalid && description?.touched) {
+            <small class="text-red-500">Description is required</small>
+          }
+        </div>
+
+        <!-- Course (Optional) -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Course (Optional)</label>
+          <select
+            formControlName="courseId"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <option value="">None</option>
+            @for (course of courses(); track course.id) {
+              <option [value]="course.id">{{ course.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Student (Optional) -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Student (Optional)</label>
+          <select
+            formControlName="studentId"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <option value="">None</option>
+            @for (student of students(); track student.id) {
+              <option [value]="student.id">{{ student.firstName }} {{ student.lastName }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Receipt Number -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Receipt Number (Optional)</label>
+          <input
+            type="text"
+            formControlName="receiptNumber"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <!-- Notes -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium mb-2">Notes (Optional)</label>
+          <textarea
+            formControlName="notes"
+            rows="3"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button
+          pButton
+          type="button"
+          label="Cancel"
+          class="p-button-secondary"
+          (click)="cancel()"
+          [disabled]="loading()"></button>
+        <button
+          pButton
+          type="submit"
+          [label]="isEditMode() ? 'Update' : 'Create'"
+          [disabled]="loading()"></button>
+      </div>
+    </form>
+  </p-card>
+</div>

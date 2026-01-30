@@ -38,6 +38,10 @@ export class ApiService {
     return this.http.delete<T>(`${this.baseUrl}/${endpoint}`);
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   private buildParams(params?: any): HttpParams {
     let httpParams = new HttpParams();
 

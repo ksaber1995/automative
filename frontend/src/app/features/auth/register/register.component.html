@@ -1,0 +1,162 @@
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4">
+  <div class="w-full max-w-md">
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4 text-center">
+          <h2 class="text-2xl font-bold">Create Account</h2>
+          <p class="text-gray-600 mt-1">Register for Automate Magic</p>
+        </div>
+      </ng-template>
+
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+        <!-- Name Fields -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">
+              First Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="firstName"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="firstName?.invalid && firstName?.touched"
+              placeholder="John" />
+            @if (firstName?.invalid && firstName?.touched) {
+              <small class="text-red-500">First name is required</small>
+            }
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-2">
+              Last Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="lastName"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="lastName?.invalid && lastName?.touched"
+              placeholder="Doe" />
+            @if (lastName?.invalid && lastName?.touched) {
+              <small class="text-red-500">Last name is required</small>
+            }
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-2">
+            Email <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            formControlName="email"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="email?.invalid && email?.touched"
+            placeholder="john.doe@example.com" />
+          @if (email?.invalid && email?.touched) {
+            <small class="text-red-500">
+              @if (email?.errors?.['required']) { Email is required }
+              @if (email?.errors?.['email']) { Please enter a valid email }
+            </small>
+          }
+        </div>
+
+        <!-- Password -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-2">
+            Password <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            formControlName="password"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="password?.invalid && password?.touched"
+            placeholder="Minimum 6 characters" />
+          @if (password?.invalid && password?.touched) {
+            <small class="text-red-500">
+              @if (password?.errors?.['required']) { Password is required }
+              @if (password?.errors?.['minlength']) { Password must be at least 6 characters }
+            </small>
+          }
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-2">
+            Confirm Password <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            formControlName="confirmPassword"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="confirmPassword?.invalid && confirmPassword?.touched"
+            placeholder="Re-enter password" />
+          @if (confirmPassword?.invalid && confirmPassword?.touched) {
+            <small class="text-red-500">
+              @if (confirmPassword?.errors?.['required']) { Please confirm your password }
+              @if (confirmPassword?.errors?.['passwordMismatch']) { Passwords do not match }
+            </small>
+          }
+        </div>
+
+        <!-- Role -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-2">
+            Role <span class="text-red-500">*</span>
+          </label>
+          <select
+            formControlName="role"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            [class.border-red-500]="role?.invalid && role?.touched">
+            <option value="">Select Role</option>
+            @for (roleOption of userRoles; track roleOption.value) {
+              <option [value]="roleOption.value">{{ roleOption.label }}</option>
+            }
+          </select>
+          @if (role?.invalid && role?.touched) {
+            <small class="text-red-500">Role is required</small>
+          }
+        </div>
+
+        <!-- Branch (conditional) -->
+        @if (registerForm.get('role')?.value === 'BRANCH_MANAGER') {
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Branch <span class="text-red-500">*</span>
+            </label>
+            <select
+              formControlName="branchId"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="branchId?.invalid && branchId?.touched">
+              <option value="">Select Branch</option>
+              @for (branch of branches(); track branch.id) {
+                <option [value]="branch.id">{{ branch.name }}</option>
+              }
+            </select>
+            @if (branchId?.invalid && branchId?.touched) {
+              <small class="text-red-500">Branch is required for Branch Managers</small>
+            }
+          </div>
+        }
+
+        <!-- Submit Button -->
+        <button
+          pButton
+          type="submit"
+          label="Register"
+          class="w-full"
+          [disabled]="loading()"></button>
+
+        <!-- Login Link -->
+        <div class="text-center mt-4">
+          <p class="text-gray-600">
+            Already have an account?
+            <a routerLink="/auth/login" class="text-blue-600 hover:text-blue-700 font-medium ml-1">
+              Sign In
+            </a>
+          </p>
+        </div>
+      </form>
+    </p-card>
+  </div>
+</div>

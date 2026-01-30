@@ -1,0 +1,83 @@
+<div class="container mx-auto p-6">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center p-4">
+        <div>
+          <h2 class="text-2xl font-bold">Expense Management</h2>
+          <p class="text-gray-600 mt-1">Total: {{ totalExpenses | currency }}</p>
+        </div>
+        <button pButton label="Add Expense" icon="pi pi-plus" (click)="createExpense()"></button>
+      </div>
+    </ng-template>
+
+    <!-- Filters -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium mb-2">Branch:</label>
+        <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+          <option value="">All Branches</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Type:</label>
+        <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+          <option value="">All Types</option>
+          <option value="FIXED">Fixed</option>
+          <option value="VARIABLE">Variable</option>
+          <option value="SHARED">Shared/Global</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Start Date:</label>
+        <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">End Date:</label>
+        <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+      </div>
+    </div>
+
+    <!-- Table -->
+    <p-table [value]="expenses()" [loading]="loading()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Branch</th>
+          <th>Description</th>
+          <th>Amount</th>
+          <th>Vendor</th>
+          <th>Recurring</th>
+          <th>Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-expense>
+        <tr>
+          <td>{{ expense.date | date: 'MMM d, y' }}</td>
+          <td><p-tag [value]="expense.type" [severity]="getTypeColor(expense.type)"></p-tag></td>
+          <td>{{ expense.category }}</td>
+          <td>{{ getBranchName(expense.branchId) }}</td>
+          <td>{{ expense.description }}</td>
+          <td class="font-semibold">{{ expense.amount | currency }}</td>
+          <td>{{ expense.vendor || '-' }}</td>
+          <td>
+            @if (expense.isRecurring) {
+              <p-tag value="Yes" severity="info" icon="pi pi-refresh"></p-tag>
+            } @else {
+              <span class="text-gray-400">No</span>
+            }
+          </td>
+          <td>
+            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text" (click)="editExpense(expense)"></button>
+            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger" (click)="deleteExpense(expense)"></button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+  <p-confirmDialog></p-confirmDialog>
+</div>

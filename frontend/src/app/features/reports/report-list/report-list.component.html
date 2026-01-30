@@ -1,0 +1,153 @@
+<div class="container mx-auto p-6">
+  <h1 class="text-3xl font-bold mb-6">Reports</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Financial Report Card -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4">
+          <h2 class="text-xl font-bold flex items-center">
+            <i class="pi pi-chart-line mr-2"></i>
+            Company-Wide Financial Report
+          </h2>
+        </div>
+      </ng-template>
+
+      <div class="space-y-4">
+        <p class="text-gray-600">
+          Generate a comprehensive financial report including all branches, revenues, expenses, and profitability metrics.
+        </p>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">Start Date:</label>
+          <input
+            type="date"
+            [(ngModel)]="financialStartDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">End Date:</label>
+          <input
+            type="date"
+            [(ngModel)]="financialEndDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <div class="flex gap-2 mt-4">
+          <button
+            pButton
+            label="Download Excel"
+            icon="pi pi-file-excel"
+            class="p-button-success flex-1"
+            (click)="downloadFinancialExcel()"></button>
+          <button
+            pButton
+            label="Download PDF"
+            icon="pi pi-file-pdf"
+            class="p-button-danger flex-1"
+            (click)="downloadFinancialPdf()"></button>
+        </div>
+      </div>
+    </p-card>
+
+    <!-- Branch Report Card -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4">
+          <h2 class="text-xl font-bold flex items-center">
+            <i class="pi pi-building mr-2"></i>
+            Branch Performance Report
+          </h2>
+        </div>
+      </ng-template>
+
+      <div class="space-y-4">
+        <p class="text-gray-600">
+          Generate a detailed performance report for a specific branch including revenues, expenses, student enrollments, and profitability.
+        </p>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">Select Branch:</label>
+          <select
+            [(ngModel)]="branchReportBranchId"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <option value="">Select a branch</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">Start Date:</label>
+          <input
+            type="date"
+            [(ngModel)]="branchStartDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">End Date:</label>
+          <input
+            type="date"
+            [(ngModel)]="branchEndDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <div class="flex gap-2 mt-4">
+          <button
+            pButton
+            label="Download Excel"
+            icon="pi pi-file-excel"
+            class="p-button-success flex-1"
+            (click)="downloadBranchExcel()"></button>
+          <button
+            pButton
+            label="Download PDF"
+            icon="pi pi-file-pdf"
+            class="p-button-danger flex-1"
+            (click)="downloadBranchPdf()"></button>
+        </div>
+      </div>
+    </p-card>
+  </div>
+
+  <!-- Report Types Info -->
+  <div class="mt-6">
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4">
+          <h3 class="text-lg font-bold flex items-center">
+            <i class="pi pi-info-circle mr-2"></i>
+            Report Information
+          </h3>
+        </div>
+      </ng-template>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <h4 class="font-semibold mb-2">Financial Report Includes:</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-700">
+            <li>Company-wide revenue summary</li>
+            <li>Total expenses breakdown by category</li>
+            <li>Per-branch performance metrics</li>
+            <li>Month-over-month trends</li>
+            <li>Profit/loss analysis</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="font-semibold mb-2">Branch Report Includes:</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-700">
+            <li>Branch-specific revenue details</li>
+            <li>Direct and allocated expenses</li>
+            <li>Student enrollment statistics</li>
+            <li>Course performance metrics</li>
+            <li>Branch profitability analysis</li>
+          </ul>
+        </div>
+      </div>
+    </p-card>
+  </div>
+</div>

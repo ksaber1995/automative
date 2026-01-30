@@ -174,4 +174,25 @@ export class ExpensesService {
 
     return totalSalaries;
   }
+
+  async findOne(id: string): Promise<any> {
+    return await this.dataStore.findById(FILE_PATHS.EXPENSES, DATA_KEYS.EXPENSES, id);
+  }
+
+  async create(createExpenseDto: any): Promise<any> {
+    const expenseData = {
+      ...createExpenseDto,
+      isRecurring: createExpenseDto.isRecurring || false,
+      parentExpenseId: null,
+    };
+    return await this.dataStore.create(FILE_PATHS.EXPENSES, DATA_KEYS.EXPENSES, expenseData);
+  }
+
+  async update(id: string, updateExpenseDto: any): Promise<any> {
+    return await this.dataStore.update(FILE_PATHS.EXPENSES, DATA_KEYS.EXPENSES, id, updateExpenseDto);
+  }
+
+  async remove(id: string): Promise<any> {
+    return await this.dataStore.delete(FILE_PATHS.EXPENSES, DATA_KEYS.EXPENSES, id);
+  }
 }

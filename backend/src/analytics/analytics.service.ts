@@ -21,21 +21,22 @@ export class AnalyticsService {
   ) {}
 
   async getDashboard(startDate?: string, endDate?: string): Promise<DashboardMetrics> {
-    // Return dummy data for testing
-    return this.getDummyDashboardData();
-
-    // Original implementation (commented out for now)
-    /*
-    const companyWideSummary = await this.calculateFinancialSummary(
-      null,
-      startDate,
-      endDate,
-    );
-
+    // Check if we have branches to work with
     const branches = await this.dataStore.findBy(
       FILE_PATHS.BRANCHES,
       DATA_KEYS.BRANCHES,
       (branch: any) => branch.isActive,
+    );
+
+    // If no branches exist, return dummy data
+    if (!branches || branches.length === 0) {
+      return this.getDummyDashboardData();
+    }
+
+    const companyWideSummary = await this.calculateFinancialSummary(
+      null,
+      startDate,
+      endDate,
     );
 
     const branchSummaries = await Promise.all(
@@ -72,7 +73,6 @@ export class AnalyticsService {
         endDate: endDate || 'all',
       },
     };
-    */
   }
 
   async getBranchAnalytics(branchId: string, startDate?: string, endDate?: string) {
