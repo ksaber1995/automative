@@ -1,6 +1,7 @@
-import { join } from 'path';
+import { join, resolve } from 'path';
 
-const DATA_DIR = process.env.DATA_PATH || join(__dirname, '..', '..', '..', 'data');
+// Use absolute path
+const DATA_DIR = process.env.DATA_PATH || 'D:/work/automate-magic/data';
 
 export const FILE_PATHS = {
   USERS: join(DATA_DIR, 'users.json'),
