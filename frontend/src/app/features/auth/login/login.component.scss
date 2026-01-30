@@ -1,0 +1,19 @@
+:host ::ng-deep {
+  .p-card {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+  }
+
+  .p-card-body {
+    padding: 2rem;
+  }
+
+  .p-inputtext,
+  .p-password input {
+    width: 100%;
+  }
+
+  .ng-invalid.ng-touched {
+    border-color: #ef4444;
+  }
+}

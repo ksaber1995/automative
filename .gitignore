@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+*/dist/
+build/
+*/build/
+.angular/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Data files (keep structure, ignore content with real data)
+data/*.json
+!data/.gitkeep
+
+# Backup files
+*.backup
+*.bak
+
+# Angular
+.angular/cache/
+frontend/.angular/
+
+# NestJS
+backend/.nest/
+
+# Compiled output
+**/*.js.map
+**/*.d.ts.map

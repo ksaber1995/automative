@@ -1,0 +1,31 @@
+{
+  "name": "automate-magic",
+  "version": "1.0.0",
+  "description": "Robotics Academy Management Platform - Full Stack SaaS Application",
+  "private": true,
+  "scripts": {
+    "backend:dev": "cd backend && npm run start:dev",
+    "frontend:dev": "cd frontend && npm start",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build",
+    "build": "npm run backend:build && npm run frontend:build",
+    "seed": "cd backend && npm run seed",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install"
+  },
+  "keywords": [
+    "robotics",
+    "academy",
+    "management",
+    "saas",
+    "angular",
+    "nestjs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@automate-magic/shared",
+  "version": "1.0.0",
+  "description": "Shared TypeScript interfaces and enums for Automate-Magic platform",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {},
+  "keywords": [
+    "typescript",
+    "interfaces",
+    "shared"
+  ],
+  "author": "",
+  "license": "MIT"
+}

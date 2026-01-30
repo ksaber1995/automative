@@ -1,0 +1,149 @@
+<div class="container-custom py-8">
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+
+  <div *ngIf="loading()" class="flex justify-center items-center py-20">
+    <i class="pi pi-spinner pi-spin text-4xl text-primary-500"></i>
+  </div>
+
+  <div *ngIf="!loading() && dashboardData() as data">
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <p-card class="bg-gradient-to-br from-blue-50 to-blue-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Total Revenue</div>
+            <div class="text-2xl font-bold text-blue-600">
+              {{ formatCurrency(data.companyWideSummary.totalRevenue) }}
+            </div>
+          </div>
+          <i class="pi pi-dollar text-4xl text-blue-400"></i>
+        </div>
+      </p-card>
+
+      <p-card class="bg-gradient-to-br from-red-50 to-red-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Total Expenses</div>
+            <div class="text-2xl font-bold text-red-600">
+              {{ formatCurrency(data.companyWideSummary.totalExpenses) }}
+            </div>
+          </div>
+          <i class="pi pi-chart-line text-4xl text-red-400"></i>
+        </div>
+      </p-card>
+
+      <p-card class="bg-gradient-to-br from-green-50 to-green-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Net Profit</div>
+            <div class="text-2xl font-bold" [class.text-green-600]="data.companyWideSummary.netProfit >= 0" [class.text-red-600]="data.companyWideSummary.netProfit < 0">
+              {{ formatCurrency(data.companyWideSummary.netProfit) }}
+            </div>
+          </div>
+          <i class="pi pi-chart-bar text-4xl text-green-400"></i>
+        </div>
+      </p-card>
+
+      <p-card class="bg-gradient-to-br from-purple-50 to-purple-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Profit Margin</div>
+            <div class="text-2xl font-bold text-purple-600">
+              {{ data.companyWideSummary.totalRevenue > 0 ? ((data.companyWideSummary.netProfit / data.companyWideSummary.totalRevenue) * 100).toFixed(1) : 0 }}%
+            </div>
+          </div>
+          <i class="pi pi-percentage text-4xl text-purple-400"></i>
+        </div>
+      </p-card>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Revenue Trends -->
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="p-4 font-semibold text-lg">Revenue & Expense Trends</div>
+        </ng-template>
+        <div style="height: 300px">
+          <p-chart type="line" [data]="revenueChartData" [options]="revenueChartOptions"></p-chart>
+        </div>
+      </p-card>
+
+      <!-- Expense Breakdown -->
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="p-4 font-semibold text-lg">Expense Breakdown by Category</div>
+        </ng-template>
+        <div style="height: 300px">
+          <p-chart type="pie" [data]="expenseChartData" [options]="expenseChartOptions"></p-chart>
+        </div>
+      </p-card>
+    </div>
+
+    <!-- Branch Performance -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4 font-semibold text-lg">Branch Performance</div>
+      </ng-template>
+      <p-table [value]="data.branchSummaries" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>Branch</th>
+            <th>Revenue</th>
+            <th>Expenses</th>
+            <th>Net Profit</th>
+            <th>Profit Margin</th>
+            <th>Status</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-branch>
+          <tr>
+            <td>
+              <div class="font-semibold">{{ branch.branchName }}</div>
+              <div class="text-sm text-gray-600">{{ branch.branchCode }}</div>
+            </td>
+            <td>{{ formatCurrency(branch.totalRevenue) }}</td>
+            <td>{{ formatCurrency(branch.totalExpenses) }}</td>
+            <td>
+              <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0" class="font-semibold">
+                {{ formatCurrency(branch.netProfit) }}
+              </span>
+            </td>
+            <td>
+              <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0">
+                {{ branch.totalRevenue > 0 ? ((branch.netProfit / branch.totalRevenue) * 100).toFixed(1) : 0 }}%
+              </span>
+            </td>
+            <td>
+              <p-tag
+                [value]="branch.netProfit >= 0 ? 'Profitable' : 'Loss'"
+                [severity]="getProfitSeverity(branch.netProfit)"
+              ></p-tag>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+
+    <!-- Top Performing Branches -->
+    <div class="mt-8">
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="p-4 font-semibold text-lg">Top Performing Branches</div>
+        </ng-template>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div *ngFor="let branch of data.topPerformingBranches; let i = index" class="p-4 border rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xl font-bold text-gray-300">#{{ i + 1 }}</span>
+              <i class="pi pi-trophy text-2xl" [class.text-yellow-500]="i === 0" [class.text-gray-400]="i === 1" [class.text-orange-600]="i === 2"></i>
+            </div>
+            <div class="font-semibold text-lg mb-1">{{ branch.branchName }}</div>
+            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount }} students • {{ branch.courseCount }} courses</div>
+            <div class="text-green-600 font-semibold">{{ formatCurrency(branch.profit) }}</div>
+            <div class="text-xs text-gray-500">{{ branch.profitMargin.toFixed(1) }}% margin</div>
+          </div>
+        </div>
+      </p-card>
+    </div>
+  </div>
+</div>
