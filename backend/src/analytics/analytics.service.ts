@@ -21,6 +21,11 @@ export class AnalyticsService {
   ) {}
 
   async getDashboard(startDate?: string, endDate?: string): Promise<DashboardMetrics> {
+    // Return dummy data for testing
+    return this.getDummyDashboardData();
+
+    // Original implementation (commented out for now)
+    /*
     const companyWideSummary = await this.calculateFinancialSummary(
       null,
       startDate,
@@ -67,6 +72,7 @@ export class AnalyticsService {
         endDate: endDate || 'all',
       },
     };
+    */
   }
 
   async getBranchAnalytics(branchId: string, startDate?: string, endDate?: string) {
@@ -325,5 +331,113 @@ export class AnalyticsService {
 
   async getProfitLoss(branchId?: string, startDate?: string, endDate?: string): Promise<FinancialSummary> {
     return this.calculateFinancialSummary(branchId || null, startDate, endDate);
+  }
+
+  private getDummyDashboardData(): DashboardMetrics {
+    return {
+      companyWideSummary: {
+        totalRevenue: 1250000,
+        fixedExpenses: 350000,
+        variableExpenses: 150000,
+        salaries: 420000,
+        sharedExpenses: 80000,
+        totalExpenses: 1000000,
+        netProfit: 250000,
+      },
+      branchSummaries: [
+        {
+          branchId: '1',
+          branchName: 'Downtown Branch',
+          branchCode: 'DTN-001',
+          totalRevenue: 450000,
+          fixedExpenses: 120000,
+          variableExpenses: 50000,
+          salaries: 150000,
+          sharedExpenses: 30000,
+          totalExpenses: 350000,
+          netProfit: 100000,
+        },
+        {
+          branchId: '2',
+          branchName: 'Uptown Branch',
+          branchCode: 'UPT-002',
+          totalRevenue: 380000,
+          fixedExpenses: 100000,
+          variableExpenses: 45000,
+          salaries: 130000,
+          sharedExpenses: 25000,
+          totalExpenses: 300000,
+          netProfit: 80000,
+        },
+        {
+          branchId: '3',
+          branchName: 'Westside Branch',
+          branchCode: 'WST-003',
+          totalRevenue: 420000,
+          fixedExpenses: 130000,
+          variableExpenses: 55000,
+          salaries: 140000,
+          sharedExpenses: 25000,
+          totalExpenses: 350000,
+          netProfit: 70000,
+        },
+      ],
+      revenueByMonth: [
+        { month: 1, year: 2025, revenue: 95000, expenses: 78000, profit: 17000 },
+        { month: 2, year: 2025, revenue: 102000, expenses: 82000, profit: 20000 },
+        { month: 3, year: 2025, revenue: 108000, expenses: 85000, profit: 23000 },
+        { month: 4, year: 2025, revenue: 115000, expenses: 88000, profit: 27000 },
+        { month: 5, year: 2025, revenue: 122000, expenses: 90000, profit: 32000 },
+        { month: 6, year: 2025, revenue: 130000, expenses: 92000, profit: 38000 },
+        { month: 7, year: 2025, revenue: 125000, expenses: 89000, profit: 36000 },
+        { month: 8, year: 2025, revenue: 118000, expenses: 87000, profit: 31000 },
+        { month: 9, year: 2025, revenue: 112000, expenses: 85000, profit: 27000 },
+        { month: 10, year: 2025, revenue: 105000, expenses: 83000, profit: 22000 },
+        { month: 11, year: 2025, revenue: 98000, expenses: 80000, profit: 18000 },
+        { month: 12, year: 2025, revenue: 100000, expenses: 81000, profit: 19000 },
+      ],
+      expensesByCategory: [
+        { category: 'SALARIES', amount: 420000, percentage: 42 },
+        { category: 'RENT', amount: 180000, percentage: 18 },
+        { category: 'UTILITIES', amount: 95000, percentage: 9.5 },
+        { category: 'MARKETING', amount: 120000, percentage: 12 },
+        { category: 'SUPPLIES', amount: 85000, percentage: 8.5 },
+        { category: 'MAINTENANCE', amount: 60000, percentage: 6 },
+        { category: 'OTHER', amount: 40000, percentage: 4 },
+      ],
+      topPerformingBranches: [
+        {
+          branchId: '1',
+          branchName: 'Downtown Branch',
+          revenue: 450000,
+          profit: 100000,
+          profitMargin: 22.22,
+          studentCount: 285,
+          courseCount: 18,
+        },
+        {
+          branchId: '3',
+          branchName: 'Westside Branch',
+          revenue: 420000,
+          profit: 70000,
+          profitMargin: 16.67,
+          studentCount: 245,
+          courseCount: 15,
+        },
+        {
+          branchId: '2',
+          branchName: 'Uptown Branch',
+          revenue: 380000,
+          profit: 80000,
+          profitMargin: 21.05,
+          studentCount: 220,
+          courseCount: 14,
+        },
+      ],
+      period: {
+        startDate: 'all',
+        endDate: 'all',
+      },
+    };
   }
 }

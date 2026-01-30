@@ -1,17 +1,17 @@
-import { promises as fs } from 'fs';
-import { join } from 'path';
-import * as bcrypt from 'bcrypt';
-import { v4 as uuid } from 'uuid';
+const fs = require('fs').promises;
+const path = require('path');
+const bcrypt = require('bcrypt');
+const { v4: uuid } = require('uuid');
 
-const dataDir = join(__dirname, '..');
+const dataDir = path.join(__dirname, '..');
 
 // Helper to generate random date in range
-function randomDate(start: Date, end: Date): string {
+function randomDate(start, end) {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString().split('T')[0];
 }
 
 // Helper to generate date X months ago
-function monthsAgo(months: number, day: number = 1): string {
+function monthsAgo(months, day = 1) {
   const date = new Date();
   date.setMonth(date.getMonth() - months);
   date.setDate(day);
@@ -104,7 +104,7 @@ async function seedData() {
         },
       ],
     };
-    await fs.writeFile(join(dataDir, 'users.json'), JSON.stringify(users, null, 2));
+    await fs.writeFile(path.join(dataDir, 'users.json'), JSON.stringify(users, null, 2));
     console.log('✓ Users seeded\n');
 
     // Seed Branches
@@ -177,7 +177,7 @@ async function seedData() {
         },
       ],
     };
-    await fs.writeFile(join(dataDir, 'branches.json'), JSON.stringify(branches, null, 2));
+    await fs.writeFile(path.join(dataDir, 'branches.json'), JSON.stringify(branches, null, 2));
     console.log('✓ Branches seeded\n');
 
     // Seed Courses
@@ -195,10 +195,10 @@ async function seedData() {
       { name: 'Competition Robotics', code: 'COMP-401', price: 1099, duration: '16 weeks', level: 'Expert' },
     ];
 
-    const courses: any[] = [];
+    const courses = [];
     const activeBranches = [branch1Id, branch2Id, branch3Id];
 
-    courseTemplates.forEach((template, idx) => {
+    courseTemplates.forEach((template) => {
       activeBranches.forEach(branchId => {
         courses.push({
           id: uuid(),
@@ -213,7 +213,7 @@ async function seedData() {
       });
     });
 
-    await fs.writeFile(join(dataDir, 'courses.json'), JSON.stringify({ courses }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'courses.json'), JSON.stringify({ courses }, null, 2));
     console.log(`✓ ${courses.length} Courses seeded\n`);
 
     // Seed Students
@@ -229,7 +229,7 @@ async function seedData() {
       'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson',
       'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores'];
 
-    const students: any[] = [];
+    const students = [];
     for (let i = 0; i < 200; i++) {
       const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
@@ -256,17 +256,17 @@ async function seedData() {
       });
     }
 
-    await fs.writeFile(join(dataDir, 'students.json'), JSON.stringify({ students }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'students.json'), JSON.stringify({ students }, null, 2));
     console.log(`✓ ${students.length} Students seeded\n`);
 
     // Seed Enrollments & Revenues
     console.log('📝 Seeding enrollments and revenues...');
-    const enrollments: any[] = [];
-    const revenues: any[] = [];
+    const enrollments = [];
+    const revenues = [];
 
     students.forEach((student, idx) => {
       const studentCourses = courses.filter(c => c.branchId === student.branchId && c.isActive);
-      const numEnrollments = Math.floor(Math.random() * 3) + 1; // 1-3 courses per student
+      const numEnrollments = Math.floor(Math.random() * 3) + 1;
 
       for (let i = 0; i < numEnrollments && i < studentCourses.length; i++) {
         const course = studentCourses[Math.floor(Math.random() * studentCourses.length)];
@@ -294,7 +294,6 @@ async function seedData() {
           updatedAt: new Date().toISOString(),
         });
 
-        // Create revenue record
         revenues.push({
           id: uuid(),
           branchId: course.branchId,
@@ -313,8 +312,8 @@ async function seedData() {
       }
     });
 
-    await fs.writeFile(join(dataDir, 'enrollments.json'), JSON.stringify({ enrollments }, null, 2));
-    await fs.writeFile(join(dataDir, 'revenues.json'), JSON.stringify({ revenues }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'enrollments.json'), JSON.stringify({ enrollments }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'revenues.json'), JSON.stringify({ revenues }, null, 2));
     console.log(`✓ ${enrollments.length} Enrollments seeded`);
     console.log(`✓ ${revenues.length} Revenues seeded\n`);
 
@@ -330,16 +329,16 @@ async function seedData() {
       { title: 'IT Support', dept: 'IT', salary: 4000, isGlobal: true },
     ];
 
-    const employees: any[] = [];
+    const employees = [];
     activeBranches.forEach((branchId, branchIdx) => {
-      positions.forEach((pos, posIdx) => {
+      positions.forEach((pos) => {
         if (!pos.isGlobal || branchIdx === 0) {
           const hireDate = monthsAgo(Math.floor(Math.random() * 20) + 4);
           employees.push({
             id: uuid(),
             firstName: firstNames[Math.floor(Math.random() * firstNames.length)],
             lastName: lastNames[Math.floor(Math.random() * lastNames.length)],
-            email: `employee${branchIdx}${posIdx}@automate-magic.com`,
+            email: `employee${branchIdx}${employees.length}@automate-magic.com`,
             phone: `+1-555-${String(8000 + employees.length).padStart(4, '0')}`,
             position: pos.title,
             department: pos.dept,
@@ -357,15 +356,14 @@ async function seedData() {
       });
     });
 
-    await fs.writeFile(join(dataDir, 'employees.json'), JSON.stringify({ employees }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'employees.json'), JSON.stringify({ employees }, null, 2));
     console.log(`✓ ${employees.length} Employees seeded\n`);
 
     // Seed Expenses
     console.log('💸 Seeding expenses (24 months)...');
-    const expenses: any[] = [];
-    const recurringExpenseTemplates: any[] = [];
+    const expenses = [];
+    const recurringExpenseTemplates = [];
 
-    // Create recurring expense templates
     activeBranches.forEach((branchId, idx) => {
       const rentAmount = [2000, 2500, 1800][idx];
       const utilitiesAmount = [300, 350, 280][idx];
@@ -411,7 +409,6 @@ async function seedData() {
 
     expenses.push(...recurringExpenseTemplates);
 
-    // Generate monthly instances of recurring expenses
     for (let month = 0; month < 24; month++) {
       recurringExpenseTemplates.forEach(template => {
         expenses.push({
@@ -434,9 +431,7 @@ async function seedData() {
         });
       });
 
-      // Add variable expenses each month
-      activeBranches.forEach((branchId, idx) => {
-        // Supplies (random 1-3 times per month)
+      activeBranches.forEach((branchId) => {
         const suppliesCount = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < suppliesCount; i++) {
           expenses.push({
@@ -459,7 +454,6 @@ async function seedData() {
           });
         }
 
-        // Maintenance (quarterly)
         if (month % 3 === 0) {
           expenses.push({
             id: uuid(),
@@ -482,7 +476,6 @@ async function seedData() {
         }
       });
 
-      // Shared expenses (marketing campaigns)
       if (month % 2 === 0) {
         expenses.push({
           id: uuid(),
@@ -505,7 +498,7 @@ async function seedData() {
       }
     }
 
-    await fs.writeFile(join(dataDir, 'expenses.json'), JSON.stringify({ expenses }, null, 2));
+    await fs.writeFile(path.join(dataDir, 'expenses.json'), JSON.stringify({ expenses }, null, 2));
     console.log(`✓ ${expenses.length} Expenses seeded\n`);
 
     console.log('🎉 Data seeding completed successfully!\n');
@@ -519,9 +512,7 @@ async function seedData() {
     console.log(`   - Revenues: ${revenues.length}`);
     console.log(`   - Expenses: ${expenses.length}`);
     console.log('\n🔑 Default Login Credentials:');
-    console.log('   Admin:');
-    console.log('   - Email: admin@automate-magic.com');
-    console.log('   - Password: admin123\n');
+    console.log('   Admin: admin@automate-magic.com / admin123\n');
   } catch (error) {
     console.error('❌ Error seeding data:', error);
     process.exit(1);

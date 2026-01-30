@@ -3,4 +3,5 @@ export const environment = {
   apiUrl: 'http://localhost:3000/api',
   jwtTokenKey: 'automate_magic_token',
   refreshTokenKey: 'automate_magic_refresh_token',
+  userDataKey: 'automate_magic_user_data',
 };

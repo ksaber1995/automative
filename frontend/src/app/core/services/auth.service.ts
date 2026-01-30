@@ -24,15 +24,36 @@ export class AuthService {
 
   private loadUserFromStorage(): void {
     const token = this.getToken();
-    if (token) {
-      // In a real app, you'd decode the JWT to get user info
-      // For now, we'll fetch the profile
+    const cachedUser = this.getCachedUser();
+
+    if (token && cachedUser) {
+      // Load cached user immediately for instant UI update
+      this.currentUser.set(cachedUser);
+      this.currentUserSubject.next(cachedUser);
+
+      // Optionally validate token in background and refresh user data
+      // If it fails, keep using cached data (offline support)
       this.getProfile().subscribe({
         next: (user) => {
           this.currentUser.set(user);
           this.currentUserSubject.next(user);
+          this.setCachedUser(user);
         },
         error: () => {
+          // Keep user logged in with cached data even if backend fails
+          console.log('Using cached user data (backend unavailable or token expired)');
+        }
+      });
+    } else if (token && !cachedUser) {
+      // Token exists but no cached user, fetch from backend
+      this.getProfile().subscribe({
+        next: (user) => {
+          this.currentUser.set(user);
+          this.currentUserSubject.next(user);
+          this.setCachedUser(user);
+        },
+        error: () => {
+          // No cached data and backend fails, logout
           this.logout();
         }
       });
@@ -44,6 +65,7 @@ export class AuthService {
       .pipe(
         tap(response => {
           this.setTokens(response.accessToken, response.refreshToken);
+          this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
         })
@@ -55,6 +77,7 @@ export class AuthService {
       .pipe(
         tap(response => {
           this.setTokens(response.accessToken, response.refreshToken);
+          this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
         })
@@ -64,6 +87,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(environment.jwtTokenKey);
     localStorage.removeItem(environment.refreshTokenKey);
+    localStorage.removeItem(environment.userDataKey);
     this.currentUser.set(null);
     this.currentUserSubject.next(null);
     this.router.navigate(['/auth/login']);
@@ -88,9 +112,17 @@ export class AuthService {
 
   isAuthenticated(): boolean {
     const token = this.getToken();
+    const cachedUser = this.getCachedUser();
+
+    // If we have both token and cached user, consider authenticated
+    // This allows offline usage and persistent sessions
+    if (token && cachedUser) {
+      return true;
+    }
+
+    // Fallback: check token expiration if no cached user
     if (!token) return false;
 
-    // Check if token is expired (simple check, in production use jwt-decode)
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const expirationDate = payload.exp * 1000;
@@ -108,5 +140,18 @@ export class AuthService {
   hasAnyRole(roles: string[]): boolean {
     const user = this.currentUser();
     return user ? roles.includes(user.role) : false;
+  }
+
+  private setCachedUser(user: SafeUser): void {
+    localStorage.setItem(environment.userDataKey, JSON.stringify(user));
+  }
+
+  private getCachedUser(): SafeUser | null {
+    try {
+      const userData = localStorage.getItem(environment.userDataKey);
+      return userData ? JSON.parse(userData) : null;
+    } catch {
+      return null;
+    }
   }
 }
