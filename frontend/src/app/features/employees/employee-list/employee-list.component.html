@@ -1,0 +1,105 @@
+<div class="container mx-auto p-6">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center p-4">
+        <h2 class="text-2xl font-bold">Employees Management</h2>
+        <button pButton label="Add Employee" icon="pi pi-plus" (click)="createEmployee()"></button>
+      </div>
+    </ng-template>
+
+    <!-- Branch Filter -->
+    <div class="mb-4">
+      <label for="branchFilter" class="block text-sm font-medium mb-2">Filter by Branch:</label>
+      <select
+        id="branchFilter"
+        [(ngModel)]="selectedBranchId"
+        (change)="onBranchFilterChange()"
+        class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option [value]="null">All Employees</option>
+        @for (branch of branches(); track branch.id) {
+          <option [value]="branch.id">{{ branch.name }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Employees Table -->
+    <p-table
+      [value]="employees()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Department</th>
+          <th>Branch</th>
+          <th>Salary</th>
+          <th>Hire Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-employee>
+        <tr>
+          <td>{{ employee.firstName }} {{ employee.lastName }}</td>
+          <td>{{ employee.position }}</td>
+          <td>{{ employee.department }}</td>
+          <td>
+            @if (employee.isGlobal) {
+              <p-tag value="Global" severity="info"></p-tag>
+            } @else {
+              {{ getBranchName(employee.branchId) }}
+            }
+          </td>
+          <td>{{ employee.salary | currency }}</td>
+          <td>{{ employee.hireDate | date: 'MMM d, y' }}</td>
+          <td>
+            <p-tag
+              [value]="employee.isActive ? 'Active' : 'Terminated'"
+              [severity]="employee.isActive ? 'success' : 'danger'"
+            ></p-tag>
+          </td>
+          <td>
+            <div class="flex gap-2">
+              <button
+                pButton
+                icon="pi pi-eye"
+                class="p-button-rounded p-button-text"
+                pTooltip="View"
+                (click)="viewEmployee(employee)"
+              ></button>
+              <button
+                pButton
+                icon="pi pi-pencil"
+                class="p-button-rounded p-button-text p-button-warn"
+                pTooltip="Edit"
+                (click)="editEmployee(employee)"
+              ></button>
+              @if (employee.isActive) {
+                <button
+                  pButton
+                  icon="pi pi-trash"
+                  class="p-button-rounded p-button-text p-button-danger"
+                  pTooltip="Terminate"
+                  (click)="terminateEmployee(employee)"
+                ></button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="8" class="text-center">No employees found.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

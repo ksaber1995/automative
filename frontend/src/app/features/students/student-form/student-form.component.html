@@ -1,0 +1,258 @@
+<div class="container mx-auto p-6">
+  <p-card [header]="isEditMode() ? 'Edit Student' : 'Add New Student'">
+    <form [formGroup]="studentForm" (ngSubmit)="onSubmit()">
+      <!-- Student Information -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Student Information</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- First Name -->
+          <div class="field">
+            <label for="firstName" class="block text-sm font-medium mb-2">
+              First Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="firstName"
+              type="text"
+                            formControlName="firstName"
+              class="w-full"
+              placeholder="Enter first name"
+              [class.ng-invalid]="firstName?.invalid && firstName?.touched"
+            />
+            @if (firstName?.invalid && firstName?.touched) {
+              <small class="text-red-500 block mt-1">
+                @if (firstName?.errors?.['required']) {
+                  First name is required
+                }
+                @if (firstName?.errors?.['minlength']) {
+                  First name must be at least 2 characters
+                }
+              </small>
+            }
+          </div>
+
+          <!-- Last Name -->
+          <div class="field">
+            <label for="lastName" class="block text-sm font-medium mb-2">
+              Last Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="lastName"
+              type="text"
+                            formControlName="lastName"
+              class="w-full"
+              placeholder="Enter last name"
+              [class.ng-invalid]="lastName?.invalid && lastName?.touched"
+            />
+            @if (lastName?.invalid && lastName?.touched) {
+              <small class="text-red-500 block mt-1">
+                @if (lastName?.errors?.['required']) {
+                  Last name is required
+                }
+                @if (lastName?.errors?.['minlength']) {
+                  Last name must be at least 2 characters
+                }
+              </small>
+            }
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="field">
+            <label for="dateOfBirth" class="block text-sm font-medium mb-2">
+              Date of Birth <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="dateOfBirth"
+              type="date"
+                            formControlName="dateOfBirth"
+              class="w-full"
+              [class.ng-invalid]="dateOfBirth?.invalid && dateOfBirth?.touched"
+            />
+            @if (dateOfBirth?.invalid && dateOfBirth?.touched) {
+              <small class="text-red-500 block mt-1">Date of birth is required</small>
+            }
+          </div>
+
+          <!-- Branch -->
+          <div class="field">
+            <label for="branchId" class="block text-sm font-medium mb-2">
+              Branch <span class="text-red-500">*</span>
+            </label>
+            <select
+              id="branchId"
+              formControlName="branchId"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [class.ng-invalid]="branchId?.invalid && branchId?.touched"
+            >
+              <option value="">Select a branch</option>
+              @for (branch of branches(); track branch.id) {
+                <option [value]="branch.id">{{ branch.name }}</option>
+              }
+            </select>
+            @if (branchId?.invalid && branchId?.touched) {
+              <small class="text-red-500 block mt-1">Branch is required</small>
+            }
+          </div>
+
+          <!-- Email (Optional) -->
+          <div class="field">
+            <label for="email" class="block text-sm font-medium mb-2">Student Email</label>
+            <input
+              id="email"
+              type="email"
+                            formControlName="email"
+              class="w-full"
+              placeholder="student@example.com (optional)"
+              [class.ng-invalid]="email?.invalid && email?.touched"
+            />
+            @if (email?.invalid && email?.touched) {
+              <small class="text-red-500 block mt-1">Please enter a valid email</small>
+            }
+          </div>
+
+          <!-- Phone (Optional) -->
+          <div class="field">
+            <label for="phone" class="block text-sm font-medium mb-2">Student Phone</label>
+            <input
+              id="phone"
+              type="tel"
+                            formControlName="phone"
+              class="w-full"
+              placeholder="Phone number (optional)"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Parent/Guardian Information -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Parent/Guardian Information</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Parent Name -->
+          <div class="field">
+            <label for="parentName" class="block text-sm font-medium mb-2">
+              Parent/Guardian Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="parentName"
+              type="text"
+                            formControlName="parentName"
+              class="w-full"
+              placeholder="Enter parent/guardian name"
+              [class.ng-invalid]="parentName?.invalid && parentName?.touched"
+            />
+            @if (parentName?.invalid && parentName?.touched) {
+              <small class="text-red-500 block mt-1">
+                @if (parentName?.errors?.['required']) {
+                  Parent name is required
+                }
+                @if (parentName?.errors?.['minlength']) {
+                  Parent name must be at least 3 characters
+                }
+              </small>
+            }
+          </div>
+
+          <!-- Parent Phone -->
+          <div class="field">
+            <label for="parentPhone" class="block text-sm font-medium mb-2">
+              Parent Phone <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="parentPhone"
+              type="tel"
+                            formControlName="parentPhone"
+              class="w-full"
+              placeholder="Enter parent phone number"
+              [class.ng-invalid]="parentPhone?.invalid && parentPhone?.touched"
+            />
+            @if (parentPhone?.invalid && parentPhone?.touched) {
+              <small class="text-red-500 block mt-1">Parent phone is required</small>
+            }
+          </div>
+
+          <!-- Parent Email -->
+          <div class="field">
+            <label for="parentEmail" class="block text-sm font-medium mb-2">Parent Email</label>
+            <input
+              id="parentEmail"
+              type="email"
+                            formControlName="parentEmail"
+              class="w-full"
+              placeholder="parent@example.com (optional)"
+              [class.ng-invalid]="parentEmail?.invalid && parentEmail?.touched"
+            />
+            @if (parentEmail?.invalid && parentEmail?.touched) {
+              <small class="text-red-500 block mt-1">Please enter a valid email</small>
+            }
+          </div>
+
+          <!-- Enrollment Date -->
+          <div class="field">
+            <label for="enrollmentDate" class="block text-sm font-medium mb-2">
+              Enrollment Date <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="enrollmentDate"
+              type="date"
+                            formControlName="enrollmentDate"
+              class="w-full"
+              [class.ng-invalid]="enrollmentDate?.invalid && enrollmentDate?.touched"
+            />
+            @if (enrollmentDate?.invalid && enrollmentDate?.touched) {
+              <small class="text-red-500 block mt-1">Enrollment date is required</small>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Address & Notes -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Additional Information</h3>
+        <div class="grid grid-cols-1 gap-4">
+          <!-- Address -->
+          <div class="field">
+            <label for="address" class="block text-sm font-medium mb-2">Address</label>
+            <textarea
+              id="address"
+                            formControlName="address"
+              rows="2"
+              class="w-full"
+              placeholder="Enter home address (optional)"
+            ></textarea>
+          </div>
+
+          <!-- Notes -->
+          <div class="field">
+            <label for="notes" class="block text-sm font-medium mb-2">Notes</label>
+            <textarea
+              id="notes"
+                            formControlName="notes"
+              rows="3"
+              class="w-full"
+              placeholder="Any additional notes or information (optional)"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="flex justify-end gap-3 mt-6">
+        <button
+          pButton
+          type="button"
+          label="Cancel"
+          class="p-button-outlined"
+          (click)="cancel()"
+          [disabled]="loading()"
+        ></button>
+        <button
+          pButton
+          type="submit"
+          [label]="isEditMode() ? 'Update Student' : 'Add Student'"
+          [loading]="loading()"
+          [disabled]="studentForm.invalid || loading()"
+        ></button>
+      </div>
+    </form>
+  </p-card>
+</div>

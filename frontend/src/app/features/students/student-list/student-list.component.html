@@ -1,0 +1,103 @@
+<div class="container mx-auto p-6">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center p-4">
+        <h2 class="text-2xl font-bold">Students Management</h2>
+        <button pButton label="Add Student" icon="pi pi-plus" (click)="createStudent()"></button>
+      </div>
+    </ng-template>
+
+    <!-- Branch Filter -->
+    <div class="mb-4">
+      <label for="branchFilter" class="block text-sm font-medium mb-2">Filter by Branch:</label>
+      <select
+        id="branchFilter"
+        [(ngModel)]="selectedBranchId"
+        (change)="onBranchFilterChange()"
+        class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option [value]="null">All Branches</option>
+        @for (branch of branches(); track branch.id) {
+          <option [value]="branch.id">{{ branch.name }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Students Table -->
+    <p-table
+      [value]="students()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [globalFilterFields]="['firstName', 'lastName', 'parentName', 'email']"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="firstName">Name <p-sortIcon field="firstName"></p-sortIcon></th>
+          <th pSortableColumn="dateOfBirth">Age</th>
+          <th>Parent</th>
+          <th>Contact</th>
+          <th pSortableColumn="enrollmentDate">Enrollment Date</th>
+          <th pSortableColumn="isActive">Status</th>
+          <th>Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-student>
+        <tr>
+          <td>{{ student.firstName }} {{ student.lastName }}</td>
+          <td>{{ getAge(student.dateOfBirth) }} years</td>
+          <td>{{ student.parentName }}</td>
+          <td>
+            <div class="text-sm">
+              <div>{{ student.parentPhone }}</div>
+              @if (student.parentEmail) {
+                <div class="text-gray-500">{{ student.parentEmail }}</div>
+              }
+            </div>
+          </td>
+          <td>{{ student.enrollmentDate | date: 'MMM d, y' }}</td>
+          <td>
+            <p-tag
+              [value]="student.isActive ? 'Active' : 'Inactive'"
+              [severity]="student.isActive ? 'success' : 'danger'"
+            ></p-tag>
+          </td>
+          <td>
+            <div class="flex gap-2">
+              <button
+                pButton
+                icon="pi pi-eye"
+                class="p-button-rounded p-button-text"
+                pTooltip="View"
+                (click)="viewStudent(student)"
+              ></button>
+              <button
+                pButton
+                icon="pi pi-pencil"
+                class="p-button-rounded p-button-text p-button-warning"
+                pTooltip="Edit"
+                (click)="editStudent(student)"
+              ></button>
+              <button
+                pButton
+                icon="pi pi-trash"
+                class="p-button-rounded p-button-text p-button-danger"
+                pTooltip="Deactivate"
+                (click)="deleteStudent(student)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center">No students found.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

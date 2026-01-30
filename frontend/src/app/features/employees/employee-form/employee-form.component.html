@@ -1,0 +1,97 @@
+<div class="container mx-auto p-6">
+  <p-card [header]="isEditMode() ? 'Edit Employee' : 'Add New Employee'">
+    <form [formGroup]="employeeForm" (ngSubmit)="onSubmit()">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- First Name -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">First Name <span class="text-red-500">*</span></label>
+          <input type="text" formControlName="firstName" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          @if (firstName?.invalid && firstName?.touched) {
+            <small class="text-red-500">First name is required</small>
+          }
+        </div>
+
+        <!-- Last Name -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Last Name <span class="text-red-500">*</span></label>
+          <input type="text" formControlName="lastName" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          @if (lastName?.invalid && lastName?.touched) {
+            <small class="text-red-500">Last name is required</small>
+          }
+        </div>
+
+        <!-- Email -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Email <span class="text-red-500">*</span></label>
+          <input type="email" formControlName="email" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          @if (email?.invalid && email?.touched) {
+            <small class="text-red-500">Valid email is required</small>
+          }
+        </div>
+
+        <!-- Phone -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Phone <span class="text-red-500">*</span></label>
+          <input type="tel" formControlName="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <!-- Position -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Position <span class="text-red-500">*</span></label>
+          <input type="text" formControlName="position" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="e.g., Instructor, Manager" />
+        </div>
+
+        <!-- Department -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Department <span class="text-red-500">*</span></label>
+          <input type="text" formControlName="department" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="e.g., Teaching, Administration" />
+        </div>
+
+        <!-- Salary -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Monthly Salary <span class="text-red-500">*</span></label>
+          <input type="number" formControlName="salary" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="0" step="0.01" />
+        </div>
+
+        <!-- Hire Date -->
+        <div class="field">
+          <label class="block text-sm font-medium mb-2">Hire Date <span class="text-red-500">*</span></label>
+          <input type="date" formControlName="hireDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        </div>
+
+        <!-- Is Global Checkbox -->
+        <div class="field col-span-2">
+          <p-checkbox formControlName="isGlobal" binary="true" inputId="isGlobal"></p-checkbox>
+          <label for="isGlobal" class="ml-2">Global Employee (works across all branches)</label>
+        </div>
+
+        <!-- Branch Selection -->
+        @if (!isGlobal?.value) {
+          <div class="field col-span-2">
+            <label class="block text-sm font-medium mb-2">Branch <span class="text-red-500">*</span></label>
+            <select formControlName="branchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+              <option value="">Select a branch</option>
+              @for (branch of branches(); track branch.id) {
+                <option [value]="branch.id">{{ branch.name }}</option>
+              }
+            </select>
+            @if (branchId?.invalid && branchId?.touched) {
+              <small class="text-red-500">Branch is required</small>
+            }
+          </div>
+        }
+
+        <!-- Notes -->
+        <div class="field col-span-2">
+          <label class="block text-sm font-medium mb-2">Notes</label>
+          <textarea formControlName="notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6">
+        <button pButton type="button" label="Cancel" class="p-button-outlined" (click)="cancel()" [disabled]="loading()"></button>
+        <button pButton type="submit" [label]="isEditMode() ? 'Update' : 'Create'" [loading]="loading()" [disabled]="employeeForm.invalid || loading()"></button>
+      </div>
+    </form>
+  </p-card>
+</div>

@@ -1,0 +1,244 @@
+<div class="container mx-auto p-6">
+  @if (student(); as s) {
+    <!-- Student Information Card -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <div>
+            <h2 class="text-2xl font-bold">{{ s.firstName }} {{ s.lastName }}</h2>
+            <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} years old</p>
+          </div>
+          <div class="flex gap-2">
+            <button pButton label="Edit" icon="pi pi-pencil" (click)="editStudent()"></button>
+            <button pButton label="Back" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
+          </div>
+        </div>
+      </ng-template>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Personal Information -->
+        <div>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">Personal Information</h3>
+          <div class="space-y-2">
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Date of Birth:</span>
+              <span>{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
+            </div>
+            @if (s.email) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">Email:</span>
+                <span>{{ s.email }}</span>
+              </div>
+            }
+            @if (s.phone) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">Phone:</span>
+                <span>{{ s.phone }}</span>
+              </div>
+            }
+            @if (s.address) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">Address:</span>
+                <span>{{ s.address }}</span>
+              </div>
+            }
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Status:</span>
+              <p-tag [value]="s.isActive ? 'Active' : 'Inactive'" [severity]="s.isActive ? 'success' : 'danger'"></p-tag>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parent/Guardian Information -->
+        <div>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">Parent/Guardian Information</h3>
+          <div class="space-y-2">
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Name:</span>
+              <span>{{ s.parentName }}</span>
+            </div>
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Phone:</span>
+              <span>{{ s.parentPhone }}</span>
+            </div>
+            @if (s.parentEmail) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">Email:</span>
+                <span>{{ s.parentEmail }}</span>
+              </div>
+            }
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Enrolled:</span>
+              <span>{{ s.enrollmentDate | date: 'MMM d, y' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      @if (s.notes) {
+        <div class="mt-6 pt-6 border-t">
+          <h3 class="text-lg font-semibold mb-2 text-gray-700">Notes</h3>
+          <p class="text-gray-600 whitespace-pre-wrap">{{ s.notes }}</p>
+        </div>
+      }
+    </p-card>
+
+    <!-- Course Enrollments Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold">Course Enrollments</h3>
+          <button pButton label="Enroll in Course" icon="pi pi-plus" (click)="openEnrollDialog()"></button>
+        </div>
+      </ng-template>
+
+      <p-table [value]="enrollments()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>Course</th>
+            <th>Enrollment Date</th>
+            <th>Original Price</th>
+            <th>Discount</th>
+            <th>Final Price</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Actions</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-enrollment>
+          <tr>
+            <td>{{ enrollment.course?.name || 'Unknown Course' }}</td>
+            <td>{{ enrollment.enrollmentDate | date: 'MMM d, y' }}</td>
+            <td>{{ enrollment.originalPrice | currency }}</td>
+            <td>
+              @if (enrollment.discountPercent > 0) {
+                <span>{{ enrollment.discountPercent }}% ({{ enrollment.discountAmount | currency }})</span>
+              } @else {
+                <span>No discount</span>
+              }
+            </td>
+            <td class="font-semibold">{{ enrollment.finalPrice | currency }}</td>
+            <td>
+              <p-tag [value]="enrollment.status" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
+            </td>
+            <td>
+              <p-tag [value]="enrollment.paymentStatus" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+            </td>
+            <td>
+              @if (enrollment.status === 'ACTIVE') {
+                <button
+                  pButton
+                  icon="pi pi-times"
+                  class="p-button-rounded p-button-text p-button-danger"
+                  pTooltip="Drop Course"
+                  (click)="dropEnrollment(enrollment)"
+                ></button>
+              }
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="8" class="text-center">No course enrollments found.</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+  }
+
+  <!-- Enrollment Dialog -->
+  <p-dialog
+    [(visible)]="showEnrollDialog"
+    header="Enroll in Course"
+    [modal]="true"
+    [style]="{ width: '500px' }"
+    [draggable]="false"
+  >
+    <form [formGroup]="enrollForm" (ngSubmit)="enrollStudent()">
+      <div class="field mb-4">
+        <label for="courseId" class="block text-sm font-medium mb-2">
+          Course <span class="text-red-500">*</span>
+        </label>
+        <select
+          id="courseId"
+          formControlName="courseId"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select a course</option>
+          @for (course of courses(); track course.id) {
+            <option [value]="course.id">{{ course.name }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field mb-4">
+        <label for="enrollmentDate" class="block text-sm font-medium mb-2">
+          Enrollment Date <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="enrollmentDate"
+          type="date"
+                    formControlName="enrollmentDate"
+          class="w-full"
+        />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="field">
+          <label for="discountPercent" class="block text-sm font-medium mb-2">Discount %</label>
+          <input
+            id="discountPercent"
+            type="number"
+            formControlName="discountPercent"
+            min="0"
+            max="100"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <label for="discountAmount" class="block text-sm font-medium mb-2">Discount Amount ($)</label>
+          <input
+            id="discountAmount"
+            type="number"
+            formControlName="discountAmount"
+            min="0"
+            step="0.01"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+
+      <div class="field mb-4">
+        <label for="notes" class="block text-sm font-medium mb-2">Notes</label>
+        <textarea
+          id="notes"
+                    formControlName="notes"
+          rows="3"
+          class="w-full"
+          placeholder="Any additional notes"
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-4">
+        <button
+          pButton
+          type="button"
+          label="Cancel"
+          class="p-button-outlined"
+          (click)="closeEnrollDialog()"
+        ></button>
+        <button
+          pButton
+          type="submit"
+          label="Enroll"
+          [disabled]="enrollForm.invalid"
+        ></button>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>
