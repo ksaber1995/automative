@@ -1,0 +1,27 @@
+:host {
+  display: block;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+::ng-deep {
+  .p-dropdown,
+  .p-multiselect,
+  .p-calendar {
+    width: 100%;
+
+    .p-inputtext {
+      width: 100%;
+    }
+  }
+
+  .p-inputnumber {
+    width: 100%;
+
+    .p-inputnumber-input {
+      width: 100%;
+    }
+  }
+}

@@ -3,7 +3,8 @@ import { EnrollmentStatus, PaymentStatus } from '../enums/enrollment-status.enum
 export interface Enrollment {
   id: string;
   studentId: string;
-  courseId: string;
+  classId: string; // Now enrolling in a specific class
+  courseId: string; // Kept for easier querying and backward compatibility
   branchId: string;
   enrollmentDate: string;
   status: EnrollmentStatus;

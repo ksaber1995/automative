@@ -1,0 +1,205 @@
+<div class="container mx-auto p-6">
+  @if (course(); as c) {
+    <!-- Course Information Card -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <div>
+            <h2 class="text-2xl font-bold">{{ c.name }}</h2>
+            <p class="text-gray-500 mt-1">{{ c.code }}</p>
+          </div>
+          <div class="flex gap-2">
+            <button pButton label="Edit Course" icon="pi pi-pencil" (click)="editCourse()"></button>
+            <button pButton label="Back" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
+          </div>
+        </div>
+      </ng-template>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Course Details -->
+        <div>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">Course Details</h3>
+          <div class="space-y-2">
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Level:</span>
+              <span>{{ c.level }}</span>
+            </div>
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Duration:</span>
+              <span>{{ c.duration }}</span>
+            </div>
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Price:</span>
+              <span>${{ c.price }}</span>
+            </div>
+            @if (c.maxStudents) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">Max Students:</span>
+                <span>{{ c.maxStudents }}</span>
+              </div>
+            }
+            <div class="flex">
+              <span class="font-medium text-gray-600 w-32">Status:</span>
+              <p-tag [value]="c.isActive ? 'Active' : 'Inactive'" [severity]="c.isActive ? 'success' : 'danger'"></p-tag>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">Description</h3>
+          <p class="text-gray-600 whitespace-pre-wrap">{{ c.description }}</p>
+        </div>
+      </div>
+    </p-card>
+
+    <!-- Classes Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold">Classes ({{ classes().length }})</h3>
+          <button pButton label="Create New Class" icon="pi pi-plus" (click)="createClass()"></button>
+        </div>
+      </ng-template>
+
+      @if (classes().length === 0) {
+        <div class="text-center py-8 text-gray-500">
+          <i class="pi pi-inbox text-4xl mb-3"></i>
+          <p>No classes created yet. Click "Create New Class" to add one.</p>
+        </div>
+      } @else {
+        <div class="space-y-4">
+          @for (cls of classes(); track cls.id) {
+            <p-panel [toggleable]="true" [collapsed]="true">
+              <ng-template pTemplate="header">
+                <div class="flex items-center gap-4 w-full">
+                  <div class="flex-1">
+                    <div class="font-bold text-lg">{{ cls.name }} ({{ cls.code }})</div>
+                    <div class="text-sm text-gray-600 mt-1">
+                      <i class="pi pi-user mr-2"></i>
+                      @if (cls.teacher) {
+                        <span>{{ cls.teacher.firstName }} {{ cls.teacher.lastName }}</span>
+                      } @else {
+                        <span class="text-red-500">No teacher assigned</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <p-tag [value]="cls.isActive ? 'Active' : 'Inactive'" [severity]="cls.isActive ? 'success' : 'danger'"></p-tag>
+                    <p-tag icon="pi pi-users" [value]="(cls.studentCount || 0) + ' students'" severity="info"></p-tag>
+                  </div>
+                </div>
+              </ng-template>
+
+              <ng-template pTemplate="icons">
+                <button
+                  pButton
+                  icon="pi pi-pencil"
+                  class="p-button-rounded p-button-text p-button-sm mr-2"
+                  (click)="editClass(cls.id); $event.stopPropagation()"></button>
+                <button
+                  pButton
+                  icon="pi pi-trash"
+                  class="p-button-rounded p-button-text p-button-danger p-button-sm"
+                  (click)="deleteClass(cls.id); $event.stopPropagation()"></button>
+              </ng-template>
+
+              <!-- Class Details -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 class="text-md font-semibold mb-3 text-gray-700">Schedule & Dates</h4>
+                  <div class="space-y-2">
+                    <div class="flex">
+                      <span class="font-medium text-gray-600 w-32">Schedule:</span>
+                      <span>{{ formatSchedule(cls.schedule) }}</span>
+                    </div>
+                    <div class="flex">
+                      <span class="font-medium text-gray-600 w-32">Start Date:</span>
+                      <span>{{ formatDate(cls.startDate) }}</span>
+                    </div>
+                    <div class="flex">
+                      <span class="font-medium text-gray-600 w-32">End Date:</span>
+                      <span>{{ formatDate(cls.endDate) }}</span>
+                    </div>
+                    @if (cls.maxStudents) {
+                      <div class="flex">
+                        <span class="font-medium text-gray-600 w-32">Max Students:</span>
+                        <span>{{ cls.maxStudents }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="text-md font-semibold mb-3 text-gray-700">Teacher Information</h4>
+                  @if (cls.teacher) {
+                    <div class="space-y-2">
+                      <div class="flex">
+                        <span class="font-medium text-gray-600 w-32">Name:</span>
+                        <span>{{ cls.teacher.firstName }} {{ cls.teacher.lastName }}</span>
+                      </div>
+                      <div class="flex">
+                        <span class="font-medium text-gray-600 w-32">Email:</span>
+                        <span>{{ cls.teacher.email }}</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <p class="text-red-500">No teacher assigned to this class</p>
+                  }
+                </div>
+              </div>
+
+              @if (cls.notes) {
+                <div class="mb-6 pb-6 border-b">
+                  <h4 class="text-md font-semibold mb-2 text-gray-700">Notes</h4>
+                  <p class="text-gray-600 whitespace-pre-wrap">{{ cls.notes }}</p>
+                </div>
+              }
+
+              <!-- Students Table -->
+              <div>
+                <h4 class="text-md font-semibold mb-3 text-gray-700">
+                  Enrolled Students ({{ cls.studentCount || 0 }})
+                </h4>
+                @if (cls.students && cls.students.length > 0) {
+                  <p-table [value]="cls.students" responsiveLayout="scroll">
+                    <ng-template pTemplate="header">
+                      <tr>
+                        <th>Student Name</th>
+                        <th>Enrollment Date</th>
+                        <th>Payment Status</th>
+                      </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-student>
+                      <tr>
+                        <td>{{ student.firstName }} {{ student.lastName }}</td>
+                        <td>{{ formatDate(student.enrollmentDate) }}</td>
+                        <td>
+                          <p-tag
+                            [value]="student.paymentStatus"
+                            [severity]="getPaymentStatusSeverity(student.paymentStatus)">
+                          </p-tag>
+                        </td>
+                      </tr>
+                    </ng-template>
+                  </p-table>
+                } @else {
+                  <div class="text-center py-4 text-gray-500 bg-gray-50 rounded">
+                    <i class="pi pi-users text-2xl mb-2"></i>
+                    <p>No students enrolled in this class yet</p>
+                  </div>
+                }
+              </div>
+            </p-panel>
+          }
+        </div>
+      }
+    </p-card>
+  } @else if (loading()) {
+    <div class="flex justify-center items-center h-64">
+      <i class="pi pi-spin pi-spinner text-4xl"></i>
+    </div>
+  }
+</div>
+
+<p-confirmDialog></p-confirmDialog>

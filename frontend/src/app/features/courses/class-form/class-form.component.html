@@ -1,0 +1,208 @@
+<div class="container mx-auto p-6 max-w-4xl">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="p-4">
+        <h2 class="text-2xl font-bold">
+          {{ isEditMode() ? 'Edit Class' : 'Create New Class' }}
+        </h2>
+        <p class="text-gray-500 mt-1">{{ courseName() }}</p>
+      </div>
+    </ng-template>
+
+    <form [formGroup]="classForm" (ngSubmit)="onSubmit()">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Class Name -->
+        <div class="field">
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+            Class Name <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="name"
+            formControlName="name"
+            placeholder="e.g., Section A, Morning Class"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('name')?.invalid && classForm.get('name')?.touched" />
+          @if (classForm.get('name')?.invalid && classForm.get('name')?.touched) {
+            <small class="text-red-500">Class name is required (min 2 characters)</small>
+          }
+        </div>
+
+        <!-- Class Code -->
+        <div class="field">
+          <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
+            Class Code <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="code"
+            formControlName="code"
+            placeholder="e.g., ROB-101-A"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('code')?.invalid && classForm.get('code')?.touched" />
+          @if (classForm.get('code')?.invalid && classForm.get('code')?.touched) {
+            <small class="text-red-500">Class code is required (min 2 characters)</small>
+          }
+        </div>
+
+        <!-- Teacher -->
+        <div class="field md:col-span-2">
+          <label for="teacherId" class="block text-sm font-medium text-gray-700 mb-2">
+            Teacher <span class="text-red-500">*</span>
+          </label>
+          <select
+            id="teacherId"
+            formControlName="teacherId"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('teacherId')?.invalid && classForm.get('teacherId')?.touched">
+            <option value="">Select a teacher</option>
+            @for (teacher of teachers(); track teacher.value) {
+              <option [value]="teacher.value">{{ teacher.label }}</option>
+            }
+          </select>
+          @if (classForm.get('teacherId')?.invalid && classForm.get('teacherId')?.touched) {
+            <small class="text-red-500">Teacher is required</small>
+          }
+        </div>
+
+        <!-- Days of Week -->
+        <div class="field md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Days of Week <span class="text-red-500">*</span>
+          </label>
+          <div class="flex flex-wrap gap-3">
+            @for (day of daysOfWeek; track day.value) {
+              <label class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  [value]="day.value"
+                  (change)="onDayChange($event, day.value)"
+                  [checked]="isDaySelected(day.value)"
+                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                <span class="text-sm">{{ day.label }}</span>
+              </label>
+            }
+          </div>
+          @if (classForm.get('days')?.invalid && classForm.get('days')?.touched) {
+            <small class="text-red-500">At least one day must be selected</small>
+          }
+        </div>
+
+        <!-- Start Time -->
+        <div class="field">
+          <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">
+            Start Time <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="time"
+            id="startTime"
+            formControlName="startTime"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched" />
+          @if (classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched) {
+            <small class="text-red-500">Start time is required</small>
+          }
+        </div>
+
+        <!-- End Time -->
+        <div class="field">
+          <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">
+            End Time <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="time"
+            id="endTime"
+            formControlName="endTime"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched" />
+          @if (classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched) {
+            <small class="text-red-500">End time is required</small>
+          }
+        </div>
+
+        <!-- Start Date -->
+        <div class="field">
+          <label for="startDate" class="block text-sm font-medium text-gray-700 mb-2">
+            Start Date <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            id="startDate"
+            formControlName="startDate"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched" />
+          @if (classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched) {
+            <small class="text-red-500">Start date is required</small>
+          }
+        </div>
+
+        <!-- End Date -->
+        <div class="field">
+          <label for="endDate" class="block text-sm font-medium text-gray-700 mb-2">
+            End Date <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            id="endDate"
+            formControlName="endDate"
+            class="w-full p-2 border border-gray-300 rounded"
+            [class.border-red-500]="classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched" />
+          @if (classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched) {
+            <small class="text-red-500">End date is required</small>
+          }
+        </div>
+
+        <!-- Max Students -->
+        <div class="field md:col-span-2">
+          <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
+            Maximum Students (Optional)
+          </label>
+          <input
+            type="number"
+            id="maxStudents"
+            formControlName="maxStudents"
+            min="1"
+            placeholder="Leave empty for unlimited"
+            class="w-full p-2 border border-gray-300 rounded" />
+        </div>
+
+        <!-- Notes -->
+        <div class="field md:col-span-2">
+          <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">
+            Notes
+          </label>
+          <textarea
+            id="notes"
+            formControlName="notes"
+            rows="4"
+            placeholder="Additional notes about this class"
+            class="w-full p-2 border border-gray-300 rounded">
+          </textarea>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end gap-2 mt-6 pt-6 border-t">
+        <button
+          pButton
+          type="button"
+          label="Cancel"
+          icon="pi pi-times"
+          class="p-button-outlined"
+          (click)="cancel()"
+          [disabled]="loading()">
+        </button>
+        <button
+          pButton
+          type="submit"
+          [label]="isEditMode() ? 'Update Class' : 'Create Class'"
+          icon="pi pi-check"
+          [disabled]="classForm.invalid || loading()">
+          @if (loading()) {
+            <i class="pi pi-spin pi-spinner"></i>
+          }
+        </button>
+      </div>
+    </form>
+  </p-card>
+</div>

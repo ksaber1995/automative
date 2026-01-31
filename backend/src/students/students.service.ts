@@ -69,7 +69,7 @@ export class StudentsService {
       }
     }
 
-    const updateData = { ...updateStudentDto };
+    const updateData: any = { ...updateStudentDto };
 
     // If student is being marked as inactive, set churn date
     if (updateStudentDto.isActive === false && !updateData.churnDate) {
@@ -105,14 +105,38 @@ export class StudentsService {
   async enrollStudent(studentId: string, enrollDto: EnrollStudentDto) {
     const student = await this.findOne(studentId);
 
+    // Get the class information
+    const classData = await this.dataStore.findById(
+      FILE_PATHS.CLASSES,
+      DATA_KEYS.CLASSES,
+      enrollDto.classId,
+    );
+
+    if (!classData || !(classData as any).isActive) {
+      throw new NotFoundException('Class not found or inactive');
+    }
+
+    // Get the course information from the class
     const course = await this.dataStore.findById(
       FILE_PATHS.COURSES,
       DATA_KEYS.COURSES,
-      enrollDto.courseId,
+      (classData as any).courseId,
     );
 
     if (!course || !(course as any).isActive) {
       throw new NotFoundException('Course not found or inactive');
+    }
+
+    // Check if class has reached max students
+    const existingEnrollments = await this.dataStore.findBy(
+      FILE_PATHS.ENROLLMENTS,
+      DATA_KEYS.ENROLLMENTS,
+      (enrollment: any) => enrollment.classId === enrollDto.classId && enrollment.status === 'ACTIVE',
+    );
+
+    const maxStudents = (classData as any).maxStudents;
+    if (maxStudents && existingEnrollments.length >= maxStudents) {
+      throw new BadRequestException('Class has reached maximum student capacity');
     }
 
     const courseData = course as any;
@@ -138,7 +162,8 @@ export class StudentsService {
       DATA_KEYS.ENROLLMENTS,
       {
         studentId,
-        courseId: enrollDto.courseId,
+        classId: enrollDto.classId,
+        courseId: (classData as any).courseId, // Store courseId for easier querying
         branchId: (student as any).branchId,
         enrollmentDate: enrollDto.enrollmentDate,
         status: 'ACTIVE',
@@ -164,7 +189,7 @@ export class StudentsService {
       (enrollment: any) => enrollment.studentId === studentId,
     );
 
-    // Enrich with course data
+    // Enrich with class and course data
     const enrichedEnrollments = await Promise.all(
       enrollments.map(async (enrollment: any) => {
         const course = await this.dataStore.findById(
@@ -172,9 +197,15 @@ export class StudentsService {
           DATA_KEYS.COURSES,
           enrollment.courseId,
         );
+        const classData = await this.dataStore.findById(
+          FILE_PATHS.CLASSES,
+          DATA_KEYS.CLASSES,
+          enrollment.classId,
+        );
         return {
           ...enrollment,
           course,
+          class: classData,
         };
       }),
     );

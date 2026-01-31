@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, IsNumber, IsOptional, Min, Max, IsDateString } fr
 export class EnrollStudentDto {
   @IsString()
   @IsNotEmpty()
-  courseId: string;
+  classId: string; // Student enrolls in a specific class, not just a course
 
   @IsDateString()
   @IsNotEmpty()

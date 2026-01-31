@@ -48,6 +48,14 @@ export const routes: Routes = [
       {
         path: 'reports',
         loadChildren: () => import('./features/reports/reports.routes').then(m => m.REPORTS_ROUTES)
+      },
+      {
+        path: 'withdrawals',
+        loadChildren: () => import('./features/withdrawals/withdrawals.routes').then(m => m.WITHDRAWALS_ROUTES)
+      },
+      {
+        path: 'debts',
+        loadChildren: () => import('./features/debts/debts.routes').then(m => m.DEBTS_ROUTES)
       }
     ]
   },

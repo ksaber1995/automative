@@ -6,6 +6,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmationService } from 'primeng/api';
 import { CourseService } from '../services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -20,7 +21,8 @@ import { Course } from '@shared/interfaces/course.interface';
     TableModule,
     ButtonModule,
     TagModule,
-    ConfirmDialogModule
+    ConfirmDialogModule,
+    TooltipModule
   ],
   providers: [ConfirmationService],
   template: `

@@ -62,6 +62,96 @@
       </p-card>
     </div>
 
+    <!-- Cash Management Cards -->
+    @if (data.companyWideSummary.currentCash !== undefined) {
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <p-card class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                <i class="pi pi-wallet text-cyan-600"></i>
+                <span>Current Cash</span>
+              </div>
+              <div class="text-2xl font-bold text-cyan-600">
+                {{ formatCurrency(data.companyWideSummary.currentCash || 0) }}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">Cash on hand</div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <button
+                pButton
+                icon="pi pi-eye"
+                class="p-button-rounded p-button-text p-button-sm"
+                pTooltip="View Details"
+                (click)="navigateTo('/withdrawals')">
+              </button>
+              <button
+                pButton
+                icon="pi pi-plus"
+                class="p-button-rounded p-button-text p-button-success p-button-sm"
+                pTooltip="Adjust Cash"
+                (click)="navigateTo('/withdrawals/new')">
+              </button>
+            </div>
+          </div>
+        </p-card>
+
+        <p-card class="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                <i class="pi pi-exclamation-circle text-orange-600"></i>
+                <span>Outstanding Debts</span>
+              </div>
+              <div class="text-2xl font-bold text-orange-600">
+                {{ formatCurrency(data.companyWideSummary.totalOutstandingDebts || 0) }}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">Total debt balance</div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <button
+                pButton
+                icon="pi pi-eye"
+                class="p-button-rounded p-button-text p-button-sm"
+                pTooltip="View Debts"
+                (click)="navigateTo('/debts')">
+              </button>
+              <button
+                pButton
+                icon="pi pi-plus"
+                class="p-button-rounded p-button-text p-button-warning p-button-sm"
+                pTooltip="New Debt"
+                (click)="navigateTo('/debts/new')">
+              </button>
+            </div>
+          </div>
+        </p-card>
+
+        <p-card class="bg-gradient-to-br from-teal-50 to-teal-100 border-2 border-teal-200">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                <i class="pi pi-check-circle text-teal-600"></i>
+                <span>Available Cash</span>
+              </div>
+              <div class="text-2xl font-bold"
+                [class.text-teal-600]="(data.companyWideSummary.availableCash || 0) >= 0"
+                [class.text-red-600]="(data.companyWideSummary.availableCash || 0) < 0">
+                {{ formatCurrency(data.companyWideSummary.availableCash || 0) }}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                Cash minus debts
+                @if ((data.companyWideSummary.availableCash || 0) < 0) {
+                  <span class="text-red-600 font-semibold ml-1">⚠️ Negative</span>
+                }
+              </div>
+            </div>
+            <i class="pi pi-money-bill text-4xl text-teal-400"></i>
+          </div>
+        </p-card>
+      </div>
+    }
+
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Revenue Trends -->

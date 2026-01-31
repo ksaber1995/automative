@@ -6,6 +6,9 @@ export interface FinancialSummary {
   sharedExpenses: number;
   totalExpenses: number;
   netProfit: number;
+  currentCash?: number;
+  totalOutstandingDebts?: number;
+  availableCash?: number;
 }
 
 export interface BranchFinancialSummary extends FinancialSummary {

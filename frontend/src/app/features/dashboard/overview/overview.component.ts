@@ -1,21 +1,25 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { ButtonModule } from 'primeng/button';
+import { TooltipModule } from 'primeng/tooltip';
 import { AnalyticsService } from '../services/analytics.service';
 import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [CommonModule, CardModule, ChartModule, TableModule, TagModule],
+  imports: [CommonModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss'
 })
 export class OverviewComponent implements OnInit {
   private analyticsService = inject(AnalyticsService);
+  private router = inject(Router);
 
   dashboardData =  signal<DashboardMetrics | null>(null);
   loading = signal(true);
@@ -151,5 +155,9 @@ export class OverviewComponent implements OnInit {
 
   getProfitSeverity(profit: number): 'success' | 'danger' {
     return profit >= 0 ? 'success' : 'danger';
+  }
+
+  navigateTo(path: string) {
+    this.router.navigate([path]);
   }
 }

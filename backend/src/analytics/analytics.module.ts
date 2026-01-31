@@ -4,9 +4,11 @@ import { AnalyticsController } from './analytics.controller';
 import { DataStoreModule } from '../data-store/data-store.module';
 import { RevenuesModule } from '../revenues/revenues.module';
 import { ExpensesModule } from '../expenses/expenses.module';
+import { CashModule } from '../cash/cash.module';
+import { DebtsModule } from '../debts/debts.module';
 
 @Module({
-  imports: [DataStoreModule, RevenuesModule, ExpensesModule],
+  imports: [DataStoreModule, RevenuesModule, ExpensesModule, CashModule, DebtsModule],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
   exports: [AnalyticsService],

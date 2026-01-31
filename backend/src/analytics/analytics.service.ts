@@ -3,10 +3,11 @@ import { DataStoreService } from '../data-store/data-store.service';
 import { FILE_PATHS, DATA_KEYS } from '../data-store/file-paths.constant';
 import { RevenuesService } from '../revenues/revenues.service';
 import { ExpensesService } from '../expenses/expenses.service';
+import { CashService } from '../cash/cash.service';
+import { DebtsService } from '../debts/debts.service';
 import {
   FinancialSummary,
   DashboardMetrics,
-  BranchFinancialSummary,
   MonthlyMetric,
   CategoryMetric,
   BranchPerformance
@@ -18,6 +19,8 @@ export class AnalyticsService {
     private dataStore: DataStoreService,
     private revenuesService: RevenuesService,
     private expensesService: ExpensesService,
+    private cashService: CashService,
+    private debtsService: DebtsService,
   ) {}
 
   async getDashboard(startDate?: string, endDate?: string): Promise<DashboardMetrics> {
@@ -38,6 +41,14 @@ export class AnalyticsService {
       startDate,
       endDate,
     );
+
+    // Add cash metrics to company-wide summary
+    const cashState = await this.cashService.getCashState();
+    const debtsSummary = await this.debtsService.getSummary();
+
+    companyWideSummary.currentCash = cashState.currentCash;
+    companyWideSummary.totalOutstandingDebts = debtsSummary.totalOutstanding;
+    companyWideSummary.availableCash = cashState.currentCash - debtsSummary.totalOutstanding;
 
     const branchSummaries = await Promise.all(
       branches.map(async (branch: any) => {
@@ -173,13 +184,7 @@ export class AnalyticsService {
 
     let totalSharedExpenses = 0;
     if (branchId) {
-      // For specific branch, calculate its portion of shared expenses
-      const branches = await this.dataStore.findBy(
-        FILE_PATHS.BRANCHES,
-        DATA_KEYS.BRANCHES,
-        (branch: any) => branch.isActive,
-      );
-
+    
       for (const expense of sharedExpenses) {
         const exp = expense as any;
         const distribution = await this.expensesService.distributeSharedExpense(
@@ -395,12 +400,7 @@ export class AnalyticsService {
       return true;
     });
 
-    // Calculate total students at start of period
-    const startDateObj = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
-    const totalStudentsAtStart = allStudents.filter((student: any) => {
-      const enrollmentDate = new Date(student.enrollmentDate);
-      return enrollmentDate <= startDateObj;
-    }).length;
+  
 
     // Group churned students by branch
     const churnByBranch = branches.map((branch: any) => {
@@ -485,7 +485,7 @@ export class AnalyticsService {
       );
 
       studentEnrollments.forEach((enrollment: any) => {
-        const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+        const course = allCourses.find((c: any) => c.id === enrollment.courseId) as any;
         if (!course) return;
 
         const courseKey = enrollment.courseId;
@@ -506,7 +506,7 @@ export class AnalyticsService {
 
     // Count total enrollments per course
     allEnrollments.forEach((enrollment: any) => {
-      const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+      const course = allCourses.find((c: any) => c.id === enrollment.courseId) as any;
       if (!course) return;
 
       if (!courseChurnMap.has(enrollment.courseId)) {
@@ -548,8 +548,8 @@ export class AnalyticsService {
       );
 
       studentEnrollments.forEach((enrollment: any) => {
-        const course = allCourses.find((c: any) => c.id === enrollment.courseId);
-        const branch = branches.find((b: any) => b.id === student.branchId);
+        const course = allCourses.find((c: any) => c.id === enrollment.courseId) as any;
+        const branch = branches.find((b: any) => b.id === student.branchId) as any;
         if (!course || !branch) return;
 
         const key = `${student.branchId}-${enrollment.courseId}`;
@@ -573,9 +573,9 @@ export class AnalyticsService {
 
     // Count total enrollments per branch-course combination
     allEnrollments.forEach((enrollment: any) => {
-      const student = allStudents.find((s: any) => s.id === enrollment.studentId);
-      const course = allCourses.find((c: any) => c.id === enrollment.courseId);
-      const branch = branches.find((b: any) => b.id === student?.branchId);
+      const student = allStudents.find((s: any) => s.id === enrollment.studentId) as any;
+      const course = allCourses.find((c: any) => c.id === enrollment.courseId) as any;
+      const branch = branches.find((b: any) => b.id === student?.branchId) as any;
 
       if (!student || !course || !branch) return;
 
@@ -621,7 +621,7 @@ export class AnalyticsService {
 
     // Enrich churned students with branch info
     const enrichedChurnedStudents = churnedStudents.map((student: any) => {
-      const branch = branches.find((b: any) => b.id === student.branchId);
+      const branch = branches.find((b: any) => b.id === student.branchId) as any;
 
       // Calculate duration in days
       const enrollmentDate = new Date(student.enrollmentDate);
@@ -634,7 +634,7 @@ export class AnalyticsService {
         (e: any) => e.studentId === student.id,
       );
       const studentCourses = studentEnrollments.map((e: any) => {
-        const course = allCourses.find((c: any) => c.id === e.courseId);
+        const course = allCourses.find((c: any) => c.id === e.courseId) as any;
         return course ? course.name : 'Unknown';
       }).join(', ');
 
