@@ -118,4 +118,25 @@ export class ReportsController {
 
     res.send(buffer);
   }
+
+  @Get('excel/churn')
+  @Roles('ADMIN', 'ACCOUNTANT', 'BRANCH_MANAGER')
+  async exportChurnReportExcel(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.generateChurnReportExcel(startDate, endDate);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=churn-rate-report-${Date.now()}.xlsx`,
+    );
+
+    res.send(buffer);
+  }
 }

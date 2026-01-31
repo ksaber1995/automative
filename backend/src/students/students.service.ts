@@ -69,11 +69,24 @@ export class StudentsService {
       }
     }
 
+    const updateData = { ...updateStudentDto };
+
+    // If student is being marked as inactive, set churn date
+    if (updateStudentDto.isActive === false && !updateData.churnDate) {
+      updateData.churnDate = new Date().toISOString().split('T')[0];
+    }
+
+    // If student is being reactivated, clear churn date
+    if (updateStudentDto.isActive === true) {
+      updateData.churnDate = null;
+      updateData.churnReason = null;
+    }
+
     return await this.dataStore.update(
       FILE_PATHS.STUDENTS,
       DATA_KEYS.STUDENTS,
       id,
-      updateStudentDto,
+      updateData,
     );
   }
 
@@ -82,7 +95,10 @@ export class StudentsService {
       FILE_PATHS.STUDENTS,
       DATA_KEYS.STUDENTS,
       id,
-      { isActive: false },
+      {
+        isActive: false,
+        churnDate: new Date().toISOString().split('T')[0],
+      },
     );
   }
 

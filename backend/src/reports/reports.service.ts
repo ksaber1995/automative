@@ -43,4 +43,9 @@ export class ReportsService {
     const monthlyData = await this.analyticsService.getMonthlyFinancialBreakdown(startDate, endDate);
     return this.excelGenerator.generateMonthlyFinancialReport(monthlyData, startDate, endDate);
   }
+
+  async generateChurnReportExcel(startDate?: string, endDate?: string): Promise<Buffer> {
+    const churnData = await this.analyticsService.getChurnAnalysis(startDate, endDate);
+    return this.excelGenerator.generateChurnReport(churnData, startDate, endDate);
+  }
 }

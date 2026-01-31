@@ -12,6 +12,8 @@ export interface Student {
   branchId: string;
   isActive: boolean;
   enrollmentDate: string;
+  churnDate?: string;
+  churnReason?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

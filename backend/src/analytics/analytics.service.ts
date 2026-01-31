@@ -362,6 +362,318 @@ export class AnalyticsService {
     return monthlyBreakdown;
   }
 
+  async getChurnAnalysis(startDate?: string, endDate?: string): Promise<any> {
+    const branches = await this.dataStore.findAll(
+      FILE_PATHS.BRANCHES,
+      DATA_KEYS.BRANCHES,
+    );
+
+    const allStudents = await this.dataStore.findAll(
+      FILE_PATHS.STUDENTS,
+      DATA_KEYS.STUDENTS,
+    );
+
+    const allEnrollments = await this.dataStore.findAll(
+      FILE_PATHS.ENROLLMENTS,
+      DATA_KEYS.ENROLLMENTS,
+    );
+
+    const allCourses = await this.dataStore.findAll(
+      FILE_PATHS.COURSES,
+      DATA_KEYS.COURSES,
+    );
+
+    // Filter churned students by date range
+    const churnedStudents = allStudents.filter((student: any) => {
+      if (student.isActive) return false;
+      if (!student.churnDate) return false;
+
+      const churnDate = new Date(student.churnDate);
+      if (startDate && churnDate < new Date(startDate)) return false;
+      if (endDate && churnDate > new Date(endDate)) return false;
+
+      return true;
+    });
+
+    // Calculate total students at start of period
+    const startDateObj = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
+    const totalStudentsAtStart = allStudents.filter((student: any) => {
+      const enrollmentDate = new Date(student.enrollmentDate);
+      return enrollmentDate <= startDateObj;
+    }).length;
+
+    // Group churned students by branch
+    const churnByBranch = branches.map((branch: any) => {
+      const branchChurned = churnedStudents.filter(
+        (student: any) => student.branchId === branch.id,
+      );
+
+      const branchTotalStudents = allStudents.filter(
+        (student: any) => student.branchId === branch.id,
+      ).length;
+
+      const branchActiveStudents = allStudents.filter(
+        (student: any) => student.branchId === branch.id && student.isActive,
+      ).length;
+
+      const churnRate = branchTotalStudents > 0
+        ? ((branchChurned.length / branchTotalStudents) * 100).toFixed(2)
+        : '0.00';
+
+      return {
+        branchId: branch.id,
+        branchName: branch.name,
+        branchCode: branch.code,
+        totalStudents: branchTotalStudents,
+        activeStudents: branchActiveStudents,
+        churnedStudents: branchChurned.length,
+        churnRate: parseFloat(churnRate),
+      };
+    });
+
+    // Calculate monthly churn trends
+    const monthlyChurnMap = new Map<string, any>();
+    churnedStudents.forEach((student: any) => {
+      const churnDate = new Date(student.churnDate);
+      const key = `${churnDate.getFullYear()}-${String(churnDate.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyChurnMap.has(key)) {
+        monthlyChurnMap.set(key, {
+          year: churnDate.getFullYear(),
+          month: churnDate.getMonth() + 1,
+          churnedCount: 0,
+          students: [],
+        });
+      }
+
+      const monthData = monthlyChurnMap.get(key);
+      monthData.churnedCount++;
+      monthData.students.push(student);
+    });
+
+    const monthlyChurn = Array.from(monthlyChurnMap.values())
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      })
+      .map((data) => {
+        const monthStart = new Date(data.year, data.month - 1, 1);
+        const monthlyActive = allStudents.filter((s: any) => {
+          const enrollDate = new Date(s.enrollmentDate);
+          return enrollDate <= monthStart;
+        }).length;
+
+        const churnRate = monthlyActive > 0
+          ? ((data.churnedCount / monthlyActive) * 100).toFixed(2)
+          : '0.00';
+
+        return {
+          year: data.year,
+          month: data.month,
+          churnedCount: data.churnedCount,
+          activeAtStart: monthlyActive,
+          churnRate: parseFloat(churnRate),
+        };
+      });
+
+    // Churn by course
+    const courseChurnMap = new Map<string, any>();
+
+    churnedStudents.forEach((student: any) => {
+      const studentEnrollments = allEnrollments.filter(
+        (e: any) => e.studentId === student.id,
+      );
+
+      studentEnrollments.forEach((enrollment: any) => {
+        const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+        if (!course) return;
+
+        const courseKey = enrollment.courseId;
+        if (!courseChurnMap.has(courseKey)) {
+          courseChurnMap.set(courseKey, {
+            courseId: course.id,
+            courseName: course.name,
+            courseCode: course.code,
+            churnedStudents: new Set(),
+            totalEnrollments: 0,
+          });
+        }
+
+        const courseData = courseChurnMap.get(courseKey);
+        courseData.churnedStudents.add(student.id);
+      });
+    });
+
+    // Count total enrollments per course
+    allEnrollments.forEach((enrollment: any) => {
+      const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+      if (!course) return;
+
+      if (!courseChurnMap.has(enrollment.courseId)) {
+        courseChurnMap.set(enrollment.courseId, {
+          courseId: course.id,
+          courseName: course.name,
+          courseCode: course.code,
+          churnedStudents: new Set(),
+          totalEnrollments: 0,
+        });
+      }
+
+      const courseData = courseChurnMap.get(enrollment.courseId);
+      courseData.totalEnrollments++;
+    });
+
+    const churnByCourse = Array.from(courseChurnMap.values()).map((data) => {
+      const churnedCount = data.churnedStudents.size;
+      const churnRate = data.totalEnrollments > 0
+        ? ((churnedCount / data.totalEnrollments) * 100).toFixed(2)
+        : '0.00';
+
+      return {
+        courseId: data.courseId,
+        courseName: data.courseName,
+        courseCode: data.courseCode,
+        totalEnrollments: data.totalEnrollments,
+        churnedStudents: churnedCount,
+        churnRate: parseFloat(churnRate),
+      };
+    }).sort((a, b) => b.churnRate - a.churnRate);
+
+    // Churn by branch AND course (combined)
+    const branchCourseChurnMap = new Map<string, any>();
+
+    churnedStudents.forEach((student: any) => {
+      const studentEnrollments = allEnrollments.filter(
+        (e: any) => e.studentId === student.id,
+      );
+
+      studentEnrollments.forEach((enrollment: any) => {
+        const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+        const branch = branches.find((b: any) => b.id === student.branchId);
+        if (!course || !branch) return;
+
+        const key = `${student.branchId}-${enrollment.courseId}`;
+        if (!branchCourseChurnMap.has(key)) {
+          branchCourseChurnMap.set(key, {
+            branchId: branch.id,
+            branchName: branch.name,
+            branchCode: branch.code,
+            courseId: course.id,
+            courseName: course.name,
+            courseCode: course.code,
+            churnedStudents: new Set(),
+            totalEnrollments: 0,
+          });
+        }
+
+        const data = branchCourseChurnMap.get(key);
+        data.churnedStudents.add(student.id);
+      });
+    });
+
+    // Count total enrollments per branch-course combination
+    allEnrollments.forEach((enrollment: any) => {
+      const student = allStudents.find((s: any) => s.id === enrollment.studentId);
+      const course = allCourses.find((c: any) => c.id === enrollment.courseId);
+      const branch = branches.find((b: any) => b.id === student?.branchId);
+
+      if (!student || !course || !branch) return;
+
+      const key = `${student.branchId}-${enrollment.courseId}`;
+      if (!branchCourseChurnMap.has(key)) {
+        branchCourseChurnMap.set(key, {
+          branchId: branch.id,
+          branchName: branch.name,
+          branchCode: branch.code,
+          courseId: course.id,
+          courseName: course.name,
+          courseCode: course.code,
+          churnedStudents: new Set(),
+          totalEnrollments: 0,
+        });
+      }
+
+      const data = branchCourseChurnMap.get(key);
+      data.totalEnrollments++;
+    });
+
+    const churnByBranchAndCourse = Array.from(branchCourseChurnMap.values()).map((data) => {
+      const churnedCount = data.churnedStudents.size;
+      const churnRate = data.totalEnrollments > 0
+        ? ((churnedCount / data.totalEnrollments) * 100).toFixed(2)
+        : '0.00';
+
+      return {
+        branchName: data.branchName,
+        branchCode: data.branchCode,
+        courseName: data.courseName,
+        courseCode: data.courseCode,
+        totalEnrollments: data.totalEnrollments,
+        churnedStudents: churnedCount,
+        churnRate: parseFloat(churnRate),
+      };
+    }).sort((a, b) => b.churnRate - a.churnRate);
+
+    // Calculate overall churn rate
+    const overallChurnRate = allStudents.length > 0
+      ? ((churnedStudents.length / allStudents.length) * 100).toFixed(2)
+      : '0.00';
+
+    // Enrich churned students with branch info
+    const enrichedChurnedStudents = churnedStudents.map((student: any) => {
+      const branch = branches.find((b: any) => b.id === student.branchId);
+
+      // Calculate duration in days
+      const enrollmentDate = new Date(student.enrollmentDate);
+      const churnDate = new Date(student.churnDate);
+      const durationDays = Math.floor((churnDate.getTime() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24));
+      const durationMonths = Math.floor(durationDays / 30);
+
+      // Get student's courses
+      const studentEnrollments = allEnrollments.filter(
+        (e: any) => e.studentId === student.id,
+      );
+      const studentCourses = studentEnrollments.map((e: any) => {
+        const course = allCourses.find((c: any) => c.id === e.courseId);
+        return course ? course.name : 'Unknown';
+      }).join(', ');
+
+      return {
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        email: student.email,
+        phone: student.phone,
+        branchName: branch?.name || 'Unknown',
+        branchCode: branch?.code || 'N/A',
+        courses: studentCourses || 'None',
+        enrollmentDate: student.enrollmentDate,
+        churnDate: student.churnDate,
+        churnReason: student.churnReason || 'Not specified',
+        durationDays,
+        durationMonths,
+      };
+    });
+
+    return {
+      summary: {
+        totalStudents: allStudents.length,
+        activeStudents: allStudents.filter((s: any) => s.isActive).length,
+        churnedStudents: churnedStudents.length,
+        overallChurnRate: parseFloat(overallChurnRate),
+        period: {
+          startDate: startDate || 'all',
+          endDate: endDate || 'all',
+        },
+      },
+      churnByBranch,
+      churnByCourse,
+      churnByBranchAndCourse,
+      monthlyChurn,
+      churnedStudentsList: enrichedChurnedStudents,
+    };
+  }
+
   private getDummyDashboardData(): DashboardMetrics {
     return {
       companyWideSummary: {

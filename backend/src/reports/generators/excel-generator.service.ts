@@ -178,6 +178,353 @@ export class ExcelGeneratorService {
     return Buffer.from(buffer);
   }
 
+  async generateChurnReport(churnData: any, startDate?: string, endDate?: string): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+
+    // ========== SUMMARY SHEET ==========
+    const summarySheet = workbook.addWorksheet('Overall Summary');
+
+    // Title
+    summarySheet.mergeCells('A1:E1');
+    summarySheet.getCell('A1').value = 'Automate Magic - Churn Rate Report';
+    summarySheet.getCell('A1').font = { size: 16, bold: true };
+    summarySheet.getCell('A1').alignment = { horizontal: 'center' as const };
+
+    // Date range
+    let row = 2;
+    if (startDate && endDate) {
+      summarySheet.mergeCells(`A${row}:E${row}`);
+      summarySheet.getCell(`A${row}`).value = `Period: ${startDate} to ${endDate}`;
+      summarySheet.getCell(`A${row}`).alignment = { horizontal: 'center' as const };
+      row++;
+    }
+    row += 2;
+
+    // Overall Summary
+    summarySheet.getCell(`A${row}`).value = 'Overall Summary';
+    summarySheet.getCell(`A${row}`).font = { size: 14, bold: true };
+    row++;
+
+    summarySheet.getCell(`A${row}`).value = 'Total Students:';
+    summarySheet.getCell(`B${row}`).value = churnData.summary.totalStudents;
+    row++;
+
+    summarySheet.getCell(`A${row}`).value = 'Active Students:';
+    summarySheet.getCell(`B${row}`).value = churnData.summary.activeStudents;
+    summarySheet.getCell(`B${row}`).fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FF90EE90' },
+    };
+    row++;
+
+    summarySheet.getCell(`A${row}`).value = 'Churned Students:';
+    summarySheet.getCell(`B${row}`).value = churnData.summary.churnedStudents;
+    summarySheet.getCell(`B${row}`).fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFFF6B6B' },
+    };
+    row++;
+
+    summarySheet.getCell(`A${row}`).value = 'Overall Churn Rate:';
+    summarySheet.getCell(`B${row}`).value = `${churnData.summary.overallChurnRate}%`;
+    summarySheet.getCell(`B${row}`).font = { bold: true, size: 12 };
+    summarySheet.getCell(`B${row}`).fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFFFD700' },
+    };
+    row += 3;
+
+    // Branch Summary Table
+    summarySheet.getCell(`A${row}`).value = 'Branch-wise Churn Analysis';
+    summarySheet.getCell(`A${row}`).font = { size: 14, bold: true };
+    row++;
+
+    // Headers
+    summarySheet.getCell(`A${row}`).value = 'Branch';
+    summarySheet.getCell(`B${row}`).value = 'Total Students';
+    summarySheet.getCell(`C${row}`).value = 'Active';
+    summarySheet.getCell(`D${row}`).value = 'Churned';
+    summarySheet.getCell(`E${row}`).value = 'Churn Rate %';
+
+    const headerRow = summarySheet.getRow(row);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+    row++;
+
+    // Branch data
+    churnData.churnByBranch.forEach((branch: any) => {
+      summarySheet.getCell(`A${row}`).value = `${branch.branchName} (${branch.branchCode})`;
+      summarySheet.getCell(`B${row}`).value = branch.totalStudents;
+      summarySheet.getCell(`C${row}`).value = branch.activeStudents;
+      summarySheet.getCell(`D${row}`).value = branch.churnedStudents;
+      summarySheet.getCell(`E${row}`).value = `${branch.churnRate}%`;
+
+      // Color code churn rate
+      if (branch.churnRate > 20) {
+        summarySheet.getCell(`E${row}`).fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFF6B6B' },
+        };
+      } else if (branch.churnRate > 10) {
+        summarySheet.getCell(`E${row}`).fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFFD700' },
+        };
+      }
+      row++;
+    });
+
+    summarySheet.columns = [
+      { width: 30 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
+    ];
+
+    // Churned Students Detail Sheet
+    const detailSheet = workbook.addWorksheet('Churned Students Detail');
+
+    detailSheet.columns = [
+      { header: 'Student Name', key: 'name', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'Branch', key: 'branch', width: 25 },
+      { header: 'Courses Enrolled', key: 'courses', width: 35 },
+      { header: 'Enrollment Date', key: 'enrollmentDate', width: 15 },
+      { header: 'Churn Date', key: 'churnDate', width: 15 },
+      { header: 'Duration (Months)', key: 'duration', width: 15 },
+      { header: 'Churn Reason', key: 'reason', width: 30 },
+    ];
+
+    // Title
+    detailSheet.insertRow(1, ['Churned Students - Detailed List']);
+    detailSheet.mergeCells('A1:I1');
+    detailSheet.getRow(1).font = { size: 16, bold: true };
+    detailSheet.getRow(1).alignment = { horizontal: 'center' as const };
+
+    // Date range
+    if (startDate && endDate) {
+      detailSheet.insertRow(2, [`Period: ${startDate} to ${endDate}`]);
+      detailSheet.mergeCells('A2:I2');
+      detailSheet.getRow(2).alignment = { horizontal: 'center' as const };
+    }
+
+    // Style header row
+    const detailHeaderRow = detailSheet.getRow(startDate && endDate ? 3 : 2);
+    detailHeaderRow.font = { bold: true };
+    detailHeaderRow.fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    // Add churned students data
+    churnData.churnedStudentsList.forEach((student: any) => {
+      detailSheet.addRow({
+        name: `${student.firstName} ${student.lastName}`,
+        email: student.email || 'N/A',
+        phone: student.phone || 'N/A',
+        branch: `${student.branchName} (${student.branchCode})`,
+        courses: student.courses || 'None',
+        enrollmentDate: student.enrollmentDate,
+        churnDate: student.churnDate,
+        duration: student.durationMonths,
+        reason: student.churnReason,
+      });
+    });
+
+    // ========== CHURN BY COURSE SHEET ==========
+    const courseSheet = workbook.addWorksheet('Churn by Course');
+
+    courseSheet.columns = [
+      { header: 'Course Name', key: 'name', width: 30 },
+      { header: 'Course Code', key: 'code', width: 15 },
+      { header: 'Total Enrollments', key: 'total', width: 18 },
+      { header: 'Churned Students', key: 'churned', width: 18 },
+      { header: 'Churn Rate %', key: 'rate', width: 15 },
+    ];
+
+    // Title
+    courseSheet.insertRow(1, ['Churn Analysis by Course']);
+    courseSheet.mergeCells('A1:E1');
+    courseSheet.getRow(1).font = { size: 16, bold: true };
+    courseSheet.getRow(1).alignment = { horizontal: 'center' as const };
+
+    if (startDate && endDate) {
+      courseSheet.insertRow(2, [`Period: ${startDate} to ${endDate}`]);
+      courseSheet.mergeCells('A2:E2');
+      courseSheet.getRow(2).alignment = { horizontal: 'center' as const };
+    }
+
+    const courseHeaderRow = courseSheet.getRow(startDate && endDate ? 3 : 2);
+    courseHeaderRow.font = { bold: true };
+    courseHeaderRow.fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    churnData.churnByCourse.forEach((course: any) => {
+      const newRow = courseSheet.addRow({
+        name: course.courseName,
+        code: course.courseCode,
+        total: course.totalEnrollments,
+        churned: course.churnedStudents,
+        rate: `${course.churnRate}%`,
+      });
+
+      if (course.churnRate > 30) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFF6B6B' },
+        };
+      } else if (course.churnRate > 15) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFFD700' },
+        };
+      }
+    });
+
+    // ========== MONTHLY CHURN TREND SHEET ==========
+    const monthlySheet = workbook.addWorksheet('Monthly Churn Trend');
+
+    monthlySheet.columns = [
+      { header: 'Year', key: 'year', width: 10 },
+      { header: 'Month', key: 'month', width: 12 },
+      { header: 'Churned Students', key: 'churned', width: 18 },
+      { header: 'Active at Month Start', key: 'active', width: 20 },
+      { header: 'Churn Rate %', key: 'rate', width: 15 },
+    ];
+
+    monthlySheet.insertRow(1, ['Monthly Churn Trend Analysis']);
+    monthlySheet.mergeCells('A1:E1');
+    monthlySheet.getRow(1).font = { size: 16, bold: true };
+    monthlySheet.getRow(1).alignment = { horizontal: 'center' as const };
+
+    if (startDate && endDate) {
+      monthlySheet.insertRow(2, [`Period: ${startDate} to ${endDate}`]);
+      monthlySheet.mergeCells('A2:E2');
+      monthlySheet.getRow(2).alignment = { horizontal: 'center' as const };
+    }
+
+    const monthlyHeaderRow = monthlySheet.getRow(startDate && endDate ? 3 : 2);
+    monthlyHeaderRow.font = { bold: true };
+    monthlyHeaderRow.fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    churnData.monthlyChurn.forEach((month: any) => {
+      const newRow = monthlySheet.addRow({
+        year: month.year,
+        month: monthNames[month.month - 1],
+        churned: month.churnedCount,
+        active: month.activeAtStart,
+        rate: `${month.churnRate}%`,
+      });
+
+      if (month.churnRate > 5) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFF6B6B' },
+        };
+      } else if (month.churnRate > 2) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFFD700' },
+        };
+      }
+    });
+
+    // ========== BRANCH & COURSE COMBINED SHEET ==========
+    const branchCourseSheet = workbook.addWorksheet('Churn by Branch & Course');
+
+    branchCourseSheet.columns = [
+      { header: 'Branch', key: 'branch', width: 25 },
+      { header: 'Course', key: 'course', width: 25 },
+      { header: 'Total Enrollments', key: 'total', width: 18 },
+      { header: 'Churned Students', key: 'churned', width: 18 },
+      { header: 'Churn Rate %', key: 'rate', width: 15 },
+    ];
+
+    branchCourseSheet.insertRow(1, ['Churn Analysis by Branch & Course']);
+    branchCourseSheet.mergeCells('A1:E1');
+    branchCourseSheet.getRow(1).font = { size: 16, bold: true };
+    branchCourseSheet.getRow(1).alignment = { horizontal: 'center' as const };
+
+    if (startDate && endDate) {
+      branchCourseSheet.insertRow(2, [`Period: ${startDate} to ${endDate}`]);
+      branchCourseSheet.mergeCells('A2:E2');
+      branchCourseSheet.getRow(2).alignment = { horizontal: 'center' as const };
+    }
+
+    const branchCourseHeaderRow = branchCourseSheet.getRow(startDate && endDate ? 3 : 2);
+    branchCourseHeaderRow.font = { bold: true };
+    branchCourseHeaderRow.fill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    churnData.churnByBranchAndCourse.forEach((item: any) => {
+      const newRow = branchCourseSheet.addRow({
+        branch: `${item.branchName} (${item.branchCode})`,
+        course: `${item.courseName} (${item.courseCode})`,
+        total: item.totalEnrollments,
+        churned: item.churnedStudents,
+        rate: `${item.churnRate}%`,
+      });
+
+      if (item.churnRate > 30) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFF6B6B' },
+        };
+      } else if (item.churnRate > 15) {
+        newRow.getCell('E').fill = {
+          type: 'pattern' as const,
+          pattern: 'solid' as const,
+          fgColor: { argb: 'FFFFD700' },
+        };
+      }
+    });
+
+    // Apply borders to all sheets
+    [summarySheet, detailSheet, courseSheet, monthlySheet, branchCourseSheet].forEach(sheet => {
+      sheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' as const },
+            left: { style: 'thin' as const },
+            bottom: { style: 'thin' as const },
+            right: { style: 'thin' as const },
+          };
+        });
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
   async generateMonthlyFinancialReport(monthlyData: any[], startDate?: string, endDate?: string): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Monthly Financial Report');

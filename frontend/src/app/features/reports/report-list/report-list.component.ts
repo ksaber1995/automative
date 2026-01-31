@@ -142,6 +142,21 @@ export class ReportListComponent implements OnInit {
     this.notificationService.success('Monthly financial report (Excel) download started');
   }
 
+  downloadChurnReportExcel() {
+    if (!this.financialStartDate || !this.financialEndDate) {
+      this.notificationService.error('Please select start and end dates');
+      return;
+    }
+
+    const url = this.reportService.downloadChurnReportExcel(
+      this.financialStartDate,
+      this.financialEndDate
+    );
+
+    this.downloadFile(url);
+    this.notificationService.success('Churn rate report (Excel) download started');
+  }
+
   private downloadFile(url: string) {
     const token = this.authService.getToken();
 
