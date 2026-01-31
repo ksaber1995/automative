@@ -127,6 +127,21 @@ export class ReportListComponent implements OnInit {
     this.notificationService.success('Branch report (PDF) download started');
   }
 
+  downloadMonthlyFinancialExcel() {
+    if (!this.financialStartDate || !this.financialEndDate) {
+      this.notificationService.error('Please select start and end dates');
+      return;
+    }
+
+    const url = this.reportService.downloadMonthlyFinancialReportExcel(
+      this.financialStartDate,
+      this.financialEndDate
+    );
+
+    this.downloadFile(url);
+    this.notificationService.success('Monthly financial report (Excel) download started');
+  }
+
   private downloadFile(url: string) {
     const token = this.authService.getToken();
 

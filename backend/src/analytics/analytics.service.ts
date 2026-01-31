@@ -333,6 +333,35 @@ export class AnalyticsService {
     return this.calculateFinancialSummary(branchId || null, startDate, endDate);
   }
 
+  async getMonthlyFinancialBreakdown(startDate?: string, endDate?: string): Promise<any[]> {
+    // Parse date range
+    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear() - 1, 0, 1);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    const monthlyBreakdown: any[] = [];
+
+    // Generate list of months in range
+    const currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
+
+    while (currentDate <= end) {
+      const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
+      const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const monthData = await this.calculateFinancialSummary(null, monthStart, monthEnd);
+
+      monthlyBreakdown.push({
+        month: currentDate.getMonth() + 1,
+        year: currentDate.getFullYear(),
+        ...monthData,
+      });
+
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    return monthlyBreakdown;
+  }
+
   private getDummyDashboardData(): DashboardMetrics {
     return {
       companyWideSummary: {

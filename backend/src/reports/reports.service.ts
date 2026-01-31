@@ -38,4 +38,9 @@ export class ReportsService {
     const data = await this.analyticsService.getBranchAnalytics(branchId, startDate, endDate);
     return this.pdfGenerator.generateBranchReport(data, startDate, endDate);
   }
+
+  async generateMonthlyFinancialReportExcel(startDate?: string, endDate?: string): Promise<Buffer> {
+    const monthlyData = await this.analyticsService.getMonthlyFinancialBreakdown(startDate, endDate);
+    return this.excelGenerator.generateMonthlyFinancialReport(monthlyData, startDate, endDate);
+  }
 }

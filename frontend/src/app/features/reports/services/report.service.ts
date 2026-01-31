@@ -27,4 +27,9 @@ export class ReportService {
     const params = new URLSearchParams({ startDate, endDate });
     return this.api.getBaseUrl() + `/reports/pdf/branch/${branchId}?${params.toString()}`;
   }
+
+  downloadMonthlyFinancialReportExcel(startDate: string, endDate: string): string {
+    const params = new URLSearchParams({ startDate, endDate });
+    return this.api.getBaseUrl() + `/reports/excel/financial-monthly?${params.toString()}`;
+  }
 }
