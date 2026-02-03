@@ -162,6 +162,40 @@ export class LayoutComponent {
       visible: true
     },
     {
+      label: 'Withdrawals',
+      icon: 'pi pi-wallet',
+      routerLink: ['/withdrawals'],
+      visible: true
+    },
+    {
+      label: 'Debts',
+      icon: 'pi pi-credit-card',
+      routerLink: ['/debts'],
+      visible: true
+    },
+    {
+      separator: true,
+      label: 'Inventory'
+    },
+    {
+      label: 'Products',
+      icon: 'pi pi-box',
+      routerLink: ['/products/list'],
+      visible: true
+    },
+    {
+      label: 'Sell Product',
+      icon: 'pi pi-shopping-cart',
+      routerLink: ['/products/sell'],
+      visible: true
+    },
+    {
+      label: 'Sales History',
+      icon: 'pi pi-history',
+      routerLink: ['/products/sales'],
+      visible: true
+    },
+    {
       separator: true,
       label: 'Reports'
     },

@@ -17,6 +17,8 @@ export const FILE_PATHS = {
   WITHDRAWALS: join(DATA_DIR, 'withdrawals.json'),
   DEBTS: join(DATA_DIR, 'debts.json'),
   DEBT_PAYMENTS: join(DATA_DIR, 'debt-payments.json'),
+  PRODUCTS: join(DATA_DIR, 'products.json'),
+  PRODUCT_SALES: join(DATA_DIR, 'product-sales.json'),
 };
 
 export const DATA_KEYS = {
@@ -33,4 +35,6 @@ export const DATA_KEYS = {
   WITHDRAWALS: 'withdrawals',
   DEBTS: 'debts',
   DEBT_PAYMENTS: 'debtPayments',
+  PRODUCTS: 'products',
+  PRODUCT_SALES: 'productSales',
 };

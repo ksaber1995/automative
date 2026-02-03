@@ -1,0 +1,14 @@
+export enum ProductCategory {
+  STATIONERY = 'STATIONERY',
+  BOOKS = 'BOOKS',
+  ELECTRONICS = 'ELECTRONICS',
+  SUPPLIES = 'SUPPLIES',
+  MERCHANDISE = 'MERCHANDISE',
+  OTHER = 'OTHER',
+}
+
+export enum DiscountType {
+  NONE = 'NONE',
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED_AMOUNT = 'FIXED_AMOUNT',
+}

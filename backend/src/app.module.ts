@@ -17,6 +17,8 @@ import { ReportsModule } from './reports/reports.module';
 import { CashModule } from './cash/cash.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { DebtsModule } from './debts/debts.module';
+import { ProductsModule } from './products/products.module';
+import { ProductSalesModule } from './product-sales/product-sales.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { DebtsModule } from './debts/debts.module';
     CashModule,
     WithdrawalsModule,
     DebtsModule,
+    ProductsModule,
+    ProductSalesModule,
     AnalyticsModule,
     ReportsModule,
   ],
