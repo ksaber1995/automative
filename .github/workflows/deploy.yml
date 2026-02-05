@@ -1,0 +1,85 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'aws/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+env:
+  NODE_VERSION: '20.x'
+  AWS_REGION: 'eu-west-1'
+
+jobs:
+  deploy:
+    name: Deploy CDK Stack
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for AWS OIDC
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            aws/package-lock.json
+            aws/lambda/api/package-lock.json
+
+      - name: Install AWS CDK dependencies
+        working-directory: ./aws
+        run: npm ci
+
+      - name: Install Lambda dependencies
+        working-directory: ./aws/lambda/api
+        run: npm ci
+
+      - name: Build Lambda function
+        working-directory: ./aws/lambda/api
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: CDK Diff
+        working-directory: ./aws
+        run: npx cdk diff
+        continue-on-error: true
+
+      - name: CDK Deploy
+        working-directory: ./aws
+        run: npx cdk deploy --require-approval never --verbose
+
+      - name: Get stack outputs
+        working-directory: ./aws
+        run: |
+          echo "### Deployment Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          aws cloudformation describe-stacks \
+            --stack-name AutomateMagicStack-dev \
+            --query 'Stacks[0].Outputs' \
+            --region ${{ env.AWS_REGION }} >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
