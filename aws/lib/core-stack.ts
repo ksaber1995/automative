@@ -15,7 +15,7 @@ export interface CoreStackProps extends cdk.StackProps {
 
 export class CoreStack extends cdk.Stack {
   public readonly api: apigateway.RestApi;
-  public readonly database: rds.DatabaseInstance;
+  public readonly database: rds.DatabaseCluster;
   public readonly apiLambda: lambda.Function;
 
   constructor(scope: Construct, id: string, props?: CoreStackProps) {
@@ -54,7 +54,7 @@ export class CoreStack extends cdk.Stack {
     // =============================================
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'DatabaseSecurityGroup', {
       vpc,
-      description: 'Security group for RDS PostgreSQL database',
+      description: 'Security group for Aurora Serverless v2 PostgreSQL database',
       allowAllOutbound: true,
     });
 
@@ -72,7 +72,7 @@ export class CoreStack extends cdk.Stack {
     );
 
     // =============================================
-    // RDS PostgreSQL Database
+    // Aurora Serverless v2 PostgreSQL Database
     // =============================================
 
     // Create database credentials secret
@@ -108,31 +108,31 @@ export class CoreStack extends cdk.Stack {
       },
     });
 
-    // RDS Instance
-    this.database = new rds.DatabaseInstance(this, 'AutomateMagicDB', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_15,
+    // Aurora Serverless v2 Cluster
+    this.database = new rds.DatabaseCluster(this, 'AutomateMagicAuroraDB', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_15_8,
       }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
       securityGroups: [dbSecurityGroup],
-      databaseName: dbName,
+      defaultDatabaseName: dbName,
       credentials: rds.Credentials.fromSecret(dbCredentialsSecret),
-      allocatedStorage: 20,
-      maxAllocatedStorage: 100,
-      storageType: rds.StorageType.GP3,
-      backupRetention: cdk.Duration.days(7),
-      deleteAutomatedBackups: false,
+      backup: {
+        retention: cdk.Duration.days(7),
+      },
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
       deletionProtection: stage === 'prod',
-      publiclyAccessible: false,
-      multiAz: stage === 'prod',
-      autoMinorVersionUpgrade: true,
-      enablePerformanceInsights: true,
-      performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
+      serverlessV2MinCapacity: 0.5, // Minimum ACUs
+      serverlessV2MaxCapacity: 1, // Maximum ACUs (adjust based on your needs)
+      writer: rds.ClusterInstance.serverlessV2('writer', {
+        publiclyAccessible: false,
+        enablePerformanceInsights: true,
+      }),
+      // Enable Data API for Query Editor support
+      enableDataApi: true,
     });
 
     // =============================================
@@ -160,8 +160,8 @@ export class CoreStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/api')),
       environment: {
         NODE_ENV: stage,
-        DB_HOST: this.database.dbInstanceEndpointAddress,
-        DB_PORT: this.database.dbInstanceEndpointPort,
+        DB_HOST: this.database.clusterEndpoint.hostname,
+        DB_PORT: this.database.clusterEndpoint.port.toString(),
         DB_NAME: dbName,
         DB_CREDENTIALS_SECRET_ARN: dbCredentialsSecret.secretArn,
         JWT_SECRET_ARN: jwtSecret.secretArn,
@@ -237,8 +237,8 @@ export class CoreStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
-      value: this.database.dbInstanceEndpointAddress,
-      description: 'RDS Database Endpoint',
+      value: this.database.clusterEndpoint.hostname,
+      description: 'Aurora Database Cluster Endpoint',
       exportName: `${stage}-db-endpoint`,
     });
 
@@ -258,6 +258,12 @@ export class CoreStack extends cdk.Stack {
       value: this.apiLambda.functionArn,
       description: 'API Lambda Function ARN',
       exportName: `${stage}-lambda-arn`,
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseClusterArn', {
+      value: this.database.clusterArn,
+      description: 'Aurora Cluster ARN (for Data API)',
+      exportName: `${stage}-db-cluster-arn`,
     });
   }
 }

@@ -4,8 +4,21 @@ This repository uses GitHub Actions to automatically deploy the AWS infrastructu
 
 ## Prerequisites
 
-1. AWS Account with appropriate permissions
-2. GitHub repository with Actions enabled
+1. Personal AWS Account with access keys (not AWS SSO)
+2. AWS CLI configured with `personal` profile
+3. GitHub repository with Actions enabled
+
+### AWS Profile Setup
+
+Configure your personal AWS profile with access keys:
+
+```bash
+aws configure --profile personal
+# Enter your AWS Access Key ID
+# Enter your AWS Secret Access Key
+# Default region: eu-west-1
+# Default output format: json
+```
 
 ## Setup GitHub Secrets
 
@@ -59,15 +72,17 @@ To manually trigger a deployment:
 
 ## Local Development
 
-To deploy locally:
+To deploy locally using your personal AWS profile with access keys (not SSO):
 
 ```bash
 # Build Lambda function
 cd aws/lambda/api && npm run build
 
-# Deploy CDK stack
-cd ../.. && npm run cdk deploy
+# Deploy CDK stack with personal profile
+cd ../.. && npx cdk deploy --profile personal
 ```
+
+**Note:** This project uses a personal AWS profile with access keys, not AWS SSO.
 
 ## Rollback
 
@@ -80,10 +95,32 @@ If you need to rollback a deployment:
 ## Security Notes
 
 - Never commit AWS credentials to the repository
-- Use GitHub secrets for sensitive data
+- Use GitHub secrets for sensitive data (for CI/CD deployments)
+- Local deployments use the `personal` AWS profile with access keys
 - Rotate access keys regularly
 - Use least-privilege IAM permissions
-- Consider using AWS OIDC for GitHub Actions (more secure than access keys)
+
+## Accessing the Database
+
+The deployed Aurora Serverless v2 cluster supports the **RDS Query Editor** with Data API enabled.
+
+### Using RDS Query Editor
+
+1. Go to [AWS RDS Console](https://console.aws.amazon.com/rds/)
+2. Click **Query Editor** in the left sidebar
+3. Select your database cluster: `automatemagicstack-dev-automatemagicauroradbef2379-*`
+4. Connect using:
+   - **Database credentials**: Choose "Connect with a Secrets Manager ARN"
+   - **Secret**: Select `/dev/automate-magic/db-credentials`
+   - **Database name**: `automative`
+5. Run SQL queries directly in the browser
+
+### Database Details
+
+- **Type**: Aurora Serverless v2 PostgreSQL 15.8
+- **Scaling**: 0.5 - 1 ACU (Aurora Capacity Units)
+- **Data API**: Enabled for Query Editor access
+- **Backup**: 7-day retention with automatic snapshots
 
 ## Support
 
@@ -91,3 +128,4 @@ For issues with deployment, check:
 1. GitHub Actions logs
 2. AWS CloudFormation events in AWS Console
 3. Lambda logs in CloudWatch
+4. Aurora cluster logs in RDS console

@@ -13,9 +13,9 @@ This guide will help you migrate the Automate Magic application from the file-ba
 
 **After (AWS)**:
 - AWS Lambda with ts-rest (replaced Next.js as requested)
-- PostgreSQL database on AWS RDS
+- Aurora Serverless v2 PostgreSQL database (supports RDS Query Editor)
 - API Gateway for RESTful endpoints
-- Serverless, scalable infrastructure
+- Serverless, scalable infrastructure with auto-scaling database
 
 ### Key Files Created
 
@@ -77,15 +77,15 @@ frontend/src/environments/
    sudo ./aws/install
    ```
 
-2. **Configure AWS credentials**:
+2. **Configure AWS credentials** (using personal profile with access keys, not SSO):
    ```bash
-   aws configure
+   aws configure --profile personal
    ```
    Enter your:
    - AWS Access Key ID
    - AWS Secret Access Key
-   - Default region (e.g., eu-west-1)
-   - Default output format (json)
+   - Default region: eu-west-1
+   - Default output format: json
 
 3. **Install AWS CDK globally**:
    ```bash
@@ -116,13 +116,17 @@ frontend/src/environments/
    cd ../..
    ```
 
-4. **Deploy the stack**:
+4. **Build Lambda function**:
    ```bash
-   # Using the deploy script (recommended)
-   bash deploy.sh dev
+   cd lambda/api
+   npm run build
+   cd ../..
+   ```
 
-   # Or manually
-   npm run deploy
+5. **Deploy the stack**:
+   ```bash
+   # Deploy using personal profile
+   npx cdk deploy --profile personal --require-approval never
    ```
 
 5. **Save the outputs**:
@@ -138,31 +142,37 @@ frontend/src/environments/
 
 ### Step 3: Initialize the Database
 
-1. **Get database credentials**:
+The database uses **Aurora Serverless v2 with Data API enabled**, so you can use the **AWS RDS Query Editor** directly from the console.
+
+1. **Using RDS Query Editor** (Recommended - easiest method):
+   - Go to [AWS RDS Console](https://console.aws.amazon.com/rds/)
+   - Click **Query Editor** in the left sidebar
+   - Select your database cluster: `automatemagicstack-dev-automatemagicauroradbef2379-*`
+   - Connect using:
+     - **Database credentials**: Choose "Connect with a Secrets Manager ARN"
+     - **Secret**: Select `/dev/automate-magic/db-credentials`
+     - **Database name**: `automative`
+   - Copy and paste the contents of `aws/sql/schema.sql`
+   - Execute the SQL to create all tables
+
+2. **Alternative: Using AWS CLI with Data API**:
+   ```bash
+   aws rds-data execute-statement \
+     --resource-arn "YOUR-CLUSTER-ARN" \
+     --secret-arn "YOUR-SECRET-ARN" \
+     --database "automative" \
+     --sql "$(cat sql/schema.sql)" \
+     --profile personal
+   ```
+
+3. **Get database credentials** (if needed for local connection):
    ```bash
    aws secretsmanager get-secret-value \
      --secret-id /dev/automate-magic/db-credentials \
      --query SecretString \
-     --output text
+     --output text \
+     --profile personal
    ```
-
-   This returns JSON with `username` and `password`.
-
-2. **Connect to the database**:
-
-   **Option A: Using psql locally** (requires database to be publicly accessible - not recommended for production):
-   ```bash
-   psql -h YOUR-DB-ENDPOINT -U automative_admin -d automative -f sql/schema.sql
-   ```
-
-   **Option B: Using AWS Systems Manager Session Manager** (recommended):
-   - Launch an EC2 instance in the same VPC
-   - Install PostgreSQL client on the instance
-   - Run the schema SQL from the instance
-
-   **Option C: Using a Lambda function** (easiest):
-   - Create a temporary Lambda function to execute the schema
-   - Or use AWS RDS Query Editor if available
 
 3. **Verify the database**:
    ```bash
@@ -347,18 +357,23 @@ Check API Gateway execution logs in the AWS Console:
 
 ### Database Monitoring
 
-- RDS Performance Insights (enabled by default)
-- CloudWatch metrics for RDS
+- Aurora Performance Insights (enabled by default)
+- CloudWatch metrics for Aurora Serverless v2
+- Automatic scaling between 0.5 - 1 ACU (Aurora Capacity Units)
+- Query Editor for direct SQL access
 
 ## Cost Optimization
 
 To reduce costs:
 
-1. **Use t3.micro or t4g.micro** for RDS (already configured)
+1. **Aurora Serverless v2 auto-scales** between 0.5 - 1 ACU (currently configured)
+   - Adjust min/max capacity based on your workload
+   - Consider pausing unused clusters (though v2 doesn't auto-pause like v1)
 2. **Consider removing NAT Gateway** if Lambda doesn't need internet access
-3. **Use Reserved Instances** for RDS in production
-4. **Enable RDS automated backups** but adjust retention period
-5. **Use Lambda Provisioned Concurrency** only if needed
+3. **Aurora automated backups** are enabled with 7-day retention
+   - Adjust retention period based on requirements
+4. **Use Lambda Provisioned Concurrency** only if needed
+5. **Monitor Aurora capacity usage** to optimize ACU limits
 
 ## Troubleshooting
 
@@ -372,8 +387,9 @@ If Lambda times out connecting to RDS:
 ### Database Connection Errors
 
 - Verify the Lambda has the correct IAM permissions to access Secrets Manager
-- Check the database endpoint is correct
-- Ensure the Lambda security group can reach the RDS security group on port 5432
+- Check the Aurora cluster endpoint is correct (not writer instance endpoint)
+- Ensure the Lambda security group can reach the Aurora security group on port 5432
+- For Query Editor access, verify Data API is enabled on the cluster
 
 ### CORS Errors
 
@@ -422,10 +438,12 @@ For issues:
 
 You now have:
 - ✅ Serverless architecture with AWS Lambda
-- ✅ PostgreSQL database on AWS RDS
+- ✅ Aurora Serverless v2 PostgreSQL database with auto-scaling
+- ✅ RDS Query Editor support with Data API enabled
 - ✅ RESTful API with API Gateway
 - ✅ ts-rest instead of Next.js (as requested)
-- ✅ Secure secrets management
-- ✅ Scalable infrastructure
+- ✅ Secure secrets management with AWS Secrets Manager
+- ✅ Fully scalable infrastructure
 - ✅ Database schema matching your backend models
 - ✅ All endpoints migrated from backend
+- ✅ Personal AWS profile with access keys (not SSO)
