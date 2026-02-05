@@ -156,7 +156,7 @@ export class CoreStack extends cdk.Stack {
     // API Lambda Function
     this.apiLambda = new lambda.Function(this, 'ApiLambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
+      handler: 'dist/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/api')),
       environment: {
         NODE_ENV: stage,

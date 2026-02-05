@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { insert, queryOne } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
 
