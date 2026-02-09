@@ -65,6 +65,22 @@ export const branchesRoutes = {
     }
   },
 
+  listActive: async () => {
+    try {
+      const branches = await query('SELECT * FROM branches WHERE is_active = true ORDER BY created_at DESC');
+      return {
+        status: 200 as const,
+        body: branches.map(mapBranchFromDB),
+      };
+    } catch (error) {
+      console.error('List active branches error:', error);
+      return {
+        status: 200 as const,
+        body: [],
+      };
+    }
+  },
+
   getById: async ({ params }: { params: { id: string } }) => {
     try {
       const branch = await findById('branches', params.id);

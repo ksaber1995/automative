@@ -54,7 +54,7 @@
             <div class="text-sm text-gray-600 mb-1">Profit Margin</div>
             <div class="text-2xl font-bold text-purple-600">
               {{ data.companyWideSummary.totalRevenue > 0 ? ((data.companyWideSummary.netProfit /
-              data.companyWideSummary.totalRevenue) * 100).toFixed(1) : 0 }}%
+              data.companyWideSummary.totalRevenue) * 100)?.toFixed(1) : 0 }}%
             </div>
           </div>
           <i class="pi pi-percentage text-4xl text-purple-400"></i>
@@ -207,7 +207,7 @@
             </td>
             <td>
               <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0">
-                {{ branch.totalRevenue > 0 ? ((branch.netProfit / branch.totalRevenue) * 100).toFixed(1) : 0 }}%
+                {{ branch.totalRevenue > 0 ? ((branch.netProfit / branch.totalRevenue) * 100)?.toFixed(1) : 0 }}%
               </span>
             </td>
             <td>
@@ -237,7 +237,7 @@
             <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount }} students • {{ branch.courseCount }}
               courses</div>
             <div class="text-green-600 font-semibold">{{ formatCurrency(branch.profit) }}</div>
-            <div class="text-xs text-gray-500">{{ branch.profitMargin.toFixed(1) }}% margin</div>
+            <div class="text-xs text-gray-500">{{ branch?.profitMargin?.toFixed(1) }}% margin</div>
           </div>
           }
         </div>

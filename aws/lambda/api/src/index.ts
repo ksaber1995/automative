@@ -17,6 +17,13 @@ import { coursesRoutes } from './routes/courses';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
 import { analyticsRoutes } from './routes/analytics';
+import { employeesRoutes } from './routes/employees';
+import { withdrawalsRoutes } from './routes/withdrawals';
+import { productsRoutes } from './routes/products';
+import { productSalesRoutes } from './routes/product-sales';
+import { debtsRoutes } from './routes/debts';
+import { cashRoutes } from './routes/cash';
+import { reportsRoutes } from './routes/reports';
 
 // Create the router implementation
 const router = {
@@ -27,6 +34,13 @@ const router = {
   revenues: revenuesRoutes,
   expenses: expensesRoutes,
   analytics: analyticsRoutes,
+  employees: employeesRoutes,
+  withdrawals: withdrawalsRoutes,
+  products: productsRoutes,
+  productSales: productSalesRoutes,
+  debts: debtsRoutes,
+  cash: cashRoutes,
+  reports: reportsRoutes,
 };
 
 // Create the Lambda handler

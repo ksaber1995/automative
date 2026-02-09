@@ -69,6 +69,32 @@ export const coursesRoutes = {
     }
   },
 
+  listActive: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+    try {
+      let sql = 'SELECT * FROM courses WHERE is_active = true';
+      const params: any[] = [];
+
+      if (queryParams.branchId) {
+        params.push(queryParams.branchId);
+        sql += ` AND branch_id = $${params.length}`;
+      }
+
+      sql += ' ORDER BY created_at DESC';
+
+      const courses = await query(sql, params);
+      return {
+        status: 200 as const,
+        body: courses.map(mapCourseFromDB),
+      };
+    } catch (error) {
+      console.error('List active courses error:', error);
+      return {
+        status: 200 as const,
+        body: [],
+      };
+    }
+  },
+
   getById: async ({ params }: { params: { id: string } }) => {
     try {
       const course = await findById('courses', params.id);
