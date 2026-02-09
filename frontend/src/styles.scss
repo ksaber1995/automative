@@ -1,15 +1,4 @@
-/* Import PrimeNG Aura Theme via CDN */
-@import url('https://unpkg.com/primeng@21/resources/themes/lara-light-blue/theme.css');
-
 /* Tailwind CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Minimal global styles */
-body {
-  margin: 0;
-  font-family: var(--font-family);
-  background-color: var(--surface-ground);
-  color: var(--text-color);
-}
