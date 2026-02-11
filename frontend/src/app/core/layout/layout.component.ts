@@ -34,10 +34,19 @@ import { AuthService } from '../services/auth.service';
 
           <div class="flex items-center gap-4">
             @if (currentUser(); as user) {
+              <!-- Company Badge -->
+              <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <i class="pi pi-building text-blue-600 text-sm"></i>
+                <span class="text-sm font-medium text-blue-700" [title]="'Company ID: ' + user.companyId">
+                  {{ getCompanyName(user) }}
+                </span>
+              </div>
+
+              <!-- User Info -->
               <div class="flex items-center gap-3">
                 <div class="text-right">
                   <p class="font-medium text-gray-900">{{ user.firstName }} {{ user.lastName }}</p>
-                  <p class="text-sm text-gray-500">{{ user.role }}</p>
+                  <p class="text-sm text-gray-500">{{ formatRole(user.role) }}</p>
                 </div>
                 <p-avatar
                   [label]="getUserInitials(user)"
@@ -223,6 +232,22 @@ export class LayoutComponent {
 
   getUserInitials(user: any): string {
     return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase();
+  }
+
+  getCompanyName(user: any): string {
+    // TODO: Fetch and cache company name from API
+    // For now, show a placeholder or use cached company data from registration
+    const cachedCompany = localStorage.getItem('company_name');
+    return cachedCompany || 'My Company';
+  }
+
+  formatRole(role: string): string {
+    const roleMap: Record<string, string> = {
+      'ADMIN': 'Administrator',
+      'BRANCH_MANAGER': 'Branch Manager',
+      'ACCOUNTANT': 'Accountant'
+    };
+    return roleMap[role] || role;
   }
 
   logout() {

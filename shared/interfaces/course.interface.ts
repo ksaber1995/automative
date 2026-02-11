@@ -1,7 +1,7 @@
 export interface Course {
   id: string;
   companyId: string;
-  branchId: string;
+  branchId: string | null; // Can be null for global courses available to all branches
   name: string;
   code: string;
   description: string | null;
@@ -19,7 +19,7 @@ export interface CourseWithEnrollmentCount extends Course {
 }
 
 export interface CourseCreateDto {
-  branchId: string;
+  branchId: string | null; // Can be null for global courses
   name: string;
   code: string;
   description?: string;

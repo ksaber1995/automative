@@ -68,6 +68,10 @@ export class AuthService {
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
+          // Cache company name if available
+          if (response.company?.name) {
+            localStorage.setItem('company_name', response.company.name);
+          }
         })
       );
   }
@@ -80,6 +84,10 @@ export class AuthService {
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
+          // Cache company name from registration
+          if (response.company?.name) {
+            localStorage.setItem('company_name', response.company.name);
+          }
         })
       );
   }
@@ -88,6 +96,7 @@ export class AuthService {
     localStorage.removeItem(environment.jwtTokenKey);
     localStorage.removeItem(environment.refreshTokenKey);
     localStorage.removeItem(environment.userDataKey);
+    localStorage.removeItem('company_name');
     this.currentUser.set(null);
     this.currentUserSubject.next(null);
     this.router.navigate(['/auth/login']);

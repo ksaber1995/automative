@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # Deploy script for Automate Magic AWS Infrastructure
+# Usage: ./deploy.sh [stage] [profile]
+# Example: ./deploy.sh prod personal
 
 set -e
 
@@ -22,7 +24,11 @@ fi
 
 # Get stage from argument or default to dev
 STAGE=${1:-dev}
+# Get AWS profile from argument or default to personal
+AWS_PROFILE=${2:-personal}
+
 echo "Deploying to stage: $STAGE"
+echo "Using AWS profile: $AWS_PROFILE"
 
 # Install root dependencies
 echo ""
@@ -45,7 +51,7 @@ npm run synth
 # Show diff
 echo ""
 echo "Showing deployment changes..."
-cdk diff --context stage=$STAGE || true
+cdk diff --context stage=$STAGE --profile $AWS_PROFILE || true
 
 # Confirm deployment
 echo ""
@@ -59,7 +65,7 @@ fi
 # Deploy the stack
 echo ""
 echo "Deploying stack..."
-cdk deploy --context stage=$STAGE --require-approval never
+cdk deploy --context stage=$STAGE --profile $AWS_PROFILE --require-approval never
 
 echo ""
 echo "================================="

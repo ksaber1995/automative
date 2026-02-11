@@ -351,15 +351,32 @@ export class EnrollmentFormComponent implements OnInit {
   selectedCourse = signal<Course | null>(null);
 
   filteredCourses = computed(() => {
-    const branchId = this.enrollmentForm?.get('branchId')?.value;
+    const branchId = '3e3c9d9c-07ea-4dd1-9794-44bd9129fc0d'
     console.log('Computing filtered courses for branchId:', branchId);
     console.log('All courses available:', this.courses().length);
     if (!branchId) {
       console.log('No branch selected, returning empty array');
       return [];
     }
-    const filtered = this.courses().filter(c => c.branchId === branchId);
-    console.log('Filtered courses:', filtered.length, filtered.map(c => ({ id: c.id, name: c.name, branchId: c.branchId })));
+
+    // Filter courses that either:
+    // 1. Belong to the selected branch (branchId matches)
+    // 2. Are global courses (branchId is null) - available to all branches
+    const filtered = this.courses().filter(c => {
+      // Convert both to strings for comparison to handle type differences
+      const courseBranchId = c.branchId ? String(c.branchId) : null;
+      const selectedBranchId = String(branchId);
+
+      // Include if course belongs to this branch OR if course is global (null branchId)
+      return courseBranchId === selectedBranchId || courseBranchId === null;
+    });
+
+    console.log('Filtered courses:', filtered.length, filtered.map(c => ({
+      id: c.id,
+      name: c.name,
+      branchId: c.branchId,
+      isGlobal: c.branchId === null
+    })));
     return filtered;
   });
 

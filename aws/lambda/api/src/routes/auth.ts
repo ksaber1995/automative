@@ -259,9 +259,17 @@ export const authRoutes = {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Registration error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        body: body
+      });
       return {
         status: 400 as const,
-        body: { message: 'Registration failed' },
+        body: {
+          message: 'Registration failed',
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        },
       };
     } finally {
       client.release();
