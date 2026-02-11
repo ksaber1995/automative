@@ -256,19 +256,19 @@ export const authRoutes = {
           },
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       console.error('Registration error:', error);
       console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
         body: body
       });
       return {
         status: 400 as const,
         body: {
           message: 'Registration failed',
-          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          error: process.env.NODE_ENV === 'development' ? (error?.message || 'Unknown error') : undefined
         },
       };
     } finally {
