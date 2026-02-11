@@ -4,6 +4,12 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -18,7 +24,13 @@ import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/
     CommonModule,
     ReactiveFormsModule,
     CardModule,
-    ButtonModule
+    ButtonModule,
+    InputTextModule,
+    InputNumberModule,
+    TextareaModule,
+    SelectModule,
+    DatePickerModule,
+    CheckboxModule
   ],
   templateUrl: './expense-form.component.html',
   styleUrl: './expense-form.component.scss'
@@ -41,8 +53,14 @@ export class ExpenseFormComponent implements OnInit {
   expenseCategories = Object.values(ExpenseCategory);
   distributionMethods = Object.values(DistributionMethod);
 
+  // Options arrays for PrimeNG selects
+  expenseTypeOptions = Object.values(ExpenseType).map(type => ({ label: type, value: type }));
+  expenseCategoryOptions = Object.values(ExpenseCategory).map(cat => ({ label: cat, value: cat }));
+  distributionMethodOptions = Object.values(DistributionMethod).map(method => ({ label: method, value: method }));
+  branchOptions = signal<{ label: string, value: string }[]>([]);
+
   constructor() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.expenseForm = this.fb.group({
       branchId: [''],
       type: ['', [Validators.required]],
@@ -102,7 +120,10 @@ export class ExpenseFormComponent implements OnInit {
 
   loadBranches() {
     this.branchService.getActiveBranches().subscribe({
-      next: (branches) => this.branches.set(branches)
+      next: (branches) => {
+        this.branches.set(branches);
+        this.branchOptions.set(branches.map(branch => ({ label: branch.name, value: branch.id })));
+      }
     });
   }
 
@@ -113,7 +134,7 @@ export class ExpenseFormComponent implements OnInit {
         this.expenseForm.patchValue({
           ...expense,
           branchId: expense.branchId || '',
-          date: expense.date.split('T')[0]
+          date: new Date(expense.date)
         });
         this.loading.set(false);
       },
@@ -132,9 +153,11 @@ export class ExpenseFormComponent implements OnInit {
     }
 
     this.loading.set(true);
+    const formValue = this.expenseForm.value;
     const expenseData = {
-      ...this.expenseForm.value,
-      branchId: this.expenseForm.value.branchId || null
+      ...formValue,
+      branchId: formValue.branchId || null,
+      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date
     };
 
     if (this.isEditMode() && this.expenseId) {

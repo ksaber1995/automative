@@ -21,16 +21,12 @@
           <h3 class="text-lg font-semibold mb-3 text-gray-700">Course Details</h3>
           <div class="space-y-2">
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Level:</span>
-              <span>{{ c.level }}</span>
-            </div>
-            <div class="flex">
               <span class="font-medium text-gray-600 w-32">Duration:</span>
-              <span>{{ c.duration }}</span>
+              <span>{{ c.duration }} weeks</span>
             </div>
             <div class="flex">
               <span class="font-medium text-gray-600 w-32">Price:</span>
-              <span>${{ c.price }}</span>
+              <span>${{ c.price.toFixed(2) }}</span>
             </div>
             @if (c.maxStudents) {
               <div class="flex">

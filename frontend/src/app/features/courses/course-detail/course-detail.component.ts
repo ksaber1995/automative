@@ -88,7 +88,7 @@ export class CourseDetailComponent implements OnInit {
   }
 
   editCourse() {
-    this.router.navigate(['/courses/edit', this.courseId]);
+    this.router.navigate(['/courses', this.courseId, 'edit']);
   }
 
   backToList() {

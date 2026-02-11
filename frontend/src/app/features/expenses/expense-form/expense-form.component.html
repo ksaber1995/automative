@@ -13,15 +13,14 @@
           <label class="block text-sm font-medium mb-2">
             Type <span class="text-red-500">*</span>
           </label>
-          <select
+          <p-select
             formControlName="type"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="type?.invalid && type?.touched">
-            <option value="">Select Type</option>
-            @for (expenseType of expenseTypes; track expenseType) {
-              <option [value]="expenseType">{{ expenseType }}</option>
-            }
-          </select>
+            [options]="expenseTypeOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select Type"
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': type?.invalid && type?.touched}"></p-select>
           @if (type?.invalid && type?.touched) {
             <small class="text-red-500">Type is required</small>
           }
@@ -35,15 +34,14 @@
           <label class="block text-sm font-medium mb-2">
             Category <span class="text-red-500">*</span>
           </label>
-          <select
+          <p-select
             formControlName="category"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="category?.invalid && category?.touched">
-            <option value="">Select Category</option>
-            @for (cat of expenseCategories; track cat) {
-              <option [value]="cat">{{ cat }}</option>
-            }
-          </select>
+            [options]="expenseCategoryOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select Category"
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': category?.invalid && category?.touched}"></p-select>
           @if (category?.invalid && category?.touched) {
             <small class="text-red-500">Category is required</small>
           }
@@ -55,15 +53,14 @@
             <label class="block text-sm font-medium mb-2">
               Branch <span class="text-red-500">*</span>
             </label>
-            <select
+            <p-select
               formControlName="branchId"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="branchId?.invalid && branchId?.touched">
-              <option value="">Select Branch</option>
-              @for (branch of branches(); track branch.id) {
-                <option [value]="branch.id">{{ branch.name }}</option>
-              }
-            </select>
+              [options]="branchOptions()"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select Branch"
+              class="w-full"
+              [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
             @if (branchId?.invalid && branchId?.touched) {
               <small class="text-red-500">Branch is required</small>
             }
@@ -76,14 +73,14 @@
             <label class="block text-sm font-medium mb-2">
               Distribution Method <span class="text-red-500">*</span>
             </label>
-            <select
+            <p-select
               formControlName="distributionMethod"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="distributionMethod?.invalid && distributionMethod?.touched">
-              @for (method of distributionMethods; track method) {
-                <option [value]="method">{{ method }}</option>
-              }
-            </select>
+              [options]="distributionMethodOptions"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select Distribution Method"
+              class="w-full"
+              [ngClass]="{'ng-invalid ng-dirty': distributionMethod?.invalid && distributionMethod?.touched}"></p-select>
             @if (distributionMethod?.invalid && distributionMethod?.touched) {
               <small class="text-red-500">Distribution method is required</small>
             }
@@ -98,12 +95,14 @@
           <label class="block text-sm font-medium mb-2">
             Amount <span class="text-red-500">*</span>
           </label>
-          <input
-            type="number"
+          <p-inputnumber
             formControlName="amount"
-            step="0.01"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="amount?.invalid && amount?.touched" />
+            mode="decimal"
+            [minFractionDigits]="2"
+            [maxFractionDigits]="2"
+            [min]="0"
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': amount?.invalid && amount?.touched}"></p-inputnumber>
           @if (amount?.invalid && amount?.touched) {
             <small class="text-red-500">Valid amount is required</small>
           }
@@ -114,11 +113,12 @@
           <label class="block text-sm font-medium mb-2">
             Date <span class="text-red-500">*</span>
           </label>
-          <input
-            type="date"
+          <p-datepicker
             formControlName="date"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="date?.invalid && date?.touched" />
+            dateFormat="yy-mm-dd"
+            [showIcon]="true"
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': date?.invalid && date?.touched}"></p-datepicker>
           @if (date?.invalid && date?.touched) {
             <small class="text-red-500">Date is required</small>
           }
@@ -131,9 +131,10 @@
           </label>
           <input
             type="text"
+            pInputText
             formControlName="description"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="description?.invalid && description?.touched" />
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': description?.invalid && description?.touched}" />
           @if (description?.invalid && description?.touched) {
             <small class="text-red-500">Description is required</small>
           }
@@ -141,11 +142,11 @@
 
         <!-- Is Recurring -->
         <div class="flex items-center">
-          <input
-            type="checkbox"
+          <p-checkbox
             formControlName="isRecurring"
-            id="isRecurring"
-            class="mr-2" />
+            [binary]="true"
+            inputId="isRecurring"
+            class="mr-2"></p-checkbox>
           <label for="isRecurring" class="text-sm font-medium">Recurring Expense</label>
         </div>
 
@@ -155,13 +156,13 @@
             <label class="block text-sm font-medium mb-2">
               Recurring Day (1-31) <span class="text-red-500">*</span>
             </label>
-            <input
-              type="number"
+            <p-inputnumber
               formControlName="recurringDay"
-              min="1"
-              max="31"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="recurringDay?.invalid && recurringDay?.touched" />
+              [min]="1"
+              [max]="31"
+              [showButtons]="true"
+              class="w-full"
+              [ngClass]="{'ng-invalid ng-dirty': recurringDay?.invalid && recurringDay?.touched}"></p-inputnumber>
             @if (recurringDay?.invalid && recurringDay?.touched) {
               <small class="text-red-500">Day must be between 1 and 31</small>
             }
@@ -174,8 +175,9 @@
           <label class="block text-sm font-medium mb-2">Vendor (Optional)</label>
           <input
             type="text"
+            pInputText
             formControlName="vendor"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+            class="w-full" />
         </div>
 
         <!-- Invoice Number -->
@@ -183,33 +185,33 @@
           <label class="block text-sm font-medium mb-2">Invoice Number (Optional)</label>
           <input
             type="text"
+            pInputText
             formControlName="invoiceNumber"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+            class="w-full" />
         </div>
 
         <!-- Notes -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">Notes (Optional)</label>
           <textarea
+            pTextarea
             formControlName="notes"
             rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+            class="w-full"></textarea>
         </div>
       </div>
 
       <div class="flex justify-end gap-2 mt-6">
-        <button
-          pButton
+        <p-button
           type="button"
           label="Cancel"
-          class="p-button-secondary"
+          severity="secondary"
           (click)="cancel()"
-          [disabled]="loading()"></button>
-        <button
-          pButton
+          [disabled]="loading()"></p-button>
+        <p-button
           type="submit"
           [label]="isEditMode() ? 'Update' : 'Create'"
-          [disabled]="loading()"></button>
+          [disabled]="loading()"></p-button>
       </div>
     </form>
   </p-card>

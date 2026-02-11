@@ -13,15 +13,14 @@
           <label class="block text-sm font-medium mb-2">
             Branch <span class="text-red-500">*</span>
           </label>
-          <select
+          <p-select
             formControlName="branchId"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="branchId?.invalid && branchId?.touched">
-            <option value="">Select Branch</option>
-            @for (branch of branches(); track branch.id) {
-              <option [value]="branch.id">{{ branch.name }}</option>
-            }
-          </select>
+            [options]="branches()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Select Branch"
+            styleClass="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
           @if (branchId?.invalid && branchId?.touched) {
             <small class="text-red-500">Branch is required</small>
           }
@@ -32,11 +31,11 @@
           <label class="block text-sm font-medium mb-2">
             Date <span class="text-red-500">*</span>
           </label>
-          <input
-            type="date"
+          <p-datepicker
             formControlName="date"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="date?.invalid && date?.touched" />
+            styleClass="w-full"
+            [showIcon]="true"
+            [ngClass]="{'ng-invalid ng-dirty': date?.invalid && date?.touched}"></p-datepicker>
           @if (date?.invalid && date?.touched) {
             <small class="text-red-500">Date is required</small>
           }
@@ -47,12 +46,13 @@
           <label class="block text-sm font-medium mb-2">
             Amount <span class="text-red-500">*</span>
           </label>
-          <input
-            type="number"
+          <p-inputnumber
             formControlName="amount"
-            step="0.01"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="amount?.invalid && amount?.touched" />
+            mode="decimal"
+            [minFractionDigits]="2"
+            [maxFractionDigits]="2"
+            styleClass="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': amount?.invalid && amount?.touched}"></p-inputnumber>
           @if (amount?.invalid && amount?.touched) {
             <small class="text-red-500">Valid amount is required</small>
           }
@@ -63,15 +63,19 @@
           <label class="block text-sm font-medium mb-2">
             Payment Method <span class="text-red-500">*</span>
           </label>
-          <select
+          <p-select
             formControlName="paymentMethod"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="paymentMethod?.invalid && paymentMethod?.touched">
-            <option value="">Select Payment Method</option>
-            @for (method of paymentMethods; track method) {
-              <option [value]="method">{{ method.replace('_', ' ') }}</option>
-            }
-          </select>
+            [options]="paymentMethods"
+            placeholder="Select Payment Method"
+            styleClass="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': paymentMethod?.invalid && paymentMethod?.touched}">
+            <ng-template pTemplate="item" let-option>
+              {{ option.replace('_', ' ') }}
+            </ng-template>
+            <ng-template pTemplate="selectedItem" let-option>
+              {{ option.replace('_', ' ') }}
+            </ng-template>
+          </p-select>
           @if (paymentMethod?.invalid && paymentMethod?.touched) {
             <small class="text-red-500">Payment method is required</small>
           }
@@ -83,10 +87,11 @@
             Description <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             type="text"
             formControlName="description"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="description?.invalid && description?.touched" />
+            class="w-full"
+            [ngClass]="{'ng-invalid ng-dirty': description?.invalid && description?.touched}" />
           @if (description?.invalid && description?.touched) {
             <small class="text-red-500">Description is required</small>
           }
@@ -95,45 +100,51 @@
         <!-- Course (Optional) -->
         <div>
           <label class="block text-sm font-medium mb-2">Course (Optional)</label>
-          <select
+          <p-select
             formControlName="courseId"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md">
-            <option value="">None</option>
-            @for (course of courses(); track course.id) {
-              <option [value]="course.id">{{ course.name }}</option>
-            }
-          </select>
+            [options]="courses()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="None"
+            styleClass="w-full"></p-select>
         </div>
 
         <!-- Student (Optional) -->
         <div>
           <label class="block text-sm font-medium mb-2">Student (Optional)</label>
-          <select
+          <p-select
             formControlName="studentId"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md">
-            <option value="">None</option>
-            @for (student of students(); track student.id) {
-              <option [value]="student.id">{{ student.firstName }} {{ student.lastName }}</option>
-            }
-          </select>
+            [options]="students()"
+            optionValue="id"
+            placeholder="None"
+            styleClass="w-full">
+            <ng-template pTemplate="item" let-student>
+              {{ student.firstName }} {{ student.lastName }}
+            </ng-template>
+            <ng-template pTemplate="selectedItem" let-student>
+              {{ student.firstName }} {{ student.lastName }}
+            </ng-template>
+          </p-select>
         </div>
 
         <!-- Receipt Number -->
         <div>
           <label class="block text-sm font-medium mb-2">Receipt Number (Optional)</label>
           <input
+            pInputText
             type="text"
             formControlName="receiptNumber"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+            class="w-full" />
         </div>
 
         <!-- Notes -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">Notes (Optional)</label>
           <textarea
+            pTextarea
             formControlName="notes"
             rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+            class="w-full"></textarea>
         </div>
       </div>
 

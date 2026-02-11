@@ -8,9 +8,9 @@
             Branch Name <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="name"
-            type="text"
-                        formControlName="name"
+            formControlName="name"
             class="w-full"
             placeholder="Enter branch name"
             [class.ng-invalid]="name?.invalid && name?.touched"
@@ -33,9 +33,9 @@
             Branch Code <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="code"
-            type="text"
-                        formControlName="code"
+            formControlName="code"
             class="w-full"
             placeholder="Enter branch code (e.g., DTN-001)"
             [class.ng-invalid]="code?.invalid && code?.touched"
@@ -58,9 +58,9 @@
             Address <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="address"
-            type="text"
-                        formControlName="address"
+            formControlName="address"
             class="w-full"
             placeholder="Enter street address"
             [class.ng-invalid]="address?.invalid && address?.touched"
@@ -76,9 +76,9 @@
             City <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="city"
-            type="text"
-                        formControlName="city"
+            formControlName="city"
             class="w-full"
             placeholder="Enter city"
             [class.ng-invalid]="city?.invalid && city?.touched"
@@ -92,9 +92,9 @@
         <div class="field">
           <label for="state" class="block text-sm font-medium mb-2">State</label>
           <input
+            pInputText
             id="state"
-            type="text"
-                        formControlName="state"
+            formControlName="state"
             class="w-full"
             placeholder="Enter state"
           />
@@ -104,9 +104,9 @@
         <div class="field">
           <label for="zipCode" class="block text-sm font-medium mb-2">Zip Code</label>
           <input
+            pInputText
             id="zipCode"
-            type="text"
-                        formControlName="zipCode"
+            formControlName="zipCode"
             class="w-full"
             placeholder="Enter zip code"
           />
@@ -118,9 +118,9 @@
             Phone <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="phone"
-            type="tel"
-                        formControlName="phone"
+            formControlName="phone"
             class="w-full"
             placeholder="Enter phone number"
             [class.ng-invalid]="phone?.invalid && phone?.touched"
@@ -136,9 +136,10 @@
             Email <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             id="email"
             type="email"
-                        formControlName="email"
+            formControlName="email"
             class="w-full"
             placeholder="Enter email address"
             [class.ng-invalid]="email?.invalid && email?.touched"
@@ -159,9 +160,9 @@
         <div class="field">
           <label for="managerId" class="block text-sm font-medium mb-2">Manager ID</label>
           <input
+            pInputText
             id="managerId"
-            type="text"
-                        formControlName="managerId"
+            formControlName="managerId"
             class="w-full"
             placeholder="Enter manager ID (optional)"
           />
@@ -172,13 +173,15 @@
           <label for="openingDate" class="block text-sm font-medium mb-2">
             Opening Date <span class="text-red-500">*</span>
           </label>
-          <input
-            id="openingDate"
-            type="date"
-                        formControlName="openingDate"
-            class="w-full"
-            [class.ng-invalid]="openingDate?.invalid && openingDate?.touched"
-          />
+          <p-datepicker
+            inputId="openingDate"
+            formControlName="openingDate"
+            dateFormat="yy-mm-dd"
+            [showIcon]="true"
+            placeholder="Select opening date"
+            [style]="{ width: '100%' }"
+            [class.ng-invalid]="openingDate?.invalid && openingDate?.touched">
+          </p-datepicker>
           @if (openingDate?.invalid && openingDate?.touched) {
             <small class="text-red-500">Opening date is required</small>
           }
@@ -187,21 +190,20 @@
 
       <!-- Form Actions -->
       <div class="flex justify-end gap-3 mt-6">
-        <button
-          pButton
+        <p-button
           type="button"
           label="Cancel"
-          class="p-button-outlined"
-          (click)="cancel()"
-          [disabled]="loading()"
-        ></button>
-        <button
-          pButton
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="cancel()"
+          [disabled]="loading()">
+        </p-button>
+        <p-button
           type="submit"
           [label]="isEditMode() ? 'Update Branch' : 'Create Branch'"
           [loading]="loading()"
-          [disabled]="branchForm.invalid || loading()"
-        ></button>
+          [disabled]="branchForm.invalid || loading()">
+        </p-button>
       </div>
     </form>
   </p-card>

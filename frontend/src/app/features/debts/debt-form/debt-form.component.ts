@@ -6,6 +6,9 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
+import { TextareaModule } from 'primeng/textarea';
 import { DebtService, CreateDebtDto } from '../../../core/services/debt.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfaces/debt.interface';
@@ -19,7 +22,10 @@ import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfa
     CardModule,
     InputTextModule,
     InputNumberModule,
-    ButtonModule
+    ButtonModule,
+    SelectModule,
+    DatePickerModule,
+    TextareaModule
   ],
   template: `
     <div class="container mx-auto p-4 max-w-4xl">
@@ -37,15 +43,15 @@ import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfa
               <label for="debtType" class="block text-sm font-medium mb-2">
                 Debt Type *
               </label>
-              <select
+              <p-select
                 id="debtType"
                 formControlName="debtType"
-                class="w-full p-2 border rounded">
-                <option value="">Select debt type</option>
-                @for (opt of debtTypeOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+                [options]="debtTypeOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select debt type"
+                [style]="{ width: '100%' }">
+              </p-select>
             </div>
 
             <div class="field">
@@ -119,67 +125,73 @@ import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfa
               <label for="compoundingFrequency" class="block text-sm font-medium mb-2">
                 Compounding Frequency *
               </label>
-              <select
+              <p-select
                 id="compoundingFrequency"
                 formControlName="compoundingFrequency"
-                class="w-full p-2 border rounded">
-                <option value="">Select frequency</option>
-                @for (opt of compoundingOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+                [options]="compoundingOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select frequency"
+                [style]="{ width: '100%' }">
+              </p-select>
             </div>
 
             <div class="field">
               <label for="takenDate" class="block text-sm font-medium mb-2">
                 Taken Date *
               </label>
-              <input
-                type="date"
+              <p-datepicker
                 id="takenDate"
                 formControlName="takenDate"
-                class="w-full p-2 border rounded" />
+                [showIcon]="true"
+                dateFormat="yy-mm-dd"
+                placeholder="Select date"
+                [style]="{ width: '100%' }">
+              </p-datepicker>
             </div>
 
             <div class="field">
               <label for="dueDate" class="block text-sm font-medium mb-2">
                 Due Date *
               </label>
-              <input
-                type="date"
+              <p-datepicker
                 id="dueDate"
                 formControlName="dueDate"
-                class="w-full p-2 border rounded" />
+                [showIcon]="true"
+                dateFormat="yy-mm-dd"
+                placeholder="Select date"
+                [style]="{ width: '100%' }">
+              </p-datepicker>
             </div>
 
             <div class="field">
               <label for="paymentSchedule" class="block text-sm font-medium mb-2">
                 Payment Schedule *
               </label>
-              <select
+              <p-select
                 id="paymentSchedule"
                 formControlName="paymentSchedule"
-                class="w-full p-2 border rounded">
-                <option value="">Select schedule</option>
-                @for (opt of paymentScheduleOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+                [options]="paymentScheduleOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select schedule"
+                [style]="{ width: '100%' }">
+              </p-select>
             </div>
 
             <div class="field">
               <label for="branchId" class="block text-sm font-medium mb-2">
                 Branch (Optional)
               </label>
-              <select
+              <p-select
                 id="branchId"
                 formControlName="branchId"
-                class="w-full p-2 border rounded">
-                <option value="">Select branch</option>
-                @for (branch of branches(); track branch.value) {
-                  <option [value]="branch.value">{{ branch.label }}</option>
-                }
-              </select>
+                [options]="branches()"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select branch"
+                [style]="{ width: '100%' }">
+              </p-select>
             </div>
 
             <div class="field md:col-span-2">
@@ -211,10 +223,11 @@ import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfa
                 Notes
               </label>
               <textarea
+                pTextarea
                 id="notes"
                 formControlName="notes"
                 rows="3"
-                class="w-full p-2 border rounded"
+                class="w-full"
                 placeholder="Additional notes...">
               </textarea>
             </div>
@@ -243,8 +256,8 @@ import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfa
   styles: [`
     :host ::ng-deep {
       .p-inputnumber,
-      .p-calendar,
-      .p-dropdown {
+      .p-datepicker,
+      .p-select {
         width: 100%;
       }
     }
@@ -300,7 +313,7 @@ export class DebtFormComponent implements OnInit {
   }
 
   initForm() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.debtForm = this.fb.group({
       debtType: ['', Validators.required],
       creditorName: ['', Validators.required],
@@ -310,7 +323,7 @@ export class DebtFormComponent implements OnInit {
       interestRate: [null, [Validators.required, Validators.min(0)]],
       compoundingFrequency: ['MONTHLY', Validators.required],
       takenDate: [today, Validators.required],
-      dueDate: ['', Validators.required],
+      dueDate: [null, Validators.required],
       paymentSchedule: ['', Validators.required],
       branchId: [''],
       purpose: [''],
@@ -342,8 +355,8 @@ export class DebtFormComponent implements OnInit {
           principalAmount: debt.principalAmount,
           interestRate: debt.interestRate,
           compoundingFrequency: debt.compoundingFrequency,
-          takenDate: debt.takenDate.split('T')[0],
-          dueDate: debt.dueDate.split('T')[0],
+          takenDate: new Date(debt.takenDate),
+          dueDate: new Date(debt.dueDate),
           paymentSchedule: debt.paymentSchedule,
           branchId: debt.branchId || '',
           purpose: '',
@@ -381,8 +394,8 @@ export class DebtFormComponent implements OnInit {
       principalAmount: formValue.principalAmount,
       interestRate: formValue.interestRate,
       compoundingFrequency: formValue.compoundingFrequency as CompoundingFrequency,
-      takenDate: formValue.takenDate,
-      dueDate: formValue.dueDate,
+      takenDate: formValue.takenDate instanceof Date ? formValue.takenDate.toISOString().split('T')[0] : formValue.takenDate,
+      dueDate: formValue.dueDate instanceof Date ? formValue.dueDate.toISOString().split('T')[0] : formValue.dueDate,
       paymentSchedule: formValue.paymentSchedule as PaymentSchedule,
       branchId: formValue.branchId || undefined,
       collateral: formValue.collateral || undefined,

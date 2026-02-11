@@ -80,17 +80,29 @@ CREATE TABLE classes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     course_id UUID NOT NULL,
     branch_id UUID NOT NULL,
-    schedule JSONB,
+    instructor_id UUID,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    start_time TIME,
+    end_time TIME,
+    days_of_week VARCHAR(50),
     max_students INTEGER,
+    current_enrollment INTEGER DEFAULT 0,
+    notes TEXT,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
+    UNIQUE(branch_id, code)
 );
 
 CREATE INDEX idx_classes_course_id ON classes(course_id);
 CREATE INDEX idx_classes_branch_id ON classes(branch_id);
+CREATE INDEX idx_classes_instructor_id ON classes(instructor_id);
 
 -- =============================================
 -- STUDENTS TABLE
@@ -313,19 +325,23 @@ CREATE INDEX idx_debt_payments_payment_date ON debt_payments(payment_date);
 -- =============================================
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    branch_id UUID NOT NULL,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50),
-    description TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    cost DECIMAL(10, 2),
-    stock_quantity INTEGER DEFAULT 0,
-    min_stock_level INTEGER DEFAULT 0,
+    code VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    cost_price DECIMAL(10, 2) NOT NULL,
+    selling_price DECIMAL(10, 2) NOT NULL,
+    stock INTEGER DEFAULT 0 NOT NULL,
+    min_stock INTEGER DEFAULT 0 NOT NULL,
+    unit VARCHAR(50) NOT NULL,
+    is_global BOOLEAN DEFAULT false NOT NULL,
+    branch_id UUID,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    UNIQUE(branch_id, code)
+    UNIQUE(branch_id, code),
+    CHECK ((is_global = true AND branch_id IS NULL) OR (is_global = false AND branch_id IS NOT NULL))
 );
 
 CREATE INDEX idx_products_branch_id ON products(branch_id);

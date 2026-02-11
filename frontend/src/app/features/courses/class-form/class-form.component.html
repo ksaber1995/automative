@@ -17,12 +17,14 @@
             Class Name <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             type="text"
             id="name"
             formControlName="name"
             placeholder="e.g., Section A, Morning Class"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('name')?.invalid && classForm.get('name')?.touched" />
+            class="w-full"
+            [class.ng-invalid]="classForm.get('name')?.invalid && classForm.get('name')?.touched"
+            [class.ng-dirty]="classForm.get('name')?.touched" />
           @if (classForm.get('name')?.invalid && classForm.get('name')?.touched) {
             <small class="text-red-500">Class name is required (min 2 characters)</small>
           }
@@ -34,90 +36,109 @@
             Class Code <span class="text-red-500">*</span>
           </label>
           <input
+            pInputText
             type="text"
             id="code"
             formControlName="code"
             placeholder="e.g., ROB-101-A"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('code')?.invalid && classForm.get('code')?.touched" />
+            class="w-full"
+            [class.ng-invalid]="classForm.get('code')?.invalid && classForm.get('code')?.touched"
+            [class.ng-dirty]="classForm.get('code')?.touched" />
           @if (classForm.get('code')?.invalid && classForm.get('code')?.touched) {
             <small class="text-red-500">Class code is required (min 2 characters)</small>
           }
         </div>
 
-        <!-- Teacher -->
-        <div class="field md:col-span-2">
-          <label for="teacherId" class="block text-sm font-medium text-gray-700 mb-2">
-            Teacher <span class="text-red-500">*</span>
+        <!-- Branch -->
+        <div class="field">
+          <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
+            Branch <span class="text-red-500">*</span>
           </label>
-          <select
-            id="teacherId"
-            formControlName="teacherId"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('teacherId')?.invalid && classForm.get('teacherId')?.touched">
-            <option value="">Select a teacher</option>
-            @for (teacher of teachers(); track teacher.value) {
-              <option [value]="teacher.value">{{ teacher.label }}</option>
-            }
-          </select>
-          @if (classForm.get('teacherId')?.invalid && classForm.get('teacherId')?.touched) {
-            <small class="text-red-500">Teacher is required</small>
+          <p-select
+            id="branchId"
+            formControlName="branchId"
+            [options]="branches()"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select a branch"
+            styleClass="w-full"
+            [class.ng-invalid]="classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched"
+            [class.ng-dirty]="classForm.get('branchId')?.touched">
+          </p-select>
+          @if (classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched) {
+            <small class="text-red-500">Branch is required</small>
           }
+        </div>
+
+        <!-- Instructor -->
+        <div class="field">
+          <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
+            Instructor
+          </label>
+          <p-select
+            id="instructorId"
+            formControlName="instructorId"
+            [options]="instructors()"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select an instructor (optional)"
+            styleClass="w-full"
+            [class.ng-invalid]="classForm.get('instructorId')?.invalid && classForm.get('instructorId')?.touched"
+            [class.ng-dirty]="classForm.get('instructorId')?.touched">
+          </p-select>
+          <small class="text-gray-500">Defaults to course instructor if not specified</small>
         </div>
 
         <!-- Days of Week -->
         <div class="field md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Days of Week <span class="text-red-500">*</span>
+            Days of Week
           </label>
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-4">
             @for (day of daysOfWeek; track day.value) {
-              <label class="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div class="flex items-center">
+                <p-checkbox
                   [value]="day.value"
-                  (change)="onDayChange($event, day.value)"
-                  [checked]="isDaySelected(day.value)"
-                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                <span class="text-sm">{{ day.label }}</span>
-              </label>
+                  [ngModel]="isDaySelected(day.value)"
+                  (ngModelChange)="onDayChange($event, day.value)"
+                  [binary]="true"
+                  [inputId]="'day-' + day.value">
+                </p-checkbox>
+                <label [for]="'day-' + day.value" class="ml-2 text-sm">{{ day.label }}</label>
+              </div>
             }
           </div>
-          @if (classForm.get('days')?.invalid && classForm.get('days')?.touched) {
-            <small class="text-red-500">At least one day must be selected</small>
-          }
+          <small class="text-gray-500">Select the days when this class meets</small>
         </div>
 
         <!-- Start Time -->
         <div class="field">
           <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">
-            Start Time <span class="text-red-500">*</span>
+            Start Time
           </label>
           <input
+            pInputText
             type="time"
             id="startTime"
             formControlName="startTime"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched" />
-          @if (classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched) {
-            <small class="text-red-500">Start time is required</small>
-          }
+            class="w-full"
+            [class.ng-invalid]="classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched"
+            [class.ng-dirty]="classForm.get('startTime')?.touched" />
         </div>
 
         <!-- End Time -->
         <div class="field">
           <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">
-            End Time <span class="text-red-500">*</span>
+            End Time
           </label>
           <input
+            pInputText
             type="time"
             id="endTime"
             formControlName="endTime"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched" />
-          @if (classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched) {
-            <small class="text-red-500">End time is required</small>
-          }
+            class="w-full"
+            [class.ng-invalid]="classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched"
+            [class.ng-dirty]="classForm.get('endTime')?.touched" />
         </div>
 
         <!-- Start Date -->
@@ -125,12 +146,15 @@
           <label for="startDate" class="block text-sm font-medium text-gray-700 mb-2">
             Start Date <span class="text-red-500">*</span>
           </label>
-          <input
-            type="date"
+          <p-datepicker
             id="startDate"
             formControlName="startDate"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched" />
+            placeholder="Select start date"
+            styleClass="w-full"
+            [showIcon]="true"
+            [class.ng-invalid]="classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched"
+            [class.ng-dirty]="classForm.get('startDate')?.touched">
+          </p-datepicker>
           @if (classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched) {
             <small class="text-red-500">Start date is required</small>
           }
@@ -141,12 +165,15 @@
           <label for="endDate" class="block text-sm font-medium text-gray-700 mb-2">
             End Date <span class="text-red-500">*</span>
           </label>
-          <input
-            type="date"
+          <p-datepicker
             id="endDate"
             formControlName="endDate"
-            class="w-full p-2 border border-gray-300 rounded"
-            [class.border-red-500]="classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched" />
+            placeholder="Select end date"
+            styleClass="w-full"
+            [showIcon]="true"
+            [class.ng-invalid]="classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched"
+            [class.ng-dirty]="classForm.get('endDate')?.touched">
+          </p-datepicker>
           @if (classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched) {
             <small class="text-red-500">End date is required</small>
           }
@@ -157,13 +184,14 @@
           <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
             Maximum Students (Optional)
           </label>
-          <input
-            type="number"
+          <p-inputnumber
             id="maxStudents"
             formControlName="maxStudents"
-            min="1"
+            [min]="1"
             placeholder="Leave empty for unlimited"
-            class="w-full p-2 border border-gray-300 rounded" />
+            styleClass="w-full"
+            [showButtons]="false">
+          </p-inputnumber>
         </div>
 
         <!-- Notes -->
@@ -172,11 +200,12 @@
             Notes
           </label>
           <textarea
+            pTextarea
             id="notes"
             formControlName="notes"
             rows="4"
             placeholder="Additional notes about this class"
-            class="w-full p-2 border border-gray-300 rounded">
+            class="w-full">
           </textarea>
         </div>
       </div>

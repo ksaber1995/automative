@@ -1,14 +1,20 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormArray } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
+import { TextareaModule } from 'primeng/textarea';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ClassService } from '../services/class.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
+import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { DayOfWeek } from '@shared/interfaces/class.interface';
 
 @Component({
   selector: 'app-class-form',
@@ -16,8 +22,15 @@ import { DayOfWeek } from '@shared/interfaces/class.interface';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     CardModule,
-    ButtonModule
+    ButtonModule,
+    InputTextModule,
+    InputNumberModule,
+    SelectModule,
+    DatePickerModule,
+    TextareaModule,
+    CheckboxModule
   ],
   templateUrl: './class-form.component.html',
   styleUrl: './class-form.component.scss'
@@ -27,6 +40,7 @@ export class ClassFormComponent implements OnInit {
   private classService = inject(ClassService);
   private employeeService = inject(EmployeeService);
   private courseService = inject(CourseService);
+  private branchService = inject(BranchService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -36,27 +50,30 @@ export class ClassFormComponent implements OnInit {
   isEditMode = signal(false);
   courseId: string | null = null;
   classId: string | null = null;
-  teachers = signal<any[]>([]);
+  instructors = signal<any[]>([]);
+  branches = signal<any[]>([]);
   courseName = signal<string>('');
+  courseDefaultInstructor = signal<string | null>(null);
 
   daysOfWeek = [
-    { label: 'Sunday', value: DayOfWeek.SUNDAY },
-    { label: 'Monday', value: DayOfWeek.MONDAY },
-    { label: 'Tuesday', value: DayOfWeek.TUESDAY },
-    { label: 'Wednesday', value: DayOfWeek.WEDNESDAY },
-    { label: 'Thursday', value: DayOfWeek.THURSDAY },
-    { label: 'Friday', value: DayOfWeek.FRIDAY },
-    { label: 'Saturday', value: DayOfWeek.SATURDAY }
+    { label: 'Sunday', value: 'SUNDAY' },
+    { label: 'Monday', value: 'MONDAY' },
+    { label: 'Tuesday', value: 'TUESDAY' },
+    { label: 'Wednesday', value: 'WEDNESDAY' },
+    { label: 'Thursday', value: 'THURSDAY' },
+    { label: 'Friday', value: 'FRIDAY' },
+    { label: 'Saturday', value: 'SATURDAY' }
   ];
 
   constructor() {
     this.classForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
       code: ['', [Validators.required, Validators.minLength(2)]],
-      teacherId: ['', [Validators.required]],
-      days: [[], [Validators.required, Validators.minLength(1)]],
-      startTime: ['', [Validators.required]],
-      endTime: ['', [Validators.required]],
+      branchId: ['', [Validators.required]],
+      instructorId: [''],
+      daysOfWeek: [[]],
+      startTime: [''],
+      endTime: [''],
       startDate: ['', [Validators.required]],
       endDate: ['', [Validators.required]],
       maxStudents: [null],
@@ -75,7 +92,8 @@ export class ClassFormComponent implements OnInit {
     }
 
     this.loadCourse(this.courseId);
-    this.loadTeachers();
+    this.loadInstructors();
+    this.loadBranches();
 
     if (this.classId) {
       this.isEditMode.set(true);
@@ -87,6 +105,15 @@ export class ClassFormComponent implements OnInit {
     this.courseService.getCourseById(id).subscribe({
       next: (course) => {
         this.courseName.set(course.name);
+        this.courseDefaultInstructor.set(course.instructorId || null);
+
+        // Auto-select course's branch and instructor if creating new class
+        if (!this.isEditMode()) {
+          this.classForm.patchValue({
+            branchId: course.branchId,
+            instructorId: course.instructorId
+          });
+        }
       },
       error: () => {
         this.notificationService.error('Failed to load course');
@@ -95,18 +122,32 @@ export class ClassFormComponent implements OnInit {
     });
   }
 
-  loadTeachers() {
+  loadInstructors() {
     this.employeeService.getAllEmployees().subscribe({
       next: (employees) => {
         // Filter for active employees only
         const activeEmployees = employees.filter(emp => emp.isActive);
-        this.teachers.set(activeEmployees.map(emp => ({
-          label: `${emp.firstName} ${emp.lastName} - ${emp.position}`,
+        this.instructors.set(activeEmployees.map(emp => ({
+          label: `${emp.firstName} ${emp.lastName}${emp.position ? ' - ' + emp.position : ''}`,
           value: emp.id
         })));
       },
       error: () => {
-        this.notificationService.error('Failed to load teachers');
+        this.notificationService.error('Failed to load instructors');
+      }
+    });
+  }
+
+  loadBranches() {
+    this.branchService.getActiveBranches().subscribe({
+      next: (branches) => {
+        this.branches.set(branches.map(branch => ({
+          label: branch.name,
+          value: branch.id
+        })));
+      },
+      error: () => {
+        this.notificationService.error('Failed to load branches');
       }
     });
   }
@@ -115,13 +156,17 @@ export class ClassFormComponent implements OnInit {
     this.loading.set(true);
     this.classService.getClassById(id).subscribe({
       next: (classData) => {
+        // Parse daysOfWeek string (e.g., "MONDAY,WEDNESDAY") to array
+        const daysArray = classData.daysOfWeek ? classData.daysOfWeek.split(',') : [];
+
         this.classForm.patchValue({
           name: classData.name,
           code: classData.code,
-          teacherId: classData.teacherId,
-          days: classData.schedule.days,
-          startTime: classData.schedule.startTime,
-          endTime: classData.schedule.endTime,
+          branchId: classData.branchId,
+          instructorId: classData.instructorId,
+          daysOfWeek: daysArray,
+          startTime: classData.startTime,
+          endTime: classData.endTime,
           startDate: new Date(classData.startDate),
           endDate: new Date(classData.endDate),
           maxStudents: classData.maxStudents,
@@ -137,21 +182,20 @@ export class ClassFormComponent implements OnInit {
     });
   }
 
-  onDayChange(event: Event, day: DayOfWeek) {
-    const checkbox = event.target as HTMLInputElement;
-    const days = this.classForm.get('days')?.value || [];
+  onDayChange(checked: boolean, day: string) {
+    const days = this.classForm.get('daysOfWeek')?.value || [];
 
-    if (checkbox.checked) {
+    if (checked) {
       if (!days.includes(day)) {
-        this.classForm.patchValue({ days: [...days, day] });
+        this.classForm.patchValue({ daysOfWeek: [...days, day] });
       }
     } else {
-      this.classForm.patchValue({ days: days.filter((d: DayOfWeek) => d !== day) });
+      this.classForm.patchValue({ daysOfWeek: days.filter((d: string) => d !== day) });
     }
   }
 
-  isDaySelected(day: DayOfWeek): boolean {
-    const days = this.classForm.get('days')?.value || [];
+  isDaySelected(day: string): boolean {
+    const days = this.classForm.get('daysOfWeek')?.value || [];
     return days.includes(day);
   }
 
@@ -165,23 +209,31 @@ export class ClassFormComponent implements OnInit {
     const formValue = this.classForm.value;
 
     // Convert dates to ISO strings
-    const startDate = formValue.startDate;
-    const endDate = formValue.endDate;
+    const startDate = formValue.startDate instanceof Date
+      ? formValue.startDate.toISOString().split('T')[0]
+      : formValue.startDate;
+    const endDate = formValue.endDate instanceof Date
+      ? formValue.endDate.toISOString().split('T')[0]
+      : formValue.endDate;
 
-    const classData = {
+    // Convert daysOfWeek array to comma-separated string
+    const daysOfWeek = formValue.daysOfWeek && formValue.daysOfWeek.length > 0
+      ? formValue.daysOfWeek.join(',')
+      : undefined;
+
+    const classData: any = {
       courseId: this.courseId!,
+      branchId: formValue.branchId,
       name: formValue.name,
       code: formValue.code,
-      teacherId: formValue.teacherId,
-      schedule: {
-        days: formValue.days,
-        startTime: formValue.startTime,
-        endTime: formValue.endTime
-      },
+      instructorId: formValue.instructorId || undefined,
       startDate,
       endDate,
-      maxStudents: formValue.maxStudents,
-      notes: formValue.notes
+      startTime: formValue.startTime || undefined,
+      endTime: formValue.endTime || undefined,
+      daysOfWeek,
+      maxStudents: formValue.maxStudents || undefined,
+      notes: formValue.notes || undefined
     };
 
     if (this.isEditMode() && this.classId) {

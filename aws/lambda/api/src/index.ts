@@ -14,6 +14,7 @@ import { authRoutes } from './routes/auth';
 import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
+import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
 import { analyticsRoutes } from './routes/analytics';
@@ -24,6 +25,8 @@ import { productSalesRoutes } from './routes/product-sales';
 import { debtsRoutes } from './routes/debts';
 import { cashRoutes } from './routes/cash';
 import { reportsRoutes } from './routes/reports';
+import { enrollmentsRoutes } from './routes/enrollments';
+import { migrationsRoutes } from './routes/migrations';
 
 // Create the router implementation
 const router = {
@@ -31,6 +34,8 @@ const router = {
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,
+  classes: classesRoutes,
+  enrollments: enrollmentsRoutes,
   revenues: revenuesRoutes,
   expenses: expensesRoutes,
   analytics: analyticsRoutes,
@@ -41,6 +46,7 @@ const router = {
   debts: debtsRoutes,
   cash: cashRoutes,
   reports: reportsRoutes,
+  migrations: migrationsRoutes,
 };
 
 // Create the Lambda handler

@@ -4,6 +4,8 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { DatePickerModule } from 'primeng/datepicker';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -15,7 +17,9 @@ import { Branch } from '@shared/interfaces/branch.interface';
     CommonModule,
     ReactiveFormsModule,
     CardModule,
-    ButtonModule
+    ButtonModule,
+    InputTextModule,
+    DatePickerModule
   ],
   templateUrl: './branch-form.component.html',
   styleUrl: './branch-form.component.scss'
@@ -33,7 +37,7 @@ export class BranchFormComponent implements OnInit {
   branchId: string | null = null;
 
   constructor() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.branchForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(3)]],
       code: ['', [Validators.required, Validators.minLength(2)]],
@@ -62,7 +66,7 @@ export class BranchFormComponent implements OnInit {
       next: (branch) => {
         this.branchForm.patchValue({
           ...branch,
-          openingDate: branch.openingDate.split('T')[0]
+          openingDate: new Date(branch.openingDate)
         });
         this.loading.set(false);
       },
@@ -81,7 +85,17 @@ export class BranchFormComponent implements OnInit {
     }
 
     this.loading.set(true);
-    const branchData = this.branchForm.value;
+    const formValue = this.branchForm.value;
+
+    // Clean the data: convert empty strings to undefined for optional UUID fields
+    // Convert Date object to ISO string for API
+    const branchData = {
+      ...formValue,
+      managerId: formValue.managerId?.trim() || undefined,
+      openingDate: formValue.openingDate instanceof Date
+        ? formValue.openingDate.toISOString().split('T')[0]
+        : formValue.openingDate,
+    };
 
     if (this.isEditMode() && this.branchId) {
       this.branchService.updateBranch(this.branchId, branchData).subscribe({

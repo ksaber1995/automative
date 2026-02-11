@@ -3,14 +3,17 @@ import { insert, update, findById, query } from '../db/connection';
 function mapProductFromDB(row: any) {
   return {
     id: row.id,
-    branchId: row.branch_id,
     name: row.name,
     code: row.code,
     description: row.description,
-    price: parseFloat(row.price),
-    cost: row.cost ? parseFloat(row.cost) : null,
-    stockQuantity: parseInt(row.stock_quantity) || 0,
-    minStockLevel: row.min_stock_level ? parseInt(row.min_stock_level) : null,
+    category: row.category,
+    costPrice: parseFloat(row.cost_price),
+    sellingPrice: parseFloat(row.selling_price),
+    stock: parseInt(row.stock) || 0,
+    minStock: parseInt(row.min_stock) || 0,
+    unit: row.unit,
+    isGlobal: row.is_global,
+    branchId: row.branch_id,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -21,14 +24,17 @@ export const productsRoutes = {
   create: async ({ body }: { body: any }) => {
     try {
       const product = await insert('products', {
-        branch_id: body.branchId,
         name: body.name,
-        code: body.code || null,
-        description: body.description || null,
-        price: body.price,
-        cost: body.cost || null,
-        stock_quantity: body.stockQuantity || 0,
-        min_stock_level: body.minStockLevel || null,
+        code: body.code,
+        description: body.description,
+        category: body.category,
+        cost_price: body.costPrice,
+        selling_price: body.sellingPrice,
+        stock: body.stock,
+        min_stock: body.minStock,
+        unit: body.unit,
+        is_global: body.isGlobal,
+        branch_id: body.isGlobal ? null : body.branchId,
         is_active: true,
       });
 
@@ -73,12 +79,12 @@ export const productsRoutes = {
 
   getAvailable: async ({ params }: { params: { branchId: string } }) => {
     try {
-      // Get products that are active and have stock > 0 for this branch
+      // Get products that are active and have stock > 0 for this branch (including global products)
       const sql = `
         SELECT * FROM products
         WHERE is_active = true
-        AND stock_quantity > 0
-        AND branch_id = $1
+        AND stock > 0
+        AND (branch_id = $1 OR is_global = true)
         ORDER BY name ASC
       `;
 
@@ -102,17 +108,16 @@ export const productsRoutes = {
       let sql = `
         SELECT * FROM products
         WHERE is_active = true
-        AND min_stock_level IS NOT NULL
-        AND stock_quantity <= min_stock_level
+        AND stock <= min_stock
       `;
       const params: any[] = [];
 
       if (queryParams.branchId) {
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
       }
 
-      sql += ' ORDER BY stock_quantity ASC';
+      sql += ' ORDER BY stock ASC';
 
       const products = await query(sql, params);
       return {
@@ -156,14 +161,16 @@ export const productsRoutes = {
     try {
       const updateData: any = {};
 
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
       if (body.name !== undefined) updateData.name = body.name;
       if (body.code !== undefined) updateData.code = body.code;
       if (body.description !== undefined) updateData.description = body.description;
-      if (body.price !== undefined) updateData.price = body.price;
-      if (body.cost !== undefined) updateData.cost = body.cost;
-      if (body.stockQuantity !== undefined) updateData.stock_quantity = body.stockQuantity;
-      if (body.minStockLevel !== undefined) updateData.min_stock_level = body.minStockLevel;
+      if (body.category !== undefined) updateData.category = body.category;
+      if (body.costPrice !== undefined) updateData.cost_price = body.costPrice;
+      if (body.sellingPrice !== undefined) updateData.selling_price = body.sellingPrice;
+      if (body.stock !== undefined) updateData.stock = body.stock;
+      if (body.minStock !== undefined) updateData.min_stock = body.minStock;
+      if (body.unit !== undefined) updateData.unit = body.unit;
+      if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
       const product = await update('products', params.id, updateData);
 
@@ -199,7 +206,7 @@ export const productsRoutes = {
         };
       }
 
-      const currentStock = parseInt(product.stock_quantity) || 0;
+      const currentStock = parseInt(product.stock) || 0;
       let newStock: number;
 
       if (body.operation === 'add') {
@@ -214,7 +221,7 @@ export const productsRoutes = {
       }
 
       // Update stock
-      const updatedProduct = await update('products', params.id, { stock_quantity: newStock });
+      const updatedProduct = await update('products', params.id, { stock: newStock });
 
       if (!updatedProduct) {
         return {

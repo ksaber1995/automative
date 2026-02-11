@@ -141,4 +141,28 @@ export const branchesRoutes = {
       };
     }
   },
+
+  delete: async ({ params }: { params: { id: string } }) => {
+    try {
+      const branch = await update('branches', params.id, { is_active: false });
+
+      if (!branch) {
+        return {
+          status: 404 as const,
+          body: { message: 'Branch not found' },
+        };
+      }
+
+      return {
+        status: 200 as const,
+        body: { message: 'Branch deleted successfully' },
+      };
+    } catch (error) {
+      console.error('Delete branch error:', error);
+      return {
+        status: 404 as const,
+        body: { message: 'Failed to delete branch' },
+      };
+    }
+  },
 };

@@ -5,12 +5,11 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { ConfirmationService } from 'primeng/api';
 import { CourseService } from '../services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { Course } from '@shared/interfaces/course.interface';
+import { Course, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-course-list',
@@ -21,10 +20,9 @@ import { Course } from '@shared/interfaces/course.interface';
     TableModule,
     ButtonModule,
     TagModule,
-    ConfirmDialogModule,
-    TooltipModule
+    TooltipModule,
+    DeleteConfirmDialogComponent
   ],
-  providers: [ConfirmationService],
   template: `
     <div class="container-custom py-8">
       <div class="flex justify-between items-center mb-6">
@@ -46,10 +44,10 @@ import { Course } from '@shared/interfaces/course.interface';
             <tr>
               <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
               <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
-              <th pSortableColumn="level">Level <p-sortIcon field="level"></p-sortIcon></th>
-              <th pSortableColumn="duration">Duration</th>
+              <th pSortableColumn="duration">Duration (weeks)</th>
               <th pSortableColumn="price">Price <p-sortIcon field="price"></p-sortIcon></th>
               <th>Max Students</th>
+              <th>Enrollments</th>
               <th pSortableColumn="isActive">Status <p-sortIcon field="isActive"></p-sortIcon></th>
               <th>Actions</th>
             </tr>
@@ -58,10 +56,12 @@ import { Course } from '@shared/interfaces/course.interface';
             <tr>
               <td>{{ course.code }}</td>
               <td>{{ course.name }}</td>
-              <td><p-tag [value]="course.level" severity="info"></p-tag></td>
-              <td>{{ course.duration }}</td>
+              <td>{{ course.duration }} weeks</td>
               <td>\${{ course.price.toFixed(2) }}</td>
-              <td>{{ course.maxStudents || 'N/A' }}</td>
+              <td>{{ course.maxStudents || 'Unlimited' }}</td>
+              <td>
+                <p-tag [value]="course.enrollmentCount || 0" severity="info"></p-tag>
+              </td>
               <td>
                 <p-tag
                   [value]="course.isActive ? 'Active' : 'Inactive'"
@@ -92,8 +92,8 @@ import { Course } from '@shared/interfaces/course.interface';
                       [rounded]="true"
                       [text]="true"
                       severity="danger"
-                      (onClick)="deleteCourse(course)"
-                      pTooltip="Deactivate"
+                      (onClick)="confirmDelete(course)"
+                      pTooltip="Delete"
                     ></p-button>
                   }
                 </div>
@@ -112,7 +112,13 @@ import { Course } from '@shared/interfaces/course.interface';
           </ng-template>
         </p-table>
       </p-card>
-      <p-confirmDialog></p-confirmDialog>
+
+      <app-delete-confirm-dialog
+        [(visible)]="showDeleteDialog"
+        [header]="'Delete Course'"
+        [message]="'Are you sure you want to delete ' + courseToDelete()?.name + '? This will permanently remove the course and all associated data.'"
+        (confirm)="deleteCourse()"
+      ></app-delete-confirm-dialog>
     </div>
   `
 })
@@ -120,10 +126,11 @@ export class CourseListComponent implements OnInit {
   private courseService = inject(CourseService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
-  private confirmationService = inject(ConfirmationService);
 
-  courses = signal<Course[]>([]);
+  courses = signal<CourseWithEnrollmentCount[]>([]);
   loading = signal(true);
+  showDeleteDialog = false;
+  courseToDelete = signal<CourseWithEnrollmentCount | null>(null);
 
   ngOnInit() {
     this.loadCourses();
@@ -140,26 +147,33 @@ export class CourseListComponent implements OnInit {
     });
   }
 
-  viewCourse(course: Course) {
+  viewCourse(course: CourseWithEnrollmentCount) {
     this.router.navigate(['/courses', course.id]);
   }
 
-  editCourse(course: Course) {
+  editCourse(course: CourseWithEnrollmentCount) {
     this.router.navigate(['/courses', course.id, 'edit']);
   }
 
-  deleteCourse(course: Course) {
-    this.confirmationService.confirm({
-      message: `Are you sure you want to deactivate ${course.name}?`,
-      header: 'Confirm Deactivation',
-      icon: 'pi pi-exclamation-triangle',
-      accept: () => {
-        this.courseService.deleteCourse(course.id).subscribe({
-          next: () => {
-            this.notificationService.success('Course deactivated successfully');
-            this.loadCourses();
-          }
-        });
+  confirmDelete(course: CourseWithEnrollmentCount) {
+    this.courseToDelete.set(course);
+    this.showDeleteDialog = true;
+  }
+
+  deleteCourse() {
+    const course = this.courseToDelete();
+    if (!course) return;
+
+    this.courseService.deleteCourse(course.id).subscribe({
+      next: () => {
+        this.notificationService.success('Course deleted successfully');
+        this.loadCourses();
+        this.showDeleteDialog = false;
+        this.courseToDelete.set(null);
+      },
+      error: () => {
+        this.notificationService.error('Failed to delete course');
+        this.showDeleteDialog = false;
       }
     });
   }

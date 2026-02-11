@@ -1,16 +1,15 @@
 import { Routes } from '@angular/router';
 
-export const REVENUES_ROUTES: Routes = [
+export const revenuesRoutes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./revenue-list/revenue-list.component').then(m => m.RevenueListComponent)
+    redirectTo: 'list',
+    pathMatch: 'full'
   },
   {
-    path: 'create',
-    loadComponent: () => import('./revenue-form/revenue-form.component').then(m => m.RevenueFormComponent)
-  },
-  {
-    path: ':id/edit',
-    loadComponent: () => import('./revenue-form/revenue-form.component').then(m => m.RevenueFormComponent)
+    path: 'list',
+    loadComponent: () =>
+      import('./revenue-list/revenue-list.component').then(m => m.RevenueListComponent),
+    title: 'Revenue List'
   }
 ];

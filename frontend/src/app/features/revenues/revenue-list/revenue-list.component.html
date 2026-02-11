@@ -1,12 +1,10 @@
 <div class="container mx-auto p-6">
   <p-card>
     <ng-template pTemplate="header">
-      <div class="flex justify-between items-center p-4">
-        <div>
-          <h2 class="text-2xl font-bold">Revenue Management</h2>
-          <p class="text-gray-600 mt-1">Total: {{ totalRevenue | currency }}</p>
-        </div>
-        <button pButton label="Add Revenue" icon="pi pi-plus" (click)="createRevenue()"></button>
+      <div class="p-4">
+        <h2 class="text-2xl font-bold">Revenue Tracking</h2>
+        <p class="text-gray-600 mt-1">Total Revenue: {{ totalRevenue | currency }}</p>
+        <p class="text-sm text-gray-500 mt-1">Revenues are automatically generated from course enrollments and product sales</p>
       </div>
     </ng-template>
 
@@ -37,28 +35,46 @@
         <tr>
           <th>Date</th>
           <th>Branch</th>
+          <th>Source</th>
           <th>Description</th>
           <th>Amount</th>
           <th>Payment Method</th>
           <th>Receipt #</th>
-          <th>Actions</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-revenue>
         <tr>
           <td>{{ revenue.date | date: 'MMM d, y' }}</td>
           <td>{{ getBranchName(revenue.branchId) }}</td>
-          <td>{{ revenue.description }}</td>
-          <td class="font-semibold">{{ revenue.amount | currency }}</td>
-          <td><p-tag [value]="revenue.paymentMethod" severity="info"></p-tag></td>
-          <td>{{ revenue.receiptNumber || '-' }}</td>
           <td>
-            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text" (click)="editRevenue(revenue)"></button>
-            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger" (click)="deleteRevenue(revenue)"></button>
+            <p-tag
+              [value]="getSourceBadge(revenue.source).label"
+              [severity]="getSourceBadge(revenue.source).severity">
+            </p-tag>
+          </td>
+          <td>{{ revenue.description }}</td>
+          <td class="font-semibold text-green-600">{{ revenue.amount | currency }}</td>
+          <td>
+            @if (revenue.paymentMethod) {
+              <p-tag [value]="revenue.paymentMethod" severity="info"></p-tag>
+            } @else {
+              <span class="text-gray-400">-</span>
+            }
+          </td>
+          <td>{{ revenue.receiptNumber || '-' }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-inbox text-4xl mb-3"></i>
+              <p>No revenue records found</p>
+              <p class="text-sm mt-2">Revenue will appear when you create course enrollments or product sales</p>
+            </div>
           </td>
         </tr>
       </ng-template>
     </p-table>
   </p-card>
-  <p-confirmDialog></p-confirmDialog>
 </div>

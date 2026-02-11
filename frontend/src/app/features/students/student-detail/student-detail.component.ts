@@ -1,67 +1,67 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import { DialogModule } from 'primeng/dialog';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService } from 'primeng/api';
-import { StudentService, Enrollment } from '../services/student.service';
+import { TooltipModule } from 'primeng/tooltip';
+import { StudentService } from '../services/student.service';
+import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Student } from '@shared/interfaces/student.interface';
+import { Enrollment } from '@shared/interfaces/enrollment.interface';
+import { Course } from '@shared/interfaces/course.interface';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-student-detail',
   standalone: true,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
     CardModule,
     ButtonModule,
     TableModule,
     TagModule,
-    DialogModule,
-    ConfirmDialogModule
+    TooltipModule,
+    DeleteConfirmDialogComponent
   ],
-  providers: [ConfirmationService],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss'
 })
 export class StudentDetailComponent implements OnInit {
   private studentService = inject(StudentService);
+  private enrollmentService = inject(EnrollmentService);
+  private courseService = inject(CourseService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  private fb = inject(FormBuilder);
   private notificationService = inject(NotificationService);
-  private confirmationService = inject(ConfirmationService);
 
   student = signal<Student | null>(null);
   enrollments = signal<Enrollment[]>([]);
+  courses = new Map<string, Course>();
   loading = signal(true);
-  showEnrollDialog = signal(false);
-  enrollForm: FormGroup;
-  courses = signal<any[]>([]);
+  showDeleteDialog = false;
+  enrollmentToDelete = signal<Enrollment | null>(null);
   studentId: string | null = null;
 
-  constructor() {
-    const today = new Date().toISOString().split('T')[0];
-    this.enrollForm = this.fb.group({
-      courseId: ['', Validators.required],
-      enrollmentDate: [today, Validators.required],
-      discountPercent: [0],
-      discountAmount: [0],
-      notes: ['']
-    });
-  }
-
-  ngOnInit() {
+  async ngOnInit() {
     this.studentId = this.route.snapshot.paramMap.get('id');
     if (this.studentId) {
+      // Load courses first for lookup
+      await this.loadCourses();
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
+    }
+  }
+
+  async loadCourses() {
+    try {
+      const courses = await this.courseService.getAllCourses().toPromise();
+      courses?.forEach(c => this.courses.set(c.id, c));
+    } catch (error) {
+      console.error('Failed to load courses', error);
     }
   }
 
@@ -81,7 +81,7 @@ export class StudentDetailComponent implements OnInit {
   }
 
   loadEnrollments(id: string) {
-    this.studentService.getEnrollments(id).subscribe({
+    this.enrollmentService.getEnrollmentsByStudent(id).subscribe({
       next: (enrollments) => {
         this.enrollments.set(enrollments);
       },
@@ -112,56 +112,52 @@ export class StudentDetailComponent implements OnInit {
     this.router.navigate(['/students']);
   }
 
-  openEnrollDialog() {
-    this.showEnrollDialog.set(true);
-    // In a real app, load available courses here
-  }
-
-  closeEnrollDialog() {
-    this.showEnrollDialog.set(false);
-    this.enrollForm.reset({
-      enrollmentDate: new Date().toISOString().split('T')[0],
-      discountPercent: 0,
-      discountAmount: 0
+  enrollStudent() {
+    this.router.navigate(['/enrollments/create'], {
+      queryParams: { studentId: this.studentId }
     });
   }
 
-  enrollStudent() {
-    if (this.enrollForm.invalid || !this.studentId) {
-      this.enrollForm.markAllAsTouched();
-      return;
-    }
+  editEnrollment(enrollment: Enrollment) {
+    this.router.navigate(['/enrollments', enrollment.id, 'edit']);
+  }
 
-    this.studentService.enrollStudent(this.studentId, this.enrollForm.value).subscribe({
+  confirmDeleteEnrollment(enrollment: Enrollment) {
+    this.enrollmentToDelete.set(enrollment);
+    this.showDeleteDialog = true;
+  }
+
+  deleteEnrollment() {
+    const enrollment = this.enrollmentToDelete();
+    if (!enrollment || !this.studentId) return;
+
+    this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
       next: () => {
-        this.notificationService.success('Student enrolled successfully');
+        this.notificationService.success('Enrollment deleted successfully');
         this.loadEnrollments(this.studentId!);
-        this.closeEnrollDialog();
+        this.showDeleteDialog = false;
+        this.enrollmentToDelete.set(null);
       },
       error: () => {
-        this.notificationService.error('Failed to enroll student');
+        this.notificationService.error('Failed to delete enrollment');
+        this.showDeleteDialog = false;
       }
     });
   }
 
-  dropEnrollment(enrollment: Enrollment) {
-    this.confirmationService.confirm({
-      message: 'Are you sure you want to drop this enrollment?',
-      header: 'Confirm Drop',
-      icon: 'pi pi-exclamation-triangle',
-      accept: () => {
-        if (this.studentId) {
-          this.studentService.deleteEnrollment(this.studentId, enrollment.id).subscribe({
-            next: () => {
-              this.notificationService.success('Enrollment dropped');
-              this.loadEnrollments(this.studentId!);
-            },
-            error: () => {
-              this.notificationService.error('Failed to drop enrollment');
-            }
-          });
-        }
-      }
+  getCourseName(courseId: string): string {
+    return this.courses.get(courseId)?.name || 'Unknown Course';
+  }
+
+  getCourseCode(courseId: string): string {
+    return this.courses.get(courseId)?.code || 'N/A';
+  }
+
+  formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   }
 

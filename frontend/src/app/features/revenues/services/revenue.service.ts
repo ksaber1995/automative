@@ -1,13 +1,37 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Revenue, RevenueCreateDto, RevenueUpdateDto } from '@shared/interfaces/revenue.interface';
+
+export interface RevenueItem {
+  id: string;
+  branchId: string;
+  branchName: string;
+  source: 'ENROLLMENT' | 'PRODUCT_SALE';
+  sourceId: string;
+  amount: number;
+  description: string;
+  date: string;
+  paymentMethod: string | null;
+  paymentStatus: string | null;
+  studentName: string | null;
+  courseName: string | null;
+  productName: string | null;
+  createdAt: string;
+}
 
 export interface RevenueSummary {
-  total: number;
-  count: number;
-  average: number;
-  byPaymentMethod: Record<string, number>;
+  totalRevenue: number;
+  enrollmentRevenue: number;
+  productRevenue: number;
+  byBranch: Array<{
+    branchId: string;
+    branchName: string;
+    revenue: number;
+  }>;
+  byMonth: Array<{
+    month: string;
+    revenue: number;
+  }>;
 }
 
 @Injectable({
@@ -16,27 +40,22 @@ export interface RevenueSummary {
 export class RevenueService {
   private api = inject(ApiService);
 
-  getAllRevenues(params?: { branchId?: string; startDate?: string; endDate?: string }): Observable<Revenue[]> {
-    return this.api.get<Revenue[]>('revenues', params);
+  // Get revenue list (calculated from enrollments and product sales)
+  getRevenues(params?: {
+    branchId?: string;
+    source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'ALL';
+    startDate?: string;
+    endDate?: string;
+  }): Observable<RevenueItem[]> {
+    return this.api.get<RevenueItem[]>('revenues', params);
   }
 
-  getRevenueSummary(params?: { branchId?: string; startDate?: string; endDate?: string }): Observable<RevenueSummary> {
+  // Get revenue summary with aggregated data
+  getRevenueSummary(params?: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Observable<RevenueSummary> {
     return this.api.get<RevenueSummary>('revenues/summary', params);
-  }
-
-  getRevenueById(id: string): Observable<Revenue> {
-    return this.api.get<Revenue>(`revenues/${id}`);
-  }
-
-  createRevenue(revenue: RevenueCreateDto): Observable<Revenue> {
-    return this.api.post<Revenue>('revenues', revenue);
-  }
-
-  updateRevenue(id: string, revenue: RevenueUpdateDto): Observable<Revenue> {
-    return this.api.patch<Revenue>(`revenues/${id}`, revenue);
-  }
-
-  deleteRevenue(id: string): Observable<Revenue> {
-    return this.api.delete<Revenue>(`revenues/${id}`);
   }
 }

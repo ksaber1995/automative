@@ -6,6 +6,9 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
+import { TextareaModule } from 'primeng/textarea';
 import { WithdrawalService, CreateWithdrawalDto } from '../../../core/services/withdrawal.service';
 import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@shared/interfaces/withdrawal.interface';
 
@@ -18,7 +21,10 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
     CardModule,
     InputTextModule,
     InputNumberModule,
-    ButtonModule
+    ButtonModule,
+    SelectModule,
+    DatePickerModule,
+    TextareaModule
   ],
   template: `
     <div class="container mx-auto p-4 max-w-4xl">
@@ -55,11 +61,14 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
               <label for="withdrawalDate" class="block text-sm font-medium mb-2">
                 Withdrawal Date *
               </label>
-              <input
-                type="date"
+              <p-datepicker
                 id="withdrawalDate"
                 formControlName="withdrawalDate"
-                class="w-full p-2 border rounded" />
+                [showIcon]="true"
+                dateFormat="yy-mm-dd"
+                placeholder="Select date"
+                [style]="{ width: '100%' }">
+              </p-datepicker>
               @if (withdrawalForm.get('withdrawalDate')?.invalid && withdrawalForm.get('withdrawalDate')?.touched) {
                 <small class="text-red-500">Withdrawal date is required</small>
               }
@@ -69,15 +78,15 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
               <label for="category" class="block text-sm font-medium mb-2">
                 Category *
               </label>
-              <select
+              <p-select
                 id="category"
                 formControlName="category"
-                class="w-full p-2 border rounded">
-                <option value="">Select category</option>
-                @for (opt of categoryOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+                [options]="categoryOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select category"
+                [style]="{ width: '100%' }">
+              </p-select>
               @if (withdrawalForm.get('category')?.invalid && withdrawalForm.get('category')?.touched) {
                 <small class="text-red-500">Category is required</small>
               }
@@ -87,15 +96,15 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
               <label for="paymentMethod" class="block text-sm font-medium mb-2">
                 Payment Method *
               </label>
-              <select
+              <p-select
                 id="paymentMethod"
                 formControlName="paymentMethod"
-                class="w-full p-2 border rounded">
-                <option value="">Select payment method</option>
-                @for (opt of paymentMethodOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+                [options]="paymentMethodOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select payment method"
+                [style]="{ width: '100%' }">
+              </p-select>
               @if (withdrawalForm.get('paymentMethod')?.invalid && withdrawalForm.get('paymentMethod')?.touched) {
                 <small class="text-red-500">Payment method is required</small>
               }
@@ -121,10 +130,11 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
                 Notes
               </label>
               <textarea
+                pTextarea
                 id="notes"
                 formControlName="notes"
                 rows="3"
-                class="w-full p-2 border rounded"
+                class="w-full"
                 placeholder="Additional notes...">
               </textarea>
             </div>
@@ -248,7 +258,9 @@ import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@share
   `,
   styles: [`
     :host ::ng-deep {
-      .p-inputnumber {
+      .p-inputnumber,
+      .p-datepicker,
+      .p-select {
         width: 100%;
       }
     }
@@ -295,7 +307,7 @@ export class WithdrawalFormComponent implements OnInit {
   }
 
   initForm() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.withdrawalForm = this.fb.group({
       amount: [null, [Validators.required, Validators.min(0.01)]],
       withdrawalDate: [today, Validators.required],
@@ -342,7 +354,7 @@ export class WithdrawalFormComponent implements OnInit {
       next: (withdrawal) => {
         this.withdrawalForm.patchValue({
           amount: withdrawal.amount,
-          withdrawalDate: withdrawal.withdrawalDate.split('T')[0],
+          withdrawalDate: new Date(withdrawal.withdrawalDate),
           reason: withdrawal.reason,
           category: withdrawal.category,
           paymentMethod: withdrawal.paymentMethod,
@@ -382,7 +394,7 @@ export class WithdrawalFormComponent implements OnInit {
     const withdrawalDto: CreateWithdrawalDto = {
       amount: formValue.amount,
       stakeholders: formValue.stakeholders,
-      withdrawalDate: formValue.withdrawalDate,
+      withdrawalDate: formValue.withdrawalDate instanceof Date ? formValue.withdrawalDate.toISOString().split('T')[0] : formValue.withdrawalDate,
       reason: formValue.reason,
       category: formValue.category as WithdrawalCategory,
       paymentMethod: formValue.paymentMethod as PaymentMethod,

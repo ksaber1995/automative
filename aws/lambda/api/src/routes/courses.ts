@@ -10,9 +10,17 @@ function mapCourseFromDB(row: any) {
     price: parseFloat(row.price),
     duration: row.duration,
     maxStudents: row.max_students,
+    instructorId: row.instructor_id,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapCourseWithEnrollmentCountFromDB(row: any) {
+  return {
+    ...mapCourseFromDB(row),
+    enrollmentCount: parseInt(row.enrollment_count || '0', 10),
   };
 }
 
@@ -27,6 +35,7 @@ export const coursesRoutes = {
         price: body.price,
         duration: body.duration,
         max_students: body.maxStudents || null,
+        instructor_id: body.instructorId || null,
         is_active: true,
       });
 
@@ -45,20 +54,27 @@ export const coursesRoutes = {
 
   list: async ({ query: queryParams }: { query: { branchId?: string } }) => {
     try {
-      let sql = 'SELECT * FROM courses WHERE 1=1';
+      let sql = `
+        SELECT
+          c.*,
+          COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as enrollment_count
+        FROM courses c
+        LEFT JOIN enrollments e ON c.id = e.course_id AND e.status != 'DROPPED'
+        WHERE 1=1
+      `;
       const params: any[] = [];
 
       if (queryParams.branchId) {
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND c.branch_id = $${params.length}`;
       }
 
-      sql += ' ORDER BY created_at DESC';
+      sql += ' GROUP BY c.id ORDER BY c.created_at DESC';
 
       const courses = await query(sql, params);
       return {
         status: 200 as const,
-        body: courses.map(mapCourseFromDB),
+        body: courses.map(mapCourseWithEnrollmentCountFromDB),
       };
     } catch (error) {
       console.error('List courses error:', error);
@@ -130,6 +146,7 @@ export const coursesRoutes = {
       if (body.price !== undefined) updateData.price = body.price;
       if (body.duration !== undefined) updateData.duration = body.duration;
       if (body.maxStudents !== undefined) updateData.max_students = body.maxStudents;
+      if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
 
       const course = await update('courses', params.id, updateData);
 
@@ -149,6 +166,30 @@ export const coursesRoutes = {
       return {
         status: 404 as const,
         body: { message: 'Failed to update course' },
+      };
+    }
+  },
+
+  delete: async ({ params }: { params: { id: string } }) => {
+    try {
+      const course = await update('courses', params.id, { is_active: false });
+
+      if (!course) {
+        return {
+          status: 404 as const,
+          body: { message: 'Course not found' },
+        };
+      }
+
+      return {
+        status: 200 as const,
+        body: { message: 'Course deleted successfully' },
+      };
+    } catch (error) {
+      console.error('Delete course error:', error);
+      return {
+        status: 404 as const,
+        body: { message: 'Failed to delete course' },
       };
     }
   },

@@ -7,6 +7,10 @@ const c = initContract();
 // Common Schemas
 // =============================================
 const UUIDSchema = z.string().uuid();
+const OptionalUUIDSchema = z.preprocess(
+  (val) => (val === '' || val === null) ? undefined : val,
+  z.string().uuid().optional()
+);
 const DateStringSchema = z.string().datetime();
 
 // User Roles
@@ -48,7 +52,7 @@ const RegisterRequestSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   role: UserRoleSchema,
-  branchId: UUIDSchema.optional(),
+  branchId: OptionalUUIDSchema,
 });
 
 const AuthResponseSchema = z.object({
@@ -118,7 +122,7 @@ const CreateBranchSchema = z.object({
   zipCode: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional(),
-  managerId: UUIDSchema.optional(),
+  managerId: OptionalUUIDSchema,
   openingDate: z.string().optional(),
 });
 
@@ -152,6 +156,7 @@ const CreateCourseSchema = z.object({
   price: z.number(),
   duration: z.number(),
   maxStudents: z.number().optional(),
+  instructorId: OptionalUUIDSchema,
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
@@ -165,6 +170,59 @@ const CourseSchema = z.object({
   price: z.number(),
   duration: z.number(),
   maxStudents: z.number().nullable(),
+  instructorId: UUIDSchema.nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
+// Class Schemas
+// =============================================
+const CreateClassSchema = z.object({
+  courseId: UUIDSchema,
+  branchId: UUIDSchema,
+  instructorId: OptionalUUIDSchema,
+  name: z.string(),
+  code: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  daysOfWeek: z.string().optional(),
+  maxStudents: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+const UpdateClassSchema = z.object({
+  instructorId: OptionalUUIDSchema,
+  name: z.string().optional(),
+  code: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  daysOfWeek: z.string().optional(),
+  maxStudents: z.number().optional(),
+  notes: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const ClassSchema = z.object({
+  id: UUIDSchema,
+  courseId: UUIDSchema,
+  branchId: UUIDSchema,
+  instructorId: UUIDSchema.nullable(),
+  name: z.string(),
+  code: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  startTime: z.string().nullable(),
+  endTime: z.string().nullable(),
+  daysOfWeek: z.string().nullable(),
+  maxStudents: z.number().nullable(),
+  currentEnrollment: z.number(),
+  notes: z.string().nullable(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -210,44 +268,45 @@ const EnrollmentSchema = z.object({
 });
 
 // =============================================
-// Revenue Schemas
+// Revenue Schemas (Read-only, calculated from enrollments and product sales)
 // =============================================
-const CreateRevenueSchema = z.object({
-  branchId: UUIDSchema,
-  courseId: UUIDSchema.optional(),
-  enrollmentId: UUIDSchema.optional(),
-  studentId: UUIDSchema.optional(),
-  amount: z.number(),
-  description: z.string().optional(),
-  date: z.string(),
-  paymentMethod: PaymentMethodSchema.optional(),
-  receiptNumber: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const UpdateRevenueSchema = CreateRevenueSchema.partial();
-
-const RevenueSchema = z.object({
+const RevenueItemSchema = z.object({
   id: UUIDSchema,
   branchId: UUIDSchema,
-  courseId: UUIDSchema.nullable(),
-  enrollmentId: UUIDSchema.nullable(),
-  studentId: UUIDSchema.nullable(),
+  branchName: z.string(),
+  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE']),
+  sourceId: UUIDSchema,
   amount: z.number(),
-  description: z.string().nullable(),
+  description: z.string(),
   date: z.string(),
   paymentMethod: z.string().nullable(),
-  receiptNumber: z.string().nullable(),
-  notes: z.string().nullable(),
+  paymentStatus: z.string().nullable(),
+  studentName: z.string().nullable(),
+  courseName: z.string().nullable(),
+  productName: z.string().nullable(),
   createdAt: z.string(),
-  updatedAt: z.string(),
+});
+
+const RevenueSummarySchema = z.object({
+  totalRevenue: z.number(),
+  enrollmentRevenue: z.number(),
+  productRevenue: z.number(),
+  byBranch: z.array(z.object({
+    branchId: z.string(),
+    branchName: z.string(),
+    revenue: z.number(),
+  })),
+  byMonth: z.array(z.object({
+    month: z.string(),
+    revenue: z.number(),
+  })),
 });
 
 // =============================================
 // Expense Schemas
 // =============================================
 const CreateExpenseSchema = z.object({
-  branchId: UUIDSchema.optional(),
+  branchId: OptionalUUIDSchema,
   type: ExpenseTypeSchema,
   category: ExpenseCategorySchema,
   amount: z.number(),
@@ -290,7 +349,7 @@ const CreateEmployeeSchema = z.object({
   email: z.string().email().optional(),
   position: z.string().optional(),
   salary: z.number().optional(),
-  branchId: UUIDSchema.optional(),
+  branchId: OptionalUUIDSchema,
   isGlobal: z.boolean().optional(),
 });
 
@@ -369,32 +428,52 @@ const WithdrawalSummarySchema = z.object({
   withdrawals: z.array(WithdrawalSchema),
 });
 
+// Product Category
+const ProductCategorySchema = z.enum(['STATIONERY', 'BOOKS', 'ELECTRONICS', 'SUPPLIES', 'MERCHANDISE', 'OTHER']);
+
 // =============================================
 // Product Schemas
 // =============================================
 const CreateProductSchema = z.object({
-  branchId: UUIDSchema,
   name: z.string(),
-  code: z.string().optional(),
-  description: z.string().optional(),
-  price: z.number(),
-  cost: z.number().optional(),
-  stockQuantity: z.number().optional(),
-  minStockLevel: z.number().optional(),
+  code: z.string(),
+  description: z.string(),
+  category: ProductCategorySchema,
+  costPrice: z.number(),
+  sellingPrice: z.number(),
+  stock: z.number(),
+  minStock: z.number(),
+  unit: z.string(),
+  isGlobal: z.boolean(),
+  branchId: OptionalUUIDSchema,
 });
 
-const UpdateProductSchema = CreateProductSchema.partial();
+const UpdateProductSchema = z.object({
+  name: z.string().optional(),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  category: ProductCategorySchema.optional(),
+  costPrice: z.number().optional(),
+  sellingPrice: z.number().optional(),
+  stock: z.number().optional(),
+  minStock: z.number().optional(),
+  unit: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
 
 const ProductSchema = z.object({
   id: UUIDSchema,
-  branchId: UUIDSchema,
   name: z.string(),
-  code: z.string().nullable(),
-  description: z.string().nullable(),
-  price: z.number(),
-  cost: z.number().nullable(),
-  stockQuantity: z.number(),
-  minStockLevel: z.number().nullable(),
+  code: z.string(),
+  description: z.string(),
+  category: ProductCategorySchema,
+  costPrice: z.number(),
+  sellingPrice: z.number(),
+  stock: z.number(),
+  minStock: z.number(),
+  unit: z.string(),
+  isGlobal: z.boolean(),
+  branchId: UUIDSchema.nullable(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -489,7 +568,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/students',
       query: z.object({
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(StudentSchema),
@@ -518,7 +597,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/students/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -570,6 +649,16 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
+    delete: {
+      method: 'DELETE',
+      path: '/api/branches/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 
   // Courses routes
@@ -587,7 +676,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/courses',
       query: z.object({
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(CourseSchema),
@@ -597,7 +686,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/courses/active',
       query: z.object({
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(CourseSchema),
@@ -622,48 +711,171 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
+    delete: {
+      method: 'DELETE',
+      path: '/api/courses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 
-  // Revenues routes
-  revenues: {
+  // Classes routes
+  classes: {
     create: {
       method: 'POST',
-      path: '/api/revenues',
-      body: CreateRevenueSchema,
+      path: '/api/classes',
+      body: CreateClassSchema,
       responses: {
-        201: RevenueSchema,
+        201: ClassSchema,
         400: z.object({ message: z.string() }),
       },
     },
     list: {
       method: 'GET',
+      path: '/api/classes',
+      query: z.object({
+        courseId: OptionalUUIDSchema,
+        branchId: OptionalUUIDSchema,
+        instructorId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.array(ClassSchema),
+      },
+    },
+    listActive: {
+      method: 'GET',
+      path: '/api/classes/active',
+      query: z.object({
+        courseId: OptionalUUIDSchema,
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.array(ClassSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/classes/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: ClassSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/classes/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateClassSchema,
+      responses: {
+        200: ClassSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/classes/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Enrollments routes
+  enrollments: {
+    create: {
+      method: 'POST',
+      path: '/api/enrollments',
+      body: CreateEnrollmentSchema,
+      responses: {
+        201: EnrollmentSchema,
+        400: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/enrollments',
+      query: z.object({
+        studentId: OptionalUUIDSchema,
+        courseId: OptionalUUIDSchema,
+        branchId: OptionalUUIDSchema,
+        status: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(EnrollmentSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/enrollments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: EnrollmentSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getByStudent: {
+      method: 'GET',
+      path: '/api/enrollments/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.array(EnrollmentSchema),
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/enrollments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateEnrollmentSchema,
+      responses: {
+        200: EnrollmentSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/enrollments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Revenues routes (Read-only - calculated from enrollments and product sales)
+  revenues: {
+    list: {
+      method: 'GET',
       path: '/api/revenues',
+      query: z.object({
+        branchId: UUIDSchema.optional(),
+        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'ALL']).optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(RevenueItemSchema),
+      },
+    },
+    summary: {
+      method: 'GET',
+      path: '/api/revenues/summary',
       query: z.object({
         branchId: UUIDSchema.optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
       responses: {
-        200: z.array(RevenueSchema),
-      },
-    },
-    getById: {
-      method: 'GET',
-      path: '/api/revenues/:id',
-      pathParams: z.object({ id: UUIDSchema }),
-      responses: {
-        200: RevenueSchema,
-        404: z.object({ message: z.string() }),
-      },
-    },
-    update: {
-      method: 'PATCH',
-      path: '/api/revenues/:id',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: UpdateRevenueSchema,
-      responses: {
-        200: RevenueSchema,
-        404: z.object({ message: z.string() }),
+        200: RevenueSummarySchema,
       },
     },
   },
@@ -782,7 +994,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/employees/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -854,7 +1066,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/withdrawals/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -877,7 +1089,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/products',
       query: z.object({
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(ProductSchema),
@@ -895,7 +1107,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/products/low-stock',
       query: z.object({
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(ProductSchema),
@@ -937,7 +1149,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/products/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -960,8 +1172,8 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/product-sales',
       query: z.object({
-        branchId: UUIDSchema.optional(),
-        productId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
+        productId: OptionalUUIDSchema,
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
@@ -1030,7 +1242,7 @@ export const contract = c.router({
         interestRate: z.number(),
         takenDate: z.string(),
         dueDate: z.string(),
-        branchId: UUIDSchema.optional(),
+        branchId: OptionalUUIDSchema,
         notes: z.string().optional(),
       }),
       responses: {
@@ -1084,7 +1296,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/debts/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.any(),
         404: z.object({ message: z.string() }),
@@ -1148,6 +1360,27 @@ export const contract = c.router({
           filename: z.string(),
         }),
         400: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Migration routes (one-time use)
+  migrations: {
+    runInstructorMigration: {
+      method: 'POST',
+      path: '/api/migrations/add-instructor',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          verification: z.any().optional(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
       },
     },
   },

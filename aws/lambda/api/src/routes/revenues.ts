@@ -1,78 +1,125 @@
-import { insert, update, findById, query } from '../db/connection';
-
-function mapRevenueFromDB(row: any) {
-  return {
-    id: row.id,
-    branchId: row.branch_id,
-    courseId: row.course_id,
-    enrollmentId: row.enrollment_id,
-    studentId: row.student_id,
-    amount: parseFloat(row.amount),
-    description: row.description,
-    date: row.date,
-    paymentMethod: row.payment_method,
-    receiptNumber: row.receipt_number,
-    notes: row.notes,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+import { query } from '../db/connection';
 
 export const revenuesRoutes = {
-  create: async ({ body }: { body: any }) => {
-    try {
-      const revenue = await insert('revenues', {
-        branch_id: body.branchId,
-        course_id: body.courseId || null,
-        enrollment_id: body.enrollmentId || null,
-        student_id: body.studentId || null,
-        amount: body.amount,
-        description: body.description || null,
-        date: body.date,
-        payment_method: body.paymentMethod || null,
-        receipt_number: body.receiptNumber || null,
-        notes: body.notes || null,
-      });
-
-      return {
-        status: 201 as const,
-        body: mapRevenueFromDB(revenue),
-      };
-    } catch (error) {
-      console.error('Create revenue error:', error);
-      return {
-        status: 400 as const,
-        body: { message: 'Failed to create revenue' },
-      };
+  list: async ({ query: queryParams }: {
+    query: {
+      branchId?: string;
+      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'ALL';
+      startDate?: string;
+      endDate?: string;
     }
-  },
-
-  list: async ({ query: queryParams }: { query: { branchId?: string; startDate?: string; endDate?: string } }) => {
+  }) => {
     try {
-      let sql = 'SELECT * FROM revenues WHERE 1=1';
       const params: any[] = [];
+      const conditions: string[] = [];
+
+      // Build the unified query to get revenues from both enrollments and product sales
+      let sql = `
+        SELECT
+          'ENROLLMENT' as source,
+          e.id as source_id,
+          e.branch_id,
+          b.name as branch_name,
+          e.final_price as amount,
+          CONCAT('Enrollment: ', s.first_name, ' ', s.last_name, ' - ', c.name) as description,
+          e.enrollment_date as date,
+          e.payment_status,
+          NULL as payment_method,
+          CONCAT(s.first_name, ' ', s.last_name) as student_name,
+          c.name as course_name,
+          NULL as product_name,
+          e.created_at
+        FROM enrollments e
+        JOIN branches b ON e.branch_id = b.id
+        JOIN students s ON e.student_id = s.id
+        JOIN courses c ON e.course_id = c.id
+        WHERE e.payment_status IN ('PAID', 'PARTIAL')
+      `;
 
       if (queryParams.branchId) {
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        conditions.push(`e.branch_id = $${params.length}`);
       }
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
-        sql += ` AND date >= $${params.length}`;
+        conditions.push(`e.enrollment_date >= $${params.length}`);
       }
 
       if (queryParams.endDate) {
         params.push(queryParams.endDate);
-        sql += ` AND date <= $${params.length}`;
+        conditions.push(`e.enrollment_date <= $${params.length}`);
+      }
+
+      if (conditions.length > 0) {
+        sql += ' AND ' + conditions.join(' AND ');
+      }
+
+      // Add product sales if source is not ENROLLMENT only
+      if (!queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'PRODUCT_SALE') {
+        sql += `
+          UNION ALL
+          SELECT
+            'PRODUCT_SALE' as source,
+            ps.id as source_id,
+            ps.branch_id,
+            b.name as branch_name,
+            ps.total_amount as amount,
+            CONCAT('Product Sale: ', p.name, ' (', ps.quantity, ' units)') as description,
+            ps.sale_date as date,
+            'PAID' as payment_status,
+            ps.payment_method,
+            ps.customer_name as student_name,
+            NULL as course_name,
+            p.name as product_name,
+            ps.created_at
+          FROM product_sales ps
+          JOIN branches b ON ps.branch_id = b.id
+          JOIN products p ON ps.product_id = p.id
+          WHERE 1=1
+        `;
+
+        const productConditions: string[] = [];
+
+        if (queryParams.branchId) {
+          productConditions.push(`ps.branch_id = $${params.indexOf(queryParams.branchId) + 1}`);
+        }
+
+        if (queryParams.startDate) {
+          productConditions.push(`ps.sale_date >= $${params.indexOf(queryParams.startDate) + 1}`);
+        }
+
+        if (queryParams.endDate) {
+          productConditions.push(`ps.sale_date <= $${params.indexOf(queryParams.endDate) + 1}`);
+        }
+
+        if (productConditions.length > 0) {
+          sql += ' AND ' + productConditions.join(' AND ');
+        }
       }
 
       sql += ' ORDER BY date DESC, created_at DESC';
 
       const revenues = await query(sql, params);
+
       return {
         status: 200 as const,
-        body: revenues.map(mapRevenueFromDB),
+        body: revenues.map((row: any) => ({
+          id: row.source_id,
+          branchId: row.branch_id,
+          branchName: row.branch_name,
+          source: row.source,
+          sourceId: row.source_id,
+          amount: parseFloat(row.amount),
+          description: row.description,
+          date: row.date,
+          paymentMethod: row.payment_method,
+          paymentStatus: row.payment_status,
+          studentName: row.student_name,
+          courseName: row.course_name,
+          productName: row.product_name,
+          createdAt: row.created_at,
+        })),
       };
     } catch (error) {
       console.error('List revenues error:', error);
@@ -83,63 +130,127 @@ export const revenuesRoutes = {
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
-    try {
-      const revenue = await findById('revenues', params.id);
-
-      if (!revenue) {
-        return {
-          status: 404 as const,
-          body: { message: 'Revenue not found' },
-        };
-      }
-
-      return {
-        status: 200 as const,
-        body: mapRevenueFromDB(revenue),
-      };
-    } catch (error) {
-      console.error('Get revenue error:', error);
-      return {
-        status: 404 as const,
-        body: { message: 'Revenue not found' },
-      };
+  summary: async ({ query: queryParams }: {
+    query: {
+      branchId?: string;
+      startDate?: string;
+      endDate?: string;
     }
-  },
-
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  }) => {
     try {
-      const updateData: any = {};
+      const params: any[] = [];
+      let enrollmentConditions = 'WHERE e.payment_status IN (\'PAID\', \'PARTIAL\')';
+      let productConditions = 'WHERE 1=1';
 
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
-      if (body.courseId !== undefined) updateData.course_id = body.courseId;
-      if (body.enrollmentId !== undefined) updateData.enrollment_id = body.enrollmentId;
-      if (body.studentId !== undefined) updateData.student_id = body.studentId;
-      if (body.amount !== undefined) updateData.amount = body.amount;
-      if (body.description !== undefined) updateData.description = body.description;
-      if (body.date !== undefined) updateData.date = body.date;
-      if (body.paymentMethod !== undefined) updateData.payment_method = body.paymentMethod;
-      if (body.receiptNumber !== undefined) updateData.receipt_number = body.receiptNumber;
-      if (body.notes !== undefined) updateData.notes = body.notes;
-
-      const revenue = await update('revenues', params.id, updateData);
-
-      if (!revenue) {
-        return {
-          status: 404 as const,
-          body: { message: 'Revenue not found' },
-        };
+      if (queryParams.branchId) {
+        params.push(queryParams.branchId);
+        enrollmentConditions += ` AND e.branch_id = $${params.length}`;
+        productConditions += ` AND ps.branch_id = $${params.length}`;
       }
+
+      if (queryParams.startDate) {
+        params.push(queryParams.startDate);
+        const paramIndex = params.length;
+        enrollmentConditions += ` AND e.enrollment_date >= $${paramIndex}`;
+        productConditions += ` AND ps.sale_date >= $${paramIndex}`;
+      }
+
+      if (queryParams.endDate) {
+        params.push(queryParams.endDate);
+        const paramIndex = params.length;
+        enrollmentConditions += ` AND e.enrollment_date <= $${paramIndex}`;
+        productConditions += ` AND ps.sale_date <= $${paramIndex}`;
+      }
+
+      // Get total revenue from enrollments
+      const enrollmentRevenueQuery = `
+        SELECT COALESCE(SUM(e.final_price), 0) as total
+        FROM enrollments e
+        ${enrollmentConditions}
+      `;
+
+      // Get total revenue from product sales
+      const productRevenueQuery = `
+        SELECT COALESCE(SUM(ps.total_amount), 0) as total
+        FROM product_sales ps
+        ${productConditions}
+      `;
+
+      // Get revenue by branch
+      const byBranchQuery = `
+        SELECT
+          b.id as branch_id,
+          b.name as branch_name,
+          COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) as revenue
+        FROM branches b
+        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.payment_status IN ('PAID', 'PARTIAL')
+          ${queryParams.startDate ? `AND e.enrollment_date >= $${params.indexOf(queryParams.startDate) + 1}` : ''}
+          ${queryParams.endDate ? `AND e.enrollment_date <= $${params.indexOf(queryParams.endDate) + 1}` : ''}
+        LEFT JOIN product_sales ps ON b.id = ps.branch_id
+          ${queryParams.startDate ? `AND ps.sale_date >= $${params.indexOf(queryParams.startDate) + 1}` : ''}
+          ${queryParams.endDate ? `AND ps.sale_date <= $${params.indexOf(queryParams.endDate) + 1}` : ''}
+        ${queryParams.branchId ? `WHERE b.id = $${params.indexOf(queryParams.branchId) + 1}` : ''}
+        GROUP BY b.id, b.name
+        ORDER BY revenue DESC
+      `;
+
+      // Get revenue by month
+      const byMonthQuery = `
+        SELECT
+          TO_CHAR(date, 'YYYY-MM') as month,
+          SUM(amount) as revenue
+        FROM (
+          SELECT e.enrollment_date as date, e.final_price as amount
+          FROM enrollments e
+          ${enrollmentConditions}
+          UNION ALL
+          SELECT ps.sale_date as date, ps.total_amount as amount
+          FROM product_sales ps
+          ${productConditions}
+        ) combined
+        GROUP BY TO_CHAR(date, 'YYYY-MM')
+        ORDER BY month DESC
+        LIMIT 12
+      `;
+
+      const [enrollmentResult, productResult, byBranchResult, byMonthResult] = await Promise.all([
+        query(enrollmentRevenueQuery, params),
+        query(productRevenueQuery, params),
+        query(byBranchQuery, params),
+        query(byMonthQuery, params),
+      ]);
+
+      const enrollmentRevenue = parseFloat(enrollmentResult[0]?.total || 0);
+      const productRevenue = parseFloat(productResult[0]?.total || 0);
 
       return {
         status: 200 as const,
-        body: mapRevenueFromDB(revenue),
+        body: {
+          totalRevenue: enrollmentRevenue + productRevenue,
+          enrollmentRevenue,
+          productRevenue,
+          byBranch: byBranchResult.map((row: any) => ({
+            branchId: row.branch_id,
+            branchName: row.branch_name,
+            revenue: parseFloat(row.revenue),
+          })),
+          byMonth: byMonthResult.map((row: any) => ({
+            month: row.month,
+            revenue: parseFloat(row.revenue),
+          })),
+        },
       };
     } catch (error) {
-      console.error('Update revenue error:', error);
+      console.error('Revenue summary error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update revenue' },
+        status: 200 as const,
+        body: {
+          totalRevenue: 0,
+          enrollmentRevenue: 0,
+          productRevenue: 0,
+          byBranch: [],
+          byMonth: [],
+        },
       };
     }
   },

@@ -4,6 +4,11 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
 import { RevenueService } from '../services/revenue.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -22,7 +27,12 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
     CommonModule,
     ReactiveFormsModule,
     CardModule,
-    ButtonModule
+    ButtonModule,
+    InputTextModule,
+    InputNumberModule,
+    TextareaModule,
+    SelectModule,
+    DatePickerModule
   ],
   templateUrl: './revenue-form.component.html',
   styleUrl: './revenue-form.component.scss'
@@ -47,7 +57,7 @@ export class RevenueFormComponent implements OnInit {
   paymentMethods = Object.values(PaymentMethod);
 
   constructor() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.revenueForm = this.fb.group({
       branchId: ['', [Validators.required]],
       courseId: [''],
@@ -97,7 +107,7 @@ export class RevenueFormComponent implements OnInit {
       next: (revenue) => {
         this.revenueForm.patchValue({
           ...revenue,
-          date: revenue.date.split('T')[0]
+          date: new Date(revenue.date)
         });
         this.loading.set(false);
       },
@@ -116,10 +126,12 @@ export class RevenueFormComponent implements OnInit {
     }
 
     this.loading.set(true);
+    const formValue = this.revenueForm.value;
     const revenueData = {
-      ...this.revenueForm.value,
-      courseId: this.revenueForm.value.courseId || null,
-      studentId: this.revenueForm.value.studentId || null
+      ...formValue,
+      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date,
+      courseId: formValue.courseId || null,
+      studentId: formValue.studentId || null
     };
 
     if (this.isEditMode() && this.revenueId) {

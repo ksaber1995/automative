@@ -5,7 +5,7 @@
         <!-- First Name -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">First Name <span class="text-red-500">*</span></label>
-          <input type="text" formControlName="firstName" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <input pInputText formControlName="firstName" class="w-full" />
           @if (firstName?.invalid && firstName?.touched) {
             <small class="text-red-500">First name is required</small>
           }
@@ -14,7 +14,7 @@
         <!-- Last Name -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Last Name <span class="text-red-500">*</span></label>
-          <input type="text" formControlName="lastName" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <input pInputText formControlName="lastName" class="w-full" />
           @if (lastName?.invalid && lastName?.touched) {
             <small class="text-red-500">Last name is required</small>
           }
@@ -23,7 +23,7 @@
         <!-- Email -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Email <span class="text-red-500">*</span></label>
-          <input type="email" formControlName="email" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <input pInputText type="email" formControlName="email" class="w-full" />
           @if (email?.invalid && email?.touched) {
             <small class="text-red-500">Valid email is required</small>
           }
@@ -32,36 +32,36 @@
         <!-- Phone -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Phone <span class="text-red-500">*</span></label>
-          <input type="tel" formControlName="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <input pInputText type="tel" formControlName="phone" class="w-full" />
         </div>
 
         <!-- Position -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Position <span class="text-red-500">*</span></label>
-          <input type="text" formControlName="position" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="e.g., Instructor, Manager" />
+          <input pInputText formControlName="position" class="w-full" placeholder="e.g., Instructor, Manager" />
         </div>
 
         <!-- Department -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Department <span class="text-red-500">*</span></label>
-          <input type="text" formControlName="department" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="e.g., Teaching, Administration" />
+          <input pInputText formControlName="department" class="w-full" placeholder="e.g., Teaching, Administration" />
         </div>
 
         <!-- Salary -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Monthly Salary <span class="text-red-500">*</span></label>
-          <input type="number" formControlName="salary" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="0" step="0.01" />
+          <p-inputnumber formControlName="salary" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
         </div>
 
         <!-- Hire Date -->
         <div class="field">
           <label class="block text-sm font-medium mb-2">Hire Date <span class="text-red-500">*</span></label>
-          <input type="date" formControlName="hireDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <input pInputText type="date" formControlName="hireDate" class="w-full" />
         </div>
 
         <!-- Is Global Checkbox -->
         <div class="field col-span-2">
-          <p-checkbox formControlName="isGlobal" binary="true" inputId="isGlobal"></p-checkbox>
+          <p-checkbox formControlName="isGlobal" [binary]="true" inputId="isGlobal"></p-checkbox>
           <label for="isGlobal" class="ml-2">Global Employee (works across all branches)</label>
         </div>
 
@@ -69,12 +69,7 @@
         @if (!isGlobal?.value) {
           <div class="field col-span-2">
             <label class="block text-sm font-medium mb-2">Branch <span class="text-red-500">*</span></label>
-            <select formControlName="branchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-              <option value="">Select a branch</option>
-              @for (branch of branches(); track branch.id) {
-                <option [value]="branch.id">{{ branch.name }}</option>
-              }
-            </select>
+            <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id" placeholder="Select a branch" class="w-full"></p-select>
             @if (branchId?.invalid && branchId?.touched) {
               <small class="text-red-500">Branch is required</small>
             }
@@ -84,7 +79,7 @@
         <!-- Notes -->
         <div class="field col-span-2">
           <label class="block text-sm font-medium mb-2">Notes</label>
-          <textarea formControlName="notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+          <textarea pInputText formControlName="notes" rows="3" class="w-full"></textarea>
         </div>
       </div>
 

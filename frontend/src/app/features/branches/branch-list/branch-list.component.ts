@@ -5,11 +5,11 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService } from 'primeng/api';
+import { TooltipModule } from 'primeng/tooltip';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-branch-list',
@@ -20,9 +20,9 @@ import { Branch } from '@shared/interfaces/branch.interface';
     TableModule,
     ButtonModule,
     TagModule,
-    ConfirmDialogModule
+    TooltipModule,
+    DeleteConfirmDialogComponent
   ],
-  providers: [ConfirmationService],
   templateUrl: './branch-list.component.html',
   styleUrl: './branch-list.component.scss'
 })
@@ -30,10 +30,11 @@ export class BranchListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
-  private confirmationService = inject(ConfirmationService);
 
   branches = signal<Branch[]>([]);
   loading = signal(true);
+  showDeleteDialog = false;
+  branchToDelete = signal<Branch | null>(null);
 
   ngOnInit() {
     this.loadBranches();
@@ -60,18 +61,25 @@ export class BranchListComponent implements OnInit {
     this.router.navigate(['/branches', branch.id, 'edit']);
   }
 
-  deleteBranch(branch: Branch) {
-    this.confirmationService.confirm({
-      message: `Are you sure you want to deactivate ${branch.name}?`,
-      header: 'Confirm Deactivation',
-      icon: 'pi pi-exclamation-triangle',
-      accept: () => {
-        this.branchService.deleteBranch(branch.id).subscribe({
-          next: () => {
-            this.notificationService.success('Branch deactivated successfully');
-            this.loadBranches();
-          }
-        });
+  confirmDelete(branch: Branch) {
+    this.branchToDelete.set(branch);
+    this.showDeleteDialog = true;
+  }
+
+  deleteBranch() {
+    const branch = this.branchToDelete();
+    if (!branch) return;
+
+    this.branchService.deleteBranch(branch.id).subscribe({
+      next: () => {
+        this.notificationService.success('Branch deleted successfully');
+        this.loadBranches();
+        this.showDeleteDialog = false;
+        this.branchToDelete.set(null);
+      },
+      error: () => {
+        this.notificationService.error('Failed to delete branch');
+        this.showDeleteDialog = false;
       }
     });
   }

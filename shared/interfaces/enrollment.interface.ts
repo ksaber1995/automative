@@ -3,8 +3,8 @@ import { EnrollmentStatus, PaymentStatus } from '../enums/enrollment-status.enum
 export interface Enrollment {
   id: string;
   studentId: string;
-  classId: string; // Now enrolling in a specific class
-  courseId: string; // Kept for easier querying and backward compatibility
+  classId: string;
+  courseId: string;
   branchId: string;
   enrollmentDate: string;
   status: EnrollmentStatus;
@@ -13,20 +13,31 @@ export interface Enrollment {
   discountAmount: number;
   finalPrice: number;
   paymentStatus: PaymentStatus;
-  completionDate?: string | null;
-  notes?: string;
+  completionDate: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface EnrollmentWithDetails extends Enrollment {
+  studentName?: string;
+  courseName?: string;
+  courseCode?: string;
+  branchName?: string;
+}
+
 export interface EnrollmentCreateDto {
   studentId: string;
+  classId: string;
   courseId: string;
   branchId: string;
   enrollmentDate: string;
+  status: EnrollmentStatus;
   originalPrice: number;
   discountPercent?: number;
   discountAmount?: number;
+  finalPrice: number;
+  paymentStatus: PaymentStatus;
   notes?: string;
 }
 
@@ -35,4 +46,14 @@ export interface EnrollmentUpdateDto {
   paymentStatus?: PaymentStatus;
   completionDate?: string;
   notes?: string;
+}
+
+export interface PaymentInstallment {
+  id: string;
+  enrollmentId: string;
+  amount: number;
+  dueDate: string;
+  paidDate: string | null;
+  status: 'PENDING' | 'PAID' | 'OVERDUE';
+  notes: string | null;
 }

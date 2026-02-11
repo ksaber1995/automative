@@ -1,67 +1,58 @@
 export interface Class {
   id: string;
   courseId: string;
-  name: string; // e.g., "Section A", "Morning Class"
-  code: string; // e.g., "ROB-101-A"
-  teacherId: string; // Employee ID
-  schedule: ClassSchedule;
-  startDate: string; // ISO date string
-  endDate: string; // ISO date string
+  branchId: string;
+  instructorId?: string;
+  name: string;
+  code: string;
+  startDate: string;
+  endDate: string;
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: string;
   maxStudents?: number;
-  isActive: boolean;
-  branchId: string; // Inherited from course for easy filtering
+  currentEnrollment: number;
   notes?: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ClassSchedule {
-  days: DayOfWeek[]; // e.g., ['MONDAY', 'WEDNESDAY']
-  startTime: string; // e.g., "15:00" (24-hour format)
-  endTime: string; // e.g., "17:00" (24-hour format)
-}
-
-export enum DayOfWeek {
-  SUNDAY = 'SUNDAY',
-  MONDAY = 'MONDAY',
-  TUESDAY = 'TUESDAY',
-  WEDNESDAY = 'WEDNESDAY',
-  THURSDAY = 'THURSDAY',
-  FRIDAY = 'FRIDAY',
-  SATURDAY = 'SATURDAY',
-}
-
 export interface ClassCreateDto {
   courseId: string;
+  branchId: string;
+  instructorId?: string;
   name: string;
   code: string;
-  teacherId: string;
-  schedule: ClassSchedule;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: string;
   maxStudents?: number;
   notes?: string;
 }
 
 export interface ClassUpdateDto {
+  courseId?: string;
+  branchId?: string;
+  instructorId?: string;
   name?: string;
   code?: string;
-  teacherId?: string;
-  schedule?: ClassSchedule;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: string;
   maxStudents?: number;
-  isActive?: boolean;
   notes?: string;
 }
 
 // Extended interface with populated data for frontend display
 export interface ClassWithDetails extends Class {
-  course?: {
-    id: string;
-    name: string;
-    code: string;
-  };
+  courseName?: string;
+  branchName?: string;
+  instructorName?: string;
   teacher?: {
     id: string;
     firstName: string;
@@ -69,12 +60,16 @@ export interface ClassWithDetails extends Class {
     email: string;
   };
   studentCount?: number;
+  schedule?: {
+    daysOfWeek?: string;
+    startTime?: string;
+    endTime?: string;
+  };
   students?: Array<{
     id: string;
     firstName: string;
     lastName: string;
-    enrollmentId: string;
-    enrollmentDate: string;
-    paymentStatus: string;
+    email?: string;
+    enrollmentStatus?: string;
   }>;
 }

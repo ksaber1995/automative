@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Course, CourseCreateDto, CourseUpdateDto } from '@shared/interfaces/course.interface';
+import { Course, CourseCreateDto, CourseUpdateDto, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -9,8 +9,8 @@ import { Course, CourseCreateDto, CourseUpdateDto } from '@shared/interfaces/cou
 export class CourseService {
   private api = inject(ApiService);
 
-  getAllCourses(): Observable<Course[]> {
-    return this.api.get<Course[]>('courses');
+  getAllCourses(): Observable<CourseWithEnrollmentCount[]> {
+    return this.api.get<CourseWithEnrollmentCount[]>('courses');
   }
 
   getActiveCourses(): Observable<Course[]> {

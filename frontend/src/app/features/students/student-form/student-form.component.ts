@@ -4,6 +4,10 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -16,7 +20,11 @@ import { Branch } from '@shared/interfaces/branch.interface';
     CommonModule,
     ReactiveFormsModule,
     CardModule,
-    ButtonModule
+    ButtonModule,
+    InputTextModule,
+    TextareaModule,
+    SelectModule,
+    DatePickerModule
   ],
   templateUrl: './student-form.component.html',
   styleUrl: './student-form.component.scss'
@@ -36,11 +44,11 @@ export class StudentFormComponent implements OnInit {
   branches = signal<Branch[]>([]);
 
   constructor() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.studentForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
       lastName: ['', [Validators.required, Validators.minLength(2)]],
-      dateOfBirth: ['', [Validators.required]],
+      dateOfBirth: [null, [Validators.required]],
       email: ['', [Validators.email]],
       phone: [''],
       parentName: ['', [Validators.required, Validators.minLength(3)]],
@@ -79,8 +87,8 @@ export class StudentFormComponent implements OnInit {
       next: (student) => {
         this.studentForm.patchValue({
           ...student,
-          dateOfBirth: student.dateOfBirth.split('T')[0],
-          enrollmentDate: student.enrollmentDate.split('T')[0]
+          dateOfBirth: new Date(student.dateOfBirth),
+          enrollmentDate: new Date(student.enrollmentDate)
         });
         this.loading.set(false);
       },
@@ -99,7 +107,12 @@ export class StudentFormComponent implements OnInit {
     }
 
     this.loading.set(true);
-    const studentData = this.studentForm.value;
+    const formValue = this.studentForm.value;
+    const studentData = {
+      ...formValue,
+      dateOfBirth: formValue.dateOfBirth instanceof Date ? formValue.dateOfBirth.toISOString().split('T')[0] : formValue.dateOfBirth,
+      enrollmentDate: formValue.enrollmentDate instanceof Date ? formValue.enrollmentDate.toISOString().split('T')[0] : formValue.enrollmentDate
+    };
 
     if (this.isEditMode() && this.studentId) {
       this.studentService.updateStudent(this.studentId, studentData).subscribe({

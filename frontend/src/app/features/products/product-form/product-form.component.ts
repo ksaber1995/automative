@@ -5,8 +5,12 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ButtonModule } from 'primeng/button';
 import { ProductService } from '../services/product.service';
+import { BranchService } from '../../branches/services/branch.service';
 import { ProductCategory } from '@shared/enums/product.enum';
 
 @Component({
@@ -18,6 +22,9 @@ import { ProductCategory } from '@shared/enums/product.enum';
     CardModule,
     InputTextModule,
     InputNumberModule,
+    TextareaModule,
+    SelectModule,
+    CheckboxModule,
     ButtonModule,
   ],
   template: `
@@ -49,7 +56,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 
             <div class="field md:col-span-2">
               <label for="description" class="block text-sm font-medium mb-2">Description *</label>
-              <textarea id="description" formControlName="description" rows="3" class="w-full p-2 border rounded"></textarea>
+              <textarea pInputTextarea id="description" formControlName="description" rows="3" class="w-full"></textarea>
               @if (productForm.get('description')?.invalid && productForm.get('description')?.touched) {
                 <small class="text-red-500">Description is required</small>
               }
@@ -57,12 +64,16 @@ import { ProductCategory } from '@shared/enums/product.enum';
 
             <div class="field">
               <label for="category" class="block text-sm font-medium mb-2">Category *</label>
-              <select id="category" formControlName="category" class="w-full p-2 border rounded">
-                <option value="">Select category</option>
-                @for (cat of categories; track cat.value) {
-                  <option [value]="cat.value">{{ cat.label }}</option>
-                }
-              </select>
+              <p-select
+                id="category"
+                formControlName="category"
+                [options]="categories"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select category"
+                class="w-full"
+                [style]="{'width': '100%'}">
+              </p-select>
               @if (productForm.get('category')?.invalid && productForm.get('category')?.touched) {
                 <small class="text-red-500">Category is required</small>
               }
@@ -70,12 +81,16 @@ import { ProductCategory } from '@shared/enums/product.enum';
 
             <div class="field">
               <label for="unit" class="block text-sm font-medium mb-2">Unit *</label>
-              <select id="unit" formControlName="unit" class="w-full p-2 border rounded">
-                <option value="">Select unit</option>
-                @for (u of units; track u) {
-                  <option [value]="u">{{ u }}</option>
-                }
-              </select>
+              <p-select
+                id="unit"
+                formControlName="unit"
+                [options]="units"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select unit"
+                class="w-full"
+                [style]="{'width': '100%'}">
+              </p-select>
               @if (productForm.get('unit')?.invalid && productForm.get('unit')?.touched) {
                 <small class="text-red-500">Unit is required</small>
               }
@@ -118,7 +133,11 @@ import { ProductCategory } from '@shared/enums/product.enum';
 
             <div class="field md:col-span-2">
               <div class="flex items-center gap-2">
-                <input type="checkbox" id="isGlobal" formControlName="isGlobal" class="w-4 h-4" />
+                <p-checkbox
+                  inputId="isGlobal"
+                  formControlName="isGlobal"
+                  [binary]="true">
+                </p-checkbox>
                 <label for="isGlobal" class="text-sm font-medium">Global Product (shared across all branches)</label>
               </div>
             </div>
@@ -126,12 +145,16 @@ import { ProductCategory } from '@shared/enums/product.enum';
             @if (!productForm.get('isGlobal')?.value) {
               <div class="field md:col-span-2">
                 <label for="branchId" class="block text-sm font-medium mb-2">Branch *</label>
-                <select id="branchId" formControlName="branchId" class="w-full p-2 border rounded">
-                  <option value="">Select branch</option>
-                  @for (branch of branches; track branch.id) {
-                    <option [value]="branch.id">{{ branch.name }}</option>
-                  }
-                </select>
+                <p-select
+                  id="branchId"
+                  formControlName="branchId"
+                  [options]="branches"
+                  optionLabel="name"
+                  optionValue="id"
+                  placeholder="Select branch"
+                  class="w-full"
+                  [style]="{'width': '100%'}">
+                </p-select>
                 @if (productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
                   <small class="text-red-500">Branch is required for branch-specific products</small>
                 }
@@ -149,7 +172,12 @@ import { ProductCategory } from '@shared/enums/product.enum';
   `,
   styles: [
     `
-      :host ::ng-deep .p-inputnumber {
+      :host ::ng-deep .p-inputnumber,
+      :host ::ng-deep .p-dropdown {
+        width: 100%;
+      }
+
+      :host ::ng-deep .p-inputnumber-input {
         width: 100%;
       }
     `,
@@ -158,6 +186,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 export class ProductFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private productService = inject(ProductService);
+  private branchService = inject(BranchService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -176,7 +205,15 @@ export class ProductFormComponent implements OnInit {
     { value: ProductCategory.OTHER, label: 'Other' },
   ];
 
-  units = ['piece', 'box', 'pack', 'kg', 'liter', 'meter', 'set'];
+  units = [
+    { value: 'piece', label: 'Piece' },
+    { value: 'box', label: 'Box' },
+    { value: 'pack', label: 'Pack' },
+    { value: 'kg', label: 'Kilogram (kg)' },
+    { value: 'liter', label: 'Liter' },
+    { value: 'meter', label: 'Meter' },
+    { value: 'set', label: 'Set' },
+  ];
 
   ngOnInit() {
     this.initForm();
@@ -219,8 +256,15 @@ export class ProductFormComponent implements OnInit {
   }
 
   loadBranches() {
-    // TODO: Inject BranchService and load branches
-    // For now, empty array - will need to add BranchService
+    this.branchService.getActiveBranches().subscribe({
+      next: (branches) => {
+        this.branches = branches;
+      },
+      error: (err) => {
+        console.error('Error loading branches:', err);
+        // Still allow form to work, just with no branches available
+      },
+    });
   }
 
   loadProduct(id: string) {

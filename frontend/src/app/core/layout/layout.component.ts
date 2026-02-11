@@ -134,6 +134,12 @@ export class LayoutComponent {
       visible: true
     },
     {
+      label: 'Classes',
+      icon: 'pi pi-calendar',
+      routerLink: ['/classes'],
+      visible: true
+    },
+    {
       label: 'Students',
       icon: 'pi pi-users',
       routerLink: ['/students'],

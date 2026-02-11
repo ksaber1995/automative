@@ -5,6 +5,9 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { SelectModule } from 'primeng/select';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -18,7 +21,10 @@ import { Branch } from '@shared/interfaces/branch.interface';
     ReactiveFormsModule,
     CardModule,
     ButtonModule,
-    CheckboxModule
+    CheckboxModule,
+    InputTextModule,
+    InputNumberModule,
+    SelectModule
   ],
   templateUrl: './employee-form.component.html',
   styleUrl: './employee-form.component.scss'

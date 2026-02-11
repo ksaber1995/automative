@@ -30,8 +30,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/courses/courses.routes').then(m => m.COURSES_ROUTES)
       },
       {
+        path: 'classes',
+        loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)
+      },
+      {
         path: 'students',
         loadChildren: () => import('./features/students/students.routes').then(m => m.STUDENTS_ROUTES)
+      },
+      {
+        path: 'enrollments',
+        loadChildren: () => import('./features/enrollments/enrollments.routes').then(m => m.ENROLLMENTS_ROUTES)
       },
       {
         path: 'employees',
@@ -39,7 +47,7 @@ export const routes: Routes = [
       },
       {
         path: 'revenues',
-        loadChildren: () => import('./features/revenues/revenues.routes').then(m => m.REVENUES_ROUTES)
+        loadChildren: () => import('./features/revenues/revenues.routes').then(m => m.revenuesRoutes)
       },
       {
         path: 'expenses',

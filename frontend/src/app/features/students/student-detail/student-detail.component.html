@@ -87,8 +87,8 @@
     <p-card class="mt-6">
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
-          <h3 class="text-xl font-bold">Course Enrollments</h3>
-          <button pButton label="Enroll in Course" icon="pi pi-plus" (click)="openEnrollDialog()"></button>
+          <h3 class="text-xl font-bold">Course Enrollments ({{ enrollments().length }})</h3>
+          <button pButton label="Enroll in Course" icon="pi pi-plus" (click)="enrollStudent()"></button>
         </div>
       </ng-template>
 
@@ -107,17 +107,25 @@
         </ng-template>
         <ng-template pTemplate="body" let-enrollment>
           <tr>
-            <td>{{ enrollment.course?.name || 'Unknown Course' }}</td>
-            <td>{{ enrollment.enrollmentDate | date: 'MMM d, y' }}</td>
-            <td>{{ enrollment.originalPrice | currency }}</td>
             <td>
-              @if (enrollment.discountPercent > 0) {
-                <span>{{ enrollment.discountPercent }}% ({{ enrollment.discountAmount | currency }})</span>
+              <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
+              <div class="text-sm text-gray-600">{{ getCourseCode(enrollment.courseId) }}</div>
+            </td>
+            <td>{{ formatDate(enrollment.enrollmentDate) }}</td>
+            <td>\${{ enrollment.originalPrice.toFixed(2) }}</td>
+            <td>
+              @if (enrollment.discountAmount > 0) {
+                <span class="text-green-600">
+                  -\${{ enrollment.discountAmount.toFixed(2) }}
+                  @if (enrollment.discountPercent > 0) {
+                    <span class="text-xs">({{ enrollment.discountPercent.toFixed(0) }}%)</span>
+                  }
+                </span>
               } @else {
-                <span>No discount</span>
+                <span class="text-gray-400">None</span>
               }
             </td>
-            <td class="font-semibold">{{ enrollment.finalPrice | currency }}</td>
+            <td class="font-semibold text-green-600">\${{ enrollment.finalPrice.toFixed(2) }}</td>
             <td>
               <p-tag [value]="enrollment.status" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
@@ -125,120 +133,52 @@
               <p-tag [value]="enrollment.paymentStatus" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
             </td>
             <td>
-              @if (enrollment.status === 'ACTIVE') {
-                <button
-                  pButton
-                  icon="pi pi-times"
-                  class="p-button-rounded p-button-text p-button-danger"
-                  pTooltip="Drop Course"
-                  (click)="dropEnrollment(enrollment)"
-                ></button>
-              }
+              <div class="flex gap-2">
+                <p-button
+                  icon="pi pi-pencil"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  (onClick)="editEnrollment(enrollment)"
+                  pTooltip="Edit"
+                ></p-button>
+                @if (enrollment.status !== 'DROPPED') {
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="confirmDeleteEnrollment(enrollment)"
+                    pTooltip="Delete"
+                  ></p-button>
+                }
+              </div>
             </td>
           </tr>
         </ng-template>
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="8" class="text-center">No course enrollments found.</td>
+            <td colspan="8" class="text-center py-8">
+              <div class="text-gray-500">
+                <i class="pi pi-inbox text-4xl mb-3"></i>
+                <p>No course enrollments found.</p>
+                <p class="text-sm mt-2">Click "Enroll in Course" to add the first enrollment.</p>
+              </div>
+            </td>
           </tr>
         </ng-template>
       </p-table>
     </p-card>
+
+    <app-delete-confirm-dialog
+      [(visible)]="showDeleteDialog"
+      [header]="'Delete Enrollment'"
+      [message]="'Are you sure you want to delete this enrollment? The student will be removed from the course.'"
+      (confirm)="deleteEnrollment()"
+    ></app-delete-confirm-dialog>
+  } @else if (loading()) {
+    <div class="flex justify-center items-center h-64">
+      <i class="pi pi-spin pi-spinner text-4xl"></i>
+    </div>
   }
-
-  <!-- Enrollment Dialog -->
-  <p-dialog
-    [(visible)]="showEnrollDialog"
-    header="Enroll in Course"
-    [modal]="true"
-    [style]="{ width: '500px' }"
-    [draggable]="false"
-  >
-    <form [formGroup]="enrollForm" (ngSubmit)="enrollStudent()">
-      <div class="field mb-4">
-        <label for="courseId" class="block text-sm font-medium mb-2">
-          Course <span class="text-red-500">*</span>
-        </label>
-        <select
-          id="courseId"
-          formControlName="courseId"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select a course</option>
-          @for (course of courses(); track course.id) {
-            <option [value]="course.id">{{ course.name }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="field mb-4">
-        <label for="enrollmentDate" class="block text-sm font-medium mb-2">
-          Enrollment Date <span class="text-red-500">*</span>
-        </label>
-        <input
-          id="enrollmentDate"
-          type="date"
-                    formControlName="enrollmentDate"
-          class="w-full"
-        />
-      </div>
-
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <div class="field">
-          <label for="discountPercent" class="block text-sm font-medium mb-2">Discount %</label>
-          <input
-            id="discountPercent"
-            type="number"
-            formControlName="discountPercent"
-            min="0"
-            max="100"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="0"
-          />
-        </div>
-
-        <div class="field">
-          <label for="discountAmount" class="block text-sm font-medium mb-2">Discount Amount ($)</label>
-          <input
-            id="discountAmount"
-            type="number"
-            formControlName="discountAmount"
-            min="0"
-            step="0.01"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="0.00"
-          />
-        </div>
-      </div>
-
-      <div class="field mb-4">
-        <label for="notes" class="block text-sm font-medium mb-2">Notes</label>
-        <textarea
-          id="notes"
-                    formControlName="notes"
-          rows="3"
-          class="w-full"
-          placeholder="Any additional notes"
-        ></textarea>
-      </div>
-
-      <div class="flex justify-end gap-2 mt-4">
-        <button
-          pButton
-          type="button"
-          label="Cancel"
-          class="p-button-outlined"
-          (click)="closeEnrollDialog()"
-        ></button>
-        <button
-          pButton
-          type="submit"
-          label="Enroll"
-          [disabled]="enrollForm.invalid"
-        ></button>
-      </div>
-    </form>
-  </p-dialog>
-
-  <p-confirmDialog></p-confirmDialog>
 </div>

@@ -1,17 +1,10 @@
 # Seed Data Script
 
-This directory contains the data seeding script to populate the JSON files with initial sample data.
+This directory contains the data seeding scripts to populate the SQL database with initial sample data.
 
 ## Running the Seed Script
 
-From the backend directory:
-
-```bash
-cd backend
-npm run seed
-```
-
-Or from the root directory:
+From the root directory:
 
 ```bash
 npm run seed
@@ -65,7 +58,7 @@ The script populates the following data:
 
 ## Important Notes
 
-- Running the script will **overwrite** existing data in the JSON files
+- Running the script will **reset** and populate the SQL database with sample data
 - All passwords are securely hashed using bcrypt
 - UUIDs are generated for all entity IDs
 - Timestamps are set to the current date/time
@@ -75,7 +68,8 @@ The script populates the following data:
 
 The script requires:
 - Node.js with TypeScript support
+- SQL database connection configured
 - bcrypt package for password hashing
 - uuid package for ID generation
 
-These are automatically installed with the backend dependencies.
+These are automatically installed with the project dependencies.

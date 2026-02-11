@@ -62,8 +62,7 @@ data/*.json
 .angular/cache/
 frontend/.angular/
 
-# NestJS
-backend/.nest/
+
 
 # Compiled output
 **/*.js.map
