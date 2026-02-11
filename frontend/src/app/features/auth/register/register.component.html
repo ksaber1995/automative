@@ -1,149 +1,220 @@
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4">
-  <div class="w-full max-w-md">
+  <div class="w-full max-w-2xl">
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4 text-center">
-          <h2 class="text-2xl font-bold">Create Account</h2>
-          <p class="text-gray-600 mt-1">Register for Automate Magic</p>
+          <h2 class="text-2xl font-bold">Create Your Company Account</h2>
+          <p class="text-gray-600 mt-1">Start your journey with Automate Magic</p>
         </div>
       </ng-template>
 
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-        <!-- Name Fields -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm font-medium mb-2">
-              First Name <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              formControlName="firstName"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="firstName?.invalid && firstName?.touched"
-              placeholder="John" />
-            @if (firstName?.invalid && firstName?.touched) {
-              <small class="text-red-500">First name is required</small>
-            }
-          </div>
+        <!-- Company Information Section -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Company Information</h3>
 
-          <div>
-            <label class="block text-sm font-medium mb-2">
-              Last Name <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              formControlName="lastName"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="lastName?.invalid && lastName?.touched"
-              placeholder="Doe" />
-            @if (lastName?.invalid && lastName?.touched) {
-              <small class="text-red-500">Last name is required</small>
-            }
-          </div>
-        </div>
-
-        <!-- Email -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-2">
-            Email <span class="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            formControlName="email"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="email?.invalid && email?.touched"
-            placeholder="john.doe@example.com" />
-          @if (email?.invalid && email?.touched) {
-            <small class="text-red-500">
-              @if (email?.errors?.['required']) { Email is required }
-              @if (email?.errors?.['email']) { Please enter a valid email }
-            </small>
-          }
-        </div>
-
-        <!-- Password -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-2">
-            Password <span class="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            formControlName="password"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="password?.invalid && password?.touched"
-            placeholder="Minimum 6 characters" />
-          @if (password?.invalid && password?.touched) {
-            <small class="text-red-500">
-              @if (password?.errors?.['required']) { Password is required }
-              @if (password?.errors?.['minlength']) { Password must be at least 6 characters }
-            </small>
-          }
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-2">
-            Confirm Password <span class="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            formControlName="confirmPassword"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="confirmPassword?.invalid && confirmPassword?.touched"
-            placeholder="Re-enter password" />
-          @if (confirmPassword?.invalid && confirmPassword?.touched) {
-            <small class="text-red-500">
-              @if (confirmPassword?.errors?.['required']) { Please confirm your password }
-              @if (confirmPassword?.errors?.['passwordMismatch']) { Passwords do not match }
-            </small>
-          }
-        </div>
-
-        <!-- Role -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-2">
-            Role <span class="text-red-500">*</span>
-          </label>
-          <select
-            formControlName="role"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            [class.border-red-500]="role?.invalid && role?.touched">
-            <option value="">Select Role</option>
-            @for (roleOption of userRoles; track roleOption.value) {
-              <option [value]="roleOption.value">{{ roleOption.label }}</option>
-            }
-          </select>
-          @if (role?.invalid && role?.touched) {
-            <small class="text-red-500">Role is required</small>
-          }
-        </div>
-
-        <!-- Branch (conditional) -->
-        @if (registerForm.get('role')?.value === 'BRANCH_MANAGER') {
+          <!-- Company Name -->
           <div class="mb-4">
             <label class="block text-sm font-medium mb-2">
-              Branch <span class="text-red-500">*</span>
+              Company Name <span class="text-red-500">*</span>
             </label>
-            <select
-              formControlName="branchId"
+            <input
+              type="text"
+              formControlName="companyName"
               class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="branchId?.invalid && branchId?.touched">
-              <option value="">Select Branch</option>
-              @for (branch of branches(); track branch.id) {
-                <option [value]="branch.id">{{ branch.name }}</option>
-              }
-            </select>
-            @if (branchId?.invalid && branchId?.touched) {
-              <small class="text-red-500">Branch is required for Branch Managers</small>
+              [class.border-red-500]="companyName?.invalid && companyName?.touched"
+              placeholder="Acme Education Center" />
+            @if (companyName?.invalid && companyName?.touched) {
+              <small class="text-red-500">
+                @if (companyName?.errors?.['required']) { Company name is required }
+                @if (companyName?.errors?.['minlength']) { Company name must be at least 2 characters }
+              </small>
             }
           </div>
-        }
+
+          <!-- Company Email -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Company Email <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              formControlName="companyEmail"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="companyEmail?.invalid && companyEmail?.touched"
+              placeholder="info@acme-edu.com" />
+            @if (companyEmail?.invalid && companyEmail?.touched) {
+              <small class="text-red-500">
+                @if (companyEmail?.errors?.['required']) { Company email is required }
+                @if (companyEmail?.errors?.['email']) { Please enter a valid email }
+              </small>
+            }
+          </div>
+
+          <!-- Company Code & Industry (Optional) -->
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">
+                Company Code <span class="text-gray-500 text-xs">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                formControlName="companyCode"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="ACME-001" />
+              <small class="text-gray-500 text-xs">Leave blank for auto-generation</small>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">
+                Industry <span class="text-gray-500 text-xs">(Optional)</span>
+              </label>
+              <select
+                formControlName="industry"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                <option value="">Select Industry</option>
+                @for (ind of industries; track ind) {
+                  <option [value]="ind">{{ ind }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <!-- Timezone -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Timezone
+            </label>
+            <select
+              formControlName="timezone"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md">
+              @for (tz of timezones; track tz) {
+                <option [value]="tz">{{ tz }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <!-- User Information Section -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Your Account (Company Owner)</h3>
+
+          <!-- Name Fields -->
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">
+                First Name <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="firstName"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                [class.border-red-500]="firstName?.invalid && firstName?.touched"
+                placeholder="John" />
+              @if (firstName?.invalid && firstName?.touched) {
+                <small class="text-red-500">First name is required</small>
+              }
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">
+                Last Name <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="lastName"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                [class.border-red-500]="lastName?.invalid && lastName?.touched"
+                placeholder="Doe" />
+              @if (lastName?.invalid && lastName?.touched) {
+                <small class="text-red-500">Last name is required</small>
+              }
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Your Email <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              formControlName="email"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="email?.invalid && email?.touched"
+              placeholder="john.doe@acme-edu.com" />
+            @if (email?.invalid && email?.touched) {
+              <small class="text-red-500">
+                @if (email?.errors?.['required']) { Email is required }
+                @if (email?.errors?.['email']) { Please enter a valid email }
+              </small>
+            }
+          </div>
+
+          <!-- Phone (Optional) -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Phone <span class="text-gray-500 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="tel"
+              formControlName="phone"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="+20 123 456 7890" />
+          </div>
+
+          <!-- Password -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Password <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              formControlName="password"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="password?.invalid && password?.touched"
+              placeholder="Minimum 6 characters" />
+            @if (password?.invalid && password?.touched) {
+              <small class="text-red-500">
+                @if (password?.errors?.['required']) { Password is required }
+                @if (password?.errors?.['minlength']) { Password must be at least 6 characters }
+              </small>
+            }
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">
+              Confirm Password <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              formControlName="confirmPassword"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              [class.border-red-500]="confirmPassword?.invalid && confirmPassword?.touched"
+              placeholder="Re-enter password" />
+            @if (confirmPassword?.invalid && confirmPassword?.touched) {
+              <small class="text-red-500">
+                @if (confirmPassword?.errors?.['required']) { Please confirm your password }
+                @if (confirmPassword?.errors?.['passwordMismatch']) { Passwords do not match }
+              </small>
+            }
+          </div>
+        </div>
+
+        <!-- Terms & Conditions Notice -->
+        <div class="mb-4 p-3 bg-blue-50 rounded-md">
+          <p class="text-sm text-gray-700">
+            By creating an account, you agree to our Terms of Service and Privacy Policy.
+            A default branch will be created for your company automatically.
+          </p>
+        </div>
 
         <!-- Submit Button -->
         <button
           pButton
           type="submit"
-          label="Register"
+          label="Create Company Account"
           class="w-full"
           [disabled]="loading()"></button>
 

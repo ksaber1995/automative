@@ -1,8 +1,10 @@
-import { insert, findById, query } from '../db/connection';
+import { insert, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapProductSaleFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     productId: row.product_id,
     branchId: row.branch_id,
     quantity: parseInt(row.quantity),
@@ -17,9 +19,19 @@ function mapProductSaleFromDB(row: any) {
 }
 
 export const productSalesRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const sale = await insert('product_sales', {
+        company_id: context.companyId,
         product_id: body.productId,
         branch_id: body.branchId,
         quantity: body.quantity,
@@ -38,19 +50,30 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Create product sale error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create product sale' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create product sale' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string; productId?: string; startDate?: string; endDate?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; productId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM product_sales WHERE 1=1';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM product_sales WHERE company_id = $1';
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
 
@@ -79,26 +102,37 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('List product sales error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list product sales' },
       };
     }
   },
 
-  summary: async ({ query: queryParams }: { query: { branchId?: string; startDate?: string; endDate?: string } }) => {
+  summary: async ({ query: queryParams, headers }: { query: { branchId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT
           COUNT(*) as total_sales,
           SUM(quantity) as total_quantity,
           SUM(total_amount) as total_revenue
         FROM product_sales
-        WHERE 1=1
+        WHERE company_id = $1
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
 
@@ -124,19 +158,25 @@ export const productSalesRoutes = {
           SUM(ps.total_amount) as revenue
         FROM product_sales ps
         LEFT JOIN products p ON ps.product_id = p.id
-        WHERE 1=1
+        WHERE ps.company_id = $1
       `;
 
       if (queryParams.branchId) {
-        productSql += ` AND ps.branch_id = $1`;
+        const branchIdx = params.indexOf(queryParams.branchId);
+        productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        const branchIdx = params.indexOf(context.branchId);
+        productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
       }
+
       if (queryParams.startDate) {
-        const idx = queryParams.branchId ? 2 : 1;
-        productSql += ` AND ps.sale_date >= $${idx}`;
+        const dateIdx = params.indexOf(queryParams.startDate);
+        productSql += ` AND ps.sale_date >= $${dateIdx + 1}`;
       }
+
       if (queryParams.endDate) {
-        const idx = (queryParams.branchId ? 1 : 0) + (queryParams.startDate ? 1 : 0) + 1;
-        productSql += ` AND ps.sale_date <= $${idx}`;
+        const dateIdx = params.indexOf(queryParams.endDate);
+        productSql += ` AND ps.sale_date <= $${dateIdx + 1}`;
       }
 
       productSql += ' GROUP BY ps.product_id, p.name ORDER BY revenue DESC';
@@ -160,19 +200,16 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Product sales summary error:', error);
       return {
-        status: 200 as const,
-        body: {
-          totalSales: 0,
-          totalQuantity: 0,
-          totalRevenue: 0,
-          byProduct: [],
-        },
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to generate product sales summary' },
       };
     }
   },
 
-  topProducts: async ({ query: queryParams }: { query: { branchId?: string; limit?: string } }) => {
+  topProducts: async ({ query: queryParams, headers }: { query: { branchId?: string; limit?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT
           ps.product_id,
@@ -181,12 +218,21 @@ export const productSalesRoutes = {
           SUM(ps.quantity) as quantity
         FROM product_sales ps
         LEFT JOIN products p ON ps.product_id = p.id
-        WHERE 1=1
+        WHERE ps.company_id = $1
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND ps.branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
       }
 
@@ -213,20 +259,32 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Top products error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get top products' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const sale = await findById('product_sales', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const sale = await queryOne(
+        'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!sale) {
         return {
           status: 404 as const,
           body: { message: 'Product sale not found' },
+        };
+      }
+
+      if (sale.branch_id && !canAccessBranch(context, sale.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this product sale' },
         };
       }
 
@@ -237,8 +295,8 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Get product sale error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Product sale not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Product sale not found' },
       };
     }
   },

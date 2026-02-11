@@ -1,5 +1,6 @@
 export interface CashState {
   id: string;
+  companyId: string;
   currentCash: number;
   lastUpdated: string;
   lastTransactionId: string | null;

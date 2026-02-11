@@ -1,5 +1,6 @@
 export interface Branch {
   id: string;
+  companyId: string;
   name: string;
   code: string;
   address: string;

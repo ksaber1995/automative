@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapCourseFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     branchId: row.branch_id,
     name: row.name,
     code: row.code,
@@ -25,9 +27,19 @@ function mapCourseWithEnrollmentCountFromDB(row: any) {
 }
 
 export const coursesRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const course = await insert('courses', {
+        company_id: context.companyId,
         branch_id: body.branchId,
         name: body.name,
         code: body.code,
@@ -46,26 +58,37 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Create course error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create course' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create course' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT
           c.*,
           COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as enrollment_count
         FROM courses c
         LEFT JOIN enrollments e ON c.id = e.course_id AND e.status != 'DROPPED'
-        WHERE 1=1
+        WHERE c.company_id = $1
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND c.branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
 
@@ -79,19 +102,30 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('List courses error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list courses' },
       };
     }
   },
 
-  listActive: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+  listActive: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM courses WHERE is_active = true';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM courses WHERE company_id = $1 AND is_active = true';
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
 
@@ -105,20 +139,32 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('List active courses error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list active courses' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const course = await findById('courses', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const course = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!course) {
         return {
           status: 404 as const,
           body: { message: 'Course not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, course.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this course' },
         };
       }
 
@@ -129,17 +175,46 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Get course error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Course not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Course not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Course not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to update this course' },
+        };
+      }
+
       const updateData: any = {};
 
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
+      if (body.branchId !== undefined) {
+        if (!canAccessBranch(context, body.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to target branch' },
+          };
+        }
+        updateData.branch_id = body.branchId;
+      }
       if (body.name !== undefined) updateData.name = body.name;
       if (body.code !== undefined) updateData.code = body.code;
       if (body.description !== undefined) updateData.description = body.description;
@@ -164,14 +239,35 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Update course error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update course' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update course' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Course not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to delete this course' },
+        };
+      }
+
       const course = await update('courses', params.id, { is_active: false });
 
       if (!course) {
@@ -188,8 +284,8 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Delete course error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete course' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete course' },
       };
     }
   },

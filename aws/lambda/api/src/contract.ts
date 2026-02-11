@@ -16,6 +16,12 @@ const DateStringSchema = z.string().datetime();
 // User Roles
 const UserRoleSchema = z.enum(['ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT']);
 
+// Subscription Tiers
+const SubscriptionTierSchema = z.enum(['BASIC', 'PROFESSIONAL', 'ENTERPRISE']);
+
+// Subscription Status
+const SubscriptionStatusSchema = z.enum(['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED']);
+
 // Enrollment Status
 const EnrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'DROPPED', 'PENDING']);
 
@@ -39,6 +45,38 @@ const WithdrawalCategorySchema = z.enum(['OWNER_DRAW', 'PROFIT_DISTRIBUTION', 'D
 const DebtStatusSchema = z.enum(['ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED']);
 
 // =============================================
+// Company Schemas
+// =============================================
+const CompanySchema = z.object({
+  id: UUIDSchema,
+  name: z.string(),
+  code: z.string(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  zipCode: z.string().nullable(),
+  country: z.string().nullable(),
+  taxId: z.string().nullable(),
+  registrationNumber: z.string().nullable(),
+  industry: z.string().nullable(),
+  subscriptionTier: SubscriptionTierSchema,
+  subscriptionStatus: SubscriptionStatusSchema,
+  subscriptionStartDate: z.string().nullable(),
+  subscriptionEndDate: z.string().nullable(),
+  maxBranches: z.number(),
+  maxUsers: z.number(),
+  timezone: z.string(),
+  currency: z.string(),
+  locale: z.string(),
+  isActive: z.boolean(),
+  onboardingCompleted: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
 // Auth Schemas
 // =============================================
 const LoginRequestSchema = z.object({
@@ -47,12 +85,19 @@ const LoginRequestSchema = z.object({
 });
 
 const RegisterRequestSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  // Company details
+  companyName: z.string().min(1),
+  companyEmail: z.string().email(),
+  companyCode: z.string().optional(),
+  industry: z.string().optional(),
+  timezone: z.string().optional(),
+
+  // User details (becomes company owner/admin)
   firstName: z.string(),
   lastName: z.string(),
-  role: UserRoleSchema,
-  branchId: OptionalUUIDSchema,
+  email: z.string().email(),
+  password: z.string().min(6),
+  phone: z.string().optional(),
 });
 
 const AuthResponseSchema = z.object({
@@ -64,9 +109,17 @@ const AuthResponseSchema = z.object({
     firstName: z.string(),
     lastName: z.string(),
     role: UserRoleSchema,
+    companyId: UUIDSchema,
     branchId: UUIDSchema.nullable(),
     isActive: z.boolean(),
   }),
+  company: z.object({
+    id: UUIDSchema,
+    name: z.string(),
+    code: z.string(),
+    subscriptionTier: SubscriptionTierSchema,
+    subscriptionStatus: SubscriptionStatusSchema,
+  }).optional(),
 });
 
 // =============================================
@@ -91,6 +144,7 @@ const UpdateStudentSchema = CreateStudentSchema.partial();
 
 const StudentSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.string().nullable(),
@@ -130,6 +184,7 @@ const UpdateBranchSchema = CreateBranchSchema.partial();
 
 const BranchSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   name: z.string(),
   code: z.string(),
   address: z.string().nullable(),
@@ -163,6 +218,7 @@ const UpdateCourseSchema = CreateCourseSchema.partial();
 
 const CourseSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   branchId: UUIDSchema,
   name: z.string(),
   code: z.string(),
@@ -210,6 +266,7 @@ const UpdateClassSchema = z.object({
 
 const ClassSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   courseId: UUIDSchema,
   branchId: UUIDSchema,
   instructorId: UUIDSchema.nullable(),
@@ -250,6 +307,7 @@ const UpdateEnrollmentSchema = CreateEnrollmentSchema.partial();
 
 const EnrollmentSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   studentId: UUIDSchema,
   classId: UUIDSchema,
   courseId: UUIDSchema,
@@ -272,6 +330,7 @@ const EnrollmentSchema = z.object({
 // =============================================
 const RevenueItemSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   branchId: UUIDSchema,
   branchName: z.string(),
   source: z.enum(['ENROLLMENT', 'PRODUCT_SALE']),
@@ -324,6 +383,7 @@ const UpdateExpenseSchema = CreateExpenseSchema.partial();
 
 const ExpenseSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   branchId: UUIDSchema.nullable(),
   type: ExpenseTypeSchema,
   category: ExpenseCategorySchema,
@@ -357,6 +417,7 @@ const UpdateEmployeeSchema = CreateEmployeeSchema.partial();
 
 const EmployeeSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   firstName: z.string(),
   lastName: z.string(),
   email: z.string().nullable(),
@@ -398,6 +459,7 @@ const UpdateWithdrawalSchema = z.object({
 
 const WithdrawalSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   amount: z.number(),
   stakeholders: z.array(WithdrawalStakeholderSchema),
   withdrawalDate: z.string(),
@@ -463,6 +525,7 @@ const UpdateProductSchema = z.object({
 
 const ProductSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   name: z.string(),
   code: z.string(),
   description: z.string(),
@@ -496,6 +559,7 @@ const CreateProductSaleSchema = z.object({
 
 const ProductSaleSchema = z.object({
   id: UUIDSchema,
+  companyId: UUIDSchema,
   productId: UUIDSchema,
   branchId: UUIDSchema,
   quantity: z.number(),
@@ -542,6 +606,7 @@ export const contract = c.router({
           firstName: z.string(),
           lastName: z.string(),
           role: UserRoleSchema,
+          companyId: UUIDSchema,
           branchId: UUIDSchema.nullable(),
           isActive: z.boolean(),
         }),
@@ -1346,13 +1411,12 @@ export const contract = c.router({
 
   // Reports routes
   reports: {
-    financialMonthly: {
+    financial: {
       method: 'GET',
-      path: '/api/reports/excel/financial-monthly',
+      path: '/api/reports/excel/financial',
       query: z.object({
         startDate: z.string(),
         endDate: z.string(),
-        branchId: UUIDSchema.optional(),
       }),
       responses: {
         200: z.object({
@@ -1360,6 +1424,72 @@ export const contract = c.router({
           filename: z.string(),
         }),
         400: z.object({ message: z.string() }),
+      },
+    },
+    financialMonthly: {
+      method: 'GET',
+      path: '/api/reports/excel/financial-monthly',
+      query: z.object({
+        startDate: z.string(),
+        endDate: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          data: z.string(), // base64 encoded Excel file
+          filename: z.string(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    branch: {
+      method: 'GET',
+      path: '/api/reports/excel/branch/:branchId',
+      pathParams: z.object({
+        branchId: UUIDSchema,
+      }),
+      query: z.object({
+        startDate: z.string(),
+        endDate: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          data: z.string(), // base64 encoded Excel file
+          filename: z.string(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    churn: {
+      method: 'GET',
+      path: '/api/reports/excel/churn',
+      query: z.object({
+        startDate: z.string(),
+        endDate: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          data: z.string(), // base64 encoded Excel file
+          filename: z.string(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Debug routes (development only)
+  debug: {
+    checkClassesTable: {
+      method: 'GET',
+      path: '/api/debug/classes-table',
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          columns: z.any(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          error: z.string(),
+        }),
       },
     },
   },
@@ -1375,6 +1505,40 @@ export const contract = c.router({
           success: z.boolean(),
           message: z.string(),
           verification: z.any().optional(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+    runClassesInstructorMigration: {
+      method: 'POST',
+      path: '/api/migrations/add-instructor-to-classes',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          verification: z.any().optional(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+    updateClassesTableStructure: {
+      method: 'POST',
+      path: '/api/migrations/update-classes-structure',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          addedColumns: z.array(z.string()).optional(),
         }),
         500: z.object({
           success: z.boolean(),

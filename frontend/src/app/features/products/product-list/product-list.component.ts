@@ -113,14 +113,14 @@ import { ProductCategory } from '@shared/enums/product.enum';
                   <p-tag value="Branch" severity="info"></p-tag>
                 }
               </td>
-              <td>\${{ product.costPrice.toFixed(2) }}</td>
-              <td class="font-semibold">\${{ product.sellingPrice.toFixed(2) }}</td>
+              <td>\${{ (product.costPrice || 0).toFixed(2) }}</td>
+              <td class="font-semibold">\${{ (product.sellingPrice || 0).toFixed(2) }}</td>
               <td>
-                @if (product.stock <= product.minStock) {
-                  <span class="text-red-600 font-bold">{{ product.stock }}</span>
+                @if ((product.stock || 0) <= (product.minStock || 0)) {
+                  <span class="text-red-600 font-bold">{{ product.stock || 0 }}</span>
                   <i class="pi pi-exclamation-triangle text-red-600 ml-1"></i>
                 } @else {
-                  <span class="text-green-600">{{ product.stock }}</span>
+                  <span class="text-green-600">{{ product.stock || 0 }}</span>
                 }
               </td>
               <td>

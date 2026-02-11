@@ -96,11 +96,11 @@ export class CourseDetailComponent implements OnInit {
   }
 
   createClass() {
-    this.router.navigate(['/courses', this.courseId, 'classes', 'new']);
+    this.router.navigate(['/courses', this.courseId, 'classes', 'create']);
   }
 
   editClass(classId: string) {
-    this.router.navigate(['/courses', this.courseId, 'classes', 'edit', classId]);
+    this.router.navigate(['/courses', this.courseId, 'classes', classId, 'edit']);
   }
 
   deleteClass(classId: string) {

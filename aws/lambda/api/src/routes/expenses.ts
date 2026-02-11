@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapExpenseFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     branchId: row.branch_id,
     type: row.type,
     category: row.category,
@@ -21,9 +23,19 @@ function mapExpenseFromDB(row: any) {
 }
 
 export const expensesRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const expense = await insert('expenses', {
+        company_id: context.companyId,
         branch_id: body.branchId || null,
         type: body.type,
         category: body.category,
@@ -45,20 +57,31 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Create expense error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create expense' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create expense' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string; startDate?: string; endDate?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM expenses WHERE 1=1';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM expenses WHERE company_id = $1';
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
+        sql += ` AND (branch_id = $${params.length} OR branch_id IS NULL)`;
       }
 
       if (queryParams.startDate) {
@@ -81,20 +104,32 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('List expenses error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list expenses' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const expense = await findById('expenses', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const expense = await queryOne(
+        'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!expense) {
         return {
           status: 404 as const,
           body: { message: 'Expense not found' },
+        };
+      }
+
+      if (expense.branch_id && !canAccessBranch(context, expense.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this expense' },
         };
       }
 
@@ -105,17 +140,46 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get expense error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Expense not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Expense not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Expense not found' },
+        };
+      }
+
+      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to update this expense' },
+        };
+      }
+
       const updateData: any = {};
 
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
+      if (body.branchId !== undefined) {
+        if (body.branchId && !canAccessBranch(context, body.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to target branch' },
+          };
+        }
+        updateData.branch_id = body.branchId;
+      }
       if (body.type !== undefined) updateData.type = body.type;
       if (body.category !== undefined) updateData.category = body.category;
       if (body.amount !== undefined) updateData.amount = body.amount;
@@ -144,8 +208,8 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Update expense error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update expense' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update expense' },
       };
     }
   },

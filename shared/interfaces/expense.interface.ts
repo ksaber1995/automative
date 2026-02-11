@@ -2,6 +2,7 @@ import { ExpenseType, ExpenseCategory, DistributionMethod } from '../enums/expen
 
 export interface Expense {
   id: string;
+  companyId: string;
   branchId?: string | null;
   type: ExpenseType;
   category: ExpenseCategory;

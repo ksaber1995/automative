@@ -101,6 +101,7 @@
                   [value]="day.value"
                   [ngModel]="isDaySelected(day.value)"
                   (ngModelChange)="onDayChange($event, day.value)"
+                  [ngModelOptions]="{standalone: true}"
                   [binary]="true"
                   [inputId]="'day-' + day.value">
                 </p-checkbox>

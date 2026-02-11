@@ -1,6 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from '../../../core/services/api.service';
+
+interface ReportResponse {
+  data: string; // base64 encoded file
+  filename: string;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -8,33 +14,36 @@ import { ApiService } from '../../../core/services/api.service';
 export class ReportService {
   private api = inject(ApiService);
 
-  downloadFinancialReportExcel(startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/excel/financial?${params.toString()}`;
+  downloadFinancialReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
+    return this.api.get<ReportResponse>(`reports/excel/financial`, { startDate, endDate });
   }
 
-  downloadFinancialReportPdf(startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/pdf/financial?${params.toString()}`;
+  downloadBranchReportExcel(branchId: string, startDate: string, endDate: string): Observable<ReportResponse> {
+    return this.api.get<ReportResponse>(`reports/excel/branch/${branchId}`, { startDate, endDate });
   }
 
-  downloadBranchReportExcel(branchId: string, startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/excel/branch/${branchId}?${params.toString()}`;
+  downloadMonthlyFinancialReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
+    return this.api.get<ReportResponse>(`reports/excel/financial-monthly`, { startDate, endDate });
   }
 
-  downloadBranchReportPdf(branchId: string, startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/pdf/branch/${branchId}?${params.toString()}`;
+  downloadChurnReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
+    return this.api.get<ReportResponse>(`reports/excel/churn`, { startDate, endDate });
   }
 
-  downloadMonthlyFinancialReportExcel(startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/excel/financial-monthly?${params.toString()}`;
-  }
+  // Helper method to download base64 file
+  downloadBase64File(base64Data: string, filename: string) {
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
-  downloadChurnReportExcel(startDate: string, endDate: string): string {
-    const params = new URLSearchParams({ startDate, endDate });
-    return this.api.getBaseUrl() + `/reports/excel/churn?${params.toString()}`;
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(link.href);
   }
 }

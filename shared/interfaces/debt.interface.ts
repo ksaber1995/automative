@@ -1,5 +1,6 @@
 export interface Debt {
   id: string;
+  companyId: string;
   debtType: DebtType;
   creditorName: string;
   creditorContact?: string;

@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapClassFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     courseId: row.course_id,
     branchId: row.branch_id,
     instructorId: row.instructor_id,
@@ -32,9 +34,21 @@ function mapClassWithDetailsFromDB(row: any) {
 }
 
 export const classesRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
-      const classRecord = await insert('classes', {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
+      console.log('Creating class with data:', JSON.stringify(body, null, 2));
+
+      const insertData = {
+        company_id: context.companyId,
         course_id: body.courseId,
         branch_id: body.branchId,
         instructor_id: body.instructorId || null,
@@ -49,7 +63,13 @@ export const classesRoutes = {
         current_enrollment: 0,
         notes: body.notes || null,
         is_active: true,
-      });
+      };
+
+      console.log('Insert data:', JSON.stringify(insertData, null, 2));
+
+      const classRecord = await insert('classes', insertData);
+
+      console.log('Class created successfully:', classRecord.id);
 
       return {
         status: 201 as const,
@@ -57,15 +77,22 @@ export const classesRoutes = {
       };
     } catch (error) {
       console.error('Create class error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create class' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: {
+          message: error.message || 'Failed to create class',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          details: error instanceof Error ? error.stack : undefined
+        },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string; courseId?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT
           c.*,
@@ -76,12 +103,21 @@ export const classesRoutes = {
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE 1=1
+        WHERE c.company_id = $1
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND c.branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
 
@@ -100,14 +136,16 @@ export const classesRoutes = {
     } catch (error) {
       console.error('List classes error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list classes' },
       };
     }
   },
 
-  listActive: async ({ query: queryParams }: { query: { branchId?: string; courseId?: string } }) => {
+  listActive: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT
           c.*,
@@ -118,12 +156,21 @@ export const classesRoutes = {
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.is_active = true
+        WHERE c.company_id = $1 AND c.is_active = true
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND c.branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
 
@@ -142,14 +189,16 @@ export const classesRoutes = {
     } catch (error) {
       console.error('List active classes error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list active classes' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       const sql = `
         SELECT
           c.*,
@@ -160,15 +209,22 @@ export const classesRoutes = {
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.id = $1
+        WHERE c.id = $1 AND c.company_id = $2
       `;
 
-      const result = await query(sql, [params.id]);
+      const result = await query(sql, [params.id, context.companyId]);
 
       if (!result || result.length === 0) {
         return {
           status: 404 as const,
           body: { message: 'Class not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, result[0].branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this class' },
         };
       }
 
@@ -179,18 +235,47 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Get class error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Class not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Class not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Class not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to update this class' },
+        };
+      }
+
       const updateData: any = {};
 
       if (body.courseId !== undefined) updateData.course_id = body.courseId;
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
+      if (body.branchId !== undefined) {
+        if (!canAccessBranch(context, body.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to target branch' },
+          };
+        }
+        updateData.branch_id = body.branchId;
+      }
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.name !== undefined) updateData.name = body.name;
       if (body.code !== undefined) updateData.code = body.code;
@@ -218,14 +303,35 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Update class error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update class' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update class' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Class not found' },
+        };
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to delete this class' },
+        };
+      }
+
       const classRecord = await update('classes', params.id, { is_active: false });
 
       if (!classRecord) {
@@ -242,8 +348,8 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Delete class error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete class' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete class' },
       };
     }
   },

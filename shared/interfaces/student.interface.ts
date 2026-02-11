@@ -1,5 +1,6 @@
 export interface Student {
   id: string;
+  companyId: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;

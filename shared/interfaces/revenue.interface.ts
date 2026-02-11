@@ -2,6 +2,7 @@ import { PaymentMethod } from '../enums/enrollment-status.enum';
 
 export interface Revenue {
   id: string;
+  companyId: string;
   branchId: string;
   courseId?: string | null;
   enrollmentId?: string | null;

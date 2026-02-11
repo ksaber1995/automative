@@ -1,8 +1,10 @@
-import { insert, update, findById, query, deleteById } from '../db/connection';
+import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapStudentFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     firstName: row.first_name,
     lastName: row.last_name,
     dateOfBirth: row.date_of_birth,
@@ -24,9 +26,21 @@ function mapStudentFromDB(row: any) {
 }
 
 export const studentsRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      // Extract tenant context for multi-tenant isolation
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify user can access the specified branch
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const student = await insert('students', {
+        company_id: context.companyId,  // NEW: Add company_id for tenant isolation
         first_name: body.firstName,
         last_name: body.lastName,
         date_of_birth: body.dateOfBirth || null,
@@ -49,19 +63,34 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Create student error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create student' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create student' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM students WHERE 1=1';
-      const params: any[] = [];
+      // Extract tenant context for multi-tenant isolation
+      const context = await extractTenantContext(headers.authorization);
 
+      // Build query with MANDATORY company_id filter
+      let sql = 'SELECT * FROM students WHERE company_id = $1';
+      const params: any[] = [context.companyId];
+
+      // Optional branch filtering with permission check
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        // Non-admins see only their branch
+        params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
 
@@ -75,20 +104,35 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('List students error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list students' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const student = await findById('students', params.id);
+      // Extract tenant context for multi-tenant isolation
+      const context = await extractTenantContext(headers.authorization);
+
+      // Query with company_id filter to ensure tenant isolation
+      const student = await queryOne(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!student) {
         return {
           status: 404 as const,
           body: { message: 'Student not found' },
+        };
+      }
+
+      // Verify branch access
+      if (!canAccessBranch(context, student.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this student' },
         };
       }
 
@@ -99,14 +143,38 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Get student error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Student not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Student not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      // Extract tenant context for multi-tenant isolation
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify the student belongs to the user's company
+      const existing = await queryOne(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Student not found' },
+        };
+      }
+
+      // Verify branch access
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to update this student' },
+        };
+      }
+
       const updateData: any = {};
 
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
@@ -118,7 +186,16 @@ export const studentsRoutes = {
       if (body.parentPhone !== undefined) updateData.parent_phone = body.parentPhone;
       if (body.parentEmail !== undefined) updateData.parent_email = body.parentEmail;
       if (body.address !== undefined) updateData.address = body.address;
-      if (body.branchId !== undefined) updateData.branch_id = body.branchId;
+      if (body.branchId !== undefined) {
+        // Verify access to new branch
+        if (!canAccessBranch(context, body.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to target branch' },
+          };
+        }
+        updateData.branch_id = body.branchId;
+      }
       if (body.enrollmentDate !== undefined) updateData.enrollment_date = body.enrollmentDate;
       if (body.notes !== undefined) updateData.notes = body.notes;
 
@@ -138,14 +215,38 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Update student error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update student' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update student' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      // Extract tenant context for multi-tenant isolation
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify the student belongs to the user's company
+      const existing = await queryOne(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Student not found' },
+        };
+      }
+
+      // Verify branch access
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to delete this student' },
+        };
+      }
+
       // Soft delete by setting is_active to false
       const student = await update('students', params.id, { is_active: false });
 
@@ -163,8 +264,8 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Delete student error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete student' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete student' },
       };
     }
   },

@@ -5,9 +5,8 @@ import { Router, RouterLink } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
-import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { Branch } from '@shared/interfaces/branch.interface';
+import { RegisterDto } from '@shared/interfaces/user.interface';
 
 @Component({
   selector: 'app-register',
@@ -19,50 +18,50 @@ import { Branch } from '@shared/interfaces/branch.interface';
 export class RegisterComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
-  private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
 
   registerForm: FormGroup;
   loading = signal(false);
-  branches = signal<Branch[]>([]);
 
-  userRoles = [
-    { value: 'ADMIN', label: 'Admin' },
-    { value: 'BRANCH_MANAGER', label: 'Branch Manager' },
-    { value: 'ACCOUNTANT', label: 'Accountant' }
+  industries = [
+    'Education & Training',
+    'Technology',
+    'Healthcare',
+    'Retail',
+    'Manufacturing',
+    'Finance',
+    'Consulting',
+    'Other'
+  ];
+
+  timezones = [
+    'Africa/Cairo',
+    'Europe/London',
+    'America/New_York',
+    'America/Los_Angeles',
+    'Asia/Dubai',
+    'Asia/Riyadh'
   ];
 
   constructor() {
     this.registerForm = this.fb.group({
+      // Company Information
+      companyName: ['', [Validators.required, Validators.minLength(2)]],
+      companyEmail: ['', [Validators.required, Validators.email]],
+      companyCode: [''],
+      industry: [''],
+      timezone: ['Africa/Cairo'],
+
+      // User Information (Company Owner)
+      firstName: ['', [Validators.required]],
+      lastName: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
-      firstName: ['', [Validators.required]],
-      lastName: ['', [Validators.required]],
-      role: ['', [Validators.required]],
-      branchId: ['']
+      phone: ['']
     }, {
       validators: this.passwordMatchValidator
-    });
-
-    this.loadBranches();
-
-    // Watch for role changes to make branchId required for BRANCH_MANAGER
-    this.registerForm.get('role')?.valueChanges.subscribe(role => {
-      const branchControl = this.registerForm.get('branchId');
-      if (role === 'BRANCH_MANAGER') {
-        branchControl?.setValidators([Validators.required]);
-      } else {
-        branchControl?.clearValidators();
-      }
-      branchControl?.updateValueAndValidity();
-    });
-  }
-
-  loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
-      next: (branches) => this.branches.set(branches)
     });
   }
 
@@ -87,25 +86,37 @@ export class RegisterComponent {
     this.loading.set(true);
     const { confirmPassword, ...registerData } = this.registerForm.value;
 
-    this.authService.register(registerData).subscribe({
+    // Type-safe registration data
+    const dto: RegisterDto = registerData;
+
+    this.authService.register(dto).subscribe({
       next: (response) => {
-        this.notificationService.success('Registration successful! Redirecting to dashboard...');
+        this.notificationService.success(
+          `Welcome to Automate Magic! Company "${response.company?.name}" has been created successfully.`
+        );
         setTimeout(() => {
           this.router.navigate(['/dashboard']);
-        }, 1000);
+        }, 1500);
       },
       error: (error) => {
         this.loading.set(false);
-        this.notificationService.error(error.error?.message || 'Registration failed');
+        this.notificationService.error(
+          error.error?.message || 'Registration failed. Please try again.'
+        );
       }
     });
   }
 
+  // Form field getters
+  get companyName() { return this.registerForm.get('companyName'); }
+  get companyEmail() { return this.registerForm.get('companyEmail'); }
+  get companyCode() { return this.registerForm.get('companyCode'); }
+  get industry() { return this.registerForm.get('industry'); }
+  get timezone() { return this.registerForm.get('timezone'); }
+  get firstName() { return this.registerForm.get('firstName'); }
+  get lastName() { return this.registerForm.get('lastName'); }
   get email() { return this.registerForm.get('email'); }
   get password() { return this.registerForm.get('password'); }
   get confirmPassword() { return this.registerForm.get('confirmPassword'); }
-  get firstName() { return this.registerForm.get('firstName'); }
-  get lastName() { return this.registerForm.get('lastName'); }
-  get role() { return this.registerForm.get('role'); }
-  get branchId() { return this.registerForm.get('branchId'); }
+  get phone() { return this.registerForm.get('phone'); }
 }

@@ -1,5 +1,6 @@
 export interface Course {
   id: string;
+  companyId: string;
   branchId: string;
   name: string;
   code: string;

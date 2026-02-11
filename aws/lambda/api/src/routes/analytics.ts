@@ -1,18 +1,31 @@
 import { query } from '../db/connection';
+import { extractTenantContext } from '../middleware/tenant-isolation';
 
 export const analyticsRoutes = {
-  dashboard: async ({ query: queryParams }: { query: { startDate?: string; endDate?: string } }) => {
+  dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       const startDate = queryParams.startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
       const endDate = queryParams.endDate || new Date().toISOString().split('T')[0];
 
-      // Get company-wide revenue
-      const revenueData = await query(
+      // Get company-wide revenue from enrollments
+      const enrollmentRevenueData = await query(
         `SELECT
-          COALESCE(SUM(amount), 0) as total_revenue
-        FROM revenues
-        WHERE date >= $1 AND date <= $2`,
-        [startDate, endDate]
+          COALESCE(SUM(final_price), 0) as total_revenue
+        FROM enrollments
+        WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+          AND enrollment_date >= $2 AND enrollment_date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
+
+      // Get product sales revenue
+      const productRevenueData = await query(
+        `SELECT
+          COALESCE(SUM(total_amount), 0) as total_revenue
+        FROM product_sales
+        WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3`,
+        [context.companyId, startDate, endDate]
       );
 
       // Get expenses by type
@@ -22,9 +35,9 @@ export const analyticsRoutes = {
           category,
           COALESCE(SUM(amount), 0) as total_amount
         FROM expenses
-        WHERE date >= $1 AND date <= $2
+        WHERE company_id = $1 AND date >= $2 AND date <= $3
         GROUP BY type, category`,
-        [startDate, endDate]
+        [context.companyId, startDate, endDate]
       );
 
       // Calculate expense totals
@@ -45,44 +58,63 @@ export const analyticsRoutes = {
         .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
 
       const totalExpenses = fixedExpenses + variableExpenses + sharedExpenses;
-      const totalRevenue = parseFloat(revenueData[0]?.total_revenue || '0');
+      const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
+      const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
+      const totalRevenue = enrollmentRevenue + productRevenue;
       const netProfit = totalRevenue - totalExpenses;
 
-      // Get cash state
-      const cashState = await query('SELECT current_balance FROM cash_state LIMIT 1');
+      // Get cash state for company
+      const cashState = await query(
+        'SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1',
+        [context.companyId]
+      );
       const currentCash = parseFloat(cashState[0]?.current_balance || '0');
 
-      // Get outstanding debts
+      // Get outstanding debts (if table exists and has company_id)
       const debtsData = await query(
         `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts
         FROM debts
-        WHERE status = 'ACTIVE'`
-      );
+        WHERE company_id = $1 AND status = 'ACTIVE'`,
+        [context.companyId]
+      ).catch(() => [{ total_debts: 0 }]); // Fallback if debts table not fully implemented
       const totalOutstandingDebts = parseFloat(debtsData[0]?.total_debts || '0');
 
-      // Get revenue by branch
+      // Get revenue by branch (enrollments + product sales)
       const branchRevenueData = await query(
         `SELECT
           b.id,
           b.name,
-          COALESCE(SUM(r.amount), 0) as total_revenue
+          COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) as total_revenue
         FROM branches b
-        LEFT JOIN revenues r ON b.id = r.branch_id AND r.date >= $1 AND r.date <= $2
+        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.company_id = $1
+          AND e.payment_status IN ('PAID', 'PARTIAL')
+          AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
+        LEFT JOIN product_sales ps ON b.id = ps.branch_id AND ps.company_id = $1
+          AND ps.sale_date >= $2 AND ps.sale_date <= $3
+        WHERE b.company_id = $1
         GROUP BY b.id, b.name
         ORDER BY total_revenue DESC`,
-        [startDate, endDate]
+        [context.companyId, startDate, endDate]
       );
 
-      // Get revenue by month
+      // Get revenue by month (combined enrollments and product sales)
       const monthlyRevenue = await query(
         `SELECT
-          DATE_TRUNC('month', date) as month,
-          COALESCE(SUM(amount), 0) as total
-        FROM revenues
-        WHERE date >= $1 AND date <= $2
-        GROUP BY DATE_TRUNC('month', date)
+          TO_CHAR(date, 'YYYY-MM') as month,
+          SUM(amount) as total
+        FROM (
+          SELECT enrollment_date as date, final_price as amount
+          FROM enrollments
+          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+            AND enrollment_date >= $2 AND enrollment_date <= $3
+          UNION ALL
+          SELECT sale_date as date, total_amount as amount
+          FROM product_sales
+          WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
+        ) combined
+        GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month`,
-        [startDate, endDate]
+        [context.companyId, startDate, endDate]
       );
 
       return {
@@ -90,6 +122,8 @@ export const analyticsRoutes = {
         body: {
           companyWideSummary: {
             totalRevenue,
+            enrollmentRevenue,
+            productRevenue,
             fixedExpenses,
             variableExpenses,
             salaries,
@@ -128,15 +162,8 @@ export const analyticsRoutes = {
     } catch (error) {
       console.error('Dashboard error:', error);
       return {
-        status: 200 as const,
-        body: {
-          companyWideSummary: {},
-          branchSummaries: [],
-          revenueByMonth: [],
-          expensesByCategory: [],
-          topPerformingBranches: [],
-          period: { startDate: '', endDate: '' },
-        },
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to load dashboard' },
       };
     }
   },

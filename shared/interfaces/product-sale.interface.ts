@@ -3,6 +3,7 @@ import { DiscountType } from '../enums/product.enum';
 
 export interface ProductSale {
   id: string;
+  companyId: string;
   branchId: string;
   productId: string;
   quantity: number;

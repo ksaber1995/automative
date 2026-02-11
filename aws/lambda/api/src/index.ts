@@ -27,6 +27,7 @@ import { cashRoutes } from './routes/cash';
 import { reportsRoutes } from './routes/reports';
 import { enrollmentsRoutes } from './routes/enrollments';
 import { migrationsRoutes } from './routes/migrations';
+import { debugRoutes } from './routes/debug';
 
 // Create the router implementation
 const router = {
@@ -46,6 +47,7 @@ const router = {
   debts: debtsRoutes,
   cash: cashRoutes,
   reports: reportsRoutes,
+  debug: debugRoutes,
   migrations: migrationsRoutes,
 };
 

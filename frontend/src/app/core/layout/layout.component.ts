@@ -65,7 +65,7 @@ import { AuthService } from '../services/auth.service';
         @if (sidebarVisible()) {
           <nav class="p-4">
             <div class="space-y-1">
-              @for (item of menuItems; track item.label) {
+              @for (item of menuItems; track $index) {
                 @if (item.separator) {
                   <div class="border-t border-gray-200 my-2"></div>
                   @if (item.label) {
@@ -202,8 +202,7 @@ export class LayoutComponent {
       visible: true
     },
     {
-      separator: true,
-      label: 'Reports'
+      separator: true
     },
     {
       label: 'Reports',

@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext } from '../middleware/tenant-isolation';
 
 function mapWithdrawalFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     amount: parseFloat(row.amount),
     stakeholders: row.stakeholders || [],
     withdrawalDate: row.withdrawal_date,
@@ -19,9 +21,12 @@ function mapWithdrawalFromDB(row: any) {
 }
 
 export const withdrawalsRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
       const withdrawal = await insert('withdrawals', {
+        company_id: context.companyId,
         amount: body.amount,
         stakeholders: JSON.stringify(body.stakeholders),
         withdrawal_date: body.withdrawalDate,
@@ -44,16 +49,18 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Create withdrawal error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create withdrawal' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create withdrawal' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { startDate?: string; endDate?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM withdrawals WHERE 1=1';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
+      const params: any[] = [context.companyId];
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
@@ -80,16 +87,18 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('List withdrawals error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list withdrawals' },
       };
     }
   },
 
-  summary: async ({ query: queryParams }: { query: { startDate?: string; endDate?: string } }) => {
+  summary: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM withdrawals WHERE 1=1';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
+      const params: any[] = [context.companyId];
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
@@ -153,30 +162,25 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Withdrawal summary error:', error);
       return {
-        status: 200 as const,
-        body: {
-          totalWithdrawals: 0,
-          totalAmount: 0,
-          byCategory: [],
-          byStakeholder: [],
-          withdrawals: [],
-        },
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to generate withdrawal summary' },
       };
     }
   },
 
-  getByStakeholder: async ({ params }: { params: { stakeholderName: string } }) => {
+  getByStakeholder: async ({ params, headers }: { params: { stakeholderName: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
       const stakeholderName = decodeURIComponent(params.stakeholderName);
 
       // Query withdrawals where stakeholders JSONB array contains the stakeholder name
       const sql = `
         SELECT * FROM withdrawals
-        WHERE stakeholders::text LIKE $1
+        WHERE company_id = $1 AND stakeholders::text LIKE $2
         ORDER BY withdrawal_date DESC
       `;
 
-      const withdrawals = await query(sql, [`%${stakeholderName}%`]);
+      const withdrawals = await query(sql, [context.companyId, `%${stakeholderName}%`]);
 
       // Filter to exact matches
       const filtered = withdrawals.filter((row: any) => {
@@ -198,15 +202,20 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Get withdrawals by stakeholder error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get withdrawals by stakeholder' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const withdrawal = await findById('withdrawals', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const withdrawal = await queryOne(
+        'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!withdrawal) {
         return {
@@ -227,14 +236,28 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Get withdrawal error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Withdrawal not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Withdrawal not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Withdrawal not found' },
+        };
+      }
+
       const updateData: any = {};
 
       if (body.stakeholders !== undefined) updateData.stakeholders = JSON.stringify(body.stakeholders);
@@ -264,14 +287,28 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Update withdrawal error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update withdrawal' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update withdrawal' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Withdrawal not found' },
+        };
+      }
+
       // Soft delete by setting is_active to false
       const withdrawal = await update('withdrawals', params.id, { is_active: false });
 
@@ -289,8 +326,8 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Delete withdrawal error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete withdrawal' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete withdrawal' },
       };
     }
   },

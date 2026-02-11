@@ -5,6 +5,7 @@ export interface JWTPayload {
   id: string;
   email: string;
   role: string;
+  companyId: string;      // Company ID for tenant isolation
   branchId?: string | null;
 }
 

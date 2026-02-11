@@ -61,28 +61,23 @@ export class ReportListComponent implements OnInit {
       return;
     }
 
-    const url = this.reportService.downloadFinancialReportExcel(
+    this.reportService.downloadFinancialReportExcel(
       this.financialStartDate,
       this.financialEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Financial report (Excel) download started');
+    ).subscribe({
+      next: (response) => {
+        this.reportService.downloadBase64File(response.data, response.filename);
+        this.notificationService.success('Financial report downloaded successfully');
+      },
+      error: (error) => {
+        console.error('Download error:', error);
+        this.notificationService.error('Failed to download financial report');
+      }
+    });
   }
 
   downloadFinancialPdf() {
-    if (!this.financialStartDate || !this.financialEndDate) {
-      this.notificationService.error('Please select start and end dates');
-      return;
-    }
-
-    const url = this.reportService.downloadFinancialReportPdf(
-      this.financialStartDate,
-      this.financialEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Financial report (PDF) download started');
+    this.notificationService.error('PDF reports are not yet implemented');
   }
 
   downloadBranchExcel() {
@@ -96,35 +91,24 @@ export class ReportListComponent implements OnInit {
       return;
     }
 
-    const url = this.reportService.downloadBranchReportExcel(
+    this.reportService.downloadBranchReportExcel(
       this.branchReportBranchId,
       this.branchStartDate,
       this.branchEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Branch report (Excel) download started');
+    ).subscribe({
+      next: (response) => {
+        this.reportService.downloadBase64File(response.data, response.filename);
+        this.notificationService.success('Branch report downloaded successfully');
+      },
+      error: (error) => {
+        console.error('Download error:', error);
+        this.notificationService.error('Failed to download branch report');
+      }
+    });
   }
 
   downloadBranchPdf() {
-    if (!this.branchReportBranchId) {
-      this.notificationService.error('Please select a branch');
-      return;
-    }
-
-    if (!this.branchStartDate || !this.branchEndDate) {
-      this.notificationService.error('Please select start and end dates');
-      return;
-    }
-
-    const url = this.reportService.downloadBranchReportPdf(
-      this.branchReportBranchId,
-      this.branchStartDate,
-      this.branchEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Branch report (PDF) download started');
+    this.notificationService.error('PDF reports are not yet implemented');
   }
 
   downloadMonthlyFinancialExcel() {
@@ -133,13 +117,19 @@ export class ReportListComponent implements OnInit {
       return;
     }
 
-    const url = this.reportService.downloadMonthlyFinancialReportExcel(
+    this.reportService.downloadMonthlyFinancialReportExcel(
       this.financialStartDate,
       this.financialEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Monthly financial report (Excel) download started');
+    ).subscribe({
+      next: (response) => {
+        this.reportService.downloadBase64File(response.data, response.filename);
+        this.notificationService.success('Monthly financial report downloaded successfully');
+      },
+      error: (error) => {
+        console.error('Download error:', error);
+        this.notificationService.error('Failed to download monthly financial report');
+      }
+    });
   }
 
   downloadChurnReportExcel() {
@@ -148,39 +138,18 @@ export class ReportListComponent implements OnInit {
       return;
     }
 
-    const url = this.reportService.downloadChurnReportExcel(
+    this.reportService.downloadChurnReportExcel(
       this.financialStartDate,
       this.financialEndDate
-    );
-
-    this.downloadFile(url);
-    this.notificationService.success('Churn rate report (Excel) download started');
-  }
-
-  private downloadFile(url: string) {
-    const token = this.authService.getToken();
-
-    // Create a temporary link element to trigger the download
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-
-    // Add authorization header via fetch for authenticated download
-    fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+    ).subscribe({
+      next: (response) => {
+        this.reportService.downloadBase64File(response.data, response.filename);
+        this.notificationService.success('Churn rate report downloaded successfully');
+      },
+      error: (error) => {
+        console.error('Download error:', error);
+        this.notificationService.error('Failed to download churn report');
       }
-    })
-    .then(response => response.blob())
-    .then(blob => {
-      const blobUrl = window.URL.createObjectURL(blob);
-      link.href = blobUrl;
-      link.click();
-      window.URL.revokeObjectURL(blobUrl);
-    })
-    .catch(error => {
-      console.error('Download error:', error);
-      this.notificationService.error('Failed to download report');
     });
   }
 }

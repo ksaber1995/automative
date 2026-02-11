@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext } from '../middleware/tenant-isolation';
 
 function mapBranchFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     name: row.name,
     code: row.code,
     address: row.address,
@@ -20,9 +22,20 @@ function mapBranchFromDB(row: any) {
 }
 
 export const branchesRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      // Only ADMIN can create branches
+      if (context.role !== 'ADMIN') {
+        return {
+          status: 403 as const,
+          body: { message: 'Only administrators can create branches' },
+        };
+      }
+
       const branch = await insert('branches', {
+        company_id: context.companyId,
         name: body.name,
         code: body.code,
         address: body.address || null,
@@ -43,15 +56,20 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Create branch error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create branch' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create branch' },
       };
     }
   },
 
-  list: async () => {
+  list: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      const branches = await query('SELECT * FROM branches ORDER BY created_at DESC');
+      const context = await extractTenantContext(headers.authorization);
+
+      const branches = await query(
+        'SELECT * FROM branches WHERE company_id = $1 ORDER BY created_at DESC',
+        [context.companyId]
+      );
       return {
         status: 200 as const,
         body: branches.map(mapBranchFromDB),
@@ -59,15 +77,20 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('List branches error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list branches' },
       };
     }
   },
 
-  listActive: async () => {
+  listActive: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      const branches = await query('SELECT * FROM branches WHERE is_active = true ORDER BY created_at DESC');
+      const context = await extractTenantContext(headers.authorization);
+
+      const branches = await query(
+        'SELECT * FROM branches WHERE company_id = $1 AND is_active = true ORDER BY created_at DESC',
+        [context.companyId]
+      );
       return {
         status: 200 as const,
         body: branches.map(mapBranchFromDB),
@@ -75,15 +98,20 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('List active branches error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list active branches' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const branch = await findById('branches', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const branch = await queryOne(
+        'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!branch) {
         return {
@@ -99,14 +127,37 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Get branch error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Branch not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Branch not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify branch belongs to company
+      const existing = await queryOne(
+        'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Branch not found' },
+        };
+      }
+
+      // Only ADMIN can update branches
+      if (context.role !== 'ADMIN') {
+        return {
+          status: 403 as const,
+          body: { message: 'Only administrators can update branches' },
+        };
+      }
+
       const updateData: any = {};
 
       if (body.name !== undefined) updateData.name = body.name;
@@ -136,14 +187,37 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Update branch error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update branch' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update branch' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify branch belongs to company
+      const existing = await queryOne(
+        'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Branch not found' },
+        };
+      }
+
+      // Only ADMIN can delete branches
+      if (context.role !== 'ADMIN') {
+        return {
+          status: 403 as const,
+          body: { message: 'Only administrators can delete branches' },
+        };
+      }
+
       const branch = await update('branches', params.id, { is_active: false });
 
       if (!branch) {
@@ -160,8 +234,8 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Delete branch error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete branch' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete branch' },
       };
     }
   },

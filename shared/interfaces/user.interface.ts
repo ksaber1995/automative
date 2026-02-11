@@ -2,6 +2,7 @@ import { UserRole } from '../enums/user-role.enum';
 
 export interface User {
   id: string;
+  companyId: string;
   email: string;
   password: string;
   firstName: string;
@@ -15,6 +16,7 @@ export interface User {
 
 export interface SafeUser {
   id: string;
+  companyId: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -26,6 +28,7 @@ export interface SafeUser {
 }
 
 export interface UserCreateDto {
+  companyId: string;
   email: string;
   password: string;
   firstName: string;
@@ -48,8 +51,33 @@ export interface LoginDto {
   password: string;
 }
 
+export interface RegisterDto {
+  // Company details
+  companyName: string;
+  companyEmail: string;
+  companyCode?: string;
+  industry?: string;
+  timezone?: string;
+
+  // User details (becomes company owner/admin)
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+export interface CompanySummary {
+  id: string;
+  name: string;
+  code: string;
+  subscriptionTier: string;
+  subscriptionStatus: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   user: SafeUser;
+  company?: CompanySummary;
 }

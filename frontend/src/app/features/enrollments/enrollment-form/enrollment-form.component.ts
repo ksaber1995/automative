@@ -352,8 +352,15 @@ export class EnrollmentFormComponent implements OnInit {
 
   filteredCourses = computed(() => {
     const branchId = this.enrollmentForm?.get('branchId')?.value;
-    if (!branchId) return [];
-    return this.courses().filter(c => c.branchId === branchId);
+    console.log('Computing filtered courses for branchId:', branchId);
+    console.log('All courses available:', this.courses().length);
+    if (!branchId) {
+      console.log('No branch selected, returning empty array');
+      return [];
+    }
+    const filtered = this.courses().filter(c => c.branchId === branchId);
+    console.log('Filtered courses:', filtered.length, filtered.map(c => ({ id: c.id, name: c.name, branchId: c.branchId })));
+    return filtered;
   });
 
   filteredClasses = computed(() => {
@@ -406,15 +413,17 @@ export class EnrollmentFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.loadData();
-
-    // Check for pre-selected student from query params
+    // Check for pre-selected student from query params first
     const studentId = this.route.snapshot.queryParamMap.get('studentId');
-    if (studentId) {
-      this.enrollmentForm.patchValue({ studentId });
-      // Auto-select student's branch to enable course dropdown
-      this.autoSelectStudentBranch(studentId);
-    }
+
+    // Load all data, then auto-select student's branch after data is loaded
+    this.loadData().then(() => {
+      if (studentId) {
+        this.enrollmentForm.patchValue({ studentId });
+        // Auto-select student's branch to enable course dropdown
+        this.autoSelectStudentBranch(studentId);
+      }
+    });
 
     this.enrollmentId = this.route.snapshot.paramMap.get('id');
     if (this.enrollmentId) {
@@ -438,57 +447,78 @@ export class EnrollmentFormComponent implements OnInit {
     });
   }
 
-  loadData() {
-    this.branchService.getActiveBranches().subscribe({
-      next: (branches) => {
-        console.log('Loaded branches:', branches);
-        this.branches.set(branches);
-      },
-      error: (err) => {
-        console.error('Error loading branches:', err);
-        this.notificationService.error('Failed to load branches');
-      }
-    });
+  loadData(): Promise<void> {
+    return new Promise((resolve) => {
+      let loadedCount = 0;
+      const totalToLoad = 4;
 
-    this.courseService.getAllCourses().subscribe({
-      next: (courses) => {
-        console.log('Loaded courses:', courses);
-        const activeCourses = courses.filter(c => c.isActive);
-        console.log('Active courses:', activeCourses);
-        this.courses.set(activeCourses);
-      },
-      error: (err) => {
-        console.error('Error loading courses:', err);
-        this.notificationService.error('Failed to load courses');
-      }
-    });
+      const checkAllLoaded = () => {
+        loadedCount++;
+        if (loadedCount === totalToLoad) {
+          resolve();
+        }
+      };
 
-    this.classService.getAllClasses().subscribe({
-      next: (classes) => {
-        console.log('Loaded classes:', classes);
-        this.classes.set(classes.filter(c => c.isActive));
-      },
-      error: (err) => {
-        console.error('Error loading classes:', err);
-        this.notificationService.error('Failed to load classes');
-      }
-    });
+      this.branchService.getActiveBranches().subscribe({
+        next: (branches) => {
+          console.log('Loaded branches:', branches);
+          this.branches.set(branches);
+          checkAllLoaded();
+        },
+        error: (err) => {
+          console.error('Error loading branches:', err);
+          this.notificationService.error('Failed to load branches');
+          checkAllLoaded();
+        }
+      });
 
-    this.studentService.getAllStudents().subscribe({
-      next: (students) => {
-        console.log('Loaded students:', students);
-        const studentsWithFullName = students
-          .filter(s => s.isActive)
-          .map(s => ({
-            ...s,
-            fullName: `${s.firstName} ${s.lastName}`
-          }));
-        this.students.set(studentsWithFullName);
-      },
-      error: (err) => {
-        console.error('Error loading students:', err);
-        this.notificationService.error('Failed to load students');
-      }
+      this.courseService.getAllCourses().subscribe({
+        next: (courses) => {
+          console.log('Loaded courses:', courses);
+          const activeCourses = courses.filter(c => c.isActive);
+          console.log('Active courses:', activeCourses);
+          console.log('Courses with branchId:', activeCourses.map(c => ({ id: c.id, name: c.name, branchId: c.branchId })));
+          this.courses.set(activeCourses);
+          checkAllLoaded();
+        },
+        error: (err) => {
+          console.error('Error loading courses:', err);
+          this.notificationService.error('Failed to load courses');
+          checkAllLoaded();
+        }
+      });
+
+      this.classService.getAllClasses().subscribe({
+        next: (classes) => {
+          console.log('Loaded classes:', classes);
+          this.classes.set(classes.filter(c => c.isActive));
+          checkAllLoaded();
+        },
+        error: (err) => {
+          console.error('Error loading classes:', err);
+          this.notificationService.error('Failed to load classes');
+          checkAllLoaded();
+        }
+      });
+
+      this.studentService.getAllStudents().subscribe({
+        next: (students) => {
+          console.log('Loaded students:', students);
+          const studentsWithFullName = students
+            .filter(s => s.isActive)
+            .map(s => ({
+              ...s,
+              fullName: `${s.firstName} ${s.lastName}`
+            }));
+          this.students.set(studentsWithFullName);
+          checkAllLoaded();
+        },
+        error: (err) => {
+          console.error('Error loading students:', err);
+          this.notificationService.error('Failed to load students');
+          checkAllLoaded();
+        }
+      });
     });
   }
 

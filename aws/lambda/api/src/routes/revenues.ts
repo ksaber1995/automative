@@ -1,16 +1,20 @@
 import { query } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 export const revenuesRoutes = {
-  list: async ({ query: queryParams }: {
+  list: async ({ query: queryParams, headers }: {
     query: {
       branchId?: string;
       source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'ALL';
       startDate?: string;
       endDate?: string;
-    }
+    };
+    headers: { authorization: string };
   }) => {
     try {
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      const params: any[] = [context.companyId];
       const conditions: string[] = [];
 
       // Build the unified query to get revenues from both enrollments and product sales
@@ -18,6 +22,7 @@ export const revenuesRoutes = {
         SELECT
           'ENROLLMENT' as source,
           e.id as source_id,
+          e.company_id,
           e.branch_id,
           b.name as branch_name,
           e.final_price as amount,
@@ -33,11 +38,20 @@ export const revenuesRoutes = {
         JOIN branches b ON e.branch_id = b.id
         JOIN students s ON e.student_id = s.id
         JOIN courses c ON e.course_id = c.id
-        WHERE e.payment_status IN ('PAID', 'PARTIAL')
+        WHERE e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL')
       `;
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        conditions.push(`e.branch_id = $${params.length}`);
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         conditions.push(`e.branch_id = $${params.length}`);
       }
 
@@ -57,11 +71,14 @@ export const revenuesRoutes = {
 
       // Add product sales if source is not ENROLLMENT only
       if (!queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'PRODUCT_SALE') {
+        const productConditions: string[] = [];
+
         sql += `
           UNION ALL
           SELECT
             'PRODUCT_SALE' as source,
             ps.id as source_id,
+            ps.company_id,
             ps.branch_id,
             b.name as branch_name,
             ps.total_amount as amount,
@@ -76,21 +93,25 @@ export const revenuesRoutes = {
           FROM product_sales ps
           JOIN branches b ON ps.branch_id = b.id
           JOIN products p ON ps.product_id = p.id
-          WHERE 1=1
+          WHERE ps.company_id = $1
         `;
 
-        const productConditions: string[] = [];
-
         if (queryParams.branchId) {
-          productConditions.push(`ps.branch_id = $${params.indexOf(queryParams.branchId) + 1}`);
+          const branchIdx = params.indexOf(queryParams.branchId);
+          productConditions.push(`ps.branch_id = $${branchIdx + 1}`);
+        } else if (context.role !== 'ADMIN' && context.branchId) {
+          const branchIdx = params.indexOf(context.branchId);
+          productConditions.push(`ps.branch_id = $${branchIdx + 1}`);
         }
 
         if (queryParams.startDate) {
-          productConditions.push(`ps.sale_date >= $${params.indexOf(queryParams.startDate) + 1}`);
+          const dateIdx = params.indexOf(queryParams.startDate);
+          productConditions.push(`ps.sale_date >= $${dateIdx + 1}`);
         }
 
         if (queryParams.endDate) {
-          productConditions.push(`ps.sale_date <= $${params.indexOf(queryParams.endDate) + 1}`);
+          const dateIdx = params.indexOf(queryParams.endDate);
+          productConditions.push(`ps.sale_date <= $${dateIdx + 1}`);
         }
 
         if (productConditions.length > 0) {
@@ -106,6 +127,7 @@ export const revenuesRoutes = {
         status: 200 as const,
         body: revenues.map((row: any) => ({
           id: row.source_id,
+          companyId: row.company_id,
           branchId: row.branch_id,
           branchName: row.branch_name,
           source: row.source,
@@ -124,26 +146,39 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('List revenues error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list revenues' },
       };
     }
   },
 
-  summary: async ({ query: queryParams }: {
+  summary: async ({ query: queryParams, headers }: {
     query: {
       branchId?: string;
       startDate?: string;
       endDate?: string;
-    }
+    };
+    headers: { authorization: string };
   }) => {
     try {
-      const params: any[] = [];
-      let enrollmentConditions = 'WHERE e.payment_status IN (\'PAID\', \'PARTIAL\')';
-      let productConditions = 'WHERE 1=1';
+      const context = await extractTenantContext(headers.authorization);
+
+      const params: any[] = [context.companyId];
+      let enrollmentConditions = 'WHERE e.company_id = $1 AND e.payment_status IN (\'PAID\', \'PARTIAL\')';
+      let productConditions = 'WHERE ps.company_id = $1';
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        enrollmentConditions += ` AND e.branch_id = $${params.length}`;
+        productConditions += ` AND ps.branch_id = $${params.length}`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         enrollmentConditions += ` AND e.branch_id = $${params.length}`;
         productConditions += ` AND ps.branch_id = $${params.length}`;
       }
@@ -183,13 +218,14 @@ export const revenuesRoutes = {
           b.name as branch_name,
           COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) as revenue
         FROM branches b
-        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.payment_status IN ('PAID', 'PARTIAL')
+        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL')
           ${queryParams.startDate ? `AND e.enrollment_date >= $${params.indexOf(queryParams.startDate) + 1}` : ''}
           ${queryParams.endDate ? `AND e.enrollment_date <= $${params.indexOf(queryParams.endDate) + 1}` : ''}
-        LEFT JOIN product_sales ps ON b.id = ps.branch_id
+        LEFT JOIN product_sales ps ON b.id = ps.branch_id AND ps.company_id = $1
           ${queryParams.startDate ? `AND ps.sale_date >= $${params.indexOf(queryParams.startDate) + 1}` : ''}
           ${queryParams.endDate ? `AND ps.sale_date <= $${params.indexOf(queryParams.endDate) + 1}` : ''}
-        ${queryParams.branchId ? `WHERE b.id = $${params.indexOf(queryParams.branchId) + 1}` : ''}
+        WHERE b.company_id = $1
+        ${queryParams.branchId ? `AND b.id = $${params.indexOf(queryParams.branchId) + 1}` : ''}
         GROUP BY b.id, b.name
         ORDER BY revenue DESC
       `;
@@ -243,14 +279,8 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('Revenue summary error:', error);
       return {
-        status: 200 as const,
-        body: {
-          totalRevenue: 0,
-          enrollmentRevenue: 0,
-          productRevenue: 0,
-          byBranch: [],
-          byMonth: [],
-        },
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to generate revenue summary' },
       };
     }
   },

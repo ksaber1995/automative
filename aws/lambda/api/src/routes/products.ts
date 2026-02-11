@@ -1,8 +1,10 @@
-import { insert, update, findById, query } from '../db/connection';
+import { insert, update, findById, query, queryOne } from '../db/connection';
+import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapProductFromDB(row: any) {
   return {
     id: row.id,
+    companyId: row.company_id,
     name: row.name,
     code: row.code,
     description: row.description,
@@ -21,9 +23,19 @@ function mapProductFromDB(row: any) {
 }
 
 export const productsRoutes = {
-  create: async ({ body }: { body: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (body.branchId && !body.isGlobal && !canAccessBranch(context, body.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const product = await insert('products', {
+        company_id: context.companyId,
         name: body.name,
         code: body.code,
         description: body.description,
@@ -45,20 +57,31 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Create product error:', error);
       return {
-        status: 400 as const,
-        body: { message: 'Failed to create product' },
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to create product' },
       };
     }
   },
 
-  list: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
-      let sql = 'SELECT * FROM products WHERE 1=1';
-      const params: any[] = [];
+      const context = await extractTenantContext(headers.authorization);
+
+      let sql = 'SELECT * FROM products WHERE company_id = $1';
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
+        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
       }
 
       sql += ' ORDER BY created_at DESC';
@@ -71,24 +94,33 @@ export const productsRoutes = {
     } catch (error) {
       console.error('List products error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to list products' },
       };
     }
   },
 
-  getAvailable: async ({ params }: { params: { branchId: string } }) => {
+  getAvailable: async ({ params, headers }: { params: { branchId: string }; headers: { authorization: string } }) => {
     try {
-      // Get products that are active and have stock > 0 for this branch (including global products)
+      const context = await extractTenantContext(headers.authorization);
+
+      if (!canAccessBranch(context, params.branchId)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this branch' },
+        };
+      }
+
       const sql = `
         SELECT * FROM products
-        WHERE is_active = true
+        WHERE company_id = $1
+        AND is_active = true
         AND stock > 0
-        AND (branch_id = $1 OR is_global = true)
+        AND (branch_id = $2 OR is_global = true)
         ORDER BY name ASC
       `;
 
-      const products = await query(sql, [params.branchId]);
+      const products = await query(sql, [context.companyId, params.branchId]);
       return {
         status: 200 as const,
         body: products.map(mapProductFromDB),
@@ -96,24 +128,35 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get available products error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get available products' },
       };
     }
   },
 
-  getLowStock: async ({ query: queryParams }: { query: { branchId?: string } }) => {
+  getLowStock: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
-      // Get products where stock is below minimum stock level
+      const context = await extractTenantContext(headers.authorization);
+
       let sql = `
         SELECT * FROM products
-        WHERE is_active = true
+        WHERE company_id = $1
+        AND is_active = true
         AND stock <= min_stock
       `;
-      const params: any[] = [];
+      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return {
+            status: 403 as const,
+            body: { message: 'Access denied to this branch' },
+          };
+        }
         params.push(queryParams.branchId);
+        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        params.push(context.branchId);
         sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
       }
 
@@ -127,20 +170,32 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get low stock products error:', error);
       return {
-        status: 200 as const,
-        body: [],
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get low stock products' },
       };
     }
   },
 
-  getById: async ({ params }: { params: { id: string } }) => {
+  getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      const product = await findById('products', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const product = await queryOne(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!product) {
         return {
           status: 404 as const,
           body: { message: 'Product not found' },
+        };
+      }
+
+      if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to this product' },
         };
       }
 
@@ -151,14 +206,35 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get product error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Product not found' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Product not found' },
       };
     }
   },
 
-  update: async ({ params, body }: { params: { id: string }; body: any }) => {
+  update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Product not found' },
+        };
+      }
+
+      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to update this product' },
+        };
+      }
+
       const updateData: any = {};
 
       if (body.name !== undefined) updateData.name = body.name;
@@ -188,21 +264,32 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Update product error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to update product' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to update product' },
       };
     }
   },
 
-  adjustStock: async ({ params, body }: { params: { id: string }; body: { quantity: number; operation: 'add' | 'subtract' } }) => {
+  adjustStock: async ({ params, body, headers }: { params: { id: string }; body: { quantity: number; operation: 'add' | 'subtract' }; headers: { authorization: string } }) => {
     try {
-      // Get current product
-      const product = await findById('products', params.id);
+      const context = await extractTenantContext(headers.authorization);
+
+      const product = await queryOne(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       if (!product) {
         return {
           status: 404 as const,
           body: { message: 'Product not found' },
+        };
+      }
+
+      if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to adjust this product stock' },
         };
       }
 
@@ -212,7 +299,7 @@ export const productsRoutes = {
       if (body.operation === 'add') {
         newStock = currentStock + body.quantity;
       } else if (body.operation === 'subtract') {
-        newStock = Math.max(0, currentStock - body.quantity); // Don't go below 0
+        newStock = Math.max(0, currentStock - body.quantity);
       } else {
         return {
           status: 400 as const,
@@ -220,7 +307,6 @@ export const productsRoutes = {
         };
       }
 
-      // Update stock
       const updatedProduct = await update('products', params.id, { stock: newStock });
 
       if (!updatedProduct) {
@@ -237,15 +323,35 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Adjust product stock error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to adjust product stock' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to adjust product stock' },
       };
     }
   },
 
-  delete: async ({ params }: { params: { id: string } }) => {
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
-      // Soft delete by setting is_active to false
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return {
+          status: 404 as const,
+          body: { message: 'Product not found' },
+        };
+      }
+
+      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
+        return {
+          status: 403 as const,
+          body: { message: 'Access denied to delete this product' },
+        };
+      }
+
       const product = await update('products', params.id, { is_active: false });
 
       if (!product) {
@@ -262,8 +368,8 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Delete product error:', error);
       return {
-        status: 404 as const,
-        body: { message: 'Failed to delete product' },
+        status: error.message === 'No authentication token provided' ? 401 : 404,
+        body: { message: error.message || 'Failed to delete product' },
       };
     }
   },

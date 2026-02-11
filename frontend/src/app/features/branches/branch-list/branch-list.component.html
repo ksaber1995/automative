@@ -8,6 +8,26 @@
     ></p-button>
   </div>
 
+  <!-- Filter Section -->
+  <p-card styleClass="mb-4">
+    <div class="flex items-center gap-4">
+      <label for="statusFilter" class="text-sm font-medium text-gray-700">
+        Status Filter:
+      </label>
+      <p-select
+        id="statusFilter"
+        [(ngModel)]="statusFilter"
+        [options]="statusFilterOptions"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="w-64"
+      ></p-select>
+      <div class="text-sm text-gray-500">
+        Showing {{ branches().length }} of {{ allBranches().length }} branches
+      </div>
+    </div>
+  </p-card>
+
   <p-card>
     <p-table
       [value]="branches()"

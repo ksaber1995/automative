@@ -2,6 +2,7 @@ import { EnrollmentStatus, PaymentStatus } from '../enums/enrollment-status.enum
 
 export interface Enrollment {
   id: string;
+  companyId: string;
   studentId: string;
   classId: string;
   courseId: string;

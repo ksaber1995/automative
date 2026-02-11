@@ -6,6 +6,7 @@ export interface WithdrawalStakeholder {
 
 export interface Withdrawal {
   id: string;
+  companyId: string;
   amount: number;
   stakeholders: WithdrawalStakeholder[];
   withdrawalDate: string;
