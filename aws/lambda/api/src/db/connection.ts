@@ -82,6 +82,12 @@ export async function update<T = any>(
   data: Record<string, any>
 ): Promise<T | null> {
   const keys = Object.keys(data);
+
+  // If no data to update, just return the existing record
+  if (keys.length === 0) {
+    return await findById<T>(table, id);
+  }
+
   const values = Object.values(data);
   const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
 

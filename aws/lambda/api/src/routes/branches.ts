@@ -170,6 +170,15 @@ export const branchesRoutes = {
       if (body.email !== undefined) updateData.email = body.email;
       if (body.managerId !== undefined) updateData.manager_id = body.managerId;
       if (body.openingDate !== undefined) updateData.opening_date = body.openingDate;
+      if (body.isActive !== undefined) updateData.is_active = body.isActive;
+
+      // Check if there's anything to update
+      if (Object.keys(updateData).length === 0) {
+        return {
+          status: 400 as const,
+          body: { message: 'No valid fields to update' },
+        };
+      }
 
       const branch = await update('branches', params.id, updateData);
 
@@ -189,6 +198,105 @@ export const branchesRoutes = {
       return {
         status: error.message === 'No authentication token provided' ? 401 : 404,
         body: { message: error.message || 'Failed to update branch' },
+      };
+    }
+  },
+
+  getStats: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      // Verify branch belongs to company
+      const branch = await queryOne(
+        'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!branch) {
+        return {
+          status: 404 as const,
+          body: { message: 'Branch not found' },
+        };
+      }
+
+      // Get course count
+      const courseResult = await queryOne(
+        'SELECT COUNT(*) as count FROM courses WHERE branch_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      const courseCount = parseInt(courseResult?.count || '0');
+
+      // Get class count
+      const classResult = await queryOne(
+        'SELECT COUNT(*) as count FROM classes WHERE branch_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      const classCount = parseInt(classResult?.count || '0');
+
+      // Get student count
+      const studentResult = await queryOne(
+        'SELECT COUNT(DISTINCT student_id) as count FROM enrollments WHERE branch_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      const studentCount = parseInt(studentResult?.count || '0');
+
+      // Get active enrollments count
+      const activeEnrollmentsResult = await queryOne(
+        'SELECT COUNT(*) as count FROM enrollments WHERE branch_id = $1 AND company_id = $2 AND status = $3',
+        [params.id, context.companyId, 'ACTIVE']
+      );
+      const activeEnrollments = parseInt(activeEnrollmentsResult?.count || '0');
+
+      // Get employee count (both branch-specific and global)
+      const employeeResult = await queryOne(
+        'SELECT COUNT(*) as count FROM employees WHERE company_id = $1 AND (branch_id = $2 OR is_global = true)',
+        [context.companyId, params.id]
+      );
+      const employeeCount = parseInt(employeeResult?.count || '0');
+
+      // Get total revenue from enrollments
+      const enrollmentRevenueResult = await queryOne(
+        'SELECT COALESCE(SUM(final_price), 0) as total FROM enrollments WHERE branch_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      const enrollmentRevenue = parseFloat(enrollmentRevenueResult?.total || '0');
+
+      // Get total revenue from product sales
+      const productRevenueResult = await queryOne(
+        'SELECT COALESCE(SUM(total_amount), 0) as total FROM product_sales WHERE branch_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      const productRevenue = parseFloat(productRevenueResult?.total || '0');
+
+      const totalRevenue = enrollmentRevenue + productRevenue;
+
+      // Get total expenses for this branch
+      const expenseResult = await queryOne(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE company_id = $1 AND (branch_id = $2 OR type = $3)',
+        [context.companyId, params.id, 'SHARED']
+      );
+      const totalExpenses = parseFloat(expenseResult?.total || '0');
+
+      const netProfit = totalRevenue - totalExpenses;
+
+      return {
+        status: 200 as const,
+        body: {
+          courseCount,
+          studentCount,
+          classCount,
+          employeeCount,
+          totalRevenue,
+          totalExpenses,
+          netProfit,
+          activeEnrollments,
+        },
+      };
+    } catch (error) {
+      console.error('Get branch stats error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get branch statistics' },
       };
     }
   },

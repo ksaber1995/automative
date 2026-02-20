@@ -10,6 +10,10 @@ export const BRANCHES_ROUTES: Routes = [
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   },
   {
+    path: ':id',
+    loadComponent: () => import('./branch-detail/branch-detail.component').then(m => m.BranchDetailComponent)
+  },
+  {
     path: ':id/edit',
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   }
