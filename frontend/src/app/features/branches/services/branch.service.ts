@@ -6,10 +6,12 @@ import { Branch, BranchCreateDto, BranchUpdateDto } from '@shared/interfaces/bra
 export interface BranchStats {
   courseCount: number;
   studentCount: number;
+  classCount: number;
   employeeCount: number;
   totalRevenue: number;
   totalExpenses: number;
   netProfit: number;
+  activeEnrollments: number;
 }
 
 @Injectable({

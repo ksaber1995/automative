@@ -88,16 +88,16 @@ const RegisterRequestSchema = z.object({
   // Company details
   companyName: z.string().min(1),
   companyEmail: z.string().email(),
-  companyCode: z.string().optional(),
-  industry: z.string().optional(),
-  timezone: z.string().optional(),
+  companyCode: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
+  industry: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
+  timezone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
 
   // User details (becomes company owner/admin)
-  firstName: z.string(),
-  lastName: z.string(),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  phone: z.string().optional(),
+  phone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
 });
 
 const AuthResponseSchema = z.object({
@@ -701,6 +701,24 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: BranchSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getStats: {
+      method: 'GET',
+      path: '/api/branches/:id/stats',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({
+          courseCount: z.number(),
+          studentCount: z.number(),
+          classCount: z.number(),
+          employeeCount: z.number(),
+          totalRevenue: z.number(),
+          totalExpenses: z.number(),
+          netProfit: z.number(),
+          activeEnrollments: z.number(),
+        }),
         404: z.object({ message: z.string() }),
       },
     },
@@ -1539,6 +1557,23 @@ export const contract = c.router({
           success: z.boolean(),
           message: z.string(),
           addedColumns: z.array(z.string()).optional(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+    updateProductsTableStructure: {
+      method: 'POST',
+      path: '/api/migrations/update-products-structure',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          updatedColumns: z.any().optional(),
         }),
         500: z.object({
           success: z.boolean(),
