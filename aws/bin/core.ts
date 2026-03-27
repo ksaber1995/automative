@@ -13,7 +13,7 @@ new CoreStack(app, `AutomateMagicStack-${stage}`, {
   stage,
   dbName: 'automative',
   env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT,
+    account: process.env.CDK_DEFAULT_ACCOUNT || '365729671026',
     region: process.env.CDK_DEFAULT_REGION || 'eu-west-1',
   },
   description: `Automate Magic Application Stack (${stage})`,

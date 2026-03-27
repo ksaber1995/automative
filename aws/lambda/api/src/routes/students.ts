@@ -26,11 +26,10 @@ function mapStudentFromDB(row: any) {
 }
 
 export const studentsRoutes = {
-  create: async ({ body, request }: { body: any; request: any }) => {
+  create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       // Extract tenant context for multi-tenant isolation
-      const authHeader = request?.headers?.authorization || request?.headers?.Authorization;
-      const context = await extractTenantContext(authHeader);
+      const context = await extractTenantContext(headers.authorization);
 
       // Verify user can access the specified branch
       if (body.branchId && !canAccessBranch(context, body.branchId)) {

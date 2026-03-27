@@ -34,6 +34,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)
       },
       {
+        path: 'classes/create',
+        loadComponent: () => import('./features/courses/class-form/class-form.component').then(m => m.ClassFormComponent)
+      },
+      {
         path: 'students',
         loadChildren: () => import('./features/students/students.routes').then(m => m.STUDENTS_ROUTES)
       },

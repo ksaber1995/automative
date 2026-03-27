@@ -52,6 +52,7 @@ const router = {
 };
 
 // Create the Lambda handler
+// @ts-expect-error - Type mismatch with ts-rest router implementation
 const lambdaHandler = createLambdaHandler(contract, router, {
   responseHandlers: [
     (response, request, args) => {

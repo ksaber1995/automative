@@ -73,8 +73,8 @@
                     <div class="font-bold text-lg">{{ cls.name }} ({{ cls.code }})</div>
                     <div class="text-sm text-gray-600 mt-1">
                       <i class="pi pi-user mr-2"></i>
-                      @if (cls.teacher) {
-                        <span>{{ cls.teacher.firstName }} {{ cls.teacher.lastName }}</span>
+                      @if (cls.instructorName) {
+                        <span>{{ cls.instructorName }} </span>
                       } @else {
                         <span class="text-red-500">No teacher assigned</span>
                       }

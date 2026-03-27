@@ -334,12 +334,12 @@ export class ClassListComponent implements OnInit {
     if (courseId) {
       this.router.navigate(['/courses', courseId, 'classes', 'create']);
     } else {
-      this.notificationService.error('Please select a course first');
+      this.router.navigate(['/classes/create']);
     }
   }
 
   selectCourseForNewClass() {
-    this.notificationService.info('Please select a course from the dropdown or navigate to a course to create a class');
+    this.router.navigate(['/classes/create']);
   }
 
   formatDaysOfWeek(days: string): string {

@@ -11,6 +11,29 @@
 
     <form [formGroup]="classForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Course Selection (only show when creating from global classes list) -->
+        @if (isGlobalCreate()) {
+          <div class="field md:col-span-2">
+            <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">
+              Course <span class="text-red-500">*</span>
+            </label>
+            <p-select
+              id="courseId"
+              formControlName="courseId"
+              [options]="courses()"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select a course"
+              styleClass="w-full"
+              [class.ng-invalid]="classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched"
+              [class.ng-dirty]="classForm.get('courseId')?.touched">
+            </p-select>
+            @if (classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched) {
+              <small class="text-red-500">Course is required</small>
+            }
+          </div>
+        }
+
         <!-- Class Name -->
         <div class="field">
           <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
@@ -161,22 +184,41 @@
           }
         </div>
 
+        <!-- Number of Sessions (for recurring schedules) -->
+        <div class="field">
+          <label for="numberOfSessions" class="block text-sm font-medium text-gray-700 mb-2">
+            Number of Sessions
+          </label>
+          <p-inputnumber
+            id="numberOfSessions"
+            formControlName="numberOfSessions"
+            [min]="1"
+            placeholder="e.g., 8"
+            styleClass="w-full"
+            [showButtons]="false">
+          </p-inputnumber>
+          <small class="text-gray-500">If provided with days of week, end date will be calculated automatically</small>
+        </div>
+
         <!-- End Date -->
         <div class="field">
           <label for="endDate" class="block text-sm font-medium text-gray-700 mb-2">
-            End Date <span class="text-red-500">*</span>
+            End Date @if (!classForm.get('numberOfSessions')?.value) {<span class="text-red-500">*</span>}
           </label>
           <p-datepicker
             id="endDate"
             formControlName="endDate"
-            placeholder="Select end date"
+            placeholder="Select end date or use number of sessions"
             styleClass="w-full"
             [showIcon]="true"
             [class.ng-invalid]="classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched"
             [class.ng-dirty]="classForm.get('endDate')?.touched">
           </p-datepicker>
           @if (classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched) {
-            <small class="text-red-500">End date is required</small>
+            <small class="text-red-500">End date is required (or provide number of sessions with days of week)</small>
+          }
+          @if (classForm.get('numberOfSessions')?.value) {
+            <small class="text-gray-500">End date will be auto-calculated based on number of sessions</small>
           }
         </div>
 

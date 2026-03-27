@@ -381,7 +381,7 @@ export class EnrollmentFormComponent implements OnInit {
   });
 
   filteredClasses = computed(() => {
-    const courseId = this.enrollmentForm?.get('courseId')?.value;
+    const courseId = '0d3014f3-dc4b-4071-b87b-35654390a0e3';
     if (!courseId) return [];
     return this.classes().filter(c => c.courseId === courseId);
   });

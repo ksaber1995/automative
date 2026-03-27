@@ -52,8 +52,10 @@ export class ClassFormComponent implements OnInit {
   classId: string | null = null;
   instructors = signal<any[]>([]);
   branches = signal<any[]>([]);
+  courses = signal<any[]>([]);
   courseName = signal<string>('');
   courseDefaultInstructor = signal<string | null>(null);
+  isGlobalCreate = signal(false);
 
   daysOfWeek = [
     { label: 'Sunday', value: 'SUNDAY' },
@@ -67,6 +69,7 @@ export class ClassFormComponent implements OnInit {
 
   constructor() {
     this.classForm = this.fb.group({
+      courseId: [''],
       name: ['', [Validators.required, Validators.minLength(2)]],
       code: ['', [Validators.required, Validators.minLength(2)]],
       branchId: ['', [Validators.required]],
@@ -75,7 +78,8 @@ export class ClassFormComponent implements OnInit {
       startTime: [''],
       endTime: [''],
       startDate: ['', [Validators.required]],
-      endDate: ['', [Validators.required]],
+      endDate: [''],
+      numberOfSessions: [null],
       maxStudents: [null],
       notes: ['']
     });
@@ -85,13 +89,16 @@ export class ClassFormComponent implements OnInit {
     this.courseId = this.route.snapshot.paramMap.get('courseId');
     this.classId = this.route.snapshot.paramMap.get('id');
 
-    if (!this.courseId) {
-      this.notificationService.error('Course ID is required');
-      this.router.navigate(['/courses']);
-      return;
+    // Check if creating from global classes list (no courseId in route)
+    if (!this.courseId && !this.classId) {
+      this.isGlobalCreate.set(true);
+      this.classForm.get('courseId')?.setValidators([Validators.required]);
+      this.classForm.get('courseId')?.updateValueAndValidity();
+      this.loadCourses();
+    } else if (this.courseId) {
+      this.loadCourse(this.courseId);
     }
 
-    this.loadCourse(this.courseId);
     this.loadInstructors();
     this.loadBranches();
 
@@ -99,6 +106,39 @@ export class ClassFormComponent implements OnInit {
       this.isEditMode.set(true);
       this.loadClass(this.classId);
     }
+
+    // Watch for changes to numberOfSessions to update endDate validation
+    this.classForm.get('numberOfSessions')?.valueChanges.subscribe(sessions => {
+      if (sessions && sessions > 0) {
+        this.classForm.get('endDate')?.clearValidators();
+      } else {
+        this.classForm.get('endDate')?.setValidators([Validators.required]);
+      }
+      this.classForm.get('endDate')?.updateValueAndValidity();
+    });
+
+    // Watch for course selection changes when in global create mode
+    if (this.isGlobalCreate()) {
+      this.classForm.get('courseId')?.valueChanges.subscribe(courseId => {
+        if (courseId) {
+          this.loadCourse(courseId);
+        }
+      });
+    }
+  }
+
+  loadCourses() {
+    this.courseService.getActiveCourses().subscribe({
+      next: (courses) => {
+        this.courses.set(courses.map(c => ({
+          label: c.name,
+          value: c.id
+        })));
+      },
+      error: () => {
+        this.notificationService.error('Failed to load courses');
+      }
+    });
   }
 
   loadCourse(id: string) {
@@ -117,7 +157,11 @@ export class ClassFormComponent implements OnInit {
       },
       error: () => {
         this.notificationService.error('Failed to load course');
-        this.router.navigate(['/courses']);
+        if (this.isGlobalCreate()) {
+          this.router.navigate(['/classes']);
+        } else {
+          this.router.navigate(['/courses']);
+        }
       }
     });
   }
@@ -159,7 +203,14 @@ export class ClassFormComponent implements OnInit {
         // Parse daysOfWeek string (e.g., "MONDAY,WEDNESDAY") to array
         const daysArray = classData.daysOfWeek ? classData.daysOfWeek.split(',') : [];
 
+        // If editing, set the courseId for potential display
+        if (!this.courseId) {
+          this.courseId = classData.courseId;
+          this.loadCourse(classData.courseId);
+        }
+
         this.classForm.patchValue({
+          courseId: classData.courseId,
           name: classData.name,
           code: classData.code,
           branchId: classData.branchId,
@@ -199,6 +250,44 @@ export class ClassFormComponent implements OnInit {
     return days.includes(day);
   }
 
+  calculateEndDate(startDate: Date, daysOfWeek: string[], numberOfSessions: number): Date {
+    if (!startDate || !daysOfWeek || daysOfWeek.length === 0 || !numberOfSessions) {
+      return startDate;
+    }
+
+    const dayMap: { [key: string]: number } = {
+      'SUNDAY': 0,
+      'MONDAY': 1,
+      'TUESDAY': 2,
+      'WEDNESDAY': 3,
+      'THURSDAY': 4,
+      'FRIDAY': 5,
+      'SATURDAY': 6
+    };
+
+    const selectedDayNumbers = daysOfWeek.map(day => dayMap[day]).sort((a, b) => a - b);
+    let currentDate = new Date(startDate);
+    let sessionsFound = 0;
+
+    // Move to the first valid day if start date is not on a selected day
+    while (!selectedDayNumbers.includes(currentDate.getDay())) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Count this as the first session
+    sessionsFound = 1;
+
+    // Find the date of the last session
+    while (sessionsFound < numberOfSessions) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      if (selectedDayNumbers.includes(currentDate.getDay())) {
+        sessionsFound++;
+      }
+    }
+
+    return currentDate;
+  }
+
   onSubmit() {
     if (this.classForm.invalid) {
       this.classForm.markAllAsTouched();
@@ -208,13 +297,37 @@ export class ClassFormComponent implements OnInit {
     this.loading.set(true);
     const formValue = this.classForm.value;
 
-    // Convert dates to ISO strings
+    // Determine courseId (from route or from form)
+    const targetCourseId = this.courseId || formValue.courseId;
+    if (!targetCourseId) {
+      this.notificationService.error('Course is required');
+      this.loading.set(false);
+      return;
+    }
+
+    // Convert start date to ISO string
     const startDate = formValue.startDate instanceof Date
       ? formValue.startDate.toISOString().split('T')[0]
       : formValue.startDate;
-    const endDate = formValue.endDate instanceof Date
-      ? formValue.endDate.toISOString().split('T')[0]
-      : formValue.endDate;
+
+    // Calculate end date if numberOfSessions is provided
+    let endDate: string;
+    if (formValue.numberOfSessions && formValue.numberOfSessions > 0 && formValue.daysOfWeek && formValue.daysOfWeek.length > 0) {
+      const calculatedEndDate = this.calculateEndDate(
+        formValue.startDate instanceof Date ? formValue.startDate : new Date(formValue.startDate),
+        formValue.daysOfWeek,
+        formValue.numberOfSessions
+      );
+      endDate = calculatedEndDate.toISOString().split('T')[0];
+    } else if (formValue.endDate) {
+      endDate = formValue.endDate instanceof Date
+        ? formValue.endDate.toISOString().split('T')[0]
+        : formValue.endDate;
+    } else {
+      this.notificationService.error('Please provide either an end date or number of sessions with days of week');
+      this.loading.set(false);
+      return;
+    }
 
     // Convert daysOfWeek array to comma-separated string
     const daysOfWeek = formValue.daysOfWeek && formValue.daysOfWeek.length > 0
@@ -222,7 +335,7 @@ export class ClassFormComponent implements OnInit {
       : undefined;
 
     const classData: any = {
-      courseId: this.courseId!,
+      courseId: targetCourseId,
       branchId: formValue.branchId,
       name: formValue.name,
       code: formValue.code,
@@ -240,7 +353,11 @@ export class ClassFormComponent implements OnInit {
       this.classService.updateClass(this.classId, classData).subscribe({
         next: () => {
           this.notificationService.success('Class updated successfully');
-          this.router.navigate(['/courses', this.courseId]);
+          if (this.isGlobalCreate()) {
+            this.router.navigate(['/classes']);
+          } else {
+            this.router.navigate(['/courses', targetCourseId]);
+          }
         },
         error: (error) => {
           this.loading.set(false);
@@ -252,7 +369,11 @@ export class ClassFormComponent implements OnInit {
       this.classService.createClass(classData).subscribe({
         next: () => {
           this.notificationService.success('Class created successfully');
-          this.router.navigate(['/courses', this.courseId]);
+          if (this.isGlobalCreate()) {
+            this.router.navigate(['/classes']);
+          } else {
+            this.router.navigate(['/courses', targetCourseId]);
+          }
         },
         error: (error) => {
           this.loading.set(false);
@@ -264,6 +385,12 @@ export class ClassFormComponent implements OnInit {
   }
 
   cancel() {
-    this.router.navigate(['/courses', this.courseId]);
+    if (this.isGlobalCreate() && !this.isEditMode()) {
+      this.router.navigate(['/classes']);
+    } else if (this.courseId) {
+      this.router.navigate(['/courses', this.courseId]);
+    } else {
+      this.router.navigate(['/classes']);
+    }
   }
 }
