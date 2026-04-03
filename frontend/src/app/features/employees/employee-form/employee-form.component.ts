@@ -95,7 +95,7 @@ export class EmployeeFormComponent implements OnInit {
       next: (employee) => {
         this.employeeForm.patchValue({
           ...employee,
-          hireDate: employee.hireDate.split('T')[0]
+          hireDate: employee.hireDate ? employee.hireDate.split('T')[0] : null
         });
         this.loading.set(false);
       },

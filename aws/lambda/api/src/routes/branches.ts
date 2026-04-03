@@ -1,4 +1,4 @@
-import { insert, update, findById, query, queryOne } from '../db/connection';
+import { insert, update, findById, query, queryOne, deleteById } from '../db/connection';
 import { extractTenantContext } from '../middleware/tenant-isolation';
 
 function mapBranchFromDB(row: any) {
@@ -10,10 +10,8 @@ function mapBranchFromDB(row: any) {
     address: row.address,
     city: row.city,
     state: row.state,
-    zipCode: row.zip_code,
     phone: row.phone,
     email: row.email,
-    managerId: row.manager_id,
     isActive: row.is_active,
     openingDate: row.opening_date,
     createdAt: row.created_at,
@@ -41,10 +39,8 @@ export const branchesRoutes = {
         address: body.address || null,
         city: body.city || null,
         state: body.state || null,
-        zip_code: body.zipCode || null,
         phone: body.phone || null,
         email: body.email || null,
-        manager_id: body.managerId || null,
         opening_date: body.openingDate || null,
         is_active: true,
       });
@@ -165,10 +161,8 @@ export const branchesRoutes = {
       if (body.address !== undefined) updateData.address = body.address;
       if (body.city !== undefined) updateData.city = body.city;
       if (body.state !== undefined) updateData.state = body.state;
-      if (body.zipCode !== undefined) updateData.zip_code = body.zipCode;
       if (body.phone !== undefined) updateData.phone = body.phone;
       if (body.email !== undefined) updateData.email = body.email;
-      if (body.managerId !== undefined) updateData.manager_id = body.managerId;
       if (body.openingDate !== undefined) updateData.opening_date = body.openingDate;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
@@ -326,14 +320,7 @@ export const branchesRoutes = {
         };
       }
 
-      const branch = await update('branches', params.id, { is_active: false });
-
-      if (!branch) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
-      }
+      await deleteById('branches', params.id);
 
       return {
         status: 200 as const,

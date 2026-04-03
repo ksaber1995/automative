@@ -111,7 +111,7 @@ export class OverviewComponent implements OnInit {
         tooltip: {
           callbacks: {
             label: (context: any) => {
-              return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
+              return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
             }
           }
         }
@@ -120,7 +120,7 @@ export class OverviewComponent implements OnInit {
         y: {
           beginAtZero: true,
           ticks: {
-            callback: (value: any) => '$' + value.toLocaleString()
+            callback: (value: any) => '' + value.toLocaleString()
           }
         }
       }
@@ -138,7 +138,7 @@ export class OverviewComponent implements OnInit {
             label: (context: any) => {
               const label = context.label || '';
               const value = context.parsed || 0;
-              return `${label}: $${value.toFixed(2)}`;
+              return `${label}: ${value.toFixed(2)}`;
             }
           }
         }
@@ -147,10 +147,13 @@ export class OverviewComponent implements OnInit {
   }
 
   formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(value);
+    if (value == null || isNaN(value)) return '0.00';
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  }
+
+  formatMargin(value: number): string {
+    if (value == null || isNaN(value)) return '0.0';
+    return value.toFixed(1);
   }
 
   getProfitSeverity(profit: number): 'success' | 'danger' {

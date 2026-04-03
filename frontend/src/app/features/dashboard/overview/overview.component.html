@@ -234,10 +234,9 @@
                 [class.text-orange-600]="i === 2"></i>
             </div>
             <div class="font-semibold text-lg mb-1">{{ branch.branchName }}</div>
-            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount }} students • {{ branch.courseCount }}
-              courses</div>
+            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount || 0 }} students • {{ branch.courseCount || 0 }} courses</div>
             <div class="text-green-600 font-semibold">{{ formatCurrency(branch.profit) }}</div>
-            <div class="text-xs text-gray-500">{{ branch?.profitMargin?.toFixed(1) }}% margin</div>
+            <div class="text-xs text-gray-500">{{ formatMargin(branch.profitMargin) }}% margin</div>
           </div>
           }
         </div>

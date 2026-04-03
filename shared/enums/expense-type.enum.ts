@@ -1,7 +1,8 @@
 export enum ExpenseType {
-  FIXED = 'FIXED',       // Recurring monthly expenses
-  VARIABLE = 'VARIABLE', // One-time expenses
+  FIXED = 'FIXED',       // Recurring monthly expenses (rent, salaries)
+  VARIABLE = 'VARIABLE', // One-time operational expenses
   SHARED = 'SHARED',     // Global expenses distributed across branches
+  CAPITAL = 'CAPITAL',   // Asset purchases amortized over time (laptop, AC, furniture)
 }
 
 export enum ExpenseCategory {

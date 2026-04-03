@@ -8,8 +8,11 @@ function mapEmployeeFromDB(row: any) {
     firstName: row.first_name,
     lastName: row.last_name,
     email: row.email,
+    phone: row.phone,
+    department: row.department,
     position: row.position,
     salary: row.salary ? parseFloat(row.salary) : null,
+    hireDate: row.hire_date,
     branchId: row.branch_id,
     isGlobal: row.is_global,
     isActive: row.is_active,
@@ -35,8 +38,11 @@ export const employeesRoutes = {
         first_name: body.firstName,
         last_name: body.lastName,
         email: body.email || null,
+        phone: body.phone || null,
+        department: body.department || null,
         position: body.position || null,
         salary: body.salary || null,
+        hire_date: body.hireDate || null,
         branch_id: body.branchId || null,
         is_global: body.isGlobal || false,
         is_active: true,
@@ -163,8 +169,11 @@ export const employeesRoutes = {
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
       if (body.lastName !== undefined) updateData.last_name = body.lastName;
       if (body.email !== undefined) updateData.email = body.email;
+      if (body.phone !== undefined) updateData.phone = body.phone;
+      if (body.department !== undefined) updateData.department = body.department;
       if (body.position !== undefined) updateData.position = body.position;
       if (body.salary !== undefined) updateData.salary = body.salary;
+      if (body.hireDate !== undefined) updateData.hire_date = body.hireDate;
       if (body.branchId !== undefined) {
         if (body.branchId && !canAccessBranch(context, body.branchId)) {
           return {

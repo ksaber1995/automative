@@ -32,8 +32,8 @@ const PaymentStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
 const PaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CREDIT_CARD', 'CHECK']);
 
 // Expense Types and Categories
-const ExpenseTypeSchema = z.enum(['FIXED', 'VARIABLE', 'SHARED']);
-const ExpenseCategorySchema = z.enum(['SALARIES', 'RENT', 'UTILITIES', 'MARKETING', 'SUPPLIES', 'MAINTENANCE', 'OTHER']);
+const ExpenseTypeSchema = z.enum(['FIXED', 'VARIABLE', 'SHARED', 'CAPITAL']);
+const ExpenseCategorySchema = z.enum(['SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'OTHER']);
 
 // Withdrawal Status
 const WithdrawalStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
@@ -173,14 +173,14 @@ const CreateBranchSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
-  zipCode: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional(),
-  managerId: OptionalUUIDSchema,
   openingDate: z.string().optional(),
 });
 
-const UpdateBranchSchema = CreateBranchSchema.partial();
+const UpdateBranchSchema = CreateBranchSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
 
 const BranchSchema = z.object({
   id: UUIDSchema,
@@ -190,10 +190,8 @@ const BranchSchema = z.object({
   address: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  zipCode: z.string().nullable(),
   phone: z.string().nullable(),
   email: z.string().nullable(),
-  managerId: UUIDSchema.nullable(),
   isActive: z.boolean(),
   openingDate: z.string().nullable(),
   createdAt: z.string(),
@@ -377,6 +375,8 @@ const CreateExpenseSchema = z.object({
   vendor: z.string().optional(),
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
+  assetName: z.string().optional(),
+  amortizationMonths: z.number().int().min(1).optional(),
 });
 
 const UpdateExpenseSchema = CreateExpenseSchema.partial();
@@ -396,6 +396,9 @@ const ExpenseSchema = z.object({
   vendor: z.string().nullable(),
   invoiceNumber: z.string().nullable(),
   notes: z.string().nullable(),
+  assetName: z.string().nullable(),
+  amortizationMonths: z.number().nullable(),
+  monthlyAmount: z.number().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -407,8 +410,11 @@ const CreateEmployeeSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   email: z.string().email().optional(),
+  phone: z.string().optional(),
+  department: z.string().optional(),
   position: z.string().optional(),
   salary: z.number().optional(),
+  hireDate: z.string().optional(),
   branchId: OptionalUUIDSchema,
   isGlobal: z.boolean().optional(),
 });
@@ -421,8 +427,11 @@ const EmployeeSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   email: z.string().nullable(),
+  phone: z.string().nullable(),
+  department: z.string().nullable(),
   position: z.string().nullable(),
   salary: z.number().nullable(),
+  hireDate: z.string().nullable(),
   branchId: UUIDSchema.nullable(),
   isGlobal: z.boolean(),
   isActive: z.boolean(),

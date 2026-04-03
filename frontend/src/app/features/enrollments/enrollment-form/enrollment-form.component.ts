@@ -208,7 +208,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                       [style]="{ width: '100%' }"
                     />
                     @if (selectedCourse()) {
-                      <small class="text-gray-500">Course price: \${{ selectedCourse()!.price.toFixed(2) }}</small>
+                      <small class="text-gray-500">Course price: {{ selectedCourse()!.price.toFixed(2) }}</small>
                     }
                   </div>
 
@@ -279,11 +279,11 @@ import { Branch } from '@shared/interfaces/branch.interface';
                       Final Price
                     </label>
                     <div class="text-2xl font-bold text-green-600">
-                      \${{ finalPriceDisplay() }}
+                      {{ finalPriceDisplay() }}
                     </div>
                     @if (savingsAmount() > 0) {
                       <small class="text-green-600">
-                        You save: \${{ savingsAmount().toFixed(2) }}
+                        You save: {{ savingsAmount().toFixed(2) }}
                       </small>
                     }
                   </div>

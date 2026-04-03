@@ -66,7 +66,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
             </div>
             <div class="bg-green-50 p-4 rounded-lg">
               <div class="text-sm text-gray-600">Total Revenue</div>
-              <div class="text-2xl font-bold text-green-600">\${{ summary()!.totalRevenue.toFixed(2) }}</div>
+              <div class="text-2xl font-bold text-green-600">{{ summary()!.totalRevenue.toFixed(2) }}</div>
             </div>
             <div class="bg-purple-50 p-4 rounded-lg">
               <div class="text-sm text-gray-600">Total Quantity Sold</div>
@@ -107,15 +107,15 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
                 }
               </td>
               <td>{{ sale.quantity }}</td>
-              <td>\${{ sale.unitPrice.toFixed(2) }}</td>
+              <td>{{ sale.unitPrice.toFixed(2) }}</td>
               <td>
                 @if (sale.discountAmount > 0) {
-                  <span class="text-orange-600">-\${{ sale.discountAmount.toFixed(2) }}</span>
+                  <span class="text-orange-600">-{{ sale.discountAmount.toFixed(2) }}</span>
                 } @else {
                   <span class="text-gray-400">None</span>
                 }
               </td>
-              <td class="font-semibold text-green-600">\${{ sale.totalAmount.toFixed(2) }}</td>
+              <td class="font-semibold text-green-600">{{ sale.totalAmount.toFixed(2) }}</td>
               <td>{{ sale.paymentMethod }}</td>
               <td>
                 @if (sale.customerName) {

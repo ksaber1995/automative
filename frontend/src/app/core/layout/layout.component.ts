@@ -182,12 +182,12 @@ export class LayoutComponent {
       routerLink: ['/withdrawals'],
       visible: true
     },
-    {
-      label: 'Debts',
-      icon: 'pi pi-credit-card',
-      routerLink: ['/debts'],
-      visible: true
-    },
+    // {
+    //   label: 'Debts',
+    //   icon: 'pi pi-credit-card',
+    //   routerLink: ['/debts'],
+    //   visible: true
+    // },
     {
       separator: true,
       label: 'Inventory'

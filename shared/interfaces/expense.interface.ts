@@ -16,6 +16,9 @@ export interface Expense {
   vendor?: string;
   invoiceNumber?: string;
   notes?: string;
+  assetName?: string | null;
+  amortizationMonths?: number | null;
+  monthlyAmount?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +36,8 @@ export interface ExpenseCreateDto {
   vendor?: string;
   invoiceNumber?: string;
   notes?: string;
+  assetName?: string;
+  amortizationMonths?: number;
 }
 
 export interface ExpenseUpdateDto {

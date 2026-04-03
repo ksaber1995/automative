@@ -2,13 +2,15 @@ import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapExpenseFromDB(row: any) {
+  const amount = parseFloat(row.amount);
+  const amortizationMonths = row.amortization_months || null;
   return {
     id: row.id,
     companyId: row.company_id,
     branchId: row.branch_id,
     type: row.type,
     category: row.category,
-    amount: parseFloat(row.amount),
+    amount,
     description: row.description,
     date: row.date,
     isRecurring: row.is_recurring,
@@ -17,6 +19,9 @@ function mapExpenseFromDB(row: any) {
     vendor: row.vendor,
     invoiceNumber: row.invoice_number,
     notes: row.notes,
+    assetName: row.asset_name,
+    amortizationMonths,
+    monthlyAmount: amortizationMonths ? parseFloat((amount / amortizationMonths).toFixed(2)) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -48,6 +53,8 @@ export const expensesRoutes = {
         vendor: body.vendor || null,
         invoice_number: body.invoiceNumber || null,
         notes: body.notes || null,
+        asset_name: body.assetName || null,
+        amortization_months: body.type === 'CAPITAL' ? (body.amortizationMonths || null) : null,
       });
 
       return {
@@ -191,6 +198,8 @@ export const expensesRoutes = {
       if (body.vendor !== undefined) updateData.vendor = body.vendor;
       if (body.invoiceNumber !== undefined) updateData.invoice_number = body.invoiceNumber;
       if (body.notes !== undefined) updateData.notes = body.notes;
+      if (body.assetName !== undefined) updateData.asset_name = body.assetName;
+      if (body.amortizationMonths !== undefined) updateData.amortization_months = body.amortizationMonths;
 
       const expense = await update('expenses', params.id, updateData);
 

@@ -1,5 +1,6 @@
 import { insert, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { getClient } from '../db/connection';
 
 function mapProductSaleFromDB(row: any) {
   return {
@@ -20,6 +21,7 @@ function mapProductSaleFromDB(row: any) {
 
 export const productSalesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    const client = await getClient();
     try {
       const context = await extractTenantContext(headers.authorization);
 
@@ -30,29 +32,67 @@ export const productSalesRoutes = {
         };
       }
 
-      const sale = await insert('product_sales', {
-        company_id: context.companyId,
-        product_id: body.productId,
-        branch_id: body.branchId,
-        quantity: body.quantity,
-        unit_price: body.unitPrice,
-        total_amount: body.totalAmount,
-        sale_date: body.saleDate,
-        payment_method: body.paymentMethod || null,
-        customer_name: body.customerName || null,
-        notes: body.notes || null,
-      });
+      // Fetch product to get cost_price for COGS
+      const product = await queryOne<any>(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+        [body.productId, context.companyId]
+      );
+
+      if (!product) {
+        return {
+          status: 404 as const,
+          body: { message: 'Product not found' },
+        };
+      }
+
+      await client.query('BEGIN');
+
+      // 1. Create the sale record
+      const saleResult = await client.query(
+        `INSERT INTO product_sales (company_id, product_id, branch_id, quantity, unit_price, total_amount, sale_date, payment_method, customer_name, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [context.companyId, body.productId, body.branchId, body.quantity, body.unitPrice,
+         body.totalAmount, body.saleDate, body.paymentMethod || null, body.customerName || null, body.notes || null]
+      );
+      const sale = saleResult.rows[0];
+
+      // 2. Deduct stock
+      await client.query(
+        'UPDATE products SET stock = stock - $1 WHERE id = $2',
+        [body.quantity, body.productId]
+      );
+
+      // 3. Auto-create COGS expense (cost_price × quantity sold)
+      const cogsAmount = parseFloat(product.cost_price) * body.quantity;
+      await client.query(
+        `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id)
+         VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7)`,
+        [
+          context.companyId,
+          body.branchId,
+          cogsAmount,
+          `COGS: ${product.name} × ${body.quantity} units`,
+          body.saleDate,
+          sale.id,
+          body.productId,
+        ]
+      );
+
+      await client.query('COMMIT');
 
       return {
         status: 201 as const,
         body: mapProductSaleFromDB(sale),
       };
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Create product sale error:', error);
       return {
         status: error.message === 'No authentication token provided' ? 401 : 400,
         body: { message: error.message || 'Failed to create product sale' },
       };
+    } finally {
+      client.release();
     }
   },
 

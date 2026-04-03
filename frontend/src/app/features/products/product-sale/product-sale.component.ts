@@ -51,7 +51,7 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
                 <div class="mt-2 p-3 bg-blue-50 rounded">
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium">Selling Price:</span>
-                    <span class="text-lg font-bold text-blue-600">\${{ selectedProduct()!.sellingPrice.toFixed(2) }}</span>
+                    <span class="text-lg font-bold text-blue-600">{{ selectedProduct()!.sellingPrice.toFixed(2) }}</span>
                   </div>
                   <div class="flex justify-between items-center mt-1">
                     <span class="text-sm font-medium">Available Stock:</span>
@@ -97,18 +97,18 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
               <div class="space-y-2">
                 <div class="flex justify-between items-center">
                   <span class="font-medium">Subtotal:</span>
-                  <span class="text-lg">\${{ subtotal().toFixed(2) }}</span>
+                  <span class="text-lg">{{ subtotal().toFixed(2) }}</span>
                 </div>
                 @if (discountAmount() > 0) {
                   <div class="flex justify-between items-center text-orange-600">
                     <span class="font-medium">Discount:</span>
-                    <span class="text-lg">-\${{ discountAmount().toFixed(2) }}</span>
+                    <span class="text-lg">-{{ discountAmount().toFixed(2) }}</span>
                   </div>
                 }
                 <hr class="border-green-300" />
                 <div class="flex justify-between items-center">
                   <span class="font-bold text-xl">Total Amount:</span>
-                  <span class="text-2xl font-bold text-green-600">\${{ totalAmount().toFixed(2) }}</span>
+                  <span class="text-2xl font-bold text-green-600">{{ totalAmount().toFixed(2) }}</span>
                 </div>
               </div>
             </div>
@@ -287,7 +287,7 @@ export class ProductSaleComponent implements OnInit {
     this.productSaleService.createSale(formValue).subscribe({
       next: (sale: any) => {
         this.submitting.set(false);
-        alert(`Sale completed successfully!\\n\\nSale ID: ${sale.id}\\nRevenue ID: ${sale.revenueId}\\nTotal Amount: $${sale.totalAmount.toFixed(2)}\\n\\nRevenue has been automatically created.`);
+        alert(`Sale completed successfully!\\n\\nSale ID: ${sale.id}\\nRevenue ID: ${sale.revenueId}\\nTotal Amount: ${sale.totalAmount.toFixed(2)}\\n\\nRevenue has been automatically created.`);
         this.router.navigate(['/products/sales']);
       },
       error: (err) => {

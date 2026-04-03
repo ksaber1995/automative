@@ -46,21 +46,38 @@ export const analyticsRoutes = {
         .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
 
       const variableExpenses = expenseData
-        .filter((e: any) => e.type === 'VARIABLE')
+        .filter((e: any) => e.type === 'VARIABLE' && e.category !== 'COGS')
         .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
 
       const sharedExpenses = expenseData
         .filter((e: any) => e.type === 'SHARED')
         .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
 
+      const capitalExpenses = expenseData
+        .filter((e: any) => e.type === 'CAPITAL')
+        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
+
+      const cogsExpenses = expenseData
+        .filter((e: any) => e.category === 'COGS')
+        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
+
       const salaries = expenseData
         .filter((e: any) => e.category === 'SALARIES')
         .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
 
-      const totalExpenses = fixedExpenses + variableExpenses + sharedExpenses;
+      const totalExpenses = fixedExpenses + variableExpenses + sharedExpenses + capitalExpenses + cogsExpenses;
+
+      // Inventory value = current stock × cost_price (snapshot, not period-bound)
+      const inventoryData = await query(
+        `SELECT COALESCE(SUM(stock * cost_price), 0) as inventory_value FROM products WHERE company_id = $1 AND is_active = true`,
+        [context.companyId]
+      );
+      const inventoryValue = parseFloat(inventoryData[0]?.inventory_value || '0');
+
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
       const totalRevenue = enrollmentRevenue + productRevenue;
+      const grossProfit = totalRevenue - cogsExpenses;
       const netProfit = totalRevenue - totalExpenses;
 
       // Get cash state for company
@@ -124,15 +141,19 @@ export const analyticsRoutes = {
             totalRevenue,
             enrollmentRevenue,
             productRevenue,
+            grossProfit,
             fixedExpenses,
             variableExpenses,
+            cogsExpenses,
             salaries,
             sharedExpenses,
+            capitalExpenses,
             totalExpenses,
             netProfit,
             currentCash,
             totalOutstandingDebts,
             availableCash: currentCash - totalOutstandingDebts,
+            inventoryValue,
           },
           branchSummaries: branchRevenueData.map((b: any) => ({
             branchId: b.id,

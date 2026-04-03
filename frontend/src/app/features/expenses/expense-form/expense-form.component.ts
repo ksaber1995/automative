@@ -59,6 +59,8 @@ export class ExpenseFormComponent implements OnInit {
   distributionMethodOptions = Object.values(DistributionMethod).map(method => ({ label: method, value: method }));
   branchOptions = signal<{ label: string, value: string }[]>([]);
 
+  isCapital = signal(false);
+
   constructor() {
     const today = new Date();
     this.expenseForm = this.fb.group({
@@ -73,27 +75,38 @@ export class ExpenseFormComponent implements OnInit {
       distributionMethod: ['EQUAL'],
       vendor: [''],
       invoiceNumber: [''],
-      notes: ['']
+      notes: [''],
+      assetName: [''],
+      amortizationMonths: [null]
     });
 
     // Watch for type changes to adjust branch requirement
     this.expenseForm.get('type')?.valueChanges.subscribe(type => {
       const branchControl = this.expenseForm.get('branchId');
       const distributionControl = this.expenseForm.get('distributionMethod');
+      const amortizationControl = this.expenseForm.get('amortizationMonths');
+
+      this.isCapital.set(type === 'CAPITAL');
 
       if (type === 'SHARED') {
-        // Shared expenses don't need a branch
         branchControl?.clearValidators();
         branchControl?.setValue('');
         distributionControl?.setValidators([Validators.required]);
-      } else {
-        // Fixed and Variable expenses need a branch
+        amortizationControl?.clearValidators();
+      } else if (type === 'CAPITAL') {
         branchControl?.setValidators([Validators.required]);
         distributionControl?.clearValidators();
         distributionControl?.setValue('EQUAL');
+        amortizationControl?.setValidators([Validators.required, Validators.min(1)]);
+      } else {
+        branchControl?.setValidators([Validators.required]);
+        distributionControl?.clearValidators();
+        distributionControl?.setValue('EQUAL');
+        amortizationControl?.clearValidators();
       }
       branchControl?.updateValueAndValidity();
       distributionControl?.updateValueAndValidity();
+      amortizationControl?.updateValueAndValidity();
     });
 
     // Watch for isRecurring changes
@@ -157,7 +170,9 @@ export class ExpenseFormComponent implements OnInit {
     const expenseData = {
       ...formValue,
       branchId: formValue.branchId || null,
-      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date
+      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date,
+      assetName: formValue.type === 'CAPITAL' ? (formValue.assetName || null) : null,
+      amortizationMonths: formValue.type === 'CAPITAL' ? (formValue.amortizationMonths || null) : null,
     };
 
     if (this.isEditMode() && this.expenseId) {
@@ -200,4 +215,6 @@ export class ExpenseFormComponent implements OnInit {
   get isRecurring() { return this.expenseForm.get('isRecurring'); }
   get recurringDay() { return this.expenseForm.get('recurringDay'); }
   get distributionMethod() { return this.expenseForm.get('distributionMethod'); }
+  get assetName() { return this.expenseForm.get('assetName'); }
+  get amortizationMonths() { return this.expenseForm.get('amortizationMonths'); }
 }

@@ -57,7 +57,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td>{{ course.code }}</td>
               <td>{{ course.name }}</td>
               <td>{{ course.duration }} weeks</td>
-              <td>\${{ course.price.toFixed(2) }}</td>
+              <td>{{ course.price.toFixed(2) }}</td>
               <td>{{ course.maxStudents || 'Unlimited' }}</td>
               <td>
                 <p-tag [value]="course.enrollmentCount || 0" severity="info"></p-tag>

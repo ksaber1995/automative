@@ -44,10 +44,8 @@ export class BranchFormComponent implements OnInit {
       address: ['', [Validators.required]],
       city: ['', [Validators.required]],
       state: [''],
-      zipCode: [''],
       phone: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
-      managerId: [''],
       openingDate: [today, [Validators.required]]
     });
   }
@@ -91,7 +89,6 @@ export class BranchFormComponent implements OnInit {
     // Convert Date object to ISO string for API
     const branchData = {
       ...formValue,
-      managerId: formValue.managerId?.trim() || undefined,
       openingDate: formValue.openingDate instanceof Date
         ? formValue.openingDate.toISOString().split('T')[0]
         : formValue.openingDate,

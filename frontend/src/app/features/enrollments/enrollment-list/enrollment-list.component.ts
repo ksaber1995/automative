@@ -76,11 +76,11 @@ interface EnrollmentDisplay extends Enrollment {
                 <div class="text-sm text-gray-600">{{ enrollment.courseCode }}</div>
               </td>
               <td>{{ formatDate(enrollment.enrollmentDate) }}</td>
-              <td>\${{ enrollment.originalPrice.toFixed(2) }}</td>
+              <td>{{ enrollment.originalPrice.toFixed(2) }}</td>
               <td>
                 @if (enrollment.discountAmount > 0) {
                   <span class="text-green-600">
-                    -\${{ enrollment.discountAmount.toFixed(2) }}
+                    -{{ enrollment.discountAmount.toFixed(2) }}
                     @if (enrollment.discountPercent > 0) {
                       <span class="text-xs">({{ enrollment.discountPercent.toFixed(0) }}%)</span>
                     }
@@ -89,7 +89,7 @@ interface EnrollmentDisplay extends Enrollment {
                   <span class="text-gray-400">None</span>
                 }
               </td>
-              <td class="font-semibold">\${{ enrollment.finalPrice.toFixed(2) }}</td>
+              <td class="font-semibold">{{ enrollment.finalPrice.toFixed(2) }}</td>
               <td>
                 <p-tag
                   [value]="enrollment.status"

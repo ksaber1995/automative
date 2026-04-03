@@ -67,7 +67,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      let sql = 'SELECT * FROM products WHERE company_id = $1';
+      let sql = 'SELECT * FROM products WHERE company_id = $1 AND is_active = true';
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
