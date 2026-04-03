@@ -96,36 +96,11 @@
           </div>
         </p-card>
 
+        <!-- Outstanding Debts card (commented out)
         <p-card class="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                <i class="pi pi-exclamation-circle text-orange-600"></i>
-                <span>Outstanding Debts</span>
-              </div>
-              <div class="text-2xl font-bold text-orange-600">
-                {{ formatCurrency(data.companyWideSummary.totalOutstandingDebts || 0) }}
-              </div>
-              <div class="text-xs text-gray-500 mt-1">Total debt balance</div>
-            </div>
-            <div class="flex flex-col gap-2">
-              <button
-                pButton
-                icon="pi pi-eye"
-                class="p-button-rounded p-button-text p-button-sm"
-                pTooltip="View Debts"
-                (click)="navigateTo('/debts')">
-              </button>
-              <button
-                pButton
-                icon="pi pi-plus"
-                class="p-button-rounded p-button-text p-button-warning p-button-sm"
-                pTooltip="New Debt"
-                (click)="navigateTo('/debts/new')">
-              </button>
-            </div>
-          </div>
+          ...
         </p-card>
+        -->
 
         <p-card class="bg-gradient-to-br from-teal-50 to-teal-100 border-2 border-teal-200">
           <div class="flex items-center justify-between">
@@ -178,16 +153,26 @@
     <!-- Branch Performance -->
     <p-card>
       <ng-template pTemplate="header">
-        <div class="p-4 font-semibold text-lg">Branch Performance</div>
+        <div class="p-4 flex items-center justify-between flex-wrap gap-3">
+          <span class="font-semibold text-lg">Branch P&amp;L</span>
+          <div class="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border">
+            <i [class]="getAllocationIcon(data.companyWideSummary.allocationMethod)"></i>
+            <span>{{ getAllocationLabel(data.companyWideSummary.allocationMethod) }}</span>
+            <a routerLink="/settings" class="text-blue-500 hover:underline ml-1 text-xs">Change</a>
+          </div>
+        </div>
       </ng-template>
       <p-table [value]="data.branchSummaries" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
             <th>Branch</th>
-            <th>Revenue</th>
-            <th>Expenses</th>
-            <th>Net Profit</th>
-            <th>Profit Margin</th>
+            <th pTooltip="Revenue from enrollments + product sales" tooltipPosition="top">Revenue</th>
+            <th pTooltip="Expenses explicitly assigned to this branch" tooltipPosition="top">Direct Costs</th>
+            <th pTooltip="Share of global overhead allocated based on chosen method" tooltipPosition="top">
+              Overhead Share
+            </th>
+            <th pTooltip="Revenue − Direct Costs − Overhead Share" tooltipPosition="top">Net Profit</th>
+            <th>Margin</th>
             <th>Status</th>
           </tr>
         </ng-template>
@@ -195,19 +180,27 @@
           <tr>
             <td>
               <div class="font-semibold">{{ branch.branchName }}</div>
-              <div class="text-sm text-gray-600">{{ branch.branchCode }}</div>
+              <div class="text-xs text-gray-500">{{ branch.studentCount }} students</div>
             </td>
-            <td>{{ formatCurrency(branch.totalRevenue) }}</td>
-            <td>{{ formatCurrency(branch.totalExpenses) }}</td>
+            <td class="font-medium text-blue-700">{{ formatCurrency(branch.totalRevenue) }}</td>
+            <td class="text-red-600">{{ formatCurrency(branch.directExpenses) }}</td>
             <td>
-              <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0"
-                class="font-semibold">
+              @if (branch.allocatedOverhead > 0) {
+                <span class="text-orange-600">{{ formatCurrency(branch.allocatedOverhead) }}</span>
+              } @else {
+                <span class="text-gray-400 text-sm">—</span>
+              }
+            </td>
+            <td>
+              <span class="font-bold text-lg"
+                [class.text-green-600]="branch.netProfit >= 0"
+                [class.text-red-600]="branch.netProfit < 0">
                 {{ formatCurrency(branch.netProfit) }}
               </span>
             </td>
             <td>
               <span [class.text-green-600]="branch.netProfit >= 0" [class.text-red-600]="branch.netProfit < 0">
-                {{ branch.totalRevenue > 0 ? ((branch.netProfit / branch.totalRevenue) * 100)?.toFixed(1) : 0 }}%
+                {{ branch.profitMargin }}%
               </span>
             </td>
             <td>
@@ -216,8 +209,104 @@
             </td>
           </tr>
         </ng-template>
+        <ng-template pTemplate="footer">
+          @if (data.companyWideSummary.allocationMethod === 'OVERHEAD' && data.companyWideSummary.globalOverhead > 0) {
+            <tr class="bg-orange-50">
+              <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
+                <i class="pi pi-building mr-2"></i>Global Overhead (not charged to branches)
+              </td>
+              <td>
+                <span class="font-bold text-orange-700">− {{ formatCurrency(data.companyWideSummary.globalOverhead) }}</span>
+              </td>
+              <td colspan="2"></td>
+            </tr>
+            <tr class="bg-green-50 border-t-2 border-green-200">
+              <td colspan="4" class="text-right text-sm font-bold text-green-800 pr-4">Company Net Profit</td>
+              <td>
+                <span class="font-bold text-xl"
+                  [class.text-green-700]="data.companyWideSummary.netProfit >= 0"
+                  [class.text-red-700]="data.companyWideSummary.netProfit < 0">
+                  {{ formatCurrency(data.companyWideSummary.netProfit) }}
+                </span>
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          }
+        </ng-template>
       </p-table>
     </p-card>
+
+    <!-- Due This Month -->
+    <div class="mt-8">
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i class="pi pi-exclamation-triangle text-orange-500 text-xl"></i>
+              <span class="font-semibold text-lg">Due This Month</span>
+              @if (dueExpenses(); as due) {
+                <span class="text-sm text-gray-500">({{ due.items.length }} unpaid)</span>
+              }
+            </div>
+            @if (dueExpenses(); as due) {
+              <div class="text-right">
+                <div class="text-xs text-gray-500">Total Due</div>
+                <div class="text-xl font-bold text-orange-600">{{ formatCurrency(due.totalDue) }}</div>
+              </div>
+            }
+          </div>
+        </ng-template>
+
+        @if (dueLoading()) {
+          <div class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-3xl text-gray-400"></i>
+          </div>
+        } @else if (dueExpenses(); as due) {
+          @if (due.items.length === 0) {
+            <div class="text-center py-8 text-gray-400">
+              <i class="pi pi-check-circle text-4xl mb-2 block text-green-400"></i>
+              <p class="font-medium">All caught up! No due expenses for this month.</p>
+            </div>
+          } @else {
+            <div class="space-y-2">
+              @for (item of due.items; track item.id) {
+                <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                  <div class="flex items-center gap-3">
+                    <i class="pi text-lg"
+                      [class.pi-refresh]="item.type === 'recurring'"
+                      [class.pi-user]="item.type === 'salary'"
+                      [class.text-blue-500]="item.type === 'recurring'"
+                      [class.text-green-500]="item.type === 'salary'">
+                    </i>
+                    <div>
+                      <div class="font-medium text-gray-800">{{ item.label }}</div>
+                      <div class="text-xs text-gray-500 flex items-center gap-2">
+                        <span class="capitalize">{{ item.type }}</span>
+                        @if (item.branchName) {
+                          <span>• {{ item.branchName }}</span>
+                        }
+                        <span>• {{ item.category }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <span class="font-bold text-gray-800">{{ formatCurrency(item.amount) }}</span>
+                    <p-button
+                      label="Pay Now"
+                      icon="pi pi-check"
+                      size="small"
+                      severity="success"
+                      [loading]="payingId() === item.id"
+                      (onClick)="payDueItem(item)">
+                    </p-button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+      </p-card>
+    </div>
 
     <!-- Top Performing Branches -->
     <div class="mt-8">

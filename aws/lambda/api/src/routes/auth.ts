@@ -160,14 +160,14 @@ export const authRoutes = {
         name: body.companyName,
         code: companyCode,
         email: body.companyEmail,
-        industry: body.industry || null,
-        subscription_tier: 'BASIC',  // Start with basic tier
-        subscription_status: 'TRIAL', // 30-day trial
+        industry: 'Tech Center',
+        subscription_tier: 'BASIC',
+        subscription_status: 'TRIAL',
         subscription_start_date: new Date(),
-        subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         max_branches: 1,
         max_users: 5,
-        timezone: body.timezone || 'Africa/Cairo',
+        timezone: 'Africa/Cairo',
         currency: 'EGP',
         locale: 'en-US',
         is_active: true,

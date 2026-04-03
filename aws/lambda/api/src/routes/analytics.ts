@@ -1,4 +1,4 @@
-import { query } from '../db/connection';
+import { query, queryOne } from '../db/connection';
 import { extractTenantContext } from '../middleware/tenant-isolation';
 
 export const analyticsRoutes = {
@@ -9,128 +9,177 @@ export const analyticsRoutes = {
       const startDate = queryParams.startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
       const endDate = queryParams.endDate || new Date().toISOString().split('T')[0];
 
-      // Get company-wide revenue from enrollments
+      // --- Company allocation method ---
+      const company = await queryOne(
+        'SELECT global_expense_allocation FROM companies WHERE id = $1',
+        [context.companyId]
+      );
+      const allocationMethod: 'PROPORTIONAL' | 'EQUAL' | 'OVERHEAD' = company?.global_expense_allocation || 'OVERHEAD';
+
+      // --- Company-wide revenue ---
       const enrollmentRevenueData = await query(
-        `SELECT
-          COALESCE(SUM(final_price), 0) as total_revenue
-        FROM enrollments
-        WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
-          AND enrollment_date >= $2 AND enrollment_date <= $3`,
+        `SELECT COALESCE(SUM(final_price), 0) as total_revenue
+         FROM enrollments
+         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+           AND enrollment_date >= $2 AND enrollment_date <= $3`,
         [context.companyId, startDate, endDate]
       );
-
-      // Get product sales revenue
       const productRevenueData = await query(
-        `SELECT
-          COALESCE(SUM(total_amount), 0) as total_revenue
-        FROM product_sales
-        WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3`,
+        `SELECT COALESCE(SUM(total_amount), 0) as total_revenue
+         FROM product_sales
+         WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3`,
         [context.companyId, startDate, endDate]
       );
 
-      // Get expenses by type
+      const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
+      const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
+      const totalRevenue = enrollmentRevenue + productRevenue;
+
+      // --- Company-wide expenses (is_recurring = false to exclude templates) ---
       const expenseData = await query(
-        `SELECT
-          type,
-          category,
-          COALESCE(SUM(amount), 0) as total_amount
-        FROM expenses
-        WHERE company_id = $1 AND date >= $2 AND date <= $3
-        GROUP BY type, category`,
+        `SELECT type, category, COALESCE(SUM(amount), 0) as total_amount
+         FROM expenses
+         WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
+         GROUP BY type, category`,
         [context.companyId, startDate, endDate]
       );
 
-      // Calculate expense totals
-      const fixedExpenses = expenseData
-        .filter((e: any) => e.type === 'FIXED')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
-      const variableExpenses = expenseData
-        .filter((e: any) => e.type === 'VARIABLE' && e.category !== 'COGS')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
-      const sharedExpenses = expenseData
-        .filter((e: any) => e.type === 'SHARED')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
-      const capitalExpenses = expenseData
-        .filter((e: any) => e.type === 'CAPITAL')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
-      const cogsExpenses = expenseData
-        .filter((e: any) => e.category === 'COGS')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
-      const salaries = expenseData
-        .filter((e: any) => e.category === 'SALARIES')
-        .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount), 0);
-
+      const fixedExpenses = expenseData.filter((e: any) => e.type === 'FIXED').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const variableExpenses = expenseData.filter((e: any) => e.type === 'VARIABLE' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const sharedExpenses = expenseData.filter((e: any) => e.type === 'SHARED').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const capitalExpenses = expenseData.filter((e: any) => e.type === 'CAPITAL').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const cogsExpenses = expenseData.filter((e: any) => e.category === 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const salaries = expenseData.filter((e: any) => e.category === 'SALARIES').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
       const totalExpenses = fixedExpenses + variableExpenses + sharedExpenses + capitalExpenses + cogsExpenses;
+      const grossProfit = totalRevenue - cogsExpenses;
+      const netProfit = totalRevenue - totalExpenses;
 
-      // Inventory value = current stock × cost_price (snapshot, not period-bound)
+      // --- Inventory value ---
       const inventoryData = await query(
         `SELECT COALESCE(SUM(stock * cost_price), 0) as inventory_value FROM products WHERE company_id = $1 AND is_active = true`,
         [context.companyId]
       );
       const inventoryValue = parseFloat(inventoryData[0]?.inventory_value || '0');
 
-      const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
-      const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue;
-      const grossProfit = totalRevenue - cogsExpenses;
-      const netProfit = totalRevenue - totalExpenses;
-
-      // Get cash state for company
-      const cashState = await query(
-        'SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1',
-        [context.companyId]
-      );
+      // --- Cash & debts ---
+      const cashState = await query('SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1', [context.companyId]);
       const currentCash = parseFloat(cashState[0]?.current_balance || '0');
-
-      // Get outstanding debts (if table exists and has company_id)
       const debtsData = await query(
-        `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts
-        FROM debts
-        WHERE company_id = $1 AND status = 'ACTIVE'`,
+        `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts FROM debts WHERE company_id = $1 AND status = 'ACTIVE'`,
         [context.companyId]
-      ).catch(() => [{ total_debts: 0 }]); // Fallback if debts table not fully implemented
+      ).catch(() => [{ total_debts: 0 }]);
       const totalOutstandingDebts = parseFloat(debtsData[0]?.total_debts || '0');
 
-      // Get revenue by branch (enrollments + product sales)
-      const branchRevenueData = await query(
+      // --- Global overhead (branch_id IS NULL, excluding product-cost categories) ---
+      const globalOverheadData = await query(
+        `SELECT COALESCE(SUM(amount), 0) as total
+         FROM expenses
+         WHERE company_id = $1 AND branch_id IS NULL
+           AND date >= $2 AND date <= $3
+           AND is_recurring = false
+           AND category NOT IN ('COGS', 'INVENTORY')`,
+        [context.companyId, startDate, endDate]
+      );
+      const totalGlobalOverhead = parseFloat(globalOverheadData[0]?.total || '0');
+
+      // --- Branch P&L ---
+      const branchRawData = await query(
         `SELECT
-          b.id,
-          b.name,
-          COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) as total_revenue
-        FROM branches b
-        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.company_id = $1
-          AND e.payment_status IN ('PAID', 'PARTIAL')
-          AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
-        LEFT JOIN product_sales ps ON b.id = ps.branch_id AND ps.company_id = $1
-          AND ps.sale_date >= $2 AND ps.sale_date <= $3
-        WHERE b.company_id = $1
-        GROUP BY b.id, b.name
-        ORDER BY total_revenue DESC`,
+           b.id,
+           b.name,
+           b.code,
+           -- Enrollment revenue
+           COALESCE((
+             SELECT SUM(e.final_price) FROM enrollments e
+             WHERE e.branch_id = b.id AND e.company_id = $1
+               AND e.payment_status IN ('PAID', 'PARTIAL')
+               AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
+           ), 0) AS enrollment_revenue,
+           -- Product sale revenue
+           COALESCE((
+             SELECT SUM(ps.total_amount) FROM product_sales ps
+             WHERE ps.branch_id = b.id AND ps.company_id = $1
+               AND ps.sale_date >= $2 AND ps.sale_date <= $3
+           ), 0) AS product_revenue,
+           -- Direct expenses (explicitly assigned to this branch)
+           COALESCE((
+             SELECT SUM(ex.amount) FROM expenses ex
+             WHERE ex.branch_id = b.id AND ex.company_id = $1
+               AND ex.date >= $2 AND ex.date <= $3
+               AND ex.is_recurring = false
+           ), 0) AS direct_expenses,
+           -- Active student count
+           (SELECT COUNT(*) FROM enrollments en
+            WHERE en.branch_id = b.id AND en.company_id = $1
+              AND en.status = 'ACTIVE') AS student_count,
+           -- Employee count
+           (SELECT COUNT(*) FROM employees em
+            WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
+         FROM branches b
+         WHERE b.company_id = $1
+         ORDER BY (COALESCE((SELECT SUM(e.final_price) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0)) DESC`,
         [context.companyId, startDate, endDate]
       );
 
-      // Get revenue by month (combined enrollments and product sales)
+      const totalBranchRevenue = branchRawData.reduce((s: number, b: any) =>
+        s + parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue), 0);
+      const branchCount = branchRawData.length;
+
+      const branchSummaries = branchRawData.map((b: any) => {
+        const revenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue);
+        const directExpenses = parseFloat(b.direct_expenses);
+
+        let allocatedOverhead = 0;
+        if (allocationMethod === 'PROPORTIONAL') {
+          allocatedOverhead = totalBranchRevenue > 0
+            ? totalGlobalOverhead * (revenue / totalBranchRevenue)
+            : (branchCount > 0 ? totalGlobalOverhead / branchCount : 0);
+        } else if (allocationMethod === 'EQUAL') {
+          allocatedOverhead = branchCount > 0 ? totalGlobalOverhead / branchCount : 0;
+        }
+        // OVERHEAD: allocatedOverhead stays 0 — shown at company level only
+
+        const totalBranchExpenses = directExpenses + allocatedOverhead;
+        const branchNetProfit = revenue - totalBranchExpenses;
+        const profitMargin = revenue > 0 ? (branchNetProfit / revenue) * 100 : 0;
+
+        return {
+          branchId: b.id,
+          branchName: b.name,
+          branchCode: b.code,
+          totalRevenue: revenue,
+          directExpenses,
+          allocatedOverhead: Math.round(allocatedOverhead * 100) / 100,
+          totalExpenses: Math.round(totalBranchExpenses * 100) / 100,
+          netProfit: Math.round(branchNetProfit * 100) / 100,
+          profitMargin: Math.round(profitMargin * 10) / 10,
+          studentCount: parseInt(b.student_count),
+          employeeCount: parseInt(b.employee_count),
+        };
+      });
+
+      // --- Revenue by month ---
       const monthlyRevenue = await query(
-        `SELECT
-          TO_CHAR(date, 'YYYY-MM') as month,
-          SUM(amount) as total
-        FROM (
-          SELECT enrollment_date as date, final_price as amount
-          FROM enrollments
-          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
-            AND enrollment_date >= $2 AND enrollment_date <= $3
-          UNION ALL
-          SELECT sale_date as date, total_amount as amount
-          FROM product_sales
-          WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
-        ) combined
-        GROUP BY TO_CHAR(date, 'YYYY-MM')
-        ORDER BY month`,
+        `SELECT TO_CHAR(date, 'YYYY-MM') as month,
+                SUM(revenue) as revenue,
+                SUM(expenses) as expenses,
+                SUM(revenue) - SUM(expenses) as profit
+         FROM (
+           SELECT enrollment_date as date, final_price as revenue, 0 as expenses
+           FROM enrollments
+           WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+             AND enrollment_date >= $2 AND enrollment_date <= $3
+           UNION ALL
+           SELECT sale_date as date, total_amount as revenue, 0 as expenses
+           FROM product_sales
+           WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
+           UNION ALL
+           SELECT date, 0 as revenue, amount as expenses
+           FROM expenses
+           WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
+         ) combined
+         GROUP BY TO_CHAR(date, 'YYYY-MM')
+         ORDER BY month`,
         [context.companyId, startDate, endDate]
       );
 
@@ -154,30 +203,33 @@ export const analyticsRoutes = {
             totalOutstandingDebts,
             availableCash: currentCash - totalOutstandingDebts,
             inventoryValue,
+            globalOverhead: totalGlobalOverhead,
+            allocationMethod,
           },
-          branchSummaries: branchRevenueData.map((b: any) => ({
-            branchId: b.id,
-            branchName: b.name,
-            totalRevenue: parseFloat(b.total_revenue),
-          })),
+          branchSummaries,
           revenueByMonth: monthlyRevenue.map((m: any) => ({
             month: m.month,
-            total: parseFloat(m.total),
+            revenue: parseFloat(m.revenue || '0'),
+            expenses: parseFloat(m.expenses || '0'),
+            profit: parseFloat(m.profit || '0'),
           })),
           expensesByCategory: expenseData.map((e: any) => ({
             type: e.type,
             category: e.category,
             amount: parseFloat(e.total_amount),
           })),
-          topPerformingBranches: branchRevenueData.slice(0, 5).map((b: any) => ({
-            branchId: b.id,
-            branchName: b.name,
-            totalRevenue: parseFloat(b.total_revenue),
-          })),
-          period: {
-            startDate,
-            endDate,
-          },
+          topPerformingBranches: [...branchSummaries]
+            .sort((a, b) => b.netProfit - a.netProfit)
+            .slice(0, 5)
+            .map(b => ({
+              branchId: b.branchId,
+              branchName: b.branchName,
+              profit: b.netProfit,
+              profitMargin: b.profitMargin,
+              studentCount: b.studentCount,
+              courseCount: 0,
+            })),
+          period: { startDate, endDate },
         },
       };
     } catch (error) {

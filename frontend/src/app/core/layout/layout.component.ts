@@ -218,6 +218,15 @@ export class LayoutComponent {
       icon: 'pi pi-chart-bar',
       routerLink: ['/reports'],
       visible: true
+    },
+    {
+      separator: true
+    },
+    {
+      label: 'Settings',
+      icon: 'pi pi-cog',
+      routerLink: ['/settings'],
+      visible: true
     }
   ];
 

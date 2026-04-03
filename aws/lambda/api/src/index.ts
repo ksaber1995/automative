@@ -27,6 +27,7 @@ import { cashRoutes } from './routes/cash';
 import { reportsRoutes } from './routes/reports';
 import { enrollmentsRoutes } from './routes/enrollments';
 import { migrationsRoutes } from './routes/migrations';
+import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 
 // Create the router implementation
@@ -40,6 +41,7 @@ const router = {
   revenues: revenuesRoutes,
   expenses: expensesRoutes,
   analytics: analyticsRoutes,
+  companies: companiesRoutes,
   employees: employeesRoutes,
   withdrawals: withdrawalsRoutes,
   products: productsRoutes,

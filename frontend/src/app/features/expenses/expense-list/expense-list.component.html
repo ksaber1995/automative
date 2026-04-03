@@ -4,17 +4,29 @@
       <div class="flex justify-between items-center p-4">
         <div>
           <h2 class="text-2xl font-bold">Expense Management</h2>
-          <p class="text-gray-600 mt-1">Total: {{ totalExpenses | currency }}</p>
+          <p class="text-gray-600 mt-1">Total: {{ totalExpenses | number:'1.2-2' }}</p>
         </div>
-        <button pButton label="Add Expense" icon="pi pi-plus" (click)="createExpense()"></button>
+        <div class="flex gap-2">
+          <p-button
+            label="Pay All Salaries"
+            icon="pi pi-users"
+            severity="warn"
+            (onClick)="openSalariesDialog()">
+          </p-button>
+          <p-button
+            label="Add Expense"
+            icon="pi pi-plus"
+            (onClick)="createExpense()">
+          </p-button>
+        </div>
       </div>
     </ng-template>
 
     <!-- Filters -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
       <div>
-        <label class="block text-sm font-medium mb-2">Branch:</label>
-        <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+        <label class="block text-sm font-medium mb-1">Branch</label>
+        <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
           <option value="">All Branches</option>
           @for (branch of branches(); track branch.id) {
             <option [value]="branch.id">{{ branch.name }}</option>
@@ -22,26 +34,47 @@
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Type:</label>
-        <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+        <label class="block text-sm font-medium mb-1">Type</label>
+        <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
           <option value="">All Types</option>
           <option value="FIXED">Fixed</option>
           <option value="VARIABLE">Variable</option>
-          <option value="SHARED">Shared/Global</option>
+          <option value="SHARED">Shared</option>
+          <option value="CAPITAL">Capital</option>
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Start Date:</label>
-        <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        <label class="block text-sm font-medium mb-1">Category</label>
+        <select [(ngModel)]="selectedCategory" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+          <option value="">All Categories</option>
+          @for (cat of categories; track cat) {
+            <option [value]="cat">{{ cat }}</option>
+          }
+        </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">End Date:</label>
-        <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+        <label class="block text-sm font-medium mb-1">Recurring</label>
+        <select [(ngModel)]="selectedRecurring" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+          <option value="">All</option>
+          <option value="true">Recurring only</option>
+          <option value="false">Non-recurring only</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Start Date</label>
+        <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+      </div>
+      <div class="flex flex-col justify-between">
+        <label class="block text-sm font-medium mb-1">End Date</label>
+        <div class="flex gap-1">
+          <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          <button pButton icon="pi pi-filter-slash" class="p-button-outlined p-button-sm" (click)="clearFilters()" pTooltip="Clear filters"></button>
+        </div>
       </div>
     </div>
 
     <!-- Table -->
-    <p-table [value]="expenses()" [loading]="loading()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
+    <p-table [value]="expenses()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
           <th>Date</th>
@@ -62,22 +95,139 @@
           <td>{{ expense.category }}</td>
           <td>{{ getBranchName(expense.branchId) }}</td>
           <td>{{ expense.description }}</td>
-          <td class="font-semibold">{{ expense.amount | currency }}</td>
+          <td class="font-semibold">{{ expense.amount | number:'1.2-2' }}</td>
           <td>{{ expense.vendor || '-' }}</td>
           <td>
             @if (expense.isRecurring) {
-              <p-tag value="Yes" severity="info" icon="pi pi-refresh"></p-tag>
+              <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
             } @else {
-              <span class="text-gray-400">No</span>
+              <span class="text-gray-400 text-sm">-</span>
             }
           </td>
           <td>
-            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text" (click)="editExpense(expense)"></button>
-            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger" (click)="deleteExpense(expense)"></button>
+            <div class="flex gap-1">
+              @if (expense.isRecurring) {
+                <p-button
+                  icon="pi pi-check-circle"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="success"
+                  pTooltip="Pay for this month"
+                  (onClick)="openPayDialog(expense)">
+                </p-button>
+              }
+              <p-button
+                icon="pi pi-pencil"
+                [rounded]="true"
+                [text]="true"
+                severity="warn"
+                pTooltip="Edit"
+                (onClick)="editExpense(expense)">
+              </p-button>
+              <p-button
+                icon="pi pi-trash"
+                [rounded]="true"
+                [text]="true"
+                severity="danger"
+                pTooltip="Delete"
+                (onClick)="confirmDelete(expense)">
+              </p-button>
+            </div>
           </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="9" class="text-center py-8 text-gray-500">No expenses found</td>
         </tr>
       </ng-template>
     </p-table>
   </p-card>
-  <p-confirmDialog></p-confirmDialog>
 </div>
+
+<!-- Delete Confirm Dialog -->
+<app-delete-confirm-dialog
+  [visible]="showDeleteDialog"
+  (visibleChange)="showDeleteDialog = $event"
+  header="Delete Expense"
+  [message]="'Are you sure you want to delete: ' + (expenseToDelete()?.description || 'this expense') + '?'"
+  (confirm)="deleteExpense()"
+  (cancel)="showDeleteDialog = false">
+</app-delete-confirm-dialog>
+
+<!-- Pay Recurring Dialog -->
+<p-dialog
+  header="Pay Recurring Expense"
+  [(visible)]="showPayDialog"
+  [modal]="true"
+  [style]="{ width: '400px' }"
+  [draggable]="false">
+  <div class="flex flex-col gap-4 py-2">
+    <p class="text-gray-700">Creating a payment entry for:</p>
+    <p class="font-semibold text-blue-700">{{ expenseToPayLabel() }}</p>
+    <div>
+      <label class="block text-sm font-medium mb-2">Payment Date</label>
+      <p-datepicker
+        [(ngModel)]="payDate"
+        dateFormat="yy-mm-dd"
+        [showIcon]="true"
+        class="w-full">
+      </p-datepicker>
+    </div>
+    <small class="text-gray-500">If already paid this month, the request will be rejected.</small>
+  </div>
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showPayDialog = false"></p-button>
+      <p-button label="Confirm Payment" severity="success" icon="pi pi-check" (onClick)="confirmPayRecurring()"></p-button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<!-- Pay Salaries Dialog -->
+<p-dialog
+  header="Pay All Salaries"
+  [(visible)]="showSalariesDialog"
+  [modal]="true"
+  [style]="{ width: '450px' }"
+  [draggable]="false">
+  <div class="flex flex-col gap-4 py-2">
+    <div class="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+      <i class="pi pi-info-circle text-amber-600 text-xl mt-0.5"></i>
+      <p class="text-sm text-amber-800">
+        This will create a SALARIES expense entry for every active employee with a salary set.
+        Already-paid employees for this month will be skipped.
+      </p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Pay Date</label>
+      <p-datepicker
+        [(ngModel)]="salariesDate"
+        dateFormat="yy-mm-dd"
+        [showIcon]="true"
+        class="w-full">
+      </p-datepicker>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Branch (optional — leave empty for all branches)</label>
+      <select [(ngModel)]="salariesBranchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+        <option value="">All Branches</option>
+        @for (branch of branches(); track branch.id) {
+          <option [value]="branch.id">{{ branch.name }}</option>
+        }
+      </select>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showSalariesDialog = false"></p-button>
+      <p-button
+        label="Pay Salaries"
+        severity="warn"
+        icon="pi pi-users"
+        [disabled]="payingSalaries()"
+        (onClick)="confirmPaySalaries()">
+      </p-button>
+    </div>
+  </ng-template>
+</p-dialog>

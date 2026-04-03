@@ -13,6 +13,11 @@ build/
 # CDK
 cdk.out/
 aws/cdk.out/
+aws/dist-deploy/
+aws/scripts/__pycache__/
+
+# Lambda build output
+aws/lambda/api/dist/
 
 # Environment files
 .env

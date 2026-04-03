@@ -1,28 +1,36 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { AnalyticsService } from '../services/analytics.service';
+import { ExpenseService } from '../../expenses/services/expense.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [CommonModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule],
+  imports: [CommonModule, RouterModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule, ProgressSpinnerModule],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss'
 })
 export class OverviewComponent implements OnInit {
   private analyticsService = inject(AnalyticsService);
+  private expenseService = inject(ExpenseService);
+  private notificationService = inject(NotificationService);
   private router = inject(Router);
 
-  dashboardData =  signal<DashboardMetrics | null>(null);
+  dashboardData = signal<DashboardMetrics | null>(null);
   loading = signal(true);
+  dueExpenses = signal<{ items: any[]; totalDue: number; month: string } | null>(null);
+  dueLoading = signal(false);
+  payingId = signal<string | null>(null);
 
   revenueChartData: any;
   revenueChartOptions: any;
@@ -31,6 +39,7 @@ export class OverviewComponent implements OnInit {
 
   ngOnInit() {
     this.loadDashboard();
+    this.loadDueExpenses();
     this.initChartOptions();
   }
 
@@ -48,15 +57,65 @@ export class OverviewComponent implements OnInit {
     });
   }
 
+  loadDueExpenses() {
+    this.dueLoading.set(true);
+    this.expenseService.getDue().subscribe({
+      next: (data) => {
+        this.dueExpenses.set(data);
+        this.dueLoading.set(false);
+      },
+      error: () => {
+        this.dueLoading.set(false);
+      }
+    });
+  }
+
+  payDueItem(item: any) {
+    this.payingId.set(item.id);
+    const obs = item.type === 'salary'
+      ? this.expenseService.payEmployeeSalary(item.employeeId)
+      : this.expenseService.payRecurring(item.templateId);
+
+    obs.subscribe({
+      next: () => {
+        this.notificationService.success(`${item.label} paid successfully`);
+        this.payingId.set(null);
+        this.loadDueExpenses();
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to pay');
+        this.payingId.set(null);
+      }
+    });
+  }
+
+  getAllocationLabel(method: string): string {
+    const labels: Record<string, string> = {
+      PROPORTIONAL: 'Proportional Allocation',
+      EQUAL: 'Equal Split',
+      OVERHEAD: 'Global Overhead Bucket',
+    };
+    return labels[method] || method;
+  }
+
+  getAllocationIcon(method: string): string {
+    const icons: Record<string, string> = {
+      PROPORTIONAL: 'pi pi-chart-pie text-green-500',
+      EQUAL: 'pi pi-sliders-h text-blue-500',
+      OVERHEAD: 'pi pi-building text-purple-500',
+    };
+    return icons[method] || 'pi pi-cog';
+  }
+
   prepareCharts(data: DashboardMetrics) {
     // Revenue Trends Chart
-    const months = data.revenueByMonth.map(m => `${m.year}-${m.month}`);
+    const months = data.revenueByMonth.map((m: any) => m.month);
     this.revenueChartData = {
       labels: months,
       datasets: [
         {
           label: 'Revenue',
-          data: data.revenueByMonth.map(m => m.revenue),
+          data: data.revenueByMonth.map((m: any) => m.revenue),
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           fill: true,
@@ -64,7 +123,7 @@ export class OverviewComponent implements OnInit {
         },
         {
           label: 'Expenses',
-          data: data.revenueByMonth.map(m => m.expenses),
+          data: data.revenueByMonth.map((m: any) => m.expenses),
           borderColor: '#EF4444',
           backgroundColor: 'rgba(239, 68, 68, 0.1)',
           fill: true,
@@ -72,7 +131,7 @@ export class OverviewComponent implements OnInit {
         },
         {
           label: 'Profit',
-          data: data.revenueByMonth.map(m => m.profit),
+          data: data.revenueByMonth.map((m: any) => m.profit),
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           fill: true,

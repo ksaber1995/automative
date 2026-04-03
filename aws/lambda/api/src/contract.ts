@@ -41,6 +41,9 @@ const WithdrawalStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 // Withdrawal Category
 const WithdrawalCategorySchema = z.enum(['OWNER_DRAW', 'PROFIT_DISTRIBUTION', 'DIVIDEND', 'OTHER']);
 
+// Global Expense Allocation Method
+const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD']);
+
 // Debt Status
 const DebtStatusSchema = z.enum(['ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED']);
 
@@ -71,6 +74,7 @@ const CompanySchema = z.object({
   currency: z.string(),
   locale: z.string(),
   isActive: z.boolean(),
+  globalExpenseAllocation: GlobalExpenseAllocationSchema.default('OVERHEAD'),
   onboardingCompleted: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -89,8 +93,6 @@ const RegisterRequestSchema = z.object({
   companyName: z.string().min(1),
   companyEmail: z.string().email(),
   companyCode: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
-  industry: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
-  timezone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
 
   // User details (becomes company owner/admin)
   firstName: z.string().min(1),
@@ -992,6 +994,9 @@ export const contract = c.router({
         branchId: UUIDSchema.optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        isRecurring: z.string().optional(),
+        category: z.string().optional(),
+        type: z.string().optional(),
       }),
       responses: {
         200: z.array(ExpenseSchema),
@@ -1014,6 +1019,65 @@ export const contract = c.router({
       responses: {
         200: ExpenseSchema,
         404: z.object({ message: z.string() }),
+      },
+    },
+    payRecurring: {
+      method: 'POST',
+      path: '/api/expenses/:id/pay',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ date: z.string().optional() }),
+      responses: {
+        201: ExpenseSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    paySalaries: {
+      method: 'POST',
+      path: '/api/expenses/pay-salaries',
+      body: z.object({ date: z.string().optional(), branchId: UUIDSchema.optional() }),
+      responses: {
+        201: z.object({
+          created: z.number(),
+          skipped: z.number(),
+          skippedNames: z.array(z.string()),
+          expenses: z.array(z.any()),
+          message: z.string(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    payEmployeeSalary: {
+      method: 'POST',
+      path: '/api/expenses/pay-employee/:employeeId',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      body: z.object({ date: z.string().optional() }),
+      responses: {
+        201: ExpenseSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getDue: {
+      method: 'GET',
+      path: '/api/expenses/due',
+      query: z.object({ month: z.string().optional() }),
+      responses: {
+        200: z.object({
+          items: z.array(z.object({
+            id: z.string(),
+            type: z.enum(['recurring', 'salary']),
+            label: z.string(),
+            amount: z.number(),
+            category: z.string(),
+            branchId: z.string().nullable(),
+            branchName: z.string().nullable(),
+            templateId: z.string().nullable(),
+            employeeId: z.string().nullable(),
+          })),
+          totalDue: z.number(),
+          month: z.string(),
+        }),
       },
     },
   },
@@ -1039,6 +1103,38 @@ export const contract = c.router({
             endDate: z.string(),
           }),
         }),
+      },
+    },
+  },
+
+  // Companies routes
+  companies: {
+    getSettings: {
+      method: 'GET' as const,
+      path: '/api/companies/settings',
+      responses: {
+        200: z.object({
+          id: UUIDSchema,
+          name: z.string(),
+          globalExpenseAllocation: GlobalExpenseAllocationSchema,
+        }),
+        401: z.object({ message: z.string() }),
+      },
+    },
+    updateSettings: {
+      method: 'PATCH' as const,
+      path: '/api/companies/settings',
+      body: z.object({
+        globalExpenseAllocation: GlobalExpenseAllocationSchema.optional(),
+      }),
+      responses: {
+        200: z.object({
+          id: UUIDSchema,
+          name: z.string(),
+          globalExpenseAllocation: GlobalExpenseAllocationSchema,
+        }),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
       },
     },
   },

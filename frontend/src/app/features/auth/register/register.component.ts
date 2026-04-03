@@ -24,34 +24,12 @@ export class RegisterComponent {
   registerForm: FormGroup;
   loading = signal(false);
 
-  industries = [
-    'Education & Training',
-    'Technology',
-    'Healthcare',
-    'Retail',
-    'Manufacturing',
-    'Finance',
-    'Consulting',
-    'Other'
-  ];
-
-  timezones = [
-    'Africa/Cairo',
-    'Europe/London',
-    'America/New_York',
-    'America/Los_Angeles',
-    'Asia/Dubai',
-    'Asia/Riyadh'
-  ];
-
   constructor() {
     this.registerForm = this.fb.group({
       // Company Information
       companyName: ['', [Validators.required, Validators.minLength(2)]],
       companyEmail: ['', [Validators.required, Validators.email]],
       companyCode: [''],
-      industry: [''],
-      timezone: ['Africa/Cairo'],
 
       // User Information (Company Owner)
       firstName: ['', [Validators.required]],
@@ -111,8 +89,6 @@ export class RegisterComponent {
   get companyName() { return this.registerForm.get('companyName'); }
   get companyEmail() { return this.registerForm.get('companyEmail'); }
   get companyCode() { return this.registerForm.get('companyCode'); }
-  get industry() { return this.registerForm.get('industry'); }
-  get timezone() { return this.registerForm.get('timezone'); }
   get firstName() { return this.registerForm.get('firstName'); }
   get lastName() { return this.registerForm.get('lastName'); }
   get email() { return this.registerForm.get('email'); }
