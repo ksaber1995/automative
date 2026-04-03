@@ -60,9 +60,9 @@ You are building vertical SaaS for education centers (tutoring academies, traini
 
 | Year | Egypt Clients | Saudi Clients | Revenue (EGP) |
 |------|--------------|---------------|---------------|
-| Year 1 | 30–50 | 5–10 | ~600K–1.2M EGP |
-| Year 2 | 100–150 | 25–40 | ~2.5M–4M EGP |
-| Year 3 | 300+ | 80–120 | ~8M–15M EGP |
+| Year 1 | 30–50 | 5–10 | ~1.2M–2.4M EGP |
+| Year 2 | 100–150 | 25–40 | ~5M–8M EGP |
+| Year 3 | 300+ | 80–120 | ~16M–30M EGP |
 
 ---
 
@@ -86,11 +86,11 @@ You are building vertical SaaS for education centers (tutoring academies, traini
 
 | Tier | Monthly Billing | Annual Billing | Target |
 |------|----------------|----------------|--------|
-| **Starter** | ~~961 EGP/mo~~ | **769 EGP/mo** ✅ Save 25% | 1 branch, up to 200 students |
-| **Growth** | ~~1,919 EGP/mo~~ | **1,535 EGP/mo** ✅ Save 25% | Up to 3 branches, 500 students, product sales |
-| **Pro** | ~~3,199 EGP/mo~~ | **2,559 EGP/mo** ✅ Save 25% | Unlimited branches, full analytics, API access |
+| **Starter** | ~~1,922 EGP/mo~~ | **1,538 EGP/mo** ✅ Save 25% | 1 branch, up to 200 students |
+| **Growth** | ~~3,838 EGP/mo~~ | **3,070 EGP/mo** ✅ Save 25% | Up to 3 branches, 500 students, product sales |
+| **Pro** | ~~6,398 EGP/mo~~ | **5,118 EGP/mo** ✅ Save 25% | Unlimited branches, full analytics, API access |
 
-> Annual billed upfront: Starter 9,228 EGP/yr · Growth 18,420 EGP/yr · Pro 30,708 EGP/yr
+> Annual billed upfront: Starter 18,456 EGP/yr · Growth 36,840 EGP/yr · Pro 61,416 EGP/yr
 
 > **Why this pricing?** A tutor center making 30K–100K EGP/month will not blink at paying annual for a 25% discount. Monthly keeps it accessible for those who want to try first.
 
@@ -98,11 +98,11 @@ You are building vertical SaaS for education centers (tutoring academies, traini
 
 | Tier | Monthly Billing | Annual Billing | Target |
 |------|----------------|----------------|--------|
-| **Starter** | ~~269 SAR/mo~~ | **215 SAR/mo** ✅ Save 25% | 1 branch |
-| **Growth** | ~~539 SAR/mo~~ | **431 SAR/mo** ✅ Save 25% | Up to 3 branches |
-| **Pro** | ~~899 SAR/mo~~ | **719 SAR/mo** ✅ Save 25% | Unlimited branches + priority support |
+| **Starter** | ~~538 SAR/mo~~ | **430 SAR/mo** ✅ Save 25% | 1 branch |
+| **Growth** | ~~1,078 SAR/mo~~ | **862 SAR/mo** ✅ Save 25% | Up to 3 branches |
+| **Pro** | ~~1,798 SAR/mo~~ | **1,438 SAR/mo** ✅ Save 25% | Unlimited branches + priority support |
 
-> Annual billed upfront: Starter 2,580 SAR/yr · Growth 5,172 SAR/yr · Pro 8,628 SAR/yr
+> Annual billed upfront: Starter 5,160 SAR/yr · Growth 10,344 SAR/yr · Pro 17,256 SAR/yr
 
 > Saudi SMBs are less price-sensitive. Annual billing is common in the Saudi B2B market — push it as the default option.
 
@@ -164,7 +164,7 @@ Second priority: **installment tracking.** In Egypt, the vast majority of educat
 | Question | Answer |
 |----------|--------|
 | Good business? | **Yes** — vertical SaaS in an underserved market with real recurring pain |
-| Profitable? | **Yes** — at 100 clients × 1,288 EGP avg = 128K EGP/month with near-zero marginal cost |
+| Profitable? | **Yes** — at 100 clients × 2,576 EGP avg = 257K EGP/month with near-zero marginal cost |
 | Can you get clients? | **Yes** — strong community channels exist; word of mouth in this niche is powerful |
 | Solves real pain? | **Yes** — financial visibility and multi-branch management are genuine daily problems |
 | Biggest threat? | Slow onboarding and missing Arabic support limiting reach |
