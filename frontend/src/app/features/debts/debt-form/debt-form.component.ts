@@ -12,6 +12,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { DebtService, CreateDebtDto } from '../../../core/services/debt.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfaces/debt.interface';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-debt-form',
@@ -269,6 +270,7 @@ export class DebtFormComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private notificationService = inject(NotificationService);
 
   debtForm!: FormGroup;
   isEditMode = signal(false);
@@ -370,7 +372,7 @@ export class DebtFormComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading debt:', err);
-        alert('Failed to load debt');
+        this.notificationService.error('Failed to load debt');
         this.cancel();
       }
     });
@@ -414,7 +416,7 @@ export class DebtFormComponent implements OnInit {
       error: (err) => {
         this.submitting.set(false);
         console.error('Error saving debt:', err);
-        alert('Failed to save debt: ' + (err.error?.message || 'Unknown error'));
+        this.notificationService.error(err.error?.message || 'Failed to save debt');
       }
     });
   }

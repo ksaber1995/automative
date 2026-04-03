@@ -33,7 +33,7 @@ const PaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CREDIT_CARD', 'CHE
 
 // Expense Types and Categories
 const ExpenseTypeSchema = z.enum(['FIXED', 'VARIABLE', 'SHARED', 'CAPITAL']);
-const ExpenseCategorySchema = z.enum(['SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'OTHER']);
+const ExpenseCategorySchema = z.enum(['SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER']);
 
 // Withdrawal Status
 const WithdrawalStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
@@ -517,6 +517,8 @@ const CreateProductSchema = z.object({
   unit: z.string(),
   isGlobal: z.boolean(),
   branchId: OptionalUUIDSchema,
+  recordStockExpense: z.boolean().optional(),
+  purchaseDate: z.string().optional(),
 });
 
 const UpdateProductSchema = z.object({

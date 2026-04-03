@@ -8,6 +8,8 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
 import { ProductService } from '../services/product.service';
 import { ProductSaleService } from '../services/product-sale.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { Product } from '@shared/interfaces/product.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
@@ -179,6 +181,8 @@ export class ProductSaleComponent implements OnInit {
   private fb = inject(FormBuilder);
   private productService = inject(ProductService);
   private productSaleService = inject(ProductSaleService);
+  private authService = inject(AuthService);
+  private notificationService = inject(NotificationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -186,33 +190,29 @@ export class ProductSaleComponent implements OnInit {
   products = signal<Product[]>([]);
   submitting = signal(false);
 
+  // Reactive signals synced from form values
+  selectedProductId = signal<string>('');
+  quantityValue = signal<number>(1);
+  discountTypeValue = signal<string>(DiscountType.NONE);
+  discountValueNum = signal<number>(0);
+
   // Expose enums to template
   DiscountType = DiscountType;
   PaymentMethod = PaymentMethod;
 
-  // Computed signals for real-time calculations
-  selectedProduct = computed(() => {
-    const productId = this.saleForm?.get('productId')?.value;
-    return this.products().find((p) => p.id === productId);
-  });
+  // Computed signals that now properly react to form changes via signals
+  selectedProduct = computed(() => this.products().find((p) => p.id === this.selectedProductId()));
 
   unitPrice = computed(() => this.selectedProduct()?.sellingPrice || 0);
 
-  subtotal = computed(() => {
-    const qty = this.saleForm?.get('quantity')?.value || 0;
-    return this.unitPrice() * qty;
-  });
+  subtotal = computed(() => this.unitPrice() * (this.quantityValue() || 0));
 
   discountAmount = computed(() => {
-    const type = this.saleForm?.get('discountType')?.value;
-    const value = this.saleForm?.get('discountValue')?.value || 0;
+    const type = this.discountTypeValue();
+    const value = this.discountValueNum() || 0;
     const sub = this.subtotal();
-
-    if (type === DiscountType.PERCENTAGE) {
-      return (sub * value) / 100;
-    } else if (type === DiscountType.FIXED_AMOUNT) {
-      return value;
-    }
+    if (type === DiscountType.PERCENTAGE) return (sub * value) / 100;
+    if (type === DiscountType.FIXED_AMOUNT) return value;
     return 0;
   });
 
@@ -220,7 +220,7 @@ export class ProductSaleComponent implements OnInit {
 
   stockAvailable = computed(() => {
     const product = this.selectedProduct();
-    const qty = this.saleForm?.get('quantity')?.value || 0;
+    const qty = this.quantityValue() || 0;
     return product ? product.stock >= qty : false;
   });
 
@@ -228,18 +228,30 @@ export class ProductSaleComponent implements OnInit {
     this.initForm();
     this.loadProducts();
 
-    // Check for pre-selected product from query params
+    // Sync form values into signals so computed() reacts to changes
+    this.saleForm.get('productId')!.valueChanges.subscribe(v => this.selectedProductId.set(v || ''));
+    this.saleForm.get('quantity')!.valueChanges.subscribe(v => this.quantityValue.set(v || 1));
+    this.saleForm.get('discountType')!.valueChanges.subscribe(v => this.discountTypeValue.set(v));
+    this.saleForm.get('discountValue')!.valueChanges.subscribe(v => this.discountValueNum.set(v || 0));
+
+    // Pre-select product from query params
     this.route.queryParams.subscribe((params) => {
       if (params['productId']) {
         this.saleForm.patchValue({ productId: params['productId'] });
+        this.selectedProductId.set(params['productId']);
       }
     });
 
+    // Patch branchId from authenticated user context
+    const user = this.authService.currentUser();
+    if (user?.branchId) {
+      this.saleForm.patchValue({ branchId: user.branchId });
+    }
+
     // Watch discount type changes
     this.saleForm.get('discountType')?.valueChanges.subscribe((type) => {
-      const discountValueControl = this.saleForm.get('discountValue');
       if (type === DiscountType.NONE) {
-        discountValueControl?.setValue(0);
+        this.saleForm.get('discountValue')?.setValue(0);
       }
     });
   }
@@ -247,7 +259,7 @@ export class ProductSaleComponent implements OnInit {
   initForm() {
     const today = new Date().toISOString().split('T')[0];
     this.saleForm = this.fb.group({
-      branchId: ['', Validators.required], // TODO: Get from auth or select
+      branchId: [''],
       productId: ['', Validators.required],
       quantity: [1, [Validators.required, Validators.min(1)]],
       discountType: [DiscountType.NONE, Validators.required],
@@ -262,8 +274,7 @@ export class ProductSaleComponent implements OnInit {
   }
 
   loadProducts() {
-    // TODO: Filter by branch if needed
-    this.productService.getAllProducts({ isActive: true }).subscribe({
+    this.productService.getAllProducts().subscribe({
       next: (data) => {
         this.products.set(data.filter((p) => p.stock > 0));
       },
@@ -287,13 +298,13 @@ export class ProductSaleComponent implements OnInit {
     this.productSaleService.createSale(formValue).subscribe({
       next: (sale: any) => {
         this.submitting.set(false);
-        alert(`Sale completed successfully!\\n\\nSale ID: ${sale.id}\\nRevenue ID: ${sale.revenueId}\\nTotal Amount: ${sale.totalAmount.toFixed(2)}\\n\\nRevenue has been automatically created.`);
+        this.notificationService.success(`Sale completed! Total: ${sale.totalAmount.toFixed(2)}`);
         this.router.navigate(['/products/sales']);
       },
       error: (err) => {
         this.submitting.set(false);
         console.error('Error creating sale:', err);
-        alert('Failed to complete sale: ' + (err.error?.message || 'Unknown error'));
+        this.notificationService.error(err.error?.message || 'Failed to complete sale');
       },
     });
   }

@@ -11,6 +11,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { WithdrawalService, CreateWithdrawalDto } from '../../../core/services/withdrawal.service';
 import { WithdrawalCategory, PaymentMethod, WithdrawalStakeholder } from '@shared/interfaces/withdrawal.interface';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-withdrawal-form',
@@ -271,6 +272,7 @@ export class WithdrawalFormComponent implements OnInit {
   private withdrawalService = inject(WithdrawalService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private notificationService = inject(NotificationService);
 
   withdrawalForm!: FormGroup;
   isEditMode = signal(false);
@@ -369,7 +371,7 @@ export class WithdrawalFormComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading withdrawal:', err);
-        alert('Failed to load withdrawal');
+        this.notificationService.error('Failed to load withdrawal');
         this.cancel();
       }
     });
@@ -413,7 +415,7 @@ export class WithdrawalFormComponent implements OnInit {
       error: (err) => {
         this.submitting.set(false);
         console.error('Error saving withdrawal:', err);
-        alert('Failed to save withdrawal: ' + (err.error?.message || 'Unknown error'));
+        this.notificationService.error(err.error?.message || 'Failed to save withdrawal');
       }
     });
   }

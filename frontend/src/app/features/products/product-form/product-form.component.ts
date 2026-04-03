@@ -9,8 +9,10 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { CheckboxModule } from 'primeng/checkbox';
 import { ButtonModule } from 'primeng/button';
+import { DatePickerModule } from 'primeng/datepicker';
 import { ProductService } from '../services/product.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { ProductCategory } from '@shared/enums/product.enum';
 
 @Component({
@@ -26,6 +28,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
     SelectModule,
     CheckboxModule,
     ButtonModule,
+    DatePickerModule,
   ],
   template: `
     <div class="container mx-auto p-4 max-w-4xl">
@@ -162,6 +165,43 @@ import { ProductCategory } from '@shared/enums/product.enum';
             }
           </div>
 
+          @if (!isEditMode()) {
+            <div class="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg mt-2">
+              <div class="flex items-center gap-2 mb-3">
+                <p-checkbox
+                  inputId="recordStockExpense"
+                  formControlName="recordStockExpense"
+                  [binary]="true">
+                </p-checkbox>
+                <label for="recordStockExpense" class="font-semibold text-blue-800">Record initial stock purchase as an expense</label>
+              </div>
+              @if (productForm.get('recordStockExpense')?.value) {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <label class="block text-sm font-medium mb-2">Purchase Date <span class="text-red-500">*</span></label>
+                    <p-datepicker
+                      formControlName="purchaseDate"
+                      dateFormat="yy-mm-dd"
+                      [showIcon]="true"
+                      class="w-full">
+                    </p-datepicker>
+                  </div>
+                  <div class="flex items-end pb-1">
+                    @if (productForm.get('costPrice')?.value && productForm.get('stock')?.value) {
+                      <div class="text-blue-700 font-medium">
+                        Total expense: {{ (productForm.get('costPrice')!.value * productForm.get('stock')!.value) | number:'1.2-2' }} EGP
+                      </div>
+                    }
+                  </div>
+                </div>
+                <small class="text-blue-600 block mt-2">This will create an INVENTORY expense entry for the cost of buying this stock.</small>
+              }
+              @if (!productForm.get('recordStockExpense')?.value) {
+                <small class="text-gray-500">Leave unchecked if you are registering existing stock already accounted for.</small>
+              }
+            </div>
+          }
+
           <div class="flex gap-3 mt-6">
             <p-button type="submit" label="{{ isEditMode() ? 'Update' : 'Create' }} Product" icon="pi pi-check" [disabled]="productForm.invalid || submitting()"></p-button>
             <p-button type="button" label="Cancel" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
@@ -187,6 +227,7 @@ export class ProductFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private productService = inject(ProductService);
   private branchService = inject(BranchService);
+  private notificationService = inject(NotificationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -252,6 +293,8 @@ export class ProductFormComponent implements OnInit {
       unit: ['', Validators.required],
       isGlobal: [false],
       branchId: ['', Validators.required],
+      recordStockExpense: [true],
+      purchaseDate: [new Date()],
     });
   }
 
@@ -286,7 +329,7 @@ export class ProductFormComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading product:', err);
-        alert('Failed to load product');
+        this.notificationService.error('Failed to load product');
         this.cancel();
       },
     });
@@ -303,9 +346,16 @@ export class ProductFormComponent implements OnInit {
     this.submitting.set(true);
     const formValue = this.productForm.value;
 
+    const productData = {
+      ...formValue,
+      purchaseDate: formValue.purchaseDate instanceof Date
+        ? formValue.purchaseDate.toISOString().split('T')[0]
+        : formValue.purchaseDate,
+    };
+
     const request = this.isEditMode()
-      ? this.productService.updateProduct(this.productId()!, formValue)
-      : this.productService.createProduct(formValue);
+      ? this.productService.updateProduct(this.productId()!, productData)
+      : this.productService.createProduct(productData);
 
     request.subscribe({
       next: () => {
@@ -315,7 +365,7 @@ export class ProductFormComponent implements OnInit {
       error: (err) => {
         this.submitting.set(false);
         console.error('Error saving product:', err);
-        alert('Failed to save product: ' + (err.error?.message || 'Unknown error'));
+        this.notificationService.error(err.error?.message || 'Failed to save product');
       },
     });
   }

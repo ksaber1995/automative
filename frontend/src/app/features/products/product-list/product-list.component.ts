@@ -7,6 +7,8 @@ import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../services/product.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
 import { ProductCategory } from '@shared/enums/product.enum';
 
@@ -20,6 +22,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
     CardModule,
     TagModule,
     FormsModule,
+    DeleteConfirmDialogComponent,
   ],
   template: `
     <div class="container mx-auto p-4">
@@ -147,7 +150,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
                     [text]="true"
                     severity="danger"
                     pTooltip="Delete"
-                    (onClick)="deleteProduct(product.id)">
+                    (onClick)="confirmDelete(product)">
                   </p-button>
                   <p-button
                     icon="pi pi-box"
@@ -172,16 +175,28 @@ import { ProductCategory } from '@shared/enums/product.enum';
         </p-table>
       </p-card>
     </div>
+
+    <app-delete-confirm-dialog
+      [visible]="showDeleteDialog"
+      (visibleChange)="showDeleteDialog = $event"
+      header="Delete Product"
+      [message]="'Are you sure you want to delete ' + (productToDelete()?.name || 'this product') + '? It will be deactivated and hidden from lists. Historical sales data will be preserved.'"
+      (confirm)="deleteProduct()"
+      (cancel)="showDeleteDialog = false">
+    </app-delete-confirm-dialog>
   `,
 })
 export class ProductListComponent implements OnInit {
   private productService = inject(ProductService);
+  private notificationService = inject(NotificationService);
   private router = inject(Router);
 
   products = signal<Product[]>([]);
   loading = signal(false);
   selectedCategory = '';
   selectedType = '';
+  showDeleteDialog = false;
+  productToDelete = signal<Product | null>(null);
 
   categories = [
     { value: ProductCategory.STATIONERY, label: 'Stationery' },
@@ -243,25 +258,27 @@ export class ProductListComponent implements OnInit {
     });
   }
 
-  deleteProduct(id: string) {
-    if (
-      confirm(
-        'Are you sure you want to delete this product? This action cannot be undone.',
-      )
-    ) {
-      this.productService.deleteProduct(id).subscribe({
-        next: () => {
-          this.loadProducts();
-        },
-        error: (err) => {
-          console.error('Error deleting product:', err);
-          alert(
-            'Failed to delete product: ' +
-              (err.error?.message || 'Unknown error'),
-          );
-        },
-      });
-    }
+  confirmDelete(product: Product) {
+    this.productToDelete.set(product);
+    this.showDeleteDialog = true;
+  }
+
+  deleteProduct() {
+    const product = this.productToDelete();
+    if (!product) return;
+
+    this.productService.deleteProduct(product.id).subscribe({
+      next: () => {
+        this.notificationService.success('Product deleted successfully');
+        this.loadProducts();
+        this.showDeleteDialog = false;
+        this.productToDelete.set(null);
+      },
+      error: () => {
+        this.notificationService.error('Failed to delete product');
+        this.showDeleteDialog = false;
+      },
+    });
   }
 
   adjustStock(product: Product) {
@@ -271,7 +288,7 @@ export class ProductListComponent implements OnInit {
     if (quantityStr) {
       const quantity = parseInt(quantityStr, 10);
       if (isNaN(quantity)) {
-        alert('Invalid quantity');
+        this.notificationService.error('Invalid quantity');
         return;
       }
 
@@ -286,10 +303,7 @@ export class ProductListComponent implements OnInit {
           },
           error: (err) => {
             console.error('Error adjusting stock:', err);
-            alert(
-              'Failed to adjust stock: ' +
-                (err.error?.message || 'Unknown error'),
-            );
+            this.notificationService.error(err.error?.message || 'Failed to adjust stock');
           },
         });
     }

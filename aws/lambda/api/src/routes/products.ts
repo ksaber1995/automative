@@ -1,4 +1,4 @@
-import { insert, update, findById, query, queryOne } from '../db/connection';
+import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
 import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
 
 function mapProductFromDB(row: any) {
@@ -24,42 +24,69 @@ function mapProductFromDB(row: any) {
 
 export const productsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    const client = await getClient();
     try {
       const context = await extractTenantContext(headers.authorization);
 
       if (body.branchId && !body.isGlobal && !canAccessBranch(context, body.branchId)) {
+        client.release();
         return {
           status: 403 as const,
           body: { message: 'Access denied to this branch' },
         };
       }
 
-      const product = await insert('products', {
-        company_id: context.companyId,
-        name: body.name,
-        code: body.code,
-        description: body.description,
-        category: body.category,
-        cost_price: body.costPrice,
-        selling_price: body.sellingPrice,
-        stock: body.stock,
-        min_stock: body.minStock,
-        unit: body.unit,
-        is_global: body.isGlobal,
-        branch_id: body.isGlobal ? null : body.branchId,
-        is_active: true,
-      });
+      await client.query('BEGIN');
+
+      const productResult = await client.query(
+        `INSERT INTO products (company_id, name, code, description, category, cost_price, selling_price, stock, min_stock, unit, is_global, branch_id, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true) RETURNING *`,
+        [
+          context.companyId, body.name, body.code, body.description, body.category,
+          body.costPrice, body.sellingPrice, body.stock, body.minStock, body.unit,
+          body.isGlobal, body.isGlobal ? null : body.branchId,
+        ]
+      );
+      const product = productResult.rows[0];
+
+      if (body.recordStockExpense && body.stock > 0) {
+        const totalCost = parseFloat(body.costPrice) * body.stock;
+        const purchaseDate = body.purchaseDate || new Date().toISOString().split('T')[0];
+        await client.query(
+          `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_id)
+           VALUES ($1,$2,'VARIABLE','INVENTORY',$3,$4,$5,$6)`,
+          [
+            context.companyId,
+            body.isGlobal ? null : body.branchId,
+            totalCost,
+            `Stock purchase: ${body.name} × ${body.stock} units @ ${body.costPrice}`,
+            purchaseDate,
+            product.id,
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
 
       return {
         status: 201 as const,
         body: mapProductFromDB(product),
       };
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Create product error:', error);
+      if (error?.code === '23505') {
+        return {
+          status: 400 as const,
+          body: { message: 'A product with this code already exists in this branch.' },
+        };
+      }
       return {
         status: error.message === 'No authentication token provided' ? 401 : 400,
         body: { message: error.message || 'Failed to create product' },
       };
+    } finally {
+      client.release();
     }
   },
 

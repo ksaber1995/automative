@@ -9,6 +9,7 @@ import { ButtonModule } from 'primeng/button';
 import { DebtService, CreatePaymentDto } from '../../../core/services/debt.service';
 import { Debt } from '@shared/interfaces/debt.interface';
 import { PaymentMethod } from '@shared/interfaces/withdrawal.interface';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-debt-payment',
@@ -174,6 +175,7 @@ export class DebtPaymentComponent implements OnInit {
   private debtService = inject(DebtService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private notificationService = inject(NotificationService);
 
   paymentForm!: FormGroup;
   debt = signal<Debt | null>(null);
@@ -215,7 +217,7 @@ export class DebtPaymentComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading debt:', err);
-        alert('Failed to load debt');
+        this.notificationService.error('Failed to load debt');
         this.cancel();
       }
     });
@@ -233,7 +235,7 @@ export class DebtPaymentComponent implements OnInit {
 
     // Validate payment amount doesn't exceed balance
     if (formValue.totalAmount > this.debt()!.currentBalance) {
-      alert('Payment amount cannot exceed current balance');
+      this.notificationService.error('Payment amount cannot exceed current balance');
       return;
     }
 
@@ -251,13 +253,13 @@ export class DebtPaymentComponent implements OnInit {
     this.debtService.createPayment(this.debt()!.id, paymentDto).subscribe({
       next: () => {
         this.submitting.set(false);
-        alert('Payment submitted successfully');
+        this.notificationService.success('Payment submitted successfully');
         this.router.navigate(['/debts', this.debt()!.id]);
       },
       error: (err) => {
         this.submitting.set(false);
         console.error('Error submitting payment:', err);
-        alert('Failed to submit payment: ' + (err.error?.message || 'Unknown error'));
+        this.notificationService.error(err.error?.message || 'Failed to submit payment');
       }
     });
   }

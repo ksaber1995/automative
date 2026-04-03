@@ -8,6 +8,7 @@ import { TagModule } from 'primeng/tag';
 import { FormsModule } from '@angular/forms';
 import { WithdrawalService } from '../../../core/services/withdrawal.service';
 import { Withdrawal } from '@shared/interfaces/withdrawal.interface';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-withdrawal-list',
@@ -174,6 +175,7 @@ import { Withdrawal } from '@shared/interfaces/withdrawal.interface';
 export class WithdrawalListComponent implements OnInit {
   private withdrawalService = inject(WithdrawalService);
   private router = inject(Router);
+  private notificationService = inject(NotificationService);
 
   withdrawals = signal<Withdrawal[]>([]);
   summary = signal<any>(null);
@@ -250,7 +252,7 @@ export class WithdrawalListComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error deleting withdrawal:', err);
-          alert('Failed to delete withdrawal: ' + (err.error?.message || 'Unknown error'));
+          this.notificationService.error(err.error?.message || 'Failed to delete withdrawal');
         }
       });
     }
