@@ -259,17 +259,29 @@ export const authRoutes = {
     } catch (error: any) {
       await client.query('ROLLBACK');
       console.error('Registration error:', error);
-      console.error('Error details:', {
-        message: error?.message || 'Unknown error',
-        stack: error?.stack,
-        body: body
-      });
+
+      // Return specific messages for known DB constraint violations
+      if (error?.code === '23505') {
+        const constraint: string = error?.constraint || '';
+        const table: string = error?.table || '';
+        const detail: string = error?.detail || '';
+        let message = 'Registration failed due to a conflict.';
+        if (constraint === 'companies_code_key') {
+          message = 'Company code is already taken. Please choose a different code.';
+        } else if (table === 'companies' && detail.includes('email')) {
+          message = 'A company with this email already exists.';
+        } else if (table === 'users' || constraint.includes('users')) {
+          message = 'An account with this email already exists.';
+        }
+        return {
+          status: 400 as const,
+          body: { message },
+        };
+      }
+
       return {
         status: 400 as const,
-        body: {
-          message: 'Registration failed',
-          error: process.env.NODE_ENV === 'development' ? (error?.message || 'Unknown error') : undefined
-        },
+        body: { message: 'Registration failed. Please try again.' },
       };
     } finally {
       client.release();
