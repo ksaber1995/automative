@@ -10,7 +10,7 @@
   @if (!loading() && dashboardData(); as data) {
   <div>
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
       <p-card class="bg-gradient-to-br from-blue-50 to-blue-100">
         <div class="flex items-center justify-between">
           <div>
@@ -18,8 +18,22 @@
             <div class="text-2xl font-bold text-blue-600">
               {{ formatCurrency(data.companyWideSummary.totalRevenue) }}
             </div>
+            <div class="text-xs text-gray-500 mt-1">After refunds</div>
           </div>
           <i class="pi pi-dollar text-4xl text-blue-400"></i>
+        </div>
+      </p-card>
+
+      <p-card class="bg-gradient-to-br from-orange-50 to-orange-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Total Refunds</div>
+            <div class="text-2xl font-bold text-orange-600">
+              {{ formatCurrency(data.companyWideSummary.totalRefunds || 0) }}
+            </div>
+            <div class="text-xs text-gray-500 mt-1">Returned to clients</div>
+          </div>
+          <i class="pi pi-replay text-4xl text-orange-400"></i>
         </div>
       </p-card>
 
@@ -30,6 +44,7 @@
             <div class="text-2xl font-bold text-red-600">
               {{ formatCurrency(data.companyWideSummary.totalExpenses) }}
             </div>
+            <div class="text-xs text-gray-500 mt-1">Excl. refunds</div>
           </div>
           <i class="pi pi-chart-line text-4xl text-red-400"></i>
         </div>

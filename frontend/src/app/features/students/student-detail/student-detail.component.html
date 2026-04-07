@@ -16,7 +16,6 @@
       </ng-template>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Personal Information -->
         <div>
           <h3 class="text-lg font-semibold mb-3 text-gray-700">Personal Information</h3>
           <div class="space-y-2">
@@ -49,7 +48,6 @@
           </div>
         </div>
 
-        <!-- Parent/Guardian Information -->
         <div>
           <h3 class="text-lg font-semibold mb-3 text-gray-700">Parent/Guardian Information</h3>
           <div class="space-y-2">
@@ -92,73 +90,179 @@
         </div>
       </ng-template>
 
-      <p-table [value]="enrollments()" responsiveLayout="scroll">
+      <p-table [value]="enrollments()" responsiveLayout="scroll" [expandedRowKeys]="expandedRows" dataKey="id">
         <ng-template pTemplate="header">
           <tr>
+            <th style="width: 3rem"></th>
             <th>Course</th>
-            <th>Enrollment Date</th>
-            <th>Original Price</th>
-            <th>Discount</th>
-            <th>Final Price</th>
+            <th>Date</th>
+            <th>Pricing</th>
+            <th>Payment Mode</th>
+            <th>Paid / Total</th>
             <th>Status</th>
             <th>Payment</th>
             <th>Actions</th>
           </tr>
         </ng-template>
-        <ng-template pTemplate="body" let-enrollment>
+
+        <ng-template pTemplate="body" let-enrollment let-expanded="expanded">
           <tr>
             <td>
-              <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
-              <div class="text-sm text-gray-600">{{ getCourseCode(enrollment.courseId) }}</div>
+              <p-button
+                [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                [text]="true"
+                [rounded]="true"
+                severity="secondary"
+                (onClick)="toggleRow(enrollment)"
+              ></p-button>
             </td>
-            <td>{{ formatDate(enrollment.enrollmentDate) }}</td>
-            <td>{{ enrollment.originalPrice.toFixed(2) }}</td>
             <td>
-              @if (enrollment.discountAmount > 0) {
-                <span class="text-green-600">
-                  -{{ enrollment.discountAmount.toFixed(2) }}
-                  @if (enrollment.discountPercent > 0) {
-                    <span class="text-xs">({{ enrollment.discountPercent.toFixed(0) }}%)</span>
-                  }
-                </span>
+              <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
+              <div class="text-sm text-gray-500">{{ getCourseCode(enrollment.courseId) }}</div>
+            </td>
+            <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
+            <td>
+              <div class="text-sm">
+                <span class="text-gray-500">{{ enrollment.originalPrice.toFixed(2) }}</span>
+                @if (enrollment.discountAmount > 0) {
+                  <span class="text-orange-500 ml-1">-{{ enrollment.discountAmount.toFixed(2) }}</span>
+                }
+                <span class="font-semibold text-green-600 ml-1">= {{ enrollment.finalPrice.toFixed(2) }}</span>
+              </div>
+            </td>
+            <td>
+              @if (enrollment.paymentMode === 'INSTALLMENTS') {
+                <p-tag value="Installments" severity="info"></p-tag>
               } @else {
-                <span class="text-gray-400">None</span>
+                <p-tag value="Full" severity="success"></p-tag>
               }
             </td>
-            <td class="font-semibold text-green-600">{{ enrollment.finalPrice.toFixed(2) }}</td>
+            <td>
+              <div class="text-sm">
+                <span class="font-semibold text-green-600">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
+                <span class="text-gray-400"> / {{ enrollment.finalPrice.toFixed(2) }}</span>
+              </div>
+              @if (enrollment.finalPrice > 0) {
+                <p-progressbar
+                  [value]="((enrollment.amountPaid || 0) / enrollment.finalPrice) * 100"
+                  [showValue]="false"
+                  [style]="{ height: '4px' }"
+                ></p-progressbar>
+              }
+            </td>
             <td>
               <p-tag [value]="enrollment.status" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
             <td>
-              <p-tag [value]="enrollment.paymentStatus" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+              <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
             </td>
             <td>
-              <div class="flex gap-2">
+              <div class="flex gap-1">
+                <!-- Pay installment button -->
+                @if (enrollment.paymentMode === 'INSTALLMENTS' && enrollment.paymentStatus !== 'PAID' && enrollment.paymentStatus !== 'REFUNDED') {
+                  <p-button
+                    icon="pi pi-wallet"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="success"
+                    (onClick)="openPaymentDialog(enrollment)"
+                    pTooltip="Add Payment"
+                  ></p-button>
+                }
+                <!-- Refund button -->
+                @if (enrollment.paymentStatus === 'PAID' || enrollment.paymentStatus === 'PARTIAL') {
+                  <p-button
+                    icon="pi pi-replay"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="warn"
+                    (onClick)="openRefundDialog(enrollment)"
+                    pTooltip="Refund"
+                  ></p-button>
+                }
                 <p-button
                   icon="pi pi-pencil"
                   [rounded]="true"
                   [text]="true"
-                  severity="warn"
+                  severity="secondary"
                   (onClick)="editEnrollment(enrollment)"
                   pTooltip="Edit"
                 ></p-button>
-                @if (enrollment.status !== 'DROPPED') {
-                  <p-button
-                    icon="pi pi-trash"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="danger"
-                    (onClick)="confirmDeleteEnrollment(enrollment)"
-                    pTooltip="Delete"
-                  ></p-button>
-                }
               </div>
             </td>
           </tr>
         </ng-template>
+
+        <!-- Expanded row: payment history -->
+        <ng-template pTemplate="expansion" let-enrollment>
+          <tr>
+            <td colspan="9">
+              <div class="p-4 bg-gray-50">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <!-- Payment history -->
+                  <div>
+                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <i class="pi pi-credit-card text-green-600"></i> Payment History
+                    </h4>
+                    @if (getPaymentHistory(enrollment.id).length === 0) {
+                      <p class="text-gray-400 text-sm">No payments recorded</p>
+                    } @else {
+                      <div class="space-y-2">
+                        @for (payment of getPaymentHistory(enrollment.id); track payment.id) {
+                          <div class="flex items-center justify-between bg-white border border-green-100 rounded p-2">
+                            <div class="flex items-center gap-2">
+                              <i class="pi pi-check-circle text-green-500 text-sm"></i>
+                              <div>
+                                <span class="font-medium text-green-700">+{{ payment.amount.toFixed(2) }}</span>
+                                @if (payment.notes) {
+                                  <span class="text-xs text-gray-500 ml-2">{{ payment.notes }}</span>
+                                }
+                              </div>
+                            </div>
+                            <span class="text-xs text-gray-500">{{ formatDate(payment.paymentDate) }}</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <!-- Refund history -->
+                  <div>
+                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <i class="pi pi-replay text-orange-500"></i> Refund History
+                    </h4>
+                    @if (getRefundHistory(enrollment.id).length === 0) {
+                      <p class="text-gray-400 text-sm">No refunds issued</p>
+                    } @else {
+                      <div class="space-y-2">
+                        @for (refund of getRefundHistory(enrollment.id); track refund.id) {
+                          <div class="flex items-center justify-between bg-white border border-orange-100 rounded p-2">
+                            <div class="flex items-center gap-2">
+                              <i class="pi pi-minus-circle text-orange-500 text-sm"></i>
+                              <div>
+                                <span class="font-medium text-orange-700">-{{ refund.amount.toFixed(2) }}</span>
+                                <span class="text-xs ml-2">
+                                  <p-tag [value]="refund.type" severity="warn" styleClass="text-xs"></p-tag>
+                                </span>
+                                @if (refund.reason) {
+                                  <span class="text-xs text-gray-500 ml-2">{{ refund.reason }}</span>
+                                }
+                              </div>
+                            </div>
+                            <span class="text-xs text-gray-500">{{ formatDate(refund.refundDate) }}</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="8" class="text-center py-8">
+            <td colspan="9" class="text-center py-8">
               <div class="text-gray-500">
                 <i class="pi pi-inbox text-4xl mb-3"></i>
                 <p>No course enrollments found.</p>
@@ -169,16 +273,99 @@
         </ng-template>
       </p-table>
     </p-card>
-
-    <app-delete-confirm-dialog
-      [(visible)]="showDeleteDialog"
-      [header]="'Delete Enrollment'"
-      [message]="'Are you sure you want to delete this enrollment? The student will be removed from the course.'"
-      (confirm)="deleteEnrollment()"
-    ></app-delete-confirm-dialog>
   } @else if (loading()) {
     <div class="flex justify-center items-center h-64">
       <i class="pi pi-spin pi-spinner text-4xl"></i>
     </div>
   }
 </div>
+
+<!-- Add Payment Dialog -->
+<p-dialog
+  [(visible)]="showPaymentDialog"
+  [header]="'Add Payment — ' + getCourseName(enrollmentForAction()?.courseId || '')"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+>
+  @if (enrollmentForAction()) {
+    <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
+      <div><span class="text-gray-500">Final Price:</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">Paid:</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">Remaining:</span> <strong class="text-red-600">{{ (enrollmentForAction()!.finalPrice - (enrollmentForAction()!.amountPaid || 0)).toFixed(2) }}</strong></div>
+    </div>
+  }
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+      <p-inputnumber [(ngModel)]="dialogPaymentAmount" [min]="0.01" placeholder="Amount" [style]="{ width: '100%' }" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+      <p-datepicker [(ngModel)]="dialogPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Notes</label>
+      <textarea pTextarea [(ngModel)]="dialogPaymentNotes" rows="2" class="w-full" placeholder="Optional notes..."></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
+    <p-button label="Record Payment" icon="pi pi-check" [loading]="actionLoading()"
+      [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
+      (onClick)="submitPayment()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Refund Dialog -->
+<p-dialog
+  [(visible)]="showRefundDialog"
+  [header]="'Issue Refund — ' + getCourseName(enrollmentForAction()?.courseId || '')"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+>
+  @if (enrollmentForAction()) {
+    <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
+      <div><span class="text-gray-500">Final Price:</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">Amount Paid:</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
+    </div>
+  }
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">Refund Type <span class="text-red-500">*</span></label>
+      <div class="flex gap-6">
+        <div class="flex items-center gap-2">
+          <p-radiobutton name="refundType" value="FULL" [(ngModel)]="refundType" (onClick)="onRefundTypeChange()"></p-radiobutton>
+          <label>Full Refund ({{ (enrollmentForAction()?.amountPaid || 0).toFixed(2) }})</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <p-radiobutton name="refundType" value="PARTIAL" [(ngModel)]="refundType"></p-radiobutton>
+          <label>Partial Refund</label>
+        </div>
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+      <p-inputnumber
+        [(ngModel)]="refundAmount"
+        [min]="0.01"
+        [max]="enrollmentForAction()?.amountPaid || 0"
+        [readonly]="refundType === 'FULL'"
+        [style]="{ width: '100%' }"
+      />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Refund Date <span class="text-red-500">*</span></label>
+      <p-datepicker [(ngModel)]="refundDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Reason</label>
+      <textarea pTextarea [(ngModel)]="refundReason" rows="2" class="w-full" placeholder="Reason for refund..."></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
+    <p-button label="Issue Refund" icon="pi pi-replay" severity="warn" [loading]="actionLoading()"
+      [disabled]="!refundAmount || !refundDate"
+      (onClick)="submitRefund()"></p-button>
+  </ng-template>
+</p-dialog>

@@ -1,4 +1,4 @@
-import { EnrollmentStatus, PaymentStatus } from '../enums/enrollment-status.enum';
+import { EnrollmentStatus, PaymentMode, PaymentStatus } from '../enums/enrollment-status.enum';
 
 export interface Enrollment {
   id: string;
@@ -13,11 +13,49 @@ export interface Enrollment {
   discountPercent: number;
   discountAmount: number;
   finalPrice: number;
+  paymentMode: PaymentMode;
+  downPayment: number;
+  amountPaid: number;
   paymentStatus: PaymentStatus;
   completionDate: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EnrollmentPayment {
+  id: string;
+  enrollmentId: string;
+  companyId: string;
+  amount: number;
+  paymentDate: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface AddPaymentDto {
+  amount: number;
+  paymentDate: string;
+  notes?: string;
+}
+
+export interface Refund {
+  id: string;
+  enrollmentId: string;
+  companyId: string;
+  studentId: string;
+  amount: number;
+  refundDate: string;
+  type: 'FULL' | 'PARTIAL';
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface CreateRefundDto {
+  type: 'FULL' | 'PARTIAL';
+  amount: number;
+  refundDate: string;
+  reason?: string;
 }
 
 export interface EnrollmentWithDetails extends Enrollment {
@@ -38,7 +76,8 @@ export interface EnrollmentCreateDto {
   discountPercent?: number;
   discountAmount?: number;
   finalPrice: number;
-  paymentStatus: PaymentStatus;
+  paymentMode: PaymentMode;
+  downPayment?: number;
   notes?: string;
 }
 

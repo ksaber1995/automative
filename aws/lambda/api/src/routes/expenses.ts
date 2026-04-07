@@ -132,6 +132,82 @@ export const expensesRoutes = {
     }
   },
 
+  getDue: async ({ query: queryParams, headers }: { query: { month?: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const targetMonth = queryParams.month || new Date().toISOString().substring(0, 7);
+      const monthStart = targetMonth + '-01';
+      const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
+
+      // 1. Unpaid recurring expense templates for this month
+      const recurringTemplates = await query(
+        `SELECT e.*, b.name as branch_name
+         FROM expenses e
+         LEFT JOIN branches b ON e.branch_id = b.id
+         WHERE e.company_id = $1 AND e.is_recurring = true
+           AND NOT EXISTS (
+             SELECT 1 FROM expenses child
+             WHERE child.recurring_template_id = e.id
+               AND child.date >= $2 AND child.date <= $3
+           )`,
+        [context.companyId, monthStart, monthEnd]
+      );
+
+      // 2. Employees with unpaid salary for this month
+      const unpaidEmployees = await query(
+        `SELECT e.*, b.name as branch_name
+         FROM employees e
+         LEFT JOIN branches b ON e.branch_id = b.id
+         WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0
+           AND NOT EXISTS (
+             SELECT 1 FROM expenses ex
+             WHERE ex.employee_id = e.id AND ex.category = 'SALARIES'
+               AND ex.date >= $2 AND ex.date <= $3
+           )`,
+        [context.companyId, monthStart, monthEnd]
+      );
+
+      const items: any[] = [
+        ...recurringTemplates.map((t: any) => ({
+          id: t.id,
+          type: 'recurring',
+          label: t.description,
+          amount: parseFloat(t.amount),
+          category: t.category,
+          branchId: t.branch_id,
+          branchName: t.branch_name,
+          templateId: t.id,
+          employeeId: null,
+        })),
+        ...unpaidEmployees.map((e: any) => ({
+          id: e.id,
+          type: 'salary',
+          label: `Salary: ${e.first_name} ${e.last_name}`,
+          amount: parseFloat(e.salary),
+          category: 'SALARIES',
+          branchId: e.branch_id,
+          branchName: e.branch_name,
+          templateId: null,
+          employeeId: e.id,
+        })),
+      ];
+
+      const totalDue = items.reduce((sum, i) => sum + i.amount, 0);
+
+      return {
+        status: 200 as const,
+        body: { items, totalDue, month: targetMonth },
+      };
+    } catch (error) {
+      console.error('Get due expenses error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get due expenses' },
+      };
+    }
+  },
+
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -234,6 +310,31 @@ export const expensesRoutes = {
       return {
         status: error.message === 'No authentication token provided' ? 401 : 404,
         body: { message: error.message || 'Failed to update expense' },
+      };
+    }
+  },
+
+  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const existing = await queryOne(
+        'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return { status: 404 as const, body: { message: 'Expense not found' } };
+      }
+
+      await query('DELETE FROM expenses WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+
+      return { status: 200 as const, body: { message: 'Expense deleted successfully' } };
+    } catch (error) {
+      console.error('Delete expense error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to delete expense' },
       };
     }
   },
@@ -418,79 +519,4 @@ export const expensesRoutes = {
     }
   },
 
-  getDue: async ({ query: queryParams, headers }: { query: { month?: string }; headers: { authorization: string } }) => {
-    try {
-      const context = await extractTenantContext(headers.authorization);
-
-      const targetMonth = queryParams.month || new Date().toISOString().substring(0, 7);
-      const monthStart = targetMonth + '-01';
-      const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
-
-      // 1. Unpaid recurring expense templates for this month
-      const recurringTemplates = await query(
-        `SELECT e.*, b.name as branch_name
-         FROM expenses e
-         LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE e.company_id = $1 AND e.is_recurring = true
-           AND NOT EXISTS (
-             SELECT 1 FROM expenses child
-             WHERE child.recurring_template_id = e.id
-               AND child.date >= $2 AND child.date <= $3
-           )`,
-        [context.companyId, monthStart, monthEnd]
-      );
-
-      // 2. Employees with unpaid salary for this month
-      const unpaidEmployees = await query(
-        `SELECT e.*, b.name as branch_name
-         FROM employees e
-         LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0
-           AND NOT EXISTS (
-             SELECT 1 FROM expenses ex
-             WHERE ex.employee_id = e.id AND ex.category = 'SALARIES'
-               AND ex.date >= $2 AND ex.date <= $3
-           )`,
-        [context.companyId, monthStart, monthEnd]
-      );
-
-      const items: any[] = [
-        ...recurringTemplates.map((t: any) => ({
-          id: t.id,
-          type: 'recurring',
-          label: t.description,
-          amount: parseFloat(t.amount),
-          category: t.category,
-          branchId: t.branch_id,
-          branchName: t.branch_name,
-          templateId: t.id,
-          employeeId: null,
-        })),
-        ...unpaidEmployees.map((e: any) => ({
-          id: e.id,
-          type: 'salary',
-          label: `Salary: ${e.first_name} ${e.last_name}`,
-          amount: parseFloat(e.salary),
-          category: 'SALARIES',
-          branchId: e.branch_id,
-          branchName: e.branch_name,
-          templateId: null,
-          employeeId: e.id,
-        })),
-      ];
-
-      const totalDue = items.reduce((sum, i) => sum + i.amount, 0);
-
-      return {
-        status: 200 as const,
-        body: { items, totalDue, month: targetMonth },
-      };
-    } catch (error) {
-      console.error('Get due expenses error:', error);
-      return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
-        body: { message: error.message || 'Failed to get due expenses' },
-      };
-    }
-  },
 };

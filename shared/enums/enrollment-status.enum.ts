@@ -12,6 +12,11 @@ export enum PaymentStatus {
   OVERDUE = 'OVERDUE',
 }
 
+export enum PaymentMode {
+  FULL = 'FULL',
+  INSTALLMENTS = 'INSTALLMENTS',
+}
+
 export enum PaymentMethod {
   CASH = 'CASH',
   CREDIT_CARD = 'CREDIT_CARD',

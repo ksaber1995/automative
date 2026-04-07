@@ -33,7 +33,15 @@ export const analyticsRoutes = {
 
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue;
+
+      // Subtract refunds from revenue
+      const refundData = await query(
+        `SELECT COALESCE(SUM(amount), 0) as total_refunds FROM refunds
+         WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
+      const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
+      const totalRevenue = enrollmentRevenue + productRevenue - totalRefunds;
 
       // --- Company-wide expenses (is_recurring = false to exclude templates) ---
       const expenseData = await query(
@@ -163,20 +171,25 @@ export const analyticsRoutes = {
         `SELECT TO_CHAR(date, 'YYYY-MM') as month,
                 SUM(revenue) as revenue,
                 SUM(expenses) as expenses,
-                SUM(revenue) - SUM(expenses) as profit
+                SUM(refunds) as refunds,
+                SUM(revenue) - SUM(refunds) - SUM(expenses) as profit
          FROM (
-           SELECT enrollment_date as date, final_price as revenue, 0 as expenses
+           SELECT enrollment_date as date, final_price as revenue, 0 as expenses, 0 as refunds
            FROM enrollments
            WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
              AND enrollment_date >= $2 AND enrollment_date <= $3
            UNION ALL
-           SELECT sale_date as date, total_amount as revenue, 0 as expenses
+           SELECT sale_date as date, total_amount as revenue, 0 as expenses, 0 as refunds
            FROM product_sales
            WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
            UNION ALL
-           SELECT date, 0 as revenue, amount as expenses
+           SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expenses
            WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
+           UNION ALL
+           SELECT refund_date as date, 0 as revenue, 0 as expenses, amount as refunds
+           FROM refunds
+           WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3
          ) combined
          GROUP BY TO_CHAR(date, 'YYYY-MM')
          ORDER BY month`,
@@ -190,6 +203,7 @@ export const analyticsRoutes = {
             totalRevenue,
             enrollmentRevenue,
             productRevenue,
+            totalRefunds,
             grossProfit,
             fixedExpenses,
             variableExpenses,
@@ -211,6 +225,7 @@ export const analyticsRoutes = {
             month: m.month,
             revenue: parseFloat(m.revenue || '0'),
             expenses: parseFloat(m.expenses || '0'),
+            refunds: parseFloat(m.refunds || '0'),
             profit: parseFloat(m.profit || '0'),
           })),
           expensesByCategory: expenseData.map((e: any) => ({

@@ -12,12 +12,19 @@ build/
 
 # CDK
 cdk.out/
+cdk.out*/
 aws/cdk.out/
+aws/cdk.out*/
 aws/dist-deploy/
 aws/scripts/__pycache__/
+aws/cdk-outputs.json
 
 # Lambda build output
 aws/lambda/api/dist/
+
+# Shared compiled output (tsc artifacts — source of truth is .ts files)
+shared/**/*.js
+shared/**/*.d.ts
 
 # Environment files
 .env

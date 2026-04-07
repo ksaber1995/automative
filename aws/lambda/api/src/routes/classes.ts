@@ -309,6 +309,78 @@ export const classesRoutes = {
     }
   },
 
+  getEnrollments: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const cls = await queryOne(
+        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!cls) {
+        return { status: 404 as const, body: { message: 'Class not found' } };
+      }
+
+      if (!canAccessBranch(context, cls.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this class' } };
+      }
+
+      const enrollments = await query(
+        `SELECT
+          e.id as enrollment_id,
+          e.student_id,
+          s.first_name as student_first_name,
+          s.last_name as student_last_name,
+          e.enrollment_date,
+          e.status,
+          e.original_price,
+          e.discount_percent,
+          e.discount_amount,
+          e.final_price,
+          e.payment_mode,
+          e.down_payment,
+          e.amount_paid,
+          e.payment_status,
+          e.notes,
+          e.created_at
+        FROM enrollments e
+        JOIN students s ON e.student_id = s.id
+        WHERE e.class_id = $1 AND e.company_id = $2 AND e.status != 'DROPPED'
+        ORDER BY e.enrollment_date DESC`,
+        [params.id, context.companyId]
+      );
+
+      return {
+        status: 200 as const,
+        body: enrollments.map((row: any) => ({
+          enrollmentId: row.enrollment_id,
+          studentId: row.student_id,
+          studentFirstName: row.student_first_name,
+          studentLastName: row.student_last_name,
+          enrollmentDate: row.enrollment_date,
+          status: row.status,
+          originalPrice: parseFloat(row.original_price),
+          discountPercent: parseFloat(row.discount_percent || 0),
+          discountAmount: parseFloat(row.discount_amount || 0),
+          finalPrice: parseFloat(row.final_price),
+          paymentMode: row.payment_mode || 'FULL',
+          downPayment: parseFloat(row.down_payment || 0),
+          amountPaid: parseFloat(row.amount_paid || 0),
+          paymentStatus: row.payment_status,
+          notes: row.notes,
+          createdAt: row.created_at,
+        })),
+      };
+    } catch (error) {
+      console.error('Get class enrollments error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get class enrollments' },
+      };
+    }
+  },
+
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

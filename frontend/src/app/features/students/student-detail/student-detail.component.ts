@@ -1,31 +1,43 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { DatePickerModule } from 'primeng/datepicker';
+import { TextareaModule } from 'primeng/textarea';
+import { RadioButtonModule } from 'primeng/radiobutton';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Student } from '@shared/interfaces/student.interface';
-import { Enrollment } from '@shared/interfaces/enrollment.interface';
+import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
-import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-student-detail',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     CardModule,
     ButtonModule,
     TableModule,
     TagModule,
     TooltipModule,
-    DeleteConfirmDialogComponent
+    DialogModule,
+    InputNumberModule,
+    DatePickerModule,
+    TextareaModule,
+    RadioButtonModule,
+    ProgressBarModule,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss'
@@ -42,14 +54,33 @@ export class StudentDetailComponent implements OnInit {
   enrollments = signal<Enrollment[]>([]);
   courses = new Map<string, Course>();
   loading = signal(true);
-  showDeleteDialog = false;
-  enrollmentToDelete = signal<Enrollment | null>(null);
   studentId: string | null = null;
+
+  // Expandable rows
+  expandedRows: { [key: string]: boolean } = {};
+  paymentHistoryMap = signal<Map<string, EnrollmentPayment[]>>(new Map());
+  refundHistoryMap = signal<Map<string, Refund[]>>(new Map());
+
+  // Action state
+  enrollmentForAction = signal<Enrollment | null>(null);
+  actionLoading = signal(false);
+
+  // Payment dialog
+  showPaymentDialog = false;
+  dialogPaymentAmount: number | null = null;
+  dialogPaymentDate: Date = new Date();
+  dialogPaymentNotes = '';
+
+  // Refund dialog
+  showRefundDialog = false;
+  refundType: 'FULL' | 'PARTIAL' = 'FULL';
+  refundAmount: number | null = null;
+  refundDate: Date = new Date();
+  refundReason = '';
 
   async ngOnInit() {
     this.studentId = this.route.snapshot.paramMap.get('id');
     if (this.studentId) {
-      // Load courses first for lookup
       await this.loadCourses();
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
@@ -91,6 +122,141 @@ export class StudentDetailComponent implements OnInit {
     });
   }
 
+  // ─── Expandable rows ────────────────────────────────────────────────────────
+
+  toggleRow(enrollment: Enrollment) {
+    const id = enrollment.id;
+    if (this.expandedRows[id]) {
+      delete this.expandedRows[id];
+    } else {
+      this.expandedRows[id] = true;
+      this.loadPaymentHistory(id);
+      this.loadRefundHistory(id);
+    }
+    this.expandedRows = { ...this.expandedRows };
+  }
+
+  loadPaymentHistory(enrollmentId: string) {
+    this.enrollmentService.getPayments(enrollmentId).subscribe({
+      next: (payments) => {
+        const map = new Map(this.paymentHistoryMap());
+        map.set(enrollmentId, payments);
+        this.paymentHistoryMap.set(map);
+      },
+      error: () => {}
+    });
+  }
+
+  loadRefundHistory(enrollmentId: string) {
+    this.enrollmentService.getRefunds(enrollmentId).subscribe({
+      next: (refunds) => {
+        const map = new Map(this.refundHistoryMap());
+        map.set(enrollmentId, refunds);
+        this.refundHistoryMap.set(map);
+      },
+      error: () => {}
+    });
+  }
+
+  getPaymentHistory(enrollmentId: string): EnrollmentPayment[] {
+    return this.paymentHistoryMap().get(enrollmentId) || [];
+  }
+
+  getRefundHistory(enrollmentId: string): Refund[] {
+    return this.refundHistoryMap().get(enrollmentId) || [];
+  }
+
+  // ─── Payment dialog ──────────────────────────────────────────────────────────
+
+  openPaymentDialog(enrollment: Enrollment) {
+    this.enrollmentForAction.set(enrollment);
+    this.dialogPaymentAmount = null;
+    this.dialogPaymentDate = new Date();
+    this.dialogPaymentNotes = '';
+    this.showPaymentDialog = true;
+  }
+
+  submitPayment() {
+    const enrollment = this.enrollmentForAction();
+    if (!enrollment || !this.dialogPaymentAmount || !this.dialogPaymentDate) return;
+
+    this.actionLoading.set(true);
+    const dateStr = this.dialogPaymentDate.toISOString().split('T')[0];
+
+    this.enrollmentService.addPayment(enrollment.id, {
+      amount: this.dialogPaymentAmount,
+      paymentDate: dateStr,
+      notes: this.dialogPaymentNotes || undefined,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success('Payment recorded successfully');
+        this.showPaymentDialog = false;
+        this.actionLoading.set(false);
+        this.loadEnrollments(this.studentId!);
+        // Refresh expanded row history if open
+        if (this.expandedRows[enrollment.id]) {
+          this.loadPaymentHistory(enrollment.id);
+        }
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to record payment');
+        this.actionLoading.set(false);
+      }
+    });
+  }
+
+  // ─── Refund dialog ───────────────────────────────────────────────────────────
+
+  openRefundDialog(enrollment: Enrollment) {
+    this.enrollmentForAction.set(enrollment);
+    this.refundType = 'FULL';
+    this.refundAmount = enrollment.amountPaid || 0;
+    this.refundDate = new Date();
+    this.refundReason = '';
+    this.showRefundDialog = true;
+  }
+
+  onRefundTypeChange() {
+    const enrollment = this.enrollmentForAction();
+    if (this.refundType === 'FULL' && enrollment) {
+      this.refundAmount = enrollment.amountPaid || 0;
+    } else {
+      this.refundAmount = null;
+    }
+  }
+
+  submitRefund() {
+    const enrollment = this.enrollmentForAction();
+    if (!enrollment || !this.refundAmount || !this.refundDate) return;
+
+    this.actionLoading.set(true);
+    const dateStr = this.refundDate.toISOString().split('T')[0];
+
+    this.enrollmentService.createRefund(enrollment.id, {
+      type: this.refundType,
+      amount: this.refundAmount,
+      refundDate: dateStr,
+      reason: this.refundReason || undefined,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success('Refund issued successfully');
+        this.showRefundDialog = false;
+        this.actionLoading.set(false);
+        this.loadEnrollments(this.studentId!);
+        if (this.expandedRows[enrollment.id]) {
+          this.loadRefundHistory(enrollment.id);
+          this.loadPaymentHistory(enrollment.id);
+        }
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to issue refund');
+        this.actionLoading.set(false);
+      }
+    });
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
+
   getAge(dateOfBirth: string): number {
     const today = new Date();
     const birthDate = new Date(dateOfBirth);
@@ -122,29 +288,6 @@ export class StudentDetailComponent implements OnInit {
     this.router.navigate(['/enrollments', enrollment.id, 'edit']);
   }
 
-  confirmDeleteEnrollment(enrollment: Enrollment) {
-    this.enrollmentToDelete.set(enrollment);
-    this.showDeleteDialog = true;
-  }
-
-  deleteEnrollment() {
-    const enrollment = this.enrollmentToDelete();
-    if (!enrollment || !this.studentId) return;
-
-    this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
-      next: () => {
-        this.notificationService.success('Enrollment deleted successfully');
-        this.loadEnrollments(this.studentId!);
-        this.showDeleteDialog = false;
-        this.enrollmentToDelete.set(null);
-      },
-      error: () => {
-        this.notificationService.error('Failed to delete enrollment');
-        this.showDeleteDialog = false;
-      }
-    });
-  }
-
   getCourseName(courseId: string): string {
     return this.courses.get(courseId)?.name || 'Unknown Course';
   }
@@ -170,12 +313,23 @@ export class StudentDetailComponent implements OnInit {
     }
   }
 
-  getPaymentSeverity(status: string): 'success' | 'warn' | 'danger' {
+  getPaymentSeverity(status: string): 'success' | 'warn' | 'danger' | 'info' {
     switch (status) {
       case 'PAID': return 'success';
+      case 'PARTIAL': return 'info';
+      case 'REFUNDED': return 'danger';
       case 'PENDING': return 'warn';
-      case 'OVERDUE': return 'danger';
       default: return 'warn';
+    }
+  }
+
+  paymentLabel(status: string): string {
+    switch (status) {
+      case 'PAID': return 'Paid';
+      case 'PARTIAL': return 'Partial';
+      case 'REFUNDED': return 'Refunded';
+      case 'PENDING': return 'Pending';
+      default: return status;
     }
   }
 }

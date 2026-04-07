@@ -159,6 +159,14 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td>
                 <div class="flex gap-2">
                   <p-button
+                    icon="pi pi-eye"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="info"
+                    (onClick)="viewClass(classItem)"
+                    pTooltip="View"
+                  ></p-button>
+                  <p-button
                     icon="pi pi-pencil"
                     [rounded]="true"
                     [text]="true"
@@ -300,6 +308,10 @@ export class ClassListComponent implements OnInit {
     this.selectedCourseId = null;
     this.selectedBranchId = null;
     this.loadClasses();
+  }
+
+  viewClass(classItem: ClassWithDetails) {
+    this.router.navigate(['/classes', classItem.id]);
   }
 
   editClass(classItem: ClassWithDetails) {

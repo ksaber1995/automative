@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const dbConfig = {
-  host: 'automatemagicstack-dev-automatemagicauroradbef2379-nmlmuhgtiaqh.cluster-cd602k6cauug.eu-west-1.rds.amazonaws.com',
+  host: 'automatemagicstack-dev-automatemagicauroradbef2379-kvvyhx0r8i95.cluster-cd602k6cauug.eu-west-1.rds.amazonaws.com',
   port: 5432,
   database: 'automative',
   user: 'automative_admin',

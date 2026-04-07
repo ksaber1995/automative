@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Enrollment, EnrollmentCreateDto, EnrollmentUpdateDto, EnrollmentWithDetails } from '@shared/interfaces/enrollment.interface';
+import { AddPaymentDto, CreateRefundDto, Enrollment, EnrollmentCreateDto, EnrollmentPayment, EnrollmentUpdateDto, EnrollmentWithDetails, Refund } from '@shared/interfaces/enrollment.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -31,5 +31,21 @@ export class EnrollmentService {
 
   deleteEnrollment(id: string): Observable<{ message: string }> {
     return this.api.delete<{ message: string }>(`enrollments/${id}`);
+  }
+
+  getPayments(enrollmentId: string): Observable<EnrollmentPayment[]> {
+    return this.api.get<EnrollmentPayment[]>(`enrollments/${enrollmentId}/payments`);
+  }
+
+  addPayment(enrollmentId: string, payment: AddPaymentDto): Observable<EnrollmentPayment> {
+    return this.api.post<EnrollmentPayment>(`enrollments/${enrollmentId}/payments`, payment);
+  }
+
+  getRefunds(enrollmentId: string): Observable<Refund[]> {
+    return this.api.get<Refund[]>(`enrollments/${enrollmentId}/refunds`);
+  }
+
+  createRefund(enrollmentId: string, refund: CreateRefundDto): Observable<Refund> {
+    return this.api.post<Refund>(`enrollments/${enrollmentId}/refunds`, refund);
   }
 }

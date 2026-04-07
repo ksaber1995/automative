@@ -6,6 +6,7 @@ export interface ProductSale {
   companyId: string;
   branchId: string;
   productId: string;
+  productName: string | null;
   quantity: number;
   unitPrice: number;
   discountType: DiscountType;
@@ -29,12 +30,11 @@ export interface ProductSaleCreateDto {
   branchId: string;
   productId: string;
   quantity: number;
-  discountType: DiscountType;
-  discountValue: number;
-  paymentMethod: PaymentMethod;
+  discountType?: DiscountType;
+  discountValue?: number;
+  paymentMethod?: PaymentMethod;
   receiptNumber?: string;
   notes?: string;
-  soldBy?: string;
   customerName?: string;
   customerPhone?: string;
   date: string;

@@ -101,7 +101,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
             <tr>
               <td>{{ sale.date | date: 'short' }}</td>
               <td>
-                <div class="font-medium">{{ sale.productId }}</div>
+                <div class="font-medium">{{ sale.productName || sale.productId }}</div>
                 @if (sale.receiptNumber) {
                   <div class="text-sm text-gray-500">Receipt: {{ sale.receiptNumber }}</div>
                 }

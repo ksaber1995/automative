@@ -1,5 +1,8 @@
 export interface FinancialSummary {
   totalRevenue: number;
+  enrollmentRevenue?: number;
+  productRevenue?: number;
+  totalRefunds?: number;
   fixedExpenses: number;
   variableExpenses: number;
   salaries: number;
@@ -9,6 +12,8 @@ export interface FinancialSummary {
   currentCash?: number;
   totalOutstandingDebts?: number;
   availableCash?: number;
+  allocationMethod: string;
+  globalOverhead: number;
 }
 
 export interface BranchFinancialSummary extends FinancialSummary {
@@ -34,6 +39,7 @@ export interface MonthlyMetric {
   year: number;
   revenue: number;
   expenses: number;
+  refunds: number;
   profit: number;
 }
 

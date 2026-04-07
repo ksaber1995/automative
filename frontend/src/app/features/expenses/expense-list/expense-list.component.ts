@@ -172,6 +172,10 @@ export class ExpenseListComponent implements OnInit {
     this.showSalariesDialog = true;
   }
 
+  goToSalaries() {
+    this.router.navigate(['/expenses/salaries']);
+  }
+
   confirmPaySalaries() {
     this.payingSalaries.set(true);
     const dateStr = this.salariesDate instanceof Date

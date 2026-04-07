@@ -28,6 +28,9 @@ const EnrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'DROPPED', 'PENDIN
 // Payment Status
 const PaymentStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
 
+// Payment Mode
+const PaymentModeSchema = z.enum(['FULL', 'INSTALLMENTS']);
+
 // Payment Methods
 const PaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CREDIT_CARD', 'CHECK']);
 
@@ -131,11 +134,11 @@ const CreateStudentSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.union([z.string().email(), z.literal('')]).optional(),
   phone: z.string().optional(),
   parentName: z.string(),
   parentPhone: z.string(),
-  parentEmail: z.string().email().optional(),
+  parentEmail: z.union([z.string().email(), z.literal('')]).optional(),
   address: z.string().optional(),
   branchId: UUIDSchema,
   enrollmentDate: z.string(),
@@ -299,7 +302,9 @@ const CreateEnrollmentSchema = z.object({
   discountPercent: z.number().optional(),
   discountAmount: z.number().optional(),
   finalPrice: z.number(),
-  paymentStatus: PaymentStatusSchema,
+  paymentMode: PaymentModeSchema.default('FULL'),
+  downPayment: z.number().optional(),
+  paymentStatus: PaymentStatusSchema.optional(),
   notes: z.string().optional(),
 });
 
@@ -318,11 +323,49 @@ const EnrollmentSchema = z.object({
   discountPercent: z.number(),
   discountAmount: z.number(),
   finalPrice: z.number(),
+  paymentMode: PaymentModeSchema,
+  downPayment: z.number(),
+  amountPaid: z.number(),
   paymentStatus: PaymentStatusSchema,
   completionDate: z.string().nullable(),
   notes: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const EnrollmentPaymentSchema = z.object({
+  id: UUIDSchema,
+  enrollmentId: UUIDSchema,
+  companyId: UUIDSchema,
+  amount: z.number(),
+  paymentDate: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const CreateEnrollmentPaymentSchema = z.object({
+  amount: z.number().positive(),
+  paymentDate: z.string(),
+  notes: z.string().optional(),
+});
+
+const RefundSchema = z.object({
+  id: UUIDSchema,
+  enrollmentId: UUIDSchema,
+  companyId: UUIDSchema,
+  studentId: UUIDSchema,
+  amount: z.number(),
+  refundDate: z.string(),
+  type: z.enum(['FULL', 'PARTIAL']),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const CreateRefundSchema = z.object({
+  type: z.enum(['FULL', 'PARTIAL']),
+  amount: z.number().positive(),
+  refundDate: z.string(),
+  reason: z.string().optional(),
 });
 
 // =============================================
@@ -558,15 +601,19 @@ const ProductSchema = z.object({
 // =============================================
 // Product Sale Schemas
 // =============================================
+const DiscountTypeSchema = z.enum(['NONE', 'PERCENTAGE', 'FIXED_AMOUNT']);
+
 const CreateProductSaleSchema = z.object({
   productId: UUIDSchema,
   branchId: UUIDSchema,
   quantity: z.number(),
-  unitPrice: z.number(),
-  totalAmount: z.number(),
-  saleDate: z.string(),
+  discountType: DiscountTypeSchema.optional().default('NONE'),
+  discountValue: z.number().optional().default(0),
+  date: z.string(),
   paymentMethod: PaymentMethodSchema.optional(),
+  receiptNumber: z.string().optional(),
   customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -574,13 +621,20 @@ const ProductSaleSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
   productId: UUIDSchema,
+  productName: z.string().nullable(),
   branchId: UUIDSchema,
   quantity: z.number(),
   unitPrice: z.number(),
+  discountType: z.string(),
+  discountValue: z.number(),
+  discountAmount: z.number(),
+  subtotal: z.number(),
   totalAmount: z.number(),
   saleDate: z.string(),
   paymentMethod: z.string().nullable(),
+  receiptNumber: z.string().nullable(),
   customerName: z.string().nullable(),
+  customerPhone: z.string().nullable(),
   notes: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -853,6 +907,32 @@ export const contract = c.router({
         200: z.array(ClassSchema),
       },
     },
+    getEnrollments: {
+      method: 'GET',
+      path: '/api/classes/:id/enrollments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          enrollmentId: UUIDSchema,
+          studentId: UUIDSchema,
+          studentFirstName: z.string(),
+          studentLastName: z.string(),
+          enrollmentDate: z.string(),
+          status: EnrollmentStatusSchema,
+          paymentMode: PaymentModeSchema,
+          originalPrice: z.number(),
+          discountPercent: z.number(),
+          discountAmount: z.number(),
+          finalPrice: z.number(),
+          downPayment: z.number(),
+          amountPaid: z.number(),
+          paymentStatus: PaymentStatusSchema,
+          notes: z.string().nullable(),
+          createdAt: z.string(),
+        })),
+        404: z.object({ message: z.string() }),
+      },
+    },
     getById: {
       method: 'GET',
       path: '/api/classes/:id',
@@ -906,6 +986,46 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(EnrollmentSchema),
+      },
+    },
+    getRefunds: {
+      method: 'GET',
+      path: '/api/enrollments/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(RefundSchema),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    createRefund: {
+      method: 'POST',
+      path: '/api/enrollments/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CreateRefundSchema,
+      responses: {
+        201: RefundSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getPayments: {
+      method: 'GET',
+      path: '/api/enrollments/:id/payments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(EnrollmentPaymentSchema),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    addPayment: {
+      method: 'POST',
+      path: '/api/enrollments/:id/payments',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CreateEnrollmentPaymentSchema,
+      responses: {
+        201: EnrollmentPaymentSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
     getById: {
@@ -1002,34 +1122,26 @@ export const contract = c.router({
         200: z.array(ExpenseSchema),
       },
     },
-    getById: {
+    getDue: {
       method: 'GET',
-      path: '/api/expenses/:id',
-      pathParams: z.object({ id: UUIDSchema }),
+      path: '/api/expenses/due',
+      query: z.object({ month: z.string().optional() }),
       responses: {
-        200: ExpenseSchema,
-        404: z.object({ message: z.string() }),
-      },
-    },
-    update: {
-      method: 'PATCH',
-      path: '/api/expenses/:id',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: UpdateExpenseSchema,
-      responses: {
-        200: ExpenseSchema,
-        404: z.object({ message: z.string() }),
-      },
-    },
-    payRecurring: {
-      method: 'POST',
-      path: '/api/expenses/:id/pay',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ date: z.string().optional() }),
-      responses: {
-        201: ExpenseSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: z.object({
+          items: z.array(z.object({
+            id: z.string(),
+            type: z.enum(['recurring', 'salary']),
+            label: z.string(),
+            amount: z.number(),
+            category: z.string(),
+            branchId: z.string().nullable(),
+            branchName: z.string().nullable(),
+            templateId: z.string().nullable(),
+            employeeId: z.string().nullable(),
+          })),
+          totalDue: z.number(),
+          month: z.string(),
+        }),
       },
     },
     paySalaries: {
@@ -1058,26 +1170,44 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
-    getDue: {
+    getById: {
       method: 'GET',
-      path: '/api/expenses/due',
-      query: z.object({ month: z.string().optional() }),
+      path: '/api/expenses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
       responses: {
-        200: z.object({
-          items: z.array(z.object({
-            id: z.string(),
-            type: z.enum(['recurring', 'salary']),
-            label: z.string(),
-            amount: z.number(),
-            category: z.string(),
-            branchId: z.string().nullable(),
-            branchName: z.string().nullable(),
-            templateId: z.string().nullable(),
-            employeeId: z.string().nullable(),
-          })),
-          totalDue: z.number(),
-          month: z.string(),
-        }),
+        200: ExpenseSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/expenses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateExpenseSchema,
+      responses: {
+        200: ExpenseSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/expenses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    payRecurring: {
+      method: 'POST',
+      path: '/api/expenses/:id/pay',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ date: z.string().optional() }),
+      responses: {
+        201: ExpenseSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
   },

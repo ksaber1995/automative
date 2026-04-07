@@ -49,7 +49,7 @@ export class ExpenseService {
   }
 
   payEmployeeSalary(employeeId: string, date?: string): Observable<Expense> {
-    return this.api.post<Expense>(`expenses/employee/${employeeId}/pay`, date ? { date } : {});
+    return this.api.post<Expense>(`expenses/pay-employee/${employeeId}`, date ? { date } : {});
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {

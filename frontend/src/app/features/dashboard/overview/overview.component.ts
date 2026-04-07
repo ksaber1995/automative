@@ -130,6 +130,14 @@ export class OverviewComponent implements OnInit {
           tension: 0.4
         },
         {
+          label: 'Refunds',
+          data: data.revenueByMonth.map((m: any) => m.refunds || 0),
+          borderColor: '#F97316',
+          backgroundColor: 'rgba(249, 115, 22, 0.1)',
+          fill: true,
+          tension: 0.4
+        },
+        {
           label: 'Profit',
           data: data.revenueByMonth.map((m: any) => m.profit),
           borderColor: '#10B981',

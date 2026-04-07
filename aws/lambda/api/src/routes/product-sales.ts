@@ -7,13 +7,20 @@ function mapProductSaleFromDB(row: any) {
     id: row.id,
     companyId: row.company_id,
     productId: row.product_id,
+    productName: row.product_name || null,
     branchId: row.branch_id,
     quantity: parseInt(row.quantity),
     unitPrice: parseFloat(row.unit_price),
+    discountType: row.discount_type || 'NONE',
+    discountValue: parseFloat(row.discount_value || 0),
+    discountAmount: parseFloat(row.discount_amount || 0),
+    subtotal: parseFloat(row.subtotal || row.total_amount),
     totalAmount: parseFloat(row.total_amount),
     saleDate: row.sale_date,
     paymentMethod: row.payment_method,
+    receiptNumber: row.receipt_number,
     customerName: row.customer_name,
+    customerPhone: row.customer_phone,
     notes: row.notes,
     createdAt: row.created_at,
   };
@@ -45,14 +52,27 @@ export const productSalesRoutes = {
         };
       }
 
+      // Compute pricing server-side from product's selling price
+      const unitPrice = parseFloat(product.selling_price);
+      const subtotal = unitPrice * body.quantity;
+      const discountType: string = body.discountType || 'NONE';
+      const discountValue: number = body.discountValue || 0;
+      let discountAmount = 0;
+      if (discountType === 'PERCENTAGE') discountAmount = (subtotal * discountValue) / 100;
+      else if (discountType === 'FIXED_AMOUNT') discountAmount = discountValue;
+      const totalAmount = Math.max(0, subtotal - discountAmount);
+
       await client.query('BEGIN');
 
       // 1. Create the sale record
       const saleResult = await client.query(
-        `INSERT INTO product_sales (company_id, product_id, branch_id, quantity, unit_price, total_amount, sale_date, payment_method, customer_name, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-        [context.companyId, body.productId, body.branchId, body.quantity, body.unitPrice,
-         body.totalAmount, body.saleDate, body.paymentMethod || null, body.customerName || null, body.notes || null]
+        `INSERT INTO product_sales
+           (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        [context.companyId, body.productId, body.branchId, body.quantity, unitPrice,
+         discountType, discountValue, discountAmount, subtotal, totalAmount,
+         body.date, body.paymentMethod || null, body.receiptNumber || null,
+         body.customerName || null, body.customerPhone || null, body.notes || null]
       );
       const sale = saleResult.rows[0];
 
@@ -64,6 +84,7 @@ export const productSalesRoutes = {
 
       // 3. Auto-create COGS expense (cost_price × quantity sold)
       const cogsAmount = parseFloat(product.cost_price) * body.quantity;
+      const saleDate = body.date;
       await client.query(
         `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id)
          VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7)`,
@@ -72,7 +93,7 @@ export const productSalesRoutes = {
           body.branchId,
           cogsAmount,
           `COGS: ${product.name} × ${body.quantity} units`,
-          body.saleDate,
+          saleDate,
           sale.id,
           body.productId,
         ]
@@ -100,7 +121,7 @@ export const productSalesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      let sql = 'SELECT * FROM product_sales WHERE company_id = $1';
+      let sql = `SELECT ps.*, p.name AS product_name FROM product_sales ps LEFT JOIN products p ON ps.product_id = p.id WHERE ps.company_id = $1`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
@@ -111,28 +132,28 @@ export const productSalesRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND ps.branch_id = $${params.length}`;
       } else if (context.role !== 'ADMIN' && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND ps.branch_id = $${params.length}`;
       }
 
       if (queryParams.productId) {
         params.push(queryParams.productId);
-        sql += ` AND product_id = $${params.length}`;
+        sql += ` AND ps.product_id = $${params.length}`;
       }
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
-        sql += ` AND sale_date >= $${params.length}`;
+        sql += ` AND ps.sale_date >= $${params.length}`;
       }
 
       if (queryParams.endDate) {
         params.push(queryParams.endDate);
-        sql += ` AND sale_date <= $${params.length}`;
+        sql += ` AND ps.sale_date <= $${params.length}`;
       }
 
-      sql += ' ORDER BY sale_date DESC, created_at DESC';
+      sql += ' ORDER BY ps.sale_date DESC, ps.created_at DESC';
 
       const sales = await query(sql, params);
       return {

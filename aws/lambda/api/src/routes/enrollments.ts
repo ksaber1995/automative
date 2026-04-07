@@ -15,12 +15,21 @@ function mapEnrollmentFromDB(row: any) {
     discountPercent: parseFloat(row.discount_percent || 0),
     discountAmount: parseFloat(row.discount_amount || 0),
     finalPrice: parseFloat(row.final_price),
+    paymentMode: row.payment_mode || 'FULL',
+    downPayment: parseFloat(row.down_payment || 0),
+    amountPaid: parseFloat(row.amount_paid || 0),
     paymentStatus: row.payment_status,
     completionDate: row.completion_date,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function computePaymentStatus(finalPrice: number, amountPaid: number): string {
+  if (amountPaid <= 0) return 'PENDING';
+  if (amountPaid >= finalPrice) return 'PAID';
+  return 'PARTIAL';
 }
 
 export const enrollmentsRoutes = {
@@ -35,6 +44,11 @@ export const enrollmentsRoutes = {
         };
       }
 
+      const paymentMode = body.paymentMode || 'FULL';
+      const downPayment = body.downPayment || 0;
+      const amountPaid = paymentMode === 'FULL' ? body.finalPrice : downPayment;
+      const paymentStatus = computePaymentStatus(body.finalPrice, amountPaid);
+
       const enrollment = await insert('enrollments', {
         company_id: context.companyId,
         student_id: body.studentId,
@@ -47,10 +61,24 @@ export const enrollmentsRoutes = {
         discount_percent: body.discountPercent || 0,
         discount_amount: body.discountAmount || 0,
         final_price: body.finalPrice,
-        payment_status: body.paymentStatus,
+        payment_mode: paymentMode,
+        down_payment: downPayment,
+        amount_paid: amountPaid,
+        payment_status: paymentStatus,
         completion_date: null,
         notes: body.notes || null,
       });
+
+      // If there's a down payment or full payment, record it
+      if (amountPaid > 0) {
+        await insert('enrollment_payments', {
+          enrollment_id: enrollment.id,
+          company_id: context.companyId,
+          amount: amountPaid,
+          payment_date: body.enrollmentDate,
+          notes: paymentMode === 'FULL' ? 'Full payment' : 'Down payment',
+        });
+      }
 
       return {
         status: 201 as const,
@@ -223,6 +251,167 @@ export const enrollmentsRoutes = {
       return {
         status: error.message === 'No authentication token provided' ? 401 : 404,
         body: { message: error.message || 'Failed to update enrollment' },
+      };
+    }
+  },
+
+  getRefunds: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      const refunds = await query(
+        'SELECT * FROM refunds WHERE enrollment_id = $1 AND company_id = $2 ORDER BY refund_date ASC',
+        [params.id, context.companyId]
+      );
+      return {
+        status: 200 as const,
+        body: refunds.map((r: any) => ({
+          id: r.id, enrollmentId: r.enrollment_id, companyId: r.company_id,
+          studentId: r.student_id, amount: parseFloat(r.amount),
+          refundDate: r.refund_date, type: r.type, reason: r.reason, createdAt: r.created_at,
+        })),
+      };
+    } catch (error) {
+      return { status: 500 as const, body: { message: error.message || 'Failed to get refunds' } };
+    }
+  },
+
+  createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const enrollment = await queryOne(
+        'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return { status: 404 as const, body: { message: 'Enrollment not found' } };
+
+      const refundAmount = parseFloat(body.amount);
+      const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
+
+      if (refundAmount > currentAmountPaid) {
+        return { status: 400 as const, body: { message: `Cannot refund more than amount paid (${currentAmountPaid})` } };
+      }
+
+      const refund = await insert('refunds', {
+        enrollment_id: params.id,
+        company_id: context.companyId,
+        student_id: enrollment.student_id,
+        amount: refundAmount,
+        refund_date: body.refundDate,
+        type: body.type,
+        reason: body.reason || null,
+      });
+
+      // Update enrollment amount_paid and payment_status
+      const newAmountPaid = Math.max(0, currentAmountPaid - refundAmount);
+      const finalPrice = parseFloat(enrollment.final_price);
+      const newStatus = newAmountPaid <= 0 ? 'REFUNDED' : newAmountPaid >= finalPrice ? 'PAID' : 'PARTIAL';
+
+      await query(
+        'UPDATE enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
+        [newAmountPaid, newStatus, params.id]
+      );
+
+      return {
+        status: 201 as const,
+        body: {
+          id: refund.id, enrollmentId: refund.enrollment_id, companyId: refund.company_id,
+          studentId: refund.student_id, amount: parseFloat(refund.amount),
+          refundDate: refund.refund_date, type: refund.type, reason: refund.reason, createdAt: refund.created_at,
+        },
+      };
+    } catch (error) {
+      return { status: 400 as const, body: { message: error.message || 'Failed to create refund' } };
+    }
+  },
+
+  getPayments: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const enrollment = await queryOne(
+        'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!enrollment) {
+        return { status: 404 as const, body: { message: 'Enrollment not found' } };
+      }
+
+      const payments = await query(
+        'SELECT * FROM enrollment_payments WHERE enrollment_id = $1 AND company_id = $2 ORDER BY payment_date ASC, created_at ASC',
+        [params.id, context.companyId]
+      );
+
+      return {
+        status: 200 as const,
+        body: payments.map((p: any) => ({
+          id: p.id,
+          enrollmentId: p.enrollment_id,
+          companyId: p.company_id,
+          amount: parseFloat(p.amount),
+          paymentDate: p.payment_date,
+          notes: p.notes,
+          createdAt: p.created_at,
+        })),
+      };
+    } catch (error) {
+      console.error('Get payments error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 500,
+        body: { message: error.message || 'Failed to get payments' },
+      };
+    }
+  },
+
+  addPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const enrollment = await queryOne(
+        'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!enrollment) {
+        return { status: 404 as const, body: { message: 'Enrollment not found' } };
+      }
+
+      const payment = await insert('enrollment_payments', {
+        enrollment_id: params.id,
+        company_id: context.companyId,
+        amount: body.amount,
+        payment_date: body.paymentDate,
+        notes: body.notes || null,
+      });
+
+      // Update enrollment amount_paid and payment_status
+      const newAmountPaid = parseFloat(enrollment.amount_paid || 0) + parseFloat(body.amount);
+      const finalPrice = parseFloat(enrollment.final_price);
+      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid);
+
+      await query(
+        'UPDATE enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
+        [newAmountPaid, newPaymentStatus, params.id]
+      );
+
+      return {
+        status: 201 as const,
+        body: {
+          id: payment.id,
+          enrollmentId: payment.enrollment_id,
+          companyId: payment.company_id,
+          amount: parseFloat(payment.amount),
+          paymentDate: payment.payment_date,
+          notes: payment.notes,
+          createdAt: payment.created_at,
+        },
+      };
+    } catch (error) {
+      console.error('Add payment error:', error);
+      return {
+        status: error.message === 'No authentication token provided' ? 401 : 400,
+        body: { message: error.message || 'Failed to add payment' },
       };
     }
   },

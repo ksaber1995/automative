@@ -63,10 +63,12 @@ CREATE TABLE courses (
     price DECIMAL(10, 2) NOT NULL,
     duration INTEGER NOT NULL,
     max_students INTEGER,
+    instructor_id UUID,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
     UNIQUE(branch_id, code)
 );
 
@@ -149,9 +151,13 @@ CREATE TABLE enrollments (
     discount_percent DECIMAL(5, 2) DEFAULT 0,
     discount_amount DECIMAL(10, 2) DEFAULT 0,
     final_price DECIMAL(10, 2) NOT NULL,
+    payment_mode VARCHAR(20) NOT NULL DEFAULT 'FULL' CHECK (payment_mode IN ('FULL', 'INSTALLMENTS')),
+    down_payment DECIMAL(10, 2) DEFAULT 0,
+    amount_paid DECIMAL(10, 2) DEFAULT 0,
     payment_status VARCHAR(50) NOT NULL CHECK (payment_status IN ('PENDING', 'PARTIAL', 'PAID', 'REFUNDED')),
     completion_date DATE,
     notes TEXT,
+    company_id UUID NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
@@ -166,6 +172,45 @@ CREATE INDEX idx_enrollments_course_id ON enrollments(course_id);
 CREATE INDEX idx_enrollments_branch_id ON enrollments(branch_id);
 CREATE INDEX idx_enrollments_status ON enrollments(status);
 CREATE INDEX idx_enrollments_payment_status ON enrollments(payment_status);
+CREATE INDEX idx_enrollments_company_id ON enrollments(company_id);
+
+-- =============================================
+-- ENROLLMENT PAYMENTS TABLE
+-- =============================================
+CREATE TABLE enrollment_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id UUID NOT NULL,
+    company_id UUID NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_enrollment_payments_enrollment_id ON enrollment_payments(enrollment_id);
+CREATE INDEX idx_enrollment_payments_company_id ON enrollment_payments(company_id);
+
+-- =============================================
+-- REFUNDS TABLE
+-- =============================================
+CREATE TABLE refunds (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id UUID NOT NULL,
+    company_id UUID NOT NULL,
+    student_id UUID NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    refund_date DATE NOT NULL,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('FULL', 'PARTIAL')),
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);
+CREATE INDEX idx_refunds_company_id ON refunds(company_id);
+CREATE INDEX idx_refunds_student_id ON refunds(student_id);
 
 -- =============================================
 -- EMPLOYEES TABLE
@@ -175,8 +220,12 @@ CREATE TABLE employees (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255),
+    phone VARCHAR(50),
     position VARCHAR(100),
+    department VARCHAR(100),
     salary DECIMAL(10, 2),
+    hire_date DATE,
+    notes TEXT,
     branch_id UUID,
     is_global BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
@@ -223,20 +272,30 @@ CREATE INDEX idx_revenues_student_id ON revenues(student_id);
 CREATE TABLE expenses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED')),
-    category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'MARKETING', 'SUPPLIES', 'MAINTENANCE', 'OTHER')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
+    category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
     amount DECIMAL(10, 2) NOT NULL,
     description TEXT,
     date DATE NOT NULL,
     is_recurring BOOLEAN DEFAULT false,
     recurring_day INTEGER,
+    recurring_template_id UUID,
+    employee_id UUID,
     distribution_method VARCHAR(50),
     vendor VARCHAR(255),
     invoice_number VARCHAR(100),
+    asset_name VARCHAR(255),
+    amortization_months INTEGER,
+    product_id UUID,
+    product_sale_id UUID,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+    FOREIGN KEY (recurring_template_id) REFERENCES expenses(id) ON DELETE SET NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_expenses_branch_id ON expenses(branch_id);
@@ -266,10 +325,16 @@ CREATE TABLE withdrawals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID,
     amount DECIMAL(10, 2) NOT NULL,
-    date DATE NOT NULL,
+    withdrawal_date DATE NOT NULL,
     reason TEXT,
+    category VARCHAR(50) DEFAULT 'OTHER',
+    payment_method VARCHAR(50) DEFAULT 'CASH',
+    stakeholders JSONB DEFAULT '[]',
+    notes TEXT,
+    receipt_url TEXT,
     approved_by UUID,
     status VARCHAR(50) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
@@ -356,10 +421,16 @@ CREATE TABLE product_sales (
     branch_id UUID NOT NULL,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
+    discount_type VARCHAR(50) DEFAULT 'NONE',
+    discount_value DECIMAL(10, 2) DEFAULT 0,
+    discount_amount DECIMAL(10, 2) DEFAULT 0,
+    subtotal DECIMAL(10, 2),
     total_amount DECIMAL(10, 2) NOT NULL,
     sale_date DATE NOT NULL,
     payment_method VARCHAR(50),
+    receipt_number VARCHAR(100),
     customer_name VARCHAR(255),
+    customer_phone VARCHAR(50),
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,

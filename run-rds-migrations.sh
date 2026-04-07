@@ -5,8 +5,8 @@
 
 set -e
 
-CLUSTER_ARN="arn:aws:rds:eu-west-1:365729671026:cluster:automatemagicstack-dev-automatemagicauroradbef2379-nmlmuhgtiaqh"
-SECRET_ARN="arn:aws:secretsmanager:eu-west-1:365729671026:secret:/dev/automate-magic/db-credentials-qJtTxN"
+CLUSTER_ARN="arn:aws:rds:eu-west-1:365729671026:cluster:automatemagicstack-dev-automatemagicauroradbef2379-kvvyhx0r8i95"
+SECRET_ARN="arn:aws:secretsmanager:eu-west-1:365729671026:secret:/dev/automate-magic/db-credentials-RA7OwZ"
 DATABASE="automative"
 PROFILE="personal"
 
