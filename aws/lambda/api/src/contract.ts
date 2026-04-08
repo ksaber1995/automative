@@ -1013,7 +1013,7 @@ export const contract = c.router({
     },
     listDues: {
       method: 'GET',
-      path: '/api/enrollments/dues',
+      path: '/api/dues',
       query: z.object({
         branchId: OptionalUUIDSchema,
       }),

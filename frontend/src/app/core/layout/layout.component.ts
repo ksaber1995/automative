@@ -29,7 +29,7 @@ import { AuthService } from '../services/auth.service';
               class="p-button-text p-button-rounded"
               (click)="toggleSidebar()">
             </button>
-            <h1 class="text-2xl font-bold text-blue-600">Netrofit</h1>
+            <img src="assets/img/logo.png" alt="Automate Magic" class="h-9 w-auto">
           </div>
 
           <div class="flex items-center gap-4">

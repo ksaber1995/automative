@@ -10,6 +10,6 @@ export class DuesService {
   getDues(branchId?: string): Observable<DueEnrollment[]> {
     const params: any = {};
     if (branchId) params['branchId'] = branchId;
-    return this.api.get<DueEnrollment[]>('enrollments/dues', params);
+    return this.api.get<DueEnrollment[]>('dues', params);
   }
 }
