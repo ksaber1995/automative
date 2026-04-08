@@ -72,7 +72,7 @@ export class ExpenseFormComponent implements OnInit {
       date: [today, [Validators.required]],
       isRecurring: [false],
       recurringDay: [1],
-      distributionMethod: ['EQUAL'],
+      distributionMethod: ['PROPORTIONAL'],
       vendor: [''],
       invoiceNumber: [''],
       notes: [''],
@@ -96,12 +96,12 @@ export class ExpenseFormComponent implements OnInit {
       } else if (type === 'CAPITAL') {
         branchControl?.setValidators([Validators.required]);
         distributionControl?.clearValidators();
-        distributionControl?.setValue('EQUAL');
+        distributionControl?.setValue('PROPORTIONAL');
         amortizationControl?.setValidators([Validators.required, Validators.min(1)]);
       } else {
         branchControl?.setValidators([Validators.required]);
         distributionControl?.clearValidators();
-        distributionControl?.setValue('EQUAL');
+        distributionControl?.setValue('PROPORTIONAL');
         amortizationControl?.clearValidators();
       }
       branchControl?.updateValueAndValidity();

@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapProductFromDB(row: any) {
   return {
@@ -82,7 +82,7 @@ export const productsRoutes = {
         };
       }
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create product' },
       };
     } finally {
@@ -121,7 +121,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('List products error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list products' },
       };
     }
@@ -155,7 +155,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get available products error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get available products' },
       };
     }
@@ -197,7 +197,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get low stock products error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get low stock products' },
       };
     }
@@ -233,7 +233,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Get product error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Product not found' },
       };
     }
@@ -291,7 +291,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Update product error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update product' },
       };
     }
@@ -350,7 +350,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Adjust product stock error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to adjust product stock' },
       };
     }
@@ -395,7 +395,7 @@ export const productsRoutes = {
     } catch (error) {
       console.error('Delete product error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete product' },
       };
     }

@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapWithdrawalFromDB(row: any) {
   return {
@@ -49,7 +49,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Create withdrawal error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create withdrawal' },
       };
     }
@@ -87,7 +87,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('List withdrawals error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list withdrawals' },
       };
     }
@@ -162,7 +162,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Withdrawal summary error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to generate withdrawal summary' },
       };
     }
@@ -202,7 +202,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Get withdrawals by stakeholder error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get withdrawals by stakeholder' },
       };
     }
@@ -236,7 +236,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Get withdrawal error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Withdrawal not found' },
       };
     }
@@ -287,7 +287,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Update withdrawal error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update withdrawal' },
       };
     }
@@ -326,7 +326,7 @@ export const withdrawalsRoutes = {
     } catch (error) {
       console.error('Delete withdrawal error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete withdrawal' },
       };
     }

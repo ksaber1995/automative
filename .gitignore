@@ -19,8 +19,10 @@ aws/dist-deploy/
 aws/scripts/__pycache__/
 aws/cdk-outputs.json
 
-# Lambda build output
+# Lambda build output & deployment artifacts
 aws/lambda/api/dist/
+aws/lambda/api/lambda.zip
+aws/lambda/**/*.zip
 
 # Shared compiled output (tsc artifacts — source of truth is .ts files)
 shared/**/*.js

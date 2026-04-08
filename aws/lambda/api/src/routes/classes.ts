@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapClassFromDB(row: any) {
   return {
@@ -79,7 +79,7 @@ export const classesRoutes = {
       console.error('Create class error:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: {
           message: error.message || 'Failed to create class',
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -136,7 +136,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('List classes error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list classes' },
       };
     }
@@ -189,7 +189,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('List active classes error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list active classes' },
       };
     }
@@ -235,7 +235,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Get class error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Class not found' },
       };
     }
@@ -303,7 +303,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Update class error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update class' },
       };
     }
@@ -375,7 +375,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Get class enrollments error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get class enrollments' },
       };
     }
@@ -420,7 +420,7 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Delete class error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete class' },
       };
     }

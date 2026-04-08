@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -88,7 +88,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Create enrollment error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create enrollment' },
       };
     }
@@ -140,7 +140,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('List enrollments error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list enrollments' },
       };
     }
@@ -176,7 +176,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get enrollment error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Enrollment not found' },
       };
     }
@@ -198,7 +198,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get student enrollments error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get student enrollments' },
       };
     }
@@ -250,7 +250,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Update enrollment error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update enrollment' },
       };
     }
@@ -309,7 +309,7 @@ export const enrollmentsRoutes = {
         })),
       };
     } catch (error) {
-      return { status: isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list dues' } };
+      return { status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list dues' } };
     }
   },
 
@@ -362,7 +362,7 @@ export const enrollmentsRoutes = {
         })),
       };
     } catch (error) {
-      return { status: isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list refunds' } };
+      return { status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list refunds' } };
     }
   },
 
@@ -470,7 +470,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get payments error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get payments' },
       };
     }
@@ -529,7 +529,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Add payment error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to add payment' },
       };
     }
@@ -575,7 +575,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Delete enrollment error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete enrollment' },
       };
     }

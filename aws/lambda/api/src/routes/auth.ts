@@ -217,10 +217,22 @@ export const authRoutes = {
         updated_by: user.id,
       });
 
+      // 11. Create subscription record (TRIAL for 2 months)
+      const trialStart = new Date();
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 60);
+      await insert('subscriptions', {
+        company_id: company.id,
+        status: 'TRIAL',
+        price: 0,
+        trial_start_date: trialStart.toISOString().split('T')[0],
+        trial_end_date: trialEnd.toISOString().split('T')[0],
+      });
+
       // Commit transaction
       await client.query('COMMIT');
 
-      // 11. Generate tokens with companyId
+      // 12. Generate tokens with companyId
       const payload = {
         id: user.id,
         email: user.email,

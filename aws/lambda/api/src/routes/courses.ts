@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapCourseFromDB(row: any) {
   return {
@@ -58,7 +58,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Create course error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create course' },
       };
     }
@@ -102,7 +102,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('List courses error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list courses' },
       };
     }
@@ -139,7 +139,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('List active courses error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list active courses' },
       };
     }
@@ -175,7 +175,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Get course error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Course not found' },
       };
     }
@@ -239,7 +239,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Update course error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update course' },
       };
     }
@@ -284,7 +284,7 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Delete course error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete course' },
       };
     }

@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne, deleteById } from '../db/connection';
-import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapBranchFromDB(row: any) {
   return {
@@ -52,7 +52,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Create branch error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create branch' },
       };
     }
@@ -73,7 +73,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('List branches error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list branches' },
       };
     }
@@ -94,7 +94,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('List active branches error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list active branches' },
       };
     }
@@ -123,7 +123,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Get branch error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Branch not found' },
       };
     }
@@ -190,7 +190,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Update branch error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update branch' },
       };
     }
@@ -289,7 +289,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Get branch stats error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get branch statistics' },
       };
     }
@@ -329,7 +329,7 @@ export const branchesRoutes = {
     } catch (error) {
       console.error('Delete branch error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete branch' },
       };
     }

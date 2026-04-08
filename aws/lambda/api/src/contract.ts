@@ -1796,6 +1796,62 @@ export const contract = c.router({
     },
   },
 
+  // Subscription routes
+  subscriptions: {
+    getMySubscription: {
+      method: 'GET',
+      path: '/api/subscription',
+      responses: {
+        200: z.object({
+          id: UUIDSchema,
+          companyId: UUIDSchema,
+          status: z.enum(['TRIAL', 'MONTHLY', 'ANNUAL', 'EXPIRED']),
+          price: z.number(),
+          trialStartDate: z.string().nullable(),
+          trialEndDate: z.string().nullable(),
+          subscriptionStartDate: z.string().nullable(),
+          subscriptionEndDate: z.string().nullable(),
+          notes: z.string().nullable(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+        }),
+        401: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    updateSubscription: {
+      method: 'PATCH',
+      path: '/api/subscription/:companyId',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({
+        status: z.enum(['TRIAL', 'MONTHLY', 'ANNUAL', 'EXPIRED']).optional(),
+        price: z.number().optional(),
+        trialStartDate: z.string().nullable().optional(),
+        trialEndDate: z.string().nullable().optional(),
+        subscriptionStartDate: z.string().nullable().optional(),
+        subscriptionEndDate: z.string().nullable().optional(),
+        notes: z.string().nullable().optional(),
+      }),
+      responses: {
+        200: z.object({
+          id: UUIDSchema,
+          companyId: UUIDSchema,
+          status: z.enum(['TRIAL', 'MONTHLY', 'ANNUAL', 'EXPIRED']),
+          price: z.number(),
+          trialStartDate: z.string().nullable(),
+          trialEndDate: z.string().nullable(),
+          subscriptionStartDate: z.string().nullable(),
+          subscriptionEndDate: z.string().nullable(),
+          notes: z.string().nullable(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+        }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
   // Migration routes (one-time use)
   migrations: {
     runInstructorMigration: {

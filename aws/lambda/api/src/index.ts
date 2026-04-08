@@ -26,6 +26,7 @@ import { debtsRoutes } from './routes/debts';
 import { cashRoutes } from './routes/cash';
 import { reportsRoutes } from './routes/reports';
 import { enrollmentsRoutes } from './routes/enrollments';
+import { subscriptionsRoutes } from './routes/subscriptions';
 import { migrationsRoutes } from './routes/migrations';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
@@ -50,6 +51,7 @@ const router = {
   cash: cashRoutes,
   reports: reportsRoutes,
   debug: debugRoutes,
+  subscriptions: subscriptionsRoutes,
   migrations: migrationsRoutes,
 };
 

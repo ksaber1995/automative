@@ -50,6 +50,13 @@ export function isAuthError(error: unknown): boolean {
   return AUTH_ERROR_MESSAGES.includes(msg);
 }
 
+const SUBSCRIPTION_ERROR_MESSAGES = ['Trial period expired', 'Subscription expired'];
+
+export function isSubscriptionError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : '';
+  return SUBSCRIPTION_ERROR_MESSAGES.includes(msg);
+}
+
 export async function extractTenantContext(
   authHeader?: string
 ): Promise<TenantContext> {
@@ -64,6 +71,24 @@ export async function extractTenantContext(
   // Enforce companyId presence - tokens without companyId are invalid
   if (!decoded.companyId) {
     throw new Error('Invalid token: missing company context');
+  }
+
+  // Check subscription status
+  const { queryOne } = await import('../db/connection');
+  const subscription = await queryOne<any>(
+    'SELECT status, trial_end_date, subscription_end_date FROM subscriptions WHERE company_id = $1',
+    [decoded.companyId]
+  );
+
+  if (subscription) {
+    const today = new Date().toISOString().split('T')[0];
+    if (subscription.status === 'TRIAL') {
+      const trialEnd = subscription.trial_end_date?.toISOString?.()?.split('T')[0] ?? subscription.trial_end_date;
+      if (trialEnd && trialEnd < today) throw new Error('Trial period expired');
+    } else if (subscription.status === 'MONTHLY' || subscription.status === 'ANNUAL') {
+      const subEnd = subscription.subscription_end_date?.toISOString?.()?.split('T')[0] ?? subscription.subscription_end_date;
+      if (subEnd && subEnd < today) throw new Error('Subscription expired');
+    }
   }
 
   return {

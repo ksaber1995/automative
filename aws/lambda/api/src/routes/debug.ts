@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const debugRoutes = {
   checkClassesTable: async ({ headers }: { headers: { authorization: string } }) => {
@@ -34,7 +34,7 @@ export const debugRoutes = {
       };
     } catch (error) {
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

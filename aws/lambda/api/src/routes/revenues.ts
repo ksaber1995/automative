@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
@@ -146,7 +146,7 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('List revenues error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list revenues' },
       };
     }
@@ -279,7 +279,7 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('Revenue summary error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to generate revenue summary' },
       };
     }

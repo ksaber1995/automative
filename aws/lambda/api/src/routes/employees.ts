@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapEmployeeFromDB(row: any) {
   return {
@@ -55,7 +55,7 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('Create employee error:', error);
       return {
-        status: isAuthError(error) ? 401 : 400,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create employee' },
       };
     }
@@ -99,7 +99,7 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('List employees error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list employees' },
       };
     }
@@ -135,7 +135,7 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('Get employee error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Employee not found' },
       };
     }
@@ -201,7 +201,7 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('Update employee error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update employee' },
       };
     }
@@ -247,7 +247,7 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('Delete employee error:', error);
       return {
-        status: isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete employee' },
       };
     }

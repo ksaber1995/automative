@@ -1,11 +1,13 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnInit, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { MenuModule } from 'primeng/menu';
+import { DialogModule } from 'primeng/dialog';
 import { MenuItem } from 'primeng/api';
 import { AuthService } from '../services/auth.service';
+import { SubscriptionService } from '../services/subscription.service';
 
 @Component({
   selector: 'app-layout',
@@ -15,7 +17,8 @@ import { AuthService } from '../services/auth.service';
     RouterModule,
     ButtonModule,
     AvatarModule,
-    MenuModule
+    MenuModule,
+    DialogModule,
   ],
   template: `
     <div class="min-h-screen bg-gray-100">
@@ -98,9 +101,25 @@ import { AuthService } from '../services/auth.service';
         }
       </aside>
 
+      <!-- Expiry Warning Banner (7 days) -->
+      @if (subscriptionService.showExpiryWarning()) {
+        <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
+          [class.ml-64]="sidebarVisible()">
+          <div class="flex items-center gap-2 text-amber-800">
+            <i class="pi pi-exclamation-triangle text-amber-600"></i>
+            <span class="text-sm font-medium">
+              Your subscription expires in {{ subscriptionService.daysUntilExpiry() }} day(s).
+              Please renew to avoid interruption.
+            </span>
+          </div>
+        </div>
+      }
+
       <!-- Main Content -->
       <main
-        class="pt-16 transition-all duration-300"
+        class="transition-all duration-300"
+        [class.pt-16]="!subscriptionService.showExpiryWarning()"
+        [class.pt-24]="subscriptionService.showExpiryWarning()"
         [class.ml-64]="sidebarVisible()"
         [class.ml-0]="!sidebarVisible()">
         <div class="p-6">
@@ -108,6 +127,46 @@ import { AuthService } from '../services/auth.service';
         </div>
       </main>
     </div>
+
+    <!-- Trial Expired Dialog -->
+    <p-dialog
+      [visible]="subscriptionService.isTrialExpired()"
+      [modal]="true"
+      [closable]="false"
+      [style]="{ width: '480px' }"
+      header="Trial Period Expired"
+    >
+      <div class="text-center py-6 px-4">
+        <i class="pi pi-clock text-6xl text-red-400 mb-4 block"></i>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Your free trial has ended</h3>
+        <p class="text-gray-500 mb-4">
+          Your 2-month trial period has expired. Please contact us to subscribe and continue using the platform.
+        </p>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Subscription Expired Dialog -->
+    <p-dialog
+      [visible]="subscriptionService.isSubscriptionExpired()"
+      [modal]="true"
+      [closable]="false"
+      [style]="{ width: '480px' }"
+      header="Subscription Expired"
+    >
+      <div class="text-center py-6 px-4">
+        <i class="pi pi-ban text-6xl text-red-400 mb-4 block"></i>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Your subscription has expired</h3>
+        <p class="text-gray-500 mb-4">
+          Your subscription has expired. Please contact us to renew your plan and regain full access.
+        </p>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
+      </ng-template>
+    </p-dialog>
   `,
   styles: [`
     :host {
@@ -115,9 +174,10 @@ import { AuthService } from '../services/auth.service';
     }
   `]
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit {
   sidebarVisible = signal(true);
   currentUser = this.authService.currentUser;
+  subscriptionService = inject(SubscriptionService);
 
   menuItems: MenuItem[] = [
     {
@@ -246,6 +306,10 @@ export class LayoutComponent {
     private authService: AuthService,
     private router: Router
   ) {}
+
+  ngOnInit() {
+    this.subscriptionService.load().subscribe({ error: () => {} });
+  }
 
   toggleSidebar() {
     this.sidebarVisible.update(v => !v);

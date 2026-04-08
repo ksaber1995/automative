@@ -1,5 +1,5 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
@@ -250,7 +250,7 @@ export const analyticsRoutes = {
     } catch (error) {
       console.error('Dashboard error:', error);
       return {
-        status: isAuthError(error) ? 401 : 500,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to load dashboard' },
       };
     }
