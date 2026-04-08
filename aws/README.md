@@ -1,6 +1,6 @@
-# Automate Magic AWS Infrastructure
+# Netrofit AWS Infrastructure
 
-This directory contains the AWS infrastructure for the Automate Magic application using AWS CDK.
+This directory contains the AWS infrastructure for the Netrofit application using AWS CDK.
 
 ## Architecture
 

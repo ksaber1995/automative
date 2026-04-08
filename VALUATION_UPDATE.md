@@ -1,4 +1,4 @@
-# Automate Magic - Updated Valuation Analysis
+# Netrofit - Updated Valuation Analysis
 
 **Multi-Vertical Platform vs Single-Vertical Tool**
 

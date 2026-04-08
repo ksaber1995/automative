@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -65,6 +65,12 @@ export class StudentDetailComponent implements OnInit {
   enrollmentForAction = signal<Enrollment | null>(null);
   actionLoading = signal(false);
 
+  remaining = computed(() => {
+    const e = this.enrollmentForAction();
+    if (!e) return 0;
+    return Math.max(0, e.finalPrice - (e.amountPaid || 0));
+  });
+
   // Payment dialog
   showPaymentDialog = false;
   dialogPaymentAmount: number | null = null;
@@ -115,6 +121,11 @@ export class StudentDetailComponent implements OnInit {
     this.enrollmentService.getEnrollmentsByStudent(id).subscribe({
       next: (enrollments) => {
         this.enrollments.set(enrollments);
+        // Auto-load payment & refund history for every enrollment
+        enrollments.forEach(e => {
+          this.loadPaymentHistory(e.id);
+          if ((e.totalRefunded || 0) > 0) this.loadRefundHistory(e.id);
+        });
       },
       error: () => {
         this.notificationService.error('Failed to load enrollments');
@@ -193,10 +204,6 @@ export class StudentDetailComponent implements OnInit {
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
-        // Refresh expanded row history if open
-        if (this.expandedRows[enrollment.id]) {
-          this.loadPaymentHistory(enrollment.id);
-        }
       },
       error: (err) => {
         this.notificationService.error(err?.error?.message || 'Failed to record payment');
@@ -331,5 +338,9 @@ export class StudentDetailComponent implements OnInit {
       case 'PENDING': return 'Pending';
       default: return status;
     }
+  }
+
+  hasRefund(enrollment: any): boolean {
+    return (enrollment.totalRefunded || 0) > 0;
   }
 }

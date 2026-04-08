@@ -70,7 +70,7 @@ export class RegisterComponent {
     this.authService.register(dto).subscribe({
       next: (response) => {
         this.notificationService.success(
-          `Welcome to Automate Magic! Company "${response.company?.name}" has been created successfully.`
+          `Welcome to Netrofit! Company "${response.company?.name}" has been created successfully.`
         );
         setTimeout(() => {
           this.router.navigate(['/dashboard']);

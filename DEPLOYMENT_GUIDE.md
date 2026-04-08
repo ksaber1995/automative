@@ -1,7 +1,7 @@
 # Multi-Tenant SaaS Deployment Guide
 
 ## Overview
-This guide covers the deployment of the multi-tenant transformation for the Automate Magic application. This is a **BREAKING CHANGE** that will require all users to re-login.
+This guide covers the deployment of the multi-tenant transformation for the Netrofit application. This is a **BREAKING CHANGE** that will require all users to re-login.
 
 ## ⚠️ Critical Warnings
 

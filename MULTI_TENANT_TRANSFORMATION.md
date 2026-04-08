@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully transformed the Automate Magic application from a single-tenant system into a fully multi-tenant SaaS platform with complete company-level data isolation.
+Successfully transformed the Netrofit application from a single-tenant system into a fully multi-tenant SaaS platform with complete company-level data isolation.
 
 ## ✅ Completed Work
 

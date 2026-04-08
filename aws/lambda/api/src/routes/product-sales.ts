@@ -1,5 +1,5 @@
 import { insert, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 import { getClient } from '../db/connection';
 
 function mapProductSaleFromDB(row: any) {
@@ -109,7 +109,7 @@ export const productSalesRoutes = {
       await client.query('ROLLBACK');
       console.error('Create product sale error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create product sale' },
       };
     } finally {
@@ -163,7 +163,7 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('List product sales error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list product sales' },
       };
     }
@@ -261,7 +261,7 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Product sales summary error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to generate product sales summary' },
       };
     }
@@ -320,7 +320,7 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Top products error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get top products' },
       };
     }
@@ -356,7 +356,7 @@ export const productSalesRoutes = {
     } catch (error) {
       console.error('Get product sale error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Product sale not found' },
       };
     }

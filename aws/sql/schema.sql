@@ -1,5 +1,5 @@
 -- Automative Database Schema
--- PostgreSQL Database for Automate Magic Application
+-- PostgreSQL Database for Netrofit Application
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

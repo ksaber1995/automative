@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
@@ -25,7 +25,7 @@ export const revenuesRoutes = {
           e.company_id,
           e.branch_id,
           b.name as branch_name,
-          e.final_price as amount,
+          e.amount_paid as amount,
           CONCAT('Enrollment: ', s.first_name, ' ', s.last_name, ' - ', c.name) as description,
           e.enrollment_date as date,
           e.payment_status,
@@ -146,7 +146,7 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('List revenues error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list revenues' },
       };
     }
@@ -199,7 +199,7 @@ export const revenuesRoutes = {
 
       // Get total revenue from enrollments
       const enrollmentRevenueQuery = `
-        SELECT COALESCE(SUM(e.final_price), 0) as total
+        SELECT COALESCE(SUM(e.amount_paid), 0) as total
         FROM enrollments e
         ${enrollmentConditions}
       `;
@@ -216,7 +216,7 @@ export const revenuesRoutes = {
         SELECT
           b.id as branch_id,
           b.name as branch_name,
-          COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) as revenue
+          COALESCE(SUM(e.amount_paid), 0) + COALESCE(SUM(ps.total_amount), 0) as revenue
         FROM branches b
         LEFT JOIN enrollments e ON b.id = e.branch_id AND e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL')
           ${queryParams.startDate ? `AND e.enrollment_date >= $${params.indexOf(queryParams.startDate) + 1}` : ''}
@@ -236,7 +236,7 @@ export const revenuesRoutes = {
           TO_CHAR(date, 'YYYY-MM') as month,
           SUM(amount) as revenue
         FROM (
-          SELECT e.enrollment_date as date, e.final_price as amount
+          SELECT e.enrollment_date as date, e.amount_paid as amount
           FROM enrollments e
           ${enrollmentConditions}
           UNION ALL
@@ -279,7 +279,7 @@ export const revenuesRoutes = {
     } catch (error) {
       console.error('Revenue summary error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to generate revenue summary' },
       };
     }

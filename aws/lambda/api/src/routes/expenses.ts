@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 function mapExpenseFromDB(row: any) {
   const amount = parseFloat(row.amount);
@@ -64,7 +64,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Create expense error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create expense' },
       };
     }
@@ -126,7 +126,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('List expenses error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list expenses' },
       };
     }
@@ -202,7 +202,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get due expenses error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get due expenses' },
       };
     }
@@ -238,7 +238,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get expense error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Expense not found' },
       };
     }
@@ -308,7 +308,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Update expense error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update expense' },
       };
     }
@@ -333,7 +333,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Delete expense error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to delete expense' },
       };
     }
@@ -390,7 +390,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Pay recurring error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to pay recurring expense' },
       };
     }
@@ -463,7 +463,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Pay salaries error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to pay salaries' },
       };
     }
@@ -513,7 +513,7 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Pay employee salary error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to pay salary' },
       };
     }

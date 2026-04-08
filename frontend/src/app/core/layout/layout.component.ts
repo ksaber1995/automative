@@ -29,7 +29,7 @@ import { AuthService } from '../services/auth.service';
               class="p-button-text p-button-rounded"
               (click)="toggleSidebar()">
             </button>
-            <h1 class="text-2xl font-bold text-blue-600">Automate Magic</h1>
+            <h1 class="text-2xl font-bold text-blue-600">Netrofit</h1>
           </div>
 
           <div class="flex items-center gap-4">
@@ -180,6 +180,18 @@ export class LayoutComponent {
       label: 'Withdrawals',
       icon: 'pi pi-wallet',
       routerLink: ['/withdrawals'],
+      visible: true
+    },
+    {
+      label: 'Refunds',
+      icon: 'pi pi-replay',
+      routerLink: ['/refunds'],
+      visible: true
+    },
+    {
+      label: 'Dues',
+      icon: 'pi pi-credit-card',
+      routerLink: ['/dues'],
       visible: true
     },
     // {

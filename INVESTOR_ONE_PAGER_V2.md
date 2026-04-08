@@ -1,4 +1,4 @@
-# Automate Magic - Investor One-Pager v2.0
+# Netrofit - Investor One-Pager v2.0
 
 **The Operating System for Multi-Location Businesses**
 
@@ -8,7 +8,7 @@
 
 **The Problem:** Small-to-medium multi-location businesses (academies, fitness studios, clinics, retail chains) waste 10-15 hours/week on manual operations, lose 5-10% revenue from poor tracking, and can't scale beyond 3-5 locations without operational chaos.
 
-**The Solution:** Automate Magic is a **horizontal multi-tenant SaaS platform** that provides enterprise-grade operations management (students/clients, revenue tracking, multi-location management, team management, analytics) at SMB pricing.
+**The Solution:** Netrofit is a **horizontal multi-tenant SaaS platform** that provides enterprise-grade operations management (students/clients, revenue tracking, multi-location management, team management, analytics) at SMB pricing.
 
 **Go-to-Market Strategy:** Start with robotics academies (underserved, high-growth), validate product-market fit, then expand to adjacent verticals.
 
@@ -70,7 +70,7 @@ Expand to ANY multi-location service business:
 | **Churn** | 0% | <5% |
 | **Market** | Robotics only | + STEM/Coding |
 
-**Customer Testimonial:** *"Automate Magic saved us 12 hours per week. We're opening 2 more locations because we can finally manage the operations."*
+**Customer Testimonial:** *"Netrofit saved us 12 hours per week. We're opening 2 more locations because we can finally manage the operations."*
 
 ---
 
@@ -213,7 +213,7 @@ Smart beachhead market selection:
 
 ## 💡 Investment Highlights
 
-### Why Invest in Automate Magic?
+### Why Invest in Netrofit?
 
 1. ✅ **Validated Beachhead:** 3 paying customers in robotics (proof of concept)
 2. ✅ **Massive TAM:** $4B+ SAM across all multi-location SMBs
@@ -228,7 +228,7 @@ Smart beachhead market selection:
 - **Shopify** started with small online stores → $150B market cap
 - **Toast** started with small restaurants → $10B valuation
 - **Mindbody** started with yoga studios → $1.9B acquisition
-- **Automate Magic** starts with robotics academies → **???**
+- **Netrofit** starts with robotics academies → **???**
 
 ---
 

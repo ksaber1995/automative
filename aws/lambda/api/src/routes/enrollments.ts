@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -18,6 +18,7 @@ function mapEnrollmentFromDB(row: any) {
     paymentMode: row.payment_mode || 'FULL',
     downPayment: parseFloat(row.down_payment || 0),
     amountPaid: parseFloat(row.amount_paid || 0),
+    totalRefunded: parseFloat(row.total_refunded || 0),
     paymentStatus: row.payment_status,
     completionDate: row.completion_date,
     notes: row.notes,
@@ -87,7 +88,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Create enrollment error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create enrollment' },
       };
     }
@@ -139,7 +140,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('List enrollments error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list enrollments' },
       };
     }
@@ -175,7 +176,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get enrollment error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Enrollment not found' },
       };
     }
@@ -197,7 +198,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get student enrollments error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get student enrollments' },
       };
     }
@@ -249,9 +250,119 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Update enrollment error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update enrollment' },
       };
+    }
+  },
+
+  listDues: async ({ query: q, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const conditions: string[] = ['e.company_id = $1', "e.payment_mode = 'INSTALLMENTS'", "e.payment_status != 'PAID'", "e.status != 'DROPPED'"];
+      const params: any[] = [context.companyId];
+      let idx = 2;
+
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        }
+        conditions.push(`e.branch_id = $${idx++}`);
+        params.push(q.branchId);
+      } else if (context.role !== 'ADMIN' && context.branchId) {
+        conditions.push(`e.branch_id = $${idx++}`);
+        params.push(context.branchId);
+      }
+
+      const rows = await query(
+        `SELECT e.id, e.student_id, e.course_id, e.branch_id, e.enrollment_date,
+                e.final_price, e.amount_paid, e.payment_status, e.status,
+                s.first_name || ' ' || s.last_name AS student_name,
+                c.name AS course_name,
+                b.name AS branch_name
+         FROM enrollments e
+         JOIN students s ON e.student_id = s.id
+         JOIN courses c ON e.course_id = c.id
+         JOIN branches b ON e.branch_id = b.id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY e.enrollment_date DESC`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          id: r.id,
+          studentId: r.student_id,
+          studentName: r.student_name,
+          courseId: r.course_id,
+          courseName: r.course_name,
+          branchId: r.branch_id,
+          branchName: r.branch_name,
+          enrollmentDate: r.enrollment_date,
+          finalPrice: parseFloat(r.final_price),
+          amountPaid: parseFloat(r.amount_paid || 0),
+          remaining: Math.max(0, parseFloat(r.final_price) - parseFloat(r.amount_paid || 0)),
+          paymentStatus: r.payment_status,
+          status: r.status,
+        })),
+      };
+    } catch (error) {
+      return { status: isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list dues' } };
+    }
+  },
+
+  listRefunds: async ({ query: q, headers }: { query: { branchId?: string; studentId?: string; type?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      const conditions: string[] = ['r.company_id = $1'];
+      const params: any[] = [context.companyId];
+      let idx = 2;
+
+      if (q.branchId) { conditions.push(`e.branch_id = $${idx++}`); params.push(q.branchId); }
+      if (q.studentId) { conditions.push(`r.student_id = $${idx++}`); params.push(q.studentId); }
+      if (q.type) { conditions.push(`r.type = $${idx++}`); params.push(q.type); }
+      if (q.startDate) { conditions.push(`r.refund_date >= $${idx++}`); params.push(q.startDate); }
+      if (q.endDate) { conditions.push(`r.refund_date <= $${idx++}`); params.push(q.endDate); }
+
+      const refunds = await query(
+        `SELECT r.*,
+                s.first_name || ' ' || s.last_name AS student_name,
+                c.name AS course_name,
+                b.name AS branch_name,
+                e.branch_id
+         FROM refunds r
+         JOIN enrollments e ON r.enrollment_id = e.id
+         JOIN students s ON r.student_id = s.id
+         JOIN courses c ON e.course_id = c.id
+         JOIN branches b ON e.branch_id = b.id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY r.refund_date DESC, r.created_at DESC`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: refunds.map((r: any) => ({
+          id: r.id,
+          enrollmentId: r.enrollment_id,
+          companyId: r.company_id,
+          studentId: r.student_id,
+          studentName: r.student_name,
+          courseName: r.course_name,
+          branchName: r.branch_name,
+          branchId: r.branch_id,
+          amount: parseFloat(r.amount),
+          refundDate: r.refund_date,
+          type: r.type,
+          reason: r.reason,
+          createdAt: r.created_at,
+        })),
+      };
+    } catch (error) {
+      return { status: isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list refunds' } };
     }
   },
 
@@ -287,9 +398,11 @@ export const enrollmentsRoutes = {
 
       const refundAmount = parseFloat(body.amount);
       const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
+      const currentTotalRefunded = parseFloat(enrollment.total_refunded || 0);
+      const refundableAmount = currentAmountPaid - currentTotalRefunded;
 
-      if (refundAmount > currentAmountPaid) {
-        return { status: 400 as const, body: { message: `Cannot refund more than amount paid (${currentAmountPaid})` } };
+      if (refundAmount > refundableAmount) {
+        return { status: 400 as const, body: { message: `Cannot refund more than refundable amount (${refundableAmount.toFixed(2)})` } };
       }
 
       const refund = await insert('refunds', {
@@ -302,14 +415,13 @@ export const enrollmentsRoutes = {
         reason: body.reason || null,
       });
 
-      // Update enrollment amount_paid and payment_status
-      const newAmountPaid = Math.max(0, currentAmountPaid - refundAmount);
-      const finalPrice = parseFloat(enrollment.final_price);
-      const newStatus = newAmountPaid <= 0 ? 'REFUNDED' : newAmountPaid >= finalPrice ? 'PAID' : 'PARTIAL';
+      // Increment total_refunded; only set REFUNDED if fully refunded, otherwise keep payment_status
+      const newTotalRefunded = currentTotalRefunded + refundAmount;
+      const isFullyRefunded = newTotalRefunded >= currentAmountPaid;
 
       await query(
-        'UPDATE enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
-        [newAmountPaid, newStatus, params.id]
+        `UPDATE enrollments SET total_refunded = $1${isFullyRefunded ? ", payment_status = 'REFUNDED'" : ''}, updated_at = NOW() WHERE id = $2`,
+        [newTotalRefunded, params.id]
       );
 
       return {
@@ -358,7 +470,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Get payments error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get payments' },
       };
     }
@@ -377,6 +489,14 @@ export const enrollmentsRoutes = {
         return { status: 404 as const, body: { message: 'Enrollment not found' } };
       }
 
+      const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
+      const finalPrice = parseFloat(enrollment.final_price);
+      const remaining = finalPrice - currentAmountPaid;
+
+      if (parseFloat(body.amount) > remaining) {
+        return { status: 400 as const, body: { message: `Payment exceeds remaining balance (${remaining.toFixed(2)})` } };
+      }
+
       const payment = await insert('enrollment_payments', {
         enrollment_id: params.id,
         company_id: context.companyId,
@@ -386,8 +506,7 @@ export const enrollmentsRoutes = {
       });
 
       // Update enrollment amount_paid and payment_status
-      const newAmountPaid = parseFloat(enrollment.amount_paid || 0) + parseFloat(body.amount);
-      const finalPrice = parseFloat(enrollment.final_price);
+      const newAmountPaid = currentAmountPaid + parseFloat(body.amount);
       const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid);
 
       await query(
@@ -410,7 +529,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Add payment error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to add payment' },
       };
     }
@@ -456,7 +575,7 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Delete enrollment error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete enrollment' },
       };
     }

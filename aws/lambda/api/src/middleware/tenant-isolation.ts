@@ -38,6 +38,18 @@ export interface TenantContext {
  *   [context.companyId]
  * );
  */
+const AUTH_ERROR_MESSAGES = [
+  'No authentication token provided',
+  'Invalid token',
+  'Invalid token: missing company context',
+  'Invalid refresh token',
+];
+
+export function isAuthError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : '';
+  return AUTH_ERROR_MESSAGES.includes(msg);
+}
+
 export async function extractTenantContext(
   authHeader?: string
 ): Promise<TenantContext> {

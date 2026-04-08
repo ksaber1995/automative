@@ -5,8 +5,8 @@
 
 const { RDSDataClient, ExecuteStatementCommand } = require('@aws-sdk/client-rds-data');
 
-const CLUSTER_ARN = 'arn:aws:rds:eu-west-1:365729671026:cluster:automatemagicstack-dev-automatemagicauroradbef2379-kvvyhx0r8i95';
-const SECRET_ARN = 'arn:aws:secretsmanager:eu-west-1:365729671026:secret:/dev/automate-magic/db-credentials-RA7OwZ';
+const CLUSTER_ARN = 'arn:aws:rds:eu-west-1:365729671026:cluster:automatemagicstack-dev-automatemagicauroradbef2379-yqb2wihdkbe8';
+const SECRET_ARN = 'arn:aws:secretsmanager:eu-west-1:365729671026:secret:/dev/automate-magic/db-credentials-i8zzeQ';
 const DATABASE = 'automative';
 
 const client = new RDSDataClient({ region: 'eu-west-1' });
@@ -134,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_companies_code ON companies(code);
 CREATE INDEX IF NOT EXISTS idx_companies_email ON companies(email);
 CREATE INDEX IF NOT EXISTS idx_companies_subscription_status ON companies(subscription_status);
 
-CREATE TRIGGER update_companies_updated_at
+CREATE OR REPLACE TRIGGER update_companies_updated_at
     BEFORE UPDATE ON companies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -158,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_users_branch_id ON users(branch_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- BRANCHES TABLE
 CREATE TABLE IF NOT EXISTS branches (
@@ -186,7 +186,7 @@ CREATE INDEX IF NOT EXISTS idx_branches_company_id ON branches(company_id);
 
 ALTER TABLE users ADD CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL;
 
-CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- EMPLOYEES TABLE (before classes, which references it)
 CREATE TABLE IF NOT EXISTS employees (
@@ -213,7 +213,7 @@ CREATE INDEX IF NOT EXISTS idx_employees_branch_id ON employees(branch_id);
 CREATE INDEX IF NOT EXISTS idx_employees_is_global ON employees(is_global);
 CREATE INDEX IF NOT EXISTS idx_employees_company_id ON employees(company_id);
 
-CREATE TRIGGER update_employees_updated_at BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_employees_updated_at BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- COURSES TABLE
 CREATE TABLE IF NOT EXISTS courses (
@@ -239,7 +239,7 @@ CREATE INDEX IF NOT EXISTS idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX IF NOT EXISTS idx_courses_code ON courses(code);
 CREATE INDEX IF NOT EXISTS idx_courses_company_id ON courses(company_id);
 
-CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- CLASSES TABLE
 CREATE TABLE IF NOT EXISTS classes (
@@ -272,7 +272,7 @@ CREATE INDEX IF NOT EXISTS idx_classes_branch_id ON classes(branch_id);
 CREATE INDEX IF NOT EXISTS idx_classes_instructor_id ON classes(instructor_id);
 CREATE INDEX IF NOT EXISTS idx_classes_company_id ON classes(company_id);
 
-CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- STUDENTS TABLE
 CREATE TABLE IF NOT EXISTS students (
@@ -304,7 +304,7 @@ CREATE INDEX IF NOT EXISTS idx_students_churn_date ON students(churn_date);
 CREATE INDEX IF NOT EXISTS idx_students_email ON students(email);
 CREATE INDEX IF NOT EXISTS idx_students_company_id ON students(company_id);
 
-CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ENROLLMENTS TABLE
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -320,6 +320,10 @@ CREATE TABLE IF NOT EXISTS enrollments (
     discount_amount DECIMAL(10, 2) DEFAULT 0,
     final_price DECIMAL(10, 2) NOT NULL,
     payment_status VARCHAR(50) NOT NULL CHECK (payment_status IN ('PENDING', 'PARTIAL', 'PAID', 'REFUNDED')),
+    payment_mode VARCHAR(50) DEFAULT 'FULL',
+    down_payment DECIMAL(10, 2) DEFAULT 0,
+    amount_paid DECIMAL(10, 2) DEFAULT 0,
+    total_refunded DECIMAL(10, 2) DEFAULT 0,
     completion_date DATE,
     notes TEXT,
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
@@ -337,7 +341,21 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_branch_id ON enrollments(branch_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
 CREATE INDEX IF NOT EXISTS idx_enrollments_company_id ON enrollments(company_id);
 
-CREATE TRIGGER update_enrollments_updated_at BEFORE UPDATE ON enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- ENROLLMENT PAYMENTS TABLE
+CREATE TABLE IF NOT EXISTS enrollment_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrollment_payments_enrollment_id ON enrollment_payments(enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_enrollment_payments_company_id ON enrollment_payments(company_id);
+
+CREATE OR REPLACE TRIGGER update_enrollments_updated_at BEFORE UPDATE ON enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- REVENUES TABLE
 CREATE TABLE IF NOT EXISTS revenues (
@@ -363,7 +381,7 @@ CREATE TABLE IF NOT EXISTS revenues (
 CREATE INDEX IF NOT EXISTS idx_revenues_branch_id ON revenues(branch_id);
 CREATE INDEX IF NOT EXISTS idx_revenues_date ON revenues(date);
 
-CREATE TRIGGER update_revenues_updated_at BEFORE UPDATE ON revenues FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_revenues_updated_at BEFORE UPDATE ON revenues FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- EXPENSES TABLE
 CREATE TABLE IF NOT EXISTS expenses (
@@ -390,8 +408,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
     FOREIGN KEY (recurring_template_id) REFERENCES expenses(id) ON DELETE SET NULL,
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_expenses_branch_id ON expenses(branch_id);
@@ -399,7 +416,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses(type);
 CREATE INDEX IF NOT EXISTS idx_expenses_company_id ON expenses(company_id);
 
-CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- CASH STATE TABLE
 CREATE TABLE IF NOT EXISTS cash_state (
@@ -408,10 +425,11 @@ CREATE TABLE IF NOT EXISTS cash_state (
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
     notes TEXT,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-INSERT INTO cash_state (current_balance) VALUES (0);
+CREATE INDEX IF NOT EXISTS idx_cash_state_company_id ON cash_state(company_id);
 
 -- WITHDRAWALS TABLE
 CREATE TABLE IF NOT EXISTS withdrawals (
@@ -435,10 +453,10 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 );
 
 CREATE INDEX IF NOT EXISTS idx_withdrawals_branch_id ON withdrawals(branch_id);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_date ON withdrawals(date);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_date ON withdrawals(withdrawal_date);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_company_id ON withdrawals(company_id);
 
-CREATE TRIGGER update_withdrawals_updated_at BEFORE UPDATE ON withdrawals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_withdrawals_updated_at BEFORE UPDATE ON withdrawals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- DEBTS TABLE
 CREATE TABLE IF NOT EXISTS debts (
@@ -452,16 +470,19 @@ CREATE TABLE IF NOT EXISTS debts (
     due_date DATE,
     status VARCHAR(50) NOT NULL CHECK (status IN ('ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED')),
     notes TEXT,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_debts_company_id ON debts(company_id);
+
 CREATE INDEX IF NOT EXISTS idx_debts_branch_id ON debts(branch_id);
 CREATE INDEX IF NOT EXISTS idx_debts_status ON debts(status);
 CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
 
-CREATE TRIGGER update_debts_updated_at BEFORE UPDATE ON debts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_debts_updated_at BEFORE UPDATE ON debts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- DEBT PAYMENTS TABLE
 CREATE TABLE IF NOT EXISTS debt_payments (
@@ -504,7 +525,9 @@ CREATE INDEX IF NOT EXISTS idx_products_branch_id ON products(branch_id);
 CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
 CREATE INDEX IF NOT EXISTS idx_products_company_id ON products(company_id);
 
-CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE expenses ADD CONSTRAINT fk_expenses_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
 
 -- PRODUCT SALES TABLE
 CREATE TABLE IF NOT EXISTS product_sales (
@@ -528,6 +551,28 @@ CREATE INDEX IF NOT EXISTS idx_product_sales_product_id ON product_sales(product
 CREATE INDEX IF NOT EXISTS idx_product_sales_branch_id ON product_sales(branch_id);
 CREATE INDEX IF NOT EXISTS idx_product_sales_sale_date ON product_sales(sale_date);
 CREATE INDEX IF NOT EXISTS idx_product_sales_company_id ON product_sales(company_id);
+
+-- REFUNDS TABLE
+CREATE TABLE IF NOT EXISTS refunds (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id UUID,
+    student_id UUID,
+    branch_id UUID,
+    amount DECIMAL(10, 2) NOT NULL,
+    type VARCHAR(50),
+    reason TEXT,
+    refund_date DATE NOT NULL,
+    payment_method VARCHAR(50),
+    notes TEXT,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE SET NULL,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_refunds_company_id ON refunds(company_id);
+CREATE INDEX IF NOT EXISTS idx_refunds_refund_date ON refunds(refund_date);
 
 -- VIEWS
 CREATE VIEW revenue_summary_by_branch AS

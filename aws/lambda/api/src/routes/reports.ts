@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 interface FinancialData {
   enrollments: any[];
@@ -420,7 +420,7 @@ export const reportsRoutes = {
     } catch (error) {
       console.error('Generate financial report error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to generate financial report' },
       };
     }
@@ -453,7 +453,7 @@ export const reportsRoutes = {
     } catch (error) {
       console.error('Generate monthly financial report error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to generate monthly financial report' },
       };
     }
@@ -496,7 +496,7 @@ export const reportsRoutes = {
     } catch (error) {
       console.error('Generate branch report error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to generate branch report' },
       };
     }
@@ -528,7 +528,7 @@ export const reportsRoutes = {
     } catch (error) {
       console.error('Generate churn report error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to generate churn report' },
       };
     }

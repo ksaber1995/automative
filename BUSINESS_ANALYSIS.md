@@ -1,4 +1,4 @@
-# Automate Magic — Business Analysis Report
+# Netrofit — Business Analysis Report
 
 > Prepared: April 2026 | Context: Multi-tenant SaaS for education businesses in Egypt & Saudi Arabia
 

@@ -1,5 +1,5 @@
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 function mapStudentFromDB(row: any) {
   return {
@@ -63,7 +63,7 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Create student error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create student' },
       };
     }
@@ -104,7 +104,7 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('List students error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list students' },
       };
     }
@@ -143,7 +143,7 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Get student error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Student not found' },
       };
     }
@@ -215,7 +215,7 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Update student error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update student' },
       };
     }
@@ -264,7 +264,7 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Delete student error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete student' },
       };
     }

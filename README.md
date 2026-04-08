@@ -1,4 +1,4 @@
-# Automate Magic
+# Netrofit
 
 ## The Operating System for Multi-Location Service Businesses
 

@@ -1,6 +1,6 @@
 # Migration Guide: Backend to AWS
 
-This guide will help you migrate the Automate Magic application from the file-based backend to AWS infrastructure.
+This guide will help you migrate the Netrofit application from the file-based backend to AWS infrastructure.
 
 ## What Changed
 

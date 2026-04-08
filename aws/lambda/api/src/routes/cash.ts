@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isAuthError } from '../middleware/tenant-isolation';
 
 export const cashRoutes = {
   current: async ({ headers }: { headers: { authorization: string } }) => {
@@ -63,7 +63,7 @@ export const cashRoutes = {
     } catch (error) {
       console.error('Get current cash error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get current cash' },
       };
     }
@@ -80,7 +80,7 @@ export const cashRoutes = {
     } catch (error) {
       console.error('Get cash state error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get cash state' },
       };
     }
@@ -100,7 +100,7 @@ export const cashRoutes = {
     } catch (error) {
       console.error('Adjust cash error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to adjust cash' },
       };
     }
@@ -118,7 +118,7 @@ export const cashRoutes = {
     } catch (error) {
       console.error('Get cash flow error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get cash flow' },
       };
     }

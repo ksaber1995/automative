@@ -1,5 +1,5 @@
 import { query, queryOne, update } from '../db/connection';
-import { extractTenantContext } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
 
 export const companiesRoutes = {
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
@@ -58,7 +58,7 @@ export const companiesRoutes = {
     } catch (error) {
       console.error('Update company settings error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to update settings' },
       };
     }

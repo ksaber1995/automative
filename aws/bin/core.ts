@@ -16,7 +16,7 @@ new CoreStack(app, `AutomateMagicStack-${stage}`, {
     account: process.env.CDK_DEFAULT_ACCOUNT || '365729671026',
     region: process.env.CDK_DEFAULT_REGION || 'eu-west-1',
   },
-  description: `Automate Magic Application Stack (${stage})`,
+  description: `Netrofit Application Stack (${stage})`,
   tags: {
     Environment: stage,
     Application: 'AutomateMagic',

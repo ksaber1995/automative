@@ -1,5 +1,5 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
@@ -18,7 +18,7 @@ export const analyticsRoutes = {
 
       // --- Company-wide revenue ---
       const enrollmentRevenueData = await query(
-        `SELECT COALESCE(SUM(final_price), 0) as total_revenue
+        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM enrollments
          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
            AND enrollment_date >= $2 AND enrollment_date <= $3`,
@@ -98,7 +98,7 @@ export const analyticsRoutes = {
            b.code,
            -- Enrollment revenue
            COALESCE((
-             SELECT SUM(e.final_price) FROM enrollments e
+             SELECT SUM(e.amount_paid) FROM enrollments e
              WHERE e.branch_id = b.id AND e.company_id = $1
                AND e.payment_status IN ('PAID', 'PARTIAL')
                AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
@@ -125,7 +125,7 @@ export const analyticsRoutes = {
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
          FROM branches b
          WHERE b.company_id = $1
-         ORDER BY (COALESCE((SELECT SUM(e.final_price) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0)) DESC`,
+         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0)) DESC`,
         [context.companyId, startDate, endDate]
       );
 
@@ -174,7 +174,7 @@ export const analyticsRoutes = {
                 SUM(refunds) as refunds,
                 SUM(revenue) - SUM(refunds) - SUM(expenses) as profit
          FROM (
-           SELECT enrollment_date as date, final_price as revenue, 0 as expenses, 0 as refunds
+           SELECT enrollment_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
            FROM enrollments
            WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
              AND enrollment_date >= $2 AND enrollment_date <= $3
@@ -250,7 +250,7 @@ export const analyticsRoutes = {
     } catch (error) {
       console.error('Dashboard error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to load dashboard' },
       };
     }

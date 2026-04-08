@@ -1,7 +1,7 @@
 {
   "name": "automate-magic-aws",
   "version": "1.0.0",
-  "description": "AWS Infrastructure for Automate Magic",
+  "description": "AWS Infrastructure for Netrofit",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",

@@ -1,6 +1,6 @@
-# Automate Magic - Financial Model & Projections
+# Netrofit - Financial Model & Projections
 
-**Company:** Automate Magic
+**Company:** Netrofit
 **Product:** Multi-Tenant SaaS Platform for Robotics Academy Management
 **Stage:** Early Revenue (3 Paying Clients)
 **Model Date:** February 2026
@@ -310,7 +310,7 @@
 
 ## 💡 Investment Highlights
 
-### Why Invest in Automate Magic?
+### Why Invest in Netrofit?
 
 1. ✅ **Validated Product:** 3 paying customers, real revenue
 2. ✅ **Strong Unit Economics:** LTV:CAC of 19:1 (7:1 at scale)

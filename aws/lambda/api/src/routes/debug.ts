@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
 
 export const debugRoutes = {
   checkClassesTable: async ({ headers }: { headers: { authorization: string } }) => {
@@ -34,7 +34,7 @@ export const debugRoutes = {
       };
     } catch (error) {
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

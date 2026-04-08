@@ -16,6 +16,7 @@ export interface Enrollment {
   paymentMode: PaymentMode;
   downPayment: number;
   amountPaid: number;
+  totalRefunded: number;
   paymentStatus: PaymentStatus;
   completionDate: string | null;
   notes: string | null;
@@ -49,6 +50,29 @@ export interface Refund {
   type: 'FULL' | 'PARTIAL';
   reason: string | null;
   createdAt: string;
+}
+
+export interface RefundWithDetails extends Refund {
+  studentName: string;
+  courseName: string;
+  branchName: string;
+  branchId: string;
+}
+
+export interface DueEnrollment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  courseId: string;
+  courseName: string;
+  branchId: string;
+  branchName: string;
+  enrollmentDate: string;
+  finalPrice: number;
+  amountPaid: number;
+  remaining: number;
+  paymentStatus: string;
+  status: string;
 }
 
 export interface CreateRefundDto {

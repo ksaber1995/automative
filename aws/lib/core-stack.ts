@@ -184,7 +184,7 @@ export class CoreStack extends cdk.Stack {
     // =============================================
     this.api = new apigateway.RestApi(this, 'AutomateMagicAPI', {
       restApiName: `automate-magic-api-${stage}`,
-      description: 'Automate Magic API Gateway',
+      description: 'Netrofit API Gateway',
       defaultCorsPreflightOptions: {
         allowOrigins: stage === 'prod'
           ? ['https://yourdomain.com'] // Replace with your production domain

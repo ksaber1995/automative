@@ -1,4 +1,4 @@
-# Automate Magic - Investor One-Pager
+# Netrofit - Investor One-Pager
 
 **Multi-Tenant SaaS Platform for Robotics Academy Management**
 
@@ -8,7 +8,7 @@
 
 **The Problem:** Robotics academies waste 10-15 hours/week on manual admin work (Excel, paper, disconnected tools), lose 5-10% revenue from tracking errors, and can't scale operations.
 
-**The Solution:** Automate Magic is the first all-in-one platform built specifically for robotics academies with multi-branch support, automated revenue tracking, and real-time financial insights.
+**The Solution:** Netrofit is the first all-in-one platform built specifically for robotics academies with multi-branch support, automated revenue tracking, and real-time financial insights.
 
 **Market:** $3.2B robotics education market growing at 20% CAGR. 15,000+ addressable academies in English-speaking markets = $54M SAM.
 
@@ -23,7 +23,7 @@
 | **ARR** | $9,000 | $180,000 |
 | **Churn** | 0% | <5% |
 
-**Customer Testimonial:** *"Automate Magic saved us 12 hours per week on admin work. Game changer!"*
+**Customer Testimonial:** *"Netrofit saved us 12 hours per week on admin work. Game changer!"*
 
 ---
 

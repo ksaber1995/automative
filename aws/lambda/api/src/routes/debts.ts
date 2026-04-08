@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext } from '../middleware/tenant-isolation';
+import { extractTenantContext, isAuthError } from '../middleware/tenant-isolation';
 
 export const debtsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
@@ -25,7 +25,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('Create debt error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 400,
+        status: isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create debt' },
       };
     }
@@ -44,7 +44,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('List debts error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to list debts' },
       };
     }
@@ -69,7 +69,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('Debts summary error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 500,
+        status: isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to generate debts summary' },
       };
     }
@@ -88,7 +88,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('Get debt error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Debt not found' },
       };
     }
@@ -107,7 +107,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('Update debt error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to update debt' },
       };
     }
@@ -126,7 +126,7 @@ export const debtsRoutes = {
     } catch (error) {
       console.error('Delete debt error:', error);
       return {
-        status: error.message === 'No authentication token provided' ? 401 : 404,
+        status: isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete debt' },
       };
     }

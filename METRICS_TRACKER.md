@@ -1,4 +1,4 @@
-# Automate Magic - Key Metrics Tracker
+# Netrofit - Key Metrics Tracker
 
 **Purpose:** Track essential SaaS metrics weekly/monthly to measure business health and fundraising progress.
 
@@ -273,7 +273,7 @@
 
 ## 📧 Monthly Investor Update Template
 
-**Subject: Automate Magic - [Month] Update**
+**Subject: Netrofit - [Month] Update**
 
 Hi [Investor Name],
 

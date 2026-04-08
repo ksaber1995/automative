@@ -1,4 +1,4 @@
-# Automate Magic - Investor Pitch Deck
+# Netrofit - Investor Pitch Deck
 
 **Seed Round Fundraise: $200,000 - $300,000**
 **Pre-Money Valuation: $1,500,000**
@@ -8,7 +8,7 @@
 
 ## Slide 1: Cover Slide
 
-### AUTOMATE MAGIC
+### Netrofit
 **The Operating System for Multi-Location Service Businesses**
 
 *Starting with robotics academies, expanding to every industry*
@@ -56,7 +56,7 @@
 
 ### The Operating System for Multi-Location Businesses
 
-**Automate Magic** is a **horizontal multi-tenant SaaS platform** with:
+**Netrofit** is a **horizontal multi-tenant SaaS platform** with:
 
 ✅ **Client/Member Management** - Works for students, patients, customers, clients
 ✅ **Financial Tracking** - Automated revenue tracking, expense management, payroll
@@ -187,7 +187,7 @@
 - ✅ **Multi-location operators** (customers have 2-4 locations each)
 
 #### Customer Testimonials:
-*"Automate Magic saved us 12 hours per week on admin work. We're opening 2 more locations because we can finally manage operations."*
+*"Netrofit saved us 12 hours per week on admin work. We're opening 2 more locations because we can finally manage operations."*
 — [Customer Name, Robotics Academy]
 
 *"Finally, I can see my real-time profit across all three locations in one dashboard."*
@@ -235,7 +235,7 @@
 
 **Their Problem:** Not purpose-built for multi-location operations. We are.
 
-### Automate Magic's Winning Position:
+### Netrofit's Winning Position:
 
 ✅ **Multi-vertical from day 1** - Not locked into single industry
 ✅ **Purpose-built for multi-location** - Not generic
@@ -248,7 +248,7 @@
 **The Shopify for Multi-Location Service Businesses**
 - Shopify: Started with small stores → Now powers millions
 - Toast: Started with small restaurants → $10B valuation
-- **Automate Magic:** Starting with robotics → Expanding to all industries
+- **Netrofit:** Starting with robotics → Expanding to all industries
 
 ---
 
@@ -642,4 +642,4 @@ Founder & CEO
 ---
 
 **CONFIDENTIAL - Not for Distribution**
-© 2026 Automate Magic. All rights reserved.
+© 2026 Netrofit. All rights reserved.

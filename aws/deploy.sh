@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Deploy script for Automate Magic AWS Infrastructure
+# Deploy script for Netrofit AWS Infrastructure
 # Usage: ./deploy.sh [stage] [profile]
 # Example: ./deploy.sh prod personal
 
 set -e
 
 echo "================================="
-echo "Automate Magic AWS Deployment"
+echo "Netrofit AWS Deployment"
 echo "================================="
 
 # Check if AWS CLI is installed

@@ -1,4 +1,4 @@
-# Automate Magic - Market Expansion Strategy
+# Netrofit - Market Expansion Strategy
 
 **From Robotics Academies to Every Multi-Location Business**
 

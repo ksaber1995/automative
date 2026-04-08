@@ -70,6 +70,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/withdrawals/withdrawals.routes').then(m => m.WITHDRAWALS_ROUTES)
       },
       {
+        path: 'refunds',
+        loadChildren: () => import('./features/refunds/refunds.routes').then(m => m.REFUNDS_ROUTES)
+      },
+      {
+        path: 'dues',
+        loadChildren: () => import('./features/dues/dues.routes').then(m => m.DUES_ROUTES)
+      },
+      {
         path: 'debts',
         loadChildren: () => import('./features/debts/debts.routes').then(m => m.DEBTS_ROUTES)
       },

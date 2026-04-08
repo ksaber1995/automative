@@ -1,7 +1,7 @@
 {
   "name": "automate-magic-api-lambda",
   "version": "1.0.0",
-  "description": "Automate Magic API Lambda Function",
+  "description": "Netrofit API Lambda Function",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

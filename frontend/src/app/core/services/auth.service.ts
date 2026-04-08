@@ -39,9 +39,11 @@ export class AuthService {
           this.currentUserSubject.next(user);
           this.setCachedUser(user);
         },
-        error: () => {
-          // Keep user logged in with cached data even if backend fails
-          console.log('Using cached user data (backend unavailable or token expired)');
+        error: (err) => {
+          if (err?.status === 401) {
+            this.logout();
+          }
+          // For other errors (network issues), keep cached data for offline support
         }
       });
     } else if (token && !cachedUser) {

@@ -1,6 +1,6 @@
 # Database Population Scripts
 
-This folder contains SQL scripts to populate the Automate Magic database with sample data for development and testing.
+This folder contains SQL scripts to populate the Netrofit database with sample data for development and testing.
 
 ## Overview
 

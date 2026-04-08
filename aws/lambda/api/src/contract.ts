@@ -349,6 +349,22 @@ const CreateEnrollmentPaymentSchema = z.object({
   notes: z.string().optional(),
 });
 
+const DueEnrollmentSchema = z.object({
+  id: UUIDSchema,
+  studentId: UUIDSchema,
+  studentName: z.string(),
+  courseId: UUIDSchema,
+  courseName: z.string(),
+  branchId: UUIDSchema,
+  branchName: z.string(),
+  enrollmentDate: z.string(),
+  finalPrice: z.number(),
+  amountPaid: z.number(),
+  remaining: z.number(),
+  paymentStatus: PaymentStatusSchema,
+  status: EnrollmentStatusSchema,
+});
+
 const RefundSchema = z.object({
   id: UUIDSchema,
   enrollmentId: UUIDSchema,
@@ -359,6 +375,13 @@ const RefundSchema = z.object({
   type: z.enum(['FULL', 'PARTIAL']),
   reason: z.string().nullable(),
   createdAt: z.string(),
+});
+
+const RefundWithDetailsSchema = RefundSchema.extend({
+  studentName: z.string(),
+  courseName: z.string(),
+  branchName: z.string(),
+  branchId: UUIDSchema,
 });
 
 const CreateRefundSchema = z.object({
@@ -420,8 +443,8 @@ const CreateExpenseSchema = z.object({
   vendor: z.string().optional(),
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
-  assetName: z.string().optional(),
-  amortizationMonths: z.number().int().min(1).optional(),
+  assetName: z.string().nullish(),
+  amortizationMonths: z.number().int().min(1).nullish(),
 });
 
 const UpdateExpenseSchema = CreateExpenseSchema.partial();
@@ -986,6 +1009,30 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(EnrollmentSchema),
+      },
+    },
+    listDues: {
+      method: 'GET',
+      path: '/api/enrollments/dues',
+      query: z.object({
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.array(DueEnrollmentSchema),
+      },
+    },
+    listRefunds: {
+      method: 'GET',
+      path: '/api/refunds',
+      query: z.object({
+        branchId: OptionalUUIDSchema,
+        studentId: OptionalUUIDSchema,
+        type: z.enum(['FULL', 'PARTIAL']).optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(RefundWithDetailsSchema),
       },
     },
     getRefunds: {

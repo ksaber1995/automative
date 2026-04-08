@@ -138,23 +138,61 @@
               }
             </td>
             <td>
-              <div class="text-sm">
-                <span class="font-semibold text-green-600">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
-                <span class="text-gray-400"> / {{ enrollment.finalPrice.toFixed(2) }}</span>
-              </div>
-              @if (enrollment.finalPrice > 0) {
+              @if (enrollment.paymentMode === 'INSTALLMENTS') {
+                <!-- Installment breakdown -->
+                <div class="space-y-1 min-w-[180px]">
+                  @for (payment of getPaymentHistory(enrollment.id); track payment.id) {
+                    <div class="flex items-center justify-between text-xs bg-green-50 border border-green-100 rounded px-2 py-1">
+                      <span class="font-semibold text-green-700">+{{ payment.amount.toFixed(2) }}</span>
+                      <span class="text-gray-400 ml-2">{{ formatDate(payment.paymentDate) }}</span>
+                    </div>
+                  }
+                  @if (getPaymentHistory(enrollment.id).length === 0) {
+                    <span class="text-xs text-gray-400">No payments yet</span>
+                  }
+                  <!-- Remaining -->
+                  @if (enrollment.paymentStatus !== 'PAID') {
+                    <div class="flex items-center justify-between text-xs bg-red-50 border border-red-100 rounded px-2 py-1">
+                      <span class="text-red-500">Remaining</span>
+                      <span class="font-semibold text-red-600">{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)).toFixed(2) }}</span>
+                    </div>
+                  }
+                </div>
                 <p-progressbar
                   [value]="((enrollment.amountPaid || 0) / enrollment.finalPrice) * 100"
                   [showValue]="false"
-                  [style]="{ height: '4px' }"
+                  [style]="{ height: '4px', marginTop: '4px' }"
                 ></p-progressbar>
+              } @else {
+                <!-- Full payment summary -->
+                <div class="text-sm">
+                  <span class="font-semibold text-green-600">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
+                  <span class="text-gray-400"> / {{ enrollment.finalPrice.toFixed(2) }}</span>
+                </div>
+                @if (enrollment.finalPrice > 0) {
+                  <p-progressbar
+                    [value]="((enrollment.amountPaid || 0) / enrollment.finalPrice) * 100"
+                    [showValue]="false"
+                    [style]="{ height: '4px' }"
+                  ></p-progressbar>
+                }
               }
             </td>
             <td>
               <p-tag [value]="enrollment.status" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
             <td>
-              <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+              <div class="flex flex-col gap-1">
+                <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+                @if (hasRefund(enrollment)) {
+                  <p-tag
+                    [value]="'Refund: -' + (enrollment.totalRefunded).toFixed(2)"
+                    severity="warn"
+                    styleClass="text-xs"
+                    pTooltip="Click the expand arrow to see refund details"
+                  ></p-tag>
+                }
+              </div>
             </td>
             <td>
               <div class="flex gap-1">
@@ -291,13 +329,13 @@
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
       <div><span class="text-gray-500">Final Price:</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
       <div><span class="text-gray-500">Paid:</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
-      <div class="col-span-2"><span class="text-gray-500">Remaining:</span> <strong class="text-red-600">{{ (enrollmentForAction()!.finalPrice - (enrollmentForAction()!.amountPaid || 0)).toFixed(2) }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">Remaining:</span> <strong class="text-red-600">{{ remaining().toFixed(2) }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
     <div>
       <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
-      <p-inputnumber [(ngModel)]="dialogPaymentAmount" [min]="0.01" placeholder="Amount" [style]="{ width: '100%' }" />
+      <p-inputnumber [(ngModel)]="dialogPaymentAmount" [min]="0.01" [max]="remaining()" placeholder="Amount" [style]="{ width: '100%' }" />
     </div>
     <div>
       <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>

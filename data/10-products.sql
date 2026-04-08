@@ -13,7 +13,7 @@ INSERT INTO products (id, branch_id, name, code, description, price, cost, stock
 ('f0777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'Drawing Tablet', 'TABLET-DRAW-001', 'Wacom drawing tablet for designers', 800.00, 500.00, 12, 3, true),
 ('f0888888-8888-8888-8888-888888888888', '22222222-2222-2222-2222-222222222222', 'Marketing Toolkit Book', 'BOOK-MKT-001', 'Digital marketing essentials guide', 200.00, 120.00, 50, 15, true),
 ('f0999999-9999-9999-9999-999999999999', '22222222-2222-2222-2222-222222222222', 'Portfolio Binder', 'BIND-PORT-001', 'Professional portfolio binder', 80.00, 45.00, 60, 20, true),
-('f0a11111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'Branded T-Shirt', 'TSHIRT-ALX-001', 'Automate Magic branded t-shirt', 120.00, 60.00, 40, 15, true),
+('f0a11111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'Branded T-Shirt', 'TSHIRT-ALX-001', 'Netrofit branded t-shirt', 120.00, 60.00, 40, 15, true),
 
 -- Giza Branch Products
 ('f0a22222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', 'AWS Study Guide', 'BOOK-AWS-001', 'AWS Solutions Architect certification guide', 350.00, 200.00, 30, 8, true),

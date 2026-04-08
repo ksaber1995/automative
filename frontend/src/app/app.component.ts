@@ -13,5 +13,5 @@ import { ToastModule } from 'primeng/toast';
   styles: []
 })
 export class AppComponent {
-  title = 'Automate Magic';
+  title = 'Netrofit';
 }
