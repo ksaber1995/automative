@@ -1,5 +1,0 @@
-export declare enum UserRole {
-    ADMIN = "ADMIN",
-    BRANCH_MANAGER = "BRANCH_MANAGER",
-    ACCOUNTANT = "ACCOUNTANT"
-}
