@@ -156,78 +156,81 @@ export const authRoutes = {
         `COMP-${Date.now().toString(36).toUpperCase()}`;
 
       // 4. Create Company
-      const company = await insert('companies', {
-        name: body.companyName,
-        code: companyCode,
-        email: body.companyEmail,
-        industry: 'Tech Center',
-        subscription_tier: 'BASIC',
-        subscription_status: 'TRIAL',
-        subscription_start_date: new Date(),
-        subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        max_branches: 1,
-        max_users: 5,
-        timezone: 'Africa/Cairo',
-        currency: 'EGP',
-        locale: 'en-US',
-        is_active: true,
-        onboarding_completed: false,
-      });
+      const companyRes = await client.query(
+        `INSERT INTO companies
+          (name, code, email, industry, subscription_tier, subscription_status,
+           subscription_start_date, subscription_end_date, max_branches, max_users,
+           timezone, currency, locale, is_active, onboarding_completed)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         RETURNING *`,
+        [
+          body.companyName, companyCode, body.companyEmail, 'Tech Center',
+          'BASIC', 'TRIAL',
+          new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false,
+        ]
+      );
+      const company = companyRes.rows[0];
 
       // 5. Create default Branch
-      const branch = await insert('branches', {
-        company_id: company.id,
-        name: `${body.companyName} - Main Branch`,
-        code: 'MAIN',
-        email: body.companyEmail,
-        phone: body.phone || null,
-        is_active: true,
-        opening_date: new Date(),
-      });
+      const branchRes = await client.query(
+        `INSERT INTO branches (company_id, name, code, email, phone, is_active, opening_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING *`,
+        [
+          company.id, `${body.companyName} - Main Branch`, 'MAIN',
+          body.companyEmail, body.phone || null, true, new Date(),
+        ]
+      );
+      const branch = branchRes.rows[0];
 
       // 6. Hash password
       const hashedPassword = await bcrypt.hash(body.password, 10);
 
       // 7. Create User (ADMIN role - company owner)
-      const user = await insert('users', {
-        company_id: company.id,
-        branch_id: branch.id,
-        email: body.email,
-        password: hashedPassword,
-        first_name: body.firstName,
-        last_name: body.lastName,
-        role: 'ADMIN', // Company owner is ADMIN
-        is_active: true,
-      });
+      const userRes = await client.query(
+        `INSERT INTO users
+          (company_id, branch_id, email, password, first_name, last_name, role, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         RETURNING *`,
+        [
+          company.id, branch.id, body.email, hashedPassword,
+          body.firstName, body.lastName, 'ADMIN', true,
+        ]
+      );
+      const user = userRes.rows[0];
 
       // 8. Update company created_by
-      await update('companies', company.id, {
-        created_by: user.id,
-      });
+      await client.query(
+        `UPDATE companies SET created_by = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [user.id, company.id]
+      );
 
       // 9. Update branch manager
-      await update('branches', branch.id, {
-        manager_id: user.id,
-      });
+      await client.query(
+        `UPDATE branches SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [user.id, branch.id]
+      );
 
       // 10. Create default cash_state for the company
-      await insert('cash_state', {
-        company_id: company.id,
-        current_balance: 0,
-        updated_by: user.id,
-      });
+      await client.query(
+        `INSERT INTO cash_state (company_id, current_balance, updated_by) VALUES ($1,$2,$3)`,
+        [company.id, 0, user.id]
+      );
 
       // 11. Create subscription record (TRIAL for 2 months)
       const trialStart = new Date();
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 60);
-      await insert('subscriptions', {
-        company_id: company.id,
-        status: 'TRIAL',
-        price: 0,
-        trial_start_date: trialStart.toISOString().split('T')[0],
-        trial_end_date: trialEnd.toISOString().split('T')[0],
-      });
+      await client.query(
+        `INSERT INTO subscriptions (company_id, status, price, trial_start_date, trial_end_date)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [
+          company.id, 'TRIAL', 0,
+          trialStart.toISOString().split('T')[0],
+          trialEnd.toISOString().split('T')[0],
+        ]
+      );
 
       // Commit transaction
       await client.query('COMMIT');
@@ -284,6 +287,8 @@ export const authRoutes = {
           message = 'A company with this email already exists.';
         } else if (table === 'users' || constraint.includes('users')) {
           message = 'An account with this email already exists.';
+        } else if (table === 'branches' || constraint.includes('branches')) {
+          message = 'Company code is already taken. Please choose a different code.';
         }
         return {
           status: 400 as const,

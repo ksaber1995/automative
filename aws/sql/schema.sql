@@ -30,7 +30,7 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE TABLE branches (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,
+    code VARCHAR(50) NOT NULL,
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(50),
@@ -45,7 +45,7 @@ CREATE TABLE branches (
     FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_branches_code ON branches(code);
+CREATE UNIQUE INDEX branches_company_id_code_key ON branches(company_id, code);
 CREATE INDEX idx_branches_manager_id ON branches(manager_id);
 
 -- Add foreign key constraint to users table
