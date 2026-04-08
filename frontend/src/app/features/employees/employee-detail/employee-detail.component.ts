@@ -1,19 +1,32 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { DividerModule } from 'primeng/divider';
+import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { PasswordModule } from 'primeng/password';
+import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { UserService } from '../../users/services/user.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Employee } from '@shared/interfaces/employee.interface';
+import { UserRole } from '@shared/enums/user-role.enum';
+import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-employee-detail',
   standalone: true,
-  imports: [CommonModule, CardModule, ButtonModule, TagModule, DividerModule],
+  imports: [
+    CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DividerModule,
+    DialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
+  ],
   template: `
     <div class="container mx-auto p-6 max-w-4xl">
       @if (loading()) {
@@ -31,6 +44,15 @@ import { Employee } from '@shared/interfaces/employee.interface';
             </p-tag>
           </div>
           <p-button label="Edit" icon="pi pi-pencil" severity="warn" (onClick)="edit()"></p-button>
+          @if (canManageUsers() && true) {
+            <p-button label="Convert to User" icon="pi pi-user-plus" severity="info"
+              (onClick)="showConvertDialog = true">
+            </p-button>
+          } @else if (false) {
+            <span class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+              <i class="pi pi-link"></i> Has user account
+            </span>
+          }
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -163,11 +185,64 @@ import { Employee } from '@shared/interfaces/employee.interface';
         </div>
       }
     </div>
+
+    <!-- Convert to User Dialog -->
+    <p-dialog [(visible)]="showConvertDialog" header="Convert Employee to User"
+      [modal]="true" [style]="{ width: '520px' }" [closable]="true">
+      <div class="space-y-5 pt-2">
+        <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <i class="pi pi-info-circle text-blue-500 mt-0.5"></i>
+          <p class="text-sm text-blue-700">
+            This will create a system user account linked to
+            <strong>{{ employee()?.firstName }} {{ employee()?.lastName }}</strong>.
+            They will be able to log in with the email and password you set.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2 field">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Login Email <span class="text-red-500">*</span></label>
+            <input pInputText [(ngModel)]="convertForm.email" type="email"
+              [placeholder]="employee()?.email || 'user@company.com'"
+              class="w-full" />
+          </div>
+          <div class="col-span-2 field">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+            <p-password [(ngModel)]="convertForm.password" [toggleMask]="true" [feedback]="true"
+              placeholder="Min. 6 characters" styleClass="w-full" [inputStyleClass]="'w-full'">
+            </p-password>
+          </div>
+          <div class="col-span-2 field">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
+            <p-select [(ngModel)]="convertForm.role" [options]="roleOptions"
+              placeholder="Select role" styleClass="w-full">
+            </p-select>
+          </div>
+          <div class="col-span-2 field">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Branch Access</label>
+            <p-multiSelect [(ngModel)]="convertForm.branchIds" [options]="branches()"
+              optionLabel="name" optionValue="id" placeholder="Select branches"
+              styleClass="w-full">
+            </p-multiSelect>
+          </div>
+        </div>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="Cancel" severity="secondary" class="p-button-outlined"
+          (click)="showConvertDialog = false">
+        </button>
+        <button pButton label="Create User Account" icon="pi pi-user-plus"
+          [loading]="converting()" (click)="convertToUser()">
+        </button>
+      </ng-template>
+    </p-dialog>
   `
 })
 export class EmployeeDetailComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private branchService = inject(BranchService);
+  private userService = inject(UserService);
+  private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -175,13 +250,39 @@ export class EmployeeDetailComponent implements OnInit {
   employee = signal<Employee | null>(null);
   loading = signal(true);
   branchName = signal('—');
+  branches = signal<Branch[]>([]);
+  converting = signal(false);
+
+  showConvertDialog = false;
+  convertForm = {
+    email: '',
+    password: '',
+    role: UserRole.ACADEMIC_MANAGER,
+    branchIds: [] as string[],
+  };
+
+  roleOptions = [
+    { label: 'Branch Admin', value: UserRole.BRANCH_ADMIN },
+    { label: 'Academic Manager', value: UserRole.ACADEMIC_MANAGER },
+    { label: 'Sales Manager', value: UserRole.SALES_MANAGER },
+    { label: 'Accountant', value: UserRole.ACCOUNTANT },
+    { label: 'Viewer', value: UserRole.VIEWER },
+  ];
+
+  canManageUsers(): boolean {
+    return this.authService.canManageUsers();
+  }
 
   ngOnInit() {
     const id = this.route.snapshot.params['id'];
+    this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
     this.employeeService.getEmployeeById(id).subscribe({
       next: (emp) => {
         this.employee.set(emp);
         this.loading.set(false);
+        // Pre-fill convert form email from employee
+        if (emp.email) this.convertForm.email = emp.email;
+        if (emp.branchId) this.convertForm.branchIds = [emp.branchId];
         if (emp.branchId) {
           this.branchService.getActiveBranches().subscribe({
             next: (branches) => {
@@ -207,5 +308,31 @@ export class EmployeeDetailComponent implements OnInit {
 
   back() {
     this.router.navigate(['/employees']);
+  }
+
+  convertToUser() {
+    const f = this.convertForm;
+    if (!f.email || !f.password || f.password.length < 6 || !f.role) {
+      this.notificationService.error('Please fill all required fields (password min. 6 chars)');
+      return;
+    }
+    this.converting.set(true);
+    this.userService.convertEmployee({
+      employeeId: this.employee()!.id,
+      email: f.email,
+      password: f.password,
+      role: f.role,
+      branchIds: f.branchIds,
+    }).subscribe({
+      next: (user) => {
+        this.notificationService.success(`User account created for ${user.firstName} ${user.lastName}`);
+        this.showConvertDialog = false;
+        this.converting.set(false);
+      },
+      error: (e) => {
+        this.notificationService.error(e.error?.message || 'Failed to create user account');
+        this.converting.set(false);
+      }
+    });
   }
 }

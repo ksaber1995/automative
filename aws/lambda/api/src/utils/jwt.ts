@@ -7,6 +7,7 @@ export interface JWTPayload {
   role: string;
   companyId: string;      // Company ID for tenant isolation
   branchId?: string | null;
+  permissions?: Record<string, any> | null;
 }
 
 let jwtSecret: string | null = null;

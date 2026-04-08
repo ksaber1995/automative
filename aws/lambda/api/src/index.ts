@@ -30,6 +30,7 @@ import { subscriptionsRoutes } from './routes/subscriptions';
 import { migrationsRoutes } from './routes/migrations';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
+import { usersRoutes } from './routes/users';
 
 // Create the router implementation
 const router = {
@@ -53,6 +54,7 @@ const router = {
   debug: debugRoutes,
   subscriptions: subscriptionsRoutes,
   migrations: migrationsRoutes,
+  users: usersRoutes,
 };
 
 // Create the Lambda handler

@@ -86,6 +86,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/products/products.routes').then(m => m.PRODUCTS_ROUTES)
       },
       {
+        path: 'users',
+        loadChildren: () => import('./features/users/users.routes').then(m => m.USERS_ROUTES)
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       }

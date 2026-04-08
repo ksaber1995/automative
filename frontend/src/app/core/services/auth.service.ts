@@ -4,6 +4,12 @@ import { Router } from '@angular/router';
 import { Observable, tap, BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SafeUser, LoginDto, AuthResponse, RegisterDto } from '@shared/interfaces/user.interface';
+import { UserRole } from '@shared/enums/user-role.enum';
+import {
+  PermissionResource,
+  PermissionAction,
+  ROLE_DEFAULT_PERMISSIONS,
+} from '@shared/interfaces/permissions.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -14,8 +20,6 @@ export class AuthService {
 
   private currentUserSubject = new BehaviorSubject<SafeUser | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
-
-  // Signal for reactive access
   public currentUser = signal<SafeUser | null>(null);
 
   constructor() {
@@ -27,12 +31,9 @@ export class AuthService {
     const cachedUser = this.getCachedUser();
 
     if (token && cachedUser) {
-      // Load cached user immediately for instant UI update
       this.currentUser.set(cachedUser);
       this.currentUserSubject.next(cachedUser);
 
-      // Optionally validate token in background and refresh user data
-      // If it fails, keep using cached data (offline support)
       this.getProfile().subscribe({
         next: (user) => {
           this.currentUser.set(user);
@@ -40,24 +41,17 @@ export class AuthService {
           this.setCachedUser(user);
         },
         error: (err) => {
-          if (err?.status === 401) {
-            this.logout();
-          }
-          // For other errors (network issues), keep cached data for offline support
+          if (err?.status === 401) this.logout();
         }
       });
     } else if (token && !cachedUser) {
-      // Token exists but no cached user, fetch from backend
       this.getProfile().subscribe({
         next: (user) => {
           this.currentUser.set(user);
           this.currentUserSubject.next(user);
           this.setCachedUser(user);
         },
-        error: () => {
-          // No cached data and backend fails, logout
-          this.logout();
-        }
+        error: () => this.logout()
       });
     }
   }
@@ -70,7 +64,6 @@ export class AuthService {
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
-          // Cache company name if available
           if (response.company?.name) {
             localStorage.setItem('company_name', response.company.name);
           }
@@ -86,7 +79,6 @@ export class AuthService {
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
           this.currentUserSubject.next(response.user);
-          // Cache company name from registration
           if (response.company?.name) {
             localStorage.setItem('company_name', response.company.name);
           }
@@ -124,34 +116,86 @@ export class AuthService {
   isAuthenticated(): boolean {
     const token = this.getToken();
     const cachedUser = this.getCachedUser();
-
-    // If we have both token and cached user, consider authenticated
-    // This allows offline usage and persistent sessions
-    if (token && cachedUser) {
-      return true;
-    }
-
-    // Fallback: check token expiration if no cached user
+    if (token && cachedUser) return true;
     if (!token) return false;
-
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      const expirationDate = payload.exp * 1000;
-      return Date.now() < expirationDate;
+      return Date.now() < payload.exp * 1000;
     } catch {
       return false;
     }
   }
 
+  // ─── Role checks ────────────────────────────────────────────────────────────
+
   hasRole(role: string): boolean {
-    const user = this.currentUser();
-    return user?.role === role;
+    return this.currentUser()?.role === role;
   }
 
   hasAnyRole(roles: string[]): boolean {
     const user = this.currentUser();
     return user ? roles.includes(user.role) : false;
   }
+
+  isGlobalAdmin(): boolean {
+    return this.hasAnyRole([UserRole.GLOBAL_ADMIN, UserRole.ADMIN]);
+  }
+
+  isBranchAdmin(): boolean {
+    return this.hasAnyRole([UserRole.BRANCH_ADMIN, UserRole.BRANCH_MANAGER]);
+  }
+
+  canManageUsers(): boolean {
+    return this.isGlobalAdmin();
+  }
+
+  // ─── Permission checks ───────────────────────────────────────────────────────
+
+  /**
+   * Check if current user has the given permission on a resource.
+   * Custom permissions override role defaults.
+   */
+  hasPermission(resource: PermissionResource, action: PermissionAction): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+
+    // Custom override takes precedence
+    const custom = user.permissions?.[resource]?.[action];
+    if (custom !== undefined) return custom as boolean;
+
+    // Fall back to role defaults
+    const role = user.role as UserRole;
+    return ROLE_DEFAULT_PERMISSIONS[role]?.[resource]?.[action] ?? false;
+  }
+
+  canRead(resource: PermissionResource): boolean {
+    return this.hasPermission(resource, 'read');
+  }
+
+  canWrite(resource: PermissionResource): boolean {
+    return this.hasPermission(resource, 'write');
+  }
+
+  canDelete(resource: PermissionResource): boolean {
+    return this.hasPermission(resource, 'delete');
+  }
+
+  canAccessFinancials(): boolean {
+    return (
+      this.hasPermission('revenues', 'read') ||
+      this.hasPermission('expenses', 'read') ||
+      this.hasPermission('reports', 'read')
+    );
+  }
+
+  canAccessAcademics(): boolean {
+    return (
+      this.hasPermission('students', 'read') ||
+      this.hasPermission('courses', 'read')
+    );
+  }
+
+  // ─── Storage helpers ─────────────────────────────────────────────────────────
 
   private setCachedUser(user: SafeUser): void {
     localStorage.setItem(environment.userDataKey, JSON.stringify(user));

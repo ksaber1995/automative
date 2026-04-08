@@ -1,4 +1,5 @@
 import { UserRole } from '../enums/user-role.enum';
+import { UserPermissions } from './permissions.interface';
 
 export interface User {
   id: string;
@@ -9,6 +10,8 @@ export interface User {
   lastName: string;
   role: UserRole;
   branchId?: string | null;
+  linkedEmployeeId?: string | null;  // Optional link to an employee record
+  permissions?: UserPermissions | null; // Custom permission overrides (null = use role defaults)
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +25,9 @@ export interface SafeUser {
   lastName: string;
   role: UserRole;
   branchId?: string | null;
+  branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)
+  linkedEmployeeId?: string | null;
+  permissions?: UserPermissions | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +41,9 @@ export interface UserCreateDto {
   lastName: string;
   role: UserRole;
   branchId?: string | null;
+  branchIds?: string[];              // For BRANCH_ADMIN: assign multiple branches
+  linkedEmployeeId?: string | null;
+  permissions?: UserPermissions | null;
 }
 
 export interface UserUpdateDto {
@@ -43,7 +52,19 @@ export interface UserUpdateDto {
   lastName?: string;
   role?: UserRole;
   branchId?: string | null;
+  branchIds?: string[];
+  linkedEmployeeId?: string | null;
+  permissions?: UserPermissions | null;
   isActive?: boolean;
+}
+
+export interface ConvertEmployeeToUserDto {
+  employeeId: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  branchIds?: string[];
+  permissions?: UserPermissions | null;
 }
 
 export interface LoginDto {

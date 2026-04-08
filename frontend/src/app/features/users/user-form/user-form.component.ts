@@ -1,0 +1,599 @@
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
+import { Router, ActivatedRoute } from '@angular/router';
+import { CardModule } from 'primeng/card';
+import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { PasswordModule } from 'primeng/password';
+import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { DividerModule } from 'primeng/divider';
+import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
+import { TooltipModule } from 'primeng/tooltip';
+import { UserService } from '../services/user.service';
+import { BranchService } from '../../branches/services/branch.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { SafeUser } from '@shared/interfaces/user.interface';
+import { UserRole, ROLE_LABELS, NEW_ROLES } from '@shared/enums/user-role.enum';
+import {
+  UserPermissions, PERMISSION_RESOURCES, ROLE_DEFAULT_PERMISSIONS,
+  PermissionResource, ResourcePermission,
+} from '@shared/interfaces/permissions.interface';
+import { Branch } from '@shared/interfaces/branch.interface';
+
+interface PermissionRow {
+  resource: PermissionResource;
+  label: string;
+  icon: string;
+  read: boolean;
+  write: boolean;
+  delete: boolean;
+  isFinancial?: boolean;
+}
+
+const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; financial?: boolean }> = {
+  dashboard:    { label: 'Dashboard',      icon: 'pi pi-home' },
+  branches:     { label: 'Branches',       icon: 'pi pi-building' },
+  courses:      { label: 'Courses',        icon: 'pi pi-book' },
+  classes:      { label: 'Classes',        icon: 'pi pi-calendar' },
+  students:     { label: 'Students',       icon: 'pi pi-users' },
+  enrollments:  { label: 'Enrollments',    icon: 'pi pi-id-card' },
+  employees:    { label: 'Employees',      icon: 'pi pi-user' },
+  revenues:     { label: 'Revenues',       icon: 'pi pi-dollar',      financial: true },
+  expenses:     { label: 'Expenses',       icon: 'pi pi-money-bill',  financial: true },
+  withdrawals:  { label: 'Withdrawals',    icon: 'pi pi-wallet',      financial: true },
+  refunds:      { label: 'Refunds',        icon: 'pi pi-replay',      financial: true },
+  debts:        { label: 'Debts',          icon: 'pi pi-credit-card', financial: true },
+  products:     { label: 'Products',       icon: 'pi pi-box' },
+  product_sales:{ label: 'Product Sales',  icon: 'pi pi-shopping-cart' },
+  reports:      { label: 'Reports',        icon: 'pi pi-chart-bar',   financial: true },
+  users:        { label: 'User Mgmt',      icon: 'pi pi-user-edit' },
+};
+
+@Component({
+  selector: 'app-user-form',
+  standalone: true,
+  imports: [
+    CommonModule, FormsModule, ReactiveFormsModule,
+    CardModule, ButtonModule, InputTextModule, PasswordModule,
+    SelectModule, MultiSelectModule, DividerModule,
+    TabsModule, Tab, TabList, TabPanel, TabPanels, TooltipModule,
+  ],
+  template: `
+    <div class="max-w-5xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-6">
+        <button pButton icon="pi pi-arrow-left" class="p-button-text p-button-rounded p-button-secondary"
+          (click)="cancel()">
+        </button>
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? 'Edit User' : 'Create User' }}</h1>
+          <p class="text-gray-500 text-sm">{{ isEdit ? 'Update user details and permissions' : 'Add a new system user with role and permissions' }}</p>
+        </div>
+      </div>
+
+      @if (loading()) {
+        <div class="flex justify-center py-20">
+          <i class="pi pi-spin pi-spinner text-4xl text-gray-300"></i>
+        </div>
+      } @else {
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <p-tabs value="0">
+            <p-tablist>
+              <p-tab value="0"><i class="pi pi-user mr-2"></i>Profile</p-tab>
+              <p-tab value="1"><i class="pi pi-shield mr-2"></i>Permissions</p-tab>
+            </p-tablist>
+            <p-tabpanels>
+            <!-- ── TAB 1: Profile ─────────────────────────────────────────── -->
+            <p-tabpanel value="0">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                <!-- First Name -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    First Name <span class="text-red-500">*</span>
+                  </label>
+                  <input pInputText formControlName="firstName" placeholder="First Name"
+                    class="w-full" [class.ng-invalid]="isInvalid('firstName')" />
+                  @if (isInvalid('firstName')) {
+                    <small class="text-red-500">First name is required</small>
+                  }
+                </div>
+
+                <!-- Last Name -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name <span class="text-red-500">*</span>
+                  </label>
+                  <input pInputText formControlName="lastName" placeholder="Last Name"
+                    class="w-full" [class.ng-invalid]="isInvalid('lastName')" />
+                  @if (isInvalid('lastName')) {
+                    <small class="text-red-500">Last name is required</small>
+                  }
+                </div>
+
+                <!-- Email -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Email <span class="text-red-500">*</span>
+                  </label>
+                  <input pInputText formControlName="email" type="email" placeholder="user@company.com"
+                    class="w-full" [class.ng-invalid]="isInvalid('email')" />
+                  @if (isInvalid('email')) {
+                    <small class="text-red-500">Valid email is required</small>
+                  }
+                </div>
+
+                <!-- Password -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ isEdit ? 'New Password (leave blank to keep)' : 'Password' }}
+                    @if (!isEdit) { <span class="text-red-500">*</span> }
+                  </label>
+                  <p-password formControlName="password" [toggleMask]="true" [feedback]="true"
+                    placeholder="{{ isEdit ? 'Leave blank to keep current' : 'Min. 6 characters' }}"
+                    styleClass="w-full" [inputStyleClass]="'w-full'">
+                  </p-password>
+                  @if (isInvalid('password')) {
+                    <small class="text-red-500">Password must be at least 6 characters</small>
+                  }
+                </div>
+
+                <!-- Role -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Role <span class="text-red-500">*</span>
+                  </label>
+                  <p-select
+                    formControlName="role"
+                    [options]="roleOptions"
+                    placeholder="Select role"
+                    styleClass="w-full"
+                    (onChange)="onRoleChange($event.value)">
+                    <ng-template pTemplate="selectedItem" let-item>
+                      <div class="flex items-center gap-2">
+                        <i [class]="getRoleIcon(item.value) + ' text-sm ' + getRoleIconColor(item.value)"></i>
+                        <span>{{ item.label }}</span>
+                      </div>
+                    </ng-template>
+                    <ng-template pTemplate="item" let-item>
+                      <div class="flex items-center gap-3 py-1">
+                        <i [class]="getRoleIcon(item.value) + ' ' + getRoleIconColor(item.value)"></i>
+                        <div>
+                          <div class="font-medium">{{ item.label }}</div>
+                          <div class="text-xs text-gray-400">{{ getRoleDescription(item.value) }}</div>
+                        </div>
+                      </div>
+                    </ng-template>
+                  </p-select>
+                </div>
+
+                <!-- Branches -->
+                <div class="field">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Branch Access
+                    @if (selectedRole === UserRole.GLOBAL_ADMIN || selectedRole === UserRole.ADMIN) {
+                      <span class="ml-1 text-xs text-purple-500">(All branches)</span>
+                    }
+                  </label>
+                  <p-multiSelect
+                    formControlName="branchIds"
+                    [options]="branches()"
+                    optionLabel="name"
+                    optionValue="id"
+                    placeholder="Select branches"
+                    [showToggleAll]="true"
+                    styleClass="w-full"
+                    [disabled]="selectedRole === UserRole.GLOBAL_ADMIN || selectedRole === UserRole.ADMIN">
+                  </p-multiSelect>
+                  <small class="text-gray-400 text-xs">
+                    @if (selectedRole === UserRole.BRANCH_ADMIN || selectedRole === UserRole.BRANCH_MANAGER) {
+                      Branch Admins can be assigned multiple branches.
+                    } @else {
+                      Restrict user to specific branches.
+                    }
+                  </small>
+                </div>
+              </div>
+            </p-tabpanel>
+
+            <!-- ── TAB 2: Permissions ──────────────────────────────────────── -->
+            <p-tabpanel value="1">
+              <div class="pt-4 space-y-4">
+                <!-- Role defaults notice -->
+                <div class="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <i class="pi pi-info-circle text-blue-500 text-lg mt-0.5"></i>
+                  <div>
+                    <p class="text-sm font-medium text-blue-800">Role Default Permissions</p>
+                    <p class="text-xs text-blue-600 mt-0.5">
+                      The selected role sets default permissions. Overrides below apply on top of the defaults.
+                      Leave toggles at their default state to use role defaults.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Permission quick presets -->
+                <div class="flex gap-2 flex-wrap">
+                  <button type="button" pButton label="Load Role Defaults" icon="pi pi-refresh"
+                    class="p-button-outlined p-button-sm p-button-secondary"
+                    (click)="loadRoleDefaults()">
+                  </button>
+                  <button type="button" pButton label="Grant All" icon="pi pi-check-circle"
+                    class="p-button-outlined p-button-sm p-button-success"
+                    (click)="grantAll()">
+                  </button>
+                  <button type="button" pButton label="Revoke All" icon="pi pi-times-circle"
+                    class="p-button-outlined p-button-sm p-button-danger"
+                    (click)="revokeAll()">
+                  </button>
+                  <button type="button" pButton label="Revoke Financial" icon="pi pi-dollar"
+                    class="p-button-outlined p-button-sm p-button-warning"
+                    pTooltip="Remove access to revenue, expenses, reports, etc."
+                    (click)="revokeFinancial()">
+                  </button>
+                </div>
+
+                <!-- Permissions matrix -->
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600 w-48">Resource</th>
+                        <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
+                          <i class="pi pi-eye mr-1 text-blue-500"></i> Read
+                        </th>
+                        <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
+                          <i class="pi pi-pencil mr-1 text-green-500"></i> Write
+                        </th>
+                        <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
+                          <i class="pi pi-trash mr-1 text-red-500"></i> Delete
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (section of permissionSections; track section.title) {
+                        <tr class="bg-gray-50 border-y border-gray-100">
+                          <td colspan="4" class="px-4 py-2">
+                            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                              {{ section.title }}
+                            </span>
+                          </td>
+                        </tr>
+                        @for (row of section.rows; track row.resource) {
+                          <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                            [class.bg-amber-50]="row.isFinancial">
+                            <td class="px-4 py-3">
+                              <div class="flex items-center gap-2">
+                                <i [class]="row.icon + ' text-gray-400'"></i>
+                                <span class="text-gray-700 font-medium">{{ row.label }}</span>
+                                @if (row.isFinancial) {
+                                  <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Financial</span>
+                                }
+                              </div>
+                            </td>
+                            <td class="text-center px-4 py-3">
+                              <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" [(ngModel)]="row.read" [ngModelOptions]="{standalone: true}"
+                                  class="sr-only peer" (change)="onPermissionChange(row)" />
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer
+                                  peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                                  after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                  peer-checked:after:translate-x-4"></div>
+                              </label>
+                            </td>
+                            <td class="text-center px-4 py-3">
+                              <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" [(ngModel)]="row.write" [ngModelOptions]="{standalone: true}"
+                                  class="sr-only peer" (change)="onPermissionChange(row)" />
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer
+                                  peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                                  after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                  peer-checked:after:translate-x-4"></div>
+                              </label>
+                            </td>
+                            <td class="text-center px-4 py-3">
+                              <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" [(ngModel)]="row.delete" [ngModelOptions]="{standalone: true}"
+                                  class="sr-only peer" (change)="onPermissionChange(row)" />
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-red-300 rounded-full peer
+                                  peer-checked:bg-red-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                                  after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                  peer-checked:after:translate-x-4"></div>
+                              </label>
+                            </td>
+                          </tr>
+                        }
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </p-tabpanel>
+            </p-tabpanels>
+          </p-tabs>
+
+          <!-- Footer actions -->
+          <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+            <button type="button" pButton label="Cancel" severity="secondary"
+              class="p-button-outlined" (click)="cancel()">
+            </button>
+            <button type="submit" pButton [label]="isEdit ? 'Save Changes' : 'Create User'"
+              icon="pi pi-check" [loading]="saving()">
+            </button>
+          </div>
+        </form>
+      }
+    </div>
+  `,
+})
+export class UserFormComponent implements OnInit {
+  private fb = inject(FormBuilder);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private userService = inject(UserService);
+  private branchService = inject(BranchService);
+  private notificationService = inject(NotificationService);
+
+  UserRole = UserRole;
+  isEdit = false;
+  userId: string | null = null;
+  loading = signal(true);
+  saving = signal(false);
+
+  branches = signal<Branch[]>([]);
+  existingUser = signal<SafeUser | null>(null);
+  selectedRole: UserRole = UserRole.ACADEMIC_MANAGER;
+
+  permissionRows: PermissionRow[] = [];
+
+  permissionSections: { title: string; rows: PermissionRow[] }[] = [];
+
+  form: FormGroup = this.fb.group({
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    password: [''],
+    role: [UserRole.ACADEMIC_MANAGER, Validators.required],
+    branchIds: [[]],
+  });
+
+  roleOptions = [
+    { label: 'Global Admin', value: UserRole.GLOBAL_ADMIN },
+    { label: 'Branch Admin', value: UserRole.BRANCH_ADMIN },
+    { label: 'Academic Manager', value: UserRole.ACADEMIC_MANAGER },
+    { label: 'Sales Manager', value: UserRole.SALES_MANAGER },
+    { label: 'Accountant', value: UserRole.ACCOUNTANT },
+    { label: 'Viewer', value: UserRole.VIEWER },
+  ];
+
+  ngOnInit() {
+    this.userId = this.route.snapshot.paramMap.get('id');
+    this.isEdit = !!this.userId;
+
+    if (!this.isEdit) {
+      this.form.get('password')!.setValidators([Validators.required, Validators.minLength(6)]);
+    }
+
+    this.branchService.getActiveBranches().subscribe({
+      next: (branches) => this.branches.set(branches),
+    });
+
+    this.initPermissionRows(UserRole.ACADEMIC_MANAGER);
+
+    if (this.isEdit && this.userId) {
+      this.userService.get(this.userId).subscribe({
+        next: (user) => {
+          this.existingUser.set(user);
+          this.form.patchValue({
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            branchIds: user.branchIds ?? (user.branchId ? [user.branchId] : []),
+          });
+          this.selectedRole = user.role as UserRole;
+          this.applyPermissionsToRows(user.permissions);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.notificationService.error('Failed to load user');
+          this.loading.set(false);
+        }
+      });
+    } else {
+      this.loading.set(false);
+    }
+  }
+
+  initPermissionRows(role: UserRole) {
+    const defaults = ROLE_DEFAULT_PERMISSIONS[role] ?? {};
+    this.permissionRows = PERMISSION_RESOURCES.map(resource => {
+      const def = defaults[resource] ?? { read: false, write: false, delete: false };
+      return {
+        resource,
+        label: RESOURCE_META[resource].label,
+        icon: RESOURCE_META[resource].icon,
+        isFinancial: RESOURCE_META[resource].financial,
+        read: def.read ?? false,
+        write: def.write ?? false,
+        delete: def.delete ?? false,
+      };
+    });
+    this.buildSections();
+  }
+
+  buildSections() {
+    const academic = this.permissionRows.filter(r =>
+      ['dashboard','branches','courses','classes','students','enrollments','employees'].includes(r.resource)
+    );
+    const financial = this.permissionRows.filter(r =>
+      ['revenues','expenses','withdrawals','refunds','debts','reports'].includes(r.resource)
+    );
+    const inventory = this.permissionRows.filter(r =>
+      ['products','product_sales'].includes(r.resource)
+    );
+    const admin = this.permissionRows.filter(r => r.resource === 'users');
+
+    this.permissionSections = [
+      { title: 'Academic & Management', rows: academic },
+      { title: 'Financial', rows: financial },
+      { title: 'Inventory', rows: inventory },
+      { title: 'Administration', rows: admin },
+    ];
+  }
+
+  applyPermissionsToRows(perms: UserPermissions | null | undefined) {
+    if (!perms) return;
+    for (const row of this.permissionRows) {
+      const p = perms[row.resource];
+      if (p) {
+        if (p.read !== undefined) row.read = p.read;
+        if (p.write !== undefined) row.write = p.write;
+        if (p.delete !== undefined) row.delete = p.delete;
+      }
+    }
+  }
+
+  onRoleChange(role: UserRole) {
+    this.selectedRole = role;
+    this.initPermissionRows(role);
+  }
+
+  onPermissionChange(_row: PermissionRow) {
+    // Angular's ngModel updates the row object directly; nothing extra needed
+  }
+
+  loadRoleDefaults() {
+    this.initPermissionRows(this.form.get('role')!.value);
+  }
+
+  grantAll() {
+    for (const row of this.permissionRows) {
+      row.read = row.write = row.delete = true;
+    }
+  }
+
+  revokeAll() {
+    for (const row of this.permissionRows) {
+      row.read = row.write = row.delete = false;
+    }
+  }
+
+  revokeFinancial() {
+    for (const row of this.permissionRows) {
+      if (row.isFinancial) {
+        row.read = row.write = row.delete = false;
+      }
+    }
+  }
+
+  buildPermissionsFromRows(): UserPermissions {
+    const perms: UserPermissions = {};
+    for (const row of this.permissionRows) {
+      perms[row.resource] = { read: row.read, write: row.write, delete: row.delete };
+    }
+    return perms;
+  }
+
+  submit() {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    const val = this.form.getRawValue();
+    const permissions = this.buildPermissionsFromRows();
+    const branchIds: string[] = val.branchIds ?? [];
+    const primaryBranchId = branchIds[0] ?? null;
+
+    this.saving.set(true);
+
+    if (this.isEdit) {
+      const dto: any = {
+        firstName: val.firstName,
+        lastName: val.lastName,
+        email: val.email,
+        role: val.role,
+        branchId: primaryBranchId,
+        branchIds,
+        permissions,
+      };
+      if (val.password) dto.password = val.password;
+
+      this.userService.update(this.userId!, dto).subscribe({
+        next: () => {
+          this.notificationService.success('User updated successfully');
+          this.saving.set(false);
+          this.router.navigate(['/users']);
+        },
+        error: (e) => {
+          this.notificationService.error(e.error?.message || 'Failed to update user');
+          this.saving.set(false);
+        }
+      });
+    } else {
+      this.userService.create({
+        companyId: '',  // injected server-side from context
+        firstName: val.firstName,
+        lastName: val.lastName,
+        email: val.email,
+        password: val.password,
+        role: val.role,
+        branchId: primaryBranchId,
+        branchIds,
+        permissions,
+      }).subscribe({
+        next: () => {
+          this.notificationService.success('User created successfully');
+          this.saving.set(false);
+          this.router.navigate(['/users']);
+        },
+        error: (e) => {
+          this.notificationService.error(e.error?.message || 'Failed to create user');
+          this.saving.set(false);
+        }
+      });
+    }
+  }
+
+  cancel() {
+    this.router.navigate(['/users']);
+  }
+
+  isInvalid(field: string): boolean {
+    const c = this.form.get(field);
+    return !!(c?.invalid && c?.touched);
+  }
+
+  getRoleIcon(role: string): string {
+    const map: Record<string, string> = {
+      GLOBAL_ADMIN: 'pi pi-crown', ADMIN: 'pi pi-crown',
+      BRANCH_ADMIN: 'pi pi-building', BRANCH_MANAGER: 'pi pi-building',
+      ACADEMIC_MANAGER: 'pi pi-book', SALES_MANAGER: 'pi pi-shopping-cart',
+      ACCOUNTANT: 'pi pi-calculator', VIEWER: 'pi pi-eye',
+    };
+    return map[role] || 'pi pi-user';
+  }
+
+  getRoleIconColor(role: string): string {
+    const map: Record<string, string> = {
+      GLOBAL_ADMIN: 'text-purple-500', ADMIN: 'text-purple-500',
+      BRANCH_ADMIN: 'text-blue-500', BRANCH_MANAGER: 'text-blue-500',
+      ACADEMIC_MANAGER: 'text-emerald-500', SALES_MANAGER: 'text-amber-500',
+      ACCOUNTANT: 'text-cyan-500', VIEWER: 'text-gray-400',
+    };
+    return map[role] || 'text-gray-400';
+  }
+
+  getRoleDescription(role: string): string {
+    const map: Record<string, string> = {
+      GLOBAL_ADMIN: 'Full access to all branches and settings',
+      BRANCH_ADMIN: 'Full access to assigned branches',
+      ACADEMIC_MANAGER: 'Students, courses, classes — no financials',
+      SALES_MANAGER: 'Products, sales, enrollments — no financials',
+      ACCOUNTANT: 'Financial data only',
+      VIEWER: 'Read-only access',
+    };
+    return map[role] || '';
+  }
+}

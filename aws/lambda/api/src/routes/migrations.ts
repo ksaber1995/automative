@@ -321,6 +321,134 @@ async function updateProductsTableStructure() {
   }
 }
 
+async function runRbacMigration() {
+  console.log('Starting migration: rbac_system');
+
+  try {
+    // ── 1. Add linked_employee_id to users ─────────────────────────────────
+    const linkedEmployeeCheck = await query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'users' AND column_name = 'linked_employee_id';
+    `);
+
+    if (linkedEmployeeCheck.length === 0) {
+      await query(`
+        ALTER TABLE users
+        ADD COLUMN linked_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL;
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_users_linked_employee_id ON users(linked_employee_id);`);
+      console.log('✓ Added linked_employee_id to users');
+    } else {
+      console.log('⚠ linked_employee_id already exists');
+    }
+
+    // ── 2. Add permissions JSONB to users ──────────────────────────────────
+    const permissionsCheck = await query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'users' AND column_name = 'permissions';
+    `);
+
+    if (permissionsCheck.length === 0) {
+      await query(`
+        ALTER TABLE users
+        ADD COLUMN permissions JSONB DEFAULT NULL;
+      `);
+      console.log('✓ Added permissions JSONB to users');
+    } else {
+      console.log('⚠ permissions column already exists');
+    }
+
+    // ── 3. Drop old role CHECK constraint and add new one ─────────────────
+    // First, find the constraint name
+    const constraints = await query(`
+      SELECT constraint_name
+      FROM information_schema.table_constraints
+      WHERE table_name = 'users'
+        AND constraint_type = 'CHECK'
+        AND constraint_name LIKE '%role%';
+    `);
+
+    for (const c of constraints) {
+      try {
+        await query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS "${c.constraint_name}";`);
+        console.log(`✓ Dropped old role constraint: ${c.constraint_name}`);
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    // Also try the standard generated name
+    try {
+      await query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`);
+    } catch (_) {}
+
+    // Add new role CHECK constraint
+    const newRoles = [
+      'GLOBAL_ADMIN', 'BRANCH_ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER', 'VIEWER',
+      'ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'
+    ];
+    const roleList = newRoles.map(r => `'${r}'`).join(', ');
+
+    try {
+      await query(`
+        ALTER TABLE users
+        ADD CONSTRAINT users_role_check CHECK (role IN (${roleList}));
+      `);
+      console.log('✓ Added new role CHECK constraint');
+    } catch (err: any) {
+      if (err?.message?.includes('already exists')) {
+        console.log('⚠ Role constraint already updated');
+      } else {
+        throw err;
+      }
+    }
+
+    // ── 4. Create user_branches junction table ─────────────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS user_branches (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        branch_id   UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+        company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, branch_id)
+      );
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_user_branches_user_id ON user_branches(user_id);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_user_branches_branch_id ON user_branches(branch_id);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_user_branches_company_id ON user_branches(company_id);`);
+    console.log('✓ Created user_branches junction table');
+
+    // ── 5. Migrate existing ADMIN → GLOBAL_ADMIN ───────────────────────────
+    const migrated = await query(`
+      UPDATE users SET role = 'GLOBAL_ADMIN' WHERE role = 'ADMIN'
+      RETURNING id;
+    `);
+    console.log(`✓ Migrated ${migrated.length} ADMIN users → GLOBAL_ADMIN`);
+
+    // ── 6. Backfill user_branches for existing non-global-admin users ──────
+    await query(`
+      INSERT INTO user_branches (user_id, branch_id, company_id)
+      SELECT u.id, u.branch_id, u.company_id
+      FROM users u
+      WHERE u.branch_id IS NOT NULL
+        AND u.role NOT IN ('GLOBAL_ADMIN', 'ADMIN')
+      ON CONFLICT (user_id, branch_id) DO NOTHING;
+    `);
+    console.log('✓ Backfilled user_branches for existing branch-scoped users');
+
+    console.log('✅ RBAC migration completed successfully!');
+
+    return {
+      success: true,
+      message: 'RBAC migration completed — users table updated, user_branches table created, ADMIN users migrated to GLOBAL_ADMIN',
+    };
+  } catch (error) {
+    console.error('❌ RBAC migration error:', error);
+    throw error;
+  }
+}
+
 export const migrationsRoutes = {
   runInstructorMigration: async () => {
     try {
@@ -389,6 +517,24 @@ export const migrationsRoutes = {
         body: {
           success: false,
           message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  runRbacMigration: async () => {
+    try {
+      const result = await runRbacMigration();
+      return {
+        status: 200 as const,
+        body: result,
+      };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'RBAC migration failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

@@ -1,43 +1,97 @@
 /**
  * Tenant Isolation Middleware
  *
- * Provides multi-tenant security by extracting company context from JWT tokens
- * and enforcing data isolation between companies.
- *
- * All protected routes MUST use extractTenantContext() to ensure proper tenant isolation.
+ * Multi-tenant security with full RBAC support:
+ *   GLOBAL_ADMIN, BRANCH_ADMIN (multi-branch), ACADEMIC_MANAGER,
+ *   SALES_MANAGER, VIEWER, ACCOUNTANT (legacy: ADMIN, BRANCH_MANAGER)
  */
 
-import { verifyToken, extractTokenFromHeader, JWTPayload } from '../utils/jwt';
+import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 
-/**
- * Tenant context extracted from JWT token
- * Contains all information needed for tenant-scoped queries
- */
+// ─── Permission types (inlined to avoid cross-rootDir imports) ──────────────
+
+type PermissionResource =
+  | 'dashboard' | 'branches' | 'courses' | 'classes' | 'students'
+  | 'enrollments' | 'employees' | 'revenues' | 'expenses' | 'withdrawals'
+  | 'refunds' | 'debts' | 'products' | 'product_sales' | 'reports' | 'users';
+
+type PermissionAction = 'read' | 'write' | 'delete';
+
+interface ResourcePermission { read: boolean; write: boolean; delete: boolean; }
+type UserPermissions = Partial<Record<PermissionResource, Partial<ResourcePermission>>>;
+
+const FULL: ResourcePermission = { read: true, write: true, delete: true };
+const READ_WRITE: ResourcePermission = { read: true, write: true, delete: false };
+const READ_ONLY: ResourcePermission = { read: true, write: false, delete: false };
+const NO_ACCESS: ResourcePermission = { read: false, write: false, delete: false };
+
+const ROLE_DEFAULTS: Record<string, UserPermissions> = {
+  GLOBAL_ADMIN: {
+    dashboard: FULL, branches: FULL, courses: FULL, classes: FULL,
+    students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
+    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    products: FULL, product_sales: FULL, reports: FULL, users: FULL,
+  },
+  ADMIN: {
+    dashboard: FULL, branches: FULL, courses: FULL, classes: FULL,
+    students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
+    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    products: FULL, product_sales: FULL, reports: FULL, users: FULL,
+  },
+  BRANCH_ADMIN: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
+    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
+  },
+  BRANCH_MANAGER: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
+    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
+  },
+  ACADEMIC_MANAGER: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    students: FULL, enrollments: READ_WRITE, employees: READ_ONLY,
+    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
+    product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
+  },
+  SALES_MANAGER: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    students: READ_WRITE, enrollments: READ_WRITE, employees: READ_ONLY,
+    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    refunds: NO_ACCESS, debts: NO_ACCESS, products: FULL,
+    product_sales: FULL, reports: NO_ACCESS, users: NO_ACCESS,
+  },
+  ACCOUNTANT: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    students: READ_ONLY, enrollments: READ_ONLY, employees: READ_ONLY,
+    revenues: FULL, expenses: FULL, withdrawals: FULL, refunds: FULL,
+    debts: FULL, products: READ_ONLY, product_sales: READ_ONLY,
+    reports: FULL, users: NO_ACCESS,
+  },
+  VIEWER: {
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    students: READ_ONLY, enrollments: READ_ONLY, employees: NO_ACCESS,
+    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
+    product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
+  },
+};
+
+// ─── Tenant Context ──────────────────────────────────────────────────────────
+
 export interface TenantContext {
   userId: string;
   email: string;
   role: string;
-  companyId: string;  // Mandatory - used for all queries
+  companyId: string;
   branchId?: string | null;
+  branchIds?: string[];
+  permissions?: UserPermissions | null;
 }
 
-/**
- * Extracts and verifies tenant context from JWT token
- *
- * CRITICAL: All protected routes must use this function
- * to ensure proper multi-tenant data isolation.
- *
- * @param authHeader - Authorization header from request (format: "Bearer <token>")
- * @returns TenantContext containing company ID and user information
- * @throws Error if no token provided or token is invalid/missing companyId
- *
- * @example
- * const context = await extractTenantContext(headers.authorization);
- * const students = await query(
- *   'SELECT * FROM students WHERE company_id = $1',
- *   [context.companyId]
- * );
- */
 const AUTH_ERROR_MESSAGES = [
   'No authentication token provided',
   'Invalid token',
@@ -46,50 +100,52 @@ const AUTH_ERROR_MESSAGES = [
 ];
 
 export function isAuthError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : '';
-  return AUTH_ERROR_MESSAGES.includes(msg);
+  return AUTH_ERROR_MESSAGES.includes(error instanceof Error ? error.message : '');
 }
 
 const SUBSCRIPTION_ERROR_MESSAGES = ['Trial period expired', 'Subscription expired'];
 
 export function isSubscriptionError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : '';
-  return SUBSCRIPTION_ERROR_MESSAGES.includes(msg);
+  return SUBSCRIPTION_ERROR_MESSAGES.includes(error instanceof Error ? error.message : '');
 }
 
-export async function extractTenantContext(
-  authHeader?: string
-): Promise<TenantContext> {
+export async function extractTenantContext(authHeader?: string): Promise<TenantContext> {
   const token = extractTokenFromHeader(authHeader);
-
-  if (!token) {
-    throw new Error('No authentication token provided');
-  }
+  if (!token) throw new Error('No authentication token provided');
 
   const decoded = await verifyToken(token);
+  if (!decoded.companyId) throw new Error('Invalid token: missing company context');
 
-  // Enforce companyId presence - tokens without companyId are invalid
-  if (!decoded.companyId) {
-    throw new Error('Invalid token: missing company context');
-  }
+  const { queryOne, query } = await import('../db/connection');
 
-  // Check subscription status
-  const { queryOne } = await import('../db/connection');
+  // Check subscription
   const subscription = await queryOne<any>(
     'SELECT status, trial_end_date, subscription_end_date FROM subscriptions WHERE company_id = $1',
     [decoded.companyId]
   );
-
   if (subscription) {
     const today = new Date().toISOString().split('T')[0];
     if (subscription.status === 'TRIAL') {
-      const trialEnd = subscription.trial_end_date?.toISOString?.()?.split('T')[0] ?? subscription.trial_end_date;
-      if (trialEnd && trialEnd < today) throw new Error('Trial period expired');
+      const end = subscription.trial_end_date?.toISOString?.()?.split('T')[0] ?? subscription.trial_end_date;
+      if (end && end < today) throw new Error('Trial period expired');
     } else if (subscription.status === 'MONTHLY' || subscription.status === 'ANNUAL') {
-      const subEnd = subscription.subscription_end_date?.toISOString?.()?.split('T')[0] ?? subscription.subscription_end_date;
-      if (subEnd && subEnd < today) throw new Error('Subscription expired');
+      const end = subscription.subscription_end_date?.toISOString?.()?.split('T')[0] ?? subscription.subscription_end_date;
+      if (end && end < today) throw new Error('Subscription expired');
     }
   }
+
+  // Fetch branch IDs from junction table
+  let branchIds: string[] = [];
+  try {
+    const rows = await query<any>(
+      'SELECT branch_id FROM user_branches WHERE user_id = $1 AND company_id = $2',
+      [decoded.id, decoded.companyId]
+    );
+    branchIds = rows.map((r: any) => r.branch_id);
+  } catch {
+    if (decoded.branchId) branchIds = [decoded.branchId];
+  }
+  if (branchIds.length === 0 && decoded.branchId) branchIds = [decoded.branchId];
 
   return {
     userId: decoded.id,
@@ -97,144 +153,75 @@ export async function extractTenantContext(
     role: decoded.role,
     companyId: decoded.companyId,
     branchId: decoded.branchId,
+    branchIds,
+    permissions: (decoded.permissions as UserPermissions) ?? null,
   };
 }
 
-/**
- * Validates that a resource belongs to the tenant's company
- *
- * Use this when accessing resources by ID to ensure they belong
- * to the same company as the requesting user.
- *
- * @param companyId - The company ID from tenant context
- * @param tableName - Name of the table to check
- * @param resourceId - ID of the resource to validate
- * @returns true if resource belongs to company, false otherwise
- *
- * @example
- * const isValid = await validateCompanyOwnership(
- *   context.companyId,
- *   'students',
- *   studentId
- * );
- * if (!isValid) {
- *   return { status: 404, body: { message: 'Student not found' } };
- * }
- */
 export async function validateCompanyOwnership(
   companyId: string,
   tableName: string,
   resourceId: string
 ): Promise<boolean> {
   const { queryOne } = await import('../db/connection');
-
-  const result = await queryOne(
+  return !!(await queryOne(
     `SELECT id FROM ${tableName} WHERE id = $1 AND company_id = $2`,
     [resourceId, companyId]
-  );
-
-  return !!result;
+  ));
 }
 
-/**
- * Role-based access control check
- *
- * Verifies if the current user has one of the required roles
- *
- * @param context - Tenant context from extractTenantContext()
- * @param requiredRoles - Array of roles that are allowed
- * @returns true if user has required role, false otherwise
- *
- * @example
- * if (!checkPermission(context, ['ADMIN', 'BRANCH_MANAGER'])) {
- *   return { status: 403, body: { message: 'Access denied' } };
- * }
- */
-export function checkPermission(
-  context: TenantContext,
-  requiredRoles: string[]
-): boolean {
+export function checkPermission(context: TenantContext, requiredRoles: string[]): boolean {
   return requiredRoles.includes(context.role);
 }
 
-/**
- * Branch-level access control
- *
- * Ensures users can only access data from their assigned branch,
- * unless they're ADMIN (company-wide access)
- *
- * @param context - Tenant context from extractTenantContext()
- * @param targetBranchId - Branch ID user is trying to access
- * @returns true if user can access the branch, false otherwise
- *
- * @example
- * if (queryParams.branchId && !canAccessBranch(context, queryParams.branchId)) {
- *   return { status: 403, body: { message: 'Access denied to this branch' } };
- * }
- */
-export function canAccessBranch(
-  context: TenantContext,
-  targetBranchId: string
-): boolean {
-  // ADMINs have company-wide access to all branches
-  if (context.role === 'ADMIN') {
-    return true;
-  }
+export function isGlobalAdmin(context: TenantContext): boolean {
+  return context.role === 'GLOBAL_ADMIN' || context.role === 'ADMIN';
+}
 
-  // Other roles can only access their own branch
+export function checkGranularPermission(
+  context: TenantContext,
+  resource: PermissionResource,
+  action: PermissionAction
+): boolean {
+  const custom = context.permissions?.[resource]?.[action];
+  if (custom !== undefined) return custom as boolean;
+  return ROLE_DEFAULTS[context.role]?.[resource]?.[action] ?? false;
+}
+
+export function canAccessBranch(context: TenantContext, targetBranchId: string): boolean {
+  if (isGlobalAdmin(context)) return true;
+  if (context.role === 'BRANCH_ADMIN' || context.role === 'BRANCH_MANAGER') {
+    return (context.branchIds ?? []).includes(targetBranchId);
+  }
   return context.branchId === targetBranchId;
 }
 
-/**
- * Helper to build company-scoped WHERE clause
- *
- * @param companyId - Company ID from tenant context
- * @param additionalConditions - Optional additional WHERE conditions
- * @returns SQL WHERE clause with company_id filter
- *
- * @example
- * const whereClause = buildCompanyFilter(context.companyId, 'is_active = true');
- * // Returns: "WHERE company_id = '<uuid>' AND is_active = true"
- */
-export function buildCompanyFilter(
-  companyId: string,
-  additionalConditions?: string
-): string {
-  let clause = `WHERE company_id = '${companyId}'`;
-
-  if (additionalConditions) {
-    clause += ` AND ${additionalConditions}`;
+export function getBranchFilter(context: TenantContext, requestedBranchId?: string): string | null {
+  if (isGlobalAdmin(context)) return requestedBranchId || null;
+  if (context.role === 'BRANCH_ADMIN' || context.role === 'BRANCH_MANAGER') {
+    if (requestedBranchId) {
+      return (context.branchIds ?? []).includes(requestedBranchId) ? requestedBranchId : null;
+    }
+    return context.branchIds?.[0] || context.branchId || null;
   }
-
-  return clause;
+  return context.branchId || null;
 }
 
-/**
- * Apply branch-level filtering based on user role
- *
- * ADMINs see all branches in their company
- * Other roles only see their assigned branch
- *
- * @param context - Tenant context
- * @param requestedBranchId - Optional branch ID from query params
- * @returns Branch ID to filter by, or null for company-wide access
- *
- * @example
- * const branchFilter = getBranchFilter(context, queryParams.branchId);
- * if (branchFilter) {
- *   sql += ' AND branch_id = $2';
- *   params.push(branchFilter);
- * }
- */
-export function getBranchFilter(
-  context: TenantContext,
-  requestedBranchId?: string
-): string | null {
-  // ADMIN can request specific branch or see all
-  if (context.role === 'ADMIN') {
-    return requestedBranchId || null;
+export function getBranchSqlFilter(context: TenantContext, columnAlias = 'branch_id'): string | null {
+  if (isGlobalAdmin(context)) return null;
+  if (
+    (context.role === 'BRANCH_ADMIN' || context.role === 'BRANCH_MANAGER') &&
+    context.branchIds && context.branchIds.length > 0
+  ) {
+    if (context.branchIds.length === 1) return `${columnAlias} = '${context.branchIds[0]}'`;
+    return `${columnAlias} IN (${context.branchIds.map(id => `'${id}'`).join(', ')})`;
   }
+  if (context.branchId) return `${columnAlias} = '${context.branchId}'`;
+  return null;
+}
 
-  // Non-admins are restricted to their own branch
-  return context.branchId || null;
+export function buildCompanyFilter(companyId: string, additionalConditions?: string): string {
+  let clause = `WHERE company_id = '${companyId}'`;
+  if (additionalConditions) clause += ` AND ${additionalConditions}`;
+  return clause;
 }

@@ -58,13 +58,28 @@ export const authRoutes = {
         };
       }
 
-      // Generate tokens with companyId
+      // Fetch branch IDs for multi-branch users
+      let branchIds: string[] = [];
+      try {
+        const { query: dbQuery } = await import('../db/connection');
+        const userBranches = await dbQuery<any>(
+          'SELECT branch_id FROM user_branches WHERE user_id = $1',
+          [user.id]
+        );
+        branchIds = userBranches.map((r: any) => r.branch_id);
+      } catch {
+        if (user.branch_id) branchIds = [user.branch_id];
+      }
+      if (branchIds.length === 0 && user.branch_id) branchIds = [user.branch_id];
+
+      // Generate tokens with companyId and permissions
       const payload = {
         id: user.id,
         email: user.email,
         role: user.role,
-        companyId: user.company_id,  // NEW: Include company ID for tenant isolation
+        companyId: user.company_id,
         branchId: user.branch_id,
+        permissions: user.permissions ?? null,
       };
 
       const accessToken = await signToken(payload);
@@ -81,8 +96,11 @@ export const authRoutes = {
             firstName: user.first_name,
             lastName: user.last_name,
             role: user.role,
-            companyId: user.company_id,  // NEW: Return company ID
+            companyId: user.company_id,
             branchId: user.branch_id,
+            branchIds,
+            linkedEmployeeId: user.linked_employee_id ?? null,
+            permissions: user.permissions ?? null,
             isActive: user.is_active,
           },
         },
@@ -317,9 +335,13 @@ export const authRoutes = {
 
       const decoded = await verifyToken(token);
 
-      // Fetch fresh user data
+      // Fetch fresh user data with branch IDs
       const user = await queryOne<any>(
-        'SELECT id, email, first_name, last_name, role, company_id, branch_id, is_active FROM users WHERE id = $1',
+        `SELECT u.*, array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
+         FROM users u
+         LEFT JOIN user_branches ub ON ub.user_id = u.id
+         WHERE u.id = $1
+         GROUP BY u.id`,
         [decoded.id]
       );
 
@@ -330,6 +352,8 @@ export const authRoutes = {
         };
       }
 
+      const branchIds: string[] = user.branch_ids ?? (user.branch_id ? [user.branch_id] : []);
+
       return {
         status: 200 as const,
         body: {
@@ -338,8 +362,11 @@ export const authRoutes = {
           firstName: user.first_name,
           lastName: user.last_name,
           role: user.role,
-          companyId: user.company_id,  // NEW: Include company ID
+          companyId: user.company_id,
           branchId: user.branch_id,
+          branchIds,
+          linkedEmployeeId: user.linked_employee_id ?? null,
+          permissions: user.permissions ?? null,
           isActive: user.is_active,
         },
       };

@@ -13,8 +13,37 @@ const OptionalUUIDSchema = z.preprocess(
 );
 const DateStringSchema = z.string().datetime();
 
-// User Roles
-const UserRoleSchema = z.enum(['ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT']);
+// User Roles (extended RBAC)
+const UserRoleSchema = z.enum([
+  'GLOBAL_ADMIN', 'BRANCH_ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER', 'VIEWER',
+  'ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT',
+]);
+
+// Permissions schema
+const ResourcePermissionSchema = z.object({
+  read: z.boolean(),
+  write: z.boolean(),
+  delete: z.boolean(),
+}).partial();
+
+const UserPermissionsSchema = z.object({
+  dashboard:    ResourcePermissionSchema.optional(),
+  branches:     ResourcePermissionSchema.optional(),
+  courses:      ResourcePermissionSchema.optional(),
+  classes:      ResourcePermissionSchema.optional(),
+  students:     ResourcePermissionSchema.optional(),
+  enrollments:  ResourcePermissionSchema.optional(),
+  employees:    ResourcePermissionSchema.optional(),
+  revenues:     ResourcePermissionSchema.optional(),
+  expenses:     ResourcePermissionSchema.optional(),
+  withdrawals:  ResourcePermissionSchema.optional(),
+  refunds:      ResourcePermissionSchema.optional(),
+  debts:        ResourcePermissionSchema.optional(),
+  products:     ResourcePermissionSchema.optional(),
+  product_sales: ResourcePermissionSchema.optional(),
+  reports:      ResourcePermissionSchema.optional(),
+  users:        ResourcePermissionSchema.optional(),
+}).optional().nullable();
 
 // Subscription Tiers
 const SubscriptionTierSchema = z.enum(['BASIC', 'PROFESSIONAL', 'ENTERPRISE']);
@@ -105,19 +134,26 @@ const RegisterRequestSchema = z.object({
   phone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
 });
 
+const SafeUserSchema = z.object({
+  id: UUIDSchema,
+  email: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  role: UserRoleSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable().optional(),
+  branchIds: z.array(UUIDSchema).optional(),
+  linkedEmployeeId: UUIDSchema.nullable().optional(),
+  permissions: UserPermissionsSchema,
+  isActive: z.boolean(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
 const AuthResponseSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
-  user: z.object({
-    id: UUIDSchema,
-    email: z.string(),
-    firstName: z.string(),
-    lastName: z.string(),
-    role: UserRoleSchema,
-    companyId: UUIDSchema,
-    branchId: UUIDSchema.nullable(),
-    isActive: z.boolean(),
-  }),
+  user: SafeUserSchema,
   company: z.object({
     id: UUIDSchema,
     name: z.string(),
@@ -125,6 +161,42 @@ const AuthResponseSchema = z.object({
     subscriptionTier: SubscriptionTierSchema,
     subscriptionStatus: SubscriptionStatusSchema,
   }).optional(),
+});
+
+// =============================================
+// User Management Schemas
+// =============================================
+const CreateUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  role: UserRoleSchema,
+  branchId: OptionalUUIDSchema,
+  branchIds: z.array(UUIDSchema).optional(),
+  linkedEmployeeId: OptionalUUIDSchema,
+  permissions: UserPermissionsSchema,
+});
+
+const UpdateUserSchema = z.object({
+  email: z.string().email().optional(),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  role: UserRoleSchema.optional(),
+  branchId: OptionalUUIDSchema,
+  branchIds: z.array(UUIDSchema).optional(),
+  linkedEmployeeId: OptionalUUIDSchema,
+  permissions: UserPermissionsSchema,
+  isActive: z.boolean().optional(),
+});
+
+const ConvertEmployeeToUserSchema = z.object({
+  employeeId: UUIDSchema,
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: UserRoleSchema,
+  branchIds: z.array(UUIDSchema).optional(),
+  permissions: UserPermissionsSchema,
 });
 
 // =============================================
@@ -690,16 +762,7 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/auth/profile',
       responses: {
-        200: z.object({
-          id: UUIDSchema,
-          email: z.string(),
-          firstName: z.string(),
-          lastName: z.string(),
-          role: UserRoleSchema,
-          companyId: UUIDSchema,
-          branchId: UUIDSchema.nullable(),
-          isActive: z.boolean(),
-        }),
+        200: SafeUserSchema,
         401: z.object({ message: z.string() }),
       },
       headers: z.object({
@@ -1920,6 +1983,131 @@ export const contract = c.router({
           message: z.string(),
           error: z.string().optional(),
         }),
+      },
+    },
+    runRbacMigration: {
+      method: 'POST',
+      path: '/api/migrations/run-rbac',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+  },
+
+  // ============================================================
+  // Users Management
+  // ============================================================
+  users: {
+    list: {
+      method: 'GET',
+      path: '/api/users',
+      query: z.object({
+        branchId: z.string().optional(),
+        role: z.string().optional(),
+        isActive: z.preprocess(
+          (v) => v === 'true' ? true : v === 'false' ? false : undefined,
+          z.boolean().optional()
+        ),
+      }),
+      responses: {
+        200: z.object({ users: z.array(SafeUserSchema) }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    get: {
+      method: 'GET',
+      path: '/api/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SafeUserSchema,
+        404: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    create: {
+      method: 'POST',
+      path: '/api/users',
+      body: CreateUserSchema,
+      responses: {
+        201: SafeUserSchema,
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateUserSchema,
+      responses: {
+        200: SafeUserSchema,
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    updatePermissions: {
+      method: 'PATCH',
+      path: '/api/users/:id/permissions',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ permissions: UserPermissionsSchema }),
+      responses: {
+        200: z.object({ message: z.string(), permissions: UserPermissionsSchema }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    resetPassword: {
+      method: 'POST',
+      path: '/api/users/:id/reset-password',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ password: z.string().min(6) }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    deactivate: {
+      method: 'POST',
+      path: '/api/users/:id/deactivate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    activate: {
+      method: 'POST',
+      path: '/api/users/:id/activate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    convertEmployee: {
+      method: 'POST',
+      path: '/api/users/convert-employee',
+      body: ConvertEmployeeToUserSchema,
+      responses: {
+        201: SafeUserSchema,
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
   },

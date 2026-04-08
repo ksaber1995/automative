@@ -5,9 +5,20 @@ import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { MenuModule } from 'primeng/menu';
 import { DialogModule } from 'primeng/dialog';
+import { TooltipModule } from 'primeng/tooltip';
 import { MenuItem } from 'primeng/api';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
+import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
+
+interface NavItem {
+  label?: string;
+  icon?: string;
+  routerLink?: string[];
+  separator?: boolean;
+  sectionLabel?: boolean;
+  visible: boolean;
+}
 
 @Component({
   selector: 'app-layout',
@@ -19,6 +30,7 @@ import { SubscriptionService } from '../services/subscription.service';
     AvatarModule,
     MenuModule,
     DialogModule,
+    TooltipModule,
   ],
   template: `
     <div class="min-h-screen bg-gray-100">
@@ -26,10 +38,7 @@ import { SubscriptionService } from '../services/subscription.service';
       <header class="bg-white shadow-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-10">
         <div class="flex items-center justify-between px-6 py-4">
           <div class="flex items-center gap-4">
-            <button
-              pButton
-              icon="pi pi-bars"
-              class="p-button-text p-button-rounded"
+            <button pButton icon="pi pi-bars" class="p-button-text p-button-rounded"
               (click)="toggleSidebar()">
             </button>
             <img src="assets/img/logo.png" alt="Automate Magic" class="h-9 w-auto">
@@ -40,29 +49,29 @@ import { SubscriptionService } from '../services/subscription.service';
               <!-- Company Badge -->
               <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                 <i class="pi pi-building text-blue-600 text-sm"></i>
-                <span class="text-sm font-medium text-blue-700" [title]="'Company ID: ' + user.companyId">
-                  {{ getCompanyName(user) }}
-                </span>
+                <span class="text-sm font-medium text-blue-700">{{ getCompanyName(user) }}</span>
               </div>
 
               <!-- User Info -->
               <div class="flex items-center gap-3">
-                <div class="text-right">
+                <div class="text-right hidden sm:block">
                   <p class="font-medium text-gray-900">{{ user.firstName }} {{ user.lastName }}</p>
-                  <p class="text-sm text-gray-500">{{ formatRole(user.role) }}</p>
+                  <p class="text-xs text-gray-500">{{ formatRole(user.role) }}</p>
                 </div>
-                <p-avatar
-                  [label]="getUserInitials(user)"
-                  styleClass="bg-blue-500 text-white"
-                  shape="circle">
-                </p-avatar>
+                <div class="relative">
+                  <p-avatar
+                    [label]="getUserInitials(user)"
+                    shape="circle"
+                    [style]="{ background: getAvatarColor(user.role), color: 'white', fontWeight: '600' }">
+                  </p-avatar>
+                  <!-- Role indicator dot -->
+                  <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
+                    [class]="getRoleDotClass(user.role)">
+                  </span>
+                </div>
               </div>
             }
-            <button
-              pButton
-              icon="pi pi-sign-out"
-              label="Logout"
-              class="p-button-text"
+            <button pButton icon="pi pi-sign-out" label="Logout" class="p-button-text"
               (click)="logout()">
             </button>
           </div>
@@ -71,27 +80,26 @@ import { SubscriptionService } from '../services/subscription.service';
 
       <!-- Sidebar -->
       <aside
-        class="fixed left-0 top-16 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-20"
+        class="fixed left-0 top-16 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-20 overflow-y-auto"
         [class.w-64]="sidebarVisible()"
         [class.w-0]="!sidebarVisible()">
         @if (sidebarVisible()) {
           <nav class="p-4">
-            <div class="space-y-1">
-              @for (item of menuItems; track $index) {
-                @if (item.separator) {
-                  <div class="border-t border-gray-200 my-2"></div>
-                  @if (item.label) {
-                    <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      {{ item.label }}
-                    </div>
-                  }
+            <div class="space-y-0.5">
+              @for (item of visibleMenuItems(); track $index) {
+                @if (item.sectionLabel) {
+                  <div class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    {{ item.label }}
+                  </div>
+                } @else if (item.separator) {
+                  <div class="border-t border-gray-100 my-2"></div>
                 } @else {
                   <a
                     [routerLink]="item.routerLink"
-                    routerLinkActive="bg-blue-50 text-blue-600 border-blue-600"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent"
-                    [class.pointer-events-none]="!item.visible">
-                    <i [class]="item.icon + ' text-lg'"></i>
+                    routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
+                    [routerLinkActiveOptions]="{ exact: item.routerLink?.length === 1 }"
+                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm">
+                    <i [class]="item.icon + ' text-base'"></i>
                     <span class="font-medium">{{ item.label }}</span>
                   </a>
                 }
@@ -101,7 +109,7 @@ import { SubscriptionService } from '../services/subscription.service';
         }
       </aside>
 
-      <!-- Expiry Warning Banner (7 days) -->
+      <!-- Expiry Warning Banner -->
       @if (subscriptionService.showExpiryWarning()) {
         <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
           [class.ml-64]="sidebarVisible()">
@@ -129,19 +137,12 @@ import { SubscriptionService } from '../services/subscription.service';
     </div>
 
     <!-- Trial Expired Dialog -->
-    <p-dialog
-      [visible]="subscriptionService.isTrialExpired()"
-      [modal]="true"
-      [closable]="false"
-      [style]="{ width: '480px' }"
-      header="Trial Period Expired"
-    >
+    <p-dialog [visible]="subscriptionService.isTrialExpired()" [modal]="true"
+      [closable]="false" [style]="{ width: '480px' }" header="Trial Period Expired">
       <div class="text-center py-6 px-4">
         <i class="pi pi-clock text-6xl text-red-400 mb-4 block"></i>
         <h3 class="text-xl font-bold text-gray-800 mb-2">Your free trial has ended</h3>
-        <p class="text-gray-500 mb-4">
-          Your 2-month trial period has expired. Please contact us to subscribe and continue using the platform.
-        </p>
+        <p class="text-gray-500 mb-4">Your 2-month trial has expired. Please contact us to subscribe.</p>
       </div>
       <ng-template pTemplate="footer">
         <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
@@ -149,158 +150,24 @@ import { SubscriptionService } from '../services/subscription.service';
     </p-dialog>
 
     <!-- Subscription Expired Dialog -->
-    <p-dialog
-      [visible]="subscriptionService.isSubscriptionExpired()"
-      [modal]="true"
-      [closable]="false"
-      [style]="{ width: '480px' }"
-      header="Subscription Expired"
-    >
+    <p-dialog [visible]="subscriptionService.isSubscriptionExpired()" [modal]="true"
+      [closable]="false" [style]="{ width: '480px' }" header="Subscription Expired">
       <div class="text-center py-6 px-4">
         <i class="pi pi-ban text-6xl text-red-400 mb-4 block"></i>
         <h3 class="text-xl font-bold text-gray-800 mb-2">Your subscription has expired</h3>
-        <p class="text-gray-500 mb-4">
-          Your subscription has expired. Please contact us to renew your plan and regain full access.
-        </p>
+        <p class="text-gray-500 mb-4">Please contact us to renew your plan.</p>
       </div>
       <ng-template pTemplate="footer">
         <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
       </ng-template>
     </p-dialog>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
-  `]
+  styles: [`:host { display: block; }`]
 })
 export class LayoutComponent implements OnInit {
   sidebarVisible = signal(true);
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
-
-  menuItems: MenuItem[] = [
-    {
-      label: 'Dashboard',
-      icon: 'pi pi-home',
-      routerLink: ['/dashboard'],
-      visible: true
-    },
-    {
-      separator: true,
-      label: 'Management'
-    },
-    {
-      label: 'Branches',
-      icon: 'pi pi-building',
-      routerLink: ['/branches'],
-      visible: true
-    },
-    {
-      label: 'Courses',
-      icon: 'pi pi-book',
-      routerLink: ['/courses'],
-      visible: true
-    },
-    {
-      label: 'Classes',
-      icon: 'pi pi-calendar',
-      routerLink: ['/classes'],
-      visible: true
-    },
-    {
-      label: 'Students',
-      icon: 'pi pi-users',
-      routerLink: ['/students'],
-      visible: true
-    },
-    {
-      label: 'Employees',
-      icon: 'pi pi-user',
-      routerLink: ['/employees'],
-      visible: true
-    },
-    {
-      separator: true,
-      label: 'Financial'
-    },
-    {
-      label: 'Revenues',
-      icon: 'pi pi-dollar',
-      routerLink: ['/revenues'],
-      visible: true
-    },
-    {
-      label: 'Expenses',
-      icon: 'pi pi-money-bill',
-      routerLink: ['/expenses'],
-      visible: true
-    },
-    {
-      label: 'Withdrawals',
-      icon: 'pi pi-wallet',
-      routerLink: ['/withdrawals'],
-      visible: true
-    },
-    {
-      label: 'Refunds',
-      icon: 'pi pi-replay',
-      routerLink: ['/refunds'],
-      visible: true
-    },
-    {
-      label: 'Dues',
-      icon: 'pi pi-credit-card',
-      routerLink: ['/dues'],
-      visible: true
-    },
-    // {
-    //   label: 'Debts',
-    //   icon: 'pi pi-credit-card',
-    //   routerLink: ['/debts'],
-    //   visible: true
-    // },
-    {
-      separator: true,
-      label: 'Inventory'
-    },
-    {
-      label: 'Products',
-      icon: 'pi pi-box',
-      routerLink: ['/products/list'],
-      visible: true
-    },
-    {
-      label: 'Sell Product',
-      icon: 'pi pi-shopping-cart',
-      routerLink: ['/products/sell'],
-      visible: true
-    },
-    {
-      label: 'Sales History',
-      icon: 'pi pi-history',
-      routerLink: ['/products/sales'],
-      visible: true
-    },
-    {
-      separator: true
-    },
-    {
-      label: 'Reports',
-      icon: 'pi pi-chart-bar',
-      routerLink: ['/reports'],
-      visible: true
-    },
-    {
-      separator: true
-    },
-    {
-      label: 'Settings',
-      icon: 'pi pi-cog',
-      routerLink: ['/settings'],
-      visible: true
-    }
-  ];
 
   constructor(
     private authService: AuthService,
@@ -311,28 +178,126 @@ export class LayoutComponent implements OnInit {
     this.subscriptionService.load().subscribe({ error: () => {} });
   }
 
-  toggleSidebar() {
-    this.sidebarVisible.update(v => !v);
-  }
+  // ─── Computed menu (permission-aware) ────────────────────────────────────
+
+  visibleMenuItems = computed<NavItem[]>(() => {
+    const auth = this.authService;
+    const all: NavItem[] = [
+      {
+        label: 'Dashboard', icon: 'pi pi-home', routerLink: ['/dashboard'],
+        visible: auth.canRead('dashboard'),
+      },
+      { separator: true, visible: true },
+      { label: 'Management', sectionLabel: true, visible: true },
+      {
+        label: 'Branches', icon: 'pi pi-building', routerLink: ['/branches'],
+        visible: auth.canRead('branches'),
+      },
+      {
+        label: 'Courses', icon: 'pi pi-book', routerLink: ['/courses'],
+        visible: auth.canRead('courses'),
+      },
+      {
+        label: 'Classes', icon: 'pi pi-calendar', routerLink: ['/classes'],
+        visible: auth.canRead('classes'),
+      },
+      {
+        label: 'Students', icon: 'pi pi-users', routerLink: ['/students'],
+        visible: auth.canRead('students'),
+      },
+      {
+        label: 'Employees', icon: 'pi pi-user', routerLink: ['/employees'],
+        visible: auth.canRead('employees'),
+      },
+      { separator: true, visible: auth.canAccessFinancials() },
+      { label: 'Financial', sectionLabel: true, visible: auth.canAccessFinancials() },
+      {
+        label: 'Revenues', icon: 'pi pi-dollar', routerLink: ['/revenues'],
+        visible: auth.canRead('revenues'),
+      },
+      {
+        label: 'Expenses', icon: 'pi pi-money-bill', routerLink: ['/expenses'],
+        visible: auth.canRead('expenses'),
+      },
+      {
+        label: 'Withdrawals', icon: 'pi pi-wallet', routerLink: ['/withdrawals'],
+        visible: auth.canRead('withdrawals'),
+      },
+      {
+        label: 'Refunds', icon: 'pi pi-replay', routerLink: ['/refunds'],
+        visible: auth.canRead('refunds'),
+      },
+      {
+        label: 'Dues', icon: 'pi pi-credit-card', routerLink: ['/dues'],
+        visible: auth.canRead('enrollments'),
+      },
+      { separator: true, visible: auth.canRead('products') },
+      { label: 'Inventory', sectionLabel: true, visible: auth.canRead('products') },
+      {
+        label: 'Products', icon: 'pi pi-box', routerLink: ['/products/list'],
+        visible: auth.canRead('products'),
+      },
+      {
+        label: 'Sell Product', icon: 'pi pi-shopping-cart', routerLink: ['/products/sell'],
+        visible: auth.canWrite('product_sales'),
+      },
+      {
+        label: 'Sales History', icon: 'pi pi-history', routerLink: ['/products/sales'],
+        visible: auth.canRead('product_sales'),
+      },
+      { separator: true, visible: auth.canRead('reports') },
+      {
+        label: 'Reports', icon: 'pi pi-chart-bar', routerLink: ['/reports'],
+        visible: auth.canRead('reports'),
+      },
+      { separator: true, visible: true },
+      {
+        label: 'Users', icon: 'pi pi-user-edit', routerLink: ['/users'],
+        visible: auth.canRead('users'),
+      },
+      {
+        label: 'Settings', icon: 'pi pi-cog', routerLink: ['/settings'],
+        visible: true,
+      },
+    ];
+
+    return all.filter(item => item.visible);
+  });
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  toggleSidebar() { this.sidebarVisible.update(v => !v); }
 
   getUserInitials(user: any): string {
     return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase();
   }
 
-  getCompanyName(user: any): string {
-    // TODO: Fetch and cache company name from API
-    // For now, show a placeholder or use cached company data from registration
-    const cachedCompany = localStorage.getItem('company_name');
-    return cachedCompany || 'My Company';
+  getCompanyName(_user: any): string {
+    return localStorage.getItem('company_name') || 'My Company';
+  }
+
+  getAvatarColor(role: string): string {
+    const map: Record<string, string> = {
+      GLOBAL_ADMIN: '#7C3AED', ADMIN: '#7C3AED',
+      BRANCH_ADMIN: '#2563EB', BRANCH_MANAGER: '#2563EB',
+      ACADEMIC_MANAGER: '#059669', SALES_MANAGER: '#D97706',
+      ACCOUNTANT: '#0891B2', VIEWER: '#6B7280',
+    };
+    return map[role] || '#3B82F6';
+  }
+
+  getRoleDotClass(role: string): string {
+    const map: Record<string, string> = {
+      GLOBAL_ADMIN: 'bg-purple-500', ADMIN: 'bg-purple-500',
+      BRANCH_ADMIN: 'bg-blue-500', BRANCH_MANAGER: 'bg-blue-500',
+      ACADEMIC_MANAGER: 'bg-emerald-500', SALES_MANAGER: 'bg-amber-500',
+      ACCOUNTANT: 'bg-cyan-500', VIEWER: 'bg-gray-400',
+    };
+    return map[role] || 'bg-gray-400';
   }
 
   formatRole(role: string): string {
-    const roleMap: Record<string, string> = {
-      'ADMIN': 'Administrator',
-      'BRANCH_MANAGER': 'Branch Manager',
-      'ACCOUNTANT': 'Accountant'
-    };
-    return roleMap[role] || role;
+    return ROLE_LABELS[role as UserRole] || role;
   }
 
   logout() {
