@@ -47,7 +47,7 @@ export const subscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (context.role !== 'ADMIN') {
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
         return { status: 403 as const, body: { message: 'Only admins can update subscription' } };
       }
 

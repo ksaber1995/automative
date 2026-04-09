@@ -24,8 +24,8 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      // Only ADMIN can create branches
-      if (context.role !== 'ADMIN') {
+      // Only ADMIN or GLOBAL_ADMIN can create branches
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
         return {
           status: 403 as const,
           body: { message: 'Only administrators can create branches' },
@@ -146,8 +146,8 @@ export const branchesRoutes = {
         };
       }
 
-      // Only ADMIN can update branches
-      if (context.role !== 'ADMIN') {
+      // Only ADMIN or GLOBAL_ADMIN can update branches
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
         return {
           status: 403 as const,
           body: { message: 'Only administrators can update branches' },
@@ -312,8 +312,8 @@ export const branchesRoutes = {
         };
       }
 
-      // Only ADMIN can delete branches
-      if (context.role !== 'ADMIN') {
+      // Only ADMIN or GLOBAL_ADMIN can delete branches
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
         return {
           status: 403 as const,
           body: { message: 'Only administrators can delete branches' },

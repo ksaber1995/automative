@@ -417,6 +417,7 @@ CREATE INDEX idx_products_code ON products(code);
 -- =============================================
 CREATE TABLE product_sales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     product_id UUID NOT NULL,
     branch_id UUID NOT NULL,
     quantity INTEGER NOT NULL,

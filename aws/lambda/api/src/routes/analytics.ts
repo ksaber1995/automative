@@ -20,7 +20,7 @@ export const analyticsRoutes = {
       const enrollmentRevenueData = await query(
         `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM enrollments
-         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
            AND enrollment_date >= $2 AND enrollment_date <= $3`,
         [context.companyId, startDate, endDate]
       );
@@ -176,7 +176,7 @@ export const analyticsRoutes = {
          FROM (
            SELECT enrollment_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
            FROM enrollments
-           WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+           WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
              AND enrollment_date >= $2 AND enrollment_date <= $3
            UNION ALL
            SELECT sale_date as date, total_amount as revenue, 0 as expenses, 0 as refunds
