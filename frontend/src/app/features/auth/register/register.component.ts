@@ -70,11 +70,11 @@ export class RegisterComponent {
     this.authService.register(dto).subscribe({
       next: (response) => {
         this.notificationService.success(
-          `Welcome to Netrofit! Company "${response.company?.name}" has been created successfully.`
+          'Registration successful! Please check your email for the verification code.'
         );
-        setTimeout(() => {
-          this.router.navigate(['/dashboard']);
-        }, 1500);
+        this.router.navigate(['/auth/verify-email'], {
+          queryParams: { email: response.email },
+        });
       },
       error: (error) => {
         this.loading.set(false);

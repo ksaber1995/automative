@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { SafeUser, LoginDto, AuthResponse, RegisterDto } from '@shared/interfaces/user.interface';
+import { SafeUser, LoginDto, AuthResponse, RegisterDto, RegisterResponse } from '@shared/interfaces/user.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
 import {
   PermissionResource,
@@ -71,8 +71,12 @@ export class AuthService {
       );
   }
 
-  register(userData: RegisterDto): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, userData)
+  register(userData: RegisterDto): Observable<RegisterResponse> {
+    return this.http.post<RegisterResponse>(`${environment.apiUrl}/auth/register`, userData);
+  }
+
+  verifyEmail(email: string, otp: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/verify-email`, { email, otp })
       .pipe(
         tap(response => {
           this.setTokens(response.accessToken, response.refreshToken);
@@ -84,6 +88,10 @@ export class AuthService {
           }
         })
       );
+  }
+
+  resendOtp(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/resend-otp`, { email });
   }
 
   logout(): void {

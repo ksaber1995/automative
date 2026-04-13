@@ -102,3 +102,8 @@ export interface AuthResponse {
   user: SafeUser;
   company?: CompanySummary;
 }
+
+export interface RegisterResponse {
+  email: string;
+  message: string;
+}

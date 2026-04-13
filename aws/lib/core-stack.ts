@@ -153,6 +153,13 @@ export class CoreStack extends cdk.Stack {
     jwtSecret.grantRead(lambdaRole);
     jwtRefreshSecret.grantRead(lambdaRole);
 
+    // Grant Lambda permission to send emails via SES
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'],
+    }));
+
     // API Lambda Function
     this.apiLambda = new lambda.Function(this, 'ApiLambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -168,6 +175,8 @@ export class CoreStack extends cdk.Stack {
         JWT_REFRESH_SECRET_ARN: jwtRefreshSecret.secretArn,
         JWT_EXPIRATION: '365d',
         JWT_REFRESH_EXPIRATION: '365d',
+        // SES sender — must be a verified identity in AWS SES (email or domain)
+        SENDER_EMAIL: 'noreply@automate-magic.com',
       },
       vpc,
       vpcSubnets: {

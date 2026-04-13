@@ -1,0 +1,187 @@
+{
+  "NAV": {
+    "DASHBOARD": "Dashboard",
+    "BRANCHES": "Branches",
+    "COURSES": "Courses",
+    "CLASSES": "Classes",
+    "STUDENTS": "Students",
+    "EMPLOYEES": "Employees",
+    "REVENUES": "Revenues",
+    "EXPENSES": "Expenses",
+    "WITHDRAWALS": "Withdrawals",
+    "REFUNDS": "Refunds",
+    "DUES": "Dues",
+    "PRODUCTS": "Products",
+    "SELL_PRODUCT": "Sell Product",
+    "SALES_HISTORY": "Sales History",
+    "REPORTS": "Reports",
+    "USERS": "Users",
+    "SETTINGS": "Settings",
+    "SECTIONS": {
+      "MANAGEMENT": "Management",
+      "FINANCIAL": "Financial",
+      "INVENTORY": "Inventory"
+    }
+  },
+  "HEADER": {
+    "LOGOUT": "Logout",
+    "TOGGLE_LANGUAGE": "عربي"
+  },
+  "SUBSCRIPTION": {
+    "EXPIRY_WARNING": "Your subscription expires in {{days}} day(s). Please renew to avoid interruption.",
+    "TRIAL_EXPIRED_TITLE": "Trial Period Expired",
+    "TRIAL_EXPIRED_HEADING": "Your free trial has ended",
+    "TRIAL_EXPIRED_MESSAGE": "Your 2-month trial has expired. Please contact us to subscribe.",
+    "TRIAL_LOGOUT": "Logout",
+    "SUBSCRIPTION_EXPIRED_TITLE": "Subscription Expired",
+    "SUBSCRIPTION_EXPIRED_HEADING": "Your subscription has expired",
+    "SUBSCRIPTION_EXPIRED_MESSAGE": "Please contact us to renew your plan.",
+    "SUBSCRIPTION_LOGOUT": "Logout"
+  },
+  "AUTH": {
+    "LOGIN": "Login",
+    "REGISTER": "Register",
+    "EMAIL": "Email",
+    "PASSWORD": "Password",
+    "CONFIRM_PASSWORD": "Confirm Password",
+    "FORGOT_PASSWORD": "Forgot Password?",
+    "SIGN_IN": "Sign In",
+    "SIGN_UP": "Sign Up",
+    "ALREADY_HAVE_ACCOUNT": "Already have an account?",
+    "DONT_HAVE_ACCOUNT": "Don't have an account?",
+    "FIRST_NAME": "First Name",
+    "LAST_NAME": "Last Name",
+    "COMPANY_NAME": "Company Name"
+  },
+  "COMMON": {
+    "SAVE": "Save",
+    "CANCEL": "Cancel",
+    "DELETE": "Delete",
+    "EDIT": "Edit",
+    "ADD": "Add",
+    "SEARCH": "Search",
+    "LOADING": "Loading...",
+    "NO_DATA": "No data available",
+    "CONFIRM": "Confirm",
+    "CLOSE": "Close",
+    "YES": "Yes",
+    "NO": "No",
+    "ACTIONS": "Actions",
+    "STATUS": "Status",
+    "NAME": "Name",
+    "DATE": "Date",
+    "AMOUNT": "Amount",
+    "NOTES": "Notes",
+    "DESCRIPTION": "Description",
+    "TYPE": "Type",
+    "CATEGORY": "Category",
+    "BRANCH": "Branch",
+    "TOTAL": "Total",
+    "BACK": "Back",
+    "NEXT": "Next",
+    "SUBMIT": "Submit",
+    "RESET": "Reset",
+    "FILTER": "Filter",
+    "EXPORT": "Export",
+    "PRINT": "Print",
+    "VIEW": "View",
+    "DETAILS": "Details",
+    "CREATED_AT": "Created At",
+    "UPDATED_AT": "Updated At",
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive",
+    "ALL": "All"
+  },
+  "DASHBOARD": {
+    "TITLE": "Dashboard",
+    "TOTAL_REVENUE": "Total Revenue",
+    "TOTAL_EXPENSES": "Total Expenses",
+    "NET_PROFIT": "Net Profit",
+    "TOTAL_STUDENTS": "Total Students",
+    "ACTIVE_ENROLLMENTS": "Active Enrollments",
+    "MONTHLY_OVERVIEW": "Monthly Overview",
+    "RECENT_ACTIVITY": "Recent Activity"
+  },
+  "BRANCHES": {
+    "TITLE": "Branches",
+    "ADD_BRANCH": "Add Branch",
+    "BRANCH_NAME": "Branch Name",
+    "BRANCH_DETAILS": "Branch Details",
+    "NO_BRANCHES": "No branches found"
+  },
+  "STUDENTS": {
+    "TITLE": "Students",
+    "ADD_STUDENT": "Add Student",
+    "STUDENT_NAME": "Student Name",
+    "STUDENT_DETAILS": "Student Details",
+    "NO_STUDENTS": "No students found",
+    "ENROLLMENT_STATUS": "Enrollment Status",
+    "PHONE": "Phone",
+    "PARENT_PHONE": "Parent Phone"
+  },
+  "EMPLOYEES": {
+    "TITLE": "Employees",
+    "ADD_EMPLOYEE": "Add Employee",
+    "EMPLOYEE_NAME": "Employee Name",
+    "POSITION": "Position",
+    "SALARY": "Salary",
+    "NO_EMPLOYEES": "No employees found"
+  },
+  "COURSES": {
+    "TITLE": "Courses",
+    "ADD_COURSE": "Add Course",
+    "COURSE_NAME": "Course Name",
+    "NO_COURSES": "No courses found"
+  },
+  "CLASSES": {
+    "TITLE": "Classes",
+    "ADD_CLASS": "Add Class",
+    "CLASS_NAME": "Class Name",
+    "NO_CLASSES": "No classes found"
+  },
+  "REVENUES": {
+    "TITLE": "Revenues",
+    "ADD_REVENUE": "Add Revenue",
+    "NO_REVENUES": "No revenues found"
+  },
+  "EXPENSES": {
+    "TITLE": "Expenses",
+    "ADD_EXPENSE": "Add Expense",
+    "NO_EXPENSES": "No expenses found"
+  },
+  "PRODUCTS": {
+    "TITLE": "Products",
+    "ADD_PRODUCT": "Add Product",
+    "PRODUCT_NAME": "Product Name",
+    "PRICE": "Price",
+    "QUANTITY": "Quantity",
+    "NO_PRODUCTS": "No products found",
+    "SELL": "Sell",
+    "STOCK": "Stock"
+  },
+  "SETTINGS": {
+    "TITLE": "Settings",
+    "COMPANY_SETTINGS": "Company Settings",
+    "EXPENSE_ALLOCATION": "Expense Allocation",
+    "SAVE_SETTINGS": "Save Settings"
+  },
+  "USERS": {
+    "TITLE": "Users",
+    "ADD_USER": "Add User",
+    "ROLE": "Role",
+    "NO_USERS": "No users found"
+  },
+  "REPORTS": {
+    "TITLE": "Reports",
+    "GENERATE": "Generate Report",
+    "DATE_RANGE": "Date Range",
+    "FROM": "From",
+    "TO": "To"
+  },
+  "DELETE_DIALOG": {
+    "HEADER": "Confirm Delete",
+    "MESSAGE": "Are you sure you want to delete this item? This action cannot be undone.",
+    "CONFIRM": "Delete",
+    "CANCEL": "Cancel"
+  }
+}

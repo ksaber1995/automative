@@ -59,7 +59,16 @@ export class LoginComponent {
       },
       error: (error) => {
         this.loading.set(false);
-        console.error('Login failed:', error);
+        if (error.status === 403 && error.error?.code === 'EMAIL_NOT_VERIFIED') {
+          this.notificationService.error('Please verify your email before logging in.');
+          this.router.navigate(['/auth/verify-email'], {
+            queryParams: { email: error.error.email },
+          });
+          return;
+        }
+        this.notificationService.error(
+          error.error?.message || 'Login failed. Please check your credentials.'
+        );
       },
       complete: () => {
         this.loading.set(false);

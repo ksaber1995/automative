@@ -1,0 +1,187 @@
+{
+  "NAV": {
+    "DASHBOARD": "لوحة التحكم",
+    "BRANCHES": "الفروع",
+    "COURSES": "الكورسات",
+    "CLASSES": "الفصول",
+    "STUDENTS": "الطلاب",
+    "EMPLOYEES": "الموظفون",
+    "REVENUES": "الإيرادات",
+    "EXPENSES": "المصروفات",
+    "WITHDRAWALS": "السحوبات",
+    "REFUNDS": "المستردات",
+    "DUES": "المستحقات",
+    "PRODUCTS": "المنتجات",
+    "SELL_PRODUCT": "بيع منتج",
+    "SALES_HISTORY": "سجل المبيعات",
+    "REPORTS": "التقارير",
+    "USERS": "المستخدمون",
+    "SETTINGS": "الإعدادات",
+    "SECTIONS": {
+      "MANAGEMENT": "الإدارة",
+      "FINANCIAL": "المالية",
+      "INVENTORY": "المخزون"
+    }
+  },
+  "HEADER": {
+    "LOGOUT": "تسجيل الخروج",
+    "TOGGLE_LANGUAGE": "English"
+  },
+  "SUBSCRIPTION": {
+    "EXPIRY_WARNING": "اشتراكك ينتهي خلال {{days}} يوم. يرجى التجديد لتجنب الانقطاع.",
+    "TRIAL_EXPIRED_TITLE": "انتهت فترة التجربة",
+    "TRIAL_EXPIRED_HEADING": "انتهت فترة التجربة المجانية",
+    "TRIAL_EXPIRED_MESSAGE": "انتهت تجربتك المجانية لمدة شهرين. يرجى التواصل معنا للاشتراك.",
+    "TRIAL_LOGOUT": "تسجيل الخروج",
+    "SUBSCRIPTION_EXPIRED_TITLE": "انتهى الاشتراك",
+    "SUBSCRIPTION_EXPIRED_HEADING": "لقد انتهى اشتراكك",
+    "SUBSCRIPTION_EXPIRED_MESSAGE": "يرجى التواصل معنا لتجديد خطتك.",
+    "SUBSCRIPTION_LOGOUT": "تسجيل الخروج"
+  },
+  "AUTH": {
+    "LOGIN": "تسجيل الدخول",
+    "REGISTER": "إنشاء حساب",
+    "EMAIL": "البريد الإلكتروني",
+    "PASSWORD": "كلمة المرور",
+    "CONFIRM_PASSWORD": "تأكيد كلمة المرور",
+    "FORGOT_PASSWORD": "نسيت كلمة المرور؟",
+    "SIGN_IN": "دخول",
+    "SIGN_UP": "إنشاء حساب",
+    "ALREADY_HAVE_ACCOUNT": "لديك حساب بالفعل؟",
+    "DONT_HAVE_ACCOUNT": "ليس لديك حساب؟",
+    "FIRST_NAME": "الاسم الأول",
+    "LAST_NAME": "اسم العائلة",
+    "COMPANY_NAME": "اسم الشركة"
+  },
+  "COMMON": {
+    "SAVE": "حفظ",
+    "CANCEL": "إلغاء",
+    "DELETE": "حذف",
+    "EDIT": "تعديل",
+    "ADD": "إضافة",
+    "SEARCH": "بحث",
+    "LOADING": "جاري التحميل...",
+    "NO_DATA": "لا توجد بيانات",
+    "CONFIRM": "تأكيد",
+    "CLOSE": "إغلاق",
+    "YES": "نعم",
+    "NO": "لا",
+    "ACTIONS": "الإجراءات",
+    "STATUS": "الحالة",
+    "NAME": "الاسم",
+    "DATE": "التاريخ",
+    "AMOUNT": "المبلغ",
+    "NOTES": "ملاحظات",
+    "DESCRIPTION": "الوصف",
+    "TYPE": "النوع",
+    "CATEGORY": "الفئة",
+    "BRANCH": "الفرع",
+    "TOTAL": "الإجمالي",
+    "BACK": "رجوع",
+    "NEXT": "التالي",
+    "SUBMIT": "إرسال",
+    "RESET": "إعادة تعيين",
+    "FILTER": "تصفية",
+    "EXPORT": "تصدير",
+    "PRINT": "طباعة",
+    "VIEW": "عرض",
+    "DETAILS": "التفاصيل",
+    "CREATED_AT": "تاريخ الإنشاء",
+    "UPDATED_AT": "تاريخ التحديث",
+    "ACTIVE": "نشط",
+    "INACTIVE": "غير نشط",
+    "ALL": "الكل"
+  },
+  "DASHBOARD": {
+    "TITLE": "لوحة التحكم",
+    "TOTAL_REVENUE": "إجمالي الإيرادات",
+    "TOTAL_EXPENSES": "إجمالي المصروفات",
+    "NET_PROFIT": "صافي الربح",
+    "TOTAL_STUDENTS": "إجمالي الطلاب",
+    "ACTIVE_ENROLLMENTS": "التسجيلات النشطة",
+    "MONTHLY_OVERVIEW": "نظرة عامة شهرية",
+    "RECENT_ACTIVITY": "النشاط الأخير"
+  },
+  "BRANCHES": {
+    "TITLE": "الفروع",
+    "ADD_BRANCH": "إضافة فرع",
+    "BRANCH_NAME": "اسم الفرع",
+    "BRANCH_DETAILS": "تفاصيل الفرع",
+    "NO_BRANCHES": "لا توجد فروع"
+  },
+  "STUDENTS": {
+    "TITLE": "الطلاب",
+    "ADD_STUDENT": "إضافة طالب",
+    "STUDENT_NAME": "اسم الطالب",
+    "STUDENT_DETAILS": "تفاصيل الطالب",
+    "NO_STUDENTS": "لا يوجد طلاب",
+    "ENROLLMENT_STATUS": "حالة التسجيل",
+    "PHONE": "رقم الهاتف",
+    "PARENT_PHONE": "هاتف ولي الأمر"
+  },
+  "EMPLOYEES": {
+    "TITLE": "الموظفون",
+    "ADD_EMPLOYEE": "إضافة موظف",
+    "EMPLOYEE_NAME": "اسم الموظف",
+    "POSITION": "الوظيفة",
+    "SALARY": "الراتب",
+    "NO_EMPLOYEES": "لا يوجد موظفون"
+  },
+  "COURSES": {
+    "TITLE": "الكورسات",
+    "ADD_COURSE": "إضافة كورس",
+    "COURSE_NAME": "اسم الكورس",
+    "NO_COURSES": "لا توجد كورسات"
+  },
+  "CLASSES": {
+    "TITLE": "الفصول",
+    "ADD_CLASS": "إضافة فصل",
+    "CLASS_NAME": "اسم الفصل",
+    "NO_CLASSES": "لا توجد فصول"
+  },
+  "REVENUES": {
+    "TITLE": "الإيرادات",
+    "ADD_REVENUE": "إضافة إيراد",
+    "NO_REVENUES": "لا توجد إيرادات"
+  },
+  "EXPENSES": {
+    "TITLE": "المصروفات",
+    "ADD_EXPENSE": "إضافة مصروف",
+    "NO_EXPENSES": "لا توجد مصروفات"
+  },
+  "PRODUCTS": {
+    "TITLE": "المنتجات",
+    "ADD_PRODUCT": "إضافة منتج",
+    "PRODUCT_NAME": "اسم المنتج",
+    "PRICE": "السعر",
+    "QUANTITY": "الكمية",
+    "NO_PRODUCTS": "لا توجد منتجات",
+    "SELL": "بيع",
+    "STOCK": "المخزون"
+  },
+  "SETTINGS": {
+    "TITLE": "الإعدادات",
+    "COMPANY_SETTINGS": "إعدادات الشركة",
+    "EXPENSE_ALLOCATION": "توزيع المصروفات",
+    "SAVE_SETTINGS": "حفظ الإعدادات"
+  },
+  "USERS": {
+    "TITLE": "المستخدمون",
+    "ADD_USER": "إضافة مستخدم",
+    "ROLE": "الدور",
+    "NO_USERS": "لا يوجد مستخدمون"
+  },
+  "REPORTS": {
+    "TITLE": "التقارير",
+    "GENERATE": "إنشاء تقرير",
+    "DATE_RANGE": "نطاق التاريخ",
+    "FROM": "من",
+    "TO": "إلى"
+  },
+  "DELETE_DIALOG": {
+    "HEADER": "تأكيد الحذف",
+    "MESSAGE": "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
+    "CONFIRM": "حذف",
+    "CANCEL": "إلغاء"
+  }
+}

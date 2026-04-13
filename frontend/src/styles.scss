@@ -2,3 +2,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── RTL / Arabic font support ───────────────────────────── */
+[dir='rtl'] {
+  font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
+
+  /* Flip active sidebar border from left to right */
+  .border-l-4 {
+    border-left-width: 0 !important;
+    border-right-width: 4px !important;
+  }
+
+  /* PrimeNG dialog RTL */
+  .p-dialog .p-dialog-header,
+  .p-dialog .p-dialog-footer {
+    direction: rtl;
+  }
+
+  /* PrimeNG button icon spacing */
+  .p-button .p-button-icon-left {
+    margin-right: 0;
+    margin-left: 0.5rem;
+  }
+
+  /* PrimeNG input text alignment */
+  .p-inputtext {
+    text-align: right;
+  }
+
+  /* Table header and cell alignment */
+  .p-datatable .p-datatable-thead > tr > th,
+  .p-datatable .p-datatable-tbody > tr > td {
+    text-align: right;
+  }
+}

@@ -6,13 +6,14 @@ import { AvatarModule } from 'primeng/avatar';
 import { MenuModule } from 'primeng/menu';
 import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { MenuItem } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
+import { LanguageService } from '../services/language.service';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 
 interface NavItem {
-  label?: string;
+  labelKey?: string;
   icon?: string;
   routerLink?: string[];
   separator?: boolean;
@@ -31,6 +32,7 @@ interface NavItem {
     MenuModule,
     DialogModule,
     TooltipModule,
+    TranslateModule,
   ],
   template: `
     <div class="min-h-screen bg-gray-100">
@@ -54,7 +56,7 @@ interface NavItem {
 
               <!-- User Info -->
               <div class="flex items-center gap-3">
-                <div class="text-right hidden sm:block">
+                <div class="text-right hidden sm:block" [class.text-left]="languageService.isRtl()">
                   <p class="font-medium text-gray-900">{{ user.firstName }} {{ user.lastName }}</p>
                   <p class="text-xs text-gray-500">{{ formatRole(user.role) }}</p>
                 </div>
@@ -64,14 +66,24 @@ interface NavItem {
                     shape="circle"
                     [style]="{ background: getAvatarColor(user.role), color: 'white', fontWeight: '600' }">
                   </p-avatar>
-                  <!-- Role indicator dot -->
                   <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
                     [class]="getRoleDotClass(user.role)">
                   </span>
                 </div>
               </div>
             }
-            <button pButton icon="pi pi-sign-out" label="Logout" class="p-button-text"
+
+            <!-- Language Toggle -->
+            <button pButton
+              [label]="'HEADER.TOGGLE_LANGUAGE' | translate"
+              class="p-button-outlined p-button-sm"
+              (click)="languageService.toggle()">
+            </button>
+
+            <button pButton
+              icon="pi pi-sign-out"
+              [label]="'HEADER.LOGOUT' | translate"
+              class="p-button-text"
               (click)="logout()">
             </button>
           </div>
@@ -80,7 +92,11 @@ interface NavItem {
 
       <!-- Sidebar -->
       <aside
-        class="fixed left-0 top-16 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-20 overflow-y-auto"
+        class="fixed top-16 bottom-0 bg-white border-gray-200 transition-all duration-300 z-20 overflow-y-auto"
+        [class.left-0]="!languageService.isRtl()"
+        [class.right-0]="languageService.isRtl()"
+        [class.border-r]="!languageService.isRtl()"
+        [class.border-l]="languageService.isRtl()"
         [class.w-64]="sidebarVisible()"
         [class.w-0]="!sidebarVisible()">
         @if (sidebarVisible()) {
@@ -89,7 +105,7 @@ interface NavItem {
               @for (item of visibleMenuItems(); track $index) {
                 @if (item.sectionLabel) {
                   <div class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {{ item.label }}
+                    {{ item.labelKey! | translate }}
                   </div>
                 } @else if (item.separator) {
                   <div class="border-t border-gray-100 my-2"></div>
@@ -98,9 +114,11 @@ interface NavItem {
                     [routerLink]="item.routerLink"
                     routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
                     [routerLinkActiveOptions]="{ exact: item.routerLink?.length === 1 }"
-                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm">
+                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm"
+                    [class.border-r-4]="languageService.isRtl()"
+                    [class.border-l-4]="!languageService.isRtl()">
                     <i [class]="item.icon + ' text-base'"></i>
-                    <span class="font-medium">{{ item.label }}</span>
+                    <span class="font-medium">{{ item.labelKey! | translate }}</span>
                   </a>
                 }
               }
@@ -112,12 +130,12 @@ interface NavItem {
       <!-- Expiry Warning Banner -->
       @if (subscriptionService.showExpiryWarning()) {
         <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
-          [class.ml-64]="sidebarVisible()">
+          [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
+          [class.mr-64]="sidebarVisible() && languageService.isRtl()">
           <div class="flex items-center gap-2 text-amber-800">
             <i class="pi pi-exclamation-triangle text-amber-600"></i>
             <span class="text-sm font-medium">
-              Your subscription expires in {{ subscriptionService.daysUntilExpiry() }} day(s).
-              Please renew to avoid interruption.
+              {{ 'SUBSCRIPTION.EXPIRY_WARNING' | translate: { days: subscriptionService.daysUntilExpiry() } }}
             </span>
           </div>
         </div>
@@ -128,8 +146,10 @@ interface NavItem {
         class="transition-all duration-300"
         [class.pt-16]="!subscriptionService.showExpiryWarning()"
         [class.pt-24]="subscriptionService.showExpiryWarning()"
-        [class.ml-64]="sidebarVisible()"
-        [class.ml-0]="!sidebarVisible()">
+        [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
+        [class.ml-0]="!sidebarVisible() && !languageService.isRtl()"
+        [class.mr-64]="sidebarVisible() && languageService.isRtl()"
+        [class.mr-0]="!sidebarVisible() && languageService.isRtl()">
         <div class="p-6">
           <router-outlet></router-outlet>
         </div>
@@ -138,27 +158,39 @@ interface NavItem {
 
     <!-- Trial Expired Dialog -->
     <p-dialog [visible]="subscriptionService.isTrialExpired()" [modal]="true"
-      [closable]="false" [style]="{ width: '480px' }" header="Trial Period Expired">
+      [closable]="false" [style]="{ width: '480px' }"
+      [header]="'SUBSCRIPTION.TRIAL_EXPIRED_TITLE' | translate">
       <div class="text-center py-6 px-4">
         <i class="pi pi-clock text-6xl text-red-400 mb-4 block"></i>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Your free trial has ended</h3>
-        <p class="text-gray-500 mb-4">Your 2-month trial has expired. Please contact us to subscribe.</p>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'SUBSCRIPTION.TRIAL_EXPIRED_HEADING' | translate }}</h3>
+        <p class="text-gray-500 mb-4">{{ 'SUBSCRIPTION.TRIAL_EXPIRED_MESSAGE' | translate }}</p>
       </div>
       <ng-template pTemplate="footer">
-        <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
+        <button pButton
+          [label]="'SUBSCRIPTION.TRIAL_LOGOUT' | translate"
+          icon="pi pi-sign-out"
+          severity="secondary"
+          (click)="logout()">
+        </button>
       </ng-template>
     </p-dialog>
 
     <!-- Subscription Expired Dialog -->
     <p-dialog [visible]="subscriptionService.isSubscriptionExpired()" [modal]="true"
-      [closable]="false" [style]="{ width: '480px' }" header="Subscription Expired">
+      [closable]="false" [style]="{ width: '480px' }"
+      [header]="'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_TITLE' | translate">
       <div class="text-center py-6 px-4">
         <i class="pi pi-ban text-6xl text-red-400 mb-4 block"></i>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Your subscription has expired</h3>
-        <p class="text-gray-500 mb-4">Please contact us to renew your plan.</p>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_HEADING' | translate }}</h3>
+        <p class="text-gray-500 mb-4">{{ 'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_MESSAGE' | translate }}</p>
       </div>
       <ng-template pTemplate="footer">
-        <button pButton label="Logout" icon="pi pi-sign-out" severity="secondary" (click)="logout()"></button>
+        <button pButton
+          [label]="'SUBSCRIPTION.SUBSCRIPTION_LOGOUT' | translate"
+          icon="pi pi-sign-out"
+          severity="secondary"
+          (click)="logout()">
+        </button>
       </ng-template>
     </p-dialog>
   `,
@@ -168,6 +200,7 @@ export class LayoutComponent implements OnInit {
   sidebarVisible = signal(true);
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
+  languageService = inject(LanguageService);
 
   constructor(
     private authService: AuthService,
@@ -184,79 +217,79 @@ export class LayoutComponent implements OnInit {
     const auth = this.authService;
     const all: NavItem[] = [
       {
-        label: 'Dashboard', icon: 'pi pi-home', routerLink: ['/dashboard'],
+        labelKey: 'NAV.DASHBOARD', icon: 'pi pi-home', routerLink: ['/dashboard'],
         visible: auth.canRead('dashboard'),
       },
       { separator: true, visible: true },
-      { label: 'Management', sectionLabel: true, visible: true },
+      { labelKey: 'NAV.SECTIONS.MANAGEMENT', sectionLabel: true, visible: true },
       {
-        label: 'Branches', icon: 'pi pi-building', routerLink: ['/branches'],
+        labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'],
         visible: auth.canRead('branches'),
       },
       {
-        label: 'Courses', icon: 'pi pi-book', routerLink: ['/courses'],
+        labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'],
         visible: auth.canRead('courses'),
       },
       {
-        label: 'Classes', icon: 'pi pi-calendar', routerLink: ['/classes'],
+        labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'],
         visible: auth.canRead('classes'),
       },
       {
-        label: 'Students', icon: 'pi pi-users', routerLink: ['/students'],
+        labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'],
         visible: auth.canRead('students'),
       },
       {
-        label: 'Employees', icon: 'pi pi-user', routerLink: ['/employees'],
+        labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'],
         visible: auth.canRead('employees'),
       },
       { separator: true, visible: auth.canAccessFinancials() },
-      { label: 'Financial', sectionLabel: true, visible: auth.canAccessFinancials() },
+      { labelKey: 'NAV.SECTIONS.FINANCIAL', sectionLabel: true, visible: auth.canAccessFinancials() },
       {
-        label: 'Revenues', icon: 'pi pi-dollar', routerLink: ['/revenues'],
+        labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'],
         visible: auth.canRead('revenues'),
       },
       {
-        label: 'Expenses', icon: 'pi pi-money-bill', routerLink: ['/expenses'],
+        labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'],
         visible: auth.canRead('expenses'),
       },
       {
-        label: 'Withdrawals', icon: 'pi pi-wallet', routerLink: ['/withdrawals'],
+        labelKey: 'NAV.WITHDRAWALS', icon: 'pi pi-wallet', routerLink: ['/withdrawals'],
         visible: auth.canRead('withdrawals'),
       },
       {
-        label: 'Refunds', icon: 'pi pi-replay', routerLink: ['/refunds'],
+        labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'],
         visible: auth.canRead('refunds'),
       },
       {
-        label: 'Dues', icon: 'pi pi-credit-card', routerLink: ['/dues'],
+        labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'],
         visible: auth.canRead('enrollments'),
       },
       { separator: true, visible: auth.canRead('products') },
-      { label: 'Inventory', sectionLabel: true, visible: auth.canRead('products') },
+      { labelKey: 'NAV.SECTIONS.INVENTORY', sectionLabel: true, visible: auth.canRead('products') },
       {
-        label: 'Products', icon: 'pi pi-box', routerLink: ['/products/list'],
+        labelKey: 'NAV.PRODUCTS', icon: 'pi pi-box', routerLink: ['/products/list'],
         visible: auth.canRead('products'),
       },
       {
-        label: 'Sell Product', icon: 'pi pi-shopping-cart', routerLink: ['/products/sell'],
+        labelKey: 'NAV.SELL_PRODUCT', icon: 'pi pi-shopping-cart', routerLink: ['/products/sell'],
         visible: auth.canWrite('product_sales'),
       },
       {
-        label: 'Sales History', icon: 'pi pi-history', routerLink: ['/products/sales'],
+        labelKey: 'NAV.SALES_HISTORY', icon: 'pi pi-history', routerLink: ['/products/sales'],
         visible: auth.canRead('product_sales'),
       },
       { separator: true, visible: auth.canRead('reports') },
       {
-        label: 'Reports', icon: 'pi pi-chart-bar', routerLink: ['/reports'],
+        labelKey: 'NAV.REPORTS', icon: 'pi pi-chart-bar', routerLink: ['/reports'],
         visible: auth.canRead('reports'),
       },
       { separator: true, visible: true },
       {
-        label: 'Users', icon: 'pi pi-user-edit', routerLink: ['/users'],
+        labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'],
         visible: auth.canRead('users'),
       },
       {
-        label: 'Settings', icon: 'pi pi-cog', routerLink: ['/settings'],
+        labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'],
         visible: true,
       },
     ];

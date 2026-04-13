@@ -34,7 +34,13 @@ import { usersRoutes } from './routes/users';
 
 // Create the router implementation
 const router = {
-  auth: authRoutes,
+  auth: {
+    login: authRoutes.login,
+    register: authRoutes.register,
+    verifyEmail: authRoutes.verifyEmail,
+    resendOtp: authRoutes.resendOtp,
+    profile: authRoutes.profile,
+  },
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,

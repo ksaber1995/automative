@@ -134,6 +134,20 @@ const RegisterRequestSchema = z.object({
   phone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
 });
 
+const RegisterResponseSchema = z.object({
+  email: z.string(),
+  message: z.string(),
+});
+
+const VerifyEmailRequestSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().length(6),
+});
+
+const ResendOtpRequestSchema = z.object({
+  email: z.string().email(),
+});
+
 const SafeUserSchema = z.object({
   id: UUIDSchema,
   email: z.string(),
@@ -747,6 +761,7 @@ export const contract = c.router({
       responses: {
         200: AuthResponseSchema,
         401: z.object({ message: z.string() }),
+        403: z.object({ message: z.string(), code: z.string(), email: z.string() }),
       },
     },
     register: {
@@ -754,7 +769,25 @@ export const contract = c.router({
       path: '/api/auth/register',
       body: RegisterRequestSchema,
       responses: {
-        201: AuthResponseSchema,
+        201: RegisterResponseSchema,
+        400: z.object({ message: z.string() }),
+      },
+    },
+    verifyEmail: {
+      method: 'POST',
+      path: '/api/auth/verify-email',
+      body: VerifyEmailRequestSchema,
+      responses: {
+        200: AuthResponseSchema,
+        400: z.object({ message: z.string() }),
+      },
+    },
+    resendOtp: {
+      method: 'POST',
+      path: '/api/auth/resend-otp',
+      body: ResendOtpRequestSchema,
+      responses: {
+        200: z.object({ message: z.string() }),
         400: z.object({ message: z.string() }),
       },
     },
