@@ -1,21 +1,12 @@
 import { Component } from '@angular/core';
 import { CardModule } from 'primeng/card';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-report-list',
   standalone: true,
-  imports: [CardModule],
-  template: `
-    <div class="container mx-auto p-6 flex justify-center items-center" style="min-height: 60vh">
-      <p-card styleClass="text-center" [style]="{ width: '420px' }">
-        <div class="py-8 px-4">
-          <i class="pi pi-clock text-5xl text-gray-300 mb-4 block"></i>
-          <h2 class="text-2xl font-bold text-gray-700 mb-2">Coming Soon</h2>
-          <p class="text-gray-500">The Reports feature will be available soon.</p>
-        </div>
-      </p-card>
-    </div>
-  `,
+  imports: [CardModule, TranslateModule],
+  templateUrl: './report-list.component.html',
 })
 export class ReportListComponent {}
 

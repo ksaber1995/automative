@@ -6,12 +6,13 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { TranslateModule } from '@ngx-translate/core';
 import { RegisterDto } from '@shared/interfaces/user.interface';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, TranslateModule],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss'
 })

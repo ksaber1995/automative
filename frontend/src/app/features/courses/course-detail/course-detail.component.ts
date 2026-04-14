@@ -15,6 +15,7 @@ import { ClassService } from '../services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-course-detail',
@@ -28,7 +29,8 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     AccordionModule,
     PanelModule,
     ConfirmDialogModule,
-    TooltipModule
+    TooltipModule,
+    TranslateModule
   ],
   providers: [ConfirmationService],
   templateUrl: './course-detail.component.html',

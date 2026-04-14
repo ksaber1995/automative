@@ -1,27 +1,27 @@
 <div class="container mx-auto p-6">
-  <p-card [header]="isEditMode() ? 'Edit Branch' : 'Create New Branch'">
+  <p-card [header]="(isEditMode() ? 'BRANCHES.FORM.EDIT_TITLE' : 'BRANCHES.FORM.CREATE_TITLE') | translate">
     <form [formGroup]="branchForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Branch Name -->
         <div class="field">
           <label for="name" class="block text-sm font-medium mb-2">
-            Branch Name <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             id="name"
             formControlName="name"
             class="w-full"
-            placeholder="Enter branch name"
+            [placeholder]="'BRANCHES.FORM.NAME_PLACEHOLDER' | translate"
             [class.ng-invalid]="name?.invalid && name?.touched"
           />
           @if (name?.invalid && name?.touched) {
             <small class="text-red-500">
               @if (name?.errors?.['required']) {
-                Branch name is required
+                {{ 'BRANCHES.FORM.NAME_REQUIRED' | translate }}
               }
               @if (name?.errors?.['minlength']) {
-                Branch name must be at least 3 characters
+                {{ 'BRANCHES.FORM.NAME_MIN' | translate }}
               }
             </small>
           }
@@ -30,23 +30,23 @@
         <!-- Branch Code -->
         <div class="field">
           <label for="code" class="block text-sm font-medium mb-2">
-            Branch Code <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.CODE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             id="code"
             formControlName="code"
             class="w-full"
-            placeholder="Enter branch code (e.g., DTN-001)"
+            [placeholder]="'BRANCHES.FORM.CODE_PLACEHOLDER' | translate"
             [class.ng-invalid]="code?.invalid && code?.touched"
           />
           @if (code?.invalid && code?.touched) {
             <small class="text-red-500">
               @if (code?.errors?.['required']) {
-                Branch code is required
+                {{ 'BRANCHES.FORM.CODE_REQUIRED' | translate }}
               }
               @if (code?.errors?.['minlength']) {
-                Branch code must be at least 2 characters
+                {{ 'BRANCHES.FORM.CODE_MIN' | translate }}
               }
             </small>
           }
@@ -55,73 +55,73 @@
         <!-- Address -->
         <div class="field md:col-span-2">
           <label for="address" class="block text-sm font-medium mb-2">
-            Address <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.ADDRESS_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             id="address"
             formControlName="address"
             class="w-full"
-            placeholder="Enter street address"
+            [placeholder]="'BRANCHES.FORM.ADDRESS_PLACEHOLDER' | translate"
             [class.ng-invalid]="address?.invalid && address?.touched"
           />
           @if (address?.invalid && address?.touched) {
-            <small class="text-red-500">Address is required</small>
+            <small class="text-red-500">{{ 'BRANCHES.FORM.ADDRESS_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- City -->
         <div class="field">
           <label for="city" class="block text-sm font-medium mb-2">
-            City <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.CITY_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             id="city"
             formControlName="city"
             class="w-full"
-            placeholder="Enter city"
+            [placeholder]="'BRANCHES.FORM.CITY_PLACEHOLDER' | translate"
             [class.ng-invalid]="city?.invalid && city?.touched"
           />
           @if (city?.invalid && city?.touched) {
-            <small class="text-red-500">City is required</small>
+            <small class="text-red-500">{{ 'BRANCHES.FORM.CITY_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- State -->
         <div class="field">
-          <label for="state" class="block text-sm font-medium mb-2">State</label>
+          <label for="state" class="block text-sm font-medium mb-2">{{ 'BRANCHES.FORM.STATE_LABEL' | translate }}</label>
           <input
             pInputText
             id="state"
             formControlName="state"
             class="w-full"
-            placeholder="Enter state"
+            [placeholder]="'BRANCHES.FORM.STATE_PLACEHOLDER' | translate"
           />
         </div>
 
         <!-- Phone -->
         <div class="field">
           <label for="phone" class="block text-sm font-medium mb-2">
-            Phone <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.PHONE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             id="phone"
             formControlName="phone"
             class="w-full"
-            placeholder="Enter phone number"
+            [placeholder]="'BRANCHES.FORM.PHONE_PLACEHOLDER' | translate"
             [class.ng-invalid]="phone?.invalid && phone?.touched"
           />
           @if (phone?.invalid && phone?.touched) {
-            <small class="text-red-500">Phone is required</small>
+            <small class="text-red-500">{{ 'BRANCHES.FORM.PHONE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Email -->
         <div class="field">
           <label for="email" class="block text-sm font-medium mb-2">
-            Email <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.EMAIL_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
@@ -129,16 +129,16 @@
             type="email"
             formControlName="email"
             class="w-full"
-            placeholder="Enter email address"
+            [placeholder]="'BRANCHES.FORM.EMAIL_PLACEHOLDER' | translate"
             [class.ng-invalid]="email?.invalid && email?.touched"
           />
           @if (email?.invalid && email?.touched) {
             <small class="text-red-500">
               @if (email?.errors?.['required']) {
-                Email is required
+                {{ 'BRANCHES.FORM.EMAIL_REQUIRED' | translate }}
               }
               @if (email?.errors?.['email']) {
-                Please enter a valid email
+                {{ 'BRANCHES.FORM.EMAIL_INVALID' | translate }}
               }
             </small>
           }
@@ -147,19 +147,19 @@
         <!-- Opening Date -->
         <div class="field">
           <label for="openingDate" class="block text-sm font-medium mb-2">
-            Opening Date <span class="text-red-500">*</span>
+            {{ 'BRANCHES.FORM.OPENING_DATE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-datepicker
             inputId="openingDate"
             formControlName="openingDate"
             dateFormat="yy-mm-dd"
             [showIcon]="true"
-            placeholder="Select opening date"
+            [placeholder]="'BRANCHES.FORM.OPENING_DATE_PLACEHOLDER' | translate"
             [style]="{ width: '100%' }"
             [class.ng-invalid]="openingDate?.invalid && openingDate?.touched">
           </p-datepicker>
           @if (openingDate?.invalid && openingDate?.touched) {
-            <small class="text-red-500">Opening date is required</small>
+            <small class="text-red-500">{{ 'BRANCHES.FORM.OPENING_DATE_REQUIRED' | translate }}</small>
           }
         </div>
       </div>
@@ -168,7 +168,7 @@
       <div class="flex justify-end gap-3 mt-6">
         <p-button
           type="button"
-          label="Cancel"
+          [label]="'BRANCHES.FORM.CANCEL' | translate"
           severity="secondary"
           [outlined]="true"
           (onClick)="cancel()"
@@ -176,7 +176,7 @@
         </p-button>
         <p-button
           type="submit"
-          [label]="isEditMode() ? 'Update Branch' : 'Create Branch'"
+          [label]="(isEditMode() ? 'BRANCHES.FORM.UPDATE' : 'BRANCHES.FORM.CREATE') | translate"
           [loading]="loading()"
           [disabled]="branchForm.invalid || loading()">
         </p-button>

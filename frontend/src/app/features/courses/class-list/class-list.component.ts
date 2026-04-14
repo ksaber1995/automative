@@ -8,6 +8,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ClassService } from '../services/class.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
@@ -27,20 +28,21 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     SelectModule,
+    TranslateModule,
     DeleteConfirmDialogComponent
   ],
   template: `
     <div class="container-custom py-8">
       <div class="flex justify-between items-center mb-6">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Classes</h1>
-          <p class="text-gray-500 mt-1">Manage class schedules and sessions</p>
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'CLASSES.LIST.TITLE' | translate }}</h1>
+          <p class="text-gray-500 mt-1">{{ 'CLASSES.LIST.SUBTITLE' | translate }}</p>
         </div>
         @if (!filterByCourseId) {
-          <p-button label="Add Class" icon="pi pi-plus" (onClick)="selectCourseForNewClass()"></p-button>
+          <p-button [label]="'CLASSES.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="selectCourseForNewClass()"></p-button>
         }
         @if (filterByCourseId) {
-          <p-button label="Add Class" icon="pi pi-plus" (onClick)="createClass()"></p-button>
+          <p-button [label]="'CLASSES.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="createClass()"></p-button>
         }
       </div>
 
@@ -49,7 +51,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="field">
             <label for="courseFilter" class="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Course
+              {{ 'CLASSES.LIST.FILTER_COURSE' | translate }}
             </label>
             <p-select
               id="courseFilter"
@@ -57,7 +59,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               [options]="courses()"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Courses"
+              [placeholder]="'CLASSES.LIST.ALL_COURSES' | translate"
               styleClass="w-full"
               (onChange)="onFilterChange()">
             </p-select>
@@ -65,7 +67,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 
           <div class="field">
             <label for="branchFilter" class="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Branch
+              {{ 'CLASSES.LIST.FILTER_BRANCH' | translate }}
             </label>
             <p-select
               id="branchFilter"
@@ -73,7 +75,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               [options]="branches()"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Branches"
+              [placeholder]="'CLASSES.LIST.ALL_BRANCHES' | translate"
               styleClass="w-full"
               (onChange)="onFilterChange()">
             </p-select>
@@ -81,7 +83,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 
           <div class="field flex items-end">
             <p-button
-              label="Clear Filters"
+              [label]="'CLASSES.LIST.CLEAR_FILTERS' | translate"
               icon="pi pi-filter-slash"
               severity="secondary"
               [outlined]="true"
@@ -99,21 +101,21 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           [paginator]="true"
           [rows]="10"
           [showCurrentPageReport]="true"
-          currentPageReportTemplate="Showing {first} to {last} of {totalRecords} classes"
+          [currentPageReportTemplate]="'CLASSES.LIST.PAGE_REPORT' | translate"
           responsiveLayout="scroll"
         >
           <ng-template pTemplate="header">
             <tr>
-              <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
-              <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
-              <th>Course</th>
-              <th>Branch</th>
-              <th>Instructor</th>
-              <th>Schedule</th>
-              <th>Dates</th>
-              <th>Enrollment</th>
-              <th pSortableColumn="isActive">Status <p-sortIcon field="isActive"></p-sortIcon></th>
-              <th>Actions</th>
+              <th pSortableColumn="code">{{ 'CLASSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
+              <th pSortableColumn="name">{{ 'CLASSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+              <th>{{ 'CLASSES.LIST.COL_COURSE' | translate }}</th>
+              <th>{{ 'CLASSES.LIST.COL_BRANCH' | translate }}</th>
+              <th>{{ 'CLASSES.LIST.COL_INSTRUCTOR' | translate }}</th>
+              <th>{{ 'CLASSES.LIST.COL_SCHEDULE' | translate }}</th>
+              <th>{{ 'CLASSES.LIST.COL_DATES' | translate }}</th>
+              <th>{{ 'CLASSES.LIST.COL_ENROLLMENT' | translate }}</th>
+              <th pSortableColumn="isActive">{{ 'CLASSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
+              <th>{{ 'CLASSES.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-classItem>
@@ -122,7 +124,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td>{{ classItem.name }}</td>
               <td>{{ classItem.courseName || 'N/A' }}</td>
               <td>{{ classItem.branchName || 'N/A' }}</td>
-              <td>{{ classItem.instructorName || 'Not assigned' }}</td>
+              <td>{{ classItem.instructorName || ('CLASSES.LIST.NOT_ASSIGNED' | translate) }}</td>
               <td>
                 <div class="text-sm">
                   @if (classItem.daysOfWeek) {
@@ -132,14 +134,14 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     <div class="text-gray-500">{{ classItem.startTime }} - {{ classItem.endTime }}</div>
                   }
                   @if (!classItem.daysOfWeek && !classItem.startTime) {
-                    <span class="text-gray-400">Not specified</span>
+                    <span class="text-gray-400">{{ 'CLASSES.LIST.NOT_SPECIFIED' | translate }}</span>
                   }
                 </div>
               </td>
               <td>
                 <div class="text-sm">
                   <div>{{ formatDate(classItem.startDate) }}</div>
-                  <div class="text-gray-500">to {{ formatDate(classItem.endDate) }}</div>
+                  <div class="text-gray-500">{{ 'CLASSES.LIST.DATE_TO' | translate }} {{ formatDate(classItem.endDate) }}</div>
                 </div>
               </td>
               <td>
@@ -152,7 +154,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               </td>
               <td>
                 <p-tag
-                  [value]="classItem.isActive ? 'Active' : 'Inactive'"
+                  [value]="classItem.isActive ? ('CLASSES.LIST.ACTIVE' | translate) : ('CLASSES.LIST.INACTIVE' | translate)"
                   [severity]="classItem.isActive ? 'success' : 'danger'"
                 ></p-tag>
               </td>
@@ -164,7 +166,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     [text]="true"
                     severity="info"
                     (onClick)="viewClass(classItem)"
-                    pTooltip="View"
+                    [pTooltip]="'CLASSES.LIST.VIEW' | translate"
                   ></p-button>
                   <p-button
                     icon="pi pi-pencil"
@@ -172,7 +174,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     [text]="true"
                     severity="warn"
                     (onClick)="editClass(classItem)"
-                    pTooltip="Edit"
+                    [pTooltip]="'CLASSES.LIST.EDIT' | translate"
                   ></p-button>
                   @if (classItem.isActive) {
                     <p-button
@@ -181,7 +183,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                       [text]="true"
                       severity="danger"
                       (onClick)="confirmDelete(classItem)"
-                      pTooltip="Delete"
+                      [pTooltip]="'CLASSES.LIST.DELETE' | translate"
                     ></p-button>
                   }
                 </div>
@@ -193,7 +195,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td colspan="10" class="text-center py-8">
                 <div class="text-gray-500">
                   <i class="pi pi-inbox text-4xl mb-3"></i>
-                  <p>No classes found</p>
+                  <p>{{ 'CLASSES.LIST.NO_CLASSES' | translate }}</p>
                 </div>
               </td>
             </tr>
@@ -203,8 +205,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 
       <app-delete-confirm-dialog
         [(visible)]="showDeleteDialog"
-        [header]="'Delete Class'"
-        [message]="'Are you sure you want to delete ' + classToDelete()?.name + '? This will permanently remove the class.'"
+        [header]="'CLASSES.LIST.DELETE_TITLE' | translate"
+        [message]="'CLASSES.LIST.DELETE_MSG' | translate: { name: classToDelete()?.name }"
         (confirm)="deleteClass()"
       ></app-delete-confirm-dialog>
     </div>
@@ -217,6 +219,7 @@ export class ClassListComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   classes = signal<ClassWithDetails[]>([]);
   courses = signal<any[]>([]);
@@ -245,7 +248,7 @@ export class ClassListComponent implements OnInit {
     this.courseService.getActiveCourses().subscribe({
       next: (courses) => {
         this.courses.set([
-          { label: 'All Courses', value: null },
+          { label: this.translate.instant('CLASSES.LIST.ALL_COURSES'), value: null },
           ...courses.map(c => ({ label: c.name, value: c.id }))
         ]);
       }
@@ -256,7 +259,7 @@ export class ClassListComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({
       next: (branches) => {
         this.branches.set([
-          { label: 'All Branches', value: null },
+          { label: this.translate.instant('CLASSES.LIST.ALL_BRANCHES'), value: null },
           ...branches.map(b => ({ label: b.name, value: b.id }))
         ]);
       }
@@ -358,16 +361,7 @@ export class ClassListComponent implements OnInit {
     if (!days) return '';
     const dayList = days.split(',').map(d => d.trim());
     const shortDays = dayList.map(d => {
-      switch(d) {
-        case 'SUNDAY': return 'Sun';
-        case 'MONDAY': return 'Mon';
-        case 'TUESDAY': return 'Tue';
-        case 'WEDNESDAY': return 'Wed';
-        case 'THURSDAY': return 'Thu';
-        case 'FRIDAY': return 'Fri';
-        case 'SATURDAY': return 'Sat';
-        default: return d;
-      }
+      return this.translate.instant('CLASSES.LIST.DAY_' + d);
     });
     return shortDays.join(', ');
   }

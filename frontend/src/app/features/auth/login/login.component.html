@@ -1,48 +1,48 @@
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700 p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
-      <h1 class="text-4xl font-bold text-white mb-2">Netrofit</h1>
-      <p class="text-primary-100">Robotics Academy Management Platform</p>
+      <h1 class="text-4xl font-bold text-white mb-2">{{ 'AUTH.LOGIN.BRAND' | translate }}</h1>
+      <p class="text-primary-100">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</p>
     </div>
 
     <p-card>
       <div class="text-center mb-6">
-        <h2 class="text-2xl font-semibold text-gray-800">Welcome Back</h2>
-        <p class="text-gray-600 mt-2">Sign in to your account</p>
+        <h2 class="text-2xl font-semibold text-gray-800">{{ 'AUTH.LOGIN.WELCOME' | translate }}</h2>
+        <p class="text-gray-600 mt-2">{{ 'AUTH.LOGIN.SIGN_IN_SUBTITLE' | translate }}</p>
       </div>
 
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-4">
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <label for="email" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.EMAIL' | translate }}</label>
           <input
             pInputText
             id="email"
             formControlName="email"
             type="email"
-            placeholder="Enter your email"
+            [placeholder]="'AUTH.LOGIN.EMAIL_PLACEHOLDER' | translate"
             class="w-full"
             [class.ng-invalid]="email?.invalid && email?.touched"
           />
           @if (email?.invalid && email?.touched) {
             <small class="text-red-600">
               @if (email?.errors?.['required']) {
-                <span>Email is required</span>
+                <span>{{ 'AUTH.LOGIN.EMAIL_REQUIRED' | translate }}</span>
               }
               @if (email?.errors?.['email']) {
-                <span>Please enter a valid email</span>
+                <span>{{ 'AUTH.LOGIN.EMAIL_INVALID' | translate }}</span>
               }
             </small>
           }
         </div>
 
         <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+          <label for="password" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.PASSWORD' | translate }}</label>
           <p-password
             id="password"
             formControlName="password"
             [toggleMask]="true"
             [feedback]="false"
-            placeholder="Enter your password"
+            [placeholder]="'AUTH.LOGIN.PASSWORD_PLACEHOLDER' | translate"
             styleClass="w-full"
             inputStyleClass="w-full"
             [class.ng-invalid]="password?.invalid && password?.touched"
@@ -50,10 +50,10 @@
           @if (password?.invalid && password?.touched) {
             <small class="text-red-600">
               @if (password?.errors?.['required']) {
-                <span>Password is required</span>
+                <span>{{ 'AUTH.LOGIN.PASSWORD_REQUIRED' | translate }}</span>
               }
               @if (password?.errors?.['minlength']) {
-                <span>Password must be at least 6 characters</span>
+                <span>{{ 'AUTH.LOGIN.PASSWORD_MIN' | translate }}</span>
               }
             </small>
           }
@@ -77,23 +77,23 @@
 
         <p-button
           type="submit"
-          label="Sign In"
+          [label]="'AUTH.LOGIN.SIGN_IN' | translate"
           [loading]="loading()"
           [disabled]="loading()"
           styleClass="w-full mt-8"
         ></p-button>
 
         <div class="text-center mt-4">
-          <span class="text-gray-600 text-sm">Don't have an account? </span>
+          <span class="text-gray-600 text-sm">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }} </span>
           <a routerLink="/auth/register" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
-            Sign up
+            {{ 'AUTH.LOGIN.SIGN_UP' | translate }}
           </a>
         </div>
       </form>
     </p-card>
 
     <div class="text-center mt-6 text-primary-100 text-sm">
-      <p>&copy; 2026 Netrofit. All rights reserved.</p>
+      <p>&copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}</p>
     </div>
   </div>
 </div>

@@ -15,6 +15,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-class-form',
@@ -30,7 +31,8 @@ import { NotificationService } from '../../../core/services/notification.service
     SelectModule,
     DatePickerModule,
     TextareaModule,
-    CheckboxModule
+    CheckboxModule,
+    TranslateModule
   ],
   templateUrl: './class-form.component.html',
   styleUrl: './class-form.component.scss'

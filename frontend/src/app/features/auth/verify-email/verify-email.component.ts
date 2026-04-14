@@ -5,21 +5,22 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-verify-email',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, InputTextModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, InputTextModule, TranslateModule],
   template: `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div class="w-full max-w-md">
 
         <!-- Logo -->
         <div class="text-center mb-8">
-          <img src="assets/img/logo.png" alt="Automate Magic" class="h-12 mx-auto mb-3">
-          <p class="text-gray-500 text-sm">Business Management Platform</p>
+          <img src="assets/img/logo.png" [alt]="'AUTH.VERIFY_EMAIL.BRAND' | translate" class="h-12 mx-auto mb-3">
+          <p class="text-gray-500 text-sm">{{ 'AUTH.VERIFY_EMAIL.BRAND_SUBTITLE' | translate }}</p>
         </div>
 
         <p-card>
@@ -30,9 +31,9 @@ import { NotificationService } from '../../../core/services/notification.service
               <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
                 <i class="pi pi-envelope text-3xl text-blue-600"></i>
               </div>
-              <h2 class="text-2xl font-bold text-gray-800 mb-2">Check your email</h2>
+              <h2 class="text-2xl font-bold text-gray-800 mb-2">{{ 'AUTH.VERIFY_EMAIL.TITLE' | translate }}</h2>
               <p class="text-gray-500 text-sm">
-                We sent a 6-digit verification code to
+                {{ 'AUTH.VERIFY_EMAIL.SENT_TO' | translate }}
               </p>
               <p class="text-blue-600 font-semibold text-sm mt-1">{{ maskedEmail() }}</p>
             </div>
@@ -42,7 +43,7 @@ import { NotificationService } from '../../../core/services/notification.service
 
               <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Verification Code
+                  {{ 'AUTH.VERIFY_EMAIL.OTP_LABEL' | translate }}
                 </label>
                 <input
                   pInputText
@@ -50,7 +51,7 @@ import { NotificationService } from '../../../core/services/notification.service
                   type="text"
                   inputmode="numeric"
                   maxlength="6"
-                  placeholder="Enter 6-digit code"
+                  [placeholder]="'AUTH.VERIFY_EMAIL.OTP_PLACEHOLDER' | translate"
                   class="w-full text-center text-2xl font-mono tracking-widest"
                   [class.ng-invalid]="otp?.invalid && otp?.touched"
                   [class.ng-dirty]="otp?.dirty"
@@ -58,9 +59,9 @@ import { NotificationService } from '../../../core/services/notification.service
                 />
                 @if (otp?.invalid && otp?.touched) {
                   <p class="text-red-500 text-xs mt-1">
-                    @if (otp?.errors?.['required']) { Verification code is required. }
-                    @if (otp?.errors?.['minlength'] || otp?.errors?.['maxlength']) { Code must be exactly 6 digits. }
-                    @if (otp?.errors?.['pattern']) { Code must contain digits only. }
+                    @if (otp?.errors?.['required']) { {{ 'AUTH.VERIFY_EMAIL.OTP_REQUIRED' | translate }} }
+                    @if (otp?.errors?.['minlength'] || otp?.errors?.['maxlength']) { {{ 'AUTH.VERIFY_EMAIL.OTP_LENGTH' | translate }} }
+                    @if (otp?.errors?.['pattern']) { {{ 'AUTH.VERIFY_EMAIL.OTP_DIGITS' | translate }} }
                   </p>
                 }
               </div>
@@ -68,7 +69,7 @@ import { NotificationService } from '../../../core/services/notification.service
               <button
                 pButton
                 type="submit"
-                label="Verify Email"
+                [label]="'AUTH.VERIFY_EMAIL.VERIFY_BTN' | translate"
                 icon="pi pi-check"
                 class="w-full"
                 [loading]="loading()"
@@ -78,16 +79,16 @@ import { NotificationService } from '../../../core/services/notification.service
 
             <!-- Resend -->
             <div class="mt-6 text-center">
-              <p class="text-sm text-gray-500 mb-2">Didn't receive the code?</p>
+              <p class="text-sm text-gray-500 mb-2">{{ 'AUTH.VERIFY_EMAIL.NO_CODE' | translate }}</p>
               @if (resendCooldown() > 0) {
                 <p class="text-sm text-gray-400">
-                  Resend available in <span class="font-semibold text-blue-600">{{ resendCooldown() }}s</span>
+                  {{ 'AUTH.VERIFY_EMAIL.RESEND_COOLDOWN' | translate: { seconds: resendCooldown() } }}
                 </p>
               } @else {
                 <button
                   pButton
                   type="button"
-                  label="Resend Code"
+                  [label]="'AUTH.VERIFY_EMAIL.RESEND_BTN' | translate"
                   icon="pi pi-refresh"
                   class="p-button-text p-button-sm"
                   [loading]="resending()"
@@ -100,7 +101,7 @@ import { NotificationService } from '../../../core/services/notification.service
             <!-- Back to login -->
             <div class="mt-4 text-center">
               <a routerLink="/auth/login" class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                <i class="pi pi-arrow-left text-xs mr-1"></i>Back to login
+                <i class="pi pi-arrow-left text-xs mr-1"></i>{{ 'AUTH.VERIFY_EMAIL.BACK_LOGIN' | translate }}
               </a>
             </div>
 

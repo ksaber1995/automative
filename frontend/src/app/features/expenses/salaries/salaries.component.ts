@@ -11,6 +11,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
 import { DividerModule } from 'primeng/divider';
 import { SelectModule } from 'primeng/select';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -30,6 +31,7 @@ import { NotificationService } from '../../../core/services/notification.service
     TooltipModule,
     DividerModule,
     SelectModule,
+    TranslateModule,
   ],
   template: `
     <div class="container-custom py-8">
@@ -37,8 +39,8 @@ import { NotificationService } from '../../../core/services/notification.service
       <div class="flex items-center gap-4 mb-6">
         <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()"></p-button>
         <div class="flex-1">
-          <h1 class="text-3xl font-bold text-gray-900">Salary Payments</h1>
-          <p class="text-gray-500 mt-1">Employees with unpaid salaries for {{ displayMonth() }}</p>
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'EXPENSES.SALARIES.TITLE' | translate }}</h1>
+          <p class="text-gray-500 mt-1">{{ 'EXPENSES.SALARIES.SUBTITLE' | translate: { month: displayMonth() } }}</p>
         </div>
       </div>
 
@@ -46,35 +48,35 @@ import { NotificationService } from '../../../core/services/notification.service
       <p-card styleClass="mb-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Month</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.MONTH_LABEL' | translate }}</label>
             <p-datepicker
               [(ngModel)]="selectedMonth"
               view="month"
               dateFormat="yy-mm"
               [showIcon]="true"
-              placeholder="Select month"
+              [placeholder]="'EXPENSES.SALARIES.MONTH_PLACEHOLDER' | translate"
               (onSelect)="onMonthChange()"
               [style]="{ width: '100%' }"
             ></p-datepicker>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.PAYMENT_DATE' | translate }}</label>
             <p-datepicker
               [(ngModel)]="paymentDate"
               [showIcon]="true"
               dateFormat="yy-mm-dd"
-              placeholder="Date of payment"
+              [placeholder]="'EXPENSES.SALARIES.DATE_PLACEHOLDER' | translate"
               [style]="{ width: '100%' }"
             ></p-datepicker>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Branch</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.FILTER_BRANCH' | translate }}</label>
             <p-select
               [(ngModel)]="selectedBranchId"
               [options]="branchOptions()"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Branches"
+              [placeholder]="'EXPENSES.SALARIES.ALL_BRANCHES' | translate"
               [style]="{ width: '100%' }"
               (onChange)="loadSalaries()"
             ></p-select>
@@ -86,15 +88,15 @@ import { NotificationService } from '../../../core/services/notification.service
       @if (!loading()) {
         <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Employees</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.TOTAL_EMPLOYEES' | translate }}</p>
             <p class="text-3xl font-bold text-gray-800">{{ filteredEmployees().length }}</p>
           </div>
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">Selected</p>
+            <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.SELECTED' | translate }}</p>
             <p class="text-3xl font-bold text-blue-700">{{ selectedIds().size }}</p>
           </div>
           <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">Total Due</p>
+            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.TOTAL_DUE' | translate }}</p>
             <p class="text-3xl font-bold text-green-700">{{ selectedTotal().toFixed(2) }}</p>
           </div>
         </div>
@@ -112,12 +114,12 @@ import { NotificationService } from '../../../core/services/notification.service
                 [indeterminate]="someSelected()"
               ></p-checkbox>
               <span class="text-sm text-gray-600">
-                {{ selectedIds().size > 0 ? selectedIds().size + ' selected' : 'Select all' }}
+                {{ selectedIds().size > 0 ? ('EXPENSES.SALARIES.SELECTED_COUNT' | translate: {count: selectedIds().size}) : ('EXPENSES.SALARIES.SELECT_ALL' | translate) }}
               </span>
             </div>
             <div class="flex gap-2">
               <p-button
-                label="Pay Selected"
+                [label]="'EXPENSES.SALARIES.PAY_SELECTED' | translate"
                 icon="pi pi-check"
                 severity="success"
                 [outlined]="true"
@@ -126,7 +128,7 @@ import { NotificationService } from '../../../core/services/notification.service
                 (onClick)="paySelected()"
               ></p-button>
               <p-button
-                label="Pay All"
+                [label]="'EXPENSES.SALARIES.PAY_ALL' | translate"
                 icon="pi pi-users"
                 severity="warn"
                 [disabled]="filteredEmployees().length === 0 || paying()"
@@ -145,10 +147,10 @@ import { NotificationService } from '../../../core/services/notification.service
           <ng-template pTemplate="header">
             <tr>
               <th style="width: 48px"></th>
-              <th>Employee</th>
-              <th>Branch</th>
-              <th>Position</th>
-              <th class="text-right">Monthly Salary</th>
+              <th>{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.COL_POSITION' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.COL_SALARY' | translate }}</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-item>
@@ -175,8 +177,8 @@ import { NotificationService } from '../../../core/services/notification.service
               <td colspan="5" class="text-center py-12">
                 <div class="text-gray-400">
                   <i class="pi pi-check-circle text-4xl mb-3 text-green-400"></i>
-                  <p class="text-lg font-medium text-green-600">All salaries are paid for {{ displayMonth() }}</p>
-                  <p class="text-sm mt-1">No pending salary payments found</p>
+                  <p class="text-lg font-medium text-green-600">{{ 'EXPENSES.SALARIES.ALL_PAID' | translate: { month: displayMonth() } }}</p>
+                  <p class="text-sm mt-1">{{ 'EXPENSES.SALARIES.NO_PENDING' | translate }}</p>
                 </div>
               </td>
             </tr>
@@ -191,6 +193,7 @@ export class SalariesComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
+  private translate = inject(TranslateService);
 
   loading = signal(false);
   paying = signal(false);
@@ -202,7 +205,7 @@ export class SalariesComponent implements OnInit {
   selectedIds = signal<Set<string>>(new Set());
 
   branchOptions = computed(() => [
-    { label: 'All Branches', value: null },
+    { label: this.translate.instant('EXPENSES.SALARIES.ALL_BRANCHES'), value: null },
     ...this.branches().map(b => ({ label: b.name, value: b.id }))
   ]);
 

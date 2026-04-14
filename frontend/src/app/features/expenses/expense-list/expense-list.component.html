@@ -3,18 +3,18 @@
     <ng-template pTemplate="header">
       <div class="flex justify-between items-center p-4">
         <div>
-          <h2 class="text-2xl font-bold">Expense Management</h2>
-          <p class="text-gray-600 mt-1">Total: {{ totalExpenses | number:'1.2-2' }}</p>
+          <h2 class="text-2xl font-bold">{{ 'EXPENSES.LIST.TITLE' | translate }}</h2>
+          <p class="text-gray-600 mt-1">{{ 'EXPENSES.LIST.TOTAL' | translate }} {{ totalExpenses | number:'1.2-2' }}</p>
         </div>
         <div class="flex gap-2">
           <p-button
-            label="Manage Salaries"
+            [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
             icon="pi pi-users"
             severity="warn"
             (onClick)="goToSalaries()">
           </p-button>
           <p-button
-            label="Add Expense"
+            [label]="'EXPENSES.LIST.ADD' | translate"
             icon="pi pi-plus"
             (onClick)="createExpense()">
           </p-button>
@@ -25,50 +25,50 @@
     <!-- Filters -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
       <div>
-        <label class="block text-sm font-medium mb-1">Branch</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.BRANCH' | translate }}</label>
         <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">All Branches</option>
+          <option value="">{{ 'EXPENSES.LIST.ALL_BRANCHES' | translate }}</option>
           @for (branch of branches(); track branch.id) {
             <option [value]="branch.id">{{ branch.name }}</option>
           }
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">Type</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.TYPE_LABEL' | translate }}</label>
         <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">All Types</option>
-          <option value="FIXED">Fixed</option>
-          <option value="VARIABLE">Variable</option>
-          <option value="SHARED">Shared</option>
-          <option value="CAPITAL">Capital</option>
+          <option value="">{{ 'EXPENSES.LIST.ALL_TYPES' | translate }}</option>
+          <option value="FIXED">{{ 'EXPENSES.LIST.FIXED' | translate }}</option>
+          <option value="VARIABLE">{{ 'EXPENSES.LIST.VARIABLE' | translate }}</option>
+          <option value="SHARED">{{ 'EXPENSES.LIST.SHARED' | translate }}</option>
+          <option value="CAPITAL">{{ 'EXPENSES.LIST.CAPITAL' | translate }}</option>
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">Category</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.CATEGORY' | translate }}</label>
         <select [(ngModel)]="selectedCategory" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">All Categories</option>
+          <option value="">{{ 'EXPENSES.LIST.ALL_CATEGORIES' | translate }}</option>
           @for (cat of categories; track cat) {
             <option [value]="cat">{{ cat }}</option>
           }
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">Recurring</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.RECURRING' | translate }}</label>
         <select [(ngModel)]="selectedRecurring" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">All</option>
-          <option value="true">Recurring only</option>
-          <option value="false">Non-recurring only</option>
+          <option value="">{{ 'EXPENSES.LIST.ALL' | translate }}</option>
+          <option value="true">{{ 'EXPENSES.LIST.RECURRING_ONLY' | translate }}</option>
+          <option value="false">{{ 'EXPENSES.LIST.NON_RECURRING' | translate }}</option>
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">Start Date</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.START_DATE' | translate }}</label>
         <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
       </div>
       <div class="flex flex-col justify-between">
-        <label class="block text-sm font-medium mb-1">End Date</label>
+        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.END_DATE' | translate }}</label>
         <div class="flex gap-1">
           <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
-          <button pButton icon="pi pi-filter-slash" class="p-button-outlined p-button-sm" (click)="clearFilters()" pTooltip="Clear filters"></button>
+          <button pButton icon="pi pi-filter-slash" class="p-button-outlined p-button-sm" (click)="clearFilters()" [pTooltip]="'EXPENSES.LIST.CLEAR_FILTERS' | translate"></button>
         </div>
       </div>
     </div>
@@ -77,21 +77,21 @@
     <p-table [value]="expenses()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Date</th>
-          <th>Type</th>
-          <th>Category</th>
-          <th>Branch</th>
-          <th>Description</th>
-          <th>Amount</th>
-          <th>Vendor</th>
-          <th>Recurring</th>
-          <th>Actions</th>
+          <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_TYPE' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_VENDOR' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_RECURRING' | translate }}</th>
+          <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-expense>
         <tr>
           <td>{{ expense.date | date: 'MMM d, y' }}</td>
-          <td><p-tag [value]="expense.type" [severity]="getTypeColor(expense.type)"></p-tag></td>
+          <td><p-tag [value]="'EXPENSES.LIST.' + expense.type | translate" [severity]="getTypeColor(expense.type)"></p-tag></td>
           <td>{{ expense.category }}</td>
           <td>{{ getBranchName(expense.branchId) }}</td>
           <td>{{ expense.description }}</td>
@@ -99,7 +99,7 @@
           <td>{{ expense.vendor || '-' }}</td>
           <td>
             @if (expense.isRecurring) {
-              <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
+              <p-tag [value]="'EXPENSES.LIST.RECURRING' | translate" severity="info" icon="pi pi-refresh"></p-tag>
             } @else {
               <span class="text-gray-400 text-sm">-</span>
             }
@@ -112,7 +112,7 @@
                   [rounded]="true"
                   [text]="true"
                   severity="success"
-                  pTooltip="Pay for this month"
+                  [pTooltip]="'EXPENSES.LIST.PAY_MONTH' | translate"
                   (onClick)="openPayDialog(expense)">
                 </p-button>
               }
@@ -121,7 +121,7 @@
                 [rounded]="true"
                 [text]="true"
                 severity="warn"
-                pTooltip="Edit"
+                [pTooltip]="'EXPENSES.LIST.EDIT' | translate"
                 (onClick)="editExpense(expense)">
               </p-button>
               <p-button
@@ -129,7 +129,7 @@
                 [rounded]="true"
                 [text]="true"
                 severity="danger"
-                pTooltip="Delete"
+                [pTooltip]="'EXPENSES.LIST.DELETE' | translate"
                 (onClick)="confirmDelete(expense)">
               </p-button>
             </div>
@@ -138,7 +138,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="text-center py-8 text-gray-500">No expenses found</td>
+          <td colspan="9" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -149,24 +149,24 @@
 <app-delete-confirm-dialog
   [visible]="showDeleteDialog"
   (visibleChange)="showDeleteDialog = $event"
-  header="Delete Expense"
-  [message]="'Are you sure you want to delete: ' + (expenseToDelete()?.description || 'this expense') + '?'"
+  [header]="'EXPENSES.LIST.DELETE_TITLE' | translate"
+  [message]="'EXPENSES.LIST.DELETE_CONFIRM' | translate: { description: expenseToDelete()?.description }"
   (confirm)="deleteExpense()"
   (cancel)="showDeleteDialog = false">
 </app-delete-confirm-dialog>
 
 <!-- Pay Recurring Dialog -->
 <p-dialog
-  header="Pay Recurring Expense"
+  [header]="'EXPENSES.LIST.PAY_RECURRING_TITLE' | translate"
   [(visible)]="showPayDialog"
   [modal]="true"
   [style]="{ width: '400px' }"
   [draggable]="false">
   <div class="flex flex-col gap-4 py-2">
-    <p class="text-gray-700">Creating a payment entry for:</p>
+    <p class="text-gray-700">{{ 'EXPENSES.LIST.PAY_RECURRING_FOR' | translate }}</p>
     <p class="font-semibold text-blue-700">{{ expenseToPayLabel() }}</p>
     <div>
-      <label class="block text-sm font-medium mb-2">Payment Date</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.LIST.PAYMENT_DATE' | translate }}</label>
       <p-datepicker
         [(ngModel)]="payDate"
         dateFormat="yy-mm-dd"
@@ -174,19 +174,19 @@
         class="w-full">
       </p-datepicker>
     </div>
-    <small class="text-gray-500">If already paid this month, the request will be rejected.</small>
+    <small class="text-gray-500">{{ 'EXPENSES.LIST.ALREADY_PAID_HINT' | translate }}</small>
   </div>
   <ng-template pTemplate="footer">
     <div class="flex justify-end gap-2">
-      <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showPayDialog = false"></p-button>
-      <p-button label="Confirm Payment" severity="success" icon="pi pi-check" (onClick)="confirmPayRecurring()"></p-button>
+      <p-button [label]="'EXPENSES.LIST.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showPayDialog = false"></p-button>
+      <p-button [label]="'EXPENSES.LIST.CONFIRM_PAYMENT' | translate" severity="success" icon="pi pi-check" (onClick)="confirmPayRecurring()"></p-button>
     </div>
   </ng-template>
 </p-dialog>
 
 <!-- Pay Salaries Dialog -->
 <p-dialog
-  header="Pay All Salaries"
+  [header]="'EXPENSES.LIST.PAY_SALARIES_TITLE' | translate"
   [(visible)]="showSalariesDialog"
   [modal]="true"
   [style]="{ width: '450px' }"
@@ -195,12 +195,11 @@
     <div class="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
       <i class="pi pi-info-circle text-amber-600 text-xl mt-0.5"></i>
       <p class="text-sm text-amber-800">
-        This will create a SALARIES expense entry for every active employee with a salary set.
-        Already-paid employees for this month will be skipped.
+        {{ 'EXPENSES.LIST.PAY_SALARIES_DESC' | translate }}
       </p>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Pay Date</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.LIST.PAY_DATE' | translate }}</label>
       <p-datepicker
         [(ngModel)]="salariesDate"
         dateFormat="yy-mm-dd"
@@ -209,9 +208,9 @@
       </p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Branch (optional — leave empty for all branches)</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.LIST.BRANCH_OPTIONAL' | translate }}</label>
       <select [(ngModel)]="salariesBranchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-        <option value="">All Branches</option>
+        <option value="">{{ 'EXPENSES.LIST.ALL_BRANCHES' | translate }}</option>
         @for (branch of branches(); track branch.id) {
           <option [value]="branch.id">{{ branch.name }}</option>
         }
@@ -220,9 +219,9 @@
   </div>
   <ng-template pTemplate="footer">
     <div class="flex justify-end gap-2">
-      <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showSalariesDialog = false"></p-button>
+      <p-button [label]="'EXPENSES.LIST.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showSalariesDialog = false"></p-button>
       <p-button
-        label="Pay Salaries"
+        [label]="'EXPENSES.LIST.PAY_SALARIES_BTN' | translate"
         severity="warn"
         icon="pi pi-users"
         [disabled]="payingSalaries()"

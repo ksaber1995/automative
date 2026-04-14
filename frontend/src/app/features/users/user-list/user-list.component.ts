@@ -12,6 +12,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { AvatarModule } from 'primeng/avatar';
 import { BadgeModule } from 'primeng/badge';
 import { ConfirmationService } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -26,6 +27,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     CommonModule, FormsModule,
     TableModule, ButtonModule, TagModule, SelectModule,
     InputTextModule, ConfirmDialogModule, TooltipModule, AvatarModule, BadgeModule,
+    TranslateModule,
   ],
   providers: [ConfirmationService],
   template: `
@@ -35,10 +37,10 @@ import { Branch } from '@shared/interfaces/branch.interface';
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
-          <p class="text-gray-500 text-sm mt-1">Manage system users, roles, and permissions</p>
+          <h1 class="text-2xl font-bold text-gray-900">{{ 'USERS.LIST.TITLE' | translate }}</h1>
+          <p class="text-gray-500 text-sm mt-1">{{ 'USERS.LIST.SUBTITLE' | translate }}</p>
         </div>
-        <button pButton label="Add User" icon="pi pi-user-plus"
+        <button pButton [label]="'USERS.LIST.ADD' | translate" icon="pi pi-user-plus"
           class="p-button-primary"
           (click)="router.navigate(['/users/create'])">
         </button>
@@ -53,7 +55,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
             </div>
             <div>
               <div class="text-2xl font-bold text-gray-900">{{ stat.value }}</div>
-              <div class="text-xs text-gray-500">{{ stat.label }}</div>
+              <div class="text-xs text-gray-500">{{ stat.label | translate }}</div>
             </div>
           </div>
         }
@@ -63,36 +65,36 @@ import { Branch } from '@shared/interfaces/branch.interface';
       <div class="bg-white rounded-xl border border-gray-200 p-4">
         <div class="flex flex-wrap gap-4 items-end">
           <div class="flex-1 min-w-48">
-            <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+            <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.SEARCH_PLACEHOLDER' | translate }}</label>
             <span class="p-input-icon-left w-full">
               <i class="pi pi-search"></i>
               <input pInputText type="text" [(ngModel)]="searchTerm"
-                placeholder="Name or email…" class="w-full" />
+                [placeholder]="'USERS.LIST.SEARCH_PLACEHOLDER' | translate" class="w-full" />
             </span>
           </div>
           <div class="min-w-44">
-            <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+            <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.ROLE_FILTER' | translate }}</label>
             <p-select [options]="roleOptions" [(ngModel)]="selectedRole"
-              placeholder="All Roles" [showClear]="true" styleClass="w-full"
+              [placeholder]="'USERS.LIST.ALL_ROLES' | translate" [showClear]="true" styleClass="w-full"
               (onChange)="applyFilters()">
             </p-select>
           </div>
           <div class="min-w-44">
-            <label class="block text-xs font-medium text-gray-500 mb-1">Branch</label>
+            <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.BRANCH_FILTER' | translate }}</label>
             <p-select [options]="branchOptions()" [(ngModel)]="selectedBranchId"
               optionLabel="name" optionValue="id"
-              placeholder="All Branches" [showClear]="true" styleClass="w-full"
+              [placeholder]="'USERS.LIST.ALL_BRANCHES' | translate" [showClear]="true" styleClass="w-full"
               (onChange)="applyFilters()">
             </p-select>
           </div>
           <div class="min-w-44">
-            <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.STATUS_FILTER' | translate }}</label>
             <p-select [options]="statusOptions" [(ngModel)]="selectedStatus"
-              placeholder="All" [showClear]="true" styleClass="w-full"
+              [placeholder]="'USERS.LIST.ALL' | translate" [showClear]="true" styleClass="w-full"
               (onChange)="applyFilters()">
             </p-select>
           </div>
-          <button pButton icon="pi pi-filter-slash" label="Clear" severity="secondary"
+          <button pButton icon="pi pi-filter-slash" [label]="'USERS.LIST.CLEAR' | translate" severity="secondary"
             class="p-button-outlined" (click)="clearFilters()">
           </button>
         </div>
@@ -111,12 +113,12 @@ import { Branch } from '@shared/interfaces/branch.interface';
 
           <ng-template pTemplate="header">
             <tr class="bg-gray-50">
-              <th class="font-semibold text-gray-600">User</th>
-              <th class="font-semibold text-gray-600">Role</th>
-              <th class="font-semibold text-gray-600">Branches</th>
-              <th class="font-semibold text-gray-600">Linked Employee</th>
-              <th class="font-semibold text-gray-600">Status</th>
-              <th class="font-semibold text-gray-600 text-center">Actions</th>
+              <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_USER' | translate }}</th>
+              <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_ROLE' | translate }}</th>
+              <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_BRANCHES' | translate }}</th>
+              <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_LINKED' | translate }}</th>
+              <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_STATUS' | translate }}</th>
+              <th class="font-semibold text-gray-600 text-center">{{ 'USERS.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
 
@@ -133,7 +135,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                     <div class="font-medium text-gray-900">
                       {{ user.firstName }} {{ user.lastName }}
                       @if (user.linkedEmployeeId) {
-                        <i class="pi pi-link text-blue-400 ml-1 text-xs" pTooltip="Linked to employee"></i>
+                        <i class="pi pi-link text-blue-400 ml-1 text-xs" [pTooltip]="'USERS.LIST.LINKED_BADGE' | translate"></i>
                       }
                     </div>
                     <div class="text-xs text-gray-400">{{ user.email }}</div>
@@ -150,7 +152,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <td>
                 <div class="flex flex-wrap gap-1">
                   @if (isGlobalRole(user.role)) {
-                    <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-xs font-medium">All Branches</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-xs font-medium">{{ 'USERS.LIST.ALL_BRANCHES' | translate }}</span>
                   } @else if (user.branchIds?.length) {
                     @for (bId of user.branchIds.slice(0, 2); track bId) {
                       <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs">{{ getBranchName(bId) }}</span>
@@ -166,7 +168,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <td>
                 @if (user.linkedEmployeeId) {
                   <span class="inline-flex items-center gap-1 text-xs text-blue-600">
-                    <i class="pi pi-user"></i> Linked
+                    <i class="pi pi-user"></i> {{ 'USERS.LIST.LINKED_BADGE' | translate }}
                   </span>
                 } @else {
                   <span class="text-gray-400 text-xs">—</span>
@@ -174,7 +176,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
               </td>
               <td>
                 <p-tag
-                  [value]="user.isActive ? 'Active' : 'Inactive'"
+                  [value]="user.isActive ? ('USERS.LIST.ACTIVE' | translate) : ('USERS.LIST.INACTIVE' | translate)"
                   [severity]="user.isActive ? 'success' : 'danger'"
                   [style]="{ fontSize: '0.7rem' }">
                 </p-tag>
@@ -182,18 +184,18 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <td (click)="$event.stopPropagation()">
                 <div class="flex items-center justify-center gap-1">
                   <button pButton icon="pi pi-pencil" class="p-button-text p-button-sm p-button-rounded"
-                    pTooltip="Edit" (click)="editUser(user)">
+                    [pTooltip]="'USERS.LIST.EDIT' | translate" (click)="editUser(user)">
                   </button>
                   <button pButton icon="pi pi-shield" class="p-button-text p-button-sm p-button-rounded p-button-info"
-                    pTooltip="Permissions" (click)="editPermissions(user)">
+                    [pTooltip]="'USERS.LIST.PERMISSIONS' | translate" (click)="editPermissions(user)">
                   </button>
                   @if (user.isActive) {
                     <button pButton icon="pi pi-ban" class="p-button-text p-button-sm p-button-rounded p-button-danger"
-                      pTooltip="Deactivate" (click)="toggleActive(user)">
+                      [pTooltip]="'USERS.LIST.DEACTIVATE' | translate" (click)="toggleActive(user)">
                     </button>
                   } @else {
                     <button pButton icon="pi pi-check-circle" class="p-button-text p-button-sm p-button-rounded p-button-success"
-                      pTooltip="Activate" (click)="toggleActive(user)">
+                      [pTooltip]="'USERS.LIST.ACTIVATE' | translate" (click)="toggleActive(user)">
                     </button>
                   }
                 </div>
@@ -205,8 +207,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <tr>
               <td colspan="6" class="text-center py-12">
                 <i class="pi pi-users text-4xl text-gray-300 mb-3 block"></i>
-                <p class="text-gray-400">No users found</p>
-                <button pButton label="Create First User" icon="pi pi-plus"
+                <p class="text-gray-400">{{ 'USERS.LIST.NO_DATA' | translate }}</p>
+                <button pButton [label]="'USERS.LIST.CREATE_FIRST' | translate" icon="pi pi-plus"
                   class="p-button-text mt-3" (click)="router.navigate(['/users/create'])">
                 </button>
               </td>
@@ -275,10 +277,10 @@ export class UserListComponent implements OnInit {
   stats = computed(() => {
     const all = this.users();
     return [
-      { label: 'Total Users', value: all.length, icon: 'pi pi-users', bg: 'bg-blue-50', iconColor: 'text-blue-500' },
-      { label: 'Active', value: all.filter(u => u.isActive).length, icon: 'pi pi-check-circle', bg: 'bg-green-50', iconColor: 'text-green-500' },
-      { label: 'Global Admins', value: all.filter(u => u.role === UserRole.GLOBAL_ADMIN || u.role === UserRole.ADMIN).length, icon: 'pi pi-crown', bg: 'bg-purple-50', iconColor: 'text-purple-500' },
-      { label: 'Linked to Employees', value: all.filter(u => u.linkedEmployeeId).length, icon: 'pi pi-link', bg: 'bg-orange-50', iconColor: 'text-orange-500' },
+      { label: 'USERS.LIST.TOTAL', value: all.length, icon: 'pi pi-users', bg: 'bg-blue-50', iconColor: 'text-blue-500' },
+      { label: 'USERS.LIST.ACTIVE_LABEL', value: all.filter(u => u.isActive).length, icon: 'pi pi-check-circle', bg: 'bg-green-50', iconColor: 'text-green-500' },
+      { label: 'USERS.LIST.GLOBAL_ADMINS', value: all.filter(u => u.role === UserRole.GLOBAL_ADMIN || u.role === UserRole.ADMIN).length, icon: 'pi pi-crown', bg: 'bg-purple-50', iconColor: 'text-purple-500' },
+      { label: 'USERS.LIST.LINKED', value: all.filter(u => u.linkedEmployeeId).length, icon: 'pi pi-link', bg: 'bg-orange-50', iconColor: 'text-orange-500' },
     ];
   });
 

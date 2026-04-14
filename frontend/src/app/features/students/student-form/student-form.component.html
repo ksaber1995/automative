@@ -1,30 +1,30 @@
 <div class="container mx-auto p-6">
-  <p-card [header]="isEditMode() ? 'Edit Student' : 'Add New Student'">
+  <p-card [header]="(isEditMode() ? 'STUDENTS.FORM.EDIT_TITLE' : 'STUDENTS.FORM.CREATE_TITLE') | translate">
     <form [formGroup]="studentForm" (ngSubmit)="onSubmit()">
       <!-- Student Information -->
       <div class="mb-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Student Information</h3>
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'STUDENTS.FORM.STUDENT_SECTION' | translate }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- First Name -->
           <div class="field">
             <label for="firstName" class="block text-sm font-medium mb-2">
-              First Name <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
             </label>
             <input
               id="firstName"
               pInputText
               formControlName="firstName"
               class="w-full"
-              placeholder="Enter first name"
+              [placeholder]="'STUDENTS.FORM.FIRST_NAME_PLACEHOLDER' | translate"
               [class.ng-invalid]="firstName?.invalid && firstName?.touched"
             />
             @if (firstName?.invalid && firstName?.touched) {
               <small class="text-red-500 block mt-1">
                 @if (firstName?.errors?.['required']) {
-                  First name is required
+                  {{ 'STUDENTS.FORM.FIRST_NAME_REQUIRED' | translate }}
                 }
                 @if (firstName?.errors?.['minlength']) {
-                  First name must be at least 2 characters
+                  {{ 'STUDENTS.FORM.FIRST_NAME_MIN' | translate }}
                 }
               </small>
             }
@@ -33,23 +33,23 @@
           <!-- Last Name -->
           <div class="field">
             <label for="lastName" class="block text-sm font-medium mb-2">
-              Last Name <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.LAST_NAME' | translate }} <span class="text-red-500">*</span>
             </label>
             <input
               id="lastName"
               pInputText
               formControlName="lastName"
               class="w-full"
-              placeholder="Enter last name"
+              [placeholder]="'STUDENTS.FORM.LAST_NAME_PLACEHOLDER' | translate"
               [class.ng-invalid]="lastName?.invalid && lastName?.touched"
             />
             @if (lastName?.invalid && lastName?.touched) {
               <small class="text-red-500 block mt-1">
                 @if (lastName?.errors?.['required']) {
-                  Last name is required
+                  {{ 'STUDENTS.FORM.LAST_NAME_REQUIRED' | translate }}
                 }
                 @if (lastName?.errors?.['minlength']) {
-                  Last name must be at least 2 characters
+                  {{ 'STUDENTS.FORM.LAST_NAME_MIN' | translate }}
                 }
               </small>
             }
@@ -58,7 +58,7 @@
           <!-- Date of Birth -->
           <div class="field">
             <label for="dateOfBirth" class="block text-sm font-medium mb-2">
-              Date of Birth <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.DOB' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-datepicker
               inputId="dateOfBirth"
@@ -66,18 +66,18 @@
               dateFormat="yy-mm-dd"
               [showIcon]="true"
               [style]="{'width': '100%'}"
-              placeholder="Select date of birth"
+              [placeholder]="'STUDENTS.FORM.DOB_PLACEHOLDER' | translate"
               [class.ng-invalid]="dateOfBirth?.invalid && dateOfBirth?.touched"
             />
             @if (dateOfBirth?.invalid && dateOfBirth?.touched) {
-              <small class="text-red-500 block mt-1">Date of birth is required</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.DOB_REQUIRED' | translate }}</small>
             }
           </div>
 
           <!-- Branch -->
           <div class="field">
             <label for="branchId" class="block text-sm font-medium mb-2">
-              Branch <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.BRANCH' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-select
               inputId="branchId"
@@ -85,40 +85,40 @@
               [options]="branches()"
               optionLabel="name"
               optionValue="id"
-              placeholder="Select a branch"
+              [placeholder]="'STUDENTS.FORM.BRANCH_PLACEHOLDER' | translate"
               [style]="{'width': '100%'}"
               [class.ng-invalid]="branchId?.invalid && branchId?.touched"
             />
             @if (branchId?.invalid && branchId?.touched) {
-              <small class="text-red-500 block mt-1">Branch is required</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
 
           <!-- Email (Optional) -->
           <div class="field">
-            <label for="email" class="block text-sm font-medium mb-2">Student Email</label>
+            <label for="email" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.STUDENT_EMAIL' | translate }}</label>
             <input
               id="email"
               pInputText
               formControlName="email"
               class="w-full"
-              placeholder="student@example.com (optional)"
+              [placeholder]="'STUDENTS.FORM.STUDENT_EMAIL_PLACEHOLDER' | translate"
               [class.ng-invalid]="email?.invalid && email?.touched"
             />
             @if (email?.invalid && email?.touched) {
-              <small class="text-red-500 block mt-1">Please enter a valid email</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.EMAIL_INVALID' | translate }}</small>
             }
           </div>
 
           <!-- Phone (Optional) -->
           <div class="field">
-            <label for="phone" class="block text-sm font-medium mb-2">Student Phone</label>
+            <label for="phone" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.STUDENT_PHONE' | translate }}</label>
             <input
               id="phone"
               pInputText
               formControlName="phone"
               class="w-full"
-              placeholder="Phone number (optional)"
+              [placeholder]="'STUDENTS.FORM.STUDENT_PHONE_PLACEHOLDER' | translate"
             />
           </div>
         </div>
@@ -126,28 +126,28 @@
 
       <!-- Parent/Guardian Information -->
       <div class="mb-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Parent/Guardian Information</h3>
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'STUDENTS.FORM.PARENT_SECTION' | translate }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Parent Name -->
           <div class="field">
             <label for="parentName" class="block text-sm font-medium mb-2">
-              Parent/Guardian Name <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.PARENT_NAME' | translate }} <span class="text-red-500">*</span>
             </label>
             <input
               id="parentName"
               pInputText
               formControlName="parentName"
               class="w-full"
-              placeholder="Enter parent/guardian name"
+              [placeholder]="'STUDENTS.FORM.PARENT_NAME_PLACEHOLDER' | translate"
               [class.ng-invalid]="parentName?.invalid && parentName?.touched"
             />
             @if (parentName?.invalid && parentName?.touched) {
               <small class="text-red-500 block mt-1">
                 @if (parentName?.errors?.['required']) {
-                  Parent name is required
+                  {{ 'STUDENTS.FORM.PARENT_NAME_REQUIRED' | translate }}
                 }
                 @if (parentName?.errors?.['minlength']) {
-                  Parent name must be at least 3 characters
+                  {{ 'STUDENTS.FORM.PARENT_NAME_MIN' | translate }}
                 }
               </small>
             }
@@ -156,41 +156,41 @@
           <!-- Parent Phone -->
           <div class="field">
             <label for="parentPhone" class="block text-sm font-medium mb-2">
-              Parent Phone <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.PARENT_PHONE' | translate }} <span class="text-red-500">*</span>
             </label>
             <input
               id="parentPhone"
               pInputText
               formControlName="parentPhone"
               class="w-full"
-              placeholder="Enter parent phone number"
+              [placeholder]="'STUDENTS.FORM.PARENT_PHONE_PLACEHOLDER' | translate"
               [class.ng-invalid]="parentPhone?.invalid && parentPhone?.touched"
             />
             @if (parentPhone?.invalid && parentPhone?.touched) {
-              <small class="text-red-500 block mt-1">Parent phone is required</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.PARENT_PHONE_REQUIRED' | translate }}</small>
             }
           </div>
 
           <!-- Parent Email -->
           <div class="field">
-            <label for="parentEmail" class="block text-sm font-medium mb-2">Parent Email</label>
+            <label for="parentEmail" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.PARENT_EMAIL' | translate }}</label>
             <input
               id="parentEmail"
               pInputText
               formControlName="parentEmail"
               class="w-full"
-              placeholder="parent@example.com (optional)"
+              [placeholder]="'STUDENTS.FORM.PARENT_EMAIL_PLACEHOLDER' | translate"
               [class.ng-invalid]="parentEmail?.invalid && parentEmail?.touched"
             />
             @if (parentEmail?.invalid && parentEmail?.touched) {
-              <small class="text-red-500 block mt-1">Please enter a valid email</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.EMAIL_INVALID' | translate }}</small>
             }
           </div>
 
           <!-- Enrollment Date -->
           <div class="field">
             <label for="enrollmentDate" class="block text-sm font-medium mb-2">
-              Enrollment Date <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.ENROLL_DATE' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-datepicker
               inputId="enrollmentDate"
@@ -198,11 +198,11 @@
               dateFormat="yy-mm-dd"
               [showIcon]="true"
               [style]="{'width': '100%'}"
-              placeholder="Select enrollment date"
+              [placeholder]="'STUDENTS.FORM.ENROLL_DATE_PLACEHOLDER' | translate"
               [class.ng-invalid]="enrollmentDate?.invalid && enrollmentDate?.touched"
             />
             @if (enrollmentDate?.invalid && enrollmentDate?.touched) {
-              <small class="text-red-500 block mt-1">Enrollment date is required</small>
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.ENROLL_DATE_REQUIRED' | translate }}</small>
             }
           </div>
         </div>
@@ -210,31 +210,31 @@
 
       <!-- Address & Notes -->
       <div class="mb-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Additional Information</h3>
+        <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'STUDENTS.FORM.ADDITIONAL_SECTION' | translate }}</h3>
         <div class="grid grid-cols-1 gap-4">
           <!-- Address -->
           <div class="field">
-            <label for="address" class="block text-sm font-medium mb-2">Address</label>
+            <label for="address" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.ADDRESS' | translate }}</label>
             <textarea
               id="address"
               pTextarea
               formControlName="address"
               rows="2"
               class="w-full"
-              placeholder="Enter home address (optional)"
+              [placeholder]="'STUDENTS.FORM.ADDRESS_PLACEHOLDER' | translate"
             ></textarea>
           </div>
 
           <!-- Notes -->
           <div class="field">
-            <label for="notes" class="block text-sm font-medium mb-2">Notes</label>
+            <label for="notes" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.NOTES' | translate }}</label>
             <textarea
               id="notes"
               pTextarea
               formControlName="notes"
               rows="3"
               class="w-full"
-              placeholder="Any additional notes or information (optional)"
+              [placeholder]="'STUDENTS.FORM.NOTES_PLACEHOLDER' | translate"
             ></textarea>
           </div>
         </div>
@@ -245,7 +245,7 @@
         <button
           pButton
           type="button"
-          label="Cancel"
+          [label]="'STUDENTS.FORM.CANCEL' | translate"
           class="p-button-outlined"
           (click)="cancel()"
           [disabled]="loading()"
@@ -253,7 +253,7 @@
         <button
           pButton
           type="submit"
-          [label]="isEditMode() ? 'Update Student' : 'Add Student'"
+          [label]="(isEditMode() ? 'STUDENTS.FORM.UPDATE' : 'STUDENTS.FORM.CREATE') | translate"
           [loading]="loading()"
           [disabled]="studentForm.invalid || loading()"
         ></button>

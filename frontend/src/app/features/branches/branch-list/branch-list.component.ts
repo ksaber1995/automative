@@ -8,6 +8,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { TranslateModule } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -25,7 +26,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     SelectModule,
-    DeleteConfirmDialogComponent
+    DeleteConfirmDialogComponent,
+    TranslateModule
   ],
   templateUrl: './branch-list.component.html',
   styleUrl: './branch-list.component.scss'

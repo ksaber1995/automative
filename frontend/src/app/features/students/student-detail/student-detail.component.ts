@@ -13,6 +13,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -38,6 +39,7 @@ import { Course } from '@shared/interfaces/course.interface';
     TextareaModule,
     RadioButtonModule,
     ProgressBarModule,
+    TranslateModule,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss'

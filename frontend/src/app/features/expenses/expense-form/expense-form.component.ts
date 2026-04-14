@@ -16,6 +16,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-expense-form',
@@ -30,7 +31,8 @@ import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/
     TextareaModule,
     SelectModule,
     DatePickerModule,
-    CheckboxModule
+    CheckboxModule,
+    TranslateModule
   ],
   templateUrl: './expense-form.component.html',
   styleUrl: './expense-form.component.scss'

@@ -2,7 +2,7 @@
   <p-card>
     <ng-template pTemplate="header">
       <div class="p-4">
-        <h2 class="text-2xl font-bold">{{ isEditMode() ? 'Edit Expense' : 'Add New Expense' }}</h2>
+        <h2 class="text-2xl font-bold">{{ isEditMode() ? ('EXPENSES.FORM.EDIT_TITLE' | translate) : ('EXPENSES.FORM.CREATE_TITLE' | translate) }}</h2>
       </div>
     </ng-template>
 
@@ -11,39 +11,39 @@
         <!-- Expense Type -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Type <span class="text-red-500">*</span>
+            {{ 'EXPENSES.FORM.TYPE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
             formControlName="type"
             [options]="expenseTypeOptions"
             optionLabel="label"
             optionValue="value"
-            placeholder="Select Type"
+            [placeholder]="'EXPENSES.FORM.TYPE_PLACEHOLDER' | translate"
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': type?.invalid && type?.touched}"></p-select>
           @if (type?.invalid && type?.touched) {
-            <small class="text-red-500">Type is required</small>
+            <small class="text-red-500">{{ 'EXPENSES.FORM.TYPE_REQUIRED' | translate }}</small>
           }
           <small class="text-gray-500 block mt-1">
-            FIXED: Recurring monthly | VARIABLE: One-time | SHARED: Distributed across branches | CAPITAL: Asset purchase (amortized)
+            {{ 'EXPENSES.FORM.TYPE_HINT' | translate }}
           </small>
         </div>
 
         <!-- Category -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Category <span class="text-red-500">*</span>
+            {{ 'EXPENSES.FORM.CATEGORY_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
             formControlName="category"
             [options]="expenseCategoryOptions"
             optionLabel="label"
             optionValue="value"
-            placeholder="Select Category"
+            [placeholder]="'EXPENSES.FORM.CATEGORY_PLACEHOLDER' | translate"
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': category?.invalid && category?.touched}"></p-select>
           @if (category?.invalid && category?.touched) {
-            <small class="text-red-500">Category is required</small>
+            <small class="text-red-500">{{ 'EXPENSES.FORM.CATEGORY_REQUIRED' | translate }}</small>
           }
         </div>
 
@@ -51,18 +51,18 @@
         @if (expenseForm.get('type')?.value !== 'SHARED') {
           <div>
             <label class="block text-sm font-medium mb-2">
-              Branch <span class="text-red-500">*</span>
+              {{ 'EXPENSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-select
               formControlName="branchId"
               [options]="branchOptions()"
               optionLabel="label"
               optionValue="value"
-              placeholder="Select Branch"
+              [placeholder]="'EXPENSES.FORM.BRANCH_PLACEHOLDER' | translate"
               class="w-full"
               [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
             @if (branchId?.invalid && branchId?.touched) {
-              <small class="text-red-500">Branch is required</small>
+              <small class="text-red-500">{{ 'EXPENSES.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
         }
@@ -71,21 +71,21 @@
         @if (expenseForm.get('type')?.value === 'SHARED') {
           <div>
             <label class="block text-sm font-medium mb-2">
-              Distribution Method <span class="text-red-500">*</span>
+              {{ 'EXPENSES.FORM.DIST_LABEL' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-select
               formControlName="distributionMethod"
               [options]="distributionMethodOptions"
               optionLabel="label"
               optionValue="value"
-              placeholder="Select Distribution Method"
+              [placeholder]="'EXPENSES.FORM.DIST_PLACEHOLDER' | translate"
               class="w-full"
               [ngClass]="{'ng-invalid ng-dirty': distributionMethod?.invalid && distributionMethod?.touched}"></p-select>
             @if (distributionMethod?.invalid && distributionMethod?.touched) {
-              <small class="text-red-500">Distribution method is required</small>
+              <small class="text-red-500">{{ 'EXPENSES.FORM.DIST_REQUIRED' | translate }}</small>
             }
             <small class="text-gray-500 block mt-1">
-              EQUAL: Divide equally | PROPORTIONAL: Based on revenue
+              {{ 'EXPENSES.FORM.DIST_HINT' | translate }}
             </small>
           </div>
         }
@@ -93,7 +93,7 @@
         <!-- Amount -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Amount <span class="text-red-500">*</span>
+            {{ 'EXPENSES.FORM.AMOUNT_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-inputnumber
             formControlName="amount"
@@ -104,14 +104,14 @@
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': amount?.invalid && amount?.touched}"></p-inputnumber>
           @if (amount?.invalid && amount?.touched) {
-            <small class="text-red-500">Valid amount is required</small>
+            <small class="text-red-500">{{ 'EXPENSES.FORM.AMOUNT_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Date -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Date <span class="text-red-500">*</span>
+            {{ 'EXPENSES.FORM.DATE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-datepicker
             formControlName="date"
@@ -120,14 +120,14 @@
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': date?.invalid && date?.touched}"></p-datepicker>
           @if (date?.invalid && date?.touched) {
-            <small class="text-red-500">Date is required</small>
+            <small class="text-red-500">{{ 'EXPENSES.FORM.DATE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Description -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">
-            Description <span class="text-red-500">*</span>
+            {{ 'EXPENSES.FORM.DESC_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -136,7 +136,7 @@
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': description?.invalid && description?.touched}" />
           @if (description?.invalid && description?.touched) {
-            <small class="text-red-500">Description is required</small>
+            <small class="text-red-500">{{ 'EXPENSES.FORM.DESC_REQUIRED' | translate }}</small>
           }
         </div>
 
@@ -147,14 +147,14 @@
             [binary]="true"
             inputId="isRecurring"
             class="mr-2"></p-checkbox>
-          <label for="isRecurring" class="text-sm font-medium">Recurring Expense</label>
+          <label for="isRecurring" class="text-sm font-medium">{{ 'EXPENSES.FORM.RECURRING_LABEL' | translate }}</label>
         </div>
 
         <!-- Recurring Day (only if recurring) -->
         @if (expenseForm.get('isRecurring')?.value) {
           <div>
             <label class="block text-sm font-medium mb-2">
-              Recurring Day (1-31) <span class="text-red-500">*</span>
+              {{ 'EXPENSES.FORM.RECURRING_DAY' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-inputnumber
               formControlName="recurringDay"
@@ -164,15 +164,15 @@
               class="w-full"
               [ngClass]="{'ng-invalid ng-dirty': recurringDay?.invalid && recurringDay?.touched}"></p-inputnumber>
             @if (recurringDay?.invalid && recurringDay?.touched) {
-              <small class="text-red-500">Day must be between 1 and 31</small>
+              <small class="text-red-500">{{ 'EXPENSES.FORM.RECURRING_DAY_REQUIRED' | translate }}</small>
             }
-            <small class="text-gray-500 block mt-1">Day of month to auto-generate this expense</small>
+            <small class="text-gray-500 block mt-1">{{ 'EXPENSES.FORM.RECURRING_DAY_HINT' | translate }}</small>
           </div>
         }
 
         <!-- Vendor -->
         <div>
-          <label class="block text-sm font-medium mb-2">Vendor (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.FORM.VENDOR_LABEL' | translate }}</label>
           <input
             type="text"
             pInputText
@@ -182,7 +182,7 @@
 
         <!-- Invoice Number -->
         <div>
-          <label class="block text-sm font-medium mb-2">Invoice Number (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.FORM.INVOICE_LABEL' | translate }}</label>
           <input
             type="text"
             pInputText
@@ -195,23 +195,23 @@
           <div class="md:col-span-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <div class="flex items-center gap-2 mb-3">
               <i class="pi pi-box text-amber-600"></i>
-              <span class="font-semibold text-amber-800">Capital Asset Details</span>
+              <span class="font-semibold text-amber-800">{{ 'EXPENSES.FORM.CAPITAL_SECTION' | translate }}</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium mb-2">
-                  Asset Name <span class="text-red-500">*</span>
+                  {{ 'EXPENSES.FORM.ASSET_NAME' | translate }} <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   pInputText
                   formControlName="assetName"
                   class="w-full"
-                  placeholder="e.g. MacBook Pro, Air Conditioner" />
+                  [placeholder]="'EXPENSES.FORM.ASSET_PLACEHOLDER' | translate" />
               </div>
               <div>
                 <label class="block text-sm font-medium mb-2">
-                  Amortize Over (Months) <span class="text-red-500">*</span>
+                  {{ 'EXPENSES.FORM.AMORTIZE_LABEL' | translate }} <span class="text-red-500">*</span>
                 </label>
                 <p-inputnumber
                   formControlName="amortizationMonths"
@@ -220,11 +220,11 @@
                   class="w-full"
                   [ngClass]="{'ng-invalid ng-dirty': amortizationMonths?.invalid && amortizationMonths?.touched}"></p-inputnumber>
                 @if (amortizationMonths?.invalid && amortizationMonths?.touched) {
-                  <small class="text-red-500">Required for capital expenses</small>
+                  <small class="text-red-500">{{ 'EXPENSES.FORM.AMORTIZE_REQUIRED' | translate }}</small>
                 }
                 @if (expenseForm.get('amount')?.value && amortizationMonths?.value) {
                   <small class="text-amber-700 block mt-1">
-                    Monthly cost: {{ (expenseForm.get('amount')!.value / amortizationMonths!.value) | number:'1.2-2' }}
+                    {{ 'EXPENSES.FORM.MONTHLY_COST' | translate }} {{ (expenseForm.get('amount')!.value / amortizationMonths!.value) | number:'1.2-2' }}
                   </small>
                 }
               </div>
@@ -234,7 +234,7 @@
 
         <!-- Notes -->
         <div class="md:col-span-2">
-          <label class="block text-sm font-medium mb-2">Notes (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.FORM.NOTES_LABEL' | translate }}</label>
           <textarea
             pTextarea
             formControlName="notes"
@@ -246,13 +246,13 @@
       <div class="flex justify-end gap-2 mt-6">
         <p-button
           type="button"
-          label="Cancel"
+          [label]="'EXPENSES.FORM.CANCEL' | translate"
           severity="secondary"
           (click)="cancel()"
           [disabled]="loading()"></p-button>
         <p-button
           type="submit"
-          [label]="isEditMode() ? 'Update' : 'Create'"
+          [label]="isEditMode() ? ('EXPENSES.FORM.UPDATE' | translate) : ('EXPENSES.FORM.CREATE' | translate)"
           [disabled]="loading()"></p-button>
       </div>
     </form>

@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
+import { TooltipModule } from 'primeng/tooltip';
 import { TagModule } from 'primeng/tag';
 import { DialogModule } from 'primeng/dialog';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -14,11 +15,12 @@ import { NotificationService } from '../../../core/services/notification.service
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-expense-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, DialogModule, DatePickerModule, DeleteConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TooltipModule, TagModule, DialogModule, DatePickerModule, DeleteConfirmDialogComponent, TranslateModule],
   templateUrl: './expense-list.component.html',
   styleUrl: './expense-list.component.scss'
 })

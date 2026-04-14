@@ -6,6 +6,7 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
+import { TranslateModule } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
 import { ProductSaleService } from '../services/product-sale.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -24,14 +25,15 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
     InputTextModule,
     InputNumberModule,
     ButtonModule,
+    TranslateModule,
   ],
   template: `
     <div class="container mx-auto p-4 max-w-4xl">
       <p-card>
         <ng-template pTemplate="header">
           <div class="p-4">
-            <h2 class="text-2xl font-bold">Sell Product</h2>
-            <p class="text-sm text-gray-600 mt-1">Revenue will be created automatically</p>
+            <h2 class="text-2xl font-bold">{{ 'PRODUCTS.SALE.TITLE' | translate }}</h2>
+            <p class="text-sm text-gray-600 mt-1">{{ 'PRODUCTS.SALE.AUTO_HINT' | translate }}</p>
           </div>
         </ng-template>
 
@@ -39,24 +41,24 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
           <div class="grid grid-cols-1 gap-4">
             <!-- Product Selection -->
             <div class="field">
-              <label for="productId" class="block text-sm font-medium mb-2">Product *</label>
+              <label for="productId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.PRODUCT_LABEL' | translate }} *</label>
               <select id="productId" formControlName="productId" class="w-full p-2 border rounded">
-                <option value="">Select product</option>
+                <option value="">{{ 'PRODUCTS.SALE.PRODUCT_PLACEHOLDER' | translate }}</option>
                 @for (product of products(); track product.id) {
                   <option [value]="product.id">{{ product.name }} ({{ product.code }}) - Stock: {{ product.stock }}</option>
                 }
               </select>
               @if (saleForm.get('productId')?.invalid && saleForm.get('productId')?.touched) {
-                <small class="text-red-500">Please select a product</small>
+                <small class="text-red-500">{{ 'PRODUCTS.SALE.PRODUCT_REQUIRED' | translate }}</small>
               }
               @if (selectedProduct()) {
                 <div class="mt-2 p-3 bg-blue-50 rounded">
                   <div class="flex justify-between items-center">
-                    <span class="text-sm font-medium">Selling Price:</span>
+                    <span class="text-sm font-medium">{{ 'PRODUCTS.SALE.SELL_PRICE_LABEL' | translate }}</span>
                     <span class="text-lg font-bold text-blue-600">{{ selectedProduct()!.sellingPrice.toFixed(2) }}</span>
                   </div>
                   <div class="flex justify-between items-center mt-1">
-                    <span class="text-sm font-medium">Available Stock:</span>
+                    <span class="text-sm font-medium">{{ 'PRODUCTS.SALE.STOCK_LABEL' | translate }}</span>
                     <span class="text-sm" [class.text-red-600]="selectedProduct()!.stock <= selectedProduct()!.minStock" [class.text-green-600]="selectedProduct()!.stock > selectedProduct()!.minStock">
                       {{ selectedProduct()!.stock }} {{ selectedProduct()!.unit }}
                     </span>
@@ -67,49 +69,49 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 
             <!-- Quantity -->
             <div class="field">
-              <label for="quantity" class="block text-sm font-medium mb-2">Quantity *</label>
+              <label for="quantity" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.QTY_LABEL' | translate }} *</label>
               <p-inputNumber inputId="quantity" formControlName="quantity" [min]="1" [showButtons]="true" class="w-full"></p-inputNumber>
               @if (saleForm.get('quantity')?.invalid && saleForm.get('quantity')?.touched) {
-                <small class="text-red-500">Quantity must be at least 1</small>
+                <small class="text-red-500">{{ 'PRODUCTS.SALE.QTY_REQUIRED' | translate }}</small>
               }
               @if (!stockAvailable()) {
-                <small class="text-red-500">Insufficient stock! Available: {{ selectedProduct()?.stock || 0 }}</small>
+                <small class="text-red-500">{{ 'PRODUCTS.SALE.INSUFFICIENT_STOCK' | translate }} {{ selectedProduct()?.stock || 0 }}</small>
               }
             </div>
 
             <!-- Discount -->
             <div class="grid grid-cols-2 gap-4">
               <div class="field">
-                <label for="discountType" class="block text-sm font-medium mb-2">Discount Type *</label>
+                <label for="discountType" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.DISCOUNT_TYPE_LABEL' | translate }} *</label>
                 <select id="discountType" formControlName="discountType" class="w-full p-2 border rounded">
-                  <option [value]="DiscountType.NONE">No Discount</option>
-                  <option [value]="DiscountType.PERCENTAGE">Percentage (%)</option>
-                  <option [value]="DiscountType.FIXED_AMOUNT">Fixed Amount ($)</option>
+                  <option [value]="DiscountType.NONE">{{ 'PRODUCTS.SALE.NO_DISCOUNT' | translate }}</option>
+                  <option [value]="DiscountType.PERCENTAGE">{{ 'PRODUCTS.SALE.PERCENT_DISCOUNT' | translate }}</option>
+                  <option [value]="DiscountType.FIXED_AMOUNT">{{ 'PRODUCTS.SALE.FIXED_DISCOUNT' | translate }}</option>
                 </select>
               </div>
               <div class="field">
-                <label for="discountValue" class="block text-sm font-medium mb-2">Discount Value</label>
+                <label for="discountValue" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.DISCOUNT_VALUE' | translate }}</label>
                 <p-inputNumber inputId="discountValue" formControlName="discountValue" [min]="0" [disabled]="saleForm.get('discountType')?.value === DiscountType.NONE" class="w-full"></p-inputNumber>
               </div>
             </div>
 
             <!-- Real-time Calculation Display -->
             <div class="mt-4 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-2 border-green-300">
-              <h3 class="font-bold text-lg mb-3">Sale Summary</h3>
+              <h3 class="font-bold text-lg mb-3">{{ 'PRODUCTS.SALE.SUMMARY_TITLE' | translate }}</h3>
               <div class="space-y-2">
                 <div class="flex justify-between items-center">
-                  <span class="font-medium">Subtotal:</span>
+                  <span class="font-medium">{{ 'PRODUCTS.SALE.SUBTOTAL' | translate }}</span>
                   <span class="text-lg">{{ subtotal().toFixed(2) }}</span>
                 </div>
                 @if (discountAmount() > 0) {
                   <div class="flex justify-between items-center text-orange-600">
-                    <span class="font-medium">Discount:</span>
+                    <span class="font-medium">{{ 'PRODUCTS.SALE.DISCOUNT' | translate }}</span>
                     <span class="text-lg">-{{ discountAmount().toFixed(2) }}</span>
                   </div>
                 }
                 <hr class="border-green-300" />
                 <div class="flex justify-between items-center">
-                  <span class="font-bold text-xl">Total Amount:</span>
+                  <span class="font-bold text-xl">{{ 'PRODUCTS.SALE.TOTAL' | translate }}</span>
                   <span class="text-2xl font-bold text-green-600">{{ totalAmount().toFixed(2) }}</span>
                 </div>
               </div>
@@ -117,53 +119,53 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 
             <!-- Payment Method -->
             <div class="field">
-              <label for="paymentMethod" class="block text-sm font-medium mb-2">Payment Method *</label>
+              <label for="paymentMethod" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.PAYMENT_METHOD_LABEL' | translate }} *</label>
               <select id="paymentMethod" formControlName="paymentMethod" class="w-full p-2 border rounded">
-                <option value="">Select payment method</option>
-                <option [value]="PaymentMethod.CASH">Cash</option>
-                <option [value]="PaymentMethod.CREDIT_CARD">Credit Card</option>
-                <option [value]="PaymentMethod.DEBIT_CARD">Debit Card</option>
-                <option [value]="PaymentMethod.BANK_TRANSFER">Bank Transfer</option>
-                <option [value]="PaymentMethod.CHECK">Check</option>
-                <option [value]="PaymentMethod.OTHER">Other</option>
+                <option value="">{{ 'PRODUCTS.SALE.PAYMENT_PLACEHOLDER' | translate }}</option>
+                <option [value]="PaymentMethod.CASH">{{ 'PRODUCTS.SALE.CASH' | translate }}</option>
+                <option [value]="PaymentMethod.CREDIT_CARD">{{ 'PRODUCTS.SALE.CREDIT_CARD' | translate }}</option>
+                <option [value]="PaymentMethod.DEBIT_CARD">{{ 'PRODUCTS.SALE.DEBIT_CARD' | translate }}</option>
+                <option [value]="PaymentMethod.BANK_TRANSFER">{{ 'PRODUCTS.SALE.BANK_TRANSFER' | translate }}</option>
+                <option [value]="PaymentMethod.CHECK">{{ 'PRODUCTS.SALE.CHECK' | translate }}</option>
+                <option [value]="PaymentMethod.OTHER">{{ 'PRODUCTS.SALE.OTHER' | translate }}</option>
               </select>
               @if (saleForm.get('paymentMethod')?.invalid && saleForm.get('paymentMethod')?.touched) {
-                <small class="text-red-500">Payment method is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.SALE.PAYMENT_REQUIRED' | translate }}</small>
               }
             </div>
 
             <!-- Optional Fields -->
             <div class="grid grid-cols-2 gap-4">
               <div class="field">
-                <label for="receiptNumber" class="block text-sm font-medium mb-2">Receipt Number</label>
+                <label for="receiptNumber" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.RECEIPT_LABEL' | translate }}</label>
                 <input pInputText id="receiptNumber" formControlName="receiptNumber" class="w-full" />
               </div>
               <div class="field">
-                <label for="date" class="block text-sm font-medium mb-2">Sale Date *</label>
+                <label for="date" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.DATE_LABEL' | translate }} *</label>
                 <input type="date" id="date" formControlName="date" class="w-full p-2 border rounded" />
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div class="field">
-                <label for="customerName" class="block text-sm font-medium mb-2">Customer Name</label>
+                <label for="customerName" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.CUSTOMER_NAME' | translate }}</label>
                 <input pInputText id="customerName" formControlName="customerName" class="w-full" />
               </div>
               <div class="field">
-                <label for="customerPhone" class="block text-sm font-medium mb-2">Customer Phone</label>
+                <label for="customerPhone" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.CUSTOMER_PHONE' | translate }}</label>
                 <input pInputText id="customerPhone" formControlName="customerPhone" class="w-full" />
               </div>
             </div>
 
             <div class="field">
-              <label for="notes" class="block text-sm font-medium mb-2">Notes</label>
+              <label for="notes" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.NOTES_LABEL' | translate }}</label>
               <textarea id="notes" formControlName="notes" rows="2" class="w-full p-2 border rounded"></textarea>
             </div>
           </div>
 
           <div class="flex gap-3 mt-6">
-            <p-button type="submit" label="Complete Sale" icon="pi pi-check" severity="success" [disabled]="saleForm.invalid || !stockAvailable() || submitting()"></p-button>
-            <p-button type="button" label="Cancel" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
+            <p-button type="submit" [label]="'PRODUCTS.SALE.COMPLETE_SALE' | translate" icon="pi pi-check" severity="success" [disabled]="saleForm.invalid || !stockAvailable() || submitting()"></p-button>
+            <p-button type="button" [label]="'PRODUCTS.SALE.CANCEL' | translate" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
           </div>
         </form>
       </p-card>

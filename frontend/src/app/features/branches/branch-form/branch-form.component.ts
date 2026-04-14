@@ -6,6 +6,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
+import { TranslateModule } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -19,7 +20,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     CardModule,
     ButtonModule,
     InputTextModule,
-    DatePickerModule
+    DatePickerModule,
+    TranslateModule
   ],
   templateUrl: './branch-form.component.html',
   styleUrl: './branch-form.component.scss'

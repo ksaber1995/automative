@@ -1,271 +1,191 @@
+<div class="container mx-auto p-6 flex justify-center items-center" style="min-height: 60vh">
+  <p-card styleClass="text-center" [style]="{ width: '420px' }">
+    <div class="py-8 px-4">
+      <i class="pi pi-clock text-5xl text-gray-300 mb-4 block"></i>
+      <h2 class="text-2xl font-bold text-gray-700 mb-2">{{ 'REPORTS.TITLE' | translate }}</h2>
+      <p class="text-gray-500">{{ 'REPORTS.FINANCIAL_DESC' | translate }}</p>
+    </div>
+  </p-card>
+</div>
+
+<!--
+  Full implementation template (activate when feature is enabled):
+
 <div class="container mx-auto p-6">
-  <h1 class="text-3xl font-bold mb-6">Reports</h1>
+  <h1 class="text-3xl font-bold mb-6">{{ 'REPORTS.TITLE' | translate }}</h1>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <!-- Financial Report Card -->
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
           <h2 class="text-xl font-bold flex items-center">
             <i class="pi pi-chart-line mr-2"></i>
-            Company-Wide Financial Report
+            {{ 'REPORTS.FINANCIAL_TITLE' | translate }}
           </h2>
         </div>
       </ng-template>
-
       <div class="space-y-4">
-        <p class="text-gray-600">
-          Generate a comprehensive financial report including all branches, revenues, expenses, and profitability metrics.
-        </p>
-
+        <p class="text-gray-600">{{ 'REPORTS.FINANCIAL_DESC' | translate }}</p>
         <div>
-          <label class="block text-sm font-medium mb-2">Start Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialStartDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.START_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div>
-          <label class="block text-sm font-medium mb-2">End Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialEndDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.END_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div class="flex gap-2 mt-4">
-          <button
-            pButton
-            label="Download Excel"
-            icon="pi pi-file-excel"
-            class="p-button-success flex-1"
-            (click)="downloadFinancialExcel()"></button>
-          <button
-            pButton
-            label="Download PDF"
-            icon="pi pi-file-pdf"
-            class="p-button-danger flex-1"
-            (click)="downloadFinancialPdf()"></button>
+          <button pButton [label]="'REPORTS.DOWNLOAD_EXCEL' | translate" icon="pi pi-file-excel" class="p-button-success flex-1" (click)="downloadFinancialExcel()"></button>
+          <button pButton [label]="'REPORTS.DOWNLOAD_PDF' | translate" icon="pi pi-file-pdf" class="p-button-danger flex-1" (click)="downloadFinancialPdf()"></button>
         </div>
       </div>
     </p-card>
 
-    <!-- Monthly Financial Report Card -->
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
           <h2 class="text-xl font-bold flex items-center">
             <i class="pi pi-calendar mr-2"></i>
-            Monthly Financial Report
+            {{ 'REPORTS.MONTHLY_TITLE' | translate }}
           </h2>
         </div>
       </ng-template>
-
       <div class="space-y-4">
-        <p class="text-gray-600">
-          Generate a month-by-month breakdown report to track financial growth and trends over the selected period.
-        </p>
-
+        <p class="text-gray-600">{{ 'REPORTS.MONTHLY_DESC' | translate }}</p>
         <div>
-          <label class="block text-sm font-medium mb-2">Start Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialStartDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.START_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div>
-          <label class="block text-sm font-medium mb-2">End Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialEndDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.END_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div class="flex gap-2 mt-4">
-          <button
-            pButton
-            label="Download Monthly Excel"
-            icon="pi pi-calendar"
-            class="p-button-info flex-1"
-            (click)="downloadMonthlyFinancialExcel()"></button>
+          <button pButton [label]="'REPORTS.MONTHLY_EXCEL' | translate" icon="pi pi-calendar" class="p-button-info flex-1" (click)="downloadMonthlyFinancialExcel()"></button>
         </div>
-
         <div class="text-sm text-gray-500 mt-2">
-          <i class="pi pi-info-circle mr-1"></i>
-          Shows revenue, expenses, profit, and growth % for each month
+          <i class="pi pi-info-circle mr-1"></i>{{ 'REPORTS.MONTHLY_HINT' | translate }}
         </div>
       </div>
     </p-card>
 
-    <!-- Churn Rate Report Card -->
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
           <h2 class="text-xl font-bold flex items-center">
             <i class="pi pi-users mr-2"></i>
-            Student Churn Rate Report
+            {{ 'REPORTS.CHURN_TITLE' | translate }}
           </h2>
         </div>
       </ng-template>
-
       <div class="space-y-4">
-        <p class="text-gray-600">
-          Track which students left your platform, analyze churn rates by branch, and identify retention opportunities.
-        </p>
-
+        <p class="text-gray-600">{{ 'REPORTS.CHURN_DESC' | translate }}</p>
         <div>
-          <label class="block text-sm font-medium mb-2">Start Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialStartDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.START_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div>
-          <label class="block text-sm font-medium mb-2">End Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="financialEndDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.END_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="financialEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div class="flex gap-2 mt-4">
-          <button
-            pButton
-            label="Download Churn Report"
-            icon="pi pi-chart-bar"
-            class="p-button-warning flex-1"
-            (click)="downloadChurnReportExcel()"></button>
+          <button pButton [label]="'REPORTS.CHURN_BTN' | translate" icon="pi pi-chart-bar" class="p-button-warning flex-1" (click)="downloadChurnReportExcel()"></button>
         </div>
-
         <div class="text-sm text-gray-500 mt-2">
-          <i class="pi pi-info-circle mr-1"></i>
-          Includes detailed list of churned students and branch-wise analysis
+          <i class="pi pi-info-circle mr-1"></i>{{ 'REPORTS.CHURN_HINT' | translate }}
         </div>
       </div>
     </p-card>
 
-    <!-- Branch Report Card -->
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
           <h2 class="text-xl font-bold flex items-center">
             <i class="pi pi-building mr-2"></i>
-            Branch Performance Report
+            {{ 'REPORTS.BRANCH_REPORT_TITLE' | translate }}
           </h2>
         </div>
       </ng-template>
-
       <div class="space-y-4">
-        <p class="text-gray-600">
-          Generate a detailed performance report for a specific branch including revenues, expenses, student enrollments, and profitability.
-        </p>
-
+        <p class="text-gray-600">{{ 'REPORTS.BRANCH_REPORT_DESC' | translate }}</p>
         <div>
-          <label class="block text-sm font-medium mb-2">Select Branch:</label>
-          <select
-            [(ngModel)]="branchReportBranchId"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md">
-            <option value="">Select a branch</option>
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.SELECT_BRANCH' | translate }}</label>
+          <select [(ngModel)]="branchReportBranchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <option value="">{{ 'REPORTS.BRANCH_PLACEHOLDER' | translate }}</option>
             @for (branch of branches(); track branch.id) {
               <option [value]="branch.id">{{ branch.name }}</option>
             }
           </select>
         </div>
-
         <div>
-          <label class="block text-sm font-medium mb-2">Start Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="branchStartDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.START_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="branchStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div>
-          <label class="block text-sm font-medium mb-2">End Date:</label>
-          <input
-            type="date"
-            [(ngModel)]="branchEndDate"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          <label class="block text-sm font-medium mb-2">{{ 'REPORTS.END_DATE' | translate }}</label>
+          <input type="date" [(ngModel)]="branchEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-
         <div class="flex gap-2 mt-4">
-          <button
-            pButton
-            label="Download Excel"
-            icon="pi pi-file-excel"
-            class="p-button-success flex-1"
-            (click)="downloadBranchExcel()"></button>
-          <button
-            pButton
-            label="Download PDF"
-            icon="pi pi-file-pdf"
-            class="p-button-danger flex-1"
-            (click)="downloadBranchPdf()"></button>
+          <button pButton [label]="'REPORTS.DOWNLOAD_EXCEL' | translate" icon="pi pi-file-excel" class="p-button-success flex-1" (click)="downloadBranchExcel()"></button>
+          <button pButton [label]="'REPORTS.DOWNLOAD_PDF' | translate" icon="pi pi-file-pdf" class="p-button-danger flex-1" (click)="downloadBranchPdf()"></button>
         </div>
       </div>
     </p-card>
   </div>
 
-  <!-- Report Types Info -->
   <div class="mt-6">
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
           <h3 class="text-lg font-bold flex items-center">
             <i class="pi pi-info-circle mr-2"></i>
-            Report Information
+            {{ 'REPORTS.INFO_TITLE' | translate }}
           </h3>
         </div>
       </ng-template>
-
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
-          <h4 class="font-semibold mb-2">Financial Report Includes:</h4>
+          <h4 class="font-semibold mb-2">{{ 'REPORTS.FINANCIAL_INCLUDES' | translate }}</h4>
           <ul class="list-disc list-inside space-y-1 text-gray-700">
-            <li>Company-wide revenue summary</li>
-            <li>Total expenses breakdown by category</li>
-            <li>Per-branch performance metrics</li>
-            <li>Month-over-month trends</li>
-            <li>Profit/loss analysis</li>
+            <li>{{ 'REPORTS.FINANCIAL_ITEM1' | translate }}</li>
+            <li>{{ 'REPORTS.FINANCIAL_ITEM2' | translate }}</li>
+            <li>{{ 'REPORTS.FINANCIAL_ITEM3' | translate }}</li>
+            <li>{{ 'REPORTS.FINANCIAL_ITEM4' | translate }}</li>
+            <li>{{ 'REPORTS.FINANCIAL_ITEM5' | translate }}</li>
           </ul>
         </div>
-
         <div>
-          <h4 class="font-semibold mb-2">Monthly Report Includes:</h4>
+          <h4 class="font-semibold mb-2">{{ 'REPORTS.MONTHLY_INCLUDES' | translate }}</h4>
           <ul class="list-disc list-inside space-y-1 text-gray-700">
-            <li>Month-by-month revenue breakdown</li>
-            <li>Monthly expense categories</li>
-            <li>Profit margins per month</li>
-            <li>Growth percentage tracking</li>
-            <li>Trend analysis over time</li>
+            <li>{{ 'REPORTS.MONTHLY_ITEM1' | translate }}</li>
+            <li>{{ 'REPORTS.MONTHLY_ITEM2' | translate }}</li>
+            <li>{{ 'REPORTS.MONTHLY_ITEM3' | translate }}</li>
+            <li>{{ 'REPORTS.MONTHLY_ITEM4' | translate }}</li>
+            <li>{{ 'REPORTS.MONTHLY_ITEM5' | translate }}</li>
           </ul>
         </div>
-
         <div>
-          <h4 class="font-semibold mb-2">Churn Report Includes:</h4>
+          <h4 class="font-semibold mb-2">{{ 'REPORTS.CHURN_INCLUDES' | translate }}</h4>
           <ul class="list-disc list-inside space-y-1 text-gray-700">
-            <li>Overall churn rate percentage</li>
-            <li>Branch-wise churn analysis</li>
-            <li>Detailed list of churned students</li>
-            <li>Student duration before leaving</li>
-            <li>Churn reasons and patterns</li>
+            <li>{{ 'REPORTS.CHURN_ITEM1' | translate }}</li>
+            <li>{{ 'REPORTS.CHURN_ITEM2' | translate }}</li>
+            <li>{{ 'REPORTS.CHURN_ITEM3' | translate }}</li>
+            <li>{{ 'REPORTS.CHURN_ITEM4' | translate }}</li>
+            <li>{{ 'REPORTS.CHURN_ITEM5' | translate }}</li>
           </ul>
         </div>
-
         <div>
-          <h4 class="font-semibold mb-2">Branch Report Includes:</h4>
+          <h4 class="font-semibold mb-2">{{ 'REPORTS.BRANCH_INCLUDES' | translate }}</h4>
           <ul class="list-disc list-inside space-y-1 text-gray-700">
-            <li>Branch-specific revenue details</li>
-            <li>Direct and allocated expenses</li>
-            <li>Student enrollment statistics</li>
-            <li>Course performance metrics</li>
-            <li>Branch profitability analysis</li>
+            <li>{{ 'REPORTS.BRANCH_ITEM1' | translate }}</li>
+            <li>{{ 'REPORTS.BRANCH_ITEM2' | translate }}</li>
+            <li>{{ 'REPORTS.BRANCH_ITEM3' | translate }}</li>
+            <li>{{ 'REPORTS.BRANCH_ITEM4' | translate }}</li>
+            <li>{{ 'REPORTS.BRANCH_ITEM5' | translate }}</li>
           </ul>
         </div>
       </div>
     </p-card>
   </div>
 </div>
+-->

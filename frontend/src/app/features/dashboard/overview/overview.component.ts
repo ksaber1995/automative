@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
+import { TranslateModule } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 import { TableModule } from 'primeng/table';
@@ -16,7 +17,7 @@ import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule, ProgressSpinnerModule],
+  imports: [CommonModule, RouterModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule, ProgressSpinnerModule, TranslateModule],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss'
 })

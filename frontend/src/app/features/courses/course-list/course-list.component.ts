@@ -6,6 +6,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
@@ -21,13 +22,14 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     ButtonModule,
     TagModule,
     TooltipModule,
+    TranslateModule,
     DeleteConfirmDialogComponent
   ],
   template: `
     <div class="container-custom py-8">
       <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">Courses</h1>
-        <p-button label="Add Course" icon="pi pi-plus" (onClick)="createCourse()"></p-button>
+        <h1 class="text-3xl font-bold text-gray-900">{{ 'COURSES.LIST.TITLE' | translate }}</h1>
+        <p-button [label]="'COURSES.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="createCourse()"></p-button>
       </div>
 
       <p-card>
@@ -37,34 +39,34 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           [paginator]="true"
           [rows]="10"
           [showCurrentPageReport]="true"
-          currentPageReportTemplate="Showing {first} to {last} of {totalRecords} courses"
+          [currentPageReportTemplate]="'COURSES.LIST.PAGE_REPORT' | translate"
           responsiveLayout="scroll"
         >
           <ng-template pTemplate="header">
             <tr>
-              <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
-              <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
-              <th pSortableColumn="duration">Duration (weeks)</th>
-              <th pSortableColumn="price">Price <p-sortIcon field="price"></p-sortIcon></th>
-              <th>Max Students</th>
-              <th>Enrollments</th>
-              <th pSortableColumn="isActive">Status <p-sortIcon field="isActive"></p-sortIcon></th>
-              <th>Actions</th>
+              <th pSortableColumn="code">{{ 'COURSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
+              <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+              <th pSortableColumn="duration">{{ 'COURSES.LIST.COL_DURATION' | translate }}</th>
+              <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
+              <th>{{ 'COURSES.LIST.COL_MAX_STUDENTS' | translate }}</th>
+              <th>{{ 'COURSES.LIST.COL_ENROLLMENTS' | translate }}</th>
+              <th pSortableColumn="isActive">{{ 'COURSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
+              <th>{{ 'COURSES.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-course>
             <tr>
               <td>{{ course.code }}</td>
               <td>{{ course.name }}</td>
-              <td>{{ course.duration }} weeks</td>
+              <td>{{ course.duration }} {{ 'COURSES.LIST.WEEKS' | translate }}</td>
               <td>{{ course.price.toFixed(2) }}</td>
-              <td>{{ course.maxStudents || 'Unlimited' }}</td>
+              <td>{{ course.maxStudents || ('COURSES.LIST.UNLIMITED' | translate) }}</td>
               <td>
                 <p-tag [value]="course.enrollmentCount || 0" severity="info"></p-tag>
               </td>
               <td>
                 <p-tag
-                  [value]="course.isActive ? 'Active' : 'Inactive'"
+                  [value]="course.isActive ? ('COURSES.LIST.ACTIVE' | translate) : ('COURSES.LIST.INACTIVE' | translate)"
                   [severity]="course.isActive ? 'success' : 'danger'"
                 ></p-tag>
               </td>
@@ -76,7 +78,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     [text]="true"
                     severity="info"
                     (onClick)="viewCourse(course)"
-                    pTooltip="View"
+                    [pTooltip]="'COURSES.LIST.VIEW' | translate"
                   ></p-button>
                   <p-button
                     icon="pi pi-pencil"
@@ -84,7 +86,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     [text]="true"
                     severity="warn"
                     (onClick)="editCourse(course)"
-                    pTooltip="Edit"
+                    [pTooltip]="'COURSES.LIST.EDIT' | translate"
                   ></p-button>
                   @if (course.isActive) {
                     <p-button
@@ -93,7 +95,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                       [text]="true"
                       severity="danger"
                       (onClick)="confirmDelete(course)"
-                      pTooltip="Delete"
+                      [pTooltip]="'COURSES.LIST.DELETE' | translate"
                     ></p-button>
                   }
                 </div>
@@ -105,7 +107,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td colspan="8" class="text-center py-8">
                 <div class="text-gray-500">
                   <i class="pi pi-inbox text-4xl mb-3"></i>
-                  <p>No courses found</p>
+                  <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>
                 </div>
               </td>
             </tr>
@@ -115,8 +117,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 
       <app-delete-confirm-dialog
         [(visible)]="showDeleteDialog"
-        [header]="'Delete Course'"
-        [message]="'Are you sure you want to delete ' + courseToDelete()?.name + '? This will permanently remove the course and all associated data.'"
+        [header]="'COURSES.LIST.DELETE_TITLE' | translate"
+        [message]="'COURSES.LIST.DELETE_MSG' | translate: { name: courseToDelete()?.name }"
         (confirm)="deleteCourse()"
       ></app-delete-confirm-dialog>
     </div>
@@ -126,6 +128,7 @@ export class CourseListComponent implements OnInit {
   private courseService = inject(CourseService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   courses = signal<CourseWithEnrollmentCount[]>([]);
   loading = signal(true);

@@ -9,8 +9,8 @@
             <p class="text-gray-500 mt-1">{{ c.code }}</p>
           </div>
           <div class="flex gap-2">
-            <button pButton label="Edit Course" icon="pi pi-pencil" (click)="editCourse()"></button>
-            <button pButton label="Back" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
+            <button pButton [label]="'COURSES.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editCourse()"></button>
+            <button pButton [label]="'COURSES.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>
         </div>
       </ng-template>
@@ -18,24 +18,24 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Course Details -->
         <div>
-          <h3 class="text-lg font-semibold mb-3 text-gray-700">Course Details</h3>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.DETAILS_SECTION' | translate }}</h3>
           <div class="space-y-2">
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Duration:</span>
-              <span>{{ c.duration }} weeks</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.DURATION' | translate }}</span>
+              <span>{{ c.duration }} {{ 'COURSES.DETAIL.WEEKS' | translate }}</span>
             </div>
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Price:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.PRICE' | translate }}</span>
               <span>{{ c.price.toFixed(2) }}</span>
             </div>
             @if (c.maxStudents) {
               <div class="flex">
-                <span class="font-medium text-gray-600 w-32">Max Students:</span>
+                <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.MAX_STUDENTS' | translate }}</span>
                 <span>{{ c.maxStudents }}</span>
               </div>
             }
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Status:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.STATUS' | translate }}</span>
               <p-tag [value]="c.isActive ? 'Active' : 'Inactive'" [severity]="c.isActive ? 'success' : 'danger'"></p-tag>
             </div>
           </div>
@@ -43,7 +43,7 @@
 
         <!-- Description -->
         <div>
-          <h3 class="text-lg font-semibold mb-3 text-gray-700">Description</h3>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.DESCRIPTION' | translate }}</h3>
           <p class="text-gray-600 whitespace-pre-wrap">{{ c.description }}</p>
         </div>
       </div>
@@ -53,15 +53,15 @@
     <p-card class="mt-6">
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
-          <h3 class="text-xl font-bold">Classes ({{ classes().length }})</h3>
-          <button pButton label="Create New Class" icon="pi pi-plus" (click)="createClass()"></button>
+          <h3 class="text-xl font-bold">{{ 'COURSES.DETAIL.CLASSES' | translate }} ({{ classes().length }})</h3>
+          <button pButton [label]="'COURSES.DETAIL.CREATE_CLASS' | translate" icon="pi pi-plus" (click)="createClass()"></button>
         </div>
       </ng-template>
 
       @if (classes().length === 0) {
         <div class="text-center py-8 text-gray-500">
           <i class="pi pi-inbox text-4xl mb-3"></i>
-          <p>No classes created yet. Click "Create New Class" to add one.</p>
+          <p>{{ 'COURSES.DETAIL.NO_CLASSES' | translate }}</p>
         </div>
       } @else {
         <div class="space-y-4">
@@ -76,13 +76,13 @@
                       @if (cls.instructorName) {
                         <span>{{ cls.instructorName }} </span>
                       } @else {
-                        <span class="text-red-500">No teacher assigned</span>
+                        <span class="text-red-500">{{ 'COURSES.DETAIL.NO_TEACHER' | translate }}</span>
                       }
                     </div>
                   </div>
                   <div class="flex gap-2">
                     <p-tag [value]="cls.isActive ? 'Active' : 'Inactive'" [severity]="cls.isActive ? 'success' : 'danger'"></p-tag>
-                    <p-tag icon="pi pi-users" [value]="(cls.studentCount || 0) + ' students'" severity="info"></p-tag>
+                    <p-tag icon="pi pi-users" [value]="(cls.studentCount || 0) + ' ' + ('DASHBOARD.COL_STUDENTS' | translate)" severity="info"></p-tag>
                   </div>
                 </div>
               </ng-template>
@@ -103,23 +103,23 @@
               <!-- Class Details -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <h4 class="text-md font-semibold mb-3 text-gray-700">Schedule & Dates</h4>
+                  <h4 class="text-md font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.SCHEDULE' | translate }}</h4>
                   <div class="space-y-2">
                     <div class="flex">
-                      <span class="font-medium text-gray-600 w-32">Schedule:</span>
+                      <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.SCHEDULE_LABEL' | translate }}</span>
                       <span>{{ formatSchedule(cls.schedule) }}</span>
                     </div>
                     <div class="flex">
-                      <span class="font-medium text-gray-600 w-32">Start Date:</span>
+                      <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.START_DATE' | translate }}</span>
                       <span>{{ formatDate(cls.startDate) }}</span>
                     </div>
                     <div class="flex">
-                      <span class="font-medium text-gray-600 w-32">End Date:</span>
+                      <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.END_DATE' | translate }}</span>
                       <span>{{ formatDate(cls.endDate) }}</span>
                     </div>
                     @if (cls.maxStudents) {
                       <div class="flex">
-                        <span class="font-medium text-gray-600 w-32">Max Students:</span>
+                        <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.MAX_STUDENTS' | translate }}</span>
                         <span>{{ cls.maxStudents }}</span>
                       </div>
                     }
@@ -127,27 +127,27 @@
                 </div>
 
                 <div>
-                  <h4 class="text-md font-semibold mb-3 text-gray-700">Teacher Information</h4>
+                  <h4 class="text-md font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.TEACHER_SECTION' | translate }}</h4>
                   @if (cls.teacher) {
                     <div class="space-y-2">
                       <div class="flex">
-                        <span class="font-medium text-gray-600 w-32">Name:</span>
+                        <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.TEACHER_NAME' | translate }}</span>
                         <span>{{ cls.teacher.firstName }} {{ cls.teacher.lastName }}</span>
                       </div>
                       <div class="flex">
-                        <span class="font-medium text-gray-600 w-32">Email:</span>
+                        <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.TEACHER_EMAIL' | translate }}</span>
                         <span>{{ cls.teacher.email }}</span>
                       </div>
                     </div>
                   } @else {
-                    <p class="text-red-500">No teacher assigned to this class</p>
+                    <p class="text-red-500">{{ 'COURSES.DETAIL.NO_TEACHER_CLASS' | translate }}</p>
                   }
                 </div>
               </div>
 
               @if (cls.notes) {
                 <div class="mb-6 pb-6 border-b">
-                  <h4 class="text-md font-semibold mb-2 text-gray-700">Notes</h4>
+                  <h4 class="text-md font-semibold mb-2 text-gray-700">{{ 'COURSES.DETAIL.NOTES' | translate }}</h4>
                   <p class="text-gray-600 whitespace-pre-wrap">{{ cls.notes }}</p>
                 </div>
               }
@@ -155,15 +155,15 @@
               <!-- Students Table -->
               <div>
                 <h4 class="text-md font-semibold mb-3 text-gray-700">
-                  Enrolled Students ({{ cls.studentCount || 0 }})
+                  {{ 'COURSES.DETAIL.ENROLLED' | translate }} ({{ cls.studentCount || 0 }})
                 </h4>
                 @if (cls.students && cls.students.length > 0) {
                   <p-table [value]="cls.students" responsiveLayout="scroll">
                     <ng-template pTemplate="header">
                       <tr>
-                        <th>Student Name</th>
-                        <th>Enrollment Date</th>
-                        <th>Payment Status</th>
+                        <th>{{ 'COURSES.DETAIL.COL_STUDENT' | translate }}</th>
+                        <th>{{ 'COURSES.DETAIL.COL_DATE' | translate }}</th>
+                        <th>{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }}</th>
                       </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-student>
@@ -182,7 +182,7 @@
                 } @else {
                   <div class="text-center py-4 text-gray-500 bg-gray-50 rounded">
                     <i class="pi pi-users text-2xl mb-2"></i>
-                    <p>No students enrolled in this class yet</p>
+                    <p>{{ 'COURSES.DETAIL.NO_STUDENTS' | translate }}</p>
                   </div>
                 }
               </div>

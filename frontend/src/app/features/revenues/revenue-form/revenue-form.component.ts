@@ -19,6 +19,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Student } from '@shared/interfaces/student.interface';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-revenue-form',
@@ -32,7 +33,8 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
     InputNumberModule,
     TextareaModule,
     SelectModule,
-    DatePickerModule
+    DatePickerModule,
+    TranslateModule
   ],
   templateUrl: './revenue-form.component.html',
   styleUrl: './revenue-form.component.scss'

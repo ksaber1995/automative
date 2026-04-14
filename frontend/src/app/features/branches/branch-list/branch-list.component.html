@@ -1,8 +1,8 @@
 <div class="container-custom py-8">
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-900">Branches</h1>
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'BRANCHES.LIST.TITLE' | translate }}</h1>
     <p-button
-      label="Add Branch"
+      [label]="'BRANCHES.LIST.ADD' | translate"
       icon="pi pi-plus"
       (onClick)="createBranch()"
     ></p-button>
@@ -12,7 +12,7 @@
   <p-card styleClass="mb-4">
     <div class="flex items-center gap-4">
       <label for="statusFilter" class="text-sm font-medium text-gray-700">
-        Status Filter:
+        {{ 'BRANCHES.LIST.STATUS_FILTER' | translate }}
       </label>
       <p-select
         id="statusFilter"
@@ -23,7 +23,7 @@
         styleClass="w-64"
       ></p-select>
       <div class="text-sm text-gray-500">
-        Showing {{ branches().length }} of {{ allBranches().length }} branches
+        {{ 'BRANCHES.LIST.PAGINATOR' | translate: { first: 1, last: branches().length, total: allBranches().length } }}
       </div>
     </div>
   </p-card>
@@ -35,19 +35,19 @@
       [paginator]="true"
       [rows]="10"
       [showCurrentPageReport]="true"
-      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} branches"
+      [currentPageReportTemplate]="'BRANCHES.LIST.PAGINATOR' | translate: { first: '{first}', last: '{last}', total: '{totalRecords}' }"
       [rowsPerPageOptions]="[10, 25, 50]"
       [globalFilterFields]="['name', 'code', 'city', 'email']"
       responsiveLayout="scroll"
     >
       <ng-template pTemplate="header">
         <tr>
-          <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
-          <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="city">City <p-sortIcon field="city"></p-sortIcon></th>
-          <th>Contact</th>
-          <th pSortableColumn="isActive">Status <p-sortIcon field="isActive"></p-sortIcon></th>
-          <th>Actions</th>
+          <th pSortableColumn="code">{{ 'BRANCHES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
+          <th pSortableColumn="name">{{ 'BRANCHES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="city">{{ 'BRANCHES.LIST.COL_CITY' | translate }} <p-sortIcon field="city"></p-sortIcon></th>
+          <th>{{ 'BRANCHES.LIST.COL_CONTACT' | translate }}</th>
+          <th pSortableColumn="isActive">{{ 'BRANCHES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
+          <th>{{ 'BRANCHES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-branch>
@@ -63,7 +63,7 @@
           </td>
           <td>
             <p-tag
-              [value]="branch.isActive ? 'Active' : 'Inactive'"
+              [value]="branch.isActive ? ('BRANCHES.LIST.ACTIVE' | translate) : ('BRANCHES.LIST.INACTIVE' | translate)"
               [severity]="branch.isActive ? 'success' : 'danger'"
             ></p-tag>
           </td>
@@ -75,7 +75,7 @@
                 [text]="true"
                 severity="info"
                 (onClick)="viewBranch(branch)"
-                pTooltip="View Details"
+                [pTooltip]="'BRANCHES.LIST.VIEW' | translate"
               ></p-button>
               <p-button
                 icon="pi pi-pencil"
@@ -83,7 +83,7 @@
                 [text]="true"
                 severity="warn"
                 (onClick)="editBranch(branch)"
-                pTooltip="Edit"
+                [pTooltip]="'BRANCHES.LIST.EDIT' | translate"
               ></p-button>
               @if (branch.isActive) {
                 <p-button
@@ -92,7 +92,7 @@
                   [text]="true"
                   severity="danger"
                   (onClick)="confirmDelete(branch)"
-                  pTooltip="Delete"
+                  [pTooltip]="'BRANCHES.LIST.DELETE' | translate"
                 ></p-button>
               }
             </div>
@@ -104,7 +104,7 @@
           <td colspan="6" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
-              <p>No branches found</p>
+              <p>{{ 'BRANCHES.LIST.NO_DATA' | translate }}</p>
             </div>
           </td>
         </tr>
@@ -114,8 +114,8 @@
 
   <app-delete-confirm-dialog
     [(visible)]="showDeleteDialog"
-    [header]="'Delete Branch'"
-    [message]="'Are you sure you want to delete ' + branchToDelete()?.name + '? This will permanently remove the branch and all associated data.'"
+    [header]="'BRANCHES.LIST.DELETE_TITLE' | translate"
+    [message]="'BRANCHES.LIST.DELETE_CONFIRM' | translate: { name: branchToDelete()?.name }"
     (confirm)="deleteBranch()"
   ></app-delete-confirm-dialog>
 </div>

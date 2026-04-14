@@ -9,6 +9,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -26,7 +27,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     ButtonModule,
     TagModule,
     ConfirmDialogModule,
-    TooltipModule
+    TooltipModule,
+    TranslateModule
   ],
   providers: [ConfirmationService],
   templateUrl: './student-list.component.html',

@@ -9,6 +9,7 @@ import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmationService } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -26,7 +27,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     ButtonModule,
     TagModule,
     ConfirmDialogModule,
-    TooltipModule
+    TooltipModule,
+    TranslateModule
   ],
   providers: [ConfirmationService],
   templateUrl: './employee-list.component.html',

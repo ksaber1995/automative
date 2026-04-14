@@ -3,7 +3,7 @@
     <ng-template pTemplate="header">
       <div class="p-4">
         <h2 class="text-2xl font-bold">
-          {{ isEditMode() ? 'Edit Class' : 'Create New Class' }}
+          {{ isEditMode() ? ('CLASSES.FORM.EDIT_TITLE' | translate) : ('CLASSES.FORM.CREATE_TITLE' | translate) }}
         </h2>
         <p class="text-gray-500 mt-1">{{ courseName() }}</p>
       </div>
@@ -15,7 +15,7 @@
         @if (isGlobalCreate()) {
           <div class="field md:col-span-2">
             <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">
-              Course <span class="text-red-500">*</span>
+              {{ 'CLASSES.FORM.COURSE_LABEL' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-select
               id="courseId"
@@ -23,13 +23,13 @@
               [options]="courses()"
               optionLabel="label"
               optionValue="value"
-              placeholder="Select a course"
+              [placeholder]="'CLASSES.FORM.COURSE_PLACEHOLDER' | translate"
               styleClass="w-full"
               [class.ng-invalid]="classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched"
               [class.ng-dirty]="classForm.get('courseId')?.touched">
             </p-select>
             @if (classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched) {
-              <small class="text-red-500">Course is required</small>
+              <small class="text-red-500">{{ 'CLASSES.FORM.COURSE_REQUIRED' | translate }}</small>
             }
           </div>
         }
@@ -37,45 +37,45 @@
         <!-- Class Name -->
         <div class="field">
           <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
-            Class Name <span class="text-red-500">*</span>
+            {{ 'CLASSES.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             type="text"
             id="name"
             formControlName="name"
-            placeholder="e.g., Section A, Morning Class"
+            [placeholder]="'CLASSES.FORM.NAME_PLACEHOLDER' | translate"
             class="w-full"
             [class.ng-invalid]="classForm.get('name')?.invalid && classForm.get('name')?.touched"
             [class.ng-dirty]="classForm.get('name')?.touched" />
           @if (classForm.get('name')?.invalid && classForm.get('name')?.touched) {
-            <small class="text-red-500">Class name is required (min 2 characters)</small>
+            <small class="text-red-500">{{ 'CLASSES.FORM.NAME_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Class Code -->
         <div class="field">
           <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
-            Class Code <span class="text-red-500">*</span>
+            {{ 'CLASSES.FORM.CODE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
             type="text"
             id="code"
             formControlName="code"
-            placeholder="e.g., ROB-101-A"
+            [placeholder]="'CLASSES.FORM.CODE_PLACEHOLDER' | translate"
             class="w-full"
             [class.ng-invalid]="classForm.get('code')?.invalid && classForm.get('code')?.touched"
             [class.ng-dirty]="classForm.get('code')?.touched" />
           @if (classForm.get('code')?.invalid && classForm.get('code')?.touched) {
-            <small class="text-red-500">Class code is required (min 2 characters)</small>
+            <small class="text-red-500">{{ 'CLASSES.FORM.CODE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Branch -->
         <div class="field">
           <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
-            Branch <span class="text-red-500">*</span>
+            {{ 'CLASSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
             id="branchId"
@@ -83,20 +83,20 @@
             [options]="branches()"
             optionLabel="label"
             optionValue="value"
-            placeholder="Select a branch"
+            [placeholder]="'CLASSES.FORM.BRANCH_PLACEHOLDER' | translate"
             styleClass="w-full"
             [class.ng-invalid]="classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched"
             [class.ng-dirty]="classForm.get('branchId')?.touched">
           </p-select>
           @if (classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched) {
-            <small class="text-red-500">Branch is required</small>
+            <small class="text-red-500">{{ 'CLASSES.FORM.BRANCH_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Instructor -->
         <div class="field">
           <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
-            Instructor
+            {{ 'CLASSES.FORM.INSTRUCTOR_LABEL' | translate }}
           </label>
           <p-select
             id="instructorId"
@@ -104,18 +104,18 @@
             [options]="instructors()"
             optionLabel="label"
             optionValue="value"
-            placeholder="Select an instructor (optional)"
+            [placeholder]="'CLASSES.FORM.INSTRUCTOR_PLACEHOLDER' | translate"
             styleClass="w-full"
             [class.ng-invalid]="classForm.get('instructorId')?.invalid && classForm.get('instructorId')?.touched"
             [class.ng-dirty]="classForm.get('instructorId')?.touched">
           </p-select>
-          <small class="text-gray-500">Defaults to course instructor if not specified</small>
+          <small class="text-gray-500">{{ 'CLASSES.FORM.INSTRUCTOR_HINT' | translate }}</small>
         </div>
 
         <!-- Days of Week -->
         <div class="field md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Days of Week
+            {{ 'CLASSES.FORM.DAYS_LABEL' | translate }}
           </label>
           <div class="flex flex-wrap gap-4">
             @for (day of daysOfWeek; track day.value) {
@@ -132,13 +132,13 @@
               </div>
             }
           </div>
-          <small class="text-gray-500">Select the days when this class meets</small>
+          <small class="text-gray-500">{{ 'CLASSES.FORM.DAYS_HINT' | translate }}</small>
         </div>
 
         <!-- Start Time -->
         <div class="field">
           <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">
-            Start Time
+            {{ 'CLASSES.FORM.START_TIME' | translate }}
           </label>
           <input
             pInputText
@@ -153,7 +153,7 @@
         <!-- End Time -->
         <div class="field">
           <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">
-            End Time
+            {{ 'CLASSES.FORM.END_TIME' | translate }}
           </label>
           <input
             pInputText
@@ -168,70 +168,70 @@
         <!-- Start Date -->
         <div class="field">
           <label for="startDate" class="block text-sm font-medium text-gray-700 mb-2">
-            Start Date <span class="text-red-500">*</span>
+            {{ 'CLASSES.FORM.START_DATE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-datepicker
             id="startDate"
             formControlName="startDate"
-            placeholder="Select start date"
+            [placeholder]="'CLASSES.FORM.START_DATE_PLACEHOLDER' | translate"
             styleClass="w-full"
             [showIcon]="true"
             [class.ng-invalid]="classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched"
             [class.ng-dirty]="classForm.get('startDate')?.touched">
           </p-datepicker>
           @if (classForm.get('startDate')?.invalid && classForm.get('startDate')?.touched) {
-            <small class="text-red-500">Start date is required</small>
+            <small class="text-red-500">{{ 'CLASSES.FORM.START_DATE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Number of Sessions (for recurring schedules) -->
         <div class="field">
           <label for="numberOfSessions" class="block text-sm font-medium text-gray-700 mb-2">
-            Number of Sessions
+            {{ 'CLASSES.FORM.SESSIONS_LABEL' | translate }}
           </label>
           <p-inputnumber
             id="numberOfSessions"
             formControlName="numberOfSessions"
             [min]="1"
-            placeholder="e.g., 8"
+            [placeholder]="'CLASSES.FORM.SESSIONS_PLACEHOLDER' | translate"
             styleClass="w-full"
             [showButtons]="false">
           </p-inputnumber>
-          <small class="text-gray-500">If provided with days of week, end date will be calculated automatically</small>
+          <small class="text-gray-500">{{ 'CLASSES.FORM.SESSIONS_HINT' | translate }}</small>
         </div>
 
         <!-- End Date -->
         <div class="field">
           <label for="endDate" class="block text-sm font-medium text-gray-700 mb-2">
-            End Date @if (!classForm.get('numberOfSessions')?.value) {<span class="text-red-500">*</span>}
+            {{ 'CLASSES.FORM.END_DATE_LABEL' | translate }} @if (!classForm.get('numberOfSessions')?.value) {<span class="text-red-500">*</span>}
           </label>
           <p-datepicker
             id="endDate"
             formControlName="endDate"
-            placeholder="Select end date or use number of sessions"
+            [placeholder]="'CLASSES.FORM.END_DATE_PLACEHOLDER' | translate"
             styleClass="w-full"
             [showIcon]="true"
             [class.ng-invalid]="classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched"
             [class.ng-dirty]="classForm.get('endDate')?.touched">
           </p-datepicker>
           @if (classForm.get('endDate')?.invalid && classForm.get('endDate')?.touched) {
-            <small class="text-red-500">End date is required (or provide number of sessions with days of week)</small>
+            <small class="text-red-500">{{ 'CLASSES.FORM.END_DATE_REQUIRED' | translate }}</small>
           }
           @if (classForm.get('numberOfSessions')?.value) {
-            <small class="text-gray-500">End date will be auto-calculated based on number of sessions</small>
+            <small class="text-gray-500">{{ 'CLASSES.FORM.END_DATE_AUTO' | translate }}</small>
           }
         </div>
 
         <!-- Max Students -->
         <div class="field md:col-span-2">
           <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
-            Maximum Students (Optional)
+            {{ 'CLASSES.FORM.MAX_STUDENTS_LABEL' | translate }}
           </label>
           <p-inputnumber
             id="maxStudents"
             formControlName="maxStudents"
             [min]="1"
-            placeholder="Leave empty for unlimited"
+            [placeholder]="'CLASSES.FORM.MAX_STUDENTS_HINT' | translate"
             styleClass="w-full"
             [showButtons]="false">
           </p-inputnumber>
@@ -240,14 +240,14 @@
         <!-- Notes -->
         <div class="field md:col-span-2">
           <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">
-            Notes
+            {{ 'CLASSES.FORM.NOTES_LABEL' | translate }}
           </label>
           <textarea
             pTextarea
             id="notes"
             formControlName="notes"
             rows="4"
-            placeholder="Additional notes about this class"
+            [placeholder]="'CLASSES.FORM.NOTES_PLACEHOLDER' | translate"
             class="w-full">
           </textarea>
         </div>
@@ -258,7 +258,7 @@
         <button
           pButton
           type="button"
-          label="Cancel"
+          [label]="'CLASSES.FORM.CANCEL' | translate"
           icon="pi pi-times"
           class="p-button-outlined"
           (click)="cancel()"
@@ -267,7 +267,7 @@
         <button
           pButton
           type="submit"
-          [label]="isEditMode() ? 'Update Class' : 'Create Class'"
+          [label]="isEditMode() ? ('CLASSES.FORM.UPDATE' | translate) : ('CLASSES.FORM.CREATE' | translate)"
           icon="pi pi-check"
           [disabled]="classForm.invalid || loading()">
           @if (loading()) {

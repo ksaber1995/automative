@@ -5,21 +5,22 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { FormsModule } from '@angular/forms';
+import { TranslateModule } from '@ngx-translate/core';
 import { ProductSaleService, SalesSummary } from '../services/product-sale.service';
 import { ProductSale } from '@shared/interfaces/product-sale.interface';
 
 @Component({
   selector: 'app-sales-history',
   standalone: true,
-  imports: [CommonModule, TableModule, ButtonModule, CardModule, FormsModule],
+  imports: [CommonModule, TableModule, ButtonModule, CardModule, FormsModule, TranslateModule],
   template: `
     <div class="container mx-auto p-4">
       <p-card>
         <ng-template pTemplate="header">
           <div class="flex justify-between items-center p-4">
-            <h2 class="text-2xl font-bold">Sales History</h2>
+            <h2 class="text-2xl font-bold">{{ 'PRODUCTS.SALES.TITLE' | translate }}</h2>
             <p-button
-              label="Sell Product"
+              [label]="'PRODUCTS.SALES.SELL_BTN' | translate"
               icon="pi pi-plus"
               severity="success"
               (onClick)="sellProduct()">
@@ -30,7 +31,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
         <!-- Filter Section -->
         <div class="mb-4 flex gap-4">
           <div class="flex-1">
-            <label class="block text-sm font-medium mb-1">Start Date</label>
+            <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.SALES.START_DATE' | translate }}</label>
             <input
               type="date"
               [(ngModel)]="startDate"
@@ -39,7 +40,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
             />
           </div>
           <div class="flex-1">
-            <label class="block text-sm font-medium mb-1">End Date</label>
+            <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.SALES.END_DATE' | translate }}</label>
             <input
               type="date"
               [(ngModel)]="endDate"
@@ -49,7 +50,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
           </div>
           <div class="flex items-end">
             <p-button
-              label="Clear Filters"
+              [label]="'PRODUCTS.SALES.CLEAR_FILTERS' | translate"
               icon="pi pi-filter-slash"
               [outlined]="true"
               (onClick)="clearFilters()">
@@ -61,15 +62,15 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
         @if (summary()) {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="bg-blue-50 p-4 rounded-lg">
-              <div class="text-sm text-gray-600">Total Sales</div>
+              <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_SALES' | translate }}</div>
               <div class="text-2xl font-bold">{{ summary()!.totalSales }}</div>
             </div>
             <div class="bg-green-50 p-4 rounded-lg">
-              <div class="text-sm text-gray-600">Total Revenue</div>
+              <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_REVENUE' | translate }}</div>
               <div class="text-2xl font-bold text-green-600">{{ summary()!.totalRevenue.toFixed(2) }}</div>
             </div>
             <div class="bg-purple-50 p-4 rounded-lg">
-              <div class="text-sm text-gray-600">Total Quantity Sold</div>
+              <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_QTY' | translate }}</div>
               <div class="text-2xl font-bold">{{ summary()!.totalQuantity }}</div>
             </div>
           </div>
@@ -86,14 +87,14 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
 
           <ng-template pTemplate="header">
             <tr>
-              <th>Date</th>
-              <th>Product</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Discount</th>
-              <th>Total</th>
-              <th>Payment Method</th>
-              <th>Customer</th>
+              <th>{{ 'PRODUCTS.SALES.COL_DATE' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_QTY' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_UNIT_PRICE' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_DISCOUNT' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_TOTAL' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_PAYMENT' | translate }}</th>
+              <th>{{ 'PRODUCTS.SALES.COL_CUSTOMER' | translate }}</th>
             </tr>
           </ng-template>
 
@@ -103,7 +104,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
               <td>
                 <div class="font-medium">{{ sale.productName || sale.productId }}</div>
                 @if (sale.receiptNumber) {
-                  <div class="text-sm text-gray-500">Receipt: {{ sale.receiptNumber }}</div>
+                  <div class="text-sm text-gray-500">{{ 'PRODUCTS.SALES.RECEIPT' | translate }} {{ sale.receiptNumber }}</div>
                 }
               </td>
               <td>{{ sale.quantity }}</td>
@@ -112,11 +113,11 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
                 @if (sale.discountAmount > 0) {
                   <span class="text-orange-600">-{{ sale.discountAmount.toFixed(2) }}</span>
                 } @else {
-                  <span class="text-gray-400">None</span>
+                  <span class="text-gray-400">{{ 'PRODUCTS.SALES.NO_DISCOUNT' | translate }}</span>
                 }
               </td>
               <td class="font-semibold text-green-600">{{ sale.totalAmount.toFixed(2) }}</td>
-              <td>{{ sale.paymentMethod }}</td>
+              <td>{{ ('PRODUCTS.SALES.METHOD_' + sale.paymentMethod) | translate }}</td>
               <td>
                 @if (sale.customerName) {
                   <div class="font-medium">{{ sale.customerName }}</div>
@@ -133,7 +134,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
           <ng-template pTemplate="emptymessage">
             <tr>
               <td colspan="8" class="text-center py-8 text-gray-500">
-                No sales found
+                {{ 'PRODUCTS.SALES.NO_SALES' | translate }}
               </td>
             </tr>
           </ng-template>

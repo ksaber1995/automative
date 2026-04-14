@@ -4,6 +4,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { FormsModule } from '@angular/forms';
+import { TranslateModule } from '@ngx-translate/core';
 import { CompanyService, GlobalExpenseAllocation } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 
@@ -23,12 +24,12 @@ interface AllocationOption {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, CardModule, ButtonModule, RadioButtonModule, FormsModule],
+  imports: [CommonModule, CardModule, ButtonModule, RadioButtonModule, FormsModule, TranslateModule],
   template: `
     <div class="container mx-auto p-6 max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Company Settings</h1>
-        <p class="text-gray-500 mt-1">Configure how your financial reports are calculated</p>
+        <h1 class="text-3xl font-bold text-gray-900">{{ 'SETTINGS.TITLE' | translate }}</h1>
+        <p class="text-gray-500 mt-1">{{ 'SETTINGS.SUBTITLE' | translate }}</p>
       </div>
 
       @if (loading()) {
@@ -42,11 +43,10 @@ interface AllocationOption {
             <div class="px-6 pt-6 pb-2">
               <div class="flex items-center gap-3 mb-1">
                 <i class="pi pi-sitemap text-blue-500 text-xl"></i>
-                <h2 class="text-xl font-bold text-gray-800">Global Expense Allocation Method</h2>
+                <h2 class="text-xl font-bold text-gray-800">{{ 'SETTINGS.ALLOCATION_TITLE' | translate }}</h2>
               </div>
               <p class="text-gray-500 text-sm ml-8">
-                Determines how expenses with no assigned branch (global employees, shared rent, etc.)
-                are distributed across your branches in financial reports.
+                {{ 'SETTINGS.ALLOCATION_DESC' | translate }}
               </p>
             </div>
           </ng-template>
@@ -72,29 +72,29 @@ interface AllocationOption {
                   <div class="flex-1">
                     <div class="flex items-center gap-3 mb-2">
                       <i [class]="option.icon + ' text-xl ' + option.iconClass"></i>
-                      <span class="font-bold text-gray-900 text-lg">{{ option.label }}</span>
+                      <span class="font-bold text-gray-900 text-lg">{{ option.label | translate }}</span>
                       <span class="text-xs font-semibold px-2 py-0.5 rounded-full" [class]="option.badgeClass">
-                        {{ option.badge }}
+                        {{ option.badge | translate }}
                       </span>
                     </div>
 
-                    <p class="text-gray-600 text-sm mb-3">{{ option.description }}</p>
+                    <p class="text-gray-600 text-sm mb-3">{{ option.description | translate }}</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div class="bg-white rounded-lg p-3 border border-gray-100">
-                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">How it works</div>
-                        <p class="text-sm text-gray-700">{{ option.howItWorks }}</p>
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{{ 'SETTINGS.HOW_IT_WORKS' | translate }}</div>
+                        <p class="text-sm text-gray-700">{{ option.howItWorks | translate }}</p>
                       </div>
                       <div class="bg-white rounded-lg p-3 border border-gray-100">
-                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Best used when</div>
-                        <p class="text-sm text-gray-700">{{ option.whyUseIt }}</p>
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{{ 'SETTINGS.BEST_USED_WHEN' | translate }}</div>
+                        <p class="text-sm text-gray-700">{{ option.whyUseIt | translate }}</p>
                       </div>
                     </div>
 
                     @if (option.risk) {
                       <div class="mt-3 flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                         <i class="pi pi-exclamation-triangle mt-0.5 flex-shrink-0"></i>
-                        <span>{{ option.risk }}</span>
+                        <span>{{ option.risk | translate }}</span>
                       </div>
                     }
                   </div>
@@ -106,7 +106,7 @@ interface AllocationOption {
           <ng-template pTemplate="footer">
             <div class="flex justify-end pt-2">
               <p-button
-                label="Save Settings"
+                [label]="'SETTINGS.SAVE' | translate"
                 icon="pi pi-check"
                 [loading]="saving()"
                 (onClick)="save()">
@@ -136,38 +136,38 @@ export class SettingsComponent implements OnInit {
   allocationOptions: AllocationOption[] = [
     {
       value: 'PROPORTIONAL',
-      label: 'Proportional Allocation',
-      badge: 'Highly Recommended',
+      label: 'SETTINGS.PROPORTIONAL_TITLE',
+      badge: 'SETTINGS.PROPORTIONAL_BADGE',
       badgeClass: 'bg-green-100 text-green-700',
       icon: 'pi pi-chart-pie',
       iconClass: 'text-green-500',
-      description: 'Global expenses are split between branches based on their share of total revenue. The more a branch earns, the more overhead it absorbs.',
-      howItWorks: 'If Branch A generates 70% of revenue and Branch B generates 30%, a global salary of 10,000 → Branch A pays 7,000, Branch B pays 3,000.',
-      whyUseIt: 'Best for most businesses. Prevents a small branch from being crushed by overhead it can\'t afford, while ensuring high performers carry their fair share.',
+      description: 'SETTINGS.PROPORTIONAL_DESC',
+      howItWorks: 'SETTINGS.PROPORTIONAL_EXAMPLE',
+      whyUseIt: 'SETTINGS.PROPORTIONAL_BEST',
     },
     {
       value: 'EQUAL',
-      label: 'Equal Split (50/50)',
-      badge: 'Simple',
+      label: 'SETTINGS.EQUAL_TITLE',
+      badge: 'SETTINGS.EQUAL_BADGE',
       badgeClass: 'bg-blue-100 text-blue-700',
       icon: 'pi pi-sliders-h',
       iconClass: 'text-blue-500',
-      description: 'Global expenses are divided equally among all branches, regardless of their revenue.',
-      howItWorks: 'With 2 branches, each pays exactly 50% of the global salary. With 3 branches, each pays 33.3%.',
-      whyUseIt: 'Use this when the global employee truly spends equal time at each location (e.g., Monday–Tuesday at Branch A, Wednesday–Thursday at Branch B).',
-      risk: 'If one branch earns much less than another, the 50% overhead hit may make it look unprofitable on paper, even if it\'s operating efficiently for its size.',
+      description: 'SETTINGS.EQUAL_DESC',
+      howItWorks: 'SETTINGS.EQUAL_EXAMPLE',
+      whyUseIt: 'SETTINGS.EQUAL_BEST',
+      risk: 'SETTINGS.EQUAL_WARNING',
     },
     {
       value: 'OVERHEAD',
-      label: 'Headquarters / Global Bucket',
-      badge: 'Conservative',
+      label: 'SETTINGS.OVERHEAD_TITLE',
+      badge: 'SETTINGS.OVERHEAD_BADGE',
       badgeClass: 'bg-purple-100 text-purple-700',
       icon: 'pi pi-building',
       iconClass: 'text-purple-500',
-      description: 'Global expenses are NOT charged to any branch. They are subtracted from total company profit after branch contributions are calculated.',
-      howItWorks: 'Each branch shows its "contribution" (revenue minus direct costs). Company net profit = total contribution minus global overhead.',
-      whyUseIt: 'Best for executive roles (CEO, owner, accountant) whose work grows the whole company, not just one branch.',
-      risk: 'Branch-level "Net Profit" will look artificially high because it doesn\'t reflect the true cost of the management layer required to run the business.',
+      description: 'SETTINGS.OVERHEAD_DESC',
+      howItWorks: 'SETTINGS.OVERHEAD_EXAMPLE',
+      whyUseIt: 'SETTINGS.OVERHEAD_BEST',
+      risk: 'SETTINGS.OVERHEAD_WARNING',
     },
   ];
 

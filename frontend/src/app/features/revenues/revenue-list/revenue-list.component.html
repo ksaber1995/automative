@@ -2,29 +2,29 @@
   <p-card>
     <ng-template pTemplate="header">
       <div class="p-4">
-        <h2 class="text-2xl font-bold">Revenue Tracking</h2>
-        <p class="text-gray-600 mt-1">Total Revenue: {{ totalRevenue | currency }}</p>
-        <p class="text-sm text-gray-500 mt-1">Revenues are automatically generated from course enrollments and product sales</p>
+        <h2 class="text-2xl font-bold">{{ 'REVENUES.LIST.TITLE' | translate }}</h2>
+        <p class="text-gray-600 mt-1">{{ 'REVENUES.LIST.TOTAL' | translate }} {{ totalRevenue | currency }}</p>
+        <p class="text-sm text-gray-500 mt-1">{{ 'REVENUES.LIST.AUTO_HINT' | translate }}</p>
       </div>
     </ng-template>
 
     <!-- Filters -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <div>
-        <label class="block text-sm font-medium mb-2">Branch:</label>
+        <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.BRANCH' | translate }}</label>
         <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-          <option value="">All Branches</option>
+          <option value="">{{ 'REVENUES.LIST.ALL_BRANCHES' | translate }}</option>
           @for (branch of branches(); track branch.id) {
             <option [value]="branch.id">{{ branch.name }}</option>
           }
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Start Date:</label>
+        <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.START_DATE' | translate }}</label>
         <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">End Date:</label>
+        <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.END_DATE' | translate }}</label>
         <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
       </div>
     </div>
@@ -33,13 +33,13 @@
     <p-table [value]="revenues()" [loading]="loading()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Date</th>
-          <th>Branch</th>
-          <th>Source</th>
-          <th>Description</th>
-          <th>Amount</th>
-          <th>Payment Method</th>
-          <th>Receipt #</th>
+          <th>{{ 'REVENUES.LIST.COL_DATE' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_BRANCH' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_SOURCE' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_DESC' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_AMOUNT' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_METHOD' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_RECEIPT' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-revenue>
@@ -48,7 +48,7 @@
           <td>{{ getBranchName(revenue.branchId) }}</td>
           <td>
             <p-tag
-              [value]="getSourceBadge(revenue.source).label"
+              [value]="('REVENUES.LIST.SOURCE_' + revenue.source) | translate"
               [severity]="getSourceBadge(revenue.source).severity">
             </p-tag>
           </td>
@@ -56,7 +56,7 @@
           <td class="font-semibold text-green-600">{{ revenue.amount | currency }}</td>
           <td>
             @if (revenue.paymentMethod) {
-              <p-tag [value]="revenue.paymentMethod" severity="info"></p-tag>
+              <p-tag [value]="('REVENUES.LIST.METHOD_' + revenue.paymentMethod) | translate" severity="info"></p-tag>
             } @else {
               <span class="text-gray-400">-</span>
             }
@@ -69,8 +69,8 @@
           <td colspan="7" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
-              <p>No revenue records found</p>
-              <p class="text-sm mt-2">Revenue will appear when you create course enrollments or product sales</p>
+              <p>{{ 'REVENUES.LIST.NO_DATA' | translate }}</p>
+              <p class="text-sm mt-2">{{ 'REVENUES.LIST.NO_DATA_HINT' | translate }}</p>
             </div>
           </td>
         </tr>

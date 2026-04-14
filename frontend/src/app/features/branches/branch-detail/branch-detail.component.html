@@ -7,29 +7,29 @@
           <div class="flex items-center gap-3 mb-2">
             <h1 class="text-3xl font-bold text-gray-900">{{ b.name }}</h1>
             <p-tag
-              [value]="b.isActive ? 'Active' : 'Inactive'"
+              [value]="b.isActive ? ('BRANCHES.LIST.ACTIVE' | translate) : ('BRANCHES.LIST.INACTIVE' | translate)"
               [severity]="b.isActive ? 'success' : 'danger'"
             ></p-tag>
           </div>
-          <p class="text-gray-600 text-lg">Code: {{ b.code }}</p>
+          <p class="text-gray-600 text-lg">{{ 'BRANCHES.DETAIL.CODE' | translate }} {{ b.code }}</p>
         </div>
         <div class="flex gap-2">
           <p-button
-            [label]="b.isActive ? 'Deactivate' : 'Activate'"
+            [label]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
             [icon]="b.isActive ? 'pi pi-times-circle' : 'pi pi-check-circle'"
             [severity]="b.isActive ? 'danger' : 'success'"
             [outlined]="true"
             (onClick)="toggleBranchStatus()"
-            [pTooltip]="b.isActive ? 'Deactivate this branch' : 'Activate this branch'"
+            [pTooltip]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
           ></p-button>
           <p-button
-            label="Edit"
+            [label]="'BRANCHES.DETAIL.EDIT' | translate"
             icon="pi pi-pencil"
             severity="warn"
             (onClick)="editBranch()"
           ></p-button>
           <p-button
-            label="Back"
+            [label]="'BRANCHES.DETAIL.BACK' | translate"
             icon="pi pi-arrow-left"
             [outlined]="true"
             (onClick)="backToList()"
@@ -49,7 +49,7 @@
         <p-card>
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-gray-600 text-sm font-medium mb-1">Total Courses</p>
+              <p class="text-gray-600 text-sm font-medium mb-1">{{ 'BRANCHES.DETAIL.TOTAL_COURSES' | translate }}</p>
               <p class="text-3xl font-bold text-blue-600">{{ s.courseCount }}</p>
             </div>
             <i class="pi pi-book text-4xl text-blue-400"></i>
@@ -60,7 +60,7 @@
         <p-card>
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-gray-600 text-sm font-medium mb-1">Total Classes</p>
+              <p class="text-gray-600 text-sm font-medium mb-1">{{ 'BRANCHES.DETAIL.TOTAL_CLASSES' | translate }}</p>
               <p class="text-3xl font-bold text-purple-600">{{ s.classCount }}</p>
             </div>
             <i class="pi pi-calendar text-4xl text-purple-400"></i>
@@ -71,9 +71,9 @@
         <p-card>
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-gray-600 text-sm font-medium mb-1">Total Students</p>
+              <p class="text-gray-600 text-sm font-medium mb-1">{{ 'BRANCHES.DETAIL.TOTAL_STUDENTS' | translate }}</p>
               <p class="text-3xl font-bold text-green-600">{{ s.studentCount }}</p>
-              <p class="text-xs text-gray-500 mt-1">{{ s.activeEnrollments }} active enrollments</p>
+              <p class="text-xs text-gray-500 mt-1">{{ s.activeEnrollments }} {{ 'BRANCHES.DETAIL.ACTIVE_ENROLLMENTS' | translate }}</p>
             </div>
             <i class="pi pi-users text-4xl text-green-400"></i>
           </div>
@@ -83,7 +83,7 @@
         <p-card>
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-gray-600 text-sm font-medium mb-1">Employees</p>
+              <p class="text-gray-600 text-sm font-medium mb-1">{{ 'BRANCHES.DETAIL.EMPLOYEES' | translate }}</p>
               <p class="text-3xl font-bold text-orange-600">{{ s.employeeCount }}</p>
             </div>
             <i class="pi pi-user text-4xl text-orange-400"></i>
@@ -96,7 +96,7 @@
         <!-- Revenue Card -->
         <p-card>
           <div class="text-center">
-            <p class="text-gray-600 text-sm font-medium mb-2">Total Revenue</p>
+            <p class="text-gray-600 text-sm font-medium mb-2">{{ 'BRANCHES.DETAIL.TOTAL_REVENUE' | translate }}</p>
             <p class="text-2xl font-bold text-green-600">{{ formatCurrency(s.totalRevenue) }}</p>
             <i class="pi pi-arrow-up text-green-500 mt-2"></i>
           </div>
@@ -105,7 +105,7 @@
         <!-- Expenses Card -->
         <p-card>
           <div class="text-center">
-            <p class="text-gray-600 text-sm font-medium mb-2">Total Expenses</p>
+            <p class="text-gray-600 text-sm font-medium mb-2">{{ 'BRANCHES.DETAIL.TOTAL_EXPENSES' | translate }}</p>
             <p class="text-2xl font-bold text-red-600">{{ formatCurrency(s.totalExpenses) }}</p>
             <i class="pi pi-arrow-down text-red-500 mt-2"></i>
           </div>
@@ -114,7 +114,7 @@
         <!-- Net Profit Card -->
         <p-card>
           <div class="text-center">
-            <p class="text-gray-600 text-sm font-medium mb-2">Net Profit</p>
+            <p class="text-gray-600 text-sm font-medium mb-2">{{ 'BRANCHES.DETAIL.NET_PROFIT' | translate }}</p>
             <p class="text-2xl font-bold" [class.text-green-600]="s.netProfit >= 0" [class.text-red-600]="s.netProfit < 0">
               {{ formatCurrency(s.netProfit) }}
             </p>
@@ -129,20 +129,20 @@
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4">
-          <h2 class="text-xl font-bold text-gray-900">Branch Information</h2>
+          <h2 class="text-xl font-bold text-gray-900">{{ 'BRANCHES.DETAIL.BRANCH_INFO' | translate }}</h2>
         </div>
       </ng-template>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Contact Information -->
         <div>
-          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Contact Information</h3>
+          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'BRANCHES.DETAIL.CONTACT_INFO' | translate }}</h3>
           <div class="space-y-3">
             @if (b.email) {
               <div class="flex items-start">
                 <i class="pi pi-envelope text-gray-500 mt-1 mr-3"></i>
                 <div>
-                  <span class="font-medium text-gray-600 block text-sm">Email</span>
+                  <span class="font-medium text-gray-600 block text-sm">{{ 'BRANCHES.DETAIL.EMAIL' | translate }}</span>
                   <span class="text-gray-900">{{ b.email }}</span>
                 </div>
               </div>
@@ -151,7 +151,7 @@
               <div class="flex items-start">
                 <i class="pi pi-phone text-gray-500 mt-1 mr-3"></i>
                 <div>
-                  <span class="font-medium text-gray-600 block text-sm">Phone</span>
+                  <span class="font-medium text-gray-600 block text-sm">{{ 'BRANCHES.DETAIL.PHONE' | translate }}</span>
                   <span class="text-gray-900">{{ b.phone }}</span>
                 </div>
               </div>
@@ -161,7 +161,7 @@
 
         <!-- Address Information -->
         <div>
-          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Address</h3>
+          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'BRANCHES.DETAIL.ADDRESS' | translate }}</h3>
           <div class="flex items-start">
             <i class="pi pi-map-marker text-gray-500 mt-1 mr-3"></i>
             <div>
@@ -177,12 +177,12 @@
 
         <!-- Operational Information -->
         <div>
-          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Operational Details</h3>
+          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'BRANCHES.DETAIL.OPERATIONAL' | translate }}</h3>
           <div class="space-y-3">
             <div class="flex items-start">
               <i class="pi pi-calendar text-gray-500 mt-1 mr-3"></i>
               <div>
-                <span class="font-medium text-gray-600 block text-sm">Opening Date</span>
+                <span class="font-medium text-gray-600 block text-sm">{{ 'BRANCHES.DETAIL.OPENING_DATE' | translate }}</span>
                 <span class="text-gray-900">{{ formatDate(b.openingDate) }}</span>
               </div>
             </div>
@@ -191,19 +191,19 @@
 
         <!-- System Information -->
         <div>
-          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">System Information</h3>
+          <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'BRANCHES.DETAIL.SYSTEM_INFO' | translate }}</h3>
           <div class="space-y-3">
             <div class="flex items-start">
               <i class="pi pi-clock text-gray-500 mt-1 mr-3"></i>
               <div>
-                <span class="font-medium text-gray-600 block text-sm">Created</span>
+                <span class="font-medium text-gray-600 block text-sm">{{ 'BRANCHES.DETAIL.CREATED' | translate }}</span>
                 <span class="text-gray-900">{{ formatDate(b.createdAt) }}</span>
               </div>
             </div>
             <div class="flex items-start">
               <i class="pi pi-refresh text-gray-500 mt-1 mr-3"></i>
               <div>
-                <span class="font-medium text-gray-600 block text-sm">Last Updated</span>
+                <span class="font-medium text-gray-600 block text-sm">{{ 'BRANCHES.DETAIL.LAST_UPDATED' | translate }}</span>
                 <span class="text-gray-900">{{ formatDate(b.updatedAt) }}</span>
               </div>
             </div>

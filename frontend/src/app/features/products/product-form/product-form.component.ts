@@ -10,6 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { CheckboxModule } from 'primeng/checkbox';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -29,108 +30,109 @@ import { ProductCategory } from '@shared/enums/product.enum';
     CheckboxModule,
     ButtonModule,
     DatePickerModule,
+    TranslateModule,
   ],
   template: `
     <div class="container mx-auto p-4 max-w-4xl">
       <p-card>
         <ng-template pTemplate="header">
           <div class="p-4">
-            <h2 class="text-2xl font-bold">{{ isEditMode() ? 'Edit' : 'Create' }} Product</h2>
+            <h2 class="text-2xl font-bold">{{ isEditMode() ? ('PRODUCTS.FORM.EDIT_TITLE' | translate) : ('PRODUCTS.FORM.CREATE_TITLE' | translate) }}</h2>
           </div>
         </ng-template>
 
         <form [formGroup]="productForm" (ngSubmit)="onSubmit()">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="field">
-              <label for="name" class="block text-sm font-medium mb-2">Product Name *</label>
+              <label for="name" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.NAME_LABEL' | translate }} *</label>
               <input pInputText id="name" formControlName="name" class="w-full" />
               @if (productForm.get('name')?.invalid && productForm.get('name')?.touched) {
-                <small class="text-red-500">Product name is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.NAME_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="code" class="block text-sm font-medium mb-2">Product Code *</label>
+              <label for="code" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.CODE_LABEL' | translate }} *</label>
               <input pInputText id="code" formControlName="code" class="w-full" />
               @if (productForm.get('code')?.invalid && productForm.get('code')?.touched) {
-                <small class="text-red-500">Product code is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.CODE_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field md:col-span-2">
-              <label for="description" class="block text-sm font-medium mb-2">Description *</label>
+              <label for="description" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.DESC_LABEL' | translate }} *</label>
               <textarea pInputTextarea id="description" formControlName="description" rows="3" class="w-full"></textarea>
               @if (productForm.get('description')?.invalid && productForm.get('description')?.touched) {
-                <small class="text-red-500">Description is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.DESC_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="category" class="block text-sm font-medium mb-2">Category *</label>
+              <label for="category" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.CATEGORY_LABEL' | translate }} *</label>
               <p-select
                 id="category"
                 formControlName="category"
                 [options]="categories"
                 optionLabel="label"
                 optionValue="value"
-                placeholder="Select category"
+                [placeholder]="'PRODUCTS.FORM.CATEGORY_PLACEHOLDER' | translate"
                 class="w-full"
                 [style]="{'width': '100%'}">
               </p-select>
               @if (productForm.get('category')?.invalid && productForm.get('category')?.touched) {
-                <small class="text-red-500">Category is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.CATEGORY_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="unit" class="block text-sm font-medium mb-2">Unit *</label>
+              <label for="unit" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.UNIT_LABEL' | translate }} *</label>
               <p-select
                 id="unit"
                 formControlName="unit"
                 [options]="units"
                 optionLabel="label"
                 optionValue="value"
-                placeholder="Select unit"
+                [placeholder]="'PRODUCTS.FORM.UNIT_PLACEHOLDER' | translate"
                 class="w-full"
                 [style]="{'width': '100%'}">
               </p-select>
               @if (productForm.get('unit')?.invalid && productForm.get('unit')?.touched) {
-                <small class="text-red-500">Unit is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.UNIT_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="costPrice" class="block text-sm font-medium mb-2">Cost Price *</label>
+              <label for="costPrice" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.COST_LABEL' | translate }} *</label>
               <p-inputNumber inputId="costPrice" formControlName="costPrice" mode="currency" currency="USD" [minFractionDigits]="2" [min]="0" class="w-full"></p-inputNumber>
               @if (productForm.get('costPrice')?.invalid && productForm.get('costPrice')?.touched) {
-                <small class="text-red-500">Cost price is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.COST_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="sellingPrice" class="block text-sm font-medium mb-2">Selling Price *</label>
+              <label for="sellingPrice" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.SELL_LABEL' | translate }} *</label>
               <p-inputNumber inputId="sellingPrice" formControlName="sellingPrice" mode="currency" currency="USD" [minFractionDigits]="2" [min]="0" class="w-full"></p-inputNumber>
               @if (productForm.get('sellingPrice')?.invalid && productForm.get('sellingPrice')?.touched) {
-                <small class="text-red-500">Selling price is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.SELL_REQUIRED' | translate }}</small>
               }
               @if (productForm.get('sellingPrice')?.value < productForm.get('costPrice')?.value) {
-                <small class="text-orange-500">Warning: Selling price is less than cost price</small>
+                <small class="text-orange-500">{{ 'PRODUCTS.FORM.SELL_WARNING' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="stock" class="block text-sm font-medium mb-2">Initial Stock *</label>
+              <label for="stock" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.STOCK_LABEL' | translate }} *</label>
               <p-inputNumber inputId="stock" formControlName="stock" [min]="0" [showButtons]="true" class="w-full"></p-inputNumber>
               @if (productForm.get('stock')?.invalid && productForm.get('stock')?.touched) {
-                <small class="text-red-500">Stock is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.STOCK_REQUIRED' | translate }}</small>
               }
             </div>
 
             <div class="field">
-              <label for="minStock" class="block text-sm font-medium mb-2">Min Stock Threshold *</label>
+              <label for="minStock" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.MIN_STOCK_LABEL' | translate }} *</label>
               <p-inputNumber inputId="minStock" formControlName="minStock" [min]="0" [showButtons]="true" class="w-full"></p-inputNumber>
               @if (productForm.get('minStock')?.invalid && productForm.get('minStock')?.touched) {
-                <small class="text-red-500">Min stock is required</small>
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.MIN_STOCK_REQUIRED' | translate }}</small>
               }
             </div>
 
@@ -141,25 +143,25 @@ import { ProductCategory } from '@shared/enums/product.enum';
                   formControlName="isGlobal"
                   [binary]="true">
                 </p-checkbox>
-                <label for="isGlobal" class="text-sm font-medium">Global Product (shared across all branches)</label>
+                <label for="isGlobal" class="text-sm font-medium">{{ 'PRODUCTS.FORM.GLOBAL_LABEL' | translate }}</label>
               </div>
             </div>
 
             @if (!productForm.get('isGlobal')?.value) {
               <div class="field md:col-span-2">
-                <label for="branchId" class="block text-sm font-medium mb-2">Branch *</label>
+                <label for="branchId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *</label>
                 <p-select
                   id="branchId"
                   formControlName="branchId"
                   [options]="branches"
                   optionLabel="name"
                   optionValue="id"
-                  placeholder="Select branch"
+                  [placeholder]="'PRODUCTS.FORM.BRANCH_PLACEHOLDER' | translate"
                   class="w-full"
                   [style]="{'width': '100%'}">
                 </p-select>
                 @if (productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
-                  <small class="text-red-500">Branch is required for branch-specific products</small>
+                  <small class="text-red-500">{{ 'PRODUCTS.FORM.BRANCH_REQUIRED' | translate }}</small>
                 }
               </div>
             }
@@ -173,12 +175,12 @@ import { ProductCategory } from '@shared/enums/product.enum';
                   formControlName="recordStockExpense"
                   [binary]="true">
                 </p-checkbox>
-                <label for="recordStockExpense" class="font-semibold text-blue-800">Record initial stock purchase as an expense</label>
+                <label for="recordStockExpense" class="font-semibold text-blue-800">{{ 'PRODUCTS.FORM.STOCK_EXPENSE_LABEL' | translate }}</label>
               </div>
               @if (productForm.get('recordStockExpense')?.value) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                   <div>
-                    <label class="block text-sm font-medium mb-2">Purchase Date <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.PURCHASE_DATE' | translate }} <span class="text-red-500">*</span></label>
                     <p-datepicker
                       formControlName="purchaseDate"
                       dateFormat="yy-mm-dd"
@@ -189,22 +191,22 @@ import { ProductCategory } from '@shared/enums/product.enum';
                   <div class="flex items-end pb-1">
                     @if (productForm.get('costPrice')?.value && productForm.get('stock')?.value) {
                       <div class="text-blue-700 font-medium">
-                        Total expense: {{ (productForm.get('costPrice')!.value * productForm.get('stock')!.value) | number:'1.2-2' }} EGP
+                        {{ 'PRODUCTS.FORM.TOTAL_EXPENSE' | translate }} {{ (productForm.get('costPrice')!.value * productForm.get('stock')!.value) | number:'1.2-2' }} EGP
                       </div>
                     }
                   </div>
                 </div>
-                <small class="text-blue-600 block mt-2">This will create an INVENTORY expense entry for the cost of buying this stock.</small>
+                <small class="text-blue-600 block mt-2">{{ 'PRODUCTS.FORM.STOCK_EXPENSE_HINT' | translate }}</small>
               }
               @if (!productForm.get('recordStockExpense')?.value) {
-                <small class="text-gray-500">Leave unchecked if you are registering existing stock already accounted for.</small>
+                <small class="text-gray-500">{{ 'PRODUCTS.FORM.NO_STOCK_EXPENSE_HINT' | translate }}</small>
               }
             </div>
           }
 
           <div class="flex gap-3 mt-6">
-            <p-button type="submit" label="{{ isEditMode() ? 'Update' : 'Create' }} Product" icon="pi pi-check" [disabled]="productForm.invalid || submitting()"></p-button>
-            <p-button type="button" label="Cancel" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
+            <p-button type="submit" [label]="isEditMode() ? ('PRODUCTS.FORM.UPDATE_BTN' | translate) : ('PRODUCTS.FORM.CREATE_BTN' | translate)" icon="pi pi-check" [disabled]="productForm.invalid || submitting()"></p-button>
+            <p-button type="button" [label]="'PRODUCTS.FORM.CANCEL' | translate" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
           </div>
         </form>
       </p-card>
@@ -230,6 +232,7 @@ export class ProductFormComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private translate = inject(TranslateService);
 
   productForm!: FormGroup;
   isEditMode = signal(false);
@@ -237,26 +240,27 @@ export class ProductFormComponent implements OnInit {
   submitting = signal(false);
   branches: any[] = [];
 
-  categories = [
-    { value: ProductCategory.STATIONERY, label: 'Stationery' },
-    { value: ProductCategory.BOOKS, label: 'Books' },
-    { value: ProductCategory.ELECTRONICS, label: 'Electronics' },
-    { value: ProductCategory.SUPPLIES, label: 'Supplies' },
-    { value: ProductCategory.MERCHANDISE, label: 'Merchandise' },
-    { value: ProductCategory.OTHER, label: 'Other' },
-  ];
-
-  units = [
-    { value: 'piece', label: 'Piece' },
-    { value: 'box', label: 'Box' },
-    { value: 'pack', label: 'Pack' },
-    { value: 'kg', label: 'Kilogram (kg)' },
-    { value: 'liter', label: 'Liter' },
-    { value: 'meter', label: 'Meter' },
-    { value: 'set', label: 'Set' },
-  ];
+  categories: { value: ProductCategory; label: string }[] = [];
+  units: { value: string; label: string }[] = [];
 
   ngOnInit() {
+    this.categories = [
+      { value: ProductCategory.STATIONERY, label: this.translate.instant('PRODUCTS.LIST.CAT_STATIONERY') },
+      { value: ProductCategory.BOOKS, label: this.translate.instant('PRODUCTS.LIST.CAT_BOOKS') },
+      { value: ProductCategory.ELECTRONICS, label: this.translate.instant('PRODUCTS.LIST.CAT_ELECTRONICS') },
+      { value: ProductCategory.SUPPLIES, label: this.translate.instant('PRODUCTS.LIST.CAT_SUPPLIES') },
+      { value: ProductCategory.MERCHANDISE, label: this.translate.instant('PRODUCTS.LIST.CAT_MERCHANDISE') },
+      { value: ProductCategory.OTHER, label: this.translate.instant('PRODUCTS.LIST.CAT_OTHER') },
+    ];
+    this.units = [
+      { value: 'piece', label: this.translate.instant('PRODUCTS.FORM.UNIT_PIECE') },
+      { value: 'box', label: this.translate.instant('PRODUCTS.FORM.UNIT_BOX') },
+      { value: 'pack', label: this.translate.instant('PRODUCTS.FORM.UNIT_PACK') },
+      { value: 'kg', label: this.translate.instant('PRODUCTS.FORM.UNIT_KG') },
+      { value: 'liter', label: this.translate.instant('PRODUCTS.FORM.UNIT_LITER') },
+      { value: 'meter', label: this.translate.instant('PRODUCTS.FORM.UNIT_METER') },
+      { value: 'set', label: this.translate.instant('PRODUCTS.FORM.UNIT_SET') },
+    ];
     this.initForm();
     this.loadBranches();
 

@@ -2,7 +2,7 @@
   <p-card>
     <ng-template pTemplate="header">
       <div class="p-4">
-        <h2 class="text-2xl font-bold">{{ isEditMode() ? 'Edit Revenue' : 'Add New Revenue' }}</h2>
+        <h2 class="text-2xl font-bold">{{ isEditMode() ? ('REVENUES.FORM.EDIT_TITLE' | translate) : ('REVENUES.FORM.CREATE_TITLE' | translate) }}</h2>
       </div>
     </ng-template>
 
@@ -11,25 +11,25 @@
         <!-- Branch -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Branch <span class="text-red-500">*</span>
+            {{ 'REVENUES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
             formControlName="branchId"
             [options]="branches()"
             optionLabel="name"
             optionValue="id"
-            placeholder="Select Branch"
+            [placeholder]="'REVENUES.FORM.BRANCH_PLACEHOLDER' | translate"
             styleClass="w-full"
             [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
           @if (branchId?.invalid && branchId?.touched) {
-            <small class="text-red-500">Branch is required</small>
+            <small class="text-red-500">{{ 'REVENUES.FORM.BRANCH_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Date -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Date <span class="text-red-500">*</span>
+            {{ 'REVENUES.FORM.DATE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-datepicker
             formControlName="date"
@@ -37,14 +37,14 @@
             [showIcon]="true"
             [ngClass]="{'ng-invalid ng-dirty': date?.invalid && date?.touched}"></p-datepicker>
           @if (date?.invalid && date?.touched) {
-            <small class="text-red-500">Date is required</small>
+            <small class="text-red-500">{{ 'REVENUES.FORM.DATE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Amount -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Amount <span class="text-red-500">*</span>
+            {{ 'REVENUES.FORM.AMOUNT_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-inputnumber
             formControlName="amount"
@@ -54,19 +54,19 @@
             styleClass="w-full"
             [ngClass]="{'ng-invalid ng-dirty': amount?.invalid && amount?.touched}"></p-inputnumber>
           @if (amount?.invalid && amount?.touched) {
-            <small class="text-red-500">Valid amount is required</small>
+            <small class="text-red-500">{{ 'REVENUES.FORM.AMOUNT_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Payment Method -->
         <div>
           <label class="block text-sm font-medium mb-2">
-            Payment Method <span class="text-red-500">*</span>
+            {{ 'REVENUES.FORM.METHOD_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
             formControlName="paymentMethod"
             [options]="paymentMethods"
-            placeholder="Select Payment Method"
+            [placeholder]="'REVENUES.FORM.METHOD_PLACEHOLDER' | translate"
             styleClass="w-full"
             [ngClass]="{'ng-invalid ng-dirty': paymentMethod?.invalid && paymentMethod?.touched}">
             <ng-template pTemplate="item" let-option>
@@ -77,14 +77,14 @@
             </ng-template>
           </p-select>
           @if (paymentMethod?.invalid && paymentMethod?.touched) {
-            <small class="text-red-500">Payment method is required</small>
+            <small class="text-red-500">{{ 'REVENUES.FORM.METHOD_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Description -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">
-            Description <span class="text-red-500">*</span>
+            {{ 'REVENUES.FORM.DESC_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <input
             pInputText
@@ -93,13 +93,13 @@
             class="w-full"
             [ngClass]="{'ng-invalid ng-dirty': description?.invalid && description?.touched}" />
           @if (description?.invalid && description?.touched) {
-            <small class="text-red-500">Description is required</small>
+            <small class="text-red-500">{{ 'REVENUES.FORM.DESC_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Course (Optional) -->
         <div>
-          <label class="block text-sm font-medium mb-2">Course (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'REVENUES.FORM.COURSE_LABEL' | translate }}</label>
           <p-select
             formControlName="courseId"
             [options]="courses()"
@@ -111,7 +111,7 @@
 
         <!-- Student (Optional) -->
         <div>
-          <label class="block text-sm font-medium mb-2">Student (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'REVENUES.FORM.STUDENT_LABEL' | translate }}</label>
           <p-select
             formControlName="studentId"
             [options]="students()"
@@ -129,7 +129,7 @@
 
         <!-- Receipt Number -->
         <div>
-          <label class="block text-sm font-medium mb-2">Receipt Number (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'REVENUES.FORM.RECEIPT_LABEL' | translate }}</label>
           <input
             pInputText
             type="text"
@@ -139,7 +139,7 @@
 
         <!-- Notes -->
         <div class="md:col-span-2">
-          <label class="block text-sm font-medium mb-2">Notes (Optional)</label>
+          <label class="block text-sm font-medium mb-2">{{ 'REVENUES.FORM.NOTES_LABEL' | translate }}</label>
           <textarea
             pTextarea
             formControlName="notes"
@@ -152,14 +152,14 @@
         <button
           pButton
           type="button"
-          label="Cancel"
+          [label]="'REVENUES.FORM.CANCEL' | translate"
           class="p-button-secondary"
           (click)="cancel()"
           [disabled]="loading()"></button>
         <button
           pButton
           type="submit"
-          [label]="isEditMode() ? 'Update' : 'Create'"
+          [label]="isEditMode() ? ('REVENUES.FORM.UPDATE' | translate) : ('REVENUES.FORM.CREATE' | translate)"
           [disabled]="loading()"></button>
       </div>
     </form>

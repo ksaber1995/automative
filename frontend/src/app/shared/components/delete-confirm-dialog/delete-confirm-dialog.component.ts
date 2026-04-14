@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-delete-confirm-dialog',
@@ -13,7 +14,8 @@ import { InputTextModule } from 'primeng/inputtext';
     FormsModule,
     DialogModule,
     ButtonModule,
-    InputTextModule
+    InputTextModule,
+    TranslateModule
   ],
   template: `
     <p-dialog
@@ -31,20 +33,20 @@ import { InputTextModule } from 'primeng/inputtext';
           <div class="flex-1">
             <p class="text-gray-700 mb-2">{{ message }}</p>
             <p class="text-sm text-gray-600 mb-4">
-              This action cannot be undone. Please type <strong class="text-red-600">delete</strong> to confirm.
+              {{ 'SHARED.DELETE_DIALOG.CONFIRM_HINT' | translate }}
             </p>
             <input
               pInputText
               type="text"
               [(ngModel)]="confirmText"
-              placeholder="Type 'delete' to confirm"
+              [placeholder]="'SHARED.DELETE_DIALOG.PLACEHOLDER' | translate"
               class="w-full"
               [class.border-red-500]="showError()"
               (keyup.enter)="onConfirm()"
             />
             @if (showError()) {
               <small class="text-red-500 mt-1 block">
-                Please type "delete" to confirm
+                {{ 'SHARED.DELETE_DIALOG.VALIDATION' | translate }}
               </small>
             }
           </div>
@@ -53,13 +55,13 @@ import { InputTextModule } from 'primeng/inputtext';
       <ng-template pTemplate="footer">
         <div class="flex justify-end gap-2">
           <p-button
-            label="Cancel"
+            [label]="'SHARED.DELETE_DIALOG.CANCEL' | translate"
             severity="secondary"
             (onClick)="onCancel()"
             [outlined]="true"
           ></p-button>
           <p-button
-            label="Delete"
+            [label]="'SHARED.DELETE_DIALOG.DELETE' | translate"
             severity="danger"
             (onClick)="onConfirm()"
             [disabled]="confirmText !== 'delete'"

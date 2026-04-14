@@ -10,6 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RefundService } from '../services/refund.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -22,17 +23,18 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
     CommonModule, FormsModule,
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, DatePickerModule, InputTextModule, TooltipModule,
+    TranslateModule,
   ],
   template: `
     <div class="space-y-4">
       <!-- Header -->
       <div class="flex justify-between items-center">
         <div>
-          <h2 class="text-2xl font-bold text-gray-800">Refunds</h2>
-          <p class="text-gray-500 text-sm mt-1">All refunds issued across enrollments</p>
+          <h2 class="text-2xl font-bold text-gray-800">{{ 'REFUNDS.LIST.TITLE' | translate }}</h2>
+          <p class="text-gray-500 text-sm mt-1">{{ 'REFUNDS.LIST.SUBTITLE' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-500">Total:</span>
+          <span class="text-sm text-gray-500">{{ 'REFUNDS.LIST.TOTAL' | translate }}</span>
           <span class="font-bold text-orange-600 text-lg">{{ totalRefunded().toFixed(2) }} EGP</span>
         </div>
       </div>
@@ -41,33 +43,33 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
       <p-card>
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Branch</label>
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_BRANCH' | translate }}</label>
             <p-select
               [(ngModel)]="filterBranch"
               [options]="branchOptions"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Branches"
+              [placeholder]="'REFUNDS.LIST.ALL_BRANCHES' | translate"
               [showClear]="true"
               [style]="{ width: '100%' }"
               (onChange)="load()"
             ></p-select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Type</label>
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_TYPE' | translate }}</label>
             <p-select
               [(ngModel)]="filterType"
               [options]="typeOptions"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Types"
+              [placeholder]="'REFUNDS.LIST.ALL_TYPES' | translate"
               [showClear]="true"
               [style]="{ width: '100%' }"
               (onChange)="load()"
             ></p-select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">From</label>
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FROM' | translate }}</label>
             <p-datepicker
               [(ngModel)]="filterStartDate"
               [showIcon]="true"
@@ -77,7 +79,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
             ></p-datepicker>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">To</label>
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.TO' | translate }}</label>
             <p-datepicker
               [(ngModel)]="filterEndDate"
               [showIcon]="true"
@@ -87,7 +89,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
             ></p-datepicker>
           </div>
           <div class="flex items-end">
-            <button pButton label="Clear Filters" icon="pi pi-filter-slash"
+            <button pButton [label]="'REFUNDS.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
               class="p-button-outlined w-full" (click)="clearFilters()"></button>
           </div>
         </div>
@@ -109,14 +111,14 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
         >
           <ng-template pTemplate="header">
             <tr>
-              <th pSortableColumn="refundDate">Date <p-sortIcon field="refundDate"></p-sortIcon></th>
-              <th pSortableColumn="studentName">Student <p-sortIcon field="studentName"></p-sortIcon></th>
-              <th pSortableColumn="courseName">Course <p-sortIcon field="courseName"></p-sortIcon></th>
-              <th pSortableColumn="branchName">Branch <p-sortIcon field="branchName"></p-sortIcon></th>
-              <th pSortableColumn="type">Type <p-sortIcon field="type"></p-sortIcon></th>
-              <th pSortableColumn="amount" class="text-right">Amount <p-sortIcon field="amount"></p-sortIcon></th>
-              <th>Reason</th>
-              <th>Actions</th>
+              <th pSortableColumn="refundDate">{{ 'REFUNDS.LIST.COL_DATE' | translate }} <p-sortIcon field="refundDate"></p-sortIcon></th>
+              <th pSortableColumn="studentName">{{ 'REFUNDS.LIST.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
+              <th pSortableColumn="courseName">{{ 'REFUNDS.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+              <th pSortableColumn="branchName">{{ 'REFUNDS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+              <th pSortableColumn="type">{{ 'REFUNDS.LIST.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+              <th pSortableColumn="amount" class="text-right">{{ 'REFUNDS.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+              <th>{{ 'REFUNDS.LIST.COL_REASON' | translate }}</th>
+              <th>{{ 'REFUNDS.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
 
@@ -130,7 +132,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
               <td class="text-sm text-gray-500">{{ refund.branchName }}</td>
               <td>
                 <p-tag
-                  [value]="refund.type === 'FULL' ? 'Full Refund' : 'Partial Refund'"
+                  [value]="refund.type === 'FULL' ? ('REFUNDS.LIST.FULL_REFUND' | translate) : ('REFUNDS.LIST.PARTIAL_REFUND' | translate)"
                   [severity]="refund.type === 'FULL' ? 'danger' : 'warn'"
                 ></p-tag>
               </td>
@@ -146,7 +148,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
                   [rounded]="true"
                   [text]="true"
                   severity="secondary"
-                  pTooltip="View Enrollment"
+                  [pTooltip]="'REFUNDS.LIST.VIEW_ENROLLMENT' | translate"
                   (onClick)="viewEnrollment(refund)"
                 ></p-button>
               </td>
@@ -158,8 +160,8 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
               <td colspan="8" class="text-center py-12">
                 <div class="text-gray-400">
                   <i class="pi pi-replay text-4xl mb-3 block"></i>
-                  <p class="text-lg">No refunds found</p>
-                  <p class="text-sm mt-1">Refunds issued from the student enrollment screen will appear here</p>
+                  <p class="text-lg">{{ 'REFUNDS.LIST.NO_DATA' | translate }}</p>
+                  <p class="text-sm mt-1">{{ 'REFUNDS.LIST.NO_DATA_HINT' | translate }}</p>
                 </div>
               </td>
             </tr>
@@ -168,7 +170,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
           <ng-template pTemplate="footer">
             @if (refunds().length > 0) {
               <tr>
-                <td colspan="5" class="text-right font-semibold text-gray-600">Total Refunded:</td>
+                <td colspan="5" class="text-right font-semibold text-gray-600">{{ 'REFUNDS.LIST.TOTAL_REFUNDED' | translate }}</td>
                 <td class="text-right font-bold text-orange-600">{{ totalRefunded().toFixed(2) }}</td>
                 <td colspan="2"></td>
               </tr>
@@ -184,6 +186,7 @@ export class RefundListComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
+  private translate = inject(TranslateService);
 
   refunds = signal<RefundWithDetails[]>([]);
   loading = signal(true);
@@ -195,14 +198,15 @@ export class RefundListComponent implements OnInit {
   filterEndDate: Date | null = null;
 
   branchOptions: { label: string; value: string }[] = [];
-  typeOptions = [
-    { label: 'Full Refund', value: 'FULL' },
-    { label: 'Partial Refund', value: 'PARTIAL' },
-  ];
+  typeOptions: { label: string; value: string }[] = [];
 
   totalRefunded = signal(0);
 
   ngOnInit() {
+    this.typeOptions = [
+      { label: this.translate.instant('REFUNDS.LIST.FULL_REFUND'), value: 'FULL' },
+      { label: this.translate.instant('REFUNDS.LIST.PARTIAL_REFUND'), value: 'PARTIAL' },
+    ];
     this.loadBranches();
     this.load();
   }

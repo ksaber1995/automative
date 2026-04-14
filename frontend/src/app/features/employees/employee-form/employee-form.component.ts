@@ -8,6 +8,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
+import { TranslateModule } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -24,7 +25,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     CheckboxModule,
     InputTextModule,
     InputNumberModule,
-    SelectModule
+    SelectModule,
+    TranslateModule
   ],
   templateUrl: './employee-form.component.html',
   styleUrl: './employee-form.component.scss'

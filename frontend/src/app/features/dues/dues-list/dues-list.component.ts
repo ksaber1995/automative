@@ -13,6 +13,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DuesService } from '../services/dues.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -27,18 +28,19 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, TooltipModule, DialogModule,
     InputNumberModule, DatePickerModule, TextareaModule, ProgressBarModule,
+    TranslateModule,
   ],
   template: `
     <div class="space-y-4">
       <!-- Header -->
       <div class="flex justify-between items-center">
         <div>
-          <h2 class="text-2xl font-bold text-gray-800">Installment Dues</h2>
-          <p class="text-gray-500 text-sm mt-1">All students with outstanding installment balances</p>
+          <h2 class="text-2xl font-bold text-gray-800">{{ 'DUES.LIST.TITLE' | translate }}</h2>
+          <p class="text-gray-500 text-sm mt-1">{{ 'DUES.LIST.SUBTITLE' | translate }}</p>
         </div>
         <div class="flex items-center gap-4">
           <div class="text-right">
-            <p class="text-xs text-gray-500 uppercase tracking-wide">Total Remaining</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wide">{{ 'DUES.LIST.TOTAL_REMAINING' | translate }}</p>
             <p class="font-bold text-red-600 text-xl">{{ totalRemaining().toFixed(2) }} EGP</p>
           </div>
         </div>
@@ -48,20 +50,20 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
       <p-card>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Branch</label>
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
             <p-select
               [(ngModel)]="filterBranch"
               [options]="branchOptions"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Branches"
+              [placeholder]="'DUES.LIST.ALL_BRANCHES' | translate"
               [showClear]="true"
               [style]="{ width: '100%' }"
               (onChange)="load()"
             ></p-select>
           </div>
           <div class="flex items-end">
-            <button pButton label="Clear Filters" icon="pi pi-filter-slash"
+            <button pButton [label]="'DUES.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
               class="p-button-outlined" (click)="clearFilters()"></button>
           </div>
         </div>
@@ -83,15 +85,15 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
         >
           <ng-template pTemplate="header">
             <tr>
-              <th pSortableColumn="studentName">Student <p-sortIcon field="studentName"></p-sortIcon></th>
-              <th pSortableColumn="courseName">Course <p-sortIcon field="courseName"></p-sortIcon></th>
-              <th pSortableColumn="branchName">Branch <p-sortIcon field="branchName"></p-sortIcon></th>
-              <th pSortableColumn="enrollmentDate">Enrolled <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
-              <th class="text-right">Total</th>
-              <th class="text-right">Paid</th>
-              <th pSortableColumn="remaining" class="text-right">Remaining <p-sortIcon field="remaining"></p-sortIcon></th>
-              <th>Progress</th>
-              <th>Actions</th>
+              <th pSortableColumn="studentName">{{ 'DUES.LIST.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
+              <th pSortableColumn="courseName">{{ 'DUES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+              <th pSortableColumn="branchName">{{ 'DUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+              <th pSortableColumn="enrollmentDate">{{ 'DUES.LIST.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+              <th class="text-right">{{ 'DUES.LIST.COL_TOTAL' | translate }}</th>
+              <th class="text-right">{{ 'DUES.LIST.COL_PAID' | translate }}</th>
+              <th pSortableColumn="remaining" class="text-right">{{ 'DUES.LIST.COL_REMAINING' | translate }} <p-sortIcon field="remaining"></p-sortIcon></th>
+              <th>{{ 'DUES.LIST.COL_PROGRESS' | translate }}</th>
+              <th>{{ 'DUES.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
 
@@ -121,7 +123,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
                     [rounded]="true"
                     [text]="true"
                     severity="success"
-                    pTooltip="Add Payment"
+                    [pTooltip]="'DUES.LIST.ADD_PAYMENT' | translate"
                     (onClick)="openPaymentDialog(due)"
                   ></p-button>
                   <p-button
@@ -129,7 +131,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
                     [rounded]="true"
                     [text]="true"
                     severity="secondary"
-                    pTooltip="View Student"
+                    [pTooltip]="'DUES.LIST.VIEW_STUDENT' | translate"
                     (onClick)="viewStudent(due)"
                   ></p-button>
                 </div>
@@ -142,8 +144,8 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
               <td colspan="9" class="text-center py-12">
                 <div class="text-gray-400">
                   <i class="pi pi-check-circle text-4xl mb-3 block text-green-400"></i>
-                  <p class="text-lg text-green-600 font-medium">All clear!</p>
-                  <p class="text-sm mt-1">No outstanding installment balances</p>
+                  <p class="text-lg text-green-600 font-medium">{{ 'DUES.LIST.ALL_CLEAR' | translate }}</p>
+                  <p class="text-sm mt-1">{{ 'DUES.LIST.NO_DUES' | translate }}</p>
                 </div>
               </td>
             </tr>
@@ -152,7 +154,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
           <ng-template pTemplate="footer">
             @if (dues().length > 0) {
               <tr>
-                <td colspan="4" class="text-right font-semibold text-gray-600">Totals:</td>
+                <td colspan="4" class="text-right font-semibold text-gray-600">{{ 'DUES.LIST.TOTALS' | translate }}</td>
                 <td class="text-right font-bold">{{ totalFinal().toFixed(2) }}</td>
                 <td class="text-right font-bold text-green-600">{{ totalPaid().toFixed(2) }}</td>
                 <td class="text-right font-bold text-red-600">{{ totalRemaining().toFixed(2) }}</td>
@@ -166,7 +168,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 
     <!-- Add Payment Dialog -->
     <p-dialog
-      header="Add Payment"
+      [header]="'DUES.LIST.PAYMENT_DIALOG_TITLE' | translate"
       [(visible)]="showPaymentDialog"
       [modal]="true"
       [style]="{ width: '420px' }"
@@ -178,13 +180,13 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
             <p class="font-medium text-gray-800">{{ selectedDue()!.studentName }}</p>
             <p class="text-sm text-gray-500">{{ selectedDue()!.courseName }}</p>
             <div class="flex justify-between mt-2 text-sm">
-              <span class="text-gray-600">Remaining Balance:</span>
+              <span class="text-gray-600">{{ 'DUES.LIST.REMAINING_BALANCE' | translate }}</span>
               <span class="font-bold text-red-600">{{ selectedDue()!.remaining.toFixed(2) }} EGP</span>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.AMOUNT_LABEL' | translate }}</label>
             <p-inputnumber
               [(ngModel)]="paymentAmount"
               [min]="0.01"
@@ -192,13 +194,13 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
               [minFractionDigits]="2"
               [maxFractionDigits]="2"
               [style]="{ width: '100%' }"
-              placeholder="Enter amount"
+              [placeholder]="'DUES.LIST.AMOUNT_PLACEHOLDER' | translate"
             ></p-inputnumber>
-            <p class="text-xs text-gray-400 mt-1">Max: {{ selectedDue()!.remaining.toFixed(2) }} EGP</p>
+            <p class="text-xs text-gray-400 mt-1">{{ 'DUES.LIST.MAX_LABEL' | translate }} {{ selectedDue()!.remaining.toFixed(2) }} EGP</p>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.DATE_LABEL' | translate }}</label>
             <p-datepicker
               [(ngModel)]="paymentDate"
               [showIcon]="true"
@@ -208,21 +210,21 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.NOTES_LABEL' | translate }}</label>
             <textarea
               pTextarea
               [(ngModel)]="paymentNotes"
               [rows]="2"
               style="width: 100%"
-              placeholder="Add any notes..."
+              [placeholder]="'DUES.LIST.NOTES_PLACEHOLDER' | translate"
             ></textarea>
           </div>
         </div>
       }
 
       <ng-template pTemplate="footer">
-        <button pButton label="Cancel" class="p-button-text" (click)="showPaymentDialog = false"></button>
-        <button pButton label="Record Payment" icon="pi pi-check"
+        <button pButton [label]="'DUES.LIST.CANCEL' | translate" class="p-button-text" (click)="showPaymentDialog = false"></button>
+        <button pButton [label]="'DUES.LIST.RECORD_PAYMENT' | translate" icon="pi pi-check"
           [loading]="actionLoading()"
           [disabled]="!paymentAmount || paymentAmount <= 0"
           (click)="submitPayment()">
@@ -237,6 +239,7 @@ export class DuesListComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
+  private translate = inject(TranslateService);
 
   dues = signal<DueEnrollment[]>([]);
   loading = signal(true);

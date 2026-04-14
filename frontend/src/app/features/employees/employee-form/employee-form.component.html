@@ -1,91 +1,91 @@
 <div class="container mx-auto p-6">
-  <p-card [header]="isEditMode() ? 'Edit Employee' : 'Add New Employee'">
+  <p-card [header]="isEditMode() ? ('EMPLOYEES.FORM.EDIT_TITLE' | translate) : ('EMPLOYEES.FORM.CREATE_TITLE' | translate)">
     <form [formGroup]="employeeForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- First Name -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">First Name <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.FIRST_NAME' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText formControlName="firstName" class="w-full" />
           @if (firstName?.invalid && firstName?.touched) {
-            <small class="text-red-500">First name is required</small>
+            <small class="text-red-500">{{ 'EMPLOYEES.FORM.FIRST_NAME_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Last Name -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Last Name <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.LAST_NAME' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText formControlName="lastName" class="w-full" />
           @if (lastName?.invalid && lastName?.touched) {
-            <small class="text-red-500">Last name is required</small>
+            <small class="text-red-500">{{ 'EMPLOYEES.FORM.LAST_NAME_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Email -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Email <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.EMAIL' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText type="email" formControlName="email" class="w-full" />
           @if (email?.invalid && email?.touched) {
-            <small class="text-red-500">Valid email is required</small>
+            <small class="text-red-500">{{ 'EMPLOYEES.FORM.EMAIL_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Phone -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Phone <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.PHONE' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText type="tel" formControlName="phone" class="w-full" />
         </div>
 
         <!-- Position -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Position <span class="text-red-500">*</span></label>
-          <input pInputText formControlName="position" class="w-full" placeholder="e.g., Instructor, Manager" />
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.POSITION' | translate }} <span class="text-red-500">*</span></label>
+          <input pInputText formControlName="position" class="w-full" [placeholder]="'EMPLOYEES.FORM.POSITION_PLACEHOLDER' | translate" />
         </div>
 
         <!-- Department -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Department <span class="text-red-500">*</span></label>
-          <input pInputText formControlName="department" class="w-full" placeholder="e.g., Teaching, Administration" />
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.DEPARTMENT' | translate }} <span class="text-red-500">*</span></label>
+          <input pInputText formControlName="department" class="w-full" [placeholder]="'EMPLOYEES.FORM.DEPARTMENT_PLACEHOLDER' | translate" />
         </div>
 
         <!-- Salary -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Monthly Salary <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
           <p-inputnumber formControlName="salary" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
         </div>
 
         <!-- Hire Date -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">Hire Date <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.HIRE_DATE' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText type="date" formControlName="hireDate" class="w-full" />
         </div>
 
         <!-- Is Global Checkbox -->
         <div class="field col-span-2">
           <p-checkbox formControlName="isGlobal" [binary]="true" inputId="isGlobal"></p-checkbox>
-          <label for="isGlobal" class="ml-2">Global Employee (works across all branches)</label>
+          <label for="isGlobal" class="ml-2">{{ 'EMPLOYEES.FORM.GLOBAL_EMPLOYEE' | translate }}</label>
         </div>
 
         <!-- Branch Selection -->
         @if (!isGlobal?.value) {
           <div class="field col-span-2">
-            <label class="block text-sm font-medium mb-2">Branch <span class="text-red-500">*</span></label>
-            <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id" placeholder="Select a branch" class="w-full"></p-select>
+            <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.BRANCH' | translate }} <span class="text-red-500">*</span></label>
+            <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id" [placeholder]="'EMPLOYEES.FORM.BRANCH_PLACEHOLDER' | translate" class="w-full"></p-select>
             @if (branchId?.invalid && branchId?.touched) {
-              <small class="text-red-500">Branch is required</small>
+              <small class="text-red-500">{{ 'EMPLOYEES.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
         }
 
         <!-- Notes -->
         <div class="field col-span-2">
-          <label class="block text-sm font-medium mb-2">Notes</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.NOTES' | translate }}</label>
           <textarea pInputText formControlName="notes" rows="3" class="w-full"></textarea>
         </div>
       </div>
 
       <div class="flex justify-end gap-3 mt-6">
-        <button pButton type="button" label="Cancel" class="p-button-outlined" (click)="cancel()" [disabled]="loading()"></button>
-        <button pButton type="submit" [label]="isEditMode() ? 'Update' : 'Create'" [loading]="loading()" [disabled]="employeeForm.invalid || loading()"></button>
+        <button pButton type="button" [label]="'EMPLOYEES.FORM.CANCEL' | translate" class="p-button-outlined" (click)="cancel()" [disabled]="loading()"></button>
+        <button pButton type="submit" [label]="isEditMode() ? ('EMPLOYEES.FORM.UPDATE' | translate) : ('EMPLOYEES.FORM.CREATE' | translate)" [loading]="loading()" [disabled]="employeeForm.invalid || loading()"></button>
       </div>
     </form>
   </p-card>

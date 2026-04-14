@@ -8,6 +8,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
+import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -24,7 +25,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     InputTextModule,
     TextareaModule,
     SelectModule,
-    DatePickerModule
+    DatePickerModule,
+    TranslateModule
   ],
   templateUrl: './student-form.component.html',
   styleUrl: './student-form.component.scss'

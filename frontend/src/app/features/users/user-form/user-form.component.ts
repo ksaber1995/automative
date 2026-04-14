@@ -11,6 +11,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { DividerModule } from 'primeng/divider';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -33,22 +34,22 @@ interface PermissionRow {
 }
 
 const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; financial?: boolean }> = {
-  dashboard:    { label: 'Dashboard',      icon: 'pi pi-home' },
-  branches:     { label: 'Branches',       icon: 'pi pi-building' },
-  courses:      { label: 'Courses',        icon: 'pi pi-book' },
-  classes:      { label: 'Classes',        icon: 'pi pi-calendar' },
-  students:     { label: 'Students',       icon: 'pi pi-users' },
-  enrollments:  { label: 'Enrollments',    icon: 'pi pi-id-card' },
-  employees:    { label: 'Employees',      icon: 'pi pi-user' },
-  revenues:     { label: 'Revenues',       icon: 'pi pi-dollar',      financial: true },
-  expenses:     { label: 'Expenses',       icon: 'pi pi-money-bill',  financial: true },
-  withdrawals:  { label: 'Withdrawals',    icon: 'pi pi-wallet',      financial: true },
-  refunds:      { label: 'Refunds',        icon: 'pi pi-replay',      financial: true },
-  debts:        { label: 'Debts',          icon: 'pi pi-credit-card', financial: true },
-  products:     { label: 'Products',       icon: 'pi pi-box' },
-  product_sales:{ label: 'Product Sales',  icon: 'pi pi-shopping-cart' },
-  reports:      { label: 'Reports',        icon: 'pi pi-chart-bar',   financial: true },
-  users:        { label: 'User Mgmt',      icon: 'pi pi-user-edit' },
+  dashboard:    { label: 'USERS.FORM.RESOURCE_DASHBOARD',     icon: 'pi pi-home' },
+  branches:     { label: 'USERS.FORM.RESOURCE_BRANCHES',      icon: 'pi pi-building' },
+  courses:      { label: 'USERS.FORM.RESOURCE_COURSES',       icon: 'pi pi-book' },
+  classes:      { label: 'USERS.FORM.RESOURCE_CLASSES',       icon: 'pi pi-calendar' },
+  students:     { label: 'USERS.FORM.RESOURCE_STUDENTS',      icon: 'pi pi-users' },
+  enrollments:  { label: 'USERS.FORM.RESOURCE_ENROLLMENTS',   icon: 'pi pi-id-card' },
+  employees:    { label: 'USERS.FORM.RESOURCE_EMPLOYEES',     icon: 'pi pi-user' },
+  revenues:     { label: 'USERS.FORM.RESOURCE_REVENUES',      icon: 'pi pi-dollar',      financial: true },
+  expenses:     { label: 'USERS.FORM.RESOURCE_EXPENSES',      icon: 'pi pi-money-bill',  financial: true },
+  withdrawals:  { label: 'USERS.FORM.RESOURCE_WITHDRAWALS',   icon: 'pi pi-wallet',      financial: true },
+  refunds:      { label: 'USERS.FORM.RESOURCE_REFUNDS',       icon: 'pi pi-replay',      financial: true },
+  debts:        { label: 'USERS.FORM.RESOURCE_DEBTS',         icon: 'pi pi-credit-card', financial: true },
+  products:     { label: 'USERS.FORM.RESOURCE_PRODUCTS',      icon: 'pi pi-box' },
+  product_sales:{ label: 'USERS.FORM.RESOURCE_PRODUCT_SALES', icon: 'pi pi-shopping-cart' },
+  reports:      { label: 'USERS.FORM.RESOURCE_REPORTS',       icon: 'pi pi-chart-bar',   financial: true },
+  users:        { label: 'USERS.FORM.RESOURCE_USERS',         icon: 'pi pi-user-edit' },
 };
 
 @Component({
@@ -59,6 +60,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
     CardModule, ButtonModule, InputTextModule, PasswordModule,
     SelectModule, MultiSelectModule, DividerModule,
     TabsModule, Tab, TabList, TabPanel, TabPanels, TooltipModule,
+    TranslateModule,
   ],
   template: `
     <div class="max-w-5xl mx-auto">
@@ -68,8 +70,8 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
           (click)="cancel()">
         </button>
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? 'Edit User' : 'Create User' }}</h1>
-          <p class="text-gray-500 text-sm">{{ isEdit ? 'Update user details and permissions' : 'Add a new system user with role and permissions' }}</p>
+          <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? ('USERS.FORM.EDIT_TITLE' | translate) : ('USERS.FORM.CREATE_TITLE' | translate) }}</h1>
+          <p class="text-gray-500 text-sm">{{ isEdit ? ('USERS.FORM.EDIT_SUBTITLE' | translate) : ('USERS.FORM.CREATE_SUBTITLE' | translate) }}</p>
         </div>
       </div>
 
@@ -81,8 +83,8 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
         <form [formGroup]="form" (ngSubmit)="submit()">
           <p-tabs value="0">
             <p-tablist>
-              <p-tab value="0"><i class="pi pi-user mr-2"></i>Profile</p-tab>
-              <p-tab value="1"><i class="pi pi-shield mr-2"></i>Permissions</p-tab>
+              <p-tab value="0"><i class="pi pi-user mr-2"></i>{{ 'USERS.FORM.TAB_PROFILE' | translate }}</p-tab>
+              <p-tab value="1"><i class="pi pi-shield mr-2"></i>{{ 'USERS.FORM.TAB_PERMISSIONS' | translate }}</p-tab>
             </p-tablist>
             <p-tabpanels>
             <!-- ── TAB 1: Profile ─────────────────────────────────────────── -->
@@ -91,77 +93,77 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <!-- First Name -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    First Name <span class="text-red-500">*</span>
+                    {{ 'USERS.FORM.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
                   </label>
-                  <input pInputText formControlName="firstName" placeholder="First Name"
+                  <input pInputText formControlName="firstName" [placeholder]="'USERS.FORM.FIRST_NAME' | translate"
                     class="w-full" [class.ng-invalid]="isInvalid('firstName')" />
                   @if (isInvalid('firstName')) {
-                    <small class="text-red-500">First name is required</small>
+                    <small class="text-red-500">{{ 'USERS.FORM.FIRST_NAME_REQUIRED' | translate }}</small>
                   }
                 </div>
 
                 <!-- Last Name -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name <span class="text-red-500">*</span>
+                    {{ 'USERS.FORM.LAST_NAME' | translate }} <span class="text-red-500">*</span>
                   </label>
-                  <input pInputText formControlName="lastName" placeholder="Last Name"
+                  <input pInputText formControlName="lastName" [placeholder]="'USERS.FORM.LAST_NAME' | translate"
                     class="w-full" [class.ng-invalid]="isInvalid('lastName')" />
                   @if (isInvalid('lastName')) {
-                    <small class="text-red-500">Last name is required</small>
+                    <small class="text-red-500">{{ 'USERS.FORM.LAST_NAME_REQUIRED' | translate }}</small>
                   }
                 </div>
 
                 <!-- Email -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Email <span class="text-red-500">*</span>
+                    {{ 'USERS.FORM.EMAIL' | translate }} <span class="text-red-500">*</span>
                   </label>
-                  <input pInputText formControlName="email" type="email" placeholder="user@company.com"
+                  <input pInputText formControlName="email" type="email" [placeholder]="'USERS.FORM.EMAIL_PLACEHOLDER' | translate"
                     class="w-full" [class.ng-invalid]="isInvalid('email')" />
                   @if (isInvalid('email')) {
-                    <small class="text-red-500">Valid email is required</small>
+                    <small class="text-red-500">{{ 'USERS.FORM.EMAIL_REQUIRED' | translate }}</small>
                   }
                 </div>
 
                 <!-- Password -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    {{ isEdit ? 'New Password (leave blank to keep)' : 'Password' }}
+                    {{ isEdit ? ('USERS.FORM.PASSWORD_EDIT' | translate) : ('AUTH.LOGIN.PASSWORD' | translate) }}
                     @if (!isEdit) { <span class="text-red-500">*</span> }
                   </label>
                   <p-password formControlName="password" [toggleMask]="true" [feedback]="true"
-                    placeholder="{{ isEdit ? 'Leave blank to keep current' : 'Min. 6 characters' }}"
+                    [placeholder]="isEdit ? ('USERS.FORM.PASSWORD_HINT_EDIT' | translate) : ('USERS.FORM.PASSWORD_HINT' | translate)"
                     styleClass="w-full" [inputStyleClass]="'w-full'">
                   </p-password>
                   @if (isInvalid('password')) {
-                    <small class="text-red-500">Password must be at least 6 characters</small>
+                    <small class="text-red-500">{{ 'USERS.FORM.PASSWORD_MIN' | translate }}</small>
                   }
                 </div>
 
                 <!-- Role -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Role <span class="text-red-500">*</span>
+                    {{ 'USERS.FORM.ROLE' | translate }} <span class="text-red-500">*</span>
                   </label>
                   <p-select
                     formControlName="role"
                     [options]="roleOptions"
-                    placeholder="Select role"
+                    [placeholder]="'USERS.FORM.ROLE_PLACEHOLDER' | translate"
                     styleClass="w-full"
                     (onChange)="onRoleChange($event.value)">
                     <ng-template pTemplate="selectedItem" let-item>
                       <div class="flex items-center gap-2">
                         <i [class]="getRoleIcon(item.value) + ' text-sm ' + getRoleIconColor(item.value)"></i>
-                        <span>{{ item.label }}</span>
+                        <span>{{ item.label | translate }}</span>
                       </div>
                     </ng-template>
                     <ng-template pTemplate="item" let-item>
                       <div class="flex items-center gap-3 py-1">
                         <i [class]="getRoleIcon(item.value) + ' ' + getRoleIconColor(item.value)"></i>
                         <div>
-                          <div class="font-medium">{{ item.label }}</div>
-                          <div class="text-xs text-gray-400">{{ getRoleDescription(item.value) }}</div>
+                          <div class="font-medium">{{ item.label | translate }}</div>
+                          <div class="text-xs text-gray-400">{{ getRoleDescription(item.value) | translate }}</div>
                         </div>
                       </div>
                     </ng-template>
@@ -171,9 +173,9 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <!-- Branches -->
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Branch Access
+                    {{ 'USERS.FORM.BRANCH_LABEL' | translate }}
                     @if (selectedRole === UserRole.GLOBAL_ADMIN || selectedRole === UserRole.ADMIN) {
-                      <span class="ml-1 text-xs text-purple-500">(All branches)</span>
+                      <span class="ml-1 text-xs text-purple-500">{{ 'USERS.FORM.ALL_BRANCHES' | translate }}</span>
                     }
                   </label>
                   <p-multiSelect
@@ -181,16 +183,16 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                     [options]="branches()"
                     optionLabel="name"
                     optionValue="id"
-                    placeholder="Select branches"
+                    [placeholder]="'USERS.FORM.BRANCH_PLACEHOLDER' | translate"
                     [showToggleAll]="true"
                     styleClass="w-full"
                     [disabled]="selectedRole === UserRole.GLOBAL_ADMIN || selectedRole === UserRole.ADMIN">
                   </p-multiSelect>
                   <small class="text-gray-400 text-xs">
                     @if (selectedRole === UserRole.BRANCH_ADMIN || selectedRole === UserRole.BRANCH_MANAGER) {
-                      Branch Admins can be assigned multiple branches.
+                      {{ 'USERS.FORM.BRANCH_MULTI_HINT' | translate }}
                     } @else {
-                      Restrict user to specific branches.
+                      {{ 'USERS.FORM.BRANCH_RESTRICT_HINT' | translate }}
                     }
                   </small>
                 </div>
@@ -204,31 +206,30 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <div class="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <i class="pi pi-info-circle text-blue-500 text-lg mt-0.5"></i>
                   <div>
-                    <p class="text-sm font-medium text-blue-800">Role Default Permissions</p>
+                    <p class="text-sm font-medium text-blue-800">{{ 'USERS.FORM.PERM_TITLE' | translate }}</p>
                     <p class="text-xs text-blue-600 mt-0.5">
-                      The selected role sets default permissions. Overrides below apply on top of the defaults.
-                      Leave toggles at their default state to use role defaults.
+                      {{ 'USERS.FORM.PERM_SUBTITLE' | translate }}
                     </p>
                   </div>
                 </div>
 
                 <!-- Permission quick presets -->
                 <div class="flex gap-2 flex-wrap">
-                  <button type="button" pButton label="Load Role Defaults" icon="pi pi-refresh"
+                  <button type="button" pButton [label]="'USERS.FORM.LOAD_DEFAULTS' | translate" icon="pi pi-refresh"
                     class="p-button-outlined p-button-sm p-button-secondary"
                     (click)="loadRoleDefaults()">
                   </button>
-                  <button type="button" pButton label="Grant All" icon="pi pi-check-circle"
+                  <button type="button" pButton [label]="'USERS.FORM.GRANT_ALL' | translate" icon="pi pi-check-circle"
                     class="p-button-outlined p-button-sm p-button-success"
                     (click)="grantAll()">
                   </button>
-                  <button type="button" pButton label="Revoke All" icon="pi pi-times-circle"
+                  <button type="button" pButton [label]="'USERS.FORM.REVOKE_ALL' | translate" icon="pi pi-times-circle"
                     class="p-button-outlined p-button-sm p-button-danger"
                     (click)="revokeAll()">
                   </button>
-                  <button type="button" pButton label="Revoke Financial" icon="pi pi-dollar"
+                  <button type="button" pButton [label]="'USERS.FORM.REVOKE_FINANCIAL' | translate" icon="pi pi-dollar"
                     class="p-button-outlined p-button-sm p-button-warning"
-                    pTooltip="Remove access to revenue, expenses, reports, etc."
+                    [pTooltip]="'USERS.FORM.REVOKE_FINANCIAL_HINT' | translate"
                     (click)="revokeFinancial()">
                   </button>
                 </div>
@@ -238,15 +239,15 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                   <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th class="text-left px-4 py-3 font-semibold text-gray-600 w-48">Resource</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600 w-48">{{ 'USERS.FORM.COL_RESOURCE' | translate }}</th>
                         <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
-                          <i class="pi pi-eye mr-1 text-blue-500"></i> Read
+                          <i class="pi pi-eye mr-1 text-blue-500"></i> {{ 'USERS.FORM.COL_READ' | translate }}
                         </th>
                         <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
-                          <i class="pi pi-pencil mr-1 text-green-500"></i> Write
+                          <i class="pi pi-pencil mr-1 text-green-500"></i> {{ 'USERS.FORM.COL_WRITE' | translate }}
                         </th>
                         <th class="text-center px-4 py-3 font-semibold text-gray-600 w-24">
-                          <i class="pi pi-trash mr-1 text-red-500"></i> Delete
+                          <i class="pi pi-trash mr-1 text-red-500"></i> {{ 'USERS.FORM.COL_DELETE' | translate }}
                         </th>
                       </tr>
                     </thead>
@@ -255,7 +256,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                         <tr class="bg-gray-50 border-y border-gray-100">
                           <td colspan="4" class="px-4 py-2">
                             <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                              {{ section.title }}
+                              {{ section.title | translate }}
                             </span>
                           </td>
                         </tr>
@@ -265,9 +266,9 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                             <td class="px-4 py-3">
                               <div class="flex items-center gap-2">
                                 <i [class]="row.icon + ' text-gray-400'"></i>
-                                <span class="text-gray-700 font-medium">{{ row.label }}</span>
+                                <span class="text-gray-700 font-medium">{{ row.label | translate }}</span>
                                 @if (row.isFinancial) {
-                                  <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Financial</span>
+                                  <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{{ 'USERS.FORM.SECTION_FINANCIAL' | translate }}</span>
                                 }
                               </div>
                             </td>
@@ -314,10 +315,10 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
 
           <!-- Footer actions -->
           <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
-            <button type="button" pButton label="Cancel" severity="secondary"
+            <button type="button" pButton [label]="'USERS.FORM.CANCEL' | translate" severity="secondary"
               class="p-button-outlined" (click)="cancel()">
             </button>
-            <button type="submit" pButton [label]="isEdit ? 'Save Changes' : 'Create User'"
+            <button type="submit" pButton [label]="isEdit ? ('USERS.FORM.SAVE' | translate) : ('USERS.FORM.CREATE' | translate)"
               icon="pi pi-check" [loading]="saving()">
             </button>
           </div>
@@ -358,12 +359,12 @@ export class UserFormComponent implements OnInit {
   });
 
   roleOptions = [
-    { label: 'Global Admin', value: UserRole.GLOBAL_ADMIN },
-    { label: 'Branch Admin', value: UserRole.BRANCH_ADMIN },
-    { label: 'Academic Manager', value: UserRole.ACADEMIC_MANAGER },
-    { label: 'Sales Manager', value: UserRole.SALES_MANAGER },
-    { label: 'Accountant', value: UserRole.ACCOUNTANT },
-    { label: 'Viewer', value: UserRole.VIEWER },
+    { label: 'USERS.FORM.ROLE_GLOBAL_ADMIN', value: UserRole.GLOBAL_ADMIN },
+    { label: 'USERS.FORM.ROLE_BRANCH_ADMIN', value: UserRole.BRANCH_ADMIN },
+    { label: 'USERS.FORM.ROLE_ACADEMIC_MANAGER', value: UserRole.ACADEMIC_MANAGER },
+    { label: 'USERS.FORM.ROLE_SALES_MANAGER', value: UserRole.SALES_MANAGER },
+    { label: 'USERS.FORM.ROLE_ACCOUNTANT', value: UserRole.ACCOUNTANT },
+    { label: 'USERS.FORM.ROLE_VIEWER', value: UserRole.VIEWER },
   ];
 
   ngOnInit() {
@@ -435,10 +436,10 @@ export class UserFormComponent implements OnInit {
     const admin = this.permissionRows.filter(r => r.resource === 'users');
 
     this.permissionSections = [
-      { title: 'Academic & Management', rows: academic },
-      { title: 'Financial', rows: financial },
-      { title: 'Inventory', rows: inventory },
-      { title: 'Administration', rows: admin },
+      { title: 'USERS.FORM.SECTION_ACADEMIC', rows: academic },
+      { title: 'USERS.FORM.SECTION_FINANCIAL', rows: financial },
+      { title: 'USERS.FORM.SECTION_INVENTORY', rows: inventory },
+      { title: 'USERS.FORM.SECTION_ADMIN', rows: admin },
     ];
   }
 
@@ -587,12 +588,12 @@ export class UserFormComponent implements OnInit {
 
   getRoleDescription(role: string): string {
     const map: Record<string, string> = {
-      GLOBAL_ADMIN: 'Full access to all branches and settings',
-      BRANCH_ADMIN: 'Full access to assigned branches',
-      ACADEMIC_MANAGER: 'Students, courses, classes — no financials',
-      SALES_MANAGER: 'Products, sales, enrollments — no financials',
-      ACCOUNTANT: 'Financial data only',
-      VIEWER: 'Read-only access',
+      GLOBAL_ADMIN: 'USERS.FORM.ROLE_DESC_GLOBAL_ADMIN',
+      BRANCH_ADMIN: 'USERS.FORM.ROLE_DESC_BRANCH_ADMIN',
+      ACADEMIC_MANAGER: 'USERS.FORM.ROLE_DESC_ACADEMIC_MANAGER',
+      SALES_MANAGER: 'USERS.FORM.ROLE_DESC_SALES_MANAGER',
+      ACCOUNTANT: 'USERS.FORM.ROLE_DESC_ACCOUNTANT',
+      VIEWER: 'USERS.FORM.ROLE_DESC_VIEWER',
     };
     return map[role] || '';
   }

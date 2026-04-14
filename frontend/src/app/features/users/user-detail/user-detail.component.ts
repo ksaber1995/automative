@@ -12,6 +12,7 @@ import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -48,6 +49,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
     CommonModule, FormsModule,
     CardModule, ButtonModule, TagModule, DividerModule, DialogModule,
     PasswordModule, TabsModule, Tab, TabList, TabPanel, TabPanels, TooltipModule, ConfirmDialogModule,
+    TranslateModule,
   ],
   providers: [ConfirmationService],
   template: `
@@ -78,28 +80,28 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                   <i [class]="getRoleIcon(user()!.role) + ' text-xs'"></i>
                   {{ getRoleLabel(user()!.role) }}
                 </span>
-                <p-tag [value]="user()!.isActive ? 'Active' : 'Inactive'"
+                <p-tag [value]="user()!.isActive ? ('USERS.DETAIL.ACTIVE' | translate) : ('USERS.DETAIL.INACTIVE' | translate)"
                   [severity]="user()!.isActive ? 'success' : 'danger'"
                   [style]="{ fontSize: '0.7rem' }">
                 </p-tag>
                 @if (user()!.linkedEmployeeId) {
                   <span class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                    <i class="pi pi-link"></i> Linked Employee
+                    <i class="pi pi-link"></i> {{ 'USERS.LIST.LINKED_BADGE' | translate }}
                   </span>
                 }
               </div>
             </div>
           </div>
           <div class="flex gap-2">
-            <button pButton icon="pi pi-pencil" label="Edit" severity="warn"
+            <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT' | translate" severity="warn"
               (click)="edit()">
             </button>
             @if (user()!.isActive) {
-              <button pButton icon="pi pi-ban" label="Deactivate" severity="danger"
+              <button pButton icon="pi pi-ban" [label]="'USERS.DETAIL.DEACTIVATE' | translate" severity="danger"
                 class="p-button-outlined" (click)="toggleActive()">
               </button>
             } @else {
-              <button pButton icon="pi pi-check" label="Activate" severity="success"
+              <button pButton icon="pi pi-check" [label]="'USERS.DETAIL.ACTIVATE' | translate" severity="success"
                 class="p-button-outlined" (click)="toggleActive()">
               </button>
             }
@@ -108,8 +110,8 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
 
         <p-tabs value="0">
           <p-tablist>
-            <p-tab value="0"><i class="pi pi-user mr-2"></i>Information</p-tab>
-            <p-tab value="1"><i class="pi pi-shield mr-2"></i>Permissions</p-tab>
+            <p-tab value="0"><i class="pi pi-user mr-2"></i>{{ 'USERS.DETAIL.TAB_INFO' | translate }}</p-tab>
+            <p-tab value="1"><i class="pi pi-shield mr-2"></i>{{ 'USERS.DETAIL.TAB_PERMISSIONS' | translate }}</p-tab>
           </p-tablist>
           <p-tabpanels>
           <!-- Info Tab -->
@@ -119,28 +121,28 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <ng-template pTemplate="header">
                   <div class="flex items-center gap-2 px-4 pt-4">
                     <i class="pi pi-info-circle text-blue-500"></i>
-                    <span class="font-semibold text-gray-700">Account Details</span>
+                    <span class="font-semibold text-gray-700">{{ 'USERS.DETAIL.ACCOUNT_DETAILS' | translate }}</span>
                   </div>
                 </ng-template>
                 <div class="space-y-3">
                   <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">Email</span>
+                    <span class="text-gray-500">{{ 'USERS.DETAIL.EMAIL' | translate }}</span>
                     <span class="font-medium">{{ user()!.email }}</span>
                   </div>
                   <p-divider styleClass="my-2"></p-divider>
                   <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">Role</span>
+                    <span class="text-gray-500">{{ 'USERS.DETAIL.ROLE' | translate }}</span>
                     <span class="font-medium">{{ getRoleLabel(user()!.role) }}</span>
                   </div>
                   <p-divider styleClass="my-2"></p-divider>
                   <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">Created</span>
+                    <span class="text-gray-500">{{ 'USERS.DETAIL.CREATED' | translate }}</span>
                     <span class="font-medium">{{ user()!.createdAt | date:'mediumDate' }}</span>
                   </div>
                   <p-divider styleClass="my-2"></p-divider>
                   <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">Status</span>
-                    <p-tag [value]="user()!.isActive ? 'Active' : 'Inactive'"
+                    <span class="text-gray-500">{{ 'USERS.DETAIL.STATUS' | translate }}</span>
+                    <p-tag [value]="user()!.isActive ? ('USERS.DETAIL.ACTIVE' | translate) : ('USERS.DETAIL.INACTIVE' | translate)"
                       [severity]="user()!.isActive ? 'success' : 'danger'">
                     </p-tag>
                   </div>
@@ -151,14 +153,14 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <ng-template pTemplate="header">
                   <div class="flex items-center gap-2 px-4 pt-4">
                     <i class="pi pi-building text-green-500"></i>
-                    <span class="font-semibold text-gray-700">Branch Access</span>
+                    <span class="font-semibold text-gray-700">{{ 'USERS.DETAIL.BRANCH_ACCESS' | translate }}</span>
                   </div>
                 </ng-template>
                 <div class="space-y-2">
                   @if (user()!.role === UserRole.GLOBAL_ADMIN || user()!.role === UserRole.ADMIN) {
                     <div class="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
                       <i class="pi pi-crown text-purple-500"></i>
-                      <span class="text-sm font-medium text-purple-700">All Branches (Global Admin)</span>
+                      <span class="text-sm font-medium text-purple-700">{{ 'USERS.DETAIL.ALL_BRANCHES' | translate }}</span>
                     </div>
                   } @else if (userBranches().length) {
                     @for (branch of userBranches(); track branch.id) {
@@ -166,12 +168,12 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                         <i class="pi pi-building text-gray-400"></i>
                         <span class="text-sm font-medium">{{ branch.name }}</span>
                         @if (branch.id === user()!.branchId) {
-                          <span class="ml-auto text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Primary</span>
+                          <span class="ml-auto text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{{ 'USERS.DETAIL.PRIMARY' | translate }}</span>
                         }
                       </div>
                     }
                   } @else {
-                    <div class="text-gray-400 text-sm text-center py-4">No branches assigned</div>
+                    <div class="text-gray-400 text-sm text-center py-4">{{ 'USERS.DETAIL.NO_BRANCHES' | translate }}</div>
                   }
                 </div>
               </p-card>
@@ -181,10 +183,10 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
             <div class="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="font-medium text-gray-700">Reset Password</p>
-                  <p class="text-xs text-gray-400 mt-0.5">Set a new password for this user</p>
+                  <p class="font-medium text-gray-700">{{ 'USERS.DETAIL.RESET_PASSWORD_LABEL' | translate }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ 'USERS.DETAIL.RESET_PASSWORD_DESC' | translate }}</p>
                 </div>
-                <button pButton icon="pi pi-key" label="Reset Password" severity="secondary"
+                <button pButton icon="pi pi-key" [label]="'USERS.DETAIL.RESET_PASSWORD_BTN' | translate" severity="secondary"
                   class="p-button-outlined" (click)="showPasswordDialog = true">
                 </button>
               </div>
@@ -196,13 +198,13 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
             <div class="pt-4">
               <div class="flex items-center justify-between mb-4">
                 <p class="text-sm text-gray-500">
-                  Effective permissions based on role
+                  {{ 'USERS.DETAIL.EFFECTIVE_PERM' | translate }}
                   <strong>{{ getRoleLabel(user()!.role) }}</strong>
                   @if (user()!.permissions) {
-                    + custom overrides
+                    {{ 'USERS.DETAIL.CUSTOM_OVERRIDES' | translate }}
                   }
                 </p>
-                <button pButton icon="pi pi-pencil" label="Edit Permissions"
+                <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT_PERMISSIONS' | translate"
                   class="p-button-sm p-button-outlined"
                   (click)="edit()">
                 </button>
@@ -212,10 +214,10 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <table class="w-full text-sm">
                   <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th class="text-left px-4 py-3 font-semibold text-gray-600">Resource</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">Read</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">Write</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">Delete</th>
+                      <th class="text-left px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_RESOURCE' | translate }}</th>
+                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_READ' | translate }}</th>
+                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_WRITE' | translate }}</th>
+                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_DELETE' | translate }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -227,7 +229,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                             <i [class]="RESOURCE_META[resource].icon + ' text-gray-400 text-sm'"></i>
                             <span class="text-gray-700">{{ RESOURCE_META[resource].label }}</span>
                             @if (RESOURCE_META[resource].financial) {
-                              <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Financial</span>
+                              <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{{ 'USERS.FORM.SECTION_FINANCIAL' | translate }}</span>
                             }
                           </div>
                         </td>
@@ -253,22 +255,22 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
     }
 
     <!-- Reset Password Dialog -->
-    <p-dialog [(visible)]="showPasswordDialog" header="Reset Password" [modal]="true"
+    <p-dialog [(visible)]="showPasswordDialog" [header]="'USERS.DETAIL.RESET_TITLE' | translate" [modal]="true"
       [style]="{ width: '400px' }">
       <div class="space-y-4 py-2">
         <p class="text-sm text-gray-500">
-          Set a new password for <strong>{{ user()?.firstName }} {{ user()?.lastName }}</strong>
+          {{ 'USERS.DETAIL.RESET_FOR' | translate }} <strong>{{ user()?.firstName }} {{ user()?.lastName }}</strong>
         </p>
         <p-password [(ngModel)]="newPassword" [toggleMask]="true" [feedback]="true"
-          placeholder="New password (min. 6 chars)"
+          [placeholder]="'USERS.DETAIL.NEW_PASSWORD' | translate"
           styleClass="w-full" [inputStyleClass]="'w-full'">
         </p-password>
       </div>
       <ng-template pTemplate="footer">
-        <button pButton label="Cancel" severity="secondary" class="p-button-outlined"
+        <button pButton [label]="'USERS.DETAIL.CANCEL' | translate" severity="secondary" class="p-button-outlined"
           (click)="showPasswordDialog = false; newPassword = ''">
         </button>
-        <button pButton label="Reset" icon="pi pi-key" [loading]="savingPassword()"
+        <button pButton [label]="'USERS.DETAIL.RESET' | translate" icon="pi pi-key" [loading]="savingPassword()"
           (click)="resetPassword()">
         </button>
       </ng-template>

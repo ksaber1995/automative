@@ -6,67 +6,70 @@
         <div class="flex justify-between items-center p-4">
           <div>
             <h2 class="text-2xl font-bold">{{ s.firstName }} {{ s.lastName }}</h2>
-            <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} years old</p>
+            <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
           </div>
           <div class="flex gap-2">
-            <button pButton label="Edit" icon="pi pi-pencil" (click)="editStudent()"></button>
-            <button pButton label="Back" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
+            <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
+            <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>
         </div>
       </ng-template>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h3 class="text-lg font-semibold mb-3 text-gray-700">Personal Information</h3>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'STUDENTS.DETAIL.PERSONAL' | translate }}</h3>
           <div class="space-y-2">
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Date of Birth:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.DOB' | translate }}</span>
               <span>{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
             </div>
             @if (s.email) {
               <div class="flex">
-                <span class="font-medium text-gray-600 w-32">Email:</span>
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.EMAIL' | translate }}</span>
                 <span>{{ s.email }}</span>
               </div>
             }
             @if (s.phone) {
               <div class="flex">
-                <span class="font-medium text-gray-600 w-32">Phone:</span>
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PHONE' | translate }}</span>
                 <span>{{ s.phone }}</span>
               </div>
             }
             @if (s.address) {
               <div class="flex">
-                <span class="font-medium text-gray-600 w-32">Address:</span>
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ADDRESS' | translate }}</span>
                 <span>{{ s.address }}</span>
               </div>
             }
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Status:</span>
-              <p-tag [value]="s.isActive ? 'Active' : 'Inactive'" [severity]="s.isActive ? 'success' : 'danger'"></p-tag>
+              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.STATUS' | translate }}</span>
+              <p-tag
+                [value]="s.isActive ? ('STUDENTS.DETAIL.ACTIVE' | translate) : ('STUDENTS.DETAIL.INACTIVE' | translate)"
+                [severity]="s.isActive ? 'success' : 'danger'"
+              ></p-tag>
             </div>
           </div>
         </div>
 
         <div>
-          <h3 class="text-lg font-semibold mb-3 text-gray-700">Parent/Guardian Information</h3>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'STUDENTS.DETAIL.PARENT' | translate }}</h3>
           <div class="space-y-2">
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Name:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_NAME' | translate }}</span>
               <span>{{ s.parentName }}</span>
             </div>
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Phone:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_PHONE' | translate }}</span>
               <span>{{ s.parentPhone }}</span>
             </div>
             @if (s.parentEmail) {
               <div class="flex">
-                <span class="font-medium text-gray-600 w-32">Email:</span>
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_EMAIL' | translate }}</span>
                 <span>{{ s.parentEmail }}</span>
               </div>
             }
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">Enrolled:</span>
+              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ENROLLED_DATE' | translate }}</span>
               <span>{{ s.enrollmentDate | date: 'MMM d, y' }}</span>
             </div>
           </div>
@@ -75,7 +78,7 @@
 
       @if (s.notes) {
         <div class="mt-6 pt-6 border-t">
-          <h3 class="text-lg font-semibold mb-2 text-gray-700">Notes</h3>
+          <h3 class="text-lg font-semibold mb-2 text-gray-700">{{ 'STUDENTS.DETAIL.NOTES' | translate }}</h3>
           <p class="text-gray-600 whitespace-pre-wrap">{{ s.notes }}</p>
         </div>
       }
@@ -85,8 +88,8 @@
     <p-card class="mt-6">
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
-          <h3 class="text-xl font-bold">Course Enrollments ({{ enrollments().length }})</h3>
-          <button pButton label="Enroll in Course" icon="pi pi-plus" (click)="enrollStudent()"></button>
+          <h3 class="text-xl font-bold">{{ 'STUDENTS.DETAIL.ENROLLMENTS' | translate }} ({{ enrollments().length }})</h3>
+          <button pButton [label]="'STUDENTS.DETAIL.ENROLL_BTN' | translate" icon="pi pi-plus" (click)="enrollStudent()"></button>
         </div>
       </ng-template>
 
@@ -94,14 +97,14 @@
         <ng-template pTemplate="header">
           <tr>
             <th style="width: 3rem"></th>
-            <th>Course</th>
-            <th>Date</th>
-            <th>Pricing</th>
-            <th>Payment Mode</th>
-            <th>Paid / Total</th>
-            <th>Status</th>
-            <th>Payment</th>
-            <th>Actions</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_MODE' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_PAID' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
+            <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
 
@@ -132,9 +135,9 @@
             </td>
             <td>
               @if (enrollment.paymentMode === 'INSTALLMENTS') {
-                <p-tag value="Installments" severity="info"></p-tag>
+                <p-tag [value]="'STUDENTS.DETAIL.INSTALLMENTS' | translate" severity="info"></p-tag>
               } @else {
-                <p-tag value="Full" severity="success"></p-tag>
+                <p-tag [value]="'STUDENTS.DETAIL.FULL' | translate" severity="success"></p-tag>
               }
             </td>
             <td>
@@ -148,12 +151,12 @@
                     </div>
                   }
                   @if (getPaymentHistory(enrollment.id).length === 0) {
-                    <span class="text-xs text-gray-400">No payments yet</span>
+                    <span class="text-xs text-gray-400">{{ 'STUDENTS.DETAIL.NO_PAYMENTS' | translate }}</span>
                   }
                   <!-- Remaining -->
                   @if (enrollment.paymentStatus !== 'PAID') {
                     <div class="flex items-center justify-between text-xs bg-red-50 border border-red-100 rounded px-2 py-1">
-                      <span class="text-red-500">Remaining</span>
+                      <span class="text-red-500">{{ 'STUDENTS.DETAIL.REMAINING' | translate }}</span>
                       <span class="font-semibold text-red-600">{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)).toFixed(2) }}</span>
                     </div>
                   }
@@ -189,7 +192,7 @@
                     [value]="'Refund: -' + (enrollment.totalRefunded).toFixed(2)"
                     severity="warn"
                     styleClass="text-xs"
-                    pTooltip="Click the expand arrow to see refund details"
+                    [pTooltip]="'STUDENTS.DETAIL.CLICK_EXPAND' | translate"
                   ></p-tag>
                 }
               </div>
@@ -204,7 +207,7 @@
                     [text]="true"
                     severity="success"
                     (onClick)="openPaymentDialog(enrollment)"
-                    pTooltip="Add Payment"
+                    [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
                   ></p-button>
                 }
                 <!-- Refund button -->
@@ -215,7 +218,7 @@
                     [text]="true"
                     severity="warn"
                     (onClick)="openRefundDialog(enrollment)"
-                    pTooltip="Refund"
+                    [pTooltip]="'STUDENTS.DETAIL.REFUND' | translate"
                   ></p-button>
                 }
                 <p-button
@@ -224,7 +227,7 @@
                   [text]="true"
                   severity="secondary"
                   (onClick)="editEnrollment(enrollment)"
-                  pTooltip="Edit"
+                  [pTooltip]="'STUDENTS.DETAIL.EDIT_ENROLLMENT' | translate"
                 ></p-button>
               </div>
             </td>
@@ -240,10 +243,10 @@
                   <!-- Payment history -->
                   <div>
                     <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <i class="pi pi-credit-card text-green-600"></i> Payment History
+                      <i class="pi pi-credit-card text-green-600"></i> {{ 'STUDENTS.DETAIL.PAYMENT_HISTORY' | translate }}
                     </h4>
                     @if (getPaymentHistory(enrollment.id).length === 0) {
-                      <p class="text-gray-400 text-sm">No payments recorded</p>
+                      <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_PAYMENT_HISTORY' | translate }}</p>
                     } @else {
                       <div class="space-y-2">
                         @for (payment of getPaymentHistory(enrollment.id); track payment.id) {
@@ -266,10 +269,10 @@
                   <!-- Refund history -->
                   <div>
                     <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <i class="pi pi-replay text-orange-500"></i> Refund History
+                      <i class="pi pi-replay text-orange-500"></i> {{ 'STUDENTS.DETAIL.REFUND_HISTORY' | translate }}
                     </h4>
                     @if (getRefundHistory(enrollment.id).length === 0) {
-                      <p class="text-gray-400 text-sm">No refunds issued</p>
+                      <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_REFUNDS' | translate }}</p>
                     } @else {
                       <div class="space-y-2">
                         @for (refund of getRefundHistory(enrollment.id); track refund.id) {
@@ -303,8 +306,8 @@
             <td colspan="9" class="text-center py-8">
               <div class="text-gray-500">
                 <i class="pi pi-inbox text-4xl mb-3"></i>
-                <p>No course enrollments found.</p>
-                <p class="text-sm mt-2">Click "Enroll in Course" to add the first enrollment.</p>
+                <p>{{ 'STUDENTS.DETAIL.NO_ENROLLMENTS' | translate }}</p>
+                <p class="text-sm mt-2">{{ 'STUDENTS.DETAIL.CLICK_TO_ENROLL' | translate }}</p>
               </div>
             </td>
           </tr>
@@ -321,34 +324,34 @@
 <!-- Add Payment Dialog -->
 <p-dialog
   [(visible)]="showPaymentDialog"
-  [header]="'Add Payment — ' + getCourseName(enrollmentForAction()?.courseId || '')"
+  [header]="('STUDENTS.DETAIL.ADD_PAYMENT_TITLE' | translate) + ' — ' + getCourseName(enrollmentForAction()?.courseId || '')"
   [modal]="true"
   [style]="{ width: '420px' }"
 >
   @if (enrollmentForAction()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
-      <div><span class="text-gray-500">Final Price:</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">Paid:</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
-      <div class="col-span-2"><span class="text-gray-500">Remaining:</span> <strong class="text-red-600">{{ remaining().toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.REMAINING_LABEL' | translate }}</span> <strong class="text-red-600">{{ remaining().toFixed(2) }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
     <div>
-      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
-      <p-inputnumber [(ngModel)]="dialogPaymentAmount" [min]="0.01" [max]="remaining()" placeholder="Amount" [style]="{ width: '100%' }" />
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.AMOUNT' | translate }} <span class="text-red-500">*</span></label>
+      <p-inputnumber [(ngModel)]="dialogPaymentAmount" [min]="0.01" [max]="remaining()" [placeholder]="'STUDENTS.DETAIL.AMOUNT' | translate" [style]="{ width: '100%' }" />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
       <p-datepicker [(ngModel)]="dialogPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Notes</label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.NOTES_LABEL' | translate }}</label>
       <textarea pTextarea [(ngModel)]="dialogPaymentNotes" rows="2" class="w-full" placeholder="Optional notes..."></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
-    <p-button label="Record Payment" icon="pi pi-check" [loading]="actionLoading()"
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
       (onClick)="submitPayment()"></p-button>
   </ng-template>
@@ -357,32 +360,32 @@
 <!-- Refund Dialog -->
 <p-dialog
   [(visible)]="showRefundDialog"
-  [header]="'Issue Refund — ' + getCourseName(enrollmentForAction()?.courseId || '')"
+  [header]="('STUDENTS.DETAIL.REFUND_TITLE' | translate) + ' — ' + getCourseName(enrollmentForAction()?.courseId || '')"
   [modal]="true"
   [style]="{ width: '440px' }"
 >
   @if (enrollmentForAction()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
-      <div><span class="text-gray-500">Final Price:</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">Amount Paid:</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
     <div>
-      <label class="block text-sm font-medium mb-2">Refund Type <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.REFUND_TYPE' | translate }} <span class="text-red-500">*</span></label>
       <div class="flex gap-6">
         <div class="flex items-center gap-2">
           <p-radiobutton name="refundType" value="FULL" [(ngModel)]="refundType" (onClick)="onRefundTypeChange()"></p-radiobutton>
-          <label>Full Refund ({{ (enrollmentForAction()?.amountPaid || 0).toFixed(2) }})</label>
+          <label>{{ 'STUDENTS.DETAIL.FULL_REFUND' | translate }} ({{ (enrollmentForAction()?.amountPaid || 0).toFixed(2) }})</label>
         </div>
         <div class="flex items-center gap-2">
           <p-radiobutton name="refundType" value="PARTIAL" [(ngModel)]="refundType"></p-radiobutton>
-          <label>Partial Refund</label>
+          <label>{{ 'STUDENTS.DETAIL.PARTIAL_REFUND' | translate }}</label>
         </div>
       </div>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.REFUND_AMOUNT' | translate }} <span class="text-red-500">*</span></label>
       <p-inputnumber
         [(ngModel)]="refundAmount"
         [min]="0.01"
@@ -392,17 +395,17 @@
       />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Refund Date <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.REFUND_DATE' | translate }} <span class="text-red-500">*</span></label>
       <p-datepicker [(ngModel)]="refundDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Reason</label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.REASON' | translate }}</label>
       <textarea pTextarea [(ngModel)]="refundReason" rows="2" class="w-full" placeholder="Reason for refund..."></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
-    <p-button label="Issue Refund" icon="pi pi-replay" severity="warn" [loading]="actionLoading()"
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn" [loading]="actionLoading()"
       [disabled]="!refundAmount || !refundDate"
       (onClick)="submitRefund()"></p-button>
   </ng-template>

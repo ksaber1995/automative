@@ -8,6 +8,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
+import { TranslateModule } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -33,7 +34,8 @@ interface BranchStats {
     TagModule,
     TooltipModule,
     ProgressSpinnerModule,
-    ConfirmDialogModule
+    ConfirmDialogModule,
+    TranslateModule
   ],
   providers: [ConfirmationService],
   templateUrl: './branch-detail.component.html',

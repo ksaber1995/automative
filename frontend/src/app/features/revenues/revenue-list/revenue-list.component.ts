@@ -10,11 +10,12 @@ import { RevenueService, RevenueItem } from '../services/revenue.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-revenue-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule],
+  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TranslateModule],
   templateUrl: './revenue-list.component.html',
   styleUrl: './revenue-list.component.scss'
 })

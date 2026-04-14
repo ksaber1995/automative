@@ -1,5 +1,5 @@
 <div class="container-custom py-8">
-  <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ 'DASHBOARD.TITLE' | translate }}</h1>
 
   @if (loading()) {
   <div class="flex justify-center items-center py-20">
@@ -14,11 +14,11 @@
       <p-card class="bg-gradient-to-br from-blue-50 to-blue-100">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-600 mb-1">Total Revenue</div>
+            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.TOTAL_REVENUE' | translate }}</div>
             <div class="text-2xl font-bold text-blue-600">
               {{ formatCurrency(data.companyWideSummary.totalRevenue) }}
             </div>
-            <div class="text-xs text-gray-500 mt-1">After refunds</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'DASHBOARD.AFTER_REFUNDS' | translate }}</div>
           </div>
           <i class="pi pi-dollar text-4xl text-blue-400"></i>
         </div>
@@ -27,11 +27,11 @@
       <p-card class="bg-gradient-to-br from-orange-50 to-orange-100">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-600 mb-1">Total Refunds</div>
+            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.TOTAL_REFUNDS' | translate }}</div>
             <div class="text-2xl font-bold text-orange-600">
               {{ formatCurrency(data.companyWideSummary.totalRefunds || 0) }}
             </div>
-            <div class="text-xs text-gray-500 mt-1">Returned to clients</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'DASHBOARD.RETURNED' | translate }}</div>
           </div>
           <i class="pi pi-replay text-4xl text-orange-400"></i>
         </div>
@@ -40,11 +40,11 @@
       <p-card class="bg-gradient-to-br from-red-50 to-red-100">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-600 mb-1">Total Expenses</div>
+            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.TOTAL_EXPENSES' | translate }}</div>
             <div class="text-2xl font-bold text-red-600">
               {{ formatCurrency(data.companyWideSummary.totalExpenses) }}
             </div>
-            <div class="text-xs text-gray-500 mt-1">Excl. refunds</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'DASHBOARD.EXCL_REFUNDS' | translate }}</div>
           </div>
           <i class="pi pi-chart-line text-4xl text-red-400"></i>
         </div>
@@ -53,7 +53,7 @@
       <p-card class="bg-gradient-to-br from-green-50 to-green-100">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-600 mb-1">Net Profit</div>
+            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.NET_PROFIT' | translate }}</div>
             <div class="text-2xl font-bold" [class.text-green-600]="data.companyWideSummary.netProfit >= 0"
               [class.text-red-600]="data.companyWideSummary.netProfit < 0">
               {{ formatCurrency(data.companyWideSummary.netProfit) }}
@@ -66,7 +66,7 @@
       <p-card class="bg-gradient-to-br from-purple-50 to-purple-100">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-600 mb-1">Profit Margin</div>
+            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.PROFIT_MARGIN' | translate }}</div>
             <div class="text-2xl font-bold text-purple-600">
               {{ data.companyWideSummary.totalRevenue > 0 ? ((data.companyWideSummary.netProfit /
               data.companyWideSummary.totalRevenue) * 100)?.toFixed(1) : 0 }}%
@@ -85,26 +85,26 @@
             <div class="flex-1">
               <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
                 <i class="pi pi-wallet text-cyan-600"></i>
-                <span>Current Cash</span>
+                <span>{{ 'DASHBOARD.CURRENT_CASH' | translate }}</span>
               </div>
               <div class="text-2xl font-bold text-cyan-600">
                 {{ formatCurrency(data.companyWideSummary.currentCash || 0) }}
               </div>
-              <div class="text-xs text-gray-500 mt-1">Cash on hand</div>
+              <div class="text-xs text-gray-500 mt-1">{{ 'DASHBOARD.CASH_ON_HAND' | translate }}</div>
             </div>
             <div class="flex flex-col gap-2">
               <button
                 pButton
                 icon="pi pi-eye"
                 class="p-button-rounded p-button-text p-button-sm"
-                pTooltip="View Details"
+                [pTooltip]="'DASHBOARD.VIEW_DETAILS' | translate"
                 (click)="navigateTo('/withdrawals')">
               </button>
               <button
                 pButton
                 icon="pi pi-plus"
                 class="p-button-rounded p-button-text p-button-success p-button-sm"
-                pTooltip="Adjust Cash"
+                [pTooltip]="'DASHBOARD.ADJUST_CASH' | translate"
                 (click)="navigateTo('/withdrawals/new')">
               </button>
             </div>
@@ -122,7 +122,7 @@
             <div class="flex-1">
               <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
                 <i class="pi pi-check-circle text-teal-600"></i>
-                <span>Available Cash</span>
+                <span>{{ 'DASHBOARD.AVAILABLE_CASH' | translate }}</span>
               </div>
               <div class="text-2xl font-bold"
                 [class.text-teal-600]="(data.companyWideSummary.availableCash || 0) >= 0"
@@ -130,9 +130,9 @@
                 {{ formatCurrency(data.companyWideSummary.availableCash || 0) }}
               </div>
               <div class="text-xs text-gray-500 mt-1">
-                Cash minus debts
+                {{ 'DASHBOARD.CASH_MINUS_DEBTS' | translate }}
                 @if ((data.companyWideSummary.availableCash || 0) < 0) {
-                  <span class="text-red-600 font-semibold ml-1">⚠️ Negative</span>
+                  <span class="text-red-600 font-semibold ml-1">⚠️ {{ 'DASHBOARD.NEGATIVE' | translate }}</span>
                 }
               </div>
             </div>
@@ -147,7 +147,7 @@
       <!-- Revenue Trends -->
       <p-card>
         <ng-template pTemplate="header">
-          <div class="p-4 font-semibold text-lg">Revenue & Expense Trends</div>
+          <div class="p-4 font-semibold text-lg">{{ 'DASHBOARD.REVENUE_TRENDS' | translate }}</div>
         </ng-template>
         <div style="height: 300px">
           <p-chart type="line" [data]="revenueChartData" [options]="revenueChartOptions"></p-chart>
@@ -157,7 +157,7 @@
       <!-- Expense Breakdown -->
       <p-card>
         <ng-template pTemplate="header">
-          <div class="p-4 font-semibold text-lg">Expense Breakdown by Category</div>
+          <div class="p-4 font-semibold text-lg">{{ 'DASHBOARD.EXPENSE_BREAKDOWN' | translate }}</div>
         </ng-template>
         <div style="height: 300px">
           <p-chart type="pie" [data]="expenseChartData" [options]="expenseChartOptions"></p-chart>
@@ -169,7 +169,7 @@
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4 flex items-center justify-between flex-wrap gap-3">
-          <span class="font-semibold text-lg">Branch P&amp;L</span>
+          <span class="font-semibold text-lg">{{ 'DASHBOARD.BRANCH_PL' | translate }}</span>
           <div class="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border">
             <i [class]="getAllocationIcon(data.companyWideSummary.allocationMethod)"></i>
             <span>{{ getAllocationLabel(data.companyWideSummary.allocationMethod) }}</span>
@@ -180,22 +180,22 @@
       <p-table [value]="data.branchSummaries" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th>Branch</th>
-            <th pTooltip="Revenue from enrollments + product sales" tooltipPosition="top">Revenue</th>
-            <th pTooltip="Expenses explicitly assigned to this branch" tooltipPosition="top">Direct Costs</th>
-            <th pTooltip="Share of global overhead allocated based on chosen method" tooltipPosition="top">
-              Overhead Share
+            <th>{{ 'NAV.BRANCHES' | translate }}</th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_REVENUE_TIP' | translate" tooltipPosition="top">{{ 'NAV.REVENUES' | translate }}</th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_DIRECT_TIP' | translate" tooltipPosition="top">{{ 'DASHBOARD.COL_DIRECT' | translate }}</th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_OVERHEAD_TIP' | translate" tooltipPosition="top">
+              {{ 'DASHBOARD.COL_OVERHEAD' | translate }}
             </th>
-            <th pTooltip="Revenue − Direct Costs − Overhead Share" tooltipPosition="top">Net Profit</th>
-            <th>Margin</th>
-            <th>Status</th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_NET_TIP' | translate" tooltipPosition="top">{{ 'DASHBOARD.COL_NET_PROFIT' | translate }}</th>
+            <th>{{ 'DASHBOARD.COL_MARGIN' | translate }}</th>
+            <th>{{ 'DASHBOARD.COL_STATUS' | translate }}</th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-branch>
           <tr>
             <td>
               <div class="font-semibold">{{ branch.branchName }}</div>
-              <div class="text-xs text-gray-500">{{ branch.studentCount }} students</div>
+              <div class="text-xs text-gray-500">{{ branch.studentCount }} {{ 'DASHBOARD.COL_STUDENTS' | translate }}</div>
             </td>
             <td class="font-medium text-blue-700">{{ formatCurrency(branch.totalRevenue) }}</td>
             <td class="text-red-600">{{ formatCurrency(branch.directExpenses) }}</td>
@@ -219,7 +219,7 @@
               </span>
             </td>
             <td>
-              <p-tag [value]="branch.netProfit >= 0 ? 'Profitable' : 'Loss'"
+              <p-tag [value]="branch.netProfit >= 0 ? ('DASHBOARD.PROFITABLE' | translate) : ('DASHBOARD.LOSS' | translate)"
                 [severity]="getProfitSeverity(branch.netProfit)"></p-tag>
             </td>
           </tr>
@@ -228,7 +228,7 @@
           @if (data.companyWideSummary.allocationMethod === 'OVERHEAD' && data.companyWideSummary.globalOverhead > 0) {
             <tr class="bg-orange-50">
               <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
-                <i class="pi pi-building mr-2"></i>Global Overhead (not charged to branches)
+                <i class="pi pi-building mr-2"></i>{{ 'DASHBOARD.GLOBAL_OVERHEAD' | translate }}
               </td>
               <td>
                 <span class="font-bold text-orange-700">− {{ formatCurrency(data.companyWideSummary.globalOverhead) }}</span>
@@ -236,7 +236,7 @@
               <td colspan="2"></td>
             </tr>
             <tr class="bg-green-50 border-t-2 border-green-200">
-              <td colspan="4" class="text-right text-sm font-bold text-green-800 pr-4">Company Net Profit</td>
+              <td colspan="4" class="text-right text-sm font-bold text-green-800 pr-4">{{ 'DASHBOARD.COMPANY_NET' | translate }}</td>
               <td>
                 <span class="font-bold text-xl"
                   [class.text-green-700]="data.companyWideSummary.netProfit >= 0"
@@ -258,14 +258,14 @@
           <div class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <i class="pi pi-exclamation-triangle text-orange-500 text-xl"></i>
-              <span class="font-semibold text-lg">Due This Month</span>
+              <span class="font-semibold text-lg">{{ 'DASHBOARD.DUE_MONTH' | translate }}</span>
               @if (dueExpenses(); as due) {
-                <span class="text-sm text-gray-500">({{ due.items.length }} unpaid)</span>
+                <span class="text-sm text-gray-500">({{ due.items.length }} {{ 'DASHBOARD.UNPAID' | translate }})</span>
               }
             </div>
             @if (dueExpenses(); as due) {
               <div class="text-right">
-                <div class="text-xs text-gray-500">Total Due</div>
+                <div class="text-xs text-gray-500">{{ 'DASHBOARD.TOTAL_DUE' | translate }}</div>
                 <div class="text-xl font-bold text-orange-600">{{ formatCurrency(due.totalDue) }}</div>
               </div>
             }
@@ -280,7 +280,7 @@
           @if (due.items.length === 0) {
             <div class="text-center py-8 text-gray-400">
               <i class="pi pi-check-circle text-4xl mb-2 block text-green-400"></i>
-              <p class="font-medium">All caught up! No due expenses for this month.</p>
+              <p class="font-medium">{{ 'DASHBOARD.ALL_CAUGHT_UP' | translate }}</p>
             </div>
           } @else {
             <div class="space-y-2">
@@ -307,7 +307,7 @@
                   <div class="flex items-center gap-4">
                     <span class="font-bold text-gray-800">{{ formatCurrency(item.amount) }}</span>
                     <p-button
-                      label="Pay Now"
+                      [label]="'DASHBOARD.PAY_NOW' | translate"
                       icon="pi pi-check"
                       size="small"
                       severity="success"
@@ -327,7 +327,7 @@
     <div class="mt-8">
       <p-card>
         <ng-template pTemplate="header">
-          <div class="p-4 font-semibold text-lg">Top Performing Branches</div>
+          <div class="p-4 font-semibold text-lg">{{ 'DASHBOARD.TOP_BRANCHES' | translate }}</div>
         </ng-template>
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
           @for (branch of data.topPerformingBranches; track branch.branchId; let i = $index) {
@@ -338,7 +338,7 @@
                 [class.text-orange-600]="i === 2"></i>
             </div>
             <div class="font-semibold text-lg mb-1">{{ branch.branchName }}</div>
-            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount || 0 }} students • {{ branch.courseCount || 0 }} courses</div>
+            <div class="text-sm text-gray-600 mb-2">{{ branch.studentCount || 0 }} {{ 'DASHBOARD.COL_STUDENTS' | translate }} • {{ branch.courseCount || 0 }} {{ 'NAV.COURSES' | translate | lowercase }}</div>
             <div class="text-green-600 font-semibold">{{ formatCurrency(branch.profit) }}</div>
             <div class="text-xs text-gray-500">{{ formatMargin(branch.profitMargin) }}% margin</div>
           </div>
