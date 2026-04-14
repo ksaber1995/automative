@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapWithdrawalFromDB(row: any) {
   return {
@@ -24,6 +24,10 @@ export const withdrawalsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const withdrawal = await insert('withdrawals', {
         company_id: context.companyId,
@@ -58,6 +62,10 @@ export const withdrawalsRoutes = {
   list: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
       const params: any[] = [context.companyId];
@@ -96,6 +104,10 @@ export const withdrawalsRoutes = {
   summary: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
       const params: any[] = [context.companyId];
@@ -171,6 +183,11 @@ export const withdrawalsRoutes = {
   getByStakeholder: async ({ params, headers }: { params: { stakeholderName: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
       const stakeholderName = decodeURIComponent(params.stakeholderName);
 
       // Query withdrawals where stakeholders JSONB array contains the stakeholder name
@@ -212,6 +229,10 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
+      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
       const withdrawal = await queryOne(
         'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
@@ -245,6 +266,10 @@ export const withdrawalsRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',
@@ -296,6 +321,10 @@ export const withdrawalsRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'withdrawals', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM withdrawals WHERE id = $1 AND company_id = $2',

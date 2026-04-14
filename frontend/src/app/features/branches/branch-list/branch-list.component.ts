@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { TranslateModule } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
@@ -36,6 +37,7 @@ export class BranchListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  authService = inject(AuthService);
 
   allBranches = signal<Branch[]>([]);
   loading = signal(true);

@@ -10,6 +10,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { ProductService } from '../services/product.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
 import { ProductCategory } from '@shared/enums/product.enum';
@@ -140,22 +141,26 @@ import { ProductCategory } from '@shared/enums/product.enum';
                     [pTooltip]="'PRODUCTS.LIST.SELL_TOOLTIP' | translate"
                     (onClick)="sell(product)">
                   </p-button>
-                  <p-button
-                    icon="pi pi-pencil"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="warn"
-                    [pTooltip]="'PRODUCTS.LIST.EDIT_TOOLTIP' | translate"
-                    (onClick)="editProduct(product.id)">
-                  </p-button>
-                  <p-button
-                    icon="pi pi-trash"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="danger"
-                    [pTooltip]="'PRODUCTS.LIST.DELETE_TOOLTIP' | translate"
-                    (onClick)="confirmDelete(product)">
-                  </p-button>
+                  @if (authService.canWrite('products')) {
+                    <p-button
+                      icon="pi pi-pencil"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      [pTooltip]="'PRODUCTS.LIST.EDIT_TOOLTIP' | translate"
+                      (onClick)="editProduct(product.id)">
+                    </p-button>
+                  }
+                  @if (authService.canDelete('products')) {
+                    <p-button
+                      icon="pi pi-trash"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="danger"
+                      [pTooltip]="'PRODUCTS.LIST.DELETE_TOOLTIP' | translate"
+                      (onClick)="confirmDelete(product)">
+                    </p-button>
+                  }
                   <p-button
                     icon="pi pi-box"
                     [rounded]="true"
@@ -195,6 +200,7 @@ export class ProductListComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  authService = inject(AuthService);
 
   products = signal<Product[]>([]);
   loading = signal(false);

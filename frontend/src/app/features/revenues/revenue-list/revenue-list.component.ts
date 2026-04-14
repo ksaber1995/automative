@@ -56,7 +56,7 @@ export class RevenueListComponent implements OnInit {
     this.revenueService.getRevenues(params).subscribe({
       next: (revenues: RevenueItem[]) => {
         this.revenues.set(revenues);
-        this.totalRevenue = revenues.reduce((sum: number, r: RevenueItem) => sum + r.amount, 0);
+        this.totalRevenue = revenues.reduce((sum: number, r: RevenueItem) => sum + r.amount - (r.totalRefunded || 0), 0);
         this.loading.set(false);
       },
       error: () => {
@@ -79,5 +79,13 @@ export class RevenueListComponent implements OnInit {
   getBranchName(branchId: string): string {
     const branch = this.branches().find(b => b.id === branchId);
     return branch ? branch.name : 'Unknown';
+  }
+
+  navigateToSource(revenue: RevenueItem) {
+    if (revenue.source === 'ENROLLMENT') {
+      this.router.navigate(['/enrollments', revenue.sourceId, 'edit']);
+    } else {
+      this.router.navigate(['/products/sales']);
+    }
   }
 }

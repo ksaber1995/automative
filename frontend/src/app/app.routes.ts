@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { permissionGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
 
 export const routes: Routes = [
@@ -19,58 +20,72 @@ export const routes: Routes = [
     children: [
       {
         path: 'dashboard',
+        canActivate: [permissionGuard('dashboard')],
         loadChildren: () => import('./features/dashboard/dashboard.routes').then(m => m.DASHBOARD_ROUTES)
       },
       {
         path: 'branches',
+        canActivate: [permissionGuard('branches')],
         loadChildren: () => import('./features/branches/branches.routes').then(m => m.BRANCHES_ROUTES)
       },
       {
         path: 'courses',
+        canActivate: [permissionGuard('courses')],
         loadChildren: () => import('./features/courses/courses.routes').then(m => m.COURSES_ROUTES)
       },
       {
         path: 'classes',
+        canActivate: [permissionGuard('classes')],
         loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)
       },
       {
         path: 'classes/create',
+        canActivate: [permissionGuard('classes')],
         loadComponent: () => import('./features/courses/class-form/class-form.component').then(m => m.ClassFormComponent)
       },
       {
         path: 'classes/:id',
+        canActivate: [permissionGuard('classes')],
         loadComponent: () => import('./features/courses/class-detail/class-detail.component').then(m => m.ClassDetailComponent)
       },
       {
         path: 'students',
+        canActivate: [permissionGuard('students')],
         loadChildren: () => import('./features/students/students.routes').then(m => m.STUDENTS_ROUTES)
       },
       {
         path: 'enrollments',
+        canActivate: [permissionGuard('enrollments')],
         loadChildren: () => import('./features/enrollments/enrollments.routes').then(m => m.ENROLLMENTS_ROUTES)
       },
       {
         path: 'employees',
+        canActivate: [permissionGuard('employees')],
         loadChildren: () => import('./features/employees/employees.routes').then(m => m.EMPLOYEES_ROUTES)
       },
       {
         path: 'revenues',
+        canActivate: [permissionGuard('revenues')],
         loadChildren: () => import('./features/revenues/revenues.routes').then(m => m.revenuesRoutes)
       },
       {
         path: 'expenses',
+        canActivate: [permissionGuard('expenses')],
         loadChildren: () => import('./features/expenses/expenses.routes').then(m => m.EXPENSES_ROUTES)
       },
       {
         path: 'reports',
+        canActivate: [permissionGuard('reports')],
         loadChildren: () => import('./features/reports/reports.routes').then(m => m.REPORTS_ROUTES)
       },
       {
         path: 'withdrawals',
+        canActivate: [permissionGuard('withdrawals')],
         loadChildren: () => import('./features/withdrawals/withdrawals.routes').then(m => m.WITHDRAWALS_ROUTES)
       },
       {
         path: 'refunds',
+        canActivate: [permissionGuard('refunds')],
         loadChildren: () => import('./features/refunds/refunds.routes').then(m => m.REFUNDS_ROUTES)
       },
       {
@@ -79,14 +94,17 @@ export const routes: Routes = [
       },
       {
         path: 'debts',
+        canActivate: [permissionGuard('debts')],
         loadChildren: () => import('./features/debts/debts.routes').then(m => m.DEBTS_ROUTES)
       },
       {
         path: 'products',
+        canActivate: [permissionGuard('products')],
         loadChildren: () => import('./features/products/products.routes').then(m => m.PRODUCTS_ROUTES)
       },
       {
         path: 'users',
+        canActivate: [permissionGuard('users')],
         loadChildren: () => import('./features/users/users.routes').then(m => m.USERS_ROUTES)
       },
       {

@@ -13,6 +13,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 
@@ -40,6 +41,7 @@ export class StudentListComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  authService = inject(AuthService);
 
   students = signal<Student[]>([]);
   branches = signal<Branch[]>([]);

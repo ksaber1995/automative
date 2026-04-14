@@ -73,14 +73,16 @@
                 [pTooltip]="'EMPLOYEES.LIST.VIEW' | translate"
                 (click)="viewEmployee(employee)"
               ></button>
-              <button
-                pButton
-                icon="pi pi-pencil"
-                class="p-button-rounded p-button-text p-button-warn"
-                [pTooltip]="'EMPLOYEES.LIST.EDIT' | translate"
-                (click)="editEmployee(employee)"
-              ></button>
-              @if (employee.isActive) {
+              @if (authService.canWrite('employees')) {
+                <button
+                  pButton
+                  icon="pi pi-pencil"
+                  class="p-button-rounded p-button-text p-button-warn"
+                  [pTooltip]="'EMPLOYEES.LIST.EDIT' | translate"
+                  (click)="editEmployee(employee)"
+                ></button>
+              }
+              @if (authService.canDelete('employees') && employee.isActive) {
                 <button
                   pButton
                   icon="pi pi-trash"

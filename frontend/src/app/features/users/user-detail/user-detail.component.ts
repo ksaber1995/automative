@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -16,6 +16,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SafeUser } from '@shared/interfaces/user.interface';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 import {
@@ -96,14 +97,16 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
             <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT' | translate" severity="warn"
               (click)="edit()">
             </button>
-            @if (user()!.isActive) {
-              <button pButton icon="pi pi-ban" [label]="'USERS.DETAIL.DEACTIVATE' | translate" severity="danger"
-                class="p-button-outlined" (click)="toggleActive()">
-              </button>
-            } @else {
-              <button pButton icon="pi pi-check" [label]="'USERS.DETAIL.ACTIVATE' | translate" severity="success"
-                class="p-button-outlined" (click)="toggleActive()">
-              </button>
+            @if (!isSelf()) {
+              @if (user()!.isActive) {
+                <button pButton icon="pi pi-ban" [label]="'USERS.DETAIL.DEACTIVATE' | translate" severity="danger"
+                  class="p-button-outlined" (click)="toggleActive()">
+                </button>
+              } @else {
+                <button pButton icon="pi pi-check" [label]="'USERS.DETAIL.ACTIVATE' | translate" severity="success"
+                  class="p-button-outlined" (click)="toggleActive()">
+                </button>
+              }
             }
           </div>
         </div>
@@ -284,6 +287,7 @@ export class UserDetailComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private authService = inject(AuthService);
 
   UserRole = UserRole;
   RESOURCE_META = RESOURCE_META;
@@ -293,6 +297,8 @@ export class UserDetailComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   savingPassword = signal(false);
+
+  isSelf = computed(() => this.authService.currentUser()?.id === this.user()?.id);
 
   showPasswordDialog = false;
   newPassword = '';

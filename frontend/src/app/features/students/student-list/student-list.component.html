@@ -73,20 +73,24 @@
                 [pTooltip]="'STUDENTS.LIST.VIEW' | translate"
                 (click)="viewStudent(student)"
               ></button>
-              <button
-                pButton
-                icon="pi pi-pencil"
-                class="p-button-rounded p-button-text p-button-warning"
-                [pTooltip]="'STUDENTS.LIST.EDIT' | translate"
-                (click)="editStudent(student)"
-              ></button>
-              <button
-                pButton
-                icon="pi pi-trash"
-                class="p-button-rounded p-button-text p-button-danger"
-                [pTooltip]="'STUDENTS.LIST.DEACTIVATE' | translate"
-                (click)="deleteStudent(student)"
-              ></button>
+              @if (authService.canWrite('students')) {
+                <button
+                  pButton
+                  icon="pi pi-pencil"
+                  class="p-button-rounded p-button-text p-button-warning"
+                  [pTooltip]="'STUDENTS.LIST.EDIT' | translate"
+                  (click)="editStudent(student)"
+                ></button>
+              }
+              @if (authService.canDelete('students')) {
+                <button
+                  pButton
+                  icon="pi pi-trash"
+                  class="p-button-rounded p-button-text p-button-danger"
+                  [pTooltip]="'STUDENTS.LIST.DEACTIVATE' | translate"
+                  (click)="deleteStudent(student)"
+                ></button>
+              }
             </div>
           </td>
         </tr>

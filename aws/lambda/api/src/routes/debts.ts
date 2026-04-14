@@ -1,10 +1,14 @@
 import { query } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const debtsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'debts', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // TODO: Implement debts table and insert logic with company_id
       // When implemented, use: company_id: context.companyId
@@ -35,6 +39,10 @@ export const debtsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
+      if (!checkGranularPermission(context, 'debts', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
       // TODO: Implement when debts table is created
       // When implemented, use: WHERE company_id = $1
       return {
@@ -53,6 +61,10 @@ export const debtsRoutes = {
   summary: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'debts', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // TODO: Implement when debts table is created
       // When implemented, filter by company_id

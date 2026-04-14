@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 interface FinancialData {
   enrollments: any[];
@@ -396,6 +396,9 @@ export const reportsRoutes = {
   financial: async ({ query: queryParams, headers }: { query: { startDate: string; endDate: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'reports', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
       const { startDate, endDate } = queryParams;
 
       if (!startDate || !endDate) {
@@ -429,6 +432,9 @@ export const reportsRoutes = {
   financialMonthly: async ({ query: queryParams, headers }: { query: { startDate: string; endDate: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'reports', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
       const { startDate, endDate } = queryParams;
 
       if (!startDate || !endDate) {
@@ -462,6 +468,9 @@ export const reportsRoutes = {
   branch: async ({ params, query: queryParams, headers }: { params: { branchId: string }; query: { startDate: string; endDate: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'reports', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
       const { branchId } = params;
       const { startDate, endDate } = queryParams;
 
@@ -505,6 +514,9 @@ export const reportsRoutes = {
   churn: async ({ query: queryParams, headers }: { query: { startDate: string; endDate: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'reports', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
       const { startDate, endDate } = queryParams;
 
       if (!startDate || !endDate) {

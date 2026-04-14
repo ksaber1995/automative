@@ -1,5 +1,5 @@
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapStudentFromDB(row: any) {
   return {
@@ -30,6 +30,9 @@ export const studentsRoutes = {
     try {
       // Extract tenant context for multi-tenant isolation
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify user can access the specified branch
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
@@ -73,6 +76,9 @@ export const studentsRoutes = {
     try {
       // Extract tenant context for multi-tenant isolation
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Build query with MANDATORY company_id filter
       let sql = 'SELECT * FROM students WHERE company_id = $1';
@@ -114,6 +120,9 @@ export const studentsRoutes = {
     try {
       // Extract tenant context for multi-tenant isolation
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Query with company_id filter to ensure tenant isolation
       const student = await queryOne(
@@ -153,6 +162,9 @@ export const studentsRoutes = {
     try {
       // Extract tenant context for multi-tenant isolation
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify the student belongs to the user's company
       const existing = await queryOne(
@@ -225,6 +237,9 @@ export const studentsRoutes = {
     try {
       // Extract tenant context for multi-tenant isolation
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify the student belongs to the user's company
       const existing = await queryOne(

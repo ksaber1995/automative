@@ -11,10 +11,18 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
 import { DividerModule } from 'primeng/divider';
 import { SelectModule } from 'primeng/select';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+
+interface SalaryAdjustment {
+  bonusAmount: number;
+  discountAmount: number;
+  adjustmentReason: string;
+}
 
 @Component({
   selector: 'app-salaries',
@@ -31,6 +39,8 @@ import { NotificationService } from '../../../core/services/notification.service
     TooltipModule,
     DividerModule,
     SelectModule,
+    InputNumberModule,
+    InputTextModule,
     TranslateModule,
   ],
   template: `
@@ -149,8 +159,11 @@ import { NotificationService } from '../../../core/services/notification.service
               <th style="width: 48px"></th>
               <th>{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }}</th>
               <th>{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }}</th>
-              <th>{{ 'EXPENSES.SALARIES.COL_POSITION' | translate }}</th>
-              <th class="text-right">{{ 'EXPENSES.SALARIES.COL_SALARY' | translate }}</th>
+              <th class="text-right">Base Salary</th>
+              <th style="width: 130px" class="text-right text-green-600">Bonus</th>
+              <th style="width: 130px" class="text-right text-red-600">Discount</th>
+              <th style="width: 200px">Reason</th>
+              <th class="text-right font-semibold">Total</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-item>
@@ -166,15 +179,47 @@ import { NotificationService } from '../../../core/services/notification.service
                 <span class="font-medium">{{ item.label.replace('Salary: ', '') }}</span>
               </td>
               <td>{{ item.branchName || 'N/A' }}</td>
-              <td>
-                <p-tag value="SALARY" severity="info"></p-tag>
+              <td class="text-right text-gray-700">{{ item.amount.toFixed(2) }}</td>
+              <td class="text-right">
+                <p-inputNumber
+                  [(ngModel)]="adjustments[item.employeeId].bonusAmount"
+                  [min]="0"
+                  [maxFractionDigits]="2"
+                  mode="decimal"
+                  inputStyleClass="w-full text-right text-green-700 border-green-300"
+                  [style]="{ width: '110px' }"
+                  (onInput)="onAdjustmentChange()"
+                ></p-inputNumber>
               </td>
-              <td class="text-right font-semibold text-green-700">{{ item.amount.toFixed(2) }}</td>
+              <td class="text-right">
+                <p-inputNumber
+                  [(ngModel)]="adjustments[item.employeeId].discountAmount"
+                  [min]="0"
+                  [max]="item.amount + (adjustments[item.employeeId].bonusAmount || 0)"
+                  [maxFractionDigits]="2"
+                  mode="decimal"
+                  inputStyleClass="w-full text-right text-red-700 border-red-300"
+                  [style]="{ width: '110px' }"
+                  (onInput)="onAdjustmentChange()"
+                ></p-inputNumber>
+              </td>
+              <td>
+                <input
+                  pInputText
+                  [(ngModel)]="adjustments[item.employeeId].adjustmentReason"
+                  placeholder="Reason (optional)"
+                  class="w-full text-sm"
+                  style="width: 100%"
+                />
+              </td>
+              <td class="text-right font-semibold" [class.text-green-700]="getFinalAmount(item) >= item.amount" [class.text-red-700]="getFinalAmount(item) < item.amount">
+                {{ getFinalAmount(item).toFixed(2) }}
+              </td>
             </tr>
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="5" class="text-center py-12">
+              <td colspan="8" class="text-center py-12">
                 <div class="text-gray-400">
                   <i class="pi pi-check-circle text-4xl mb-3 text-green-400"></i>
                   <p class="text-lg font-medium text-green-600">{{ 'EXPENSES.SALARIES.ALL_PAID' | translate: { month: displayMonth() } }}</p>
@@ -203,6 +248,7 @@ export class SalariesComponent implements OnInit {
   paymentDate: Date = new Date();
   selectedBranchId: string | null = null;
   selectedIds = signal<Set<string>>(new Set());
+  adjustments: Record<string, SalaryAdjustment> = {};
 
   branchOptions = computed(() => [
     { label: this.translate.instant('EXPENSES.SALARIES.ALL_BRANCHES'), value: null },
@@ -219,7 +265,7 @@ export class SalariesComponent implements OnInit {
     const ids = this.selectedIds();
     return this.filteredEmployees()
       .filter(i => ids.has(i.employeeId))
-      .reduce((sum, i) => sum + i.amount, 0);
+      .reduce((sum, i) => sum + this.getFinalAmount(i), 0);
   });
 
   allSelected = computed(() => {
@@ -238,6 +284,17 @@ export class SalariesComponent implements OnInit {
     return this.selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   });
 
+  getFinalAmount(item: any): number {
+    const adj = this.adjustments[item.employeeId];
+    if (!adj) return item.amount;
+    return item.amount + (adj.bonusAmount || 0) - (adj.discountAmount || 0);
+  }
+
+  onAdjustmentChange() {
+    // trigger selectedTotal recompute by updating signal
+    this.selectedIds.set(new Set(this.selectedIds()));
+  }
+
   ngOnInit() {
     this.branchService.getActiveBranches().subscribe({
       next: (b) => this.branches.set(b)
@@ -251,7 +308,14 @@ export class SalariesComponent implements OnInit {
     const month = this.formatMonth(this.selectedMonth);
     this.expenseService.getDue(month).subscribe({
       next: (res) => {
-        this.salaryItems.set(res.items.filter(i => i.type === 'salary'));
+        const items = res.items.filter(i => i.type === 'salary');
+        this.salaryItems.set(items);
+        // initialise adjustments for each employee
+        items.forEach(i => {
+          if (!this.adjustments[i.employeeId]) {
+            this.adjustments[i.employeeId] = { bonusAmount: 0, discountAmount: 0, adjustmentReason: '' };
+          }
+        });
         this.loading.set(false);
       },
       error: () => {
@@ -313,7 +377,14 @@ export class SalariesComponent implements OnInit {
     };
 
     for (const id of employeeIds) {
-      this.expenseService.payEmployeeSalary(id, dateStr).subscribe({
+      const adj = this.adjustments[id];
+      this.expenseService.payEmployeeSalary(
+        id,
+        dateStr,
+        adj?.bonusAmount || undefined,
+        adj?.discountAmount || undefined,
+        adj?.adjustmentReason || undefined
+      ).subscribe({
         next: () => next(),
         error: () => { failed++; next(); }
       });

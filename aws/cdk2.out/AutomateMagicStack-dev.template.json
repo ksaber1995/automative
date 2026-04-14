@@ -1,0 +1,1541 @@
+{
+ "Description": "Netrofit Application Stack (dev)",
+ "Resources": {
+  "AutomateMagicVPCC43CF6A0": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/Resource"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1SubnetF79BF3E8": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/Subnet"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1RouteTableD0863E8A": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/RouteTable"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1RouteTableAssociation15EC6CC2": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1RouteTableD0863E8A"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1SubnetF79BF3E8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1DefaultRoute6FF25929": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AutomateMagicVPCIGW472C5BF3"
+    },
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1RouteTableD0863E8A"
+    }
+   },
+   "DependsOn": [
+    "AutomateMagicVPCVPCGW7D9A3B4C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/DefaultRoute"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1EIP9237F290": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/EIP"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet1NATGatewayF784AFED": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "AutomateMagicVPCpublicSubnet1EIP9237F290",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1SubnetF79BF3E8"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1"
+     }
+    ]
+   },
+   "DependsOn": [
+    "AutomateMagicVPCpublicSubnet1DefaultRoute6FF25929",
+    "AutomateMagicVPCpublicSubnet1RouteTableAssociation15EC6CC2"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet1/NATGateway"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet2Subnet5C21A8D9": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2/Subnet"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet2RouteTableE2E4182F": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2/RouteTable"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet2RouteTableAssociationDDF581FE": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCpublicSubnet2RouteTableE2E4182F"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCpublicSubnet2Subnet5C21A8D9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCpublicSubnet2DefaultRoute1E957EE8": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AutomateMagicVPCIGW472C5BF3"
+    },
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCpublicSubnet2RouteTableE2E4182F"
+    }
+   },
+   "DependsOn": [
+    "AutomateMagicVPCVPCGW7D9A3B4C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/publicSubnet2/DefaultRoute"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet1Subnet6040A705": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1/Subnet"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet1RouteTableC4639C1D": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1/RouteTable"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet1RouteTableAssociation9A5A24B1": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCprivateSubnet1RouteTableC4639C1D"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCprivateSubnet1Subnet6040A705"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet1DefaultRoute224C4B9B": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1NATGatewayF784AFED"
+    },
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCprivateSubnet1RouteTableC4639C1D"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet1/DefaultRoute"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet2Subnet5C707B9D": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2/Subnet"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet2RouteTableE9A1AB67": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2/RouteTable"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet2RouteTableAssociation59138327": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCprivateSubnet2RouteTableE9A1AB67"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCprivateSubnet2Subnet5C707B9D"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCprivateSubnet2DefaultRoute0474EDA7": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "AutomateMagicVPCpublicSubnet1NATGatewayF784AFED"
+    },
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCprivateSubnet2RouteTableE9A1AB67"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/privateSubnet2/DefaultRoute"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet1Subnet07675FAC": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1a",
+    "CidrBlock": "10.0.4.0/28",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "isolated"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet1/Subnet"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet1RouteTable5962CE83": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet1/RouteTable"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet1RouteTableAssociation6A3749CB": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCisolatedSubnet1RouteTable5962CE83"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCisolatedSubnet1Subnet07675FAC"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet1/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet2Subnet90940B1F": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-west-1b",
+    "CidrBlock": "10.0.4.16/28",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "isolated"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet2/Subnet"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet2RouteTableBA4735D8": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet2/RouteTable"
+   }
+  },
+  "AutomateMagicVPCisolatedSubnet2RouteTableAssociation59807AA7": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutomateMagicVPCisolatedSubnet2RouteTableBA4735D8"
+    },
+    "SubnetId": {
+     "Ref": "AutomateMagicVPCisolatedSubnet2Subnet90940B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/isolatedSubnet2/RouteTableAssociation"
+   }
+  },
+  "AutomateMagicVPCIGW472C5BF3": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutomateMagicStack-dev/AutomateMagicVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/IGW"
+   }
+  },
+  "AutomateMagicVPCVPCGW7D9A3B4C": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "AutomateMagicVPCIGW472C5BF3"
+    },
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/VPCGW"
+   }
+  },
+  "AutomateMagicVPCRestrictDefaultSecurityGroupCustomResourceDDB88C6C": {
+   "Type": "Custom::VpcRestrictDefaultSG",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+      "Arn"
+     ]
+    },
+    "DefaultSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AutomateMagicVPCC43CF6A0",
+      "DefaultSecurityGroup"
+     ]
+    },
+    "Account": "365729671026"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicVPC/RestrictDefaultSecurityGroupCustomResource/Default"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyName": "Inline",
+      "PolicyDocument": {
+       "Version": "2012-10-17",
+       "Statement": [
+        {
+         "Effect": "Allow",
+         "Action": [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress"
+         ],
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:ec2:eu-west-1:365729671026:security-group/",
+             {
+              "Fn::GetAtt": [
+               "AutomateMagicVPCC43CF6A0",
+               "DefaultSecurityGroup"
+              ]
+             }
+            ]
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-365729671026-eu-west-1",
+     "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "__entrypoint__.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group"
+   },
+   "DependsOn": [
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+    "aws:asset:property": "Code"
+   }
+  },
+  "DatabaseSecurityGroup7319C0F6": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for Aurora Serverless v2 PostgreSQL database",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/DatabaseSecurityGroup/Resource"
+   }
+  },
+  "DatabaseSecurityGroupfromAutomateMagicStackdevLambdaSecurityGroupAEFDCAA85432FE4E2CE4": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow Lambda to connect to PostgreSQL",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "DatabaseSecurityGroup7319C0F6",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "LambdaSecurityGroup0BD9FC99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/DatabaseSecurityGroup/from AutomateMagicStackdevLambdaSecurityGroupAEFDCAA8:5432"
+   }
+  },
+  "LambdaSecurityGroup0BD9FC99": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for Lambda functions",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutomateMagicVPCC43CF6A0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/LambdaSecurityGroup/Resource"
+   }
+  },
+  "DBCredentialsSecretAFB45EA2": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "password",
+     "IncludeSpace": false,
+     "PasswordLength": 32,
+     "SecretStringTemplate": "{\"username\":\"automative_admin\"}"
+    },
+    "Name": "/dev/automate-magic/db-credentials"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/DBCredentialsSecret/Resource"
+   }
+  },
+  "DBCredentialsSecretAttachment8D28662C": {
+   "Type": "AWS::SecretsManager::SecretTargetAttachment",
+   "Properties": {
+    "SecretId": {
+     "Ref": "DBCredentialsSecretAFB45EA2"
+    },
+    "TargetId": {
+     "Ref": "AutomateMagicAuroraDBEF237903"
+    },
+    "TargetType": "AWS::RDS::DBCluster"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/DBCredentialsSecret/Attachment/Resource"
+   }
+  },
+  "JWTSecretF6F1CBF0": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "secret",
+     "PasswordLength": 64,
+     "SecretStringTemplate": "{}"
+    },
+    "Name": "/dev/automate-magic/jwt-secret"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/JWTSecret/Resource"
+   }
+  },
+  "JWTRefreshSecret15C066C6": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "secret",
+     "PasswordLength": 64,
+     "SecretStringTemplate": "{}"
+    },
+    "Name": "/dev/automate-magic/jwt-refresh-secret"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/JWTRefreshSecret/Resource"
+   }
+  },
+  "AutomateMagicAuroraDBSubnetsCE584DD8": {
+   "Type": "AWS::RDS::DBSubnetGroup",
+   "Properties": {
+    "DBSubnetGroupDescription": "Subnets for AutomateMagicAuroraDB database",
+    "SubnetIds": [
+     {
+      "Ref": "AutomateMagicVPCisolatedSubnet1Subnet07675FAC"
+     },
+     {
+      "Ref": "AutomateMagicVPCisolatedSubnet2Subnet90940B1F"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAuroraDB/Subnets/Default"
+   }
+  },
+  "AutomateMagicAuroraDBEF237903": {
+   "Type": "AWS::RDS::DBCluster",
+   "Properties": {
+    "BackupRetentionPeriod": 7,
+    "CopyTagsToSnapshot": true,
+    "DBClusterParameterGroupName": "default.aurora-postgresql15",
+    "DBSubnetGroupName": {
+     "Ref": "AutomateMagicAuroraDBSubnetsCE584DD8"
+    },
+    "DatabaseName": "automative",
+    "DeletionProtection": false,
+    "EnableHttpEndpoint": true,
+    "Engine": "aurora-postgresql",
+    "EngineVersion": "15.8",
+    "MasterUserPassword": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "DBCredentialsSecretAFB45EA2"
+       },
+       ":SecretString:password::}}"
+      ]
+     ]
+    },
+    "MasterUsername": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "DBCredentialsSecretAFB45EA2"
+       },
+       ":SecretString:username::}}"
+      ]
+     ]
+    },
+    "Port": 5432,
+    "ServerlessV2ScalingConfiguration": {
+     "MaxCapacity": 1,
+     "MinCapacity": 0.5
+    },
+    "VpcSecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DatabaseSecurityGroup7319C0F6",
+       "GroupId"
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Snapshot",
+   "DeletionPolicy": "Snapshot",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAuroraDB/Resource"
+   }
+  },
+  "AutomateMagicAuroraDBwriter6CDD33D9": {
+   "Type": "AWS::RDS::DBInstance",
+   "Properties": {
+    "DBClusterIdentifier": {
+     "Ref": "AutomateMagicAuroraDBEF237903"
+    },
+    "DBInstanceClass": "db.serverless",
+    "EnablePerformanceInsights": true,
+    "Engine": "aurora-postgresql",
+    "PerformanceInsightsRetentionPeriod": 7,
+    "PromotionTier": 0,
+    "PubliclyAccessible": false
+   },
+   "DependsOn": [
+    "AutomateMagicVPCisolatedSubnet1RouteTableAssociation6A3749CB",
+    "AutomateMagicVPCisolatedSubnet2RouteTableAssociation59807AA7"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAuroraDB/writer/Resource"
+   }
+  },
+  "ApiLambdaRole66D0B4CD": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/ApiLambdaRole/Resource"
+   }
+  },
+  "ApiLambdaRoleDefaultPolicy84E47AF4": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Ref": "DBCredentialsSecretAFB45EA2"
+        },
+        {
+         "Ref": "JWTRefreshSecret15C066C6"
+        },
+        {
+         "Ref": "JWTSecretF6F1CBF0"
+        }
+       ]
+      },
+      {
+       "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ApiLambdaRoleDefaultPolicy84E47AF4",
+    "Roles": [
+     {
+      "Ref": "ApiLambdaRole66D0B4CD"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/ApiLambdaRole/DefaultPolicy/Resource"
+   }
+  },
+  "ApiLambdaFunction69BCE939": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-365729671026-eu-west-1",
+     "S3Key": "e4c3643b0ea4635473fc427001d468140348efd77f0b3ffd04f97484ef00e966.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "NODE_ENV": "dev",
+      "DB_HOST": {
+       "Fn::GetAtt": [
+        "AutomateMagicAuroraDBEF237903",
+        "Endpoint.Address"
+       ]
+      },
+      "DB_PORT": {
+       "Fn::GetAtt": [
+        "AutomateMagicAuroraDBEF237903",
+        "Endpoint.Port"
+       ]
+      },
+      "DB_NAME": "automative",
+      "DB_CREDENTIALS_SECRET_ARN": {
+       "Ref": "DBCredentialsSecretAFB45EA2"
+      },
+      "JWT_SECRET_ARN": {
+       "Ref": "JWTSecretF6F1CBF0"
+      },
+      "JWT_REFRESH_SECRET_ARN": {
+       "Ref": "JWTRefreshSecret15C066C6"
+      },
+      "JWT_EXPIRATION": "365d",
+      "JWT_REFRESH_EXPIRATION": "365d",
+      "SENDER_EMAIL": "noreply@automate-magic.com"
+     }
+    },
+    "Handler": "dist/index.handler",
+    "MemorySize": 1024,
+    "Role": {
+     "Fn::GetAtt": [
+      "ApiLambdaRole66D0B4CD",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs20.x",
+    "Timeout": 30,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::GetAtt": [
+        "LambdaSecurityGroup0BD9FC99",
+        "GroupId"
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Ref": "AutomateMagicVPCprivateSubnet1Subnet6040A705"
+      },
+      {
+       "Ref": "AutomateMagicVPCprivateSubnet2Subnet5C707B9D"
+      }
+     ]
+    }
+   },
+   "DependsOn": [
+    "ApiLambdaRoleDefaultPolicy84E47AF4",
+    "ApiLambdaRole66D0B4CD",
+    "AutomateMagicVPCprivateSubnet1DefaultRoute224C4B9B",
+    "AutomateMagicVPCprivateSubnet1RouteTableAssociation9A5A24B1",
+    "AutomateMagicVPCprivateSubnet2DefaultRoute0474EDA7",
+    "AutomateMagicVPCprivateSubnet2RouteTableAssociation59138327"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/ApiLambdaFunction/Resource",
+    "aws:asset:path": "asset.e4c3643b0ea4635473fc427001d468140348efd77f0b3ffd04f97484ef00e966",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "AutomateMagicAPIECF23C56": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "Netrofit API Gateway",
+    "Name": "automate-magic-api-dev"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Resource"
+   }
+  },
+  "AutomateMagicAPIDeploymentF3F3EF64a1d27de276a25af8566578ba85ab0fe5": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "Netrofit API Gateway",
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "DependsOn": [
+    "AutomateMagicAPIproxyANY5F4F683B",
+    "AutomateMagicAPIproxyOPTIONSCD93D679",
+    "AutomateMagicAPIproxy1C38C497",
+    "AutomateMagicAPIANY67B6C6B5",
+    "AutomateMagicAPIOPTIONSCC63EF3B"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "AutomateMagicAPIDeploymentStagedevB480E5E4": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "AutomateMagicAPIDeploymentF3F3EF64a1d27de276a25af8566578ba85ab0fe5"
+    },
+    "MethodSettings": [
+     {
+      "DataTraceEnabled": false,
+      "HttpMethod": "*",
+      "LoggingLevel": "OFF",
+      "MetricsEnabled": true,
+      "ResourcePath": "/*"
+     }
+    ],
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    },
+    "StageName": "dev",
+    "TracingEnabled": true
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/DeploymentStage.dev/Resource"
+   }
+  },
+  "AutomateMagicAPIOPTIONSCC63EF3B": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+        "method.response.header.Access-Control-Allow-Credentials": "'true'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Credentials": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "AutomateMagicAPIECF23C56",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/OPTIONS/Resource"
+   }
+  },
+  "AutomateMagicAPIproxy1C38C497": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "AutomateMagicAPIECF23C56",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "{proxy+}",
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/{proxy+}/Resource"
+   }
+  },
+  "AutomateMagicAPIproxyOPTIONSCD93D679": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+        "method.response.header.Access-Control-Allow-Credentials": "'true'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Credentials": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "AutomateMagicAPIproxy1C38C497"
+    },
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/{proxy+}/OPTIONS/Resource"
+   }
+  },
+  "AutomateMagicAPIproxyANYApiPermissionAutomateMagicStackdevAutomateMagicAPI7C7C4C54ANYproxy332D5768": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiLambdaFunction69BCE939",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-west-1:365729671026:",
+       {
+        "Ref": "AutomateMagicAPIECF23C56"
+       },
+       "/",
+       {
+        "Ref": "AutomateMagicAPIDeploymentStagedevB480E5E4"
+       },
+       "/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/{proxy+}/ANY/ApiPermission.AutomateMagicStackdevAutomateMagicAPI7C7C4C54.ANY..{proxy+}"
+   }
+  },
+  "AutomateMagicAPIproxyANYApiPermissionTestAutomateMagicStackdevAutomateMagicAPI7C7C4C54ANYproxy92B66EFA": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiLambdaFunction69BCE939",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-west-1:365729671026:",
+       {
+        "Ref": "AutomateMagicAPIECF23C56"
+       },
+       "/test-invoke-stage/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/{proxy+}/ANY/ApiPermission.Test.AutomateMagicStackdevAutomateMagicAPI7C7C4C54.ANY..{proxy+}"
+   }
+  },
+  "AutomateMagicAPIproxyANY5F4F683B": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ApiLambdaFunction69BCE939",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "AutomateMagicAPIproxy1C38C497"
+    },
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/{proxy+}/ANY/Resource"
+   }
+  },
+  "AutomateMagicAPIANYApiPermissionAutomateMagicStackdevAutomateMagicAPI7C7C4C54ANYDCE4ECC9": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiLambdaFunction69BCE939",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-west-1:365729671026:",
+       {
+        "Ref": "AutomateMagicAPIECF23C56"
+       },
+       "/",
+       {
+        "Ref": "AutomateMagicAPIDeploymentStagedevB480E5E4"
+       },
+       "/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/ANY/ApiPermission.AutomateMagicStackdevAutomateMagicAPI7C7C4C54.ANY.."
+   }
+  },
+  "AutomateMagicAPIANYApiPermissionTestAutomateMagicStackdevAutomateMagicAPI7C7C4C54ANYEE4207F2": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiLambdaFunction69BCE939",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-west-1:365729671026:",
+       {
+        "Ref": "AutomateMagicAPIECF23C56"
+       },
+       "/test-invoke-stage/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/ANY/ApiPermission.Test.AutomateMagicStackdevAutomateMagicAPI7C7C4C54.ANY.."
+   }
+  },
+  "AutomateMagicAPIANY67B6C6B5": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ApiLambdaFunction69BCE939",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "AutomateMagicAPIECF23C56",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "AutomateMagicAPIECF23C56"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/AutomateMagicAPI/Default/ANY/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31RTU/rQAz8Ldy3C6RP4twPHurhPaIEcUXOxqSmyW609raqovx3lE36IUCcZjye2N5JopP5g767gQPPTLmb1VToLhcwOwUHfuvQJLp7bY1avdvXdKXSUNRk8lBYlEG7sMwFwRcoarzoF23B7AyBkLNn80AeN+kA/0GeQPAAR5V62oPgZfDGCnqLZ8N4yVQtRMBsG7SicjTBkxyfvAttvOFXYWMrj8y9YjQehRuwUKHXXR7ryT+wEV7AVyhX+86Gr51e+ZJ1twaBAhhXdWBBr8YXnY9ZL78JJ2csNpYFrMFeETS6y9wYbMTU1WRiEiPrVQ1NUYLu/gZrTiFf8xR9Q8zkbK94/gbMKKwXAyie62UwO5QlMCpoqRqz1V2GLIuW4t6JrrGt3fEUwFWVC1Tjr48kQ3bBG4wz/6FsXTk0J3bqTpMj7/srObC45ifXl1bq3Z5K9HFNfM6wnmw1fPMcpA3SK+tK1B98u08Sff9H3918MNHMByvUoM5G/AQMb9O8CgMAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutomateMagicStack-dev/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AutomateMagicAPIEndpoint12BFD910": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AutomateMagicAPIECF23C56"
+      },
+      ".execute-api.eu-west-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AutomateMagicAPIDeploymentStagedevB480E5E4"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "ApiUrl": {
+   "Description": "API Gateway URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AutomateMagicAPIECF23C56"
+      },
+      ".execute-api.eu-west-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AutomateMagicAPIDeploymentStagedevB480E5E4"
+      },
+      "/"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "dev-api-url"
+   }
+  },
+  "ApiId": {
+   "Description": "API Gateway ID",
+   "Value": {
+    "Ref": "AutomateMagicAPIECF23C56"
+   },
+   "Export": {
+    "Name": "dev-api-id"
+   }
+  },
+  "DatabaseEndpoint": {
+   "Description": "Aurora Database Cluster Endpoint",
+   "Value": {
+    "Fn::GetAtt": [
+     "AutomateMagicAuroraDBEF237903",
+     "Endpoint.Address"
+    ]
+   },
+   "Export": {
+    "Name": "dev-db-endpoint"
+   }
+  },
+  "DatabaseName": {
+   "Description": "Database Name",
+   "Value": "automative",
+   "Export": {
+    "Name": "dev-db-name"
+   }
+  },
+  "DatabaseSecretArn": {
+   "Description": "Database Credentials Secret ARN",
+   "Value": {
+    "Ref": "DBCredentialsSecretAFB45EA2"
+   },
+   "Export": {
+    "Name": "dev-db-secret-arn"
+   }
+  },
+  "LambdaFunctionArn": {
+   "Description": "API Lambda Function ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "ApiLambdaFunction69BCE939",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "dev-lambda-arn"
+   }
+  },
+  "DatabaseClusterArn": {
+   "Description": "Aurora Cluster ARN (for Data API)",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "arn:aws:rds:eu-west-1:365729671026:cluster:",
+      {
+       "Ref": "AutomateMagicAuroraDBEF237903"
+      }
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "dev-db-cluster-arn"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

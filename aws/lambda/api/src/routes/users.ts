@@ -198,6 +198,11 @@ export const usersRoutes = {
       const existing = await getUserWithBranches(params.id, context.companyId);
       if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
 
+      // Prevent self-deactivation via update
+      if (body.isActive === false && params.id === context.userId) {
+        return { status: 400 as const, body: { message: 'You cannot deactivate your own account' } };
+      }
+
       // Build update fields
       const updates: Record<string, any> = {};
       if (body.email !== undefined) updates.email = body.email;

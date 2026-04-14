@@ -77,15 +77,17 @@
                 (onClick)="viewBranch(branch)"
                 [pTooltip]="'BRANCHES.LIST.VIEW' | translate"
               ></p-button>
-              <p-button
-                icon="pi pi-pencil"
-                [rounded]="true"
-                [text]="true"
-                severity="warn"
-                (onClick)="editBranch(branch)"
-                [pTooltip]="'BRANCHES.LIST.EDIT' | translate"
-              ></p-button>
-              @if (branch.isActive) {
+              @if (authService.canWrite('branches')) {
+                <p-button
+                  icon="pi pi-pencil"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  (onClick)="editBranch(branch)"
+                  [pTooltip]="'BRANCHES.LIST.EDIT' | translate"
+                ></p-button>
+              }
+              @if (authService.canDelete('branches')) {
                 <p-button
                   icon="pi pi-trash"
                   [rounded]="true"

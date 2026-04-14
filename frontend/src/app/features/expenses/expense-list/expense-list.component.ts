@@ -12,6 +12,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
@@ -29,6 +30,7 @@ export class ExpenseListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  authService = inject(AuthService);
 
   expenses = signal<Expense[]>([]);
   branches = signal<Branch[]>([]);

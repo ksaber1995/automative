@@ -1,10 +1,14 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+
+      if (!checkGranularPermission(context, 'dashboard', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const startDate = queryParams.startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
       const endDate = queryParams.endDate || new Date().toISOString().split('T')[0];
@@ -20,7 +24,7 @@ export const analyticsRoutes = {
       const enrollmentRevenueData = await query(
         `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM enrollments
-         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
+         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
            AND enrollment_date >= $2 AND enrollment_date <= $3`,
         [context.companyId, startDate, endDate]
       );

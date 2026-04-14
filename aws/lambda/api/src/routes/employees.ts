@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapEmployeeFromDB(row: any) {
   return {
@@ -25,6 +25,9 @@ export const employeesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return {
@@ -64,6 +67,9 @@ export const employeesRoutes = {
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; isGlobal?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = 'SELECT * FROM employees WHERE company_id = $1';
       const params: any[] = [context.companyId];
@@ -108,6 +114,9 @@ export const employeesRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const employee = await queryOne(
         'SELECT * FROM employees WHERE id = $1 AND company_id = $2',
@@ -144,6 +153,9 @@ export const employeesRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM employees WHERE id = $1 AND company_id = $2',
@@ -210,6 +222,9 @@ export const employeesRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM employees WHERE id = $1 AND company_id = $2',

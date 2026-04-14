@@ -16,6 +16,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SafeUser } from '@shared/interfaces/user.interface';
 import { UserRole, ROLE_LABELS, NEW_ROLES } from '@shared/enums/user-role.enum';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -189,14 +190,16 @@ import { Branch } from '@shared/interfaces/branch.interface';
                   <button pButton icon="pi pi-shield" class="p-button-text p-button-sm p-button-rounded p-button-info"
                     [pTooltip]="'USERS.LIST.PERMISSIONS' | translate" (click)="editPermissions(user)">
                   </button>
-                  @if (user.isActive) {
-                    <button pButton icon="pi pi-ban" class="p-button-text p-button-sm p-button-rounded p-button-danger"
-                      [pTooltip]="'USERS.LIST.DEACTIVATE' | translate" (click)="toggleActive(user)">
-                    </button>
-                  } @else {
-                    <button pButton icon="pi pi-check-circle" class="p-button-text p-button-sm p-button-rounded p-button-success"
-                      [pTooltip]="'USERS.LIST.ACTIVATE' | translate" (click)="toggleActive(user)">
-                    </button>
+                  @if (user.id !== currentUserId()) {
+                    @if (user.isActive) {
+                      <button pButton icon="pi pi-ban" class="p-button-text p-button-sm p-button-rounded p-button-danger"
+                        [pTooltip]="'USERS.LIST.DEACTIVATE' | translate" (click)="toggleActive(user)">
+                      </button>
+                    } @else {
+                      <button pButton icon="pi pi-check-circle" class="p-button-text p-button-sm p-button-rounded p-button-success"
+                        [pTooltip]="'USERS.LIST.ACTIVATE' | translate" (click)="toggleActive(user)">
+                      </button>
+                    }
                   }
                 </div>
               </td>
@@ -225,6 +228,9 @@ export class UserListComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private authService = inject(AuthService);
+
+  currentUserId = computed(() => this.authService.currentUser()?.id);
 
   users = signal<SafeUser[]>([]);
   branches = signal<Branch[]>([]);

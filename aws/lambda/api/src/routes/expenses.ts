@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapExpenseFromDB(row: any) {
   const amount = parseFloat(row.amount);
@@ -22,6 +22,9 @@ function mapExpenseFromDB(row: any) {
     assetName: row.asset_name,
     amortizationMonths,
     monthlyAmount: amortizationMonths ? parseFloat((amount / amortizationMonths).toFixed(2)) : null,
+    bonusAmount: row.bonus_amount ? parseFloat(row.bonus_amount) : 0,
+    discountAmount: row.discount_amount ? parseFloat(row.discount_amount) : 0,
+    adjustmentReason: row.adjustment_reason || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -31,6 +34,9 @@ export const expensesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return {
@@ -73,6 +79,9 @@ export const expensesRoutes = {
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; startDate?: string; endDate?: string; isRecurring?: string; category?: string; type?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = 'SELECT * FROM expenses WHERE company_id = $1';
       const params: any[] = [context.companyId];
@@ -211,6 +220,9 @@ export const expensesRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const expense = await queryOne(
         'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
@@ -247,6 +259,9 @@ export const expensesRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
@@ -317,6 +332,9 @@ export const expensesRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
@@ -469,9 +487,12 @@ export const expensesRoutes = {
     }
   },
 
-  payEmployeeSalary: async ({ params, body, headers }: { params: { employeeId: string }; body: { date?: string }; headers: { authorization: string } }) => {
+  payEmployeeSalary: async ({ params, body, headers }: { params: { employeeId: string }; body: { date?: string; bonusAmount?: number; discountAmount?: number; adjustmentReason?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const emp = await queryOne(
         'SELECT * FROM employees WHERE id = $1 AND company_id = $2 AND is_active = true',
@@ -497,16 +518,28 @@ export const expensesRoutes = {
         return { status: 400 as const, body: { message: `Salary already paid for ${monthLabel}` } };
       }
 
+      const baseSalary = parseFloat(emp.salary);
+      const bonus = body.bonusAmount || 0;
+      const discount = body.discountAmount || 0;
+      const finalAmount = baseSalary + bonus - discount;
+
+      if (finalAmount <= 0) {
+        return { status: 400 as const, body: { message: 'Final salary amount must be greater than zero' } };
+      }
+
       const expense = await insert('expenses', {
         company_id: context.companyId,
         branch_id: emp.branch_id,
         type: 'FIXED',
         category: 'SALARIES',
-        amount: parseFloat(emp.salary),
+        amount: finalAmount,
         description: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
         date: payDate,
         is_recurring: false,
         employee_id: emp.id,
+        bonus_amount: bonus,
+        discount_amount: discount,
+        adjustment_reason: body.adjustmentReason || null,
       });
 
       return { status: 201 as const, body: mapExpenseFromDB(expense) };
@@ -515,6 +548,35 @@ export const expensesRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to pay salary' },
+      };
+    }
+  },
+
+  getEmployeeSalaryHistory: async ({ params, headers }: { params: { employeeId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const emp = await queryOne(
+        'SELECT id FROM employees WHERE id = $1 AND company_id = $2',
+        [params.employeeId, context.companyId]
+      );
+
+      if (!emp) return { status: 404 as const, body: { message: 'Employee not found' } };
+
+      const rows = await query(
+        `SELECT * FROM expenses WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND is_recurring = false ORDER BY date DESC`,
+        [context.companyId, params.employeeId]
+      );
+
+      return { status: 200 as const, body: rows.map(mapExpenseFromDB) };
+    } catch (error) {
+      console.error('Get employee salary history error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to get salary history' },
       };
     }
   },

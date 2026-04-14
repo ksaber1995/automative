@@ -39,7 +39,7 @@
           <th>{{ 'REVENUES.LIST.COL_DESC' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_AMOUNT' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_METHOD' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_RECEIPT' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_LINK' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-revenue>
@@ -53,7 +53,21 @@
             </p-tag>
           </td>
           <td>{{ revenue.description }}</td>
-          <td class="font-semibold text-green-600">{{ revenue.amount | currency }}</td>
+          <td>
+            @if (revenue.totalRefunded > 0) {
+              <div class="line-through text-gray-400">{{ revenue.amount | currency }}</div>
+              <div class="text-red-600 text-xs font-medium">
+                -{{ revenue.totalRefunded | currency }} {{ 'REVENUES.LIST.REFUNDED' | translate }}
+              </div>
+              @if (revenue.totalRefunded < revenue.amount) {
+                <div class="text-green-600 font-semibold text-sm">
+                  {{ 'REVENUES.LIST.NET' | translate }}: {{ (revenue.amount - revenue.totalRefunded) | currency }}
+                </div>
+              }
+            } @else {
+              <span class="font-semibold text-green-600">{{ revenue.amount | currency }}</span>
+            }
+          </td>
           <td>
             @if (revenue.paymentMethod) {
               <p-tag [value]="('REVENUES.LIST.METHOD_' + revenue.paymentMethod) | translate" severity="info"></p-tag>
@@ -61,7 +75,18 @@
               <span class="text-gray-400">-</span>
             }
           </td>
-          <td>{{ revenue.receiptNumber || '-' }}</td>
+          <td>
+            <button
+              (click)="navigateToSource(revenue)"
+              class="text-blue-600 hover:text-blue-800 underline text-sm flex items-center gap-1">
+              <i class="pi pi-external-link text-xs"></i>
+              @if (revenue.source === 'ENROLLMENT') {
+                {{ 'REVENUES.LIST.VIEW_ENROLLMENT' | translate }}
+              } @else {
+                {{ 'REVENUES.LIST.VIEW_SALE' | translate }}
+              }
+            </button>
+          </td>
         </tr>
       </ng-template>
       <ng-template pTemplate="emptymessage">

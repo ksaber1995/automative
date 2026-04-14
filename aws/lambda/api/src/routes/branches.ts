@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne, deleteById } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapBranchFromDB(row: any) {
   return {
@@ -23,6 +23,9 @@ export const branchesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Only ADMIN or GLOBAL_ADMIN can create branches
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -61,6 +64,9 @@ export const branchesRoutes = {
   list: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const branches = await query(
         'SELECT * FROM branches WHERE company_id = $1 ORDER BY created_at DESC',
@@ -82,6 +88,9 @@ export const branchesRoutes = {
   listActive: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const branches = await query(
         'SELECT * FROM branches WHERE company_id = $1 AND is_active = true ORDER BY created_at DESC',
@@ -103,6 +112,9 @@ export const branchesRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const branch = await queryOne(
         'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
@@ -132,6 +144,9 @@ export const branchesRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify branch belongs to company
       const existing = await queryOne(
@@ -199,6 +214,9 @@ export const branchesRoutes = {
   getStats: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify branch belongs to company
       const branch = await queryOne(
@@ -298,6 +316,9 @@ export const branchesRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // Verify branch belongs to company
       const existing = await queryOne(

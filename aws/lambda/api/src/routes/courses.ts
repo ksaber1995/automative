@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapCourseFromDB(row: any) {
   return {
@@ -30,6 +30,9 @@ export const coursesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return {
@@ -67,6 +70,9 @@ export const coursesRoutes = {
   list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `
         SELECT
@@ -87,7 +93,7 @@ export const coursesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
@@ -111,6 +117,9 @@ export const coursesRoutes = {
   listActive: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = 'SELECT * FROM courses WHERE company_id = $1 AND is_active = true';
       const params: any[] = [context.companyId];
@@ -124,7 +133,7 @@ export const coursesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
@@ -148,6 +157,9 @@ export const coursesRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const course = await queryOne(
         'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
@@ -184,6 +196,9 @@ export const coursesRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
@@ -248,6 +263,9 @@ export const coursesRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const existing = await queryOne(
         'SELECT * FROM courses WHERE id = $1 AND company_id = $2',

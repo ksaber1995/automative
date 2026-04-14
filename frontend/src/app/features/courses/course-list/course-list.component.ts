@@ -9,6 +9,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Course, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
@@ -80,15 +81,17 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     (onClick)="viewCourse(course)"
                     [pTooltip]="'COURSES.LIST.VIEW' | translate"
                   ></p-button>
-                  <p-button
-                    icon="pi pi-pencil"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="warn"
-                    (onClick)="editCourse(course)"
-                    [pTooltip]="'COURSES.LIST.EDIT' | translate"
-                  ></p-button>
-                  @if (course.isActive) {
+                  @if (authService.canWrite('courses')) {
+                    <p-button
+                      icon="pi pi-pencil"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="editCourse(course)"
+                      [pTooltip]="'COURSES.LIST.EDIT' | translate"
+                    ></p-button>
+                  }
+                  @if (authService.canDelete('courses') && course.isActive) {
                     <p-button
                       icon="pi pi-trash"
                       [rounded]="true"
@@ -129,6 +132,7 @@ export class CourseListComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  authService = inject(AuthService);
 
   courses = signal<CourseWithEnrollmentCount[]>([]);
   loading = signal(true);
@@ -146,7 +150,10 @@ export class CourseListComponent implements OnInit {
         this.courses.set(courses);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        this.notificationService.error('Failed to load courses');
+        this.loading.set(false);
+      }
     });
   }
 

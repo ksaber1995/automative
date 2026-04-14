@@ -8,6 +8,7 @@ import { TagModule } from 'primeng/tag';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { DebtService } from '../../../core/services/debt.service';
 import { Debt, DebtStatus } from '@shared/interfaces/debt.interface';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-debt-list',
@@ -130,14 +131,16 @@ import { Debt, DebtStatus } from '@shared/interfaces/debt.interface';
                       pTooltip="Make Payment">
                     </p-button>
                   }
-                  <p-button
-                    icon="pi pi-pencil"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="warn"
-                    (onClick)="editDebt(debt.id)"
-                    pTooltip="Edit">
-                  </p-button>
+                  @if (authService.canWrite('debts')) {
+                    <p-button
+                      icon="pi pi-pencil"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="editDebt(debt.id)"
+                      pTooltip="Edit">
+                    </p-button>
+                  }
                 </div>
               </td>
             </tr>
@@ -164,6 +167,7 @@ import { Debt, DebtStatus } from '@shared/interfaces/debt.interface';
 export class DebtListComponent implements OnInit {
   private debtService = inject(DebtService);
   private router = inject(Router);
+  authService = inject(AuthService);
 
   debts = signal<Debt[]>([]);
   summary = signal<any>(null);

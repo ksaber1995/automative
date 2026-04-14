@@ -9,6 +9,7 @@ export interface RevenueItem {
   source: 'ENROLLMENT' | 'PRODUCT_SALE';
   sourceId: string;
   amount: number;
+  totalRefunded: number;
   description: string;
   date: string;
   paymentMethod: string | null;

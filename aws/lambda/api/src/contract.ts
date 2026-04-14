@@ -308,7 +308,7 @@ const UpdateCourseSchema = CreateCourseSchema.partial();
 const CourseSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
-  branchId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
   name: z.string(),
   code: z.string(),
   description: z.string().nullable(),
@@ -317,6 +317,7 @@ const CourseSchema = z.object({
   maxStudents: z.number().nullable(),
   instructorId: UUIDSchema.nullable(),
   isActive: z.boolean(),
+  enrollmentCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -488,6 +489,7 @@ const RevenueItemSchema = z.object({
   source: z.enum(['ENROLLMENT', 'PRODUCT_SALE']),
   sourceId: UUIDSchema,
   amount: z.number(),
+  totalRefunded: z.number(),
   description: z.string(),
   date: z.string(),
   paymentMethod: z.string().nullable(),
@@ -553,6 +555,9 @@ const ExpenseSchema = z.object({
   assetName: z.string().nullable(),
   amortizationMonths: z.number().nullable(),
   monthlyAmount: z.number().nullable(),
+  bonusAmount: z.number().nullable(),
+  discountAmount: z.number().nullable(),
+  adjustmentReason: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1306,10 +1311,24 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/expenses/pay-employee/:employeeId',
       pathParams: z.object({ employeeId: UUIDSchema }),
-      body: z.object({ date: z.string().optional() }),
+      body: z.object({
+        date: z.string().optional(),
+        bonusAmount: z.number().min(0).optional(),
+        discountAmount: z.number().min(0).optional(),
+        adjustmentReason: z.string().optional(),
+      }),
       responses: {
         201: ExpenseSchema,
         400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getEmployeeSalaryHistory: {
+      method: 'GET',
+      path: '/api/expenses/employee/:employeeId/salary-history',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      responses: {
+        200: z.array(ExpenseSchema),
         404: z.object({ message: z.string() }),
       },
     },

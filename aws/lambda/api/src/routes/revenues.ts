@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
@@ -14,6 +14,10 @@ export const revenuesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
+      if (!checkGranularPermission(context, 'revenues', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
       const params: any[] = [context.companyId];
       const conditions: string[] = [];
 
@@ -26,6 +30,7 @@ export const revenuesRoutes = {
           e.branch_id,
           b.name as branch_name,
           e.amount_paid as amount,
+          COALESCE(e.total_refunded, 0) as total_refunded,
           CONCAT('Enrollment: ', s.first_name, ' ', s.last_name, ' - ', c.name) as description,
           e.enrollment_date as date,
           e.payment_status,
@@ -38,7 +43,7 @@ export const revenuesRoutes = {
         JOIN branches b ON e.branch_id = b.id
         JOIN students s ON e.student_id = s.id
         JOIN courses c ON e.course_id = c.id
-        WHERE e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL')
+        WHERE e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
       `;
 
       if (queryParams.branchId) {
@@ -50,7 +55,7 @@ export const revenuesRoutes = {
         }
         params.push(queryParams.branchId);
         conditions.push(`e.branch_id = $${params.length}`);
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         conditions.push(`e.branch_id = $${params.length}`);
       }
@@ -82,6 +87,7 @@ export const revenuesRoutes = {
             ps.branch_id,
             b.name as branch_name,
             ps.total_amount as amount,
+            CAST(0 AS NUMERIC) as total_refunded,
             CONCAT('Product Sale: ', p.name, ' (', ps.quantity, ' units)') as description,
             ps.sale_date as date,
             'PAID' as payment_status,
@@ -99,7 +105,7 @@ export const revenuesRoutes = {
         if (queryParams.branchId) {
           const branchIdx = params.indexOf(queryParams.branchId);
           productConditions.push(`ps.branch_id = $${branchIdx + 1}`);
-        } else if (context.role !== 'ADMIN' && context.branchId) {
+        } else if (!isGlobalAdmin(context) && context.branchId) {
           const branchIdx = params.indexOf(context.branchId);
           productConditions.push(`ps.branch_id = $${branchIdx + 1}`);
         }
@@ -133,6 +139,7 @@ export const revenuesRoutes = {
           source: row.source,
           sourceId: row.source_id,
           amount: parseFloat(row.amount),
+          totalRefunded: parseFloat(row.total_refunded || 0),
           description: row.description,
           date: row.date,
           paymentMethod: row.payment_method,
@@ -163,6 +170,10 @@ export const revenuesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
+      if (!checkGranularPermission(context, 'revenues', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
       const params: any[] = [context.companyId];
       let enrollmentConditions = 'WHERE e.company_id = $1 AND e.payment_status IN (\'PAID\', \'PARTIAL\')';
       let productConditions = 'WHERE ps.company_id = $1';
@@ -177,7 +188,7 @@ export const revenuesRoutes = {
         params.push(queryParams.branchId);
         enrollmentConditions += ` AND e.branch_id = $${params.length}`;
         productConditions += ` AND ps.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         enrollmentConditions += ` AND e.branch_id = $${params.length}`;
         productConditions += ` AND ps.branch_id = $${params.length}`;

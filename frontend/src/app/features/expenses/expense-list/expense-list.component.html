@@ -116,22 +116,26 @@
                   (onClick)="openPayDialog(expense)">
                 </p-button>
               }
-              <p-button
-                icon="pi pi-pencil"
-                [rounded]="true"
-                [text]="true"
-                severity="warn"
-                [pTooltip]="'EXPENSES.LIST.EDIT' | translate"
-                (onClick)="editExpense(expense)">
-              </p-button>
-              <p-button
-                icon="pi pi-trash"
-                [rounded]="true"
-                [text]="true"
-                severity="danger"
-                [pTooltip]="'EXPENSES.LIST.DELETE' | translate"
-                (onClick)="confirmDelete(expense)">
-              </p-button>
+              @if (authService.canWrite('expenses')) {
+                <p-button
+                  icon="pi pi-pencil"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  [pTooltip]="'EXPENSES.LIST.EDIT' | translate"
+                  (onClick)="editExpense(expense)">
+                </p-button>
+              }
+              @if (authService.canDelete('expenses')) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  [pTooltip]="'EXPENSES.LIST.DELETE' | translate"
+                  (onClick)="confirmDelete(expense)">
+                </p-button>
+              }
             </div>
           </td>
         </tr>

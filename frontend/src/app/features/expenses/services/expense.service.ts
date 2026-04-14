@@ -48,8 +48,17 @@ export class ExpenseService {
     return this.api.delete<Expense>(`expenses/${id}`);
   }
 
-  payEmployeeSalary(employeeId: string, date?: string): Observable<Expense> {
-    return this.api.post<Expense>(`expenses/pay-employee/${employeeId}`, date ? { date } : {});
+  payEmployeeSalary(employeeId: string, date?: string, bonusAmount?: number, discountAmount?: number, adjustmentReason?: string): Observable<Expense> {
+    const body: any = {};
+    if (date) body.date = date;
+    if (bonusAmount) body.bonusAmount = bonusAmount;
+    if (discountAmount) body.discountAmount = discountAmount;
+    if (adjustmentReason) body.adjustmentReason = adjustmentReason;
+    return this.api.post<Expense>(`expenses/pay-employee/${employeeId}`, body);
+  }
+
+  getEmployeeSalaryHistory(employeeId: string): Observable<Expense[]> {
+    return this.api.get<Expense[]>(`expenses/employee/${employeeId}/salary-history`);
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {

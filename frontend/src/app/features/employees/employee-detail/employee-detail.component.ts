@@ -11,12 +11,16 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { TableModule } from 'primeng/table';
+import { TooltipModule } from 'primeng/tooltip';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ExpenseService } from '../../expenses/services/expense.service';
 import { Employee } from '@shared/interfaces/employee.interface';
+import { Expense } from '@shared/interfaces/expense.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
 import { Branch } from '@shared/interfaces/branch.interface';
 
@@ -26,9 +30,10 @@ import { Branch } from '@shared/interfaces/branch.interface';
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DividerModule,
     DialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
+    TableModule, TooltipModule,
   ],
   template: `
-    <div class="container mx-auto p-6 max-w-4xl">
+    <div class="container mx-auto p-6 max-w-5xl">
       @if (loading()) {
         <div class="flex justify-center py-16">
           <i class="pi pi-spin pi-spinner text-4xl text-gray-400"></i>
@@ -55,7 +60,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
           }
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
           <!-- Personal Info -->
           <p-card>
@@ -177,6 +182,75 @@ import { Branch } from '@shared/interfaces/branch.interface';
           </p-card>
 
         </div>
+
+        <!-- Salary Payment History -->
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="flex items-center gap-2 px-4 pt-4">
+              <i class="pi pi-history text-purple-500"></i>
+              <span class="font-semibold text-gray-700">Salary Payment History</span>
+              <span class="text-xs text-gray-400 ml-auto mr-4">{{ salaryHistory().length }} payment(s)</span>
+            </div>
+          </ng-template>
+
+          @if (historyLoading()) {
+            <div class="flex justify-center py-8">
+              <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+            </div>
+          } @else {
+            <p-table [value]="salaryHistory()" [paginator]="salaryHistory().length > 10" [rows]="10" responsiveLayout="scroll">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>Date</th>
+                  <th class="text-right">Base Salary</th>
+                  <th class="text-right text-green-600">Bonus</th>
+                  <th class="text-right text-red-600">Discount</th>
+                  <th class="text-right font-semibold">Total Paid</th>
+                  <th>Reason</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-item>
+                <tr>
+                  <td class="font-medium">{{ item.date | date:'mediumDate' }}</td>
+                  <td class="text-right text-gray-600">
+                    {{ getBaseSalary(item) | number:'1.2-2' }}
+                  </td>
+                  <td class="text-right">
+                    @if (item.bonusAmount && item.bonusAmount > 0) {
+                      <span class="text-green-600 font-medium">+{{ item.bonusAmount | number:'1.2-2' }}</span>
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
+                  <td class="text-right">
+                    @if (item.discountAmount && item.discountAmount > 0) {
+                      <span class="text-red-600 font-medium">-{{ item.discountAmount | number:'1.2-2' }}</span>
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
+                  <td class="text-right font-semibold text-gray-800">{{ item.amount | number:'1.2-2' }}</td>
+                  <td>
+                    @if (item.adjustmentReason) {
+                      <span class="text-sm text-gray-600 italic">"{{ item.adjustmentReason }}"</span>
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="6" class="text-center py-8 text-gray-400">
+                    <i class="pi pi-inbox text-2xl mb-2 block"></i>
+                    No salary payments recorded yet.
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          }
+        </p-card>
+
       } @else {
         <div class="text-center py-16 text-gray-500">
           <i class="pi pi-exclamation-circle text-4xl mb-4 block"></i>
@@ -244,6 +318,7 @@ export class EmployeeDetailComponent implements OnInit {
   private userService = inject(UserService);
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
+  private expenseService = inject(ExpenseService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -252,6 +327,8 @@ export class EmployeeDetailComponent implements OnInit {
   branchName = signal('—');
   branches = signal<Branch[]>([]);
   converting = signal(false);
+  salaryHistory = signal<Expense[]>([]);
+  historyLoading = signal(false);
 
   showConvertDialog = false;
   convertForm = {
@@ -273,6 +350,10 @@ export class EmployeeDetailComponent implements OnInit {
     return this.authService.canManageUsers();
   }
 
+  getBaseSalary(item: Expense): number {
+    return item.amount - (item.bonusAmount || 0) + (item.discountAmount || 0);
+  }
+
   ngOnInit() {
     const id = this.route.snapshot.params['id'];
     this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
@@ -280,7 +361,6 @@ export class EmployeeDetailComponent implements OnInit {
       next: (emp) => {
         this.employee.set(emp);
         this.loading.set(false);
-        // Pre-fill convert form email from employee
         if (emp.email) this.convertForm.email = emp.email;
         if (emp.branchId) this.convertForm.branchIds = [emp.branchId];
         if (emp.branchId) {
@@ -293,11 +373,25 @@ export class EmployeeDetailComponent implements OnInit {
         } else {
           this.branchName.set(emp.isGlobal ? 'All Branches' : '—');
         }
+        this.loadSalaryHistory(id);
       },
       error: () => {
         this.notificationService.error('Employee not found');
         this.loading.set(false);
         this.router.navigate(['/employees']);
+      }
+    });
+  }
+
+  private loadSalaryHistory(employeeId: string) {
+    this.historyLoading.set(true);
+    this.expenseService.getEmployeeSalaryHistory(employeeId).subscribe({
+      next: (history) => {
+        this.salaryHistory.set(history);
+        this.historyLoading.set(false);
+      },
+      error: () => {
+        this.historyLoading.set(false);
       }
     });
   }

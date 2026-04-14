@@ -329,12 +329,13 @@ export class CourseFormComponent implements OnInit {
     } else {
       this.courseService.createCourse(courseData).subscribe({
         next: () => {
+          this.loading.set(false);
           this.notificationService.success('Course created successfully');
           this.router.navigate(['/courses']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error('Failed to create course');
+          this.notificationService.error(error?.error?.message || 'Failed to create course');
           console.error('Create error:', error);
         }
       });

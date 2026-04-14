@@ -1,5 +1,5 @@
 import { insert, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 import { getClient } from '../db/connection';
 
 function mapProductSaleFromDB(row: any) {
@@ -31,6 +31,10 @@ export const productSalesRoutes = {
     const client = await getClient();
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'write')) {
+        client.release();
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return {
@@ -120,6 +124,9 @@ export const productSalesRoutes = {
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; productId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `SELECT ps.*, p.name AS product_name FROM product_sales ps LEFT JOIN products p ON ps.product_id = p.id WHERE ps.company_id = $1`;
       const params: any[] = [context.companyId];
@@ -172,6 +179,9 @@ export const productSalesRoutes = {
   summary: async ({ query: queryParams, headers }: { query: { branchId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `
         SELECT
@@ -329,6 +339,9 @@ export const productSalesRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const sale = await queryOne(
         'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',

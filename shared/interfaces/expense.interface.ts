@@ -19,6 +19,9 @@ export interface Expense {
   assetName?: string | null;
   amortizationMonths?: number | null;
   monthlyAmount?: number | null;
+  bonusAmount?: number | null;
+  discountAmount?: number | null;
+  adjustmentReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
