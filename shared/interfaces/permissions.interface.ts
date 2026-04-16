@@ -32,6 +32,8 @@ export interface UserPermissions {
   product_sales?: Partial<ResourcePermission>;
   reports?: Partial<ResourcePermission>;
   users?: Partial<ResourcePermission>;
+  master_courses?: Partial<ResourcePermission>;
+  events?: Partial<ResourcePermission>;
 }
 
 export type PermissionResource = keyof UserPermissions;
@@ -54,6 +56,8 @@ export const PERMISSION_RESOURCES: PermissionResource[] = [
   'product_sales',
   'reports',
   'users',
+  'master_courses',
+  'events',
 ];
 
 export const FINANCIAL_RESOURCES: PermissionResource[] = [
@@ -92,6 +96,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      FULL,
     users:        FULL,
+    master_courses: FULL,
+    events: FULL,
   },
   [UserRole.ADMIN]: {
     dashboard:    FULL,
@@ -110,6 +116,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      FULL,
     users:        FULL,
+    master_courses: FULL,
+    events: FULL,
   },
   [UserRole.BRANCH_ADMIN]: {
     dashboard:    READ_ONLY,
@@ -128,6 +136,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      READ_ONLY,
     users:        NO_ACCESS,
+    master_courses: READ_WRITE,
+    events: FULL,
   },
   [UserRole.BRANCH_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -146,6 +156,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      READ_ONLY,
     users:        NO_ACCESS,
+    master_courses: READ_WRITE,
+    events: FULL,
   },
   [UserRole.ACADEMIC_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -164,6 +176,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: NO_ACCESS,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
+    master_courses: FULL,
+    events: FULL,
   },
   [UserRole.SALES_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -182,6 +196,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
   [UserRole.ACCOUNTANT]: {
     dashboard:    READ_ONLY,
@@ -200,6 +216,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: READ_ONLY,
     reports:      FULL,
     users:        NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
   [UserRole.VIEWER]: {
     dashboard:    READ_ONLY,
@@ -218,6 +236,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: NO_ACCESS,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
 };
 

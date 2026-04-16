@@ -25,6 +25,7 @@ function mapExpenseFromDB(row: any) {
     bonusAmount: row.bonus_amount ? parseFloat(row.bonus_amount) : 0,
     discountAmount: row.discount_amount ? parseFloat(row.discount_amount) : 0,
     adjustmentReason: row.adjustment_reason || null,
+    eventId: row.event_id || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,6 +62,7 @@ export const expensesRoutes = {
         notes: body.notes || null,
         asset_name: body.assetName || null,
         amortization_months: body.type === 'CAPITAL' ? (body.amortizationMonths || null) : null,
+        event_id: body.eventId || null,
       });
 
       return {
@@ -304,6 +306,7 @@ export const expensesRoutes = {
       if (body.vendor !== undefined) updateData.vendor = body.vendor;
       if (body.invoiceNumber !== undefined) updateData.invoice_number = body.invoiceNumber;
       if (body.notes !== undefined) updateData.notes = body.notes;
+      if (body.eventId !== undefined) updateData.event_id = body.eventId || null;
       if (body.assetName !== undefined) updateData.asset_name = body.assetName;
       if (body.amortizationMonths !== undefined) updateData.amortization_months = body.amortizationMonths;
 

@@ -232,6 +232,21 @@
           </div>
         }
 
+        <!-- Event link (optional) -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.FORM.EVENT_LABEL' | translate }}</label>
+          <p-select
+            formControlName="eventId"
+            [options]="eventOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [placeholder]="'EXPENSES.FORM.EVENT_PLACEHOLDER' | translate"
+            [showClear]="true"
+            [style]="{ width: '100%' }"
+          ></p-select>
+          <small class="text-gray-500">{{ 'EXPENSES.FORM.EVENT_HINT' | translate }}</small>
+        </div>
+
         <!-- Notes -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.FORM.NOTES_LABEL' | translate }}</label>

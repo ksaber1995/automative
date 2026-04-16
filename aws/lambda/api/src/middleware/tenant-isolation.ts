@@ -13,7 +13,8 @@ import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 type PermissionResource =
   | 'dashboard' | 'branches' | 'courses' | 'classes' | 'students'
   | 'enrollments' | 'employees' | 'revenues' | 'expenses' | 'withdrawals'
-  | 'refunds' | 'debts' | 'products' | 'product_sales' | 'reports' | 'users';
+  | 'refunds' | 'debts' | 'products' | 'product_sales' | 'reports' | 'users'
+  | 'master_courses' | 'events';
 
 type PermissionAction = 'read' | 'write' | 'delete';
 
@@ -31,24 +32,32 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
+    master_courses: FULL,
+    events: FULL,
   },
   ADMIN: {
     dashboard: FULL, branches: FULL, courses: FULL, classes: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
+    master_courses: FULL,
+    events: FULL,
   },
   BRANCH_ADMIN: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
+    master_courses: READ_WRITE,
+    events: FULL,
   },
   BRANCH_MANAGER: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
+    master_courses: READ_WRITE,
+    events: FULL,
   },
   ACADEMIC_MANAGER: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
@@ -56,6 +65,8 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
+    master_courses: FULL,
+    events: FULL,
   },
   SALES_MANAGER: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
@@ -63,6 +74,8 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: FULL,
     product_sales: FULL, reports: NO_ACCESS, users: NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
   ACCOUNTANT: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
@@ -70,6 +83,8 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     revenues: FULL, expenses: FULL, withdrawals: FULL, refunds: FULL,
     debts: FULL, products: READ_ONLY, product_sales: READ_ONLY,
     reports: FULL, users: NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
   VIEWER: {
     dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
@@ -77,6 +92,8 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
+    master_courses: READ_ONLY,
+    events: READ_ONLY,
   },
 };
 

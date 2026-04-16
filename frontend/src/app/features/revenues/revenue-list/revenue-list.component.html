@@ -38,6 +38,7 @@
           <th>{{ 'REVENUES.LIST.COL_SOURCE' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_DESC' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_AMOUNT' | translate }}</th>
+          <th>{{ 'REVENUES.LIST.COL_REFUND_STATUS' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_METHOD' | translate }}</th>
           <th>{{ 'REVENUES.LIST.COL_LINK' | translate }}</th>
         </tr>
@@ -69,6 +70,12 @@
             }
           </td>
           <td>
+            <p-tag
+              [value]="('REVENUES.LIST.REFUND_STATUS_' + getRefundStatus(revenue)) | translate"
+              [severity]="getRefundStatusSeverity(revenue)">
+            </p-tag>
+          </td>
+          <td>
             @if (revenue.paymentMethod) {
               <p-tag [value]="('REVENUES.LIST.METHOD_' + revenue.paymentMethod) | translate" severity="info"></p-tag>
             } @else {
@@ -91,7 +98,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-8">
+          <td colspan="8" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'REVENUES.LIST.NO_DATA' | translate }}</p>

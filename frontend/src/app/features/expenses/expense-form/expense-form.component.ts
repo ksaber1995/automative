@@ -12,9 +12,11 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { CheckboxModule } from 'primeng/checkbox';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { EventService } from '../../events/services/event.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { EventModel } from '@shared/interfaces/event.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -41,6 +43,7 @@ export class ExpenseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private expenseService = inject(ExpenseService);
   private branchService = inject(BranchService);
+  private eventService = inject(EventService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -50,6 +53,8 @@ export class ExpenseFormComponent implements OnInit {
   isEditMode = signal(false);
   expenseId: string | null = null;
   branches = signal<Branch[]>([]);
+  events = signal<EventModel[]>([]);
+  eventOptions = signal<{ label: string; value: string }[]>([]);
 
   expenseTypes = Object.values(ExpenseType);
   expenseCategories = Object.values(ExpenseCategory);
@@ -79,7 +84,8 @@ export class ExpenseFormComponent implements OnInit {
       invoiceNumber: [''],
       notes: [''],
       assetName: [''],
-      amortizationMonths: [null]
+      amortizationMonths: [null],
+      eventId: [null]
     });
 
     // Watch for type changes to adjust branch requirement
@@ -125,6 +131,7 @@ export class ExpenseFormComponent implements OnInit {
 
   ngOnInit() {
     this.loadBranches();
+    this.loadEvents();
 
     this.expenseId = this.route.snapshot.paramMap.get('id');
     if (this.expenseId) {
@@ -142,6 +149,16 @@ export class ExpenseFormComponent implements OnInit {
     });
   }
 
+  loadEvents() {
+    this.eventService.getAll().subscribe({
+      next: (events) => {
+        const active = events.filter((e) => e.isActive && e.status !== 'CANCELLED');
+        this.events.set(active);
+        this.eventOptions.set(active.map((e) => ({ label: e.name, value: e.id })));
+      },
+    });
+  }
+
   loadExpense(id: string) {
     this.loading.set(true);
     this.expenseService.getExpenseById(id).subscribe({
@@ -149,7 +166,8 @@ export class ExpenseFormComponent implements OnInit {
         this.expenseForm.patchValue({
           ...expense,
           branchId: expense.branchId || '',
-          date: new Date(expense.date)
+          date: new Date(expense.date),
+          eventId: (expense as any).eventId || null,
         });
         this.loading.set(false);
       },
@@ -175,6 +193,7 @@ export class ExpenseFormComponent implements OnInit {
       date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date,
       assetName: formValue.type === 'CAPITAL' ? (formValue.assetName || null) : null,
       amortizationMonths: formValue.type === 'CAPITAL' ? (formValue.amortizationMonths || null) : null,
+      eventId: formValue.eventId || null,
     };
 
     if (this.isEditMode() && this.expenseId) {

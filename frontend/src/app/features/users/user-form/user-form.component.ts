@@ -37,6 +37,8 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
   dashboard:    { label: 'USERS.FORM.RESOURCE_DASHBOARD',     icon: 'pi pi-home' },
   branches:     { label: 'USERS.FORM.RESOURCE_BRANCHES',      icon: 'pi pi-building' },
   courses:      { label: 'USERS.FORM.RESOURCE_COURSES',       icon: 'pi pi-book' },
+  master_courses: { label: 'USERS.FORM.RESOURCE_MASTER_COURSES', icon: 'pi pi-th-large' },
+  events:       { label: 'USERS.FORM.RESOURCE_EVENTS',       icon: 'pi pi-flag' },
   classes:      { label: 'USERS.FORM.RESOURCE_CLASSES',       icon: 'pi pi-calendar' },
   students:     { label: 'USERS.FORM.RESOURCE_STUDENTS',      icon: 'pi pi-users' },
   enrollments:  { label: 'USERS.FORM.RESOURCE_ENROLLMENTS',   icon: 'pi pi-id-card' },

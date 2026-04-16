@@ -9,9 +9,11 @@ import { ButtonModule } from 'primeng/button';
 import { TranslateModule } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
 import { ProductSaleService } from '../services/product-sale.service';
+import { EventService } from '../../events/services/event.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Product } from '@shared/interfaces/product.interface';
+import { EventModel } from '@shared/interfaces/event.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 
@@ -158,6 +160,17 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
             </div>
 
             <div class="field">
+              <label for="eventId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.EVENT_LABEL' | translate }}</label>
+              <select id="eventId" formControlName="eventId" class="w-full p-2 border rounded">
+                <option value="">{{ 'PRODUCTS.SALE.EVENT_PLACEHOLDER' | translate }}</option>
+                @for (event of events(); track event.id) {
+                  <option [value]="event.id">{{ event.name }}</option>
+                }
+              </select>
+              <small class="text-gray-500">{{ 'PRODUCTS.SALE.EVENT_HINT' | translate }}</small>
+            </div>
+
+            <div class="field">
               <label for="notes" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALE.NOTES_LABEL' | translate }}</label>
               <textarea id="notes" formControlName="notes" rows="2" class="w-full p-2 border rounded"></textarea>
             </div>
@@ -183,6 +196,7 @@ export class ProductSaleComponent implements OnInit {
   private fb = inject(FormBuilder);
   private productService = inject(ProductService);
   private productSaleService = inject(ProductSaleService);
+  private eventService = inject(EventService);
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
@@ -190,6 +204,7 @@ export class ProductSaleComponent implements OnInit {
 
   saleForm!: FormGroup;
   products = signal<Product[]>([]);
+  events = signal<EventModel[]>([]);
   submitting = signal(false);
 
   // Reactive signals synced from form values
@@ -229,6 +244,7 @@ export class ProductSaleComponent implements OnInit {
   ngOnInit() {
     this.initForm();
     this.loadProducts();
+    this.loadEvents();
 
     // Sync form values into signals so computed() reacts to changes
     this.saleForm.get('productId')!.valueChanges.subscribe(v => this.selectedProductId.set(v || ''));
@@ -272,6 +288,15 @@ export class ProductSaleComponent implements OnInit {
       customerPhone: [''],
       notes: [''],
       date: [today, Validators.required],
+      eventId: [''],
+    });
+  }
+
+  loadEvents() {
+    this.eventService.getAll().subscribe({
+      next: (evts) => {
+        this.events.set(evts.filter((e) => e.isActive && e.status !== 'CANCELLED'));
+      },
     });
   }
 
@@ -295,7 +320,10 @@ export class ProductSaleComponent implements OnInit {
     }
 
     this.submitting.set(true);
-    const formValue = this.saleForm.value;
+    const formValue = {
+      ...this.saleForm.value,
+      eventId: this.saleForm.value.eventId || undefined,
+    };
 
     this.productSaleService.createSale(formValue).subscribe({
       next: (sale: any) => {

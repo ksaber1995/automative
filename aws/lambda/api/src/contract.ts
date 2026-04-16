@@ -43,6 +43,8 @@ const UserPermissionsSchema = z.object({
   product_sales: ResourcePermissionSchema.optional(),
   reports:      ResourcePermissionSchema.optional(),
   users:        ResourcePermissionSchema.optional(),
+  master_courses: ResourcePermissionSchema.optional(),
+  events:        ResourcePermissionSchema.optional(),
 }).optional().nullable();
 
 // Subscription Tiers
@@ -305,10 +307,138 @@ const CreateCourseSchema = z.object({
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
 
+// =============================================
+// Master Course Schemas
+// =============================================
+const CreateMasterCourseSchema = z.object({
+  branchId: UUIDSchema,
+  name: z.string(),
+  code: z.string(),
+  description: z.string().optional(),
+  defaultPrice: z.number(),
+  defaultDuration: z.number(),
+  defaultMaxStudents: z.number().optional(),
+});
+
+const UpdateMasterCourseSchema = z.object({
+  name: z.string().optional(),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  defaultPrice: z.number().optional(),
+  defaultDuration: z.number().optional(),
+  defaultMaxStudents: z.number().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const CloneMasterCourseSchema = z.object({
+  branchId: UUIDSchema,
+  code: z.string().optional(),
+});
+
+const MasterCourseSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  branchName: z.string().nullable().optional(),
+  name: z.string(),
+  code: z.string(),
+  description: z.string().nullable(),
+  defaultPrice: z.number(),
+  defaultDuration: z.number(),
+  defaultMaxStudents: z.number().nullable(),
+  isActive: z.boolean(),
+  linkedCourseCount: z.number().optional(),
+  branchCount: z.number().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ApplyMasterCourseSchema = z.object({
+  applyName: z.boolean().optional(),
+  applyDescription: z.boolean().optional(),
+  applyPrice: z.boolean().optional(),
+  applyDuration: z.boolean().optional(),
+  applyMaxStudents: z.boolean().optional(),
+});
+
+const InstantiateMasterCourseSchema = z.object({
+  branchIds: z.array(UUIDSchema),
+});
+
+// =============================================
+// Event Schemas
+// =============================================
+const EventTypeSchema = z.enum(['TRIP', 'COMPETITION', 'WORKSHOP', 'SEMINAR', 'CAMP', 'OTHER']);
+const EventStatusSchema = z.enum(['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED']);
+
+const CreateEventSchema = z.object({
+  branchId: OptionalUUIDSchema,
+  name: z.string(),
+  code: z.string().optional(),
+  eventType: EventTypeSchema.optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  budget: z.number().optional(),
+  status: EventStatusSchema.optional(),
+});
+
+const UpdateEventSchema = CreateEventSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+const EventSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  name: z.string(),
+  code: z.string().nullable(),
+  eventType: z.string(),
+  description: z.string().nullable(),
+  location: z.string().nullable(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  budget: z.number().nullable(),
+  status: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const EventPLSchema = z.object({
+  eventId: UUIDSchema,
+  revenue: z.number(),
+  revenueCount: z.number(),
+  expenses: z.number(),
+  expenseCount: z.number(),
+  refunds: z.number(),
+  refundCount: z.number(),
+  productRevenue: z.number(),
+  productCost: z.number(),
+  productMargin: z.number(),
+  productSaleCount: z.number(),
+  netProfit: z.number(),
+  budget: z.number().nullable(),
+});
+
+const LinkedCourseSummarySchema = z.object({
+  id: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  branchName: z.string().nullable(),
+  name: z.string(),
+  code: z.string(),
+  price: z.number(),
+  duration: z.number(),
+  maxStudents: z.number().nullable(),
+  isActive: z.boolean(),
+});
+
 const CourseSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
   branchId: UUIDSchema.nullable(),
+  masterCourseId: UUIDSchema.nullable().optional(),
   name: z.string(),
   code: z.string(),
   description: z.string().nullable(),
@@ -533,6 +663,7 @@ const CreateExpenseSchema = z.object({
   notes: z.string().optional(),
   assetName: z.string().nullish(),
   amortizationMonths: z.number().int().min(1).nullish(),
+  eventId: OptionalUUIDSchema,
 });
 
 const UpdateExpenseSchema = CreateExpenseSchema.partial();
@@ -558,6 +689,7 @@ const ExpenseSchema = z.object({
   bonusAmount: z.number().nullable(),
   discountAmount: z.number().nullable(),
   adjustmentReason: z.string().nullable(),
+  eventId: UUIDSchema.nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -729,6 +861,7 @@ const CreateProductSaleSchema = z.object({
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
   notes: z.string().optional(),
+  eventId: OptionalUUIDSchema,
 });
 
 const ProductSaleSchema = z.object({
@@ -750,6 +883,7 @@ const ProductSaleSchema = z.object({
   customerName: z.string().nullable(),
   customerPhone: z.string().nullable(),
   notes: z.string().nullable(),
+  eventId: UUIDSchema.nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -992,6 +1126,146 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Events routes
+  events: {
+    create: {
+      method: 'POST',
+      path: '/api/events',
+      body: CreateEventSchema,
+      responses: { 201: EventSchema, 400: z.object({ message: z.string() }) },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/events',
+      query: z.object({
+        branchId: OptionalUUIDSchema,
+        status: z.string().optional(),
+      }),
+      responses: { 200: z.array(EventSchema) },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/events/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: EventSchema, 404: z.object({ message: z.string() }) },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/events/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateEventSchema,
+      responses: { 200: EventSchema, 404: z.object({ message: z.string() }) },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/events/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.object({ message: z.string() }), 404: z.object({ message: z.string() }) },
+    },
+    getPL: {
+      method: 'GET',
+      path: '/api/events/:id/pl',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: EventPLSchema, 404: z.object({ message: z.string() }) },
+    },
+  },
+
+  // Master courses routes
+  masterCourses: {
+    create: {
+      method: 'POST',
+      path: '/api/master-courses',
+      body: CreateMasterCourseSchema,
+      responses: {
+        201: MasterCourseSchema,
+        400: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/master-courses',
+      responses: {
+        200: z.array(MasterCourseSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/master-courses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: MasterCourseSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getLinkedCourses: {
+      method: 'GET',
+      path: '/api/master-courses/:id/linked-courses',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(LinkedCourseSummarySchema),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/master-courses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateMasterCourseSchema,
+      responses: {
+        200: MasterCourseSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/master-courses/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    apply: {
+      method: 'POST',
+      path: '/api/master-courses/:id/apply',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: ApplyMasterCourseSchema,
+      responses: {
+        200: z.object({ updatedCount: z.number(), skippedCount: z.number() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    instantiate: {
+      method: 'POST',
+      path: '/api/master-courses/:id/instantiate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: InstantiateMasterCourseSchema,
+      responses: {
+        201: z.object({
+          createdCount: z.number(),
+          skippedCount: z.number(),
+          created: z.array(z.object({ id: UUIDSchema, branchId: UUIDSchema })),
+        }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    clone: {
+      method: 'POST',
+      path: '/api/master-courses/:id/clone',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CloneMasterCourseSchema,
+      responses: {
+        201: MasterCourseSchema,
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },

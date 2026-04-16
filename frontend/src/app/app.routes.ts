@@ -34,6 +34,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/courses/courses.routes').then(m => m.COURSES_ROUTES)
       },
       {
+        path: 'master-courses',
+        canActivate: [permissionGuard('master_courses')],
+        loadChildren: () => import('./features/master-courses/master-courses.routes').then(m => m.MASTER_COURSES_ROUTES)
+      },
+      {
+        path: 'events',
+        canActivate: [permissionGuard('events')],
+        loadChildren: () => import('./features/events/events.routes').then(m => m.EVENTS_ROUTES)
+      },
+      {
         path: 'classes',
         canActivate: [permissionGuard('classes')],
         loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)

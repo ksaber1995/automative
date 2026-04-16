@@ -22,6 +22,7 @@ function mapProductSaleFromDB(row: any) {
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     notes: row.notes,
+    eventId: row.event_id || null,
     createdAt: row.created_at,
   };
 }
@@ -71,12 +72,13 @@ export const productSalesRoutes = {
       // 1. Create the sale record
       const saleResult = await client.query(
         `INSERT INTO product_sales
-           (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+           (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes, event_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
         [context.companyId, body.productId, body.branchId, body.quantity, unitPrice,
          discountType, discountValue, discountAmount, subtotal, totalAmount,
          body.date, body.paymentMethod || null, body.receiptNumber || null,
-         body.customerName || null, body.customerPhone || null, body.notes || null]
+         body.customerName || null, body.customerPhone || null, body.notes || null,
+         body.eventId || null]
       );
       const sale = saleResult.rows[0];
 
@@ -90,8 +92,8 @@ export const productSalesRoutes = {
       const cogsAmount = parseFloat(product.cost_price) * body.quantity;
       const saleDate = body.date;
       await client.query(
-        `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id)
-         VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7)`,
+        `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id, event_id)
+         VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7,$8)`,
         [
           context.companyId,
           body.branchId,
@@ -100,6 +102,7 @@ export const productSalesRoutes = {
           saleDate,
           sale.id,
           body.productId,
+          body.eventId || null,
         ]
       );
 

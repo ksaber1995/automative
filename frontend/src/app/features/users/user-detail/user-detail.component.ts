@@ -28,6 +28,8 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
   dashboard:    { label: 'Dashboard',      icon: 'pi pi-home' },
   branches:     { label: 'Branches',       icon: 'pi pi-building' },
   courses:      { label: 'Courses',        icon: 'pi pi-book' },
+  master_courses: { label: 'Master Courses', icon: 'pi pi-th-large' },
+  events:       { label: 'Events',          icon: 'pi pi-flag' },
   classes:      { label: 'Classes',        icon: 'pi pi-calendar' },
   students:     { label: 'Students',       icon: 'pi pi-users' },
   enrollments:  { label: 'Enrollments',    icon: 'pi pi-id-card' },

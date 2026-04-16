@@ -76,6 +76,19 @@ export class RevenueListComponent implements OnInit {
       : { severity: 'info', label: 'Product' };
   }
 
+  getRefundStatus(revenue: RevenueItem): 'NONE' | 'PARTIAL' | 'FULL' {
+    if (!revenue.totalRefunded || revenue.totalRefunded === 0) return 'NONE';
+    if (revenue.totalRefunded < revenue.amount) return 'PARTIAL';
+    return 'FULL';
+  }
+
+  getRefundStatusSeverity(revenue: RevenueItem): 'success' | 'warn' | 'danger' {
+    const status = this.getRefundStatus(revenue);
+    if (status === 'NONE') return 'success';
+    if (status === 'PARTIAL') return 'warn';
+    return 'danger';
+  }
+
   getBranchName(branchId: string): string {
     const branch = this.branches().find(b => b.id === branchId);
     return branch ? branch.name : 'Unknown';

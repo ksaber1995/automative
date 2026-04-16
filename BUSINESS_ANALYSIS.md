@@ -135,6 +135,22 @@ You are building vertical SaaS for education centers (tutoring academies, traini
 | **Employee back-pay calculator** | Already planned — needed for accurate payroll |
 | **Debt / receivables tracking** | Follow up on unpaid balances from students or vendors |
 | **SMS/Email enrollment reminders** | Reduce no-shows and churn |
+| **Master courses (bulk course management)** | Implemented. Multi-branch academies can define a course template once and push pricing/duration/description changes to every branch instance in one click, instead of editing N branches manually. Turns a frequent 30-minute chore into a 10-second action. |
+
+#### Master Courses — Feature Detail
+
+**Problem:** A chain with 5 branches offering the same "Robotics 101" course has to edit price, duration, or description five times whenever it changes. Branch managers drift out of sync — same course name, different prices across branches — which breaks cross-branch revenue reports.
+
+**Solution:** A company-level **master course** catalog, accessible from its own sidebar page (`/master-courses`). Each master carries default name, code, description, price, duration, and max students. From the master detail page, an admin can:
+
+1. **Instantiate to branches** — one click to create a linked branch-level `course` row in every selected branch. Branches that already have a linked course are skipped.
+2. **Apply to linked courses** — push any subset of fields (name, description, price, duration, max students) to every linked course at once, respecting branch-access RBAC. Users only update courses in branches they have write access to.
+
+Branch admins can still edit a linked course locally (e.g. set a different instructor) — the master only overwrites the fields the operator explicitly selects to apply. Deleting a master soft-deletes it but leaves linked courses intact (unlinked).
+
+**Data model:** `master_courses` table at the company level, plus `courses.master_course_id` nullable FK. Soft delete via `is_active`. RBAC: new `master_courses` permission resource — default `FULL` for admins and academic managers, `READ_WRITE` for branch admins, `READ_ONLY` for accountant/sales/viewer.
+
+**Business value:** Sold as a multi-branch differentiator. The single-branch competitors (Odoo, generic ERPs) don't model this — the feature is what makes Netrofit credible for 3+ branch chains, which are the high-LTV segment.
 
 ### Tier 3: Growth Features (competitive differentiation)
 

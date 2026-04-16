@@ -14,6 +14,8 @@ import { authRoutes } from './routes/auth';
 import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
+import { masterCoursesRoutes } from './routes/master-courses';
+import { eventsRoutes } from './routes/events';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
@@ -44,6 +46,8 @@ const router = {
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,
+  masterCourses: masterCoursesRoutes,
+  events: eventsRoutes,
   classes: classesRoutes,
   enrollments: enrollmentsRoutes,
   revenues: revenuesRoutes,

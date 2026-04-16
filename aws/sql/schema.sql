@@ -54,9 +54,33 @@ ALTER TABLE users ADD CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFEREN
 -- =============================================
 -- COURSES TABLE
 -- =============================================
+-- =============================================
+-- MASTER COURSES TABLE
+-- Company-wide course templates. A branch-level `courses` row can be linked
+-- to a master via `courses.master_course_id`; updates to the master can then
+-- be applied in bulk to every linked course.
+-- =============================================
+CREATE TABLE master_courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) NOT NULL,
+    description TEXT,
+    default_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    default_duration INTEGER NOT NULL DEFAULT 8,
+    default_max_students INTEGER,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id, code)
+);
+
+CREATE INDEX idx_master_courses_company ON master_courses(company_id);
+
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID NOT NULL,
+    master_course_id UUID,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
     description TEXT,
@@ -69,11 +93,13 @@ CREATE TABLE courses (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (master_course_id) REFERENCES master_courses(id) ON DELETE SET NULL,
     UNIQUE(branch_id, code)
 );
 
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX idx_courses_code ON courses(code);
+CREATE INDEX idx_courses_master_course ON courses(master_course_id);
 
 -- =============================================
 -- CLASSES TABLE
@@ -192,6 +218,34 @@ CREATE INDEX idx_enrollment_payments_enrollment_id ON enrollment_payments(enroll
 CREATE INDEX idx_enrollment_payments_company_id ON enrollment_payments(company_id);
 
 -- =============================================
+-- EVENTS TABLE
+-- Company-level occasions (trip, competition, workshop, etc.) with their
+-- own mini P&L. Rows in expenses, revenues, refunds, products, and
+-- product_sales may be optionally linked to an event via event_id.
+-- =============================================
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50),
+    event_type VARCHAR(32) NOT NULL DEFAULT 'OTHER',
+    description TEXT,
+    location VARCHAR(255),
+    start_date DATE,
+    end_date DATE,
+    budget DECIMAL(12, 2),
+    status VARCHAR(16) NOT NULL DEFAULT 'PLANNED',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_events_company ON events(company_id);
+CREATE INDEX idx_events_branch ON events(branch_id);
+
+-- =============================================
 -- REFUNDS TABLE
 -- =============================================
 CREATE TABLE refunds (
@@ -199,18 +253,21 @@ CREATE TABLE refunds (
     enrollment_id UUID NOT NULL,
     company_id UUID NOT NULL,
     student_id UUID NOT NULL,
+    event_id UUID,
     amount DECIMAL(10, 2) NOT NULL,
     refund_date DATE NOT NULL,
     type VARCHAR(20) NOT NULL CHECK (type IN ('FULL', 'PARTIAL')),
     reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);
 CREATE INDEX idx_refunds_company_id ON refunds(company_id);
 CREATE INDEX idx_refunds_student_id ON refunds(student_id);
+CREATE INDEX idx_refunds_event ON refunds(event_id);
 
 -- =============================================
 -- EMPLOYEES TABLE
@@ -246,6 +303,7 @@ CREATE TABLE revenues (
     course_id UUID,
     enrollment_id UUID,
     student_id UUID,
+    event_id UUID,
     amount DECIMAL(10, 2) NOT NULL,
     description TEXT,
     date DATE NOT NULL,
@@ -257,7 +315,8 @@ CREATE TABLE revenues (
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE SET NULL,
-    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_revenues_branch_id ON revenues(branch_id);
@@ -265,6 +324,7 @@ CREATE INDEX idx_revenues_date ON revenues(date);
 CREATE INDEX idx_revenues_course_id ON revenues(course_id);
 CREATE INDEX idx_revenues_enrollment_id ON revenues(enrollment_id);
 CREATE INDEX idx_revenues_student_id ON revenues(student_id);
+CREATE INDEX idx_revenues_event ON revenues(event_id);
 
 -- =============================================
 -- EXPENSES TABLE
@@ -288,6 +348,7 @@ CREATE TABLE expenses (
     amortization_months INTEGER,
     product_id UUID,
     product_sale_id UUID,
+    event_id UUID,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -295,13 +356,15 @@ CREATE TABLE expenses (
     FOREIGN KEY (recurring_template_id) REFERENCES expenses(id) ON DELETE SET NULL,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE SET NULL
+    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_expenses_branch_id ON expenses(branch_id);
 CREATE INDEX idx_expenses_date ON expenses(date);
 CREATE INDEX idx_expenses_type ON expenses(type);
 CREATE INDEX idx_expenses_category ON expenses(category);
+CREATE INDEX idx_expenses_event ON expenses(event_id);
 
 -- =============================================
 -- CASH STATE TABLE
@@ -401,16 +464,19 @@ CREATE TABLE products (
     unit VARCHAR(50) NOT NULL,
     is_global BOOLEAN DEFAULT false NOT NULL,
     branch_id UUID,
+    event_id UUID,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
     UNIQUE(branch_id, code),
     CHECK ((is_global = true AND branch_id IS NULL) OR (is_global = false AND branch_id IS NOT NULL))
 );
 
 CREATE INDEX idx_products_branch_id ON products(branch_id);
 CREATE INDEX idx_products_code ON products(code);
+CREATE INDEX idx_products_event ON products(event_id);
 
 -- =============================================
 -- PRODUCT SALES TABLE
@@ -433,14 +499,17 @@ CREATE TABLE product_sales (
     customer_name VARCHAR(255),
     customer_phone VARCHAR(50),
     notes TEXT,
+    event_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_product_sales_product_id ON product_sales(product_id);
 CREATE INDEX idx_product_sales_branch_id ON product_sales(branch_id);
 CREATE INDEX idx_product_sales_sale_date ON product_sales(sale_date);
+CREATE INDEX idx_product_sales_event ON product_sales(event_id);
 
 -- =============================================
 -- TRIGGERS FOR UPDATED_AT
@@ -456,6 +525,7 @@ $$ language 'plpgsql';
 -- Apply updated_at trigger to all tables
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_master_courses_updated_at BEFORE UPDATE ON master_courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -466,6 +536,7 @@ CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW
 CREATE TRIGGER update_withdrawals_updated_at BEFORE UPDATE ON withdrawals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_debts_updated_at BEFORE UPDATE ON debts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
 -- VIEWS FOR ANALYTICS
