@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
 function mapProductFromDB(row: any) {
   return {
@@ -112,7 +112,7 @@ export const productsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
@@ -188,7 +188,7 @@ export const productsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }

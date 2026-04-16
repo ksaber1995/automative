@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
 function mapEmployeeFromDB(row: any) {
   return {
@@ -83,7 +83,7 @@ export const employeesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId && !queryParams.isGlobal) {
+      } else if (!isGlobalAdmin(context) && context.branchId && !queryParams.isGlobal) {
         // Non-admins see only their branch employees (unless requesting global)
         params.push(context.branchId);
         sql += ` AND (branch_id = $${params.length} OR is_global = true)`;

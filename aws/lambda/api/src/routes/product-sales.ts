@@ -1,5 +1,5 @@
 import { insert, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 import { getClient } from '../db/connection';
 
 function mapProductSaleFromDB(row: any) {
@@ -143,7 +143,7 @@ export const productSalesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
       }
@@ -205,7 +205,7 @@ export const productSalesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
@@ -238,7 +238,7 @@ export const productSalesRoutes = {
       if (queryParams.branchId) {
         const branchIdx = params.indexOf(queryParams.branchId);
         productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         const branchIdx = params.indexOf(context.branchId);
         productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
       }
@@ -305,7 +305,7 @@ export const productSalesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
       }

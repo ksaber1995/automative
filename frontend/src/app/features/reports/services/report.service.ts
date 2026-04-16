@@ -19,7 +19,10 @@ export interface SalaryMonthRow {
   count: number;
 }
 
+export type CourseRowType = 'COURSE' | 'MASTER';
+
 export interface TopCourseRow {
+  type: CourseRowType;
   courseId: string;
   courseName: string;
   courseCode: string;
@@ -47,6 +50,7 @@ export interface ChurnSummary {
 }
 
 export interface ProfitByCourseRow {
+  type: CourseRowType;
   courseId: string;
   courseName: string;
   courseCode: string;

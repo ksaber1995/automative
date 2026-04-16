@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -158,7 +158,7 @@ export const enrollmentsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }
@@ -320,7 +320,7 @@ export const enrollmentsRoutes = {
         }
         conditions.push(`e.branch_id = $${idx++}`);
         params.push(q.branchId);
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         conditions.push(`e.branch_id = $${idx++}`);
         params.push(context.branchId);
       }

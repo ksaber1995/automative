@@ -166,7 +166,8 @@ export const reportsRoutes = {
     }
   },
 
-  // Top courses by enrollment count + revenue.
+  // Top courses by enrollment count + revenue. Mixes regular courses and
+  // master-course bundles — bundles appear with type='MASTER'.
   topCourses: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -174,25 +175,47 @@ export const reportsRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND e.branch_id = $4' : '';
+      const courseBranchClause = q.branchId ? ' AND e.branch_id = $4' : '';
+      const masterBranchClause = q.branchId ? ' AND me.branch_id = $4' : '';
       const params: any[] = [context.companyId, startDate, endDate];
       if (q.branchId) params.push(q.branchId);
 
       const rows = await query(
-        `SELECT
-           c.id AS course_id,
-           c.name AS course_name,
-           c.code AS course_code,
-           b.name AS branch_name,
-           COUNT(e.id) AS enrollment_count,
-           COUNT(e.id) FILTER (WHERE e.status = 'ACTIVE') AS active_count,
-           COALESCE(SUM(e.amount_paid), 0) AS revenue
-         FROM enrollments e
-         INNER JOIN courses c ON c.id = e.course_id
-         INNER JOIN branches b ON b.id = e.branch_id
-         WHERE e.company_id = $1
-           AND e.enrollment_date >= $2 AND e.enrollment_date <= $3 ${branchClause}
-         GROUP BY c.id, c.name, c.code, b.name
+        `SELECT * FROM (
+           SELECT
+             'COURSE' AS type,
+             c.id AS course_id,
+             c.name AS course_name,
+             c.code AS course_code,
+             b.name AS branch_name,
+             COUNT(e.id) AS enrollment_count,
+             COUNT(e.id) FILTER (WHERE e.status = 'ACTIVE') AS active_count,
+             COALESCE(SUM(e.amount_paid), 0) AS revenue
+           FROM enrollments e
+           INNER JOIN courses c ON c.id = e.course_id
+           INNER JOIN branches b ON b.id = e.branch_id
+           WHERE e.company_id = $1
+             AND e.enrollment_date >= $2 AND e.enrollment_date <= $3 ${courseBranchClause}
+           GROUP BY c.id, c.name, c.code, b.name
+
+           UNION ALL
+
+           SELECT
+             'MASTER' AS type,
+             mc.id AS course_id,
+             mc.name AS course_name,
+             mc.code AS course_code,
+             b.name AS branch_name,
+             COUNT(me.id) AS enrollment_count,
+             COUNT(me.id) FILTER (WHERE me.status = 'ACTIVE') AS active_count,
+             COALESCE(SUM(me.amount_paid), 0) AS revenue
+           FROM master_enrollments me
+           INNER JOIN master_courses mc ON mc.id = me.master_course_id
+           INNER JOIN branches b ON b.id = me.branch_id
+           WHERE me.company_id = $1
+             AND me.enrollment_date >= $2 AND me.enrollment_date <= $3 ${masterBranchClause}
+           GROUP BY mc.id, mc.name, mc.code, b.name
+         ) combined
          ORDER BY enrollment_count DESC, revenue DESC
          LIMIT 20`,
         params
@@ -200,6 +223,7 @@ export const reportsRoutes = {
       return {
         status: 200 as const,
         body: rows.map((r: any) => ({
+          type: r.type,
           courseId: r.course_id,
           courseName: r.course_name,
           courseCode: r.course_code,
@@ -337,7 +361,8 @@ export const reportsRoutes = {
     }
   },
 
-  // Profit per course: revenue from enrollments grouped by course.
+  // Revenue per course. Includes both regular courses and master-course
+  // bundles — bundles appear as rows with type='MASTER'.
   profitByCourse: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -345,27 +370,51 @@ export const reportsRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND c.branch_id = $4' : '';
+      const courseBranchClause = q.branchId ? ' AND c.branch_id = $4' : '';
+      const masterBranchClause = q.branchId ? ' AND mc.branch_id = $4' : '';
       const params: any[] = [context.companyId, startDate, endDate];
       if (q.branchId) params.push(q.branchId);
 
       const rows = await query(
-        `SELECT
-           c.id AS course_id,
-           c.name AS course_name,
-           c.code AS course_code,
-           b.name AS branch_name,
-           COUNT(e.id) AS enrollments,
-           COALESCE(SUM(e.amount_paid), 0) AS revenue,
-           COALESCE(AVG(e.final_price), 0) AS avg_price
-         FROM courses c
-         INNER JOIN branches b ON b.id = c.branch_id
-         LEFT JOIN enrollments e ON e.course_id = c.id
-           AND e.company_id = $1
-           AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
-         WHERE b.company_id = $1 ${branchClause}
-         GROUP BY c.id, c.name, c.code, b.name
-         HAVING COUNT(e.id) > 0
+        `SELECT * FROM (
+           SELECT
+             'COURSE' AS type,
+             c.id AS course_id,
+             c.name AS course_name,
+             c.code AS course_code,
+             b.name AS branch_name,
+             COUNT(e.id) AS enrollments,
+             COALESCE(SUM(e.amount_paid), 0) AS revenue,
+             COALESCE(AVG(e.final_price), 0) AS avg_price
+           FROM courses c
+           INNER JOIN branches b ON b.id = c.branch_id
+           LEFT JOIN enrollments e ON e.course_id = c.id
+             AND e.company_id = $1
+             AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
+           WHERE b.company_id = $1 ${courseBranchClause}
+           GROUP BY c.id, c.name, c.code, b.name
+           HAVING COUNT(e.id) > 0
+
+           UNION ALL
+
+           SELECT
+             'MASTER' AS type,
+             mc.id AS course_id,
+             mc.name AS course_name,
+             mc.code AS course_code,
+             b.name AS branch_name,
+             COUNT(me.id) AS enrollments,
+             COALESCE(SUM(me.amount_paid), 0) AS revenue,
+             COALESCE(AVG(me.final_price), 0) AS avg_price
+           FROM master_courses mc
+           INNER JOIN branches b ON b.id = mc.branch_id
+           LEFT JOIN master_enrollments me ON me.master_course_id = mc.id
+             AND me.company_id = $1
+             AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
+           WHERE b.company_id = $1 ${masterBranchClause}
+           GROUP BY mc.id, mc.name, mc.code, b.name
+           HAVING COUNT(me.id) > 0
+         ) combined
          ORDER BY revenue DESC
          LIMIT 50`,
         params
@@ -373,6 +422,7 @@ export const reportsRoutes = {
       return {
         status: 200 as const,
         body: rows.map((r: any) => ({
+          type: r.type,
           courseId: r.course_id,
           courseName: r.course_name,
           courseCode: r.course_code,

@@ -1,260 +1,123 @@
-# Database Population Scripts
+# Data seed
 
-This folder contains SQL scripts to populate the Netrofit database with sample data for development and testing.
+Reusable population harness for Netrofit. Seeds **branches, employees, courses,
+and students** into a target tenant's company. Does **not** seed products,
+enrollments, or expenses — those are left for real testing.
 
-## Overview
+Re-runnable: every insert uses `ON CONFLICT (id) DO NOTHING`, so running the
+seed twice is a no-op on the second run.
 
-The scripts create realistic sample data including:
-- **3 Branches**: Downtown (Cairo), Alexandria, Giza
-- **6 Users**: Admin, branch managers, accountants
-- **9 Courses**: Web dev, Python, Mobile apps, Design, Marketing, etc.
-- **17 Students**: Enrolled across different branches
-- **16 Enrollments**: Active, completed, and dropped statuses
-- **14 Employees**: Global and branch-specific staff
-- **Revenue & Expenses**: 3 months of financial transactions
-- **Products & Sales**: Educational materials and accessories
-- **Debts & Payments**: Realistic financial obligations
+## Files
 
-## Prerequisites
+| File | Role |
+|---|---|
+| `seed.js` | Runnable script. Reads the JSON files, resolves the target company, inserts rows. |
+| `branches.json` | 3 branches (Nasr City, Maadi, New Cairo). |
+| `master_courses.json` | 5 bundle packages (English Track, Programming Career, French, Math, Junior STEM). |
+| `employees.json` | 8 employees distributed across branches. |
+| `courses.json` | 11 courses. Each links into a bundle via `master_course_ref`. |
+| `classes.json` | 11 class cohorts (one per course) with realistic schedules. |
+| `students.json` | 15 students spread across all branches. |
+| `package.json` | Declares deps (`@aws-sdk/client-rds-data`, `credential-providers`). |
 
-1. **Database Schema**: Run the schema first
-   ```bash
-   # Using AWS RDS Query Editor (Recommended)
-   - Copy contents of aws/sql/schema.sql
-   - Paste into Query Editor
-   - Execute
-   ```
+Foreign keys are resolved by **name** inside the JSON — `branch_ref`,
+`instructor_ref`, `master_course_ref`, `course_ref`. The script builds
+name→id maps and injects the correct UUIDs at insert time.
 
-2. **AWS Aurora Cluster**: Ensure your Aurora Serverless v2 database is running
-
-## Quick Start
-
-### Option 1: Using AWS RDS Query Editor (Easiest)
-
-1. Go to [AWS RDS Console](https://console.aws.amazon.com/rds/)
-2. Click **Query Editor** in the left sidebar
-3. Connect to your database:
-   - Cluster: `automatemagicstack-dev-automatemagicauroradbef2379-*`
-   - Secret: `/dev/automate-magic/db-credentials`
-   - Database: `automative`
-4. Copy and paste the contents of `00-populate-all.sql`
-5. Execute the script
-
-### Option 2: Using psql Command Line
-
-If you have psql installed and can connect to the database:
+## First-time setup
 
 ```bash
-# From the data directory
-psql -h YOUR-CLUSTER-ENDPOINT \
-     -U automative_admin \
-     -d automative \
-     -f 00-populate-all.sql
+cd data
+npm install
 ```
 
-### Option 3: Individual Scripts
-
-Run each script in order (respecting dependencies):
+## Running
 
 ```bash
-psql ... -f 01-branches.sql
-psql ... -f 02-users.sql
-psql ... -f 03-courses.sql
-# ... and so on
+# Seed everything for the default user (k@gmail.com)
+npm run seed
+
+# Seed for a different user
+node seed.js --email=someone@example.com
+
+# Seed just one entity (useful after editing one JSON file)
+npm run seed:branches
+npm run seed:master-courses
+npm run seed:employees
+npm run seed:courses        # also re-links courses to their master on every run
+npm run seed:classes
+npm run seed:students
 ```
 
-## Script Files
+Output looks like:
 
-| File | Table | Dependencies | Records |
-|------|-------|--------------|---------|
-| `01-branches.sql` | branches | None | 3 |
-| `02-users.sql` | users | branches | 6 |
-| `03-courses.sql` | courses | branches | 9 |
-| `04-classes.sql` | classes | courses, branches | 9 |
-| `05-students.sql` | students | branches | 17 |
-| `06-enrollments.sql` | enrollments | students, classes, courses, branches | 16 |
-| `07-employees.sql` | employees | branches | 14 |
-| `08-revenues.sql` | revenues | branches, courses, enrollments, students | 20+ |
-| `09-expenses.sql` | expenses | branches | 40+ |
-| `10-products.sql` | products | branches | 15 |
-| `11-product-sales.sql` | product_sales | products, branches | 17 |
-| `12-withdrawals.sql` | withdrawals | branches, users | 9 |
-| `13-debts.sql` | debts | branches | 8 |
-| `14-debt-payments.sql` | debt_payments | debts | 12 |
-
-## Sample Data Details
-
-### Users & Authentication
-- **Email**: All users follow pattern `role.branch@automatemagic.com`
-- **Password**: All users have password `password123` (hashed)
-- **Roles**: ADMIN, BRANCH_MANAGER, ACCOUNTANT
-
-#### Login Credentials:
 ```
-Admin:
-- Email: admin@automatemagic.com
-- Password: password123
+Netrofit seed
+  target user : k@gmail.com
+  db          : automative
+  entities    : all (branches, employees, courses, students)
+  company_id  : 7c1df4c0-c0f0-4dd3-9b31-80b98098f785
 
-Downtown Manager:
-- Email: manager.dt@automatemagic.com
-- Password: password123
+[branches]  ...
+[employees] ........
+[courses]   ...........
+[students]  ...............
 
-Alexandria Manager:
-- Email: manager.alx@automatemagic.com
-- Password: password123
+Summary ("." = inserted, "-" = already exists / skipped):
+  branches    inserted=3   skipped=0
+  employees   inserted=8   skipped=0
+  courses     inserted=11  skipped=0
+  students    inserted=15  skipped=0
 ```
 
-### Branches
-1. **Downtown Branch** (DT001) - Cairo
-2. **Alexandria Branch** (ALX001) - Alexandria
-3. **Giza Branch** (GZ001) - Giza
+## Configuration
 
-### Courses by Branch
+AWS credentials use the `personal` profile by default. Override via env vars:
 
-**Downtown (Cairo)**:
-- Web Development Basics (3,000 EGP)
-- Advanced Python Programming (4,500 EGP)
-- Mobile App Development (5,000 EGP)
+```bash
+AWS_PROFILE=otherprofile AWS_REGION=us-east-1 \
+DB_CLUSTER_ARN=arn:... DB_SECRET_ARN=arn:... DB_NAME=automative \
+node seed.js
+```
 
-**Alexandria**:
-- Digital Marketing Essentials (2,500 EGP)
-- Graphic Design Pro (3,500 EGP)
-- UI/UX Design Masterclass (4,000 EGP)
+## Editing the data
 
-**Giza**:
-- Data Analytics with Excel (2,800 EGP)
-- Cloud Computing AWS (5,500 EGP)
-- Cybersecurity Basics (4,200 EGP)
+Open the JSON files and add / remove / change rows as you like. The script
+uses the `id` field as the conflict key, so:
 
-### Financial Data
+- **New row** (fresh UUID) → inserted on next run
+- **Existing row** (same `id`) → skipped
+- **Removed row** → NOT deleted from the DB (delete manually if needed)
 
-**Revenue Period**: January - March 2024
-- Course enrollment payments
+If you want to change a field on an existing row, delete that row from the DB
+first (or change the `id` so it's treated as new).
+
+## Dependency order
+
+The seed runs in this order, so references resolve:
+
+```
+branches  →  master_courses  →  employees
+                             →  courses  (needs branches + employees + master_courses)
+                                      →  classes  (needs courses + employees)
+                             →  students
+```
+
+The `courses` seed also runs a second "relink" pass that sets
+`master_course_id` on existing rows — so if you add `master_course_ref` to a
+course JSON entry later, re-running the seed will pick up the link without
+needing to delete the course row first.
+
+## What is NOT seeded
+
+By design:
+
+- Products
 - Product sales
-- Registration and material fees
+- **Enrollments (regular & master)** — bundles exist but no student has bought one
+- Revenues, refunds
+- Expenses, withdrawals
+- Debts
 
-**Expense Period**: January - March 2024
-- Fixed: Rent, salaries, utilities
-- Variable: Supplies, marketing, maintenance
-- Shared: Company-wide marketing and software
-
-**Payment Methods**: Bank Transfer, Cash, Credit Card, Check
-
-## Testing Scenarios
-
-After population, you can test:
-
-1. **Authentication**
-   - Login with different user roles
-   - Test JWT token generation
-
-2. **Branch Analytics**
-   - Revenue by branch
-   - Expense breakdown
-   - Profit margins
-
-3. **Student Management**
-   - Active vs churned students
-   - Enrollment statistics
-   - Payment statuses
-
-4. **Financial Reports**
-   - Monthly revenue trends
-   - Expense categories
-   - Debt management
-   - Product sales analysis
-
-5. **Multi-branch Operations**
-   - Cross-branch queries
-   - Shared vs branch-specific expenses
-   - Global employee allocation
-
-## Verification Queries
-
-Check if data was populated correctly:
-
-```sql
--- Count records in each table
-SELECT 'branches' AS table_name, COUNT(*) AS count FROM branches
-UNION ALL
-SELECT 'users', COUNT(*) FROM users
-UNION ALL
-SELECT 'courses', COUNT(*) FROM courses
-UNION ALL
-SELECT 'students', COUNT(*) FROM students
-UNION ALL
-SELECT 'enrollments', COUNT(*) FROM enrollments
-UNION ALL
-SELECT 'employees', COUNT(*) FROM employees
-UNION ALL
-SELECT 'revenues', COUNT(*) FROM revenues
-UNION ALL
-SELECT 'expenses', COUNT(*) FROM expenses
-UNION ALL
-SELECT 'products', COUNT(*) FROM products
-UNION ALL
-SELECT 'product_sales', COUNT(*) FROM product_sales
-UNION ALL
-SELECT 'withdrawals', COUNT(*) FROM withdrawals
-UNION ALL
-SELECT 'debts', COUNT(*) FROM debts
-UNION ALL
-SELECT 'debt_payments', COUNT(*) FROM debt_payments;
-
--- Check revenue by branch
-SELECT b.name, SUM(r.amount) as total_revenue
-FROM branches b
-LEFT JOIN revenues r ON b.id = r.branch_id
-GROUP BY b.name
-ORDER BY total_revenue DESC;
-
--- Check active students by branch
-SELECT b.name, COUNT(s.id) as student_count
-FROM branches b
-LEFT JOIN students s ON b.id = s.branch_id AND s.is_active = true
-GROUP BY b.name
-ORDER BY student_count DESC;
-```
-
-## Resetting Data
-
-To clear all data and start fresh:
-
-```sql
--- WARNING: This deletes all data!
-TRUNCATE TABLE debt_payments CASCADE;
-TRUNCATE TABLE debts CASCADE;
-TRUNCATE TABLE withdrawals CASCADE;
-TRUNCATE TABLE product_sales CASCADE;
-TRUNCATE TABLE products CASCADE;
-TRUNCATE TABLE expenses CASCADE;
-TRUNCATE TABLE revenues CASCADE;
-TRUNCATE TABLE employees CASCADE;
-TRUNCATE TABLE enrollments CASCADE;
-TRUNCATE TABLE students CASCADE;
-TRUNCATE TABLE classes CASCADE;
-TRUNCATE TABLE courses CASCADE;
-TRUNCATE TABLE users CASCADE;
-TRUNCATE TABLE branches CASCADE;
-
--- Reset cash state
-UPDATE cash_state SET current_balance = 0;
-```
-
-Then re-run the population scripts.
-
-## Notes
-
-- All UUIDs are fixed for consistency and easier testing
-- Dates are set to Q1 2024 (January-March)
-- Financial amounts are in Egyptian Pounds (EGP)
-- Phone numbers follow Egyptian format (+20-XX-XXXX-XXXX)
-- All data is fictional and for testing purposes only
-
-## Support
-
-If you encounter issues:
-1. Verify schema was created successfully
-2. Check foreign key constraints
-3. Review error messages for specific table issues
-4. Ensure you're running scripts in the correct order
+Those are meant to be exercised manually from the UI so you can test the real
+flows end-to-end.

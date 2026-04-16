@@ -15,6 +15,7 @@ interface Benefit { icon: string; titleKey: string; textKey: string; }
 interface Feature { icon: string; titleKey: string; textKey: string; }
 interface Testimonial { quoteKey: string; authorKey: string; roleKey: string; }
 interface Faq { qKey: string; aKey: string; }
+interface Partner { name: string; logo?: string; }
 
 @Component({
   selector: 'app-root',
@@ -25,7 +26,7 @@ interface Faq { qKey: string; aKey: string; }
     <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
       <div class="container-custom h-16 flex items-center justify-between">
         <a href="#top" class="flex items-center gap-2">
-          <span class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">N</span>
+          <img src="logo.svg" alt="Netrofit" class="w-9 h-9 rounded-lg" />
           <span class="font-bold text-lg text-gray-900">Netrofit</span>
         </a>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
@@ -246,8 +247,18 @@ interface Faq { qKey: string; aKey: string; }
           <h2 class="mt-2 text-3xl font-bold text-gray-900">{{ 'PARTNERS.HEADING' | translate }}</h2>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 items-center">
-          @for (p of partners; track p) {
-            <div class="h-16 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-gray-400 font-semibold">{{ p }}</div>
+          @for (p of partners; track p.name) {
+            <div class="h-16 rounded-lg bg-white border border-gray-100 flex items-center justify-center p-3">
+              @if (p.logo) {
+                <img
+                  [src]="p.logo"
+                  [alt]="p.name"
+                  class="max-h-10 max-w-full object-contain opacity-70 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-200"
+                  (error)="onPartnerLogoError($event, p)" />
+              } @else {
+                <span class="text-gray-400 font-semibold text-sm">{{ p.name }}</span>
+              }
+            </div>
           }
         </div>
 
@@ -309,7 +320,7 @@ interface Faq { qKey: string; aKey: string; }
       <div class="container-custom flex flex-col md:flex-row justify-between gap-6">
         <div>
           <div class="flex items-center gap-2 mb-2">
-            <span class="w-7 h-7 rounded bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">N</span>
+            <img src="logo.svg" alt="Netrofit" class="w-7 h-7 rounded" />
             <span class="font-bold text-white">Netrofit</span>
           </div>
           <p>{{ 'FOOTER.COPY' | translate: { year: currentYear } }}</p>
@@ -472,7 +483,16 @@ export class LandingComponent {
     { icon: '🎁', titleKey: 'FEATURES.ITEMS.BUNDLES_TITLE', textKey: 'FEATURES.ITEMS.BUNDLES_TEXT' },
   ];
 
-  partners = ['Vodafone Cash', 'Fawry', 'InstaPay', 'Mada', 'STC Pay', 'WhatsApp'];
+  // Partner logos. Drop a PNG / SVG into `public/partners/` and reference it
+  // here. When `logo` is omitted the card falls back to the partner name.
+  partners: Partner[] = [
+    { name: 'Vodafone Cash', logo: 'partners/vodafone-cash.svg' },
+    { name: 'Fawry',         logo: 'partners/fawry.svg' },
+    { name: 'InstaPay',      logo: 'partners/instapay.svg' },
+    { name: 'Mada',          logo: 'partners/mada.svg' },
+    { name: 'STC Pay',       logo: 'partners/stc-pay.svg' },
+    { name: 'WhatsApp',      logo: 'partners/whatsapp.svg' },
+  ];
 
   testimonials: Testimonial[] = [
     { quoteKey: 'TESTIMONIALS.T1_QUOTE', authorKey: 'TESTIMONIALS.T1_AUTHOR', roleKey: 'TESTIMONIALS.T1_ROLE' },
@@ -579,6 +599,13 @@ export class LandingComponent {
 
   toggleLang() {
     this.lang.set(this.lang() === 'en' ? 'ar' : 'en');
+  }
+
+  // If a partner logo file is missing (404), drop the logo ref so the card
+  // falls back to the partner name on the next render.
+  onPartnerLogoError(event: Event, p: Partner) {
+    (event.target as HTMLImageElement).style.display = 'none';
+    this.partners = this.partners.map((x) => (x.name === p.name ? { name: x.name } : x));
   }
 
   private applyDir(l: Lang) {

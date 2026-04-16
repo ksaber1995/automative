@@ -268,6 +268,7 @@ import { NotificationService } from '../../../core/services/notification.service
                 <p-table [value]="profitCourses()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
                   <ng-template pTemplate="header">
                     <tr>
+                      <th>{{ 'REPORTS.COL_TYPE' | translate }}</th>
                       <th>{{ 'REPORTS.COL_COURSE' | translate }}</th>
                       <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
                       <th class="text-right">{{ 'REPORTS.COL_ENROLLMENTS' | translate }}</th>
@@ -277,6 +278,11 @@ import { NotificationService } from '../../../core/services/notification.service
                   </ng-template>
                   <ng-template pTemplate="body" let-row>
                     <tr>
+                      <td>
+                        <p-tag
+                          [value]="row.type === 'MASTER' ? ('REPORTS.TYPE_BUNDLE' | translate) : ('REPORTS.TYPE_COURSE' | translate)"
+                          [severity]="row.type === 'MASTER' ? 'warn' : 'info'"></p-tag>
+                      </td>
                       <td class="font-medium">{{ row.courseName }} <span class="text-xs text-gray-500 font-mono">{{ row.courseCode }}</span></td>
                       <td>{{ row.branchName }}</td>
                       <td class="text-right">{{ row.enrollments }}</td>
@@ -285,7 +291,7 @@ import { NotificationService } from '../../../core/services/notification.service
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="emptymessage">
-                    <tr><td colspan="5" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+                    <tr><td colspan="6" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
                   </ng-template>
                 </p-table>
               </p-card>
@@ -527,13 +533,15 @@ export class ReportListComponent implements OnInit {
   topCoursesChart = computed(() => {
     const data = this.topCourses();
     if (!data.length) return null;
+    // Color master bundles purple to distinguish from single-course rows.
+    const colors = data.map((r) => (r.type === 'MASTER' ? '#8b5cf6' : '#3b82f6'));
     return {
-      labels: data.map((r) => r.courseName),
+      labels: data.map((r) => (r.type === 'MASTER' ? `🎁 ${r.courseName}` : r.courseName)),
       datasets: [
         {
           label: this.translate.instant('REPORTS.CHART_ENROLLMENTS'),
           data: data.map((r) => r.enrollmentCount),
-          backgroundColor: '#3b82f6',
+          backgroundColor: colors,
         },
       ],
     };

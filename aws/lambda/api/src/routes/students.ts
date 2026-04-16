@@ -1,5 +1,5 @@
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
 function mapStudentFromDB(row: any) {
   return {
@@ -94,8 +94,9 @@ export const studentsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
-        // Non-admins see only their branch
+      } else if (!isGlobalAdmin(context) && context.branchId) {
+        // Non-admins see only their branch. GLOBAL_ADMIN sees the whole
+        // company when no branch is selected.
         params.push(context.branchId);
         sql += ` AND branch_id = $${params.length}`;
       }

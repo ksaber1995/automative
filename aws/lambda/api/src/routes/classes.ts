@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
 function mapClassFromDB(row: any) {
   return {
@@ -122,7 +122,7 @@ export const classesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
@@ -175,7 +175,7 @@ export const classesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
-      } else if (context.role !== 'ADMIN' && context.branchId) {
+      } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
       }
