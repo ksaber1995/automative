@@ -1,7 +1,7 @@
 export interface MasterCourse {
   id: string;
   companyId: string;
-  branchId: string | null;
+  branchId: string;
   branchName?: string | null;
   name: string;
   code: string;
@@ -26,11 +26,6 @@ export interface MasterCourseCreateDto {
   defaultMaxStudents?: number;
 }
 
-export interface CloneMasterCourseDto {
-  branchId: string;
-  code?: string;
-}
-
 export interface MasterCourseUpdateDto {
   name?: string;
   code?: string;
@@ -53,25 +48,3 @@ export interface LinkedCourseSummary {
   isActive: boolean;
 }
 
-export interface ApplyMasterCourseDto {
-  applyName?: boolean;
-  applyDescription?: boolean;
-  applyPrice?: boolean;
-  applyDuration?: boolean;
-  applyMaxStudents?: boolean;
-}
-
-export interface ApplyMasterCourseResult {
-  updatedCount: number;
-  skippedCount: number;
-}
-
-export interface InstantiateMasterCourseDto {
-  branchIds: string[];
-}
-
-export interface InstantiateMasterCourseResult {
-  createdCount: number;
-  skippedCount: number;
-  created: { id: string; branchId: string }[];
-}

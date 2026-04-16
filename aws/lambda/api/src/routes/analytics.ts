@@ -34,18 +34,28 @@ export const analyticsRoutes = {
          WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3`,
         [context.companyId, startDate, endDate]
       );
+      // Master course bundle payments are revenue too.
+      const masterRevenueData = await query(
+        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
+         FROM master_enrollments
+         WHERE company_id = $1 AND amount_paid > 0
+           AND enrollment_date >= $2 AND enrollment_date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
 
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
+      const masterRevenue = parseFloat(masterRevenueData[0]?.total_revenue || '0');
 
-      // Subtract refunds from revenue
+      // Subtract refunds from revenue (includes master-bundle refunds via the
+      // polymorphic refunds table).
       const refundData = await query(
         `SELECT COALESCE(SUM(amount), 0) as total_refunds FROM refunds
          WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3`,
         [context.companyId, startDate, endDate]
       );
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue - totalRefunds;
+      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue - totalRefunds;
 
       // --- Company-wide expenses (is_recurring = false to exclude templates) ---
       const expenseData = await query(
@@ -113,6 +123,13 @@ export const analyticsRoutes = {
              WHERE ps.branch_id = b.id AND ps.company_id = $1
                AND ps.sale_date >= $2 AND ps.sale_date <= $3
            ), 0) AS product_revenue,
+           -- Master bundle revenue
+           COALESCE((
+             SELECT SUM(me.amount_paid) FROM master_enrollments me
+             WHERE me.branch_id = b.id AND me.company_id = $1
+               AND me.amount_paid > 0
+               AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
+           ), 0) AS master_revenue,
            -- Direct expenses (explicitly assigned to this branch)
            COALESCE((
              SELECT SUM(ex.amount) FROM expenses ex
@@ -129,16 +146,16 @@ export const analyticsRoutes = {
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
          FROM branches b
          WHERE b.company_id = $1
-         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0)) DESC`,
+         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0)) DESC`,
         [context.companyId, startDate, endDate]
       );
 
       const totalBranchRevenue = branchRawData.reduce((s: number, b: any) =>
-        s + parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue), 0);
+        s + parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0'), 0);
       const branchCount = branchRawData.length;
 
       const branchSummaries = branchRawData.map((b: any) => {
-        const revenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue);
+        const revenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
         const directExpenses = parseFloat(b.direct_expenses);
 
         let allocatedOverhead = 0;
@@ -187,6 +204,11 @@ export const analyticsRoutes = {
            FROM product_sales
            WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
            UNION ALL
+           SELECT enrollment_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
+           FROM master_enrollments
+           WHERE company_id = $1 AND amount_paid > 0
+             AND enrollment_date >= $2 AND enrollment_date <= $3
+           UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expenses
            WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
@@ -207,6 +229,7 @@ export const analyticsRoutes = {
             totalRevenue,
             enrollmentRevenue,
             productRevenue,
+            masterRevenue,
             totalRefunds,
             grossProfit,
             fixedExpenses,

@@ -280,7 +280,14 @@ export const branchesRoutes = {
       );
       const productRevenue = parseFloat(productRevenueResult?.total || '0');
 
-      const totalRevenue = enrollmentRevenue + productRevenue;
+      // Get total revenue from master course bundle enrollments.
+      const masterRevenueResult = await queryOne(
+        'SELECT COALESCE(SUM(amount_paid), 0) as total FROM master_enrollments WHERE branch_id = $1 AND company_id = $2 AND amount_paid > 0',
+        [params.id, context.companyId]
+      );
+      const masterRevenue = parseFloat(masterRevenueResult?.total || '0');
+
+      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue;
 
       // Get total expenses for this branch
       const expenseResult = await queryOne(

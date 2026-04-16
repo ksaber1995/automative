@@ -89,6 +89,8 @@
               <i class="pi pi-external-link text-xs"></i>
               @if (revenue.source === 'ENROLLMENT') {
                 {{ 'REVENUES.LIST.VIEW_ENROLLMENT' | translate }}
+              } @else if (revenue.source === 'MASTER_ENROLLMENT') {
+                {{ 'REVENUES.LIST.VIEW_BUNDLE' | translate }}
               } @else {
                 {{ 'REVENUES.LIST.VIEW_SALE' | translate }}
               }

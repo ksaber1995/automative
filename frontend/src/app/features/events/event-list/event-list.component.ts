@@ -63,7 +63,6 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                 <p-sortIcon field="startDate"></p-sortIcon>
               </th>
               <th>{{ 'EVENTS.LIST.COL_END_DATE' | translate }}</th>
-              <th>{{ 'EVENTS.LIST.COL_BUDGET' | translate }}</th>
               <th>{{ 'EVENTS.LIST.COL_STATUS' | translate }}</th>
               <th>{{ 'EVENTS.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
@@ -80,7 +79,6 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td>{{ item.location || '—' }}</td>
               <td>{{ item.startDate | date: 'mediumDate' }}</td>
               <td>{{ item.endDate | date: 'mediumDate' }}</td>
-              <td>{{ item.budget !== null ? item.budget.toFixed(2) : '—' }}</td>
               <td>
                 <p-tag
                   [value]="('EVENTS.STATUS.' + item.status) | translate"
@@ -120,7 +118,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="8" class="text-center py-8">
+              <td colspan="7" class="text-center py-8">
                 <div class="text-gray-500">
                   <i class="pi pi-calendar text-4xl mb-3"></i>
                   <p>{{ 'EVENTS.LIST.EMPTY' | translate }}</p>

@@ -23,28 +23,54 @@ export const cashRoutes = {
         'SELECT COALESCE(SUM(total_amount), 0) as total FROM product_sales WHERE company_id = $1',
         [context.companyId]
       );
+      const masterEnrollmentResult = await query(
+        'SELECT COALESCE(SUM(amount_paid), 0) as total FROM master_enrollments WHERE company_id = $1 AND amount_paid > 0',
+        [context.companyId]
+      );
 
       const totalRevenue = parseFloat(enrollmentRevenueResult[0]?.total || 0);
       const totalExpenses = parseFloat(expenseResult[0]?.total || 0);
       const totalWithdrawals = parseFloat(withdrawalResult[0]?.total || 0);
       const totalProductSales = parseFloat(productSalesResult[0]?.total || 0);
+      const totalMasterRevenue = parseFloat(masterEnrollmentResult[0]?.total || 0);
 
-      const totalCash = totalRevenue + totalProductSales - totalExpenses - totalWithdrawals;
+      const totalCash = totalRevenue + totalProductSales + totalMasterRevenue - totalExpenses - totalWithdrawals;
 
       // Get by branch
       const branchCashQuery = `
         SELECT
           b.id,
           b.name,
-          COALESCE(SUM(e.final_price), 0) + COALESCE(SUM(ps.total_amount), 0) -
-          COALESCE(SUM(exp.amount), 0) - COALESCE(SUM(w.amount), 0) as cash
+          COALESCE(enroll.total, 0) + COALESCE(prod.total, 0) + COALESCE(mast.total, 0)
+            - COALESCE(exp.total, 0) - COALESCE(w.total, 0) AS cash
         FROM branches b
-        LEFT JOIN enrollments e ON b.id = e.branch_id AND e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL')
-        LEFT JOIN product_sales ps ON b.id = ps.branch_id AND ps.company_id = $1
-        LEFT JOIN expenses exp ON b.id = exp.branch_id AND exp.company_id = $1
-        LEFT JOIN withdrawals w ON b.id = w.branch_id AND w.company_id = $1 AND w.is_active = true
+        LEFT JOIN (
+          SELECT branch_id, SUM(final_price) AS total FROM enrollments
+          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+          GROUP BY branch_id
+        ) enroll ON enroll.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(total_amount) AS total FROM product_sales
+          WHERE company_id = $1
+          GROUP BY branch_id
+        ) prod ON prod.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) AS total FROM master_enrollments
+          WHERE company_id = $1 AND amount_paid > 0
+          GROUP BY branch_id
+        ) mast ON mast.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount) AS total FROM expenses
+          WHERE company_id = $1
+          GROUP BY branch_id
+        ) exp ON exp.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount) AS total FROM withdrawals
+          WHERE company_id = $1 AND is_active = true
+          GROUP BY branch_id
+        ) w ON w.branch_id = b.id
         WHERE b.company_id = $1 AND b.is_active = true
-        GROUP BY b.id, b.name
+        GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, exp.total, w.total
       `;
 
       const byBranch = await query(branchCashQuery, [context.companyId]);

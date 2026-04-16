@@ -12,8 +12,7 @@ export interface Product {
   stock: number;
   minStock: number;
   unit: string;
-  isGlobal: boolean;
-  branchId: string | null;
+  branchId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -29,8 +28,7 @@ export interface ProductCreateDto {
   stock: number;
   minStock: number;
   unit: string;
-  isGlobal: boolean;
-  branchId?: string | null;
+  branchId: string;
 }
 
 export interface ProductUpdateDto {

@@ -111,7 +111,28 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                       [pTooltip]="'MASTER_COURSES.LIST.EDIT' | translate"
                     ></p-button>
                   }
-                  @if (authService.canDelete('master_courses') && item.isActive) {
+                  @if (authService.canWrite('master_courses')) {
+                    @if (item.isActive) {
+                      <p-button
+                        icon="pi pi-ban"
+                        [rounded]="true"
+                        [text]="true"
+                        severity="secondary"
+                        (onClick)="toggleActive(item)"
+                        [pTooltip]="'MASTER_COURSES.LIST.DEACTIVATE' | translate"
+                      ></p-button>
+                    } @else {
+                      <p-button
+                        icon="pi pi-check-circle"
+                        [rounded]="true"
+                        [text]="true"
+                        severity="success"
+                        (onClick)="toggleActive(item)"
+                        [pTooltip]="'MASTER_COURSES.LIST.ACTIVATE' | translate"
+                      ></p-button>
+                    }
+                  }
+                  @if (authService.canDelete('master_courses')) {
                     <p-button
                       icon="pi pi-trash"
                       [rounded]="true"
@@ -190,6 +211,19 @@ export class MasterCourseListComponent implements OnInit {
       error: () => {
         this.notifications.error('Failed to delete');
         this.showDeleteDialog = false;
+      },
+    });
+  }
+
+  toggleActive(item: MasterCourse) {
+    const next = !item.isActive;
+    this.service.update(item.id, { isActive: next }).subscribe({
+      next: () => {
+        this.notifications.success(next ? 'Master course activated' : 'Master course deactivated');
+        this.load();
+      },
+      error: () => {
+        this.notifications.error('Failed to update status');
       },
     });
   }

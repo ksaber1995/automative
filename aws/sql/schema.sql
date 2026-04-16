@@ -1,8 +1,70 @@
--- Automative Database Schema
--- PostgreSQL Database for Netrofit Application
+-- Automative / Netrofit Database Schema
+-- PostgreSQL — reflects the live schema (all migrations 001–020 applied).
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =============================================
+-- COMPANIES TABLE  (migration 001)
+-- Top-level tenant row. Every other business table references companies(id).
+-- =============================================
+CREATE TABLE companies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    city VARCHAR(100),
+    state VARCHAR(50),
+    zip_code VARCHAR(20),
+    country VARCHAR(100) DEFAULT 'Egypt',
+    tax_id VARCHAR(100),
+    registration_number VARCHAR(100),
+    industry VARCHAR(100),
+    subscription_tier VARCHAR(50) DEFAULT 'BASIC' CHECK (subscription_tier IN ('BASIC', 'PROFESSIONAL', 'ENTERPRISE')),
+    subscription_status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (subscription_status IN ('TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED')),
+    subscription_start_date DATE DEFAULT CURRENT_DATE,
+    subscription_end_date DATE,
+    max_branches INTEGER DEFAULT 1,
+    max_users INTEGER DEFAULT 5,
+    timezone VARCHAR(50) DEFAULT 'Africa/Cairo',
+    currency VARCHAR(10) DEFAULT 'EGP',
+    locale VARCHAR(10) DEFAULT 'en-US',
+    -- How global (branch_id IS NULL) expenses are allocated to branches for P&L.
+    global_expense_allocation VARCHAR(20) DEFAULT 'OVERHEAD' CHECK (global_expense_allocation IN ('PROPORTIONAL', 'EQUAL', 'OVERHEAD')),
+    is_active BOOLEAN DEFAULT true,
+    onboarding_completed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    CONSTRAINT companies_name_not_empty CHECK (LENGTH(TRIM(name)) > 0)
+);
+
+CREATE INDEX idx_companies_code ON companies(code);
+CREATE INDEX idx_companies_email ON companies(email);
+CREATE INDEX idx_companies_subscription_status ON companies(subscription_status);
+
+-- =============================================
+-- SUBSCRIPTIONS TABLE
+-- One row per company tracking their billing state (distinct from the legacy
+-- subscription fields on companies, which are retained for backward compat).
+-- =============================================
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'TRIAL' CHECK (status IN ('TRIAL', 'MONTHLY', 'ANNUAL', 'EXPIRED')),
+    price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    trial_start_date DATE,
+    trial_end_date DATE,
+    subscription_start_date DATE,
+    subscription_end_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_subscriptions_company_id ON subscriptions(company_id);
 
 -- =============================================
 -- USERS TABLE
@@ -13,8 +75,21 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT')),
+    -- RBAC roles added by migration 006.
+    role VARCHAR(50) NOT NULL CHECK (role IN (
+        'GLOBAL_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
+        'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER'
+    )),
+    -- Granular per-resource permissions JSON (migration 006).
+    granular_permissions JSONB,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     branch_id UUID,
+    -- Email verification (migration 010).
+    email_verified BOOLEAN DEFAULT false,
+    email_verification_token VARCHAR(255),
+    email_verification_expires TIMESTAMP WITH TIME ZONE,
+    password_reset_token VARCHAR(255),
+    password_reset_expires TIMESTAMP WITH TIME ZONE,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -22,7 +97,25 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_branch_id ON users(branch_id);
+CREATE INDEX idx_users_company_id ON users(company_id);
 CREATE INDEX idx_users_role ON users(role);
+
+-- =============================================
+-- USER_BRANCHES TABLE  (migration 006)
+-- Many-to-many: which branches each non-global-admin user can access.
+-- =============================================
+CREATE TABLE user_branches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, branch_id)
+);
+
+CREATE INDEX idx_user_branches_user_id ON user_branches(user_id);
+CREATE INDEX idx_user_branches_branch_id ON user_branches(branch_id);
+CREATE INDEX idx_user_branches_company_id ON user_branches(company_id);
 
 -- =============================================
 -- BRANCHES TABLE
@@ -63,6 +156,7 @@ ALTER TABLE users ADD CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFEREN
 CREATE TABLE master_courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
     description TEXT,
@@ -72,10 +166,47 @@ CREATE TABLE master_courses (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id, code)
+    UNIQUE (branch_id, code)
 );
 
 CREATE INDEX idx_master_courses_company ON master_courses(company_id);
+CREATE INDEX idx_master_courses_branch ON master_courses(branch_id);
+
+-- =============================================
+-- MASTER ENROLLMENTS TABLE
+-- A bundle purchase: student pays the master course price once, then enrolls
+-- in any linked course without additional charge. Child enrollments reference
+-- back via enrollments.master_enrollment_id.
+-- =============================================
+CREATE TABLE master_enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    master_course_id UUID NOT NULL REFERENCES master_courses(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    enrollment_date DATE NOT NULL,
+    original_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    discount_percent DECIMAL(5, 2) NOT NULL DEFAULT 0,
+    discount_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    final_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_mode VARCHAR(20) NOT NULL DEFAULT 'FULL' CHECK (payment_mode IN ('FULL', 'INSTALLMENTS')),
+    down_payment DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    amount_paid DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total_refunded DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PARTIAL', 'PAID')),
+    payment_method VARCHAR(50),
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_master_enrollments_student ON master_enrollments(student_id);
+CREATE INDEX idx_master_enrollments_master ON master_enrollments(master_course_id);
+CREATE INDEX idx_master_enrollments_company ON master_enrollments(company_id);
+CREATE UNIQUE INDEX uq_master_enrollments_active
+    ON master_enrollments(student_id, master_course_id)
+    WHERE status = 'ACTIVE';
 
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -181,15 +312,18 @@ CREATE TABLE enrollments (
     down_payment DECIMAL(10, 2) DEFAULT 0,
     amount_paid DECIMAL(10, 2) DEFAULT 0,
     payment_status VARCHAR(50) NOT NULL CHECK (payment_status IN ('PENDING', 'PARTIAL', 'PAID', 'REFUNDED')),
+    total_refunded DECIMAL(10, 2) NOT NULL DEFAULT 0,
     completion_date DATE,
     notes TEXT,
     company_id UUID NOT NULL,
+    master_enrollment_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
     FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_enrollments_student_id ON enrollments(student_id);
@@ -198,6 +332,7 @@ CREATE INDEX idx_enrollments_course_id ON enrollments(course_id);
 CREATE INDEX idx_enrollments_branch_id ON enrollments(branch_id);
 CREATE INDEX idx_enrollments_status ON enrollments(status);
 CREATE INDEX idx_enrollments_payment_status ON enrollments(payment_status);
+CREATE INDEX idx_enrollments_master_enrollment ON enrollments(master_enrollment_id);
 CREATE INDEX idx_enrollments_company_id ON enrollments(company_id);
 
 -- =============================================
@@ -234,7 +369,6 @@ CREATE TABLE events (
     location VARCHAR(255),
     start_date DATE,
     end_date DATE,
-    budget DECIMAL(12, 2),
     status VARCHAR(16) NOT NULL DEFAULT 'PLANNED',
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -250,7 +384,8 @@ CREATE INDEX idx_events_branch ON events(branch_id);
 -- =============================================
 CREATE TABLE refunds (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    enrollment_id UUID NOT NULL,
+    enrollment_id UUID,
+    master_enrollment_id UUID,
     company_id UUID NOT NULL,
     student_id UUID NOT NULL,
     event_id UUID,
@@ -260,11 +395,17 @@ CREATE TABLE refunds (
     reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
+    FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+    CHECK (
+        (enrollment_id IS NOT NULL AND master_enrollment_id IS NULL) OR
+        (enrollment_id IS NULL AND master_enrollment_id IS NOT NULL)
+    )
 );
 
 CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);
+CREATE INDEX idx_refunds_master_enrollment_id ON refunds(master_enrollment_id);
 CREATE INDEX idx_refunds_company_id ON refunds(company_id);
 CREATE INDEX idx_refunds_student_id ON refunds(student_id);
 CREATE INDEX idx_refunds_event ON refunds(event_id);
@@ -462,16 +603,14 @@ CREATE TABLE products (
     stock INTEGER DEFAULT 0 NOT NULL,
     min_stock INTEGER DEFAULT 0 NOT NULL,
     unit VARCHAR(50) NOT NULL,
-    is_global BOOLEAN DEFAULT false NOT NULL,
-    branch_id UUID,
+    branch_id UUID NOT NULL,
     event_id UUID,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
-    UNIQUE(branch_id, code),
-    CHECK ((is_global = true AND branch_id IS NULL) OR (is_global = false AND branch_id IS NOT NULL))
+    UNIQUE(branch_id, code)
 );
 
 CREATE INDEX idx_products_branch_id ON products(branch_id);
@@ -512,6 +651,32 @@ CREATE INDEX idx_product_sales_sale_date ON product_sales(sale_date);
 CREATE INDEX idx_product_sales_event ON product_sales(event_id);
 
 -- =============================================
+-- DEMO LEADS TABLE
+-- Public "Book a Demo" submissions from the marketing landing page. No
+-- tenant scope — these are pre-customer records reviewed by Netrofit staff.
+-- =============================================
+CREATE TABLE demo_leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    company VARCHAR(255),
+    country VARCHAR(10),
+    branch_count INTEGER,
+    message TEXT,
+    source VARCHAR(50),
+    status VARCHAR(20) NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW', 'CONTACTED', 'QUALIFIED', 'LOST', 'CONVERTED')),
+    user_agent TEXT,
+    ip VARCHAR(64),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_demo_leads_created ON demo_leads(created_at DESC);
+CREATE INDEX idx_demo_leads_status ON demo_leads(status);
+CREATE INDEX idx_demo_leads_email ON demo_leads(email);
+
+-- =============================================
 -- TRIGGERS FOR UPDATED_AT
 -- =============================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -523,9 +688,13 @@ END;
 $$ language 'plpgsql';
 
 -- Apply updated_at trigger to all tables
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_courses_updated_at BEFORE UPDATE ON master_courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_master_enrollments_updated_at BEFORE UPDATE ON master_enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_demo_leads_updated_at BEFORE UPDATE ON demo_leads FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

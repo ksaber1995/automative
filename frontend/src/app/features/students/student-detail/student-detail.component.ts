@@ -17,10 +17,12 @@ import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
+import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
+import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
 
 @Component({
   selector: 'app-student-detail',
@@ -48,12 +50,14 @@ export class StudentDetailComponent implements OnInit {
   private studentService = inject(StudentService);
   private enrollmentService = inject(EnrollmentService);
   private courseService = inject(CourseService);
+  private masterEnrollmentService = inject(MasterEnrollmentService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
 
   student = signal<Student | null>(null);
   enrollments = signal<Enrollment[]>([]);
+  masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   courses = new Map<string, Course>();
   loading = signal(true);
   studentId: string | null = null;
@@ -79,12 +83,26 @@ export class StudentDetailComponent implements OnInit {
   dialogPaymentDate: Date = new Date();
   dialogPaymentNotes = '';
 
-  // Refund dialog
+  // Refund dialog (regular enrollment)
   showRefundDialog = false;
   refundType: 'FULL' | 'PARTIAL' = 'FULL';
   refundAmount: number | null = null;
   refundDate: Date = new Date();
   refundReason = '';
+
+  // Refund dialog (master enrollment / bundle)
+  showMasterRefundDialog = false;
+  masterEnrollmentForAction = signal<MasterEnrollmentProgress | null>(null);
+  masterRefundType: 'FULL' | 'PARTIAL' = 'FULL';
+  masterRefundAmount: number | null = null;
+  masterRefundDate: Date = new Date();
+  masterRefundReason = '';
+
+  masterRefundable = computed(() => {
+    const me = this.masterEnrollmentForAction();
+    if (!me) return 0;
+    return Math.max(0, (me.amountPaid || 0) - (me.totalRefunded || 0));
+  });
 
   async ngOnInit() {
     this.studentId = this.route.snapshot.paramMap.get('id');
@@ -92,8 +110,36 @@ export class StudentDetailComponent implements OnInit {
       await this.loadCourses();
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
+      this.loadMasterEnrollments(this.studentId);
     }
   }
+
+  loadMasterEnrollments(id: string) {
+    this.masterEnrollmentService.getByStudent(id).subscribe({
+      next: (rows) => this.masterEnrollments.set(rows),
+    });
+  }
+
+  enrollInMaster() {
+    if (!this.studentId) return;
+    this.router.navigate(['/enrollments/create'], {
+      queryParams: { studentId: this.studentId, type: 'MASTER' },
+    });
+  }
+
+  cancelMasterEnrollment(me: MasterEnrollmentProgress) {
+    if (!confirm('Cancel this master enrollment? The student will lose coverage for linked courses.')) return;
+    this.masterEnrollmentService.cancel(me.id).subscribe({
+      next: () => {
+        this.notificationService.success('Master enrollment cancelled');
+        if (this.studentId) this.loadMasterEnrollments(this.studentId);
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to cancel');
+      },
+    });
+  }
+
 
   async loadCourses() {
     try {
@@ -260,6 +306,56 @@ export class StudentDetailComponent implements OnInit {
       error: (err) => {
         this.notificationService.error(err?.error?.message || 'Failed to issue refund');
         this.actionLoading.set(false);
+      }
+    });
+  }
+
+  // ─── Master-enrollment refund dialog ────────────────────────────────────────
+
+  openMasterRefundDialog(me: MasterEnrollmentProgress) {
+    const refundable = Math.max(0, (me.amountPaid || 0) - (me.totalRefunded || 0));
+    if (refundable <= 0) {
+      this.notificationService.error('Nothing left to refund on this enrollment');
+      return;
+    }
+    this.masterEnrollmentForAction.set(me);
+    this.masterRefundType = 'FULL';
+    this.masterRefundAmount = refundable;
+    this.masterRefundDate = new Date();
+    this.masterRefundReason = '';
+    this.showMasterRefundDialog = true;
+  }
+
+  onMasterRefundTypeChange() {
+    if (this.masterRefundType === 'FULL') {
+      this.masterRefundAmount = this.masterRefundable();
+    } else {
+      this.masterRefundAmount = null;
+    }
+  }
+
+  submitMasterRefund() {
+    const me = this.masterEnrollmentForAction();
+    if (!me || !this.masterRefundAmount || !this.masterRefundDate) return;
+
+    this.actionLoading.set(true);
+    const dateStr = this.masterRefundDate.toISOString().split('T')[0];
+
+    this.masterEnrollmentService.createRefund(me.id, {
+      type: this.masterRefundType,
+      amount: this.masterRefundAmount,
+      refundDate: dateStr,
+      reason: this.masterRefundReason || undefined,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success('Bundle refund issued');
+        this.showMasterRefundDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadMasterEnrollments(this.studentId);
+      },
+      error: (err) => {
+        this.actionLoading.set(false);
+        this.notificationService.error(err?.error?.message || 'Failed to issue refund');
       }
     });
   }

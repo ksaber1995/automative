@@ -242,7 +242,10 @@ export const masterCoursesRoutes = {
         return { status: 403 as const, body: { message: 'Access denied to this master course' } };
       }
 
-      await update('master_courses', params.id, { is_active: false });
+      await query(
+        'DELETE FROM master_courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
       return { status: 200 as const, body: { message: 'Master course deleted successfully' } };
     } catch (error: any) {
       console.error('Delete master course error:', error);
@@ -253,9 +256,8 @@ export const masterCoursesRoutes = {
     }
   },
 
-  // Apply master fields to every linked course. Linked courses can only live on
-  // the master's own branch, so every target is on that branch.
-  apply: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+  // Link an existing course to this master. Course and master must share branch.
+  addCourse: async ({ params, body, headers }: { params: { id: string }; body: { courseId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'master_courses', 'write')) {
@@ -270,144 +272,38 @@ export const masterCoursesRoutes = {
         [params.id, context.companyId]
       );
       if (!master) return { status: 404 as const, body: { message: 'Master course not found' } };
-      if (master.branch_id && !canAccessBranch(context, master.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this master course' } };
-      }
-
-      const applyName = body.applyName === true;
-      const applyDescription = body.applyDescription === true;
-      const applyPrice = body.applyPrice === true;
-      const applyDuration = body.applyDuration === true;
-      const applyMaxStudents = body.applyMaxStudents === true;
-
-      if (!applyName && !applyDescription && !applyPrice && !applyDuration && !applyMaxStudents) {
-        return { status: 400 as const, body: { message: 'Select at least one field to apply' } };
-      }
-
-      const targets = await query(
-        'SELECT id, branch_id FROM courses WHERE master_course_id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
-
-      const accessible = targets.filter((t: any) => canAccessBranch(context, t.branch_id));
-      if (accessible.length === 0) {
-        return { status: 200 as const, body: { updatedCount: 0, skippedCount: targets.length } };
-      }
-
-      const sets: string[] = [];
-      const values: any[] = [];
-      if (applyName) { values.push(master.name); sets.push(`name = $${values.length}`); }
-      if (applyDescription) { values.push(master.description); sets.push(`description = $${values.length}`); }
-      if (applyPrice) { values.push(master.default_price); sets.push(`price = $${values.length}`); }
-      if (applyDuration) { values.push(master.default_duration); sets.push(`duration = $${values.length}`); }
-      if (applyMaxStudents) { values.push(master.default_max_students); sets.push(`max_students = $${values.length}`); }
-      sets.push(`updated_at = CURRENT_TIMESTAMP`);
-
-      const ids = accessible.map((t: any) => t.id);
-      values.push(ids);
-      const sql = `UPDATE courses SET ${sets.join(', ')} WHERE id = ANY($${values.length}::uuid[])`;
-      await query(sql, values);
-
-      return {
-        status: 200 as const,
-        body: { updatedCount: accessible.length, skippedCount: targets.length - accessible.length },
-      };
-    } catch (error: any) {
-      console.error('Apply master course error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to apply master course' },
-      };
-    }
-  },
-
-  // Create linked course instances inside the master's own branch. Selected
-  // branches outside the master's branch are rejected. Branches already linked
-  // or with a code conflict are skipped.
-  instantiate: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
-    try {
-      const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'master_courses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
-      }
-      if (!checkGranularPermission(context, 'courses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions on courses' } };
-      }
-
-      const master = await queryOne(
-        'SELECT * FROM master_courses WHERE id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
-      if (!master) return { status: 404 as const, body: { message: 'Master course not found' } };
-      if (!master.branch_id) {
-        return { status: 400 as const, body: { message: 'Master course has no branch assigned' } };
-      }
       if (!canAccessBranch(context, master.branch_id)) {
         return { status: 403 as const, body: { message: 'Access denied to this master course' } };
       }
 
-      const branchIds: string[] = Array.isArray(body.branchIds) ? body.branchIds : [];
-      if (branchIds.length === 0) {
-        return { status: 400 as const, body: { message: 'No branches selected' } };
-      }
-
-      const offBranch = branchIds.filter((b) => b !== master.branch_id);
-      if (offBranch.length > 0) {
-        return {
-          status: 400 as const,
-          body: { message: 'Can only link courses inside the master course\'s branch. Use clone to create it on another branch.' },
-        };
-      }
-
-      const targetBranchId = master.branch_id;
-
-      const existing = await query(
-        'SELECT branch_id FROM courses WHERE master_course_id = $1 AND company_id = $2 AND branch_id = $3',
-        [params.id, context.companyId, targetBranchId]
+      const course = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [body.courseId, context.companyId]
       );
-      const alreadyLinked = existing.length > 0;
-
-      const codeConflicts = await query(
-        'SELECT id FROM courses WHERE code = $1 AND branch_id = $2',
-        [master.code, targetBranchId]
-      );
-
-      let createdCount = 0;
-      let skippedCount = 0;
-      const created: { id: string; branchId: string }[] = [];
-
-      if (alreadyLinked || codeConflicts.length > 0) {
-        skippedCount = 1;
-      } else {
-        const row = await insert('courses', {
-          company_id: context.companyId,
-          branch_id: targetBranchId,
-          master_course_id: master.id,
-          name: master.name,
-          code: master.code,
-          description: master.description,
-          price: master.default_price,
-          duration: master.default_duration,
-          max_students: master.default_max_students,
-          is_active: true,
-        });
-        created.push({ id: row.id, branchId: row.branch_id });
-        createdCount = 1;
+      if (!course) return { status: 404 as const, body: { message: 'Course not found' } };
+      if (course.branch_id !== master.branch_id) {
+        return { status: 400 as const, body: { message: 'Course must be in the same branch as the master course' } };
+      }
+      if (course.master_course_id && course.master_course_id !== master.id) {
+        return { status: 400 as const, body: { message: 'Course is already linked to another master course' } };
       }
 
-      return { status: 201 as const, body: { createdCount, skippedCount, created } };
+      await query(
+        'UPDATE courses SET master_course_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [master.id, course.id]
+      );
+      return { status: 200 as const, body: { message: 'Course added to master' } };
     } catch (error: any) {
-      console.error('Instantiate master course error:', error);
+      console.error('Add course to master error:', error);
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to instantiate master course' },
+        body: { message: error.message || 'Failed to add course' },
       };
     }
   },
 
-  // Copy this master to another branch. The new master is independent and can
-  // then be instantiated / linked on the target branch.
-  clone: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+  // Unlink a course from its master (leaves the course itself intact).
+  removeCourse: async ({ params, headers }: { params: { id: string; courseId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'master_courses', 'write')) {
@@ -415,67 +311,69 @@ export const masterCoursesRoutes = {
       }
 
       const master = await queryOne(
-        'SELECT * FROM master_courses WHERE id = $1 AND company_id = $2',
+        'SELECT id, branch_id FROM master_courses WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
       if (!master) return { status: 404 as const, body: { message: 'Master course not found' } };
-      if (master.branch_id && !canAccessBranch(context, master.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to source master course' } };
+      if (!canAccessBranch(context, master.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this master course' } };
       }
 
-      const targetBranchId: string | undefined = body.branchId;
-      if (!targetBranchId || !canAccessBranch(context, targetBranchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to target branch' } };
-      }
-      if (targetBranchId === master.branch_id) {
-        return { status: 400 as const, body: { message: 'Target branch must differ from source branch' } };
-      }
-
-      const targetBranch = await queryOne(
-        'SELECT id FROM branches WHERE id = $1 AND company_id = $2',
-        [targetBranchId, context.companyId]
+      await query(
+        `UPDATE courses SET master_course_id = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND master_course_id = $2 AND company_id = $3`,
+        [params.courseId, master.id, context.companyId]
       );
-      if (!targetBranch) return { status: 400 as const, body: { message: 'Invalid target branch' } };
-
-      const code: string = (body.code && body.code.trim()) || master.code;
-
-      const conflict = await queryOne(
-        'SELECT id FROM master_courses WHERE branch_id = $1 AND code = $2',
-        [targetBranchId, code]
-      );
-      if (conflict) {
-        return {
-          status: 400 as const,
-          body: { message: 'A master course with this code already exists on the target branch. Provide a different code.' },
-        };
-      }
-
-      const cloned = await insert('master_courses', {
-        company_id: context.companyId,
-        branch_id: targetBranchId,
-        name: master.name,
-        code,
-        description: master.description,
-        default_price: master.default_price,
-        default_duration: master.default_duration,
-        default_max_students: master.default_max_students,
-        is_active: true,
-      });
-
-      const withBranch = await queryOne(
-        `SELECT mc.*, b.name AS branch_name
-         FROM master_courses mc
-         LEFT JOIN branches b ON b.id = mc.branch_id
-         WHERE mc.id = $1`,
-        [cloned.id]
-      );
-
-      return { status: 201 as const, body: mapMasterCourseFromDB(withBranch || cloned) };
+      return { status: 200 as const, body: { message: 'Course removed from master' } };
     } catch (error: any) {
-      console.error('Clone master course error:', error);
+      console.error('Remove course from master error:', error);
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to clone master course' },
+        body: { message: error.message || 'Failed to remove course' },
+      };
+    }
+  },
+
+  // Courses in the master's branch that can still be added (no master yet).
+  availableCourses: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'master_courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const master = await queryOne(
+        'SELECT id, branch_id FROM master_courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!master) return { status: 404 as const, body: { message: 'Master course not found' } };
+      if (!canAccessBranch(context, master.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this master course' } };
+      }
+
+      const rows = await query(
+        `SELECT id, name, code, price, duration
+         FROM courses
+         WHERE company_id = $1 AND branch_id = $2 AND is_active = true
+           AND master_course_id IS NULL
+         ORDER BY name ASC`,
+        [context.companyId, master.branch_id]
+      );
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          code: r.code,
+          price: parseFloat(r.price),
+          duration: r.duration,
+        })),
+      };
+    } catch (error: any) {
+      console.error('Available courses error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to list available courses' },
       };
     }
   },

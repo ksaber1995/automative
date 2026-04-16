@@ -64,17 +64,6 @@ import { ProductCategory } from '@shared/enums/product.enum';
               }
             </select>
           </div>
-          <div class="flex-1">
-            <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.LIST.FILTER_TYPE' | translate }}</label>
-            <select
-              [(ngModel)]="selectedType"
-              (change)="onFilterChange()"
-              class="w-full p-2 border rounded">
-              <option value="">{{ 'PRODUCTS.LIST.ALL' | translate }}</option>
-              <option value="global">{{ 'PRODUCTS.LIST.GLOBAL' | translate }}</option>
-              <option value="branch">{{ 'PRODUCTS.LIST.BRANCH_SPECIFIC' | translate }}</option>
-            </select>
-          </div>
           <div class="flex items-end">
             <p-button
               [label]="'PRODUCTS.LIST.CLEAR_FILTERS' | translate"
@@ -98,7 +87,6 @@ import { ProductCategory } from '@shared/enums/product.enum';
               <th>{{ 'PRODUCTS.LIST.COL_CODE' | translate }}</th>
               <th>{{ 'PRODUCTS.LIST.COL_NAME' | translate }}</th>
               <th>{{ 'PRODUCTS.LIST.COL_CATEGORY' | translate }}</th>
-              <th>{{ 'PRODUCTS.LIST.COL_TYPE' | translate }}</th>
               <th>{{ 'PRODUCTS.LIST.COL_COST' | translate }}</th>
               <th>{{ 'PRODUCTS.LIST.COL_SELL' | translate }}</th>
               <th>{{ 'PRODUCTS.LIST.COL_STOCK' | translate }}</th>
@@ -114,13 +102,6 @@ import { ProductCategory } from '@shared/enums/product.enum';
                 <div class="text-sm text-gray-500">{{ product.unit }}</div>
               </td>
               <td>{{ getCategoryLabel(product.category) }}</td>
-              <td>
-                @if (product.isGlobal) {
-                  <p-tag [value]="'PRODUCTS.LIST.TYPE_GLOBAL' | translate" severity="success"></p-tag>
-                } @else {
-                  <p-tag [value]="'PRODUCTS.LIST.TYPE_BRANCH' | translate" severity="info"></p-tag>
-                }
-              </td>
               <td>{{ (product.costPrice || 0).toFixed(2) }}</td>
               <td class="font-semibold">{{ (product.sellingPrice || 0).toFixed(2) }}</td>
               <td>
@@ -176,7 +157,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="8" class="text-center py-8 text-gray-500">
+              <td colspan="7" class="text-center py-8 text-gray-500">
                 {{ 'PRODUCTS.LIST.NO_PRODUCTS' | translate }}
               </td>
             </tr>
@@ -205,7 +186,6 @@ export class ProductListComponent implements OnInit {
   products = signal<Product[]>([]);
   loading = signal(false);
   selectedCategory = '';
-  selectedType = '';
   showDeleteDialog = false;
   productToDelete = signal<Product | null>(null);
 
@@ -227,8 +207,6 @@ export class ProductListComponent implements OnInit {
     this.loading.set(true);
     const params: any = {};
     if (this.selectedCategory) params.category = this.selectedCategory;
-    if (this.selectedType === 'global') params.isGlobal = true;
-    if (this.selectedType === 'branch') params.isGlobal = false;
 
     this.productService.getAllProducts(params).subscribe({
       next: (data) => {
@@ -248,7 +226,6 @@ export class ProductListComponent implements OnInit {
 
   clearFilters() {
     this.selectedCategory = '';
-    this.selectedType = '';
     this.loadProducts();
   }
 

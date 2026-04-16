@@ -330,15 +330,10 @@ const UpdateMasterCourseSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-const CloneMasterCourseSchema = z.object({
-  branchId: UUIDSchema,
-  code: z.string().optional(),
-});
-
 const MasterCourseSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
-  branchId: UUIDSchema.nullable(),
+  branchId: UUIDSchema,
   branchName: z.string().nullable().optional(),
   name: z.string(),
   code: z.string(),
@@ -351,18 +346,6 @@ const MasterCourseSchema = z.object({
   branchCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-});
-
-const ApplyMasterCourseSchema = z.object({
-  applyName: z.boolean().optional(),
-  applyDescription: z.boolean().optional(),
-  applyPrice: z.boolean().optional(),
-  applyDuration: z.boolean().optional(),
-  applyMaxStudents: z.boolean().optional(),
-});
-
-const InstantiateMasterCourseSchema = z.object({
-  branchIds: z.array(UUIDSchema),
 });
 
 // =============================================
@@ -380,7 +363,6 @@ const CreateEventSchema = z.object({
   location: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  budget: z.number().optional(),
   status: EventStatusSchema.optional(),
 });
 
@@ -399,7 +381,6 @@ const EventSchema = z.object({
   location: z.string().nullable(),
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
-  budget: z.number().nullable(),
   status: z.string(),
   isActive: z.boolean(),
   createdAt: z.string(),
@@ -419,7 +400,6 @@ const EventPLSchema = z.object({
   productMargin: z.number(),
   productSaleCount: z.number(),
   netProfit: z.number(),
-  budget: z.number().nullable(),
 });
 
 const LinkedCourseSummarySchema = z.object({
@@ -806,8 +786,7 @@ const CreateProductSchema = z.object({
   stock: z.number(),
   minStock: z.number(),
   unit: z.string(),
-  isGlobal: z.boolean(),
-  branchId: OptionalUUIDSchema,
+  branchId: UUIDSchema,
   recordStockExpense: z.boolean().optional(),
   purchaseDate: z.string().optional(),
 });
@@ -837,8 +816,7 @@ const ProductSchema = z.object({
   stock: z.number(),
   minStock: z.number(),
   unit: z.string(),
-  isGlobal: z.boolean(),
-  branchId: UUIDSchema.nullable(),
+  branchId: UUIDSchema,
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -1176,6 +1154,37 @@ export const contract = c.router({
     },
   },
 
+  // Demo leads (public contact form from landing page)
+  demoLeads: {
+    create: {
+      method: 'POST',
+      path: '/api/demo-leads',
+      body: z.object({
+        name: z.string().min(2),
+        email: z.string().email(),
+        phone: z.string().optional(),
+        company: z.string().optional(),
+        country: z.string().optional(),
+        branchCount: z.number().optional(),
+        message: z.string().optional(),
+        source: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({ id: UUIDSchema, message: z.string() }),
+        400: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/demo-leads',
+      responses: {
+        200: z.array(z.any()),
+        401: z.object({ message: z.string() }),
+      },
+    },
+  },
+
   // Master courses routes
   masterCourses: {
     create: {
@@ -1232,42 +1241,119 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
-    apply: {
+    addCourse: {
       method: 'POST',
-      path: '/api/master-courses/:id/apply',
+      path: '/api/master-courses/:id/courses',
       pathParams: z.object({ id: UUIDSchema }),
-      body: ApplyMasterCourseSchema,
+      body: z.object({ courseId: UUIDSchema }),
       responses: {
-        200: z.object({ updatedCount: z.number(), skippedCount: z.number() }),
+        200: z.object({ message: z.string() }),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },
-    instantiate: {
-      method: 'POST',
-      path: '/api/master-courses/:id/instantiate',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: InstantiateMasterCourseSchema,
+    removeCourse: {
+      method: 'DELETE',
+      path: '/api/master-courses/:id/courses/:courseId',
+      pathParams: z.object({ id: UUIDSchema, courseId: UUIDSchema }),
+      body: z.object({}).optional(),
       responses: {
-        201: z.object({
-          createdCount: z.number(),
-          skippedCount: z.number(),
-          created: z.array(z.object({ id: UUIDSchema, branchId: UUIDSchema })),
-        }),
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    availableCourses: {
+      method: 'GET',
+      path: '/api/master-courses/:id/available-courses',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(z.any()),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    listEnrollments: {
+      method: 'GET',
+      path: '/api/master-courses/:id/enrollments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(z.any()) },
+    },
+  },
+
+  // Master enrollments (student bought a bundle).
+  // Ordering matters: more-specific paths MUST come before `/:id`.
+  masterEnrollments: {
+    coverageCheck: {
+      method: 'GET',
+      path: '/api/master-enrollments/coverage',
+      query: z.object({ studentId: UUIDSchema, courseId: UUIDSchema }),
+      responses: { 200: z.any() },
+    },
+    listByStudent: {
+      method: 'GET',
+      path: '/api/master-enrollments/by-student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: { 200: z.array(z.any()) },
+    },
+    create: {
+      method: 'POST',
+      path: '/api/master-enrollments',
+      body: z.object({
+        studentId: UUIDSchema,
+        masterCourseId: UUIDSchema,
+        enrollmentDate: z.string(),
+        originalPrice: z.number().optional(),
+        discountPercent: z.number().optional(),
+        discountAmount: z.number().optional(),
+        finalPrice: z.number().optional(),
+        paymentMode: z.enum(['FULL', 'INSTALLMENTS']).optional(),
+        downPayment: z.number().optional(),
+        amountPaid: z.number().optional(),
+        paymentMethod: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },
-    clone: {
+    cancel: {
       method: 'POST',
-      path: '/api/master-courses/:id/clone',
+      path: '/api/master-enrollments/:id/cancel',
       pathParams: z.object({ id: UUIDSchema }),
-      body: CloneMasterCourseSchema,
+      body: z.object({}).optional(),
       responses: {
-        201: MasterCourseSchema,
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    createRefund: {
+      method: 'POST',
+      path: '/api/master-enrollments/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        type: z.enum(['FULL', 'PARTIAL']),
+        amount: z.number(),
+        refundDate: z.string(),
+        reason: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
+    },
+    listRefunds: {
+      method: 'GET',
+      path: '/api/master-enrollments/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/master-enrollments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.any(), 404: z.object({ message: z.string() }) },
     },
   },
 
@@ -2100,70 +2186,95 @@ export const contract = c.router({
     },
   },
 
-  // Reports routes
+  // Reports routes (chart data, read-only)
   reports: {
-    financial: {
+    monthlyPL: {
       method: 'GET',
-      path: '/api/reports/excel/financial',
+      path: '/api/reports/monthly-pl',
       query: z.object({
-        startDate: z.string(),
-        endDate: z.string(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
       }),
-      responses: {
-        200: z.object({
-          data: z.string(), // base64 encoded Excel file
-          filename: z.string(),
-        }),
-        400: z.object({ message: z.string() }),
-      },
+      responses: { 200: z.array(z.any()) },
     },
-    financialMonthly: {
+    salaryGrowth: {
       method: 'GET',
-      path: '/api/reports/excel/financial-monthly',
+      path: '/api/reports/salary-growth',
       query: z.object({
-        startDate: z.string(),
-        endDate: z.string(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
       }),
-      responses: {
-        200: z.object({
-          data: z.string(), // base64 encoded Excel file
-          filename: z.string(),
-        }),
-        400: z.object({ message: z.string() }),
-      },
+      responses: { 200: z.array(z.any()) },
     },
-    branch: {
+    topCourses: {
       method: 'GET',
-      path: '/api/reports/excel/branch/:branchId',
-      pathParams: z.object({
-        branchId: UUIDSchema,
-      }),
+      path: '/api/reports/top-courses',
       query: z.object({
-        startDate: z.string(),
-        endDate: z.string(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
       }),
-      responses: {
-        200: z.object({
-          data: z.string(), // base64 encoded Excel file
-          filename: z.string(),
-        }),
-        400: z.object({ message: z.string() }),
-      },
+      responses: { 200: z.array(z.any()) },
     },
-    churn: {
+    studentsOverTime: {
       method: 'GET',
-      path: '/api/reports/excel/churn',
+      path: '/api/reports/students-over-time',
       query: z.object({
-        startDate: z.string(),
-        endDate: z.string(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
       }),
-      responses: {
-        200: z.object({
-          data: z.string(), // base64 encoded Excel file
-          filename: z.string(),
-        }),
-        400: z.object({ message: z.string() }),
-      },
+      responses: { 200: z.array(z.any()) },
+    },
+    studentChurn: {
+      method: 'GET',
+      path: '/api/reports/student-churn',
+      query: z.object({
+        branchId: OptionalUUIDSchema,
+        inactiveMonths: z.string().optional(),
+      }),
+      responses: { 200: z.any() },
+    },
+    profitByCourse: {
+      method: 'GET',
+      path: '/api/reports/profit-by-course',
+      query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: { 200: z.array(z.any()) },
+    },
+    profitByBranch: {
+      method: 'GET',
+      path: '/api/reports/profit-by-branch',
+      query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }),
+      responses: { 200: z.array(z.any()) },
+    },
+    profitByProduct: {
+      method: 'GET',
+      path: '/api/reports/profit-by-product',
+      query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: { 200: z.array(z.any()) },
+    },
+    expensesByCategory: {
+      method: 'GET',
+      path: '/api/reports/expenses-by-category',
+      query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: { 200: z.array(z.any()) },
     },
   },
 

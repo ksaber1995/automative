@@ -1,49 +1,136 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { ApiService } from '../../../core/services/api.service';
 
-interface ReportResponse {
-  data: string; // base64 encoded file
-  filename: string;
+export interface MonthlyPLRow {
+  month: string;
+  enrollmentRevenue: number;
+  productRevenue: number;
+  masterRevenue: number;
+  refunds: number;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
 }
 
-@Injectable({
-  providedIn: 'root'
-})
+export interface SalaryMonthRow {
+  month: string;
+  total: number;
+  count: number;
+}
+
+export interface TopCourseRow {
+  courseId: string;
+  courseName: string;
+  courseCode: string;
+  branchName: string;
+  enrollmentCount: number;
+  activeCount: number;
+  revenue: number;
+}
+
+export interface StudentMonthRow {
+  month: string;
+  newStudents: number;
+  churned: number;
+  netChange: number;
+}
+
+export interface ChurnSummary {
+  totalStudents: number;
+  activeStudents: number;
+  churnedStudents: number;
+  inactiveStudents: number;
+  inactiveMonths: number;
+  churnRate: number;
+  inactivityRate: number;
+}
+
+export interface ProfitByCourseRow {
+  courseId: string;
+  courseName: string;
+  courseCode: string;
+  branchName: string;
+  enrollments: number;
+  revenue: number;
+  avgPrice: number;
+}
+
+export interface ProfitByBranchRow {
+  branchId: string;
+  branchName: string;
+  branchCode: string;
+  enrollmentRevenue: number;
+  productRevenue: number;
+  masterRevenue: number;
+  refunds: number;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
+  activeStudents: number;
+}
+
+export interface ProfitByProductRow {
+  productId: string;
+  productName: string;
+  productCode: string;
+  branchName: string;
+  unitsSold: number;
+  revenue: number;
+  cost: number;
+  margin: number;
+  currentStock: number;
+}
+
+export interface ExpenseCategoryRow {
+  category: string;
+  total: number;
+  count: number;
+}
+
+export interface ReportFilters {
+  startDate?: string;
+  endDate?: string;
+  branchId?: string;
+}
+
+@Injectable({ providedIn: 'root' })
 export class ReportService {
   private api = inject(ApiService);
 
-  downloadFinancialReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
-    return this.api.get<ReportResponse>(`reports/excel/financial`, { startDate, endDate });
+  monthlyPL(filters: ReportFilters = {}): Observable<MonthlyPLRow[]> {
+    return this.api.get<MonthlyPLRow[]>('reports/monthly-pl', filters);
   }
 
-  downloadBranchReportExcel(branchId: string, startDate: string, endDate: string): Observable<ReportResponse> {
-    return this.api.get<ReportResponse>(`reports/excel/branch/${branchId}`, { startDate, endDate });
+  salaryGrowth(filters: ReportFilters = {}): Observable<SalaryMonthRow[]> {
+    return this.api.get<SalaryMonthRow[]>('reports/salary-growth', filters);
   }
 
-  downloadMonthlyFinancialReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
-    return this.api.get<ReportResponse>(`reports/excel/financial-monthly`, { startDate, endDate });
+  topCourses(filters: ReportFilters = {}): Observable<TopCourseRow[]> {
+    return this.api.get<TopCourseRow[]>('reports/top-courses', filters);
   }
 
-  downloadChurnReportExcel(startDate: string, endDate: string): Observable<ReportResponse> {
-    return this.api.get<ReportResponse>(`reports/excel/churn`, { startDate, endDate });
+  studentsOverTime(filters: ReportFilters = {}): Observable<StudentMonthRow[]> {
+    return this.api.get<StudentMonthRow[]>('reports/students-over-time', filters);
   }
 
-  // Helper method to download base64 file
-  downloadBase64File(base64Data: string, filename: string) {
-    const byteCharacters = atob(base64Data);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  studentChurn(branchId?: string, inactiveMonths: number = 3): Observable<ChurnSummary> {
+    return this.api.get<ChurnSummary>('reports/student-churn', { branchId, inactiveMonths: String(inactiveMonths) });
+  }
 
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(link.href);
+  profitByCourse(filters: ReportFilters = {}): Observable<ProfitByCourseRow[]> {
+    return this.api.get<ProfitByCourseRow[]>('reports/profit-by-course', filters);
+  }
+
+  profitByBranch(filters: ReportFilters = {}): Observable<ProfitByBranchRow[]> {
+    return this.api.get<ProfitByBranchRow[]>('reports/profit-by-branch', filters);
+  }
+
+  profitByProduct(filters: ReportFilters = {}): Observable<ProfitByProductRow[]> {
+    return this.api.get<ProfitByProductRow[]>('reports/profit-by-product', filters);
+  }
+
+  expensesByCategory(filters: ReportFilters = {}): Observable<ExpenseCategoryRow[]> {
+    return this.api.get<ExpenseCategoryRow[]>('reports/expenses-by-category', filters);
   }
 }

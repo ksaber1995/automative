@@ -14,7 +14,6 @@ function mapProductFromDB(row: any) {
     stock: parseInt(row.stock) || 0,
     minStock: parseInt(row.min_stock) || 0,
     unit: row.unit,
-    isGlobal: row.is_global,
     branchId: row.branch_id,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -32,7 +31,7 @@ export const productsRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      if (body.branchId && !body.isGlobal && !canAccessBranch(context, body.branchId)) {
+      if (!body.branchId || !canAccessBranch(context, body.branchId)) {
         client.release();
         return {
           status: 403 as const,
@@ -43,12 +42,12 @@ export const productsRoutes = {
       await client.query('BEGIN');
 
       const productResult = await client.query(
-        `INSERT INTO products (company_id, name, code, description, category, cost_price, selling_price, stock, min_stock, unit, is_global, branch_id, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true) RETURNING *`,
+        `INSERT INTO products (company_id, name, code, description, category, cost_price, selling_price, stock, min_stock, unit, branch_id, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true) RETURNING *`,
         [
           context.companyId, body.name, body.code, body.description, body.category,
           body.costPrice, body.sellingPrice, body.stock, body.minStock, body.unit,
-          body.isGlobal, body.isGlobal ? null : body.branchId,
+          body.branchId,
         ]
       );
       const product = productResult.rows[0];
@@ -61,7 +60,7 @@ export const productsRoutes = {
            VALUES ($1,$2,'VARIABLE','INVENTORY',$3,$4,$5,$6)`,
           [
             context.companyId,
-            body.isGlobal ? null : body.branchId,
+            body.branchId,
             totalCost,
             `Stock purchase: ${body.name} × ${body.stock} units @ ${body.costPrice}`,
             purchaseDate,
@@ -112,10 +111,10 @@ export const productsRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+        sql += ` AND branch_id = $${params.length}`;
       } else if (context.role !== 'ADMIN' && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+        sql += ` AND branch_id = $${params.length}`;
       }
 
       sql += ' ORDER BY created_at DESC';
@@ -150,7 +149,7 @@ export const productsRoutes = {
         WHERE company_id = $1
         AND is_active = true
         AND stock > 0
-        AND (branch_id = $2 OR is_global = true)
+        AND branch_id = $2
         ORDER BY name ASC
       `;
 
@@ -188,10 +187,10 @@ export const productsRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+        sql += ` AND branch_id = $${params.length}`;
       } else if (context.role !== 'ADMIN' && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+        sql += ` AND branch_id = $${params.length}`;
       }
 
       sql += ' ORDER BY stock ASC';

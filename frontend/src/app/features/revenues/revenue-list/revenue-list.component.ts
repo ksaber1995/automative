@@ -29,7 +29,7 @@ export class RevenueListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
-  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'ALL' = 'ALL';
+  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'ALL' = 'ALL';
   startDate: string = '';
   endDate: string = '';
   totalRevenue: number = 0;
@@ -70,10 +70,10 @@ export class RevenueListComponent implements OnInit {
     this.loadRevenues();
   }
 
-  getSourceBadge(source: string): { severity: 'success' | 'info' | 'warn'; label: string } {
-    return source === 'ENROLLMENT'
-      ? { severity: 'success', label: 'Course' }
-      : { severity: 'info', label: 'Product' };
+  getSourceBadge(source: string): { severity: 'success' | 'info' | 'warn' | 'secondary'; label: string } {
+    if (source === 'ENROLLMENT') return { severity: 'success', label: 'Course' };
+    if (source === 'MASTER_ENROLLMENT') return { severity: 'secondary', label: 'Bundle' };
+    return { severity: 'info', label: 'Product' };
   }
 
   getRefundStatus(revenue: RevenueItem): 'NONE' | 'PARTIAL' | 'FULL' {
@@ -97,6 +97,12 @@ export class RevenueListComponent implements OnInit {
   navigateToSource(revenue: RevenueItem) {
     if (revenue.source === 'ENROLLMENT') {
       this.router.navigate(['/enrollments', revenue.sourceId, 'edit']);
+    } else if (revenue.source === 'MASTER_ENROLLMENT') {
+      // Master bundles don't have a dedicated edit page — jump to the student
+      // so the user can view/cancel/refund the enrollment row.
+      if (revenue.studentId) {
+        this.router.navigate(['/students', revenue.studentId]);
+      }
     } else {
       this.router.navigate(['/products/sales']);
     }

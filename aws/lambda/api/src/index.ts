@@ -15,6 +15,7 @@ import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
 import { masterCoursesRoutes } from './routes/master-courses';
+import { masterEnrollmentsRoutes } from './routes/master-enrollments';
 import { eventsRoutes } from './routes/events';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
@@ -33,6 +34,7 @@ import { migrationsRoutes } from './routes/migrations';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
+import { demoLeadsRoutes } from './routes/demo-leads';
 
 // Create the router implementation
 const router = {
@@ -46,7 +48,17 @@ const router = {
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,
-  masterCourses: masterCoursesRoutes,
+  masterCourses: { ...masterCoursesRoutes, listEnrollments: masterEnrollmentsRoutes.listByMaster },
+  // Route order matters — specific paths first, before `/:id`.
+  masterEnrollments: {
+    coverageCheck: masterEnrollmentsRoutes.coverageCheck,
+    listByStudent: masterEnrollmentsRoutes.listByStudent,
+    create: masterEnrollmentsRoutes.create,
+    cancel: masterEnrollmentsRoutes.cancel,
+    createRefund: masterEnrollmentsRoutes.createRefund,
+    listRefunds: masterEnrollmentsRoutes.listRefunds,
+    getById: masterEnrollmentsRoutes.getById,
+  },
   events: eventsRoutes,
   classes: classesRoutes,
   enrollments: enrollmentsRoutes,
@@ -65,6 +77,7 @@ const router = {
   subscriptions: subscriptionsRoutes,
   migrations: migrationsRoutes,
   users: usersRoutes,
+  demoLeads: demoLeadsRoutes,
 };
 
 // Create the Lambda handler

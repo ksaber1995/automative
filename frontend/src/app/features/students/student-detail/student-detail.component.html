@@ -84,6 +84,98 @@
       }
     </p-card>
 
+    <!-- Master Course (Bundle) Enrollments -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold">
+            {{ 'STUDENTS.DETAIL.MASTER_ENROLLMENTS' | translate }} ({{ masterEnrollments().length }})
+          </h3>
+          <button pButton [label]="'STUDENTS.DETAIL.ENROLL_MASTER_BTN' | translate" icon="pi pi-plus"
+            severity="info" (click)="enrollInMaster()"></button>
+        </div>
+      </ng-template>
+
+      @if (masterEnrollments().length === 0) {
+        <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_MASTER_ENROLLMENTS' | translate }}</div>
+      } @else {
+        <p-table [value]="masterEnrollments()" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }}</th>
+              <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-me>
+            <tr>
+              <td>
+                <div class="font-medium">{{ me.masterCourseName }}</div>
+                <div class="text-xs text-gray-500 font-mono">{{ me.masterCourseCode }}</div>
+              </td>
+              <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
+              <td class="text-right">
+                <div class="font-semibold">{{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }}</div>
+                @if ((me.totalRefunded || 0) > 0) {
+                  <div class="text-xs text-orange-600 mt-0.5">
+                    {{ 'STUDENTS.DETAIL.REFUNDED' | translate }}: {{ me.totalRefunded.toFixed(2) }}
+                  </div>
+                }
+              </td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <p-progressBar
+                    [value]="me.totalCourses > 0 ? (me.completedCourses / me.totalCourses) * 100 : 0"
+                    [style]="{ height: '6px', width: '140px' }"
+                    [showValue]="false"
+                  ></p-progressBar>
+                  <span class="text-sm whitespace-nowrap">
+                    {{ me.completedCourses }} / {{ me.totalCourses }}
+                  </span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                  {{ 'STUDENTS.DETAIL.ACTIVE' | translate }}: {{ me.activeCourses }}
+                </div>
+              </td>
+              <td>
+                <p-tag
+                  [value]="me.status"
+                  [severity]="me.status === 'ACTIVE' ? 'success' : me.status === 'COMPLETED' ? 'info' : 'danger'"
+                ></p-tag>
+              </td>
+              <td>
+                <div class="flex gap-1">
+                  @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
+                    <p-button
+                      icon="pi pi-undo"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="openMasterRefundDialog(me)"
+                      [pTooltip]="'STUDENTS.DETAIL.REFUND_MASTER' | translate"
+                    ></p-button>
+                  }
+                  @if (me.status === 'ACTIVE') {
+                    <p-button
+                      icon="pi pi-times"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="danger"
+                      (onClick)="cancelMasterEnrollment(me)"
+                      [pTooltip]="'STUDENTS.DETAIL.CANCEL_MASTER' | translate"
+                    ></p-button>
+                  }
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </p-card>
+
     <!-- Course Enrollments Card -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">
@@ -408,5 +500,54 @@
     <p-button [label]="'STUDENTS.DETAIL.ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn" [loading]="actionLoading()"
       [disabled]="!refundAmount || !refundDate"
       (onClick)="submitRefund()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Master enrollment refund dialog -->
+<p-dialog [(visible)]="showMasterRefundDialog" [modal]="true"
+  [header]="'STUDENTS.DETAIL.REFUND_MASTER_TITLE' | translate"
+  [style]="{ width: '520px' }">
+  <div class="p-4">
+    @if (masterEnrollmentForAction(); as me) {
+      <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+        <div class="font-semibold text-purple-900">🎁 {{ me.masterCourseName }}</div>
+        <div class="text-sm text-purple-700 mt-1">
+          {{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }} {{ me.amountPaid.toFixed(2) }}
+          · {{ 'STUDENTS.DETAIL.REFUNDABLE' | translate }}: <strong>{{ masterRefundable().toFixed(2) }}</strong>
+        </div>
+      </div>
+    }
+    <div class="flex flex-col gap-4">
+      <div class="flex gap-6">
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="masterRefundType" value="FULL" [(ngModel)]="masterRefundType" (onClick)="onMasterRefundTypeChange()"></p-radiobutton>
+          <span>{{ 'STUDENTS.DETAIL.FULL_REFUND' | translate }}</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="masterRefundType" value="PARTIAL" [(ngModel)]="masterRefundType" (onClick)="onMasterRefundTypeChange()"></p-radiobutton>
+          <span>{{ 'STUDENTS.DETAIL.PARTIAL_REFUND' | translate }}</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ 'STUDENTS.DETAIL.AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="masterRefundAmount" [min]="0.01" [max]="masterRefundable()"
+          [disabled]="masterRefundType === 'FULL'" [style]="{ width: '100%' }" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ 'STUDENTS.DETAIL.REFUND_DATE' | translate }}</label>
+        <p-datepicker [(ngModel)]="masterRefundDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ 'STUDENTS.DETAIL.REASON' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="masterRefundReason" rows="2" class="w-full" placeholder="Reason for refund..."></textarea>
+      </div>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true"
+      (onClick)="showMasterRefundDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn"
+      [loading]="actionLoading()" [disabled]="!masterRefundAmount || !masterRefundDate"
+      (onClick)="submitMasterRefund()"></p-button>
   </ng-template>
 </p-dialog>

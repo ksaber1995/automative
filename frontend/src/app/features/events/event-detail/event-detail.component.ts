@@ -52,7 +52,7 @@ import { EventModel, EventPL } from '@shared/interfaces/event.interface';
       </div>
 
       @if (event(); as e) {
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <p-card>
             <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.LOCATION' | translate }}</div>
             <div class="text-lg font-semibold">{{ e.location || '—' }}</div>
@@ -64,12 +64,6 @@ import { EventModel, EventPL } from '@shared/interfaces/event.interface';
               @if (e.endDate && e.endDate !== e.startDate) {
                 → {{ e.endDate | date: 'mediumDate' }}
               }
-            </div>
-          </p-card>
-          <p-card>
-            <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.BUDGET' | translate }}</div>
-            <div class="text-lg font-semibold">
-              {{ e.budget !== null ? e.budget.toFixed(2) : '—' }}
             </div>
           </p-card>
         </div>
@@ -149,19 +143,6 @@ import { EventModel, EventPL } from '@shared/interfaces/event.interface';
             </div>
           </div>
 
-          @if (p.budget !== null) {
-            <div class="mt-4 p-4 bg-gray-50 rounded flex justify-between items-center">
-              <div class="text-sm">
-                <span class="font-medium">{{ 'EVENTS.DETAIL.BUDGET_VS_ACTUAL' | translate }}:</span>
-                {{ 'EVENTS.DETAIL.BUDGET' | translate }} {{ p.budget.toFixed(2) }}
-                · {{ 'EVENTS.DETAIL.SPENT' | translate }} {{ (p.expenses + p.refunds + p.productCost).toFixed(2) }}
-              </div>
-              <p-tag
-                [value]="budgetStatus(p)"
-                [severity]="(p.expenses + p.refunds + p.productCost) > p.budget ? 'danger' : 'success'"
-              ></p-tag>
-            </div>
-          }
         } @else {
           <div class="text-center py-8 text-gray-500">
             <i class="pi pi-spin pi-spinner text-2xl"></i>
@@ -209,8 +190,4 @@ export class EventDetailComponent implements OnInit {
     }
   }
 
-  budgetStatus(p: EventPL): string {
-    const spent = p.expenses + p.refunds + p.productCost;
-    return spent > (p.budget || 0) ? 'Over Budget' : 'Under Budget';
-  }
 }

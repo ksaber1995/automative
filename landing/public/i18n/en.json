@@ -1,0 +1,172 @@
+{
+  "NAV": {
+    "BENEFITS": "Benefits",
+    "FEATURES": "Features",
+    "PRICING": "Pricing",
+    "PARTNERS": "Partners",
+    "FAQ": "FAQ",
+    "BOOK_DEMO": "Book a Demo"
+  },
+  "HERO": {
+    "BADGE": "Trusted by 100+ education centers across MENA",
+    "HEADLINE_1": "Stop running your academy on",
+    "HEADLINE_STRIKE": "Excel",
+    "HEADLINE_2": "Run it on Netrofit.",
+    "SUBTITLE": "Netrofit is the first financial management platform purpose-built for tutoring academies, training institutes, and language schools in Egypt, Saudi Arabia, and the Gulf. Real-time P&L, multi-branch dashboards, installment tracking, and payroll — in one place.",
+    "CTA_PRIMARY": "📅 Book a Free 30-min Demo",
+    "CTA_SECONDARY": "See Pricing",
+    "PERK_1": "No credit card required",
+    "PERK_2": "14-day free trial",
+    "PERK_3": "Arabic & English",
+    "STAT_CENTERS": "Education centers",
+    "STAT_STUDENTS": "Students tracked",
+    "STAT_HOURS": "Saved per owner / month",
+    "STAT_RATING": "Customer rating"
+  },
+  "BENEFITS": {
+    "KICKER": "Why Netrofit",
+    "HEADING": "Built for how academies actually run.",
+    "SUB": "Generic ERPs were never made for tutoring centers. We fix the specific things that drive you crazy.",
+    "ITEMS": {
+      "REALTIME_TITLE": "Real-time P&L, always",
+      "REALTIME_TEXT": "No waiting for the accountant. See revenue, expenses, and profit for every branch — live.",
+      "MULTIBRANCH_TITLE": "Multi-branch native",
+      "MULTIBRANCH_TEXT": "Manage 2 or 20 branches from one dashboard. Compare performance side by side.",
+      "INSTALLMENTS_TITLE": "Installment tracking that works",
+      "INSTALLMENTS_TEXT": "Track who owes what, when. Get reminders for overdue installments automatically.",
+      "ARABIC_TITLE": "Arabic-first UI",
+      "ARABIC_TEXT": "Full RTL support. Your staff can use it from day one — no English barrier.",
+      "PAYROLL_TITLE": "Payroll + attendance",
+      "PAYROLL_TEXT": "Track instructor sessions, salaries, and bonuses. Print payslips in one click.",
+      "MOBILE_TITLE": "Mobile-friendly",
+      "MOBILE_TEXT": "Check your numbers from your phone at any time. Built for how you actually work."
+    }
+  },
+  "FEATURES": {
+    "KICKER": "Everything you need",
+    "HEADING": "One platform. All your operations.",
+    "ITEMS": {
+      "STUDENTS_TITLE": "Students & Enrollments",
+      "STUDENTS_TEXT": "Full student profiles, bulk enrollments, installment plans, refunds.",
+      "COURSES_TITLE": "Courses & Classes",
+      "COURSES_TEXT": "Create courses, schedule classes, assign instructors, set max capacity.",
+      "INVENTORY_TITLE": "Inventory & Product Sales",
+      "INVENTORY_TEXT": "Track stock, sell books and materials at the front desk, auto-deduct cost.",
+      "EXPENSES_TITLE": "Expenses & Receipts",
+      "EXPENSES_TEXT": "Categorize every expense, attach receipts, handle recurring bills.",
+      "ANALYTICS_TITLE": "Analytics & Reports",
+      "ANALYTICS_TEXT": "Churn, profit per course, salary growth, top products — all charted.",
+      "BUNDLES_TITLE": "Course Bundles",
+      "BUNDLES_TEXT": "Sell \"all access\" packages — students enroll in any linked course for free."
+    }
+  },
+  "PRICING": {
+    "KICKER": "Simple, transparent pricing",
+    "HEADING": "Pick a plan. Start today.",
+    "SUB": "Save 25% when you pay annually. All plans include unlimited users and Arabic support.",
+    "TOGGLE_ANNUAL": "Annual · Save 25%",
+    "TOGGLE_MONTHLY": "Monthly",
+    "BILLED_ANNUALLY": "✓ Billed annually",
+    "BILLED_MONTHLY": "Billed monthly",
+    "PER_MONTH": "/mo",
+    "MOST_POPULAR": "MOST POPULAR",
+    "CTA": "Book a Demo",
+    "CUSTOM_PREFIX": "Need more? We offer white-label and custom plans for franchises.",
+    "CUSTOM_CTA": "Talk to us →",
+    "PLANS": {
+      "STARTER_TIER": "Starter",
+      "STARTER_SUB": "Perfect for a single branch",
+      "STARTER_FEAT_1": "1 branch",
+      "STARTER_FEAT_2": "Up to 200 students",
+      "STARTER_FEAT_3": "Full financial tracking",
+      "STARTER_FEAT_4": "Arabic + English",
+      "STARTER_FEAT_5": "Email support",
+      "GROWTH_TIER": "Growth",
+      "GROWTH_SUB": "Scale with multiple branches",
+      "GROWTH_FEAT_1": "Up to 3 branches",
+      "GROWTH_FEAT_2": "500 students",
+      "GROWTH_FEAT_3": "Product sales & inventory",
+      "GROWTH_FEAT_4": "Master course bundles",
+      "GROWTH_FEAT_5": "WhatsApp support",
+      "PRO_TIER": "Pro",
+      "PRO_SUB": "For serious operators",
+      "PRO_FEAT_1": "Unlimited branches",
+      "PRO_FEAT_2": "Unlimited students",
+      "PRO_FEAT_3": "Advanced analytics",
+      "PRO_FEAT_4": "API access",
+      "PRO_FEAT_5": "Dedicated success manager"
+    }
+  },
+  "PARTNERS": {
+    "KICKER": "Partners & Integrations",
+    "HEADING": "Plays well with what you already use."
+  },
+  "TESTIMONIALS": {
+    "T1_QUOTE": "We saved about 40 hours a month on reporting alone. The multi-branch dashboard is game-changing.",
+    "T1_AUTHOR": "Ahmed Hassan",
+    "T1_ROLE": "Owner, Galaxy Training Center",
+    "T2_QUOTE": "Installment tracking used to be chaos. Now parents get reminders automatically and I stopped losing money.",
+    "T2_AUTHOR": "Sara Mahmoud",
+    "T2_ROLE": "Founder, Step Up Academy",
+    "T3_QUOTE": "The Arabic UI meant we onboarded the whole staff in one afternoon. No complaints, no training issues.",
+    "T3_AUTHOR": "Khalid Al-Otaibi",
+    "T3_ROLE": "GM, Riyadh Coding Institute"
+  },
+  "FAQ": {
+    "KICKER": "FAQ",
+    "HEADING": "Questions, answered.",
+    "Q1": "How quickly can we start?",
+    "A1": "Most customers are live within 48 hours. We import your student list and branch data for you during onboarding.",
+    "Q2": "Does it work offline?",
+    "A2": "Netrofit is cloud-based so you need internet to use it. It runs great on mobile data and saves your work if the connection drops briefly.",
+    "Q3": "Can I try before I buy?",
+    "A3": "Yes — every plan comes with a 14-day free trial. No credit card required to start.",
+    "Q4": "Is my data safe?",
+    "A4": "Your data lives on AWS with encryption at rest and in transit, automatic daily backups, and multi-tenant isolation so no other customer can ever see your numbers.",
+    "Q5": "Can you customize for my business?",
+    "A5": "Absolutely. Our Pro plan includes custom workflows, and we offer white-label for franchise networks.",
+    "Q6": "What payment methods do you support?",
+    "A6": "Bank transfer, Vodafone Cash, InstaPay, Fawry, credit card, and cash (tracked manually with receipts)."
+  },
+  "CTA": {
+    "HEADING": "Ready to see it in action?",
+    "SUB": "In 30 minutes we'll walk you through your exact workflow — branches, courses, payroll, installments — and show how Netrofit saves your team hours every week.",
+    "BUTTON": "📅 Book My Free Demo",
+    "FINE_PRINT": "No credit card. No obligation. 30 minutes max."
+  },
+  "FOOTER": {
+    "COPY": "© {{year}} Netrofit. Built for education businesses in MENA."
+  },
+  "MODAL": {
+    "TITLE": "Book Your Free Demo",
+    "SUB": "30 minutes. No sales pressure. Personalized to your academy.",
+    "SUCCESS_TITLE": "We got it!",
+    "CLOSE": "Close",
+    "NAME": "Your Name",
+    "EMAIL": "Email",
+    "PHONE": "Phone / WhatsApp",
+    "PHONE_PLACEHOLDER": "+20 1000000000",
+    "ACADEMY": "Academy Name",
+    "COUNTRY": "Country",
+    "COUNTRY_PLACEHOLDER": "Select country…",
+    "COUNTRY_EGYPT": "🇪🇬 Egypt",
+    "COUNTRY_SAUDI": "🇸🇦 Saudi Arabia",
+    "COUNTRY_UAE": "🇦🇪 UAE",
+    "COUNTRY_OTHER": "Other",
+    "BRANCHES": "How many branches?",
+    "MESSAGE": "Anything specific you'd like to see?",
+    "SUBMITTING": "Submitting…",
+    "SUBMIT": "📅 Book My Demo",
+    "FINE_PRINT": "We'll reach out within 24 hours. Your info is never shared.",
+    "GENERIC_ERROR": "Something went wrong. Please try again or email us directly."
+  },
+  "LANG": {
+    "EN": "English",
+    "AR": "العربية",
+    "TOGGLE": "Switch language"
+  },
+  "WHATSAPP": {
+    "TITLE": "Chat on WhatsApp",
+    "MESSAGE": "Hi! I'd like to know more about Netrofit for my academy."
+  }
+}

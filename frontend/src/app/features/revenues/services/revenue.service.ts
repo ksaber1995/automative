@@ -2,12 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 
+export type RevenueSource = 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT';
+
 export interface RevenueItem {
   id: string;
   branchId: string;
   branchName: string;
-  source: 'ENROLLMENT' | 'PRODUCT_SALE';
+  source: RevenueSource;
   sourceId: string;
+  studentId: string | null;
   amount: number;
   totalRefunded: number;
   description: string;
@@ -24,6 +27,7 @@ export interface RevenueSummary {
   totalRevenue: number;
   enrollmentRevenue: number;
   productRevenue: number;
+  masterRevenue: number;
   byBranch: Array<{
     branchId: string;
     branchName: string;
@@ -44,7 +48,7 @@ export class RevenueService {
   // Get revenue list (calculated from enrollments and product sales)
   getRevenues(params?: {
     branchId?: string;
-    source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'ALL';
+    source?: RevenueSource | 'ALL';
     startDate?: string;
     endDate?: string;
   }): Observable<RevenueItem[]> {

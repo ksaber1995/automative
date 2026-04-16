@@ -21,7 +21,6 @@ function mapEventFromDB(row: any) {
     location: row.location,
     startDate: row.start_date,
     endDate: row.end_date,
-    budget: row.budget !== null && row.budget !== undefined ? parseFloat(row.budget) : null,
     status: row.status,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -50,7 +49,6 @@ export const eventsRoutes = {
         location: body.location || null,
         start_date: body.startDate || null,
         end_date: body.endDate || null,
-        budget: body.budget ?? null,
         status: body.status || 'PLANNED',
         is_active: true,
       });
@@ -159,7 +157,6 @@ export const eventsRoutes = {
       if (body.location !== undefined) updateData.location = body.location;
       if (body.startDate !== undefined) updateData.start_date = body.startDate;
       if (body.endDate !== undefined) updateData.end_date = body.endDate;
-      if (body.budget !== undefined) updateData.budget = body.budget;
       if (body.status !== undefined) updateData.status = body.status;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
@@ -207,7 +204,7 @@ export const eventsRoutes = {
       }
 
       const event = await queryOne(
-        'SELECT * FROM events WHERE id = $1 AND company_id = $2',
+        'SELECT id FROM events WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
       if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
@@ -263,7 +260,6 @@ export const eventsRoutes = {
           productMargin,
           productSaleCount: parseInt(productRow?.count || '0', 10),
           netProfit: revenueTotal + productMargin - expenseTotal - refundTotal,
-          budget: event.budget !== null ? parseFloat(event.budget) : null,
         },
       };
     } catch (error: any) {

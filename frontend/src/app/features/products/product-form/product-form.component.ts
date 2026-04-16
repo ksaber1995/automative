@@ -137,34 +137,21 @@ import { ProductCategory } from '@shared/enums/product.enum';
             </div>
 
             <div class="field md:col-span-2">
-              <div class="flex items-center gap-2">
-                <p-checkbox
-                  inputId="isGlobal"
-                  formControlName="isGlobal"
-                  [binary]="true">
-                </p-checkbox>
-                <label for="isGlobal" class="text-sm font-medium">{{ 'PRODUCTS.FORM.GLOBAL_LABEL' | translate }}</label>
-              </div>
+              <label for="branchId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *</label>
+              <p-select
+                id="branchId"
+                formControlName="branchId"
+                [options]="branches"
+                optionLabel="name"
+                optionValue="id"
+                [placeholder]="'PRODUCTS.FORM.BRANCH_PLACEHOLDER' | translate"
+                class="w-full"
+                [style]="{'width': '100%'}">
+              </p-select>
+              @if (productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
+                <small class="text-red-500">{{ 'PRODUCTS.FORM.BRANCH_REQUIRED' | translate }}</small>
+              }
             </div>
-
-            @if (!productForm.get('isGlobal')?.value) {
-              <div class="field md:col-span-2">
-                <label for="branchId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *</label>
-                <p-select
-                  id="branchId"
-                  formControlName="branchId"
-                  [options]="branches"
-                  optionLabel="name"
-                  optionValue="id"
-                  [placeholder]="'PRODUCTS.FORM.BRANCH_PLACEHOLDER' | translate"
-                  class="w-full"
-                  [style]="{'width': '100%'}">
-                </p-select>
-                @if (productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
-                  <small class="text-red-500">{{ 'PRODUCTS.FORM.BRANCH_REQUIRED' | translate }}</small>
-                }
-              </div>
-            }
           </div>
 
           @if (!isEditMode()) {
@@ -271,17 +258,6 @@ export class ProductFormComponent implements OnInit {
       this.loadProduct(id);
     }
 
-    // Watch isGlobal changes
-    this.productForm.get('isGlobal')?.valueChanges.subscribe((isGlobal) => {
-      const branchControl = this.productForm.get('branchId');
-      if (isGlobal) {
-        branchControl?.clearValidators();
-        branchControl?.setValue(null);
-      } else {
-        branchControl?.setValidators([Validators.required]);
-      }
-      branchControl?.updateValueAndValidity();
-    });
   }
 
   initForm() {
@@ -295,7 +271,6 @@ export class ProductFormComponent implements OnInit {
       stock: [0, [Validators.required, Validators.min(0)]],
       minStock: [0, [Validators.required, Validators.min(0)]],
       unit: ['', Validators.required],
-      isGlobal: [false],
       branchId: ['', Validators.required],
       recordStockExpense: [true],
       purchaseDate: [new Date()],
@@ -327,7 +302,6 @@ export class ProductFormComponent implements OnInit {
           stock: product.stock,
           minStock: product.minStock,
           unit: product.unit,
-          isGlobal: product.isGlobal,
           branchId: product.branchId,
         });
       },

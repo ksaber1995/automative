@@ -16,12 +16,17 @@ import { StudentService } from '../../students/services/student.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { MasterCourseService } from '../../master-courses/services/master-course.service';
+import { MasterEnrollmentService, CoverageInfo } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { EnrollmentStatus, PaymentMode } from '@shared/enums/enrollment-status.enum';
 import { Student } from '@shared/interfaces/student.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Class } from '@shared/interfaces/class.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { MasterCourse } from '@shared/interfaces/master-course.interface';
+
+type EnrollmentType = 'COURSE' | 'MASTER';
 
 @Component({
   selector: 'app-enrollment-form',
@@ -50,49 +55,128 @@ import { Branch } from '@shared/interfaces/branch.interface';
 
         <p-card>
           <form [formGroup]="enrollmentForm" (ngSubmit)="onSubmit()">
+            <!-- Enrollment type toggle -->
+            @if (!isEditMode()) {
+              <div class="mb-6">
+                <div class="text-sm font-medium text-gray-700 mb-2">Enrollment Type</div>
+                <div class="flex gap-3">
+                  <button type="button"
+                    class="relative flex-1 p-4 pr-10 border-2 rounded-lg text-left transition-all focus:outline-none"
+                    [class]="enrollmentType() === 'COURSE'
+                      ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-200'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-gray-50'"
+                    (click)="setEnrollmentType('COURSE')">
+                    @if (enrollmentType() === 'COURSE') {
+                      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white text-blue-600 flex items-center justify-center text-sm font-bold shadow">✓</span>
+                    }
+                    <div class="font-semibold text-base flex items-center gap-2">
+                      <span class="text-xl">🎓</span> Single Course
+                    </div>
+                    <div class="text-xs mt-1" [class]="enrollmentType() === 'COURSE' ? 'text-blue-100' : 'text-gray-500'">
+                      Enroll the student in one class of one course.
+                    </div>
+                  </button>
+                  <button type="button"
+                    class="relative flex-1 p-4 pr-10 border-2 rounded-lg text-left transition-all focus:outline-none"
+                    [class]="enrollmentType() === 'MASTER'
+                      ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-600/30 ring-2 ring-purple-200'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300 hover:bg-gray-50'"
+                    (click)="setEnrollmentType('MASTER')">
+                    @if (enrollmentType() === 'MASTER') {
+                      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white text-purple-600 flex items-center justify-center text-sm font-bold shadow">✓</span>
+                    }
+                    <div class="font-semibold text-base flex items-center gap-2">
+                      <span class="text-xl">🎁</span> Master Course Bundle
+                    </div>
+                    <div class="text-xs mt-1" [class]="enrollmentType() === 'MASTER' ? 'text-purple-100' : 'text-gray-500'">
+                      One payment gives access to every course in the bundle.
+                    </div>
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (studentLocked() && studentBranchName()) {
+              <div class="mb-4 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm">
+                <span class="text-gray-500">Branch:</span>
+                <span class="ml-2 font-semibold text-gray-900">{{ studentBranchName() }}</span>
+                <span class="ml-2 text-xs text-gray-400">(locked to the student's branch)</span>
+              </div>
+            }
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              <!-- Student -->
-              <div class="col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Student <span class="text-red-500">*</span></label>
-                <p-select formControlName="studentId" [options]="students()" optionLabel="fullName" optionValue="id"
-                  placeholder="Select a student" [filter]="true" [style]="{ width: '100%' }"></p-select>
-                @if (f['studentId'].invalid && f['studentId'].touched) {
-                  <small class="text-red-500">Student is required</small>
-                }
-              </div>
+              <!-- Student (only shown when not locked to a single student) -->
+              @if (!studentLocked()) {
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Student <span class="text-red-500">*</span></label>
+                  <p-select formControlName="studentId" [options]="students()" optionLabel="fullName" optionValue="id"
+                    placeholder="Select a student" [filter]="true" (onChange)="onStudentChange()" [style]="{ width: '100%' }"></p-select>
+                  @if (f['studentId'].invalid && f['studentId'].touched) {
+                    <small class="text-red-500">Student is required</small>
+                  }
+                </div>
+              }
 
-              <!-- Branch -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Branch <span class="text-red-500">*</span></label>
-                <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
-                  placeholder="Select a branch" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
-                @if (f['branchId'].invalid && f['branchId'].touched) {
-                  <small class="text-red-500">Branch is required</small>
-                }
-              </div>
+              <!-- Branch (only shown when not locked to a student) -->
+              @if (!studentLocked()) {
+                <div [class.col-span-2]="enrollmentType() === 'MASTER'">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Branch <span class="text-red-500">*</span></label>
+                  <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
+                    placeholder="Select a branch" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
+                  @if (f['branchId'].invalid && f['branchId'].touched) {
+                    <small class="text-red-500">Branch is required</small>
+                  }
+                </div>
+              }
 
-              <!-- Course -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Course <span class="text-red-500">*</span></label>
-                <p-select formControlName="courseId" [options]="filteredCourses()" optionLabel="name" optionValue="id"
-                  placeholder="Select a course" (onChange)="onCourseChange()" [style]="{ width: '100%' }"
-                  [disabled]="!f['branchId'].value"></p-select>
-                @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
-                @if (f['branchId'].value && filteredCourses().length === 0) {
-                  <small class="text-orange-500">No active courses for this branch</small>
-                }
-              </div>
+              <!-- Master Course (MASTER mode) -->
+              @if (enrollmentType() === 'MASTER') {
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Master Course <span class="text-red-500">*</span></label>
+                  <p-select formControlName="masterCourseId" [options]="filteredMasters()" optionLabel="name" optionValue="id"
+                    placeholder="Select a master course" (onChange)="onMasterCourseChange()" [style]="{ width: '100%' }"
+                    [disabled]="!f['branchId'].value">
+                    <ng-template let-m pTemplate="item">
+                      <div class="flex justify-between items-center gap-3">
+                        <span>{{ m.name }} <span class="text-xs text-gray-500 font-mono ml-2">{{ m.code }}</span></span>
+                        <span class="text-sm text-gray-600">{{ m.defaultPrice.toFixed(2) }}</span>
+                      </div>
+                    </ng-template>
+                  </p-select>
+                  @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+                  @if (f['branchId'].value && filteredMasters().length === 0) {
+                    <small class="text-orange-500">No active master courses for this branch</small>
+                  }
+                  @if (f['masterCourseId'].invalid && f['masterCourseId'].touched) {
+                    <small class="text-red-500">Master course is required</small>
+                  }
+                </div>
+              }
 
-              <!-- Class -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Class <span class="text-red-500">*</span></label>
-                <p-select formControlName="classId" [options]="filteredClasses()" optionLabel="name" optionValue="id"
-                  placeholder="Select a class" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value"></p-select>
-                @if (f['classId'].invalid && f['classId'].touched) {
-                  <small class="text-red-500">Class is required</small>
-                }
-              </div>
+              <!-- Course (COURSE mode) -->
+              @if (enrollmentType() === 'COURSE') {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Course <span class="text-red-500">*</span></label>
+                  <p-select formControlName="courseId" [options]="filteredCourses()" optionLabel="name" optionValue="id"
+                    placeholder="Select a course" (onChange)="onCourseChange()" [style]="{ width: '100%' }"
+                    [disabled]="!f['branchId'].value"></p-select>
+                  @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+                  @if (f['branchId'].value && filteredCourses().length === 0) {
+                    <small class="text-orange-500">No active courses for this branch</small>
+                  }
+                </div>
+
+                <!-- Class -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Class <span class="text-red-500">*</span></label>
+                  <p-select formControlName="classId" [options]="filteredClasses()" optionLabel="name" optionValue="id"
+                    placeholder="Select a class" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value"></p-select>
+                  @if (f['classId'].invalid && f['classId'].touched) {
+                    <small class="text-red-500">Class is required</small>
+                  }
+                </div>
+              }
 
               <!-- Enrollment Date -->
               <div>
@@ -109,7 +193,37 @@ import { Branch } from '@shared/interfaces/branch.interface';
               </div>
             </div>
 
-            @if (selectedCourse()) {
+            @if (enrollmentType() === 'COURSE' && coverage()?.covered) {
+              <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-start gap-3">
+                  <i class="pi pi-check-circle text-green-600 text-2xl mt-1"></i>
+                  <div>
+                    <p class="font-semibold text-green-800">Covered by master course</p>
+                    <p class="text-sm text-green-700 mt-1">
+                      This student is enrolled in <strong>{{ coverage()?.masterCourseName }}</strong>.
+                      This course is included — no payment required.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (enrollmentType() === 'MASTER' && selectedMaster(); as m) {
+              <p-divider></p-divider>
+              <div class="p-4 rounded-lg bg-purple-50 border border-purple-200 mb-4">
+                <div class="font-semibold text-purple-900">🎁 {{ m.name }}</div>
+                <div class="text-sm text-purple-700 mt-1">
+                  This bundle includes {{ linkedCourseCount() }} course(s). The student can enroll in any class inside those courses for free.
+                </div>
+              </div>
+              @if (duplicateMaster()) {
+                <div class="p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                  This student already has an active enrollment in this master course.
+                </div>
+              }
+            }
+
+            @if (showPricingBlock()) {
             <p-divider></p-divider>
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Pricing</h3>
 
@@ -262,6 +376,8 @@ export class EnrollmentFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private masterCourseService = inject(MasterCourseService);
+  private masterEnrollmentService = inject(MasterEnrollmentService);
 
   enrollmentForm: FormGroup;
   loading = signal(false);
@@ -272,9 +388,16 @@ export class EnrollmentFormComponent implements OnInit {
   branches = signal<Branch[]>([]);
   courses = signal<Course[]>([]);
   classes = signal<Class[]>([]);
+  masters = signal<MasterCourse[]>([]);
   selectedCourse = signal<Course | null>(null);
+  selectedMaster = signal<MasterCourse | null>(null);
   selectedBranchId = signal<string | null>(null);
   selectedCourseId = signal<string | null>(null);
+  enrollmentType = signal<EnrollmentType>('COURSE');
+  linkedCourseCount = signal(0);
+  duplicateMaster = signal(false);
+  studentLocked = signal(false);
+  studentBranchName = signal<string>('');
 
   // Signals for reactive display — avoids reading form.value in template
   originalPriceSig = signal(0);
@@ -284,13 +407,16 @@ export class EnrollmentFormComponent implements OnInit {
   discountTypeSig = signal<'none' | 'percentage' | 'amount' | 'direct'>('none');
   paymentModeSig = signal<'FULL' | 'INSTALLMENTS'>('FULL');
   downPaymentSig = signal(0);
+  coverage = signal<CoverageInfo | null>(null);
 
   filteredCourses = computed(() => {
     const branchId = this.selectedBranchId();
     if (!branchId) return [];
     return this.courses().filter(c => {
       const courseBranchId = c.branchId ? String(c.branchId) : null;
-      return courseBranchId === String(branchId) || courseBranchId === null;
+      const matchesBranch = courseBranchId === String(branchId) || courseBranchId === null;
+      // Courses attached to a master course are enrolled-in via MASTER mode, not as single courses.
+      return matchesBranch && !c.masterCourseId;
     });
   });
 
@@ -298,6 +424,17 @@ export class EnrollmentFormComponent implements OnInit {
     const courseId = this.selectedCourseId();
     if (!courseId) return [];
     return this.classes().filter(c => c.courseId === courseId);
+  });
+
+  filteredMasters = computed(() => {
+    const branchId = this.selectedBranchId();
+    if (!branchId) return [];
+    return this.masters().filter(m => m.isActive && m.branchId === branchId);
+  });
+
+  showPricingBlock = computed(() => {
+    if (this.enrollmentType() === 'MASTER') return !!this.selectedMaster();
+    return !!this.selectedCourse() && !this.coverage()?.covered;
   });
 
   enrollmentStatuses = [
@@ -313,6 +450,7 @@ export class EnrollmentFormComponent implements OnInit {
       branchId: ['', [Validators.required]],
       courseId: ['', [Validators.required]],
       classId: ['', [Validators.required]],
+      masterCourseId: [''],
       enrollmentDate: [new Date(), [Validators.required]],
       status: [EnrollmentStatus.ACTIVE, [Validators.required]],
       discountType: ['none'],
@@ -330,6 +468,8 @@ export class EnrollmentFormComponent implements OnInit {
     const classId = this.route.snapshot.queryParamMap.get('classId');
     const courseId = this.route.snapshot.queryParamMap.get('courseId');
     const branchId = this.route.snapshot.queryParamMap.get('branchId');
+    const typeParam = (this.route.snapshot.queryParamMap.get('type') || '').toUpperCase();
+    if (typeParam === 'MASTER') this.setEnrollmentType('MASTER');
 
     this.loadData().then(() => {
       if (branchId) {
@@ -350,7 +490,11 @@ export class EnrollmentFormComponent implements OnInit {
       }
       if (studentId) {
         this.enrollmentForm.patchValue({ studentId });
-        if (!branchId) this.autoSelectStudentBranch(studentId);
+        // When opened from a student page, lock the branch to that student's branch.
+        // The student can only enroll in courses/masters at their own branch.
+        this.studentLocked.set(true);
+        this.enrollmentForm.get('studentId')?.disable({ emitEvent: false });
+        this.autoSelectStudentBranch(studentId, true);
       }
     });
 
@@ -373,12 +517,16 @@ export class EnrollmentFormComponent implements OnInit {
     );
   }
 
-  autoSelectStudentBranch(studentId: string) {
+  autoSelectStudentBranch(studentId: string, lock = false) {
     this.studentService.getStudentById(studentId).subscribe({
       next: (student) => {
         if (student.branchId) {
           this.enrollmentForm.patchValue({ branchId: student.branchId });
           this.selectedBranchId.set(student.branchId);
+          if (lock) {
+            this.studentBranchName.set(this.branches().find(b => b.id === student.branchId)?.name || '');
+            this.enrollmentForm.get('branchId')?.disable({ emitEvent: false });
+          }
         }
       }
     });
@@ -387,10 +535,11 @@ export class EnrollmentFormComponent implements OnInit {
   loadData(): Promise<void> {
     return new Promise((resolve) => {
       let loaded = 0;
-      const check = () => { if (++loaded === 4) resolve(); };
+      const check = () => { if (++loaded === 5) resolve(); };
       this.branchService.getActiveBranches().subscribe({ next: (b) => { this.branches.set(b); check(); }, error: () => check() });
       this.courseService.getAllCourses().subscribe({ next: (c) => { this.courses.set(c.filter(x => x.isActive)); check(); }, error: () => check() });
       this.classService.getAllClasses().subscribe({ next: (c) => { this.classes.set(c.filter(x => x.isActive)); check(); }, error: () => check() });
+      this.masterCourseService.getAll().subscribe({ next: (m) => { this.masters.set(m); check(); }, error: () => check() });
       this.studentService.getAllStudents().subscribe({
         next: (s) => { this.students.set(s.filter(x => x.isActive).map(x => ({ ...x, fullName: `${x.firstName} ${x.lastName}` }))); check(); },
         error: () => check()
@@ -442,12 +591,84 @@ export class EnrollmentFormComponent implements OnInit {
 
   onBranchChange() {
     this.selectedBranchId.set(this.enrollmentForm.get('branchId')?.value || null);
-    this.enrollmentForm.patchValue({ courseId: '', classId: '' });
+    this.enrollmentForm.patchValue({ courseId: '', classId: '', masterCourseId: '' });
     this.selectedCourseId.set(null);
     this.selectedCourse.set(null);
+    this.selectedMaster.set(null);
+    this.linkedCourseCount.set(0);
+    this.duplicateMaster.set(false);
     this.setPrices(0, 0, 0, 0);
     this.discountTypeSig.set('none');
     this.enrollmentForm.patchValue({ discountType: 'none' });
+  }
+
+  setEnrollmentType(t: EnrollmentType) {
+    if (this.isEditMode()) return;
+    this.enrollmentType.set(t);
+    // Re-wire validators based on the chosen path.
+    const courseCtl = this.enrollmentForm.get('courseId');
+    const classCtl = this.enrollmentForm.get('classId');
+    const masterCtl = this.enrollmentForm.get('masterCourseId');
+    if (t === 'MASTER') {
+      courseCtl?.clearValidators();
+      classCtl?.clearValidators();
+      masterCtl?.setValidators([Validators.required]);
+      // Reset course fields and coverage state.
+      this.enrollmentForm.patchValue({ courseId: '', classId: '' });
+      this.selectedCourseId.set(null);
+      this.selectedCourse.set(null);
+      this.setPrices(0, 0, 0, 0);
+      this.coverage.set(null);
+    } else {
+      masterCtl?.clearValidators();
+      this.enrollmentForm.patchValue({ masterCourseId: '' });
+      this.selectedMaster.set(null);
+      this.linkedCourseCount.set(0);
+      this.duplicateMaster.set(false);
+      courseCtl?.setValidators([Validators.required]);
+      classCtl?.setValidators([Validators.required]);
+    }
+    courseCtl?.updateValueAndValidity({ emitEvent: false });
+    classCtl?.updateValueAndValidity({ emitEvent: false });
+    masterCtl?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  onMasterCourseChange() {
+    const id: string | null = this.enrollmentForm.get('masterCourseId')?.value || null;
+    if (!id) {
+      this.selectedMaster.set(null);
+      this.linkedCourseCount.set(0);
+      this.duplicateMaster.set(false);
+      this.setPrices(0, 0, 0, 0);
+      this.discountTypeSig.set('none');
+      this.enrollmentForm.patchValue({ discountType: 'none' });
+      return;
+    }
+    const m = this.masters().find((x) => x.id === id) || null;
+    this.selectedMaster.set(m);
+    if (m) {
+      this.setPrices(m.defaultPrice, 0, 0, m.defaultPrice);
+      this.discountTypeSig.set('none');
+      this.enrollmentForm.patchValue({ discountType: 'none' });
+    }
+
+    // Fetch linked courses count for the bundle info banner.
+    this.masterCourseService.getLinkedCourses(id).subscribe({
+      next: (rows) => this.linkedCourseCount.set(rows.length),
+      error: () => this.linkedCourseCount.set(0),
+    });
+
+    // Check if this student already has an active master enrollment for this master.
+    const studentId = this.enrollmentForm.get('studentId')?.value;
+    this.duplicateMaster.set(false);
+    if (studentId) {
+      this.masterEnrollmentService.getByStudent(studentId).subscribe({
+        next: (list) => {
+          const dup = list.some((e) => e.masterCourseId === id && e.status === 'ACTIVE');
+          this.duplicateMaster.set(dup);
+        },
+      });
+    }
   }
 
   onCourseChange() {
@@ -462,6 +683,21 @@ export class EnrollmentFormComponent implements OnInit {
         this.setPrices(course.price, 0, 0, course.price);
       }
     }
+    this.checkCoverage();
+  }
+
+  onStudentChange() {
+    this.checkCoverage();
+  }
+
+  checkCoverage() {
+    const studentId = this.enrollmentForm.get('studentId')?.value;
+    const courseId = this.enrollmentForm.get('courseId')?.value;
+    this.coverage.set(null);
+    if (!studentId || !courseId || this.isEditMode()) return;
+    this.masterEnrollmentService.checkCoverage(studentId, courseId).subscribe({
+      next: (info) => this.coverage.set(info),
+    });
   }
 
   setDiscountType(type: 'none' | 'percentage' | 'amount' | 'direct') {
@@ -503,9 +739,44 @@ export class EnrollmentFormComponent implements OnInit {
       this.enrollmentForm.markAllAsTouched();
       return;
     }
-    this.loading.set(true);
-    const v = this.enrollmentForm.value;
+    const v = this.enrollmentForm.getRawValue();
 
+    if (!this.isEditMode() && this.enrollmentType() === 'MASTER') {
+      if (this.duplicateMaster()) {
+        this.notificationService.error('Student already has an active enrollment in this master course');
+        return;
+      }
+      this.loading.set(true);
+      const finalPrice = this.finalPriceSig();
+      const paymentMode: 'FULL' | 'INSTALLMENTS' = v.paymentMode === 'INSTALLMENTS' ? 'INSTALLMENTS' : 'FULL';
+      const downPayment = paymentMode === 'INSTALLMENTS' ? (v.downPayment || 0) : 0;
+      const amountPaid = paymentMode === 'FULL' ? finalPrice : downPayment;
+      this.masterEnrollmentService.create({
+        studentId: v.studentId,
+        masterCourseId: v.masterCourseId,
+        enrollmentDate: this.formatDate(v.enrollmentDate),
+        originalPrice: this.originalPriceSig(),
+        discountPercent: this.discountPercentSig(),
+        discountAmount: this.discountAmountSig(),
+        finalPrice,
+        paymentMode,
+        downPayment,
+        amountPaid,
+        notes: v.notes || undefined,
+      }).subscribe({
+        next: () => {
+          this.notificationService.success('Student enrolled in master course bundle');
+          this.router.navigate(['/students', v.studentId]);
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.notificationService.error(err?.error?.message || 'Failed to enroll in master course');
+        },
+      });
+      return;
+    }
+
+    this.loading.set(true);
     const enrollmentData = {
       studentId: v.studentId,
       classId: v.classId,

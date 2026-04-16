@@ -42,7 +42,8 @@ export interface AddPaymentDto {
 
 export interface Refund {
   id: string;
-  enrollmentId: string;
+  enrollmentId: string | null;
+  masterEnrollmentId: string | null;
   companyId: string;
   studentId: string;
   amount: number;

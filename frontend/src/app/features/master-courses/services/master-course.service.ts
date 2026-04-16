@@ -6,12 +6,15 @@ import {
   MasterCourseCreateDto,
   MasterCourseUpdateDto,
   LinkedCourseSummary,
-  ApplyMasterCourseDto,
-  ApplyMasterCourseResult,
-  InstantiateMasterCourseDto,
-  InstantiateMasterCourseResult,
-  CloneMasterCourseDto,
 } from '@shared/interfaces/master-course.interface';
+
+export interface AvailableCourse {
+  id: string;
+  name: string;
+  code: string;
+  price: number;
+  duration: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class MasterCourseService {
@@ -29,6 +32,10 @@ export class MasterCourseService {
     return this.api.get<LinkedCourseSummary[]>(`master-courses/${id}/linked-courses`);
   }
 
+  getAvailableCourses(id: string): Observable<AvailableCourse[]> {
+    return this.api.get<AvailableCourse[]>(`master-courses/${id}/available-courses`);
+  }
+
   create(dto: MasterCourseCreateDto): Observable<MasterCourse> {
     return this.api.post<MasterCourse>('master-courses', dto);
   }
@@ -41,15 +48,11 @@ export class MasterCourseService {
     return this.api.delete<{ message: string }>(`master-courses/${id}`);
   }
 
-  apply(id: string, dto: ApplyMasterCourseDto): Observable<ApplyMasterCourseResult> {
-    return this.api.post<ApplyMasterCourseResult>(`master-courses/${id}/apply`, dto);
+  addCourse(id: string, courseId: string): Observable<{ message: string }> {
+    return this.api.post<{ message: string }>(`master-courses/${id}/courses`, { courseId });
   }
 
-  instantiate(id: string, dto: InstantiateMasterCourseDto): Observable<InstantiateMasterCourseResult> {
-    return this.api.post<InstantiateMasterCourseResult>(`master-courses/${id}/instantiate`, dto);
-  }
-
-  clone(id: string, dto: CloneMasterCourseDto): Observable<MasterCourse> {
-    return this.api.post<MasterCourse>(`master-courses/${id}/clone`, dto);
+  removeCourse(id: string, courseId: string): Observable<{ message: string }> {
+    return this.api.delete<{ message: string }>(`master-courses/${id}/courses/${courseId}`);
   }
 }

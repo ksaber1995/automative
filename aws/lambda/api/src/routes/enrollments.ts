@@ -48,10 +48,41 @@ export const enrollmentsRoutes = {
         };
       }
 
-      const paymentMode = body.paymentMode || 'FULL';
-      const downPayment = body.downPayment || 0;
-      const amountPaid = paymentMode === 'FULL' ? body.finalPrice : downPayment;
-      const paymentStatus = computePaymentStatus(body.finalPrice, amountPaid);
+      // Check if this course is covered by an active master enrollment for
+      // the student. If yes, the enrollment is free.
+      const coverage = await queryOne(
+        `SELECT me.id AS master_enrollment_id
+         FROM master_enrollments me
+         INNER JOIN courses c ON c.master_course_id = me.master_course_id
+         WHERE me.company_id = $1 AND me.student_id = $2
+           AND me.status = 'ACTIVE' AND c.id = $3
+         LIMIT 1`,
+        [context.companyId, body.studentId, body.courseId]
+      );
+
+      let paymentMode = body.paymentMode || 'FULL';
+      let downPayment = body.downPayment || 0;
+      let originalPrice = body.originalPrice;
+      let discountPercent = body.discountPercent || 0;
+      let discountAmount = body.discountAmount || 0;
+      let finalPrice = body.finalPrice;
+      let amountPaid = paymentMode === 'FULL' ? finalPrice : downPayment;
+      let notes = body.notes || null;
+      const masterEnrollmentId = coverage?.master_enrollment_id || null;
+
+      if (masterEnrollmentId) {
+        paymentMode = 'FULL';
+        downPayment = 0;
+        originalPrice = 0;
+        discountPercent = 0;
+        discountAmount = 0;
+        finalPrice = 0;
+        amountPaid = 0;
+        const tag = '[Covered by master course bundle]';
+        notes = notes ? `${tag} ${notes}` : tag;
+      }
+
+      const paymentStatus = computePaymentStatus(finalPrice, amountPaid);
 
       const enrollment = await insert('enrollments', {
         company_id: context.companyId,
@@ -61,19 +92,20 @@ export const enrollmentsRoutes = {
         branch_id: body.branchId,
         enrollment_date: body.enrollmentDate,
         status: body.status,
-        original_price: body.originalPrice,
-        discount_percent: body.discountPercent || 0,
-        discount_amount: body.discountAmount || 0,
-        final_price: body.finalPrice,
+        original_price: originalPrice,
+        discount_percent: discountPercent,
+        discount_amount: discountAmount,
+        final_price: finalPrice,
         payment_mode: paymentMode,
         down_payment: downPayment,
         amount_paid: amountPaid,
         payment_status: paymentStatus,
         completion_date: null,
-        notes: body.notes || null,
+        notes,
+        master_enrollment_id: masterEnrollmentId,
       });
 
-      // If there's a down payment or full payment, record it
+      // Only record a payment row if money actually changed hands.
       if (amountPaid > 0) {
         await insert('enrollment_payments', {
           enrollment_id: enrollment.id,

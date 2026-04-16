@@ -15,7 +15,6 @@ export class ProductService {
 
   getAllProducts(params?: {
     branchId?: string;
-    isGlobal?: boolean;
     category?: string;
     isActive?: boolean;
   }): Observable<Product[]> {

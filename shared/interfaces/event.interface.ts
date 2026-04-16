@@ -12,7 +12,6 @@ export interface EventModel {
   location: string | null;
   startDate: string | null;
   endDate: string | null;
-  budget: number | null;
   status: EventStatus | string;
   isActive: boolean;
   createdAt: string;
@@ -28,7 +27,6 @@ export interface EventCreateDto {
   location?: string;
   startDate?: string;
   endDate?: string;
-  budget?: number;
   status?: EventStatus;
 }
 
@@ -49,5 +47,4 @@ export interface EventPL {
   productMargin: number;
   productSaleCount: number;
   netProfit: number;
-  budget: number | null;
 }

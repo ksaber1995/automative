@@ -107,19 +107,6 @@ import { Branch } from '@shared/interfaces/branch.interface';
 
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ 'EVENTS.FORM.BUDGET' | translate }}
-                </label>
-                <p-inputnumber
-                  formControlName="budget"
-                  mode="currency"
-                  currency="USD"
-                  [min]="0"
-                  [style]="{ width: '100%' }"
-                ></p-inputnumber>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
                   {{ 'EVENTS.FORM.START_DATE' | translate }}
                 </label>
                 <p-datepicker
@@ -211,7 +198,6 @@ export class EventFormComponent implements OnInit {
       status: ['PLANNED'],
       branchId: [null],
       location: [''],
-      budget: [null],
       startDate: [null],
       endDate: [null],
       description: [''],
@@ -241,7 +227,6 @@ export class EventFormComponent implements OnInit {
           status: row.status,
           branchId: row.branchId,
           location: row.location || '',
-          budget: row.budget,
           startDate: row.startDate ? new Date(row.startDate) : null,
           endDate: row.endDate ? new Date(row.endDate) : null,
           description: row.description || '',
@@ -269,7 +254,6 @@ export class EventFormComponent implements OnInit {
       status: v.status,
       branchId: v.branchId || undefined,
       location: v.location?.trim() || undefined,
-      budget: v.budget ?? undefined,
       startDate: v.startDate ? this.toIsoDate(v.startDate) : undefined,
       endDate: v.endDate ? this.toIsoDate(v.endDate) : undefined,
       description: v.description?.trim() || undefined,
