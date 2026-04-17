@@ -9,6 +9,24 @@ import {
 
 type AuthHeaders = { authorization: string };
 
+let paymentsTableReady = false;
+async function ensurePaymentsTable() {
+  if (paymentsTableReady) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS master_enrollment_payments (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      master_enrollment_id UUID NOT NULL REFERENCES master_enrollments(id) ON DELETE CASCADE,
+      company_id UUID NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      payment_date DATE NOT NULL,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_mep_me_id ON master_enrollment_payments(master_enrollment_id)`);
+  paymentsTableReady = true;
+}
+
 function mapRow(row: any) {
   return {
     id: row.id,
@@ -379,6 +397,105 @@ export const masterEnrollmentsRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
         body: { message: error.message || 'Failed to create refund' },
+      };
+    }
+  },
+
+  getPayments: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      await ensurePaymentsTable();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+      const me = await queryOne(
+        'SELECT branch_id FROM master_enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!canAccessBranch(context, me.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied' } };
+      }
+      const rows = await query(
+        `SELECT * FROM master_enrollment_payments
+         WHERE master_enrollment_id = $1 AND company_id = $2
+         ORDER BY payment_date ASC, created_at ASC`,
+        [params.id, context.companyId]
+      );
+      return {
+        status: 200 as const,
+        body: rows.map((p: any) => ({
+          id: p.id,
+          enrollmentId: null,
+          masterEnrollmentId: p.master_enrollment_id,
+          companyId: p.company_id,
+          amount: parseFloat(p.amount),
+          paymentDate: p.payment_date,
+          notes: p.notes,
+          createdAt: p.created_at,
+        })),
+      };
+    } catch (error: any) {
+      return { status: 500 as const, body: { message: error.message || 'Failed to get payments' } };
+    }
+  },
+
+  addPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: AuthHeaders }) => {
+    try {
+      await ensurePaymentsTable();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+      const me = await queryOne(
+        'SELECT * FROM master_enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!canAccessBranch(context, me.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied' } };
+      }
+
+      const currentAmountPaid = parseFloat(me.amount_paid || '0');
+      const finalPrice = parseFloat(me.final_price || '0');
+      const remaining = finalPrice - currentAmountPaid;
+      const amount = parseFloat(body.amount);
+      if (amount > remaining + 0.001) {
+        return { status: 400 as const, body: { message: `Payment exceeds remaining balance (${remaining.toFixed(2)})` } };
+      }
+
+      const payment = await insert('master_enrollment_payments', {
+        master_enrollment_id: params.id,
+        company_id: context.companyId,
+        amount,
+        payment_date: body.paymentDate,
+        notes: body.notes || null,
+      });
+
+      const newAmountPaid = currentAmountPaid + amount;
+      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid);
+      await query(
+        'UPDATE master_enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
+        [newAmountPaid, newPaymentStatus, params.id]
+      );
+
+      return {
+        status: 201 as const,
+        body: {
+          id: payment.id,
+          enrollmentId: null,
+          masterEnrollmentId: payment.master_enrollment_id,
+          companyId: payment.company_id,
+          amount: parseFloat(payment.amount),
+          paymentDate: payment.payment_date,
+          notes: payment.notes,
+          createdAt: payment.created_at,
+        },
+      };
+    } catch (error: any) {
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
+        body: { message: error.message || 'Failed to add payment' },
       };
     }
   },

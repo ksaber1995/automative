@@ -6,7 +6,7 @@ import {
   MasterEnrollmentProgress,
   MasterEnrollmentCreateDto,
 } from '@shared/interfaces/master-enrollment.interface';
-import { Refund, CreateRefundDto } from '@shared/interfaces/enrollment.interface';
+import { Refund, CreateRefundDto, EnrollmentPayment, AddPaymentDto } from '@shared/interfaces/enrollment.interface';
 
 export interface CoverageInfo {
   covered: boolean;
@@ -49,5 +49,13 @@ export class MasterEnrollmentService {
 
   listByMaster(masterCourseId: string): Observable<MasterEnrollmentProgress[]> {
     return this.api.get<MasterEnrollmentProgress[]>(`master-courses/${masterCourseId}/enrollments`);
+  }
+
+  getPayments(id: string): Observable<EnrollmentPayment[]> {
+    return this.api.get<EnrollmentPayment[]>(`master-enrollments/${id}/payments`);
+  }
+
+  addPayment(id: string, dto: AddPaymentDto): Observable<EnrollmentPayment> {
+    return this.api.post<EnrollmentPayment>(`master-enrollments/${id}/payments`, dto);
   }
 }

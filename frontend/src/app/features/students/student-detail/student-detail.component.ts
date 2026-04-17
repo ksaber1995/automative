@@ -18,11 +18,13 @@ import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
+import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
+import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
 
 @Component({
   selector: 'app-student-detail',
@@ -51,6 +53,7 @@ export class StudentDetailComponent implements OnInit {
   private enrollmentService = inject(EnrollmentService);
   private courseService = inject(CourseService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
+  private masterCourseService = inject(MasterCourseService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -62,10 +65,27 @@ export class StudentDetailComponent implements OnInit {
   loading = signal(true);
   studentId: string | null = null;
 
-  // Expandable rows
+  // Expandable rows (course enrollments)
   expandedRows: { [key: string]: boolean } = {};
   paymentHistoryMap = signal<Map<string, EnrollmentPayment[]>>(new Map());
   refundHistoryMap = signal<Map<string, Refund[]>>(new Map());
+
+  // Expandable rows (master enrollments → linked courses + payment history)
+  expandedMasterRows: { [key: string]: boolean } = {};
+  linkedCoursesMap = signal<Map<string, LinkedCourseSummary[]>>(new Map());
+  masterPaymentHistoryMap = signal<Map<string, EnrollmentPayment[]>>(new Map());
+
+  // Master payment dialog
+  showMasterPaymentDialog = false;
+  masterDialogPaymentAmount: number | null = null;
+  masterDialogPaymentDate: Date = new Date();
+  masterDialogPaymentNotes = '';
+
+  masterPaymentRemaining = computed(() => {
+    const me = this.masterEnrollmentForAction();
+    if (!me) return 0;
+    return Math.max(0, me.finalPrice - (me.amountPaid || 0));
+  });
 
   // Action state
   enrollmentForAction = signal<Enrollment | null>(null);
@@ -357,6 +377,85 @@ export class StudentDetailComponent implements OnInit {
         this.actionLoading.set(false);
         this.notificationService.error(err?.error?.message || 'Failed to issue refund');
       }
+    });
+  }
+
+  // ─── Bundle course expansion ──────────────────────────────────────────────────
+
+  onMasterRowExpand(event: { data: MasterEnrollmentProgress }) {
+    this.loadLinkedCoursesIfNeeded(event.data.masterCourseId);
+    this.loadMasterPaymentHistory(event.data.id);
+  }
+
+  private loadLinkedCoursesIfNeeded(masterCourseId: string) {
+    if (this.linkedCoursesMap().has(masterCourseId)) return;
+    this.masterCourseService.getLinkedCourses(masterCourseId).subscribe({
+      next: (courses) => {
+        const map = new Map(this.linkedCoursesMap());
+        map.set(masterCourseId, courses);
+        this.linkedCoursesMap.set(map);
+      },
+    });
+  }
+
+  getLinkedCourses(masterCourseId: string): LinkedCourseSummary[] {
+    return this.linkedCoursesMap().get(masterCourseId) || [];
+  }
+
+  getBundleCourseStatus(courseId: string): string | null {
+    const found = this.enrollments().find(e => e.courseId === courseId);
+    return found?.status ?? null;
+  }
+
+  joinBundleCourse(courseId: string) {
+    this.router.navigate(['/enrollments/create'], {
+      queryParams: { studentId: this.studentId, courseId },
+    });
+  }
+
+  loadMasterPaymentHistory(masterEnrollmentId: string) {
+    this.masterEnrollmentService.getPayments(masterEnrollmentId).subscribe({
+      next: (payments) => {
+        const map = new Map(this.masterPaymentHistoryMap());
+        map.set(masterEnrollmentId, payments);
+        this.masterPaymentHistoryMap.set(map);
+      },
+    });
+  }
+
+  getMasterPaymentHistory(masterEnrollmentId: string): EnrollmentPayment[] {
+    return this.masterPaymentHistoryMap().get(masterEnrollmentId) || [];
+  }
+
+  openMasterPaymentDialog(me: MasterEnrollmentProgress) {
+    this.masterEnrollmentForAction.set(me);
+    this.masterDialogPaymentAmount = null;
+    this.masterDialogPaymentDate = new Date();
+    this.masterDialogPaymentNotes = '';
+    this.showMasterPaymentDialog = true;
+  }
+
+  submitMasterPayment() {
+    const me = this.masterEnrollmentForAction();
+    if (!me || !this.masterDialogPaymentAmount || !this.masterDialogPaymentDate) return;
+    this.actionLoading.set(true);
+    const dateStr = this.masterDialogPaymentDate.toISOString().split('T')[0];
+    this.masterEnrollmentService.addPayment(me.id, {
+      amount: this.masterDialogPaymentAmount,
+      paymentDate: dateStr,
+      notes: this.masterDialogPaymentNotes || undefined,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success('Payment recorded successfully');
+        this.showMasterPaymentDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadMasterEnrollments(this.studentId);
+        this.loadMasterPaymentHistory(me.id);
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to record payment');
+        this.actionLoading.set(false);
+      },
     });
   }
 

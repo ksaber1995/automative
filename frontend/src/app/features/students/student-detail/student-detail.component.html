@@ -99,9 +99,12 @@
       @if (masterEnrollments().length === 0) {
         <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_MASTER_ENROLLMENTS' | translate }}</div>
       } @else {
-        <p-table [value]="masterEnrollments()" responsiveLayout="scroll">
+        <p-table [value]="masterEnrollments()" responsiveLayout="scroll"
+          [expandedRowKeys]="expandedMasterRows" dataKey="id"
+          (onRowExpand)="onMasterRowExpand($event)">
           <ng-template pTemplate="header">
             <tr>
+              <th style="width: 3rem"></th>
               <th>{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }}</th>
               <th>{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }}</th>
               <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
@@ -110,8 +113,18 @@
               <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
-          <ng-template pTemplate="body" let-me>
+          <ng-template pTemplate="body" let-me let-expanded="expanded">
             <tr>
+              <td>
+                <p-button
+                  [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="secondary"
+                  [pRowToggler]="me"
+                  [pTooltip]="expanded ? 'Hide courses' : 'View courses'"
+                ></p-button>
+              </td>
               <td>
                 <div class="font-medium">{{ me.masterCourseName }}</div>
                 <div class="text-xs text-gray-500 font-mono">{{ me.masterCourseCode }}</div>
@@ -147,7 +160,17 @@
                 ></p-tag>
               </td>
               <td>
-                <div class="flex gap-1">
+                <div class="flex gap-1 flex-wrap">
+                  @if (me.status === 'ACTIVE' && me.paymentMode === 'INSTALLMENTS' && me.paymentStatus !== 'PAID') {
+                    <p-button
+                      icon="pi pi-wallet"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="success"
+                      (onClick)="openMasterPaymentDialog(me)"
+                      pTooltip="Record installment payment"
+                    ></p-button>
+                  }
                   @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
                     <p-button
                       icon="pi pi-undo"
@@ -167,6 +190,138 @@
                       (onClick)="cancelMasterEnrollment(me)"
                       [pTooltip]="'STUDENTS.DETAIL.CANCEL_MASTER' | translate"
                     ></p-button>
+                  }
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="expandedrow" let-me>
+            <tr>
+              <td colspan="7" class="p-0">
+                <div class="px-6 py-4 bg-purple-50/50 border-t border-purple-100">
+
+                  <!-- Installment payment history -->
+                  @if (me.paymentMode === 'INSTALLMENTS') {
+                    <div class="mb-5">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i class="pi pi-credit-card text-green-600"></i>
+                        <span class="font-semibold text-gray-700 text-sm">Installment Payments</span>
+                        <span class="text-xs text-gray-400">
+                          {{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }} paid
+                        </span>
+                        @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
+                          <span class="text-xs text-red-500 font-medium ml-1">
+                            · {{ (me.finalPrice - me.amountPaid).toFixed(2) }} remaining
+                          </span>
+                        }
+                      </div>
+
+                      <div class="space-y-1.5">
+                        @for (p of getMasterPaymentHistory(me.id); track p.id) {
+                          <div class="flex items-center justify-between bg-white border border-green-100 rounded-lg px-3 py-2 text-sm">
+                            <div class="flex items-center gap-2">
+                              <i class="pi pi-check-circle text-green-500 text-xs"></i>
+                              <span class="font-semibold text-green-700">+{{ p.amount.toFixed(2) }}</span>
+                              @if (p.notes) {
+                                <span class="text-xs text-gray-400">{{ p.notes }}</span>
+                              }
+                            </div>
+                            <span class="text-xs text-gray-400">{{ formatDate(p.paymentDate) }}</span>
+                          </div>
+                        }
+                        @if (getMasterPaymentHistory(me.id).length === 0) {
+                          <p class="text-xs text-gray-400 italic">No payments recorded yet.</p>
+                        }
+                        @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
+                          <div class="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-sm">
+                            <span class="text-red-500 text-xs font-medium">Remaining balance</span>
+                            <span class="font-bold text-red-600">{{ (me.finalPrice - me.amountPaid).toFixed(2) }}</span>
+                          </div>
+                        }
+                      </div>
+                      <p-progressBar
+                        [value]="me.finalPrice > 0 ? (me.amountPaid / me.finalPrice) * 100 : 0"
+                        [showValue]="false"
+                        [style]="{ height: '4px', marginTop: '8px' }"
+                      ></p-progressBar>
+                    </div>
+                  }
+
+                  <div class="flex items-center gap-2 mb-4">
+                    <i class="pi pi-book text-purple-600"></i>
+                    <h4 class="font-semibold text-purple-900 text-sm">
+                      Courses in <span class="font-bold">{{ me.masterCourseName }}</span>
+                    </h4>
+                    <span class="text-xs text-purple-500 bg-purple-100 rounded-full px-2 py-0.5">
+                      {{ me.completedCourses }}/{{ me.totalCourses }} completed
+                    </span>
+                  </div>
+
+                  @if (getLinkedCourses(me.masterCourseId).length === 0) {
+                    <div class="flex items-center gap-2 text-sm text-gray-400 py-2">
+                      <i class="pi pi-spin pi-spinner"></i> Loading courses…
+                    </div>
+                  } @else {
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      @for (course of getLinkedCourses(me.masterCourseId); track course.id) {
+                        @let status = getBundleCourseStatus(course.id);
+                        <div class="flex items-center justify-between bg-white rounded-xl border px-4 py-3 gap-3"
+                             [class.border-green-200]="status === 'ACTIVE'"
+                             [class.border-blue-200]="status === 'COMPLETED'"
+                             [class.border-gray-100]="!status || status === 'DROPPED'">
+
+                          <!-- Course icon + info -->
+                          <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center text-lg"
+                                 [class.bg-green-100]="status === 'ACTIVE'"
+                                 [class.bg-blue-100]="status === 'COMPLETED'"
+                                 [class.bg-gray-100]="!status || status === 'DROPPED'">
+                              @if (status === 'COMPLETED') { ✅ }
+                              @else if (status === 'ACTIVE') { 🟢 }
+                              @else { ⚪ }
+                            </div>
+                            <div class="min-w-0">
+                              <div class="font-medium text-sm text-gray-900 truncate">{{ course.name }}</div>
+                              <div class="text-xs text-gray-400 font-mono">{{ course.code }}</div>
+                            </div>
+                          </div>
+
+                          <!-- Status + action -->
+                          <div class="flex items-center gap-2 flex-shrink-0">
+                            @if (status === 'ACTIVE') {
+                              <p-tag value="Active" severity="success" styleClass="text-xs"></p-tag>
+                            } @else if (status === 'COMPLETED') {
+                              <p-tag value="Completed" severity="info" styleClass="text-xs"></p-tag>
+                            } @else if (status === 'DROPPED') {
+                              <p-tag value="Dropped" severity="danger" styleClass="text-xs"></p-tag>
+                              @if (me.status === 'ACTIVE') {
+                                <p-button
+                                  icon="pi pi-user-plus"
+                                  label="Re-join"
+                                  size="small"
+                                  severity="help"
+                                  [outlined]="true"
+                                  (onClick)="joinBundleCourse(course.id)"
+                                ></p-button>
+                              }
+                            } @else {
+                              <p-tag value="Not Enrolled" severity="secondary" styleClass="text-xs"></p-tag>
+                              @if (me.status === 'ACTIVE') {
+                                <p-button
+                                  icon="pi pi-user-plus"
+                                  label="Join"
+                                  size="small"
+                                  severity="help"
+                                  [outlined]="true"
+                                  (onClick)="joinBundleCourse(course.id)"
+                                ></p-button>
+                              }
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
                   }
                 </div>
               </td>
@@ -327,7 +482,7 @@
         </ng-template>
 
         <!-- Expanded row: payment history -->
-        <ng-template pTemplate="expansion" let-enrollment>
+        <ng-template pTemplate="expandedrow" let-enrollment>
           <tr>
             <td colspan="9">
               <div class="p-4 bg-gray-50">
@@ -500,6 +655,49 @@
     <p-button [label]="'STUDENTS.DETAIL.ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn" [loading]="actionLoading()"
       [disabled]="!refundAmount || !refundDate"
       (onClick)="submitRefund()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Master enrollment payment dialog -->
+<p-dialog
+  [(visible)]="showMasterPaymentDialog"
+  [modal]="true"
+  header="Record Installment Payment"
+  [style]="{ width: '420px' }"
+>
+  @if (masterEnrollmentForAction(); as me) {
+    <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm grid grid-cols-2 gap-2">
+      <div class="col-span-2 font-semibold text-purple-900">🎁 {{ me.masterCourseName }}</div>
+      <div><span class="text-gray-500">Total price</span> <strong>{{ me.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">Paid so far</span> <strong class="text-green-600">{{ me.amountPaid.toFixed(2) }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">Remaining</span> <strong class="text-red-600">{{ masterPaymentRemaining().toFixed(2) }}</strong></div>
+    </div>
+  }
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+      <p-inputnumber
+        [(ngModel)]="masterDialogPaymentAmount"
+        [min]="0.01"
+        [max]="masterPaymentRemaining()"
+        placeholder="Enter payment amount"
+        [style]="{ width: '100%' }"
+      />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+      <p-datepicker [(ngModel)]="masterDialogPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Notes</label>
+      <textarea pTextarea [(ngModel)]="masterDialogPaymentNotes" rows="2" class="w-full" placeholder="Optional notes..."></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showMasterPaymentDialog = false"></p-button>
+    <p-button label="Record Payment" icon="pi pi-check" severity="success" [loading]="actionLoading()"
+      [disabled]="!masterDialogPaymentAmount || !masterDialogPaymentDate"
+      (onClick)="submitMasterPayment()"></p-button>
   </ng-template>
 </p-dialog>
 

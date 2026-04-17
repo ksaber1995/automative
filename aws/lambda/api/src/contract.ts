@@ -560,6 +560,7 @@ const DueEnrollmentSchema = z.object({
   remaining: z.number(),
   paymentStatus: PaymentStatusSchema,
   status: EnrollmentStatusSchema,
+  type: z.enum(['ENROLLMENT', 'MASTER_ENROLLMENT']),
 });
 
 const RefundSchema = z.object({
@@ -1324,6 +1325,27 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getPayments: {
+      method: 'GET',
+      path: '/api/master-enrollments/:id/payments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+    },
+    addPayment: {
+      method: 'POST',
+      path: '/api/master-enrollments/:id/payments',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        amount: z.number(),
+        paymentDate: z.string(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },

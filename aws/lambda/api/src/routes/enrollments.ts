@@ -310,54 +310,73 @@ export const enrollmentsRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      const conditions: string[] = ['e.company_id = $1', "e.payment_mode = 'INSTALLMENTS'", "e.payment_status != 'PAID'", "e.status != 'DROPPED'"];
-      const params: any[] = [context.companyId];
-      let idx = 2;
-
-      if (q.branchId) {
-        if (!canAccessBranch(context, q.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
-        }
-        conditions.push(`e.branch_id = $${idx++}`);
-        params.push(q.branchId);
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        conditions.push(`e.branch_id = $${idx++}`);
-        params.push(context.branchId);
+      if (q.branchId && !canAccessBranch(context, q.branchId)) {
+        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
       }
+      const branchFilter = q.branchId || (!isGlobalAdmin(context) && context.branchId ? context.branchId : null);
 
-      const rows = await query(
-        `SELECT e.id, e.student_id, e.course_id, e.branch_id, e.enrollment_date,
-                e.final_price, e.amount_paid, e.payment_status, e.status,
-                s.first_name || ' ' || s.last_name AS student_name,
-                c.name AS course_name,
-                b.name AS branch_name
-         FROM enrollments e
-         JOIN students s ON e.student_id = s.id
-         JOIN courses c ON e.course_id = c.id
-         JOIN branches b ON e.branch_id = b.id
-         WHERE ${conditions.join(' AND ')}
-         ORDER BY e.enrollment_date DESC`,
-        params
-      );
+      const eConditions: string[] = ['e.company_id = $1', "e.payment_mode = 'INSTALLMENTS'", "e.payment_status != 'PAID'", "e.status != 'DROPPED'"];
+      const eParams: any[] = [context.companyId];
+      if (branchFilter) { eConditions.push(`e.branch_id = $2`); eParams.push(branchFilter); }
 
-      return {
-        status: 200 as const,
-        body: rows.map((r: any) => ({
-          id: r.id,
-          studentId: r.student_id,
-          studentName: r.student_name,
-          courseId: r.course_id,
-          courseName: r.course_name,
-          branchId: r.branch_id,
-          branchName: r.branch_name,
-          enrollmentDate: r.enrollment_date,
-          finalPrice: parseFloat(r.final_price),
-          amountPaid: parseFloat(r.amount_paid || 0),
-          remaining: Math.max(0, parseFloat(r.final_price) - parseFloat(r.amount_paid || 0)),
-          paymentStatus: r.payment_status,
-          status: r.status,
-        })),
-      };
+      const meConditions: string[] = ['me.company_id = $1', "me.payment_mode = 'INSTALLMENTS'", "me.payment_status != 'PAID'", "me.status != 'CANCELLED'"];
+      const meParams: any[] = [context.companyId];
+      if (branchFilter) { meConditions.push(`me.branch_id = $2`); meParams.push(branchFilter); }
+
+      const [enrollmentRows, masterRows] = await Promise.all([
+        query(
+          `SELECT e.id, e.student_id, e.course_id AS course_id, e.branch_id, e.enrollment_date,
+                  e.final_price, e.amount_paid, e.payment_status, e.status,
+                  s.first_name || ' ' || s.last_name AS student_name,
+                  c.name AS course_name,
+                  b.name AS branch_name
+           FROM enrollments e
+           JOIN students s ON e.student_id = s.id
+           JOIN courses c ON e.course_id = c.id
+           JOIN branches b ON e.branch_id = b.id
+           WHERE ${eConditions.join(' AND ')}
+           ORDER BY e.enrollment_date DESC`,
+          eParams
+        ),
+        query(
+          `SELECT me.id, me.student_id, me.master_course_id AS course_id, me.branch_id, me.enrollment_date,
+                  me.final_price, me.amount_paid, me.payment_status, me.status,
+                  s.first_name || ' ' || s.last_name AS student_name,
+                  mc.name AS course_name,
+                  b.name AS branch_name
+           FROM master_enrollments me
+           JOIN students s ON me.student_id = s.id
+           JOIN master_courses mc ON me.master_course_id = mc.id
+           JOIN branches b ON me.branch_id = b.id
+           WHERE ${meConditions.join(' AND ')}
+           ORDER BY me.enrollment_date DESC`,
+          meParams
+        ),
+      ]);
+
+      const mapRow = (r: any, type: 'ENROLLMENT' | 'MASTER_ENROLLMENT') => ({
+        id: r.id,
+        studentId: r.student_id,
+        studentName: r.student_name,
+        courseId: r.course_id,
+        courseName: r.course_name,
+        branchId: r.branch_id,
+        branchName: r.branch_name,
+        enrollmentDate: r.enrollment_date,
+        finalPrice: parseFloat(r.final_price),
+        amountPaid: parseFloat(r.amount_paid || 0),
+        remaining: Math.max(0, parseFloat(r.final_price) - parseFloat(r.amount_paid || 0)),
+        paymentStatus: r.payment_status,
+        status: r.status,
+        type,
+      });
+
+      const combined = [
+        ...enrollmentRows.map((r: any) => mapRow(r, 'ENROLLMENT')),
+        ...masterRows.map((r: any) => mapRow(r, 'MASTER_ENROLLMENT')),
+      ].sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime());
+
+      return { status: 200 as const, body: combined };
     } catch (error) {
       return { status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list dues' } };
     }

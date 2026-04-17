@@ -11,12 +11,14 @@ import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
 import { MasterCourseService, AvailableCourse } from '../services/master-course.service';
+import { MasterEnrollmentService } from '../services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import {
   MasterCourse,
   LinkedCourseSummary,
 } from '@shared/interfaces/master-course.interface';
+import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -162,6 +164,64 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         </p-table>
       </p-card>
 
+      <!-- Enrolled students -->
+      <p-card styleClass="mt-6">
+        <ng-template pTemplate="header">
+          <div class="px-6 py-4 border-b">
+            <h3 class="text-xl font-semibold">
+              Enrolled Students
+              <span class="text-sm font-normal text-gray-500 ml-2">({{ enrollments()?.length || 0 }})</span>
+            </h3>
+          </div>
+        </ng-template>
+
+        <p-table [value]="enrollments() || []" [loading]="loadingEnrollments()" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Student</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th class="text-center">Completed</th>
+              <th class="text-center">In Progress</th>
+              <th class="text-center">Pending</th>
+              <th class="text-center">Total</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-e>
+            <tr>
+              <td class="font-medium">{{ e.studentName }}</td>
+              <td>
+                <p-tag
+                  [value]="e.status"
+                  [severity]="e.status === 'ACTIVE' ? 'success' : e.status === 'COMPLETED' ? 'info' : 'danger'"
+                ></p-tag>
+              </td>
+              <td>
+                <p-tag
+                  [value]="e.paymentStatus"
+                  [severity]="e.paymentStatus === 'PAID' ? 'success' : e.paymentStatus === 'PARTIAL' ? 'warn' : 'danger'"
+                ></p-tag>
+              </td>
+              <td class="text-center">
+                <span class="text-green-700 font-semibold">{{ e.completedCourses }}</span>
+              </td>
+              <td class="text-center">
+                <span class="text-blue-700 font-semibold">{{ e.activeCourses }}</span>
+              </td>
+              <td class="text-center">
+                <span class="text-gray-500 font-semibold">{{ e.pendingCourses }}</span>
+              </td>
+              <td class="text-center font-semibold">{{ e.totalCourses }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="7" class="text-center py-6 text-gray-500">No students enrolled yet.</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+
       <!-- Add course dialog -->
       <p-dialog
         [(visible)]="showAddDialog"
@@ -221,6 +281,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class MasterCourseDetailComponent implements OnInit {
   private service = inject(MasterCourseService);
+  private enrollmentService = inject(MasterEnrollmentService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private notifications = inject(NotificationService);
@@ -237,6 +298,9 @@ export class MasterCourseDetailComponent implements OnInit {
   pickedCourseId: string | null = null;
   adding = signal(false);
 
+  enrollments = signal<MasterEnrollmentProgress[] | null>(null);
+  loadingEnrollments = signal(true);
+
   showRemoveDialog = false;
   toRemove = signal<LinkedCourseSummary | null>(null);
 
@@ -249,6 +313,7 @@ export class MasterCourseDetailComponent implements OnInit {
     this.id = this.route.snapshot.paramMap.get('id')!;
     this.loadMaster();
     this.loadLinked();
+    this.loadEnrollments();
   }
 
   loadMaster() {
@@ -266,6 +331,14 @@ export class MasterCourseDetailComponent implements OnInit {
     this.service.getLinkedCourses(this.id).subscribe({
       next: (rows) => { this.linked.set(rows); this.loadingLinked.set(false); },
       error: () => { this.loadingLinked.set(false); },
+    });
+  }
+
+  loadEnrollments() {
+    this.loadingEnrollments.set(true);
+    this.enrollmentService.listByMaster(this.id).subscribe({
+      next: (rows) => { this.enrollments.set(rows); this.loadingEnrollments.set(false); },
+      error: () => { this.loadingEnrollments.set(false); },
     });
   }
 

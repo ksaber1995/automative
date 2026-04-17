@@ -74,6 +74,7 @@ export interface DueEnrollment {
   remaining: number;
   paymentStatus: string;
   status: string;
+  type: 'ENROLLMENT' | 'MASTER_ENROLLMENT';
 }
 
 export interface CreateRefundDto {

@@ -54,6 +54,8 @@ const router = {
     coverageCheck: masterEnrollmentsRoutes.coverageCheck,
     listByStudent: masterEnrollmentsRoutes.listByStudent,
     create: masterEnrollmentsRoutes.create,
+    getPayments: masterEnrollmentsRoutes.getPayments,
+    addPayment: masterEnrollmentsRoutes.addPayment,
     cancel: masterEnrollmentsRoutes.cancel,
     createRefund: masterEnrollmentsRoutes.createRefund,
     listRefunds: masterEnrollmentsRoutes.listRefunds,

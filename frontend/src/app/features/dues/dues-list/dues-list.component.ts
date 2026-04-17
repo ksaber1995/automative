@@ -17,6 +17,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DuesService } from '../services/dues.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 
@@ -28,7 +29,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, TooltipModule, DialogModule,
     InputNumberModule, DatePickerModule, TextareaModule, ProgressBarModule,
-    TranslateModule,
+    TranslateModule, TagModule,
   ],
   template: `
     <div class="space-y-4">
@@ -103,7 +104,12 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
                 <span class="font-medium cursor-pointer text-blue-600 hover:underline"
                   (click)="viewStudent(due)">{{ due.studentName }}</span>
               </td>
-              <td class="text-sm text-gray-600">{{ due.courseName }}</td>
+              <td class="text-sm text-gray-600">
+                {{ due.courseName }}
+                @if (due.type === 'MASTER_ENROLLMENT') {
+                  <p-tag value="Master" severity="info" styleClass="ml-1 text-xs"></p-tag>
+                }
+              </td>
               <td class="text-sm text-gray-500">{{ due.branchName }}</td>
               <td class="text-sm">{{ formatDate(due.enrollmentDate) }}</td>
               <td class="text-right font-medium">{{ due.finalPrice.toFixed(2) }}</td>
@@ -236,6 +242,7 @@ import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 export class DuesListComponent implements OnInit {
   private duesService = inject(DuesService);
   private enrollmentService = inject(EnrollmentService);
+  private masterEnrollmentService = inject(MasterEnrollmentService);
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
@@ -311,12 +318,13 @@ export class DuesListComponent implements OnInit {
 
     this.actionLoading.set(true);
     const dateStr = this.paymentDate.toISOString().split('T')[0];
+    const dto = { amount: this.paymentAmount, paymentDate: dateStr, notes: this.paymentNotes || undefined };
 
-    this.enrollmentService.addPayment(due.id, {
-      amount: this.paymentAmount,
-      paymentDate: dateStr,
-      notes: this.paymentNotes || undefined,
-    }).subscribe({
+    const request$ = due.type === 'MASTER_ENROLLMENT'
+      ? this.masterEnrollmentService.addPayment(due.id, dto)
+      : this.enrollmentService.addPayment(due.id, dto);
+
+    request$.subscribe({
       next: () => {
         this.notificationService.success('Payment recorded successfully');
         this.showPaymentDialog = false;
