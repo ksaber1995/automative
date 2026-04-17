@@ -16,6 +16,15 @@ interface Feature { icon: string; titleKey: string; textKey: string; }
 interface Testimonial { quoteKey: string; authorKey: string; roleKey: string; }
 interface Faq { qKey: string; aKey: string; }
 interface Partner { name: string; logo?: string; }
+interface RoadmapPhase {
+  phase: string;
+  icon: string;
+  dateKey: string;
+  titleKey: string;
+  subKey: string;
+  status: 'done' | 'active' | 'upcoming';
+  featureKeys: string[];
+}
 
 @Component({
   selector: 'app-root',
@@ -33,6 +42,7 @@ interface Partner { name: string; logo?: string; }
           <a href="#benefits" class="hover:text-brand-600">{{ 'NAV.BENEFITS' | translate }}</a>
           <a href="#features" class="hover:text-brand-600">{{ 'NAV.FEATURES' | translate }}</a>
           <a href="#pricing" class="hover:text-brand-600">{{ 'NAV.PRICING' | translate }}</a>
+          <a href="#roadmap" class="hover:text-brand-600">{{ 'NAV.ROADMAP' | translate }}</a>
           <a href="#partners" class="hover:text-brand-600">{{ 'NAV.PARTNERS' | translate }}</a>
           <a href="#faq" class="hover:text-brand-600">{{ 'NAV.FAQ' | translate }}</a>
         </nav>
@@ -236,6 +246,99 @@ interface Partner { name: string; logo?: string; }
           {{ 'PRICING.CUSTOM_PREFIX' | translate }}
           <button (click)="openDemo('pricing-custom')" class="text-brand-600 font-medium hover:underline">{{ 'PRICING.CUSTOM_CTA' | translate }}</button>
         </p>
+      </div>
+    </section>
+
+    <!-- ROADMAP -->
+    <section id="roadmap" class="py-24 bg-gray-950 text-white relative overflow-hidden">
+      <div class="absolute top-0 start-1/4 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute bottom-0 end-1/4 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="container-custom relative">
+        <div class="text-center max-w-2xl mx-auto mb-16">
+          <p class="text-sm font-semibold text-brand-400 uppercase tracking-widest mb-3">{{ 'ROADMAP.KICKER' | translate }}</p>
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight">{{ 'ROADMAP.HEADING' | translate }}</h2>
+          <p class="mt-4 text-lg text-gray-400">{{ 'ROADMAP.SUB' | translate }}</p>
+        </div>
+
+        <div class="relative max-w-3xl mx-auto">
+          <div class="absolute start-[27px] top-8 bottom-8 w-0.5 bg-gradient-to-b from-brand-500 via-brand-700 to-gray-700 opacity-60"></div>
+
+          <div class="space-y-6">
+            @for (phase of roadmapPhases; track phase.phase) {
+              <div class="relative ps-[4.5rem]">
+
+                <div class="absolute start-[18px] top-7">
+                  @if (phase.status === 'active') {
+                    <div class="relative w-5 h-5">
+                      <div class="absolute inset-0 rounded-full bg-brand-500 animate-ping opacity-50"></div>
+                      <div class="relative w-5 h-5 rounded-full bg-brand-500 border-2 border-brand-300 flex items-center justify-center">
+                        <span class="w-2 h-2 rounded-full bg-white block"></span>
+                      </div>
+                    </div>
+                  }
+                  @if (phase.status === 'done') {
+                    <div class="w-5 h-5 rounded-full bg-emerald-500 border-2 border-emerald-300 flex items-center justify-center">
+                      <span class="text-white text-[10px] font-black leading-none">✓</span>
+                    </div>
+                  }
+                  @if (phase.status === 'upcoming') {
+                    <div class="w-5 h-5 rounded-full bg-gray-700 border-2 border-gray-600 flex items-center justify-center">
+                      <span class="w-2 h-2 rounded-full bg-gray-500 block"></span>
+                    </div>
+                  }
+                </div>
+
+                <div class="rounded-2xl border p-6 transition-all duration-200"
+                     [ngClass]="{
+                       'border-emerald-800 bg-emerald-950/25': phase.status === 'done',
+                       'border-brand-500 bg-brand-950/30 shadow-xl': phase.status === 'active',
+                       'border-gray-700 bg-gray-800/20 opacity-50': phase.status === 'upcoming'
+                     }">
+
+                  <div class="flex items-start justify-between gap-4 mb-3">
+                    <div class="flex items-center gap-3">
+                      <span class="text-2xl leading-none">{{ phase.icon }}</span>
+                      <div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ phase.dateKey | translate }}</div>
+                        <h3 class="text-lg font-bold text-white mt-0.5">{{ phase.titleKey | translate }}</h3>
+                      </div>
+                    </div>
+                    <span class="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide"
+                          [ngClass]="{
+                            'bg-emerald-900/70 text-emerald-400': phase.status === 'done',
+                            'bg-brand-900/70 text-brand-300': phase.status === 'active',
+                            'bg-gray-800 text-gray-500': phase.status === 'upcoming'
+                          }">
+                      @if (phase.status === 'done') { {{ 'ROADMAP.STATUS_DONE' | translate }} ✓ }
+                      @if (phase.status === 'active') { 🚀 {{ 'ROADMAP.STATUS_ACTIVE' | translate }} }
+                      @if (phase.status === 'upcoming') { {{ 'ROADMAP.STATUS_UPCOMING' | translate }} }
+                    </span>
+                  </div>
+
+                  <p class="text-sm text-gray-400 mb-4">{{ phase.subKey | translate }}</p>
+
+                  <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                    @for (fKey of phase.featureKeys; track fKey) {
+                      <li class="flex items-start gap-2 text-sm">
+                        <span class="flex-shrink-0 mt-0.5 font-bold"
+                              [class.text-emerald-500]="phase.status === 'done'"
+                              [class.text-brand-400]="phase.status === 'active'"
+                              [class.text-gray-600]="phase.status === 'upcoming'">
+                          @if (phase.status === 'done') { ✓ }
+                          @if (phase.status === 'active') { › }
+                          @if (phase.status === 'upcoming') { ○ }
+                        </span>
+                        <span [class.text-gray-200]="phase.status === 'done'"
+                              [class.text-gray-100]="phase.status === 'active'"
+                              [class.text-gray-500]="phase.status === 'upcoming'">{{ fKey | translate }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
       </div>
     </section>
 
@@ -498,6 +601,39 @@ export class LandingComponent {
     { quoteKey: 'TESTIMONIALS.T1_QUOTE', authorKey: 'TESTIMONIALS.T1_AUTHOR', roleKey: 'TESTIMONIALS.T1_ROLE' },
     { quoteKey: 'TESTIMONIALS.T2_QUOTE', authorKey: 'TESTIMONIALS.T2_AUTHOR', roleKey: 'TESTIMONIALS.T2_ROLE' },
     { quoteKey: 'TESTIMONIALS.T3_QUOTE', authorKey: 'TESTIMONIALS.T3_AUTHOR', roleKey: 'TESTIMONIALS.T3_ROLE' },
+  ];
+
+  roadmapPhases: RoadmapPhase[] = [
+    {
+      phase: '01', icon: '🏗️',
+      dateKey: 'ROADMAP.PHASE_1_DATE', titleKey: 'ROADMAP.PHASE_1_TITLE', subKey: 'ROADMAP.PHASE_1_SUB',
+      status: 'done',
+      featureKeys: ['ROADMAP.PHASE_1_F1', 'ROADMAP.PHASE_1_F2', 'ROADMAP.PHASE_1_F3', 'ROADMAP.PHASE_1_F4'],
+    },
+    {
+      phase: '02', icon: '⚙️',
+      dateKey: 'ROADMAP.PHASE_2_DATE', titleKey: 'ROADMAP.PHASE_2_TITLE', subKey: 'ROADMAP.PHASE_2_SUB',
+      status: 'done',
+      featureKeys: ['ROADMAP.PHASE_2_F1', 'ROADMAP.PHASE_2_F2', 'ROADMAP.PHASE_2_F3', 'ROADMAP.PHASE_2_F4'],
+    },
+    {
+      phase: '03', icon: '📊',
+      dateKey: 'ROADMAP.PHASE_3_DATE', titleKey: 'ROADMAP.PHASE_3_TITLE', subKey: 'ROADMAP.PHASE_3_SUB',
+      status: 'done',
+      featureKeys: ['ROADMAP.PHASE_3_F1', 'ROADMAP.PHASE_3_F2', 'ROADMAP.PHASE_3_F3', 'ROADMAP.PHASE_3_F4'],
+    },
+    {
+      phase: '04', icon: '🤖',
+      dateKey: 'ROADMAP.PHASE_4_DATE', titleKey: 'ROADMAP.PHASE_4_TITLE', subKey: 'ROADMAP.PHASE_4_SUB',
+      status: 'active',
+      featureKeys: ['ROADMAP.PHASE_4_F1', 'ROADMAP.PHASE_4_F2', 'ROADMAP.PHASE_4_F3', 'ROADMAP.PHASE_4_F4'],
+    },
+    {
+      phase: '05', icon: '🌐',
+      dateKey: 'ROADMAP.PHASE_5_DATE', titleKey: 'ROADMAP.PHASE_5_TITLE', subKey: 'ROADMAP.PHASE_5_SUB',
+      status: 'upcoming',
+      featureKeys: ['ROADMAP.PHASE_5_F1', 'ROADMAP.PHASE_5_F2', 'ROADMAP.PHASE_5_F3', 'ROADMAP.PHASE_5_F4'],
+    },
   ];
 
   faqs: Faq[] = [
