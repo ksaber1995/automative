@@ -104,7 +104,9 @@ export const classesRoutes = {
           c.*,
           co.name as course_name,
           b.name as branch_name,
-          CONCAT(e.first_name, ' ', e.last_name) as instructor_name
+          CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          (SELECT COUNT(*) FROM enrollments en
+           WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')) AS current_enrollment
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
@@ -157,7 +159,9 @@ export const classesRoutes = {
           c.*,
           co.name as course_name,
           b.name as branch_name,
-          CONCAT(e.first_name, ' ', e.last_name) as instructor_name
+          CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          (SELECT COUNT(*) FROM enrollments en
+           WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')) AS current_enrollment
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id

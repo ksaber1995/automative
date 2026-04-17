@@ -414,9 +414,7 @@ export class EnrollmentFormComponent implements OnInit {
     if (!branchId) return [];
     return this.courses().filter(c => {
       const courseBranchId = c.branchId ? String(c.branchId) : null;
-      const matchesBranch = courseBranchId === String(branchId) || courseBranchId === null;
-      // Courses attached to a master course are enrolled-in via MASTER mode, not as single courses.
-      return matchesBranch && !c.masterCourseId;
+      return courseBranchId === String(branchId) || courseBranchId === null;
     });
   });
 
