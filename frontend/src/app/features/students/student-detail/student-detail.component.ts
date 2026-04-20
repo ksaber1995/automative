@@ -433,6 +433,11 @@ export class StudentDetailComponent implements OnInit {
     return items.find(e => e.courseId === courseId)?.status ?? null;
   }
 
+  getBundleClassName(masterEnrollmentId: string, courseId: string): string | null {
+    const items = this.masterClassEnrollmentsMap().get(masterEnrollmentId) || [];
+    return items.find(e => e.courseId === courseId)?.className ?? null;
+  }
+
   joinBundleCourse(courseId: string, masterEnrollmentId: string) {
     this.joinBundleCourseId = courseId;
     this.joinBundleMasterEnrollmentId = masterEnrollmentId;

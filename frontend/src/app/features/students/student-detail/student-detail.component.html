@@ -284,6 +284,11 @@
                             <div class="min-w-0">
                               <div class="font-medium text-sm text-gray-900 truncate">{{ course.name }}</div>
                               <div class="text-xs text-gray-400 font-mono">{{ course.code }}</div>
+
+                              @let className = getBundleClassName(me.id, course.id);
+                              @if (className) {
+                                <div class="text-xs text-gray-500 truncate">{{ className }}</div>
+                              }
                             </div>
                           </div>
 

@@ -146,7 +146,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               </td>
               <td>
                 <div class="text-sm">
-                  <span class="font-medium">{{ classItem.currentEnrollment || 0 }}</span>
+                  <span class="font-medium">{{ classItem.studentCount ?? classItem.currentEnrollment ?? 0 }}</span>
                   @if (classItem.maxStudents) {
                     <span class="text-gray-500"> / {{ classItem.maxStudents }}</span>
                   }

@@ -235,7 +235,6 @@ CREATE INDEX idx_mce_company ON master_class_enrollments(company_id);
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID NOT NULL,
-    master_course_id UUID,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
     description TEXT,
@@ -248,13 +247,22 @@ CREATE TABLE courses (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
-    FOREIGN KEY (master_course_id) REFERENCES master_courses(id) ON DELETE SET NULL,
     UNIQUE(branch_id, code)
 );
 
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX idx_courses_code ON courses(code);
-CREATE INDEX idx_courses_master_course ON courses(master_course_id);
+
+CREATE TABLE master_course_courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    master_course_id UUID NOT NULL REFERENCES master_courses(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (master_course_id, course_id)
+);
+
+CREATE INDEX idx_mcc_master_course ON master_course_courses(master_course_id);
+CREATE INDEX idx_mcc_course ON master_course_courses(course_id);
 
 -- =============================================
 -- CLASSES TABLE
@@ -573,28 +581,6 @@ CREATE INDEX idx_withdrawals_branch_id ON withdrawals(branch_id);
 CREATE INDEX idx_withdrawals_date ON withdrawals(date);
 CREATE INDEX idx_withdrawals_status ON withdrawals(status);
 
--- =============================================
--- DEBTS TABLE
--- =============================================
-CREATE TABLE debts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    branch_id UUID,
-    creditor_name VARCHAR(255) NOT NULL,
-    amount DECIMAL(10, 2) NOT NULL,
-    remaining_amount DECIMAL(10, 2) NOT NULL,
-    description TEXT,
-    date DATE NOT NULL,
-    due_date DATE,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED')),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_debts_branch_id ON debts(branch_id);
-CREATE INDEX idx_debts_status ON debts(status);
-CREATE INDEX idx_debts_due_date ON debts(due_date);
 
 -- =============================================
 -- DEBT PAYMENTS TABLE

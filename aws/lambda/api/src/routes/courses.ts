@@ -6,7 +6,6 @@ function mapCourseFromDB(row: any) {
     id: row.id,
     companyId: row.company_id,
     branchId: row.branch_id,
-    masterCourseId: row.master_course_id || null,
     name: row.name,
     code: row.code,
     description: row.description,

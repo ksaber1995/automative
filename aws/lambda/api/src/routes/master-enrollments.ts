@@ -82,7 +82,7 @@ const SELECT_WITH_PROGRESS = `
     mc.code AS master_course_code,
     mc.default_price AS master_course_price,
     b.name AS branch_name,
-    (SELECT COUNT(*) FROM courses c WHERE c.master_course_id = me.master_course_id) AS total_courses,
+    (SELECT COUNT(*) FROM master_course_courses mcc WHERE mcc.master_course_id = me.master_course_id) AS total_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce
       WHERE mce.master_enrollment_id = me.id AND mce.status = 'COMPLETED') AS completed_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce

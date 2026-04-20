@@ -9,7 +9,6 @@ export interface Course {
   duration: number;
   maxStudents: number | null;
   instructorId: string | null;
-  masterCourseId: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

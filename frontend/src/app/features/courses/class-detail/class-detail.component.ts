@@ -83,7 +83,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
             </div>
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Enrollment</p>
-              <p class="font-semibold">{{ classDetail()?.currentEnrollment || 0 }}
+              <p class="font-semibold">{{ classDetail()?.studentCount ?? classDetail()?.currentEnrollment ?? 0 }}
                 @if (classDetail()?.maxStudents) { <span class="text-gray-400">/ {{ classDetail()?.maxStudents }}</span> }
               </p>
             </div>
@@ -123,7 +123,12 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
             </ng-template>
             <ng-template pTemplate="body" let-row>
               <tr>
-                <td class="font-medium">{{ row.studentFirstName }} {{ row.studentLastName }}</td>
+                <td class="font-medium">
+                  <div>{{ row.studentFirstName }} {{ row.studentLastName }}</div>
+                  @if (row.enrollmentType === 'MASTER') {
+                    <div class="text-xs text-purple-600 font-normal mt-0.5">Bundle: {{ row.masterCourseName }}</div>
+                  }
+                </td>
                 <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
                 <td>
                   <p-tag [value]="row.status" [severity]="statusSeverity(row.status)"></p-tag>

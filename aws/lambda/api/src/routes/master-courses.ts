@@ -86,7 +86,8 @@ export const masterCoursesRoutes = {
           COUNT(DISTINCT c.branch_id) FILTER (WHERE c.is_active = true) AS branch_count
         FROM master_courses mc
         LEFT JOIN branches b ON b.id = mc.branch_id
-        LEFT JOIN courses c ON c.master_course_id = mc.id
+        LEFT JOIN master_course_courses mcc ON mcc.master_course_id = mc.id
+        LEFT JOIN courses c ON c.id = mcc.course_id
         WHERE mc.company_id = $1
         GROUP BY mc.id, b.name
         ORDER BY mc.created_at DESC
@@ -152,8 +153,9 @@ export const masterCoursesRoutes = {
       const rows = await query(
         `SELECT c.*, b.name AS branch_name
          FROM courses c
+         JOIN master_course_courses mcc ON mcc.course_id = c.id AND mcc.master_course_id = $1
          LEFT JOIN branches b ON b.id = c.branch_id
-         WHERE c.master_course_id = $1 AND c.company_id = $2
+         WHERE c.company_id = $2
          ORDER BY b.name ASC, c.created_at DESC`,
         [params.id, context.companyId]
       );
@@ -284,12 +286,11 @@ export const masterCoursesRoutes = {
       if (course.branch_id !== master.branch_id) {
         return { status: 400 as const, body: { message: 'Course must be in the same branch as the master course' } };
       }
-      if (course.master_course_id && course.master_course_id !== master.id) {
-        return { status: 400 as const, body: { message: 'Course is already linked to another master course' } };
-      }
 
       await query(
-        'UPDATE courses SET master_course_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        `INSERT INTO master_course_courses (master_course_id, course_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
         [master.id, course.id]
       );
       return { status: 200 as const, body: { message: 'Course added to master' } };
@@ -320,9 +321,9 @@ export const masterCoursesRoutes = {
       }
 
       await query(
-        `UPDATE courses SET master_course_id = NULL, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND master_course_id = $2 AND company_id = $3`,
-        [params.courseId, master.id, context.companyId]
+        `DELETE FROM master_course_courses
+         WHERE course_id = $1 AND master_course_id = $2`,
+        [params.courseId, master.id]
       );
       return { status: 200 as const, body: { message: 'Course removed from master' } };
     } catch (error: any) {
@@ -355,9 +356,11 @@ export const masterCoursesRoutes = {
         `SELECT id, name, code, price, duration
          FROM courses
          WHERE company_id = $1 AND branch_id = $2 AND is_active = true
-           AND master_course_id IS NULL
+           AND id NOT IN (
+             SELECT course_id FROM master_course_courses WHERE master_course_id = $3
+           )
          ORDER BY name ASC`,
-        [context.companyId, master.branch_id]
+        [context.companyId, master.branch_id, master.id]
       );
       return {
         status: 200 as const,

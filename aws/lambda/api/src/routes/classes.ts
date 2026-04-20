@@ -377,11 +377,41 @@ export const classesRoutes = {
           e.amount_paid,
           e.payment_status,
           e.notes,
-          e.created_at
+          e.created_at,
+          'DIRECT' as enrollment_type,
+          NULL as master_course_name
         FROM enrollments e
         JOIN students s ON e.student_id = s.id
         WHERE e.class_id = $1 AND e.company_id = $2 AND e.status != 'DROPPED'
-        ORDER BY e.enrollment_date DESC`,
+
+        UNION ALL
+
+        SELECT
+          mce.id as enrollment_id,
+          mce.student_id,
+          s.first_name as student_first_name,
+          s.last_name as student_last_name,
+          me.enrollment_date,
+          mce.status,
+          me.original_price,
+          me.discount_percent,
+          me.discount_amount,
+          me.final_price,
+          me.payment_mode,
+          me.down_payment,
+          me.amount_paid,
+          me.payment_status,
+          mce.notes,
+          mce.created_at,
+          'MASTER' as enrollment_type,
+          mc.name as master_course_name
+        FROM master_class_enrollments mce
+        JOIN students s ON mce.student_id = s.id
+        JOIN master_enrollments me ON mce.master_enrollment_id = me.id
+        JOIN master_courses mc ON me.master_course_id = mc.id
+        WHERE mce.class_id = $1 AND mce.company_id = $2 AND mce.status != 'DROPPED'
+
+        ORDER BY enrollment_date DESC`,
         [params.id, context.companyId]
       );
 
@@ -404,6 +434,8 @@ export const classesRoutes = {
           paymentStatus: row.payment_status,
           notes: row.notes,
           createdAt: row.created_at,
+          enrollmentType: row.enrollment_type,
+          masterCourseName: row.master_course_name,
         })),
       };
     } catch (error) {
