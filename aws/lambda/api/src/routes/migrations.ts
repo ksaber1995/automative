@@ -449,6 +449,82 @@ async function runRbacMigration() {
   }
 }
 
+async function createMasterClassEnrollments() {
+  console.log('Starting migration: create_master_class_enrollments');
+
+  try {
+    const tableExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'master_class_enrollments'
+    `);
+
+    if (tableExists.length === 0) {
+      await query(`
+        CREATE TABLE master_class_enrollments (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          master_enrollment_id UUID NOT NULL REFERENCES master_enrollments(id) ON DELETE CASCADE,
+          student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+          class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+          course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+          branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+          enrolled_at DATE NOT NULL DEFAULT CURRENT_DATE,
+          status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
+            CHECK (status IN ('ACTIVE', 'COMPLETED', 'DROPPED')),
+          notes TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await query(`CREATE INDEX idx_mce_master_enrollment ON master_class_enrollments(master_enrollment_id)`);
+      await query(`CREATE INDEX idx_mce_student ON master_class_enrollments(student_id)`);
+      await query(`CREATE INDEX idx_mce_class ON master_class_enrollments(class_id)`);
+      await query(`CREATE INDEX idx_mce_company ON master_class_enrollments(company_id)`);
+      console.log('✓ Created master_class_enrollments table');
+    } else {
+      console.log('⚠ master_class_enrollments table already exists');
+    }
+
+    // Migrate existing bundle enrollments from enrollments table
+    const migrated = await query(`
+      INSERT INTO master_class_enrollments
+        (company_id, master_enrollment_id, student_id, class_id, course_id, branch_id, enrolled_at, status, notes)
+      SELECT company_id, master_enrollment_id, student_id, class_id, course_id, branch_id,
+             enrollment_date, status, notes
+      FROM enrollments
+      WHERE master_enrollment_id IS NOT NULL
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `);
+    console.log(`✓ Migrated ${migrated.length} bundle enrollments to master_class_enrollments`);
+
+    // Remove those rows from enrollments
+    const deleted = await query(`
+      DELETE FROM enrollments WHERE master_enrollment_id IS NOT NULL RETURNING id
+    `);
+    console.log(`✓ Deleted ${deleted.length} rows from enrollments (now in master_class_enrollments)`);
+
+    // Drop master_enrollment_id column from enrollments if it exists
+    const colExists = await query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'enrollments' AND column_name = 'master_enrollment_id'
+    `);
+    if (colExists.length > 0) {
+      await query(`ALTER TABLE enrollments DROP COLUMN IF EXISTS master_enrollment_id`);
+      console.log('✓ Dropped master_enrollment_id column from enrollments');
+    }
+
+    console.log('✅ master_class_enrollments migration completed!');
+    return {
+      success: true,
+      message: `Migration done: table created, ${migrated.length} records migrated, ${deleted.length} old rows removed`,
+    };
+  } catch (error) {
+    console.error('❌ master_class_enrollments migration error:', error);
+    throw error;
+  }
+}
+
 export const migrationsRoutes = {
   runInstructorMigration: async () => {
     try {
@@ -535,6 +611,21 @@ export const migrationsRoutes = {
         body: {
           success: false,
           message: 'RBAC migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createMasterClassEnrollments: async () => {
+    try {
+      const result = await createMasterClassEnrollments();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

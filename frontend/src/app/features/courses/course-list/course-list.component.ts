@@ -96,7 +96,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <th pSortableColumn="duration">{{ 'COURSES.LIST.COL_DURATION' | translate }}</th>
               <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
               <th>{{ 'COURSES.LIST.COL_MAX_STUDENTS' | translate }}</th>
-              <th>{{ 'COURSES.LIST.COL_ENROLLMENTS' | translate }}</th>
+              <th>Enrollments</th>
               <th pSortableColumn="isActive">{{ 'COURSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
               <th>{{ 'COURSES.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
@@ -110,7 +110,29 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <td>{{ course.price.toFixed(2) }}</td>
               <td>{{ course.maxStudents || ('COURSES.LIST.UNLIMITED' | translate) }}</td>
               <td>
-                <p-tag [value]="course.enrollmentCount || 0" severity="info"></p-tag>
+                <div class="flex flex-col gap-1">
+                  <span class="font-semibold text-sm">
+                    Total: {{ course.enrollmentCount || 0 }}
+                  </span>
+                  @if (course.directEnrollmentCount > 0 || course.masterEnrollmentCount > 0) {
+                    <div class="flex gap-1 flex-wrap">
+                      @if (course.directEnrollmentCount > 0) {
+                        <p-tag
+                          [value]="course.directEnrollmentCount + ' direct'"
+                          severity="info"
+                          [pTooltip]="'Direct course enrollments'"
+                        ></p-tag>
+                      }
+                      @if (course.masterEnrollmentCount > 0) {
+                        <p-tag
+                          [value]="course.masterEnrollmentCount + ' bundle'"
+                          severity="secondary"
+                          [pTooltip]="'From master course bundle enrollments'"
+                        ></p-tag>
+                      }
+                    </div>
+                  }
+                </div>
               </td>
               <td>
                 <p-tag

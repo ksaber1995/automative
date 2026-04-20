@@ -30,6 +30,7 @@ function mapClassWithDetailsFromDB(row: any) {
     courseName: row.course_name,
     branchName: row.branch_name,
     instructorName: row.instructor_name,
+    studentCount: parseInt(row.student_count ?? row.current_enrollment ?? '0', 10),
   };
 }
 
@@ -105,8 +106,13 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
-          (SELECT COUNT(*) FROM enrollments en
-           WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')) AS current_enrollment
+          (
+            SELECT COALESCE(COUNT(*), 0) FROM enrollments en
+            WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+          ) + (
+            SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
+            WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+          ) AS student_count
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
@@ -160,8 +166,13 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
-          (SELECT COUNT(*) FROM enrollments en
-           WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')) AS current_enrollment
+          (
+            SELECT COALESCE(COUNT(*), 0) FROM enrollments en
+            WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+          ) + (
+            SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
+            WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+          ) AS student_count
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
@@ -217,7 +228,14 @@ export const classesRoutes = {
           c.*,
           co.name as course_name,
           b.name as branch_name,
-          CONCAT(e.first_name, ' ', e.last_name) as instructor_name
+          CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          (
+            SELECT COALESCE(COUNT(*), 0) FROM enrollments en
+            WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+          ) + (
+            SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
+            WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+          ) AS student_count
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id

@@ -17,13 +17,17 @@ import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
+import { ClassService } from '../../courses/services/class.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
+import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
+import { Class } from '@shared/interfaces/class.interface';
 import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
+import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
 
 @Component({
@@ -52,8 +56,10 @@ export class StudentDetailComponent implements OnInit {
   private studentService = inject(StudentService);
   private enrollmentService = inject(EnrollmentService);
   private courseService = inject(CourseService);
+  private classService = inject(ClassService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
   private masterCourseService = inject(MasterCourseService);
+  private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -73,6 +79,7 @@ export class StudentDetailComponent implements OnInit {
   // Expandable rows (master enrollments → linked courses + payment history)
   expandedMasterRows: { [key: string]: boolean } = {};
   linkedCoursesMap = signal<Map<string, LinkedCourseSummary[]>>(new Map());
+  masterClassEnrollmentsMap = signal<Map<string, MasterClassEnrollment[]>>(new Map());
   masterPaymentHistoryMap = signal<Map<string, EnrollmentPayment[]>>(new Map());
 
   // Master payment dialog
@@ -123,6 +130,14 @@ export class StudentDetailComponent implements OnInit {
     if (!me) return 0;
     return Math.max(0, (me.amountPaid || 0) - (me.totalRefunded || 0));
   });
+
+  // Join bundle course dialog
+  showJoinBundleCourseDialog = false;
+  joinBundleCourseClasses = signal<Class[]>([]);
+  joinBundleCourseLoading = signal(false);
+  selectedJoinClass = signal<Class | null>(null);
+  private joinBundleCourseId: string | null = null;
+  private joinBundleMasterEnrollmentId: string | null = null;
 
   async ngOnInit() {
     this.studentId = this.route.snapshot.paramMap.get('id');
@@ -385,6 +400,17 @@ export class StudentDetailComponent implements OnInit {
   onMasterRowExpand(event: { data: MasterEnrollmentProgress }) {
     this.loadLinkedCoursesIfNeeded(event.data.masterCourseId);
     this.loadMasterPaymentHistory(event.data.id);
+    this.loadMasterClassEnrollments(event.data.id);
+  }
+
+  loadMasterClassEnrollments(masterEnrollmentId: string) {
+    this.masterClassEnrollmentService.listByMasterEnrollment(masterEnrollmentId).subscribe({
+      next: (items) => {
+        const map = new Map(this.masterClassEnrollmentsMap());
+        map.set(masterEnrollmentId, items);
+        this.masterClassEnrollmentsMap.set(map);
+      },
+    });
   }
 
   private loadLinkedCoursesIfNeeded(masterCourseId: string) {
@@ -402,14 +428,51 @@ export class StudentDetailComponent implements OnInit {
     return this.linkedCoursesMap().get(masterCourseId) || [];
   }
 
-  getBundleCourseStatus(courseId: string): string | null {
-    const found = this.enrollments().find(e => e.courseId === courseId);
-    return found?.status ?? null;
+  getBundleCourseStatus(masterEnrollmentId: string, courseId: string): string | null {
+    const items = this.masterClassEnrollmentsMap().get(masterEnrollmentId) || [];
+    return items.find(e => e.courseId === courseId)?.status ?? null;
   }
 
-  joinBundleCourse(courseId: string) {
-    this.router.navigate(['/enrollments/create'], {
-      queryParams: { studentId: this.studentId, courseId },
+  joinBundleCourse(courseId: string, masterEnrollmentId: string) {
+    this.joinBundleCourseId = courseId;
+    this.joinBundleMasterEnrollmentId = masterEnrollmentId;
+    this.selectedJoinClass.set(null);
+    this.joinBundleCourseClasses.set([]);
+    this.joinBundleCourseLoading.set(true);
+    this.showJoinBundleCourseDialog = true;
+    this.classService.getClassesByCourse(courseId).subscribe({
+      next: (classes) => {
+        this.joinBundleCourseClasses.set(classes.filter(c => c.isActive));
+        this.joinBundleCourseLoading.set(false);
+      },
+      error: () => {
+        this.notificationService.error('Failed to load classes');
+        this.joinBundleCourseLoading.set(false);
+      },
+    });
+  }
+
+  submitJoinBundleCourse() {
+    const cls = this.selectedJoinClass();
+    if (!cls || !this.joinBundleCourseId || !this.joinBundleMasterEnrollmentId) return;
+    this.actionLoading.set(true);
+    this.masterClassEnrollmentService.create({
+      masterEnrollmentId: this.joinBundleMasterEnrollmentId,
+      classId: cls.id,
+      courseId: this.joinBundleCourseId,
+      branchId: cls.branchId,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success('Student enrolled in class');
+        this.showJoinBundleCourseDialog = false;
+        this.actionLoading.set(false);
+        this.loadMasterClassEnrollments(this.joinBundleMasterEnrollmentId!);
+        if (this.studentId) this.loadMasterEnrollments(this.studentId);
+      },
+      error: (err) => {
+        this.notificationService.error(err?.error?.message || 'Failed to enroll');
+        this.actionLoading.set(false);
+      },
     });
   }
 

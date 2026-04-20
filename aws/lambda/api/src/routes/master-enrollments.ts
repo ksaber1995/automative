@@ -83,12 +83,12 @@ const SELECT_WITH_PROGRESS = `
     mc.default_price AS master_course_price,
     b.name AS branch_name,
     (SELECT COUNT(*) FROM courses c WHERE c.master_course_id = me.master_course_id) AS total_courses,
-    (SELECT COUNT(*) FROM enrollments e
-      WHERE e.master_enrollment_id = me.id AND e.status = 'COMPLETED') AS completed_courses,
-    (SELECT COUNT(*) FROM enrollments e
-      WHERE e.master_enrollment_id = me.id AND e.status = 'ACTIVE') AS active_courses,
-    (SELECT COUNT(*) FROM enrollments e
-      WHERE e.master_enrollment_id = me.id AND e.status IN ('PENDING')) AS pending_courses
+    (SELECT COUNT(*) FROM master_class_enrollments mce
+      WHERE mce.master_enrollment_id = me.id AND mce.status = 'COMPLETED') AS completed_courses,
+    (SELECT COUNT(*) FROM master_class_enrollments mce
+      WHERE mce.master_enrollment_id = me.id AND mce.status = 'ACTIVE') AS active_courses,
+    (SELECT COUNT(*) FROM master_class_enrollments mce
+      WHERE mce.master_enrollment_id = me.id AND mce.status = 'DROPPED') AS pending_courses
   FROM master_enrollments me
   INNER JOIN students s ON s.id = me.student_id
   INNER JOIN master_courses mc ON mc.id = me.master_course_id

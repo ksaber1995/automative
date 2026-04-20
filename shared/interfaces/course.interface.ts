@@ -17,6 +17,8 @@ export interface Course {
 
 export interface CourseWithEnrollmentCount extends Course {
   enrollmentCount: number;
+  directEnrollmentCount: number;
+  masterEnrollmentCount: number;
 }
 
 export interface CourseCreateDto {

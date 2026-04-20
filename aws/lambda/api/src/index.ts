@@ -16,6 +16,7 @@ import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
 import { masterCoursesRoutes } from './routes/master-courses';
 import { masterEnrollmentsRoutes } from './routes/master-enrollments';
+import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments';
 import { eventsRoutes } from './routes/events';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
@@ -61,6 +62,7 @@ const router = {
     listRefunds: masterEnrollmentsRoutes.listRefunds,
     getById: masterEnrollmentsRoutes.getById,
   },
+  masterClassEnrollments: masterClassEnrollmentsRoutes,
   events: eventsRoutes,
   classes: classesRoutes,
   enrollments: enrollmentsRoutes,

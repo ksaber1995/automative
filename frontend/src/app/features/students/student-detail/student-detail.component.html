@@ -265,7 +265,7 @@
                   } @else {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                       @for (course of getLinkedCourses(me.masterCourseId); track course.id) {
-                        @let status = getBundleCourseStatus(course.id);
+                        @let status = getBundleCourseStatus(me.id, course.id);
                         <div class="flex items-center justify-between bg-white rounded-xl border px-4 py-3 gap-3"
                              [class.border-green-200]="status === 'ACTIVE'"
                              [class.border-blue-200]="status === 'COMPLETED'"
@@ -302,7 +302,7 @@
                                   size="small"
                                   severity="help"
                                   [outlined]="true"
-                                  (onClick)="joinBundleCourse(course.id)"
+                                  (onClick)="joinBundleCourse(course.id, me.id)"
                                 ></p-button>
                               }
                             } @else {
@@ -314,7 +314,7 @@
                                   size="small"
                                   severity="help"
                                   [outlined]="true"
-                                  (onClick)="joinBundleCourse(course.id)"
+                                  (onClick)="joinBundleCourse(course.id, me.id)"
                                 ></p-button>
                               }
                             }
@@ -747,5 +747,68 @@
     <p-button [label]="'STUDENTS.DETAIL.ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn"
       [loading]="actionLoading()" [disabled]="!masterRefundAmount || !masterRefundDate"
       (onClick)="submitMasterRefund()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Join Bundle Course Dialog -->
+<p-dialog
+  [(visible)]="showJoinBundleCourseDialog"
+  header="Choose a Class to Join"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+>
+  @if (joinBundleCourseLoading()) {
+    <div class="flex items-center gap-2 py-6 justify-center text-gray-400">
+      <i class="pi pi-spin pi-spinner text-xl"></i>
+      <span>Loading classes…</span>
+    </div>
+  } @else if (joinBundleCourseClasses().length === 0) {
+    <div class="py-6 text-center text-gray-400">
+      <i class="pi pi-inbox text-3xl mb-2 block"></i>
+      No active classes available for this course.
+    </div>
+  } @else {
+    <div class="flex flex-col gap-3">
+      @for (cls of joinBundleCourseClasses(); track cls.id) {
+        <div
+          class="flex items-start gap-3 border rounded-xl px-4 py-3 cursor-pointer transition-colors"
+          [class.border-purple-400]="selectedJoinClass()?.id === cls.id"
+          [class.bg-purple-50]="selectedJoinClass()?.id === cls.id"
+          [class.border-gray-200]="selectedJoinClass()?.id !== cls.id"
+          (click)="selectedJoinClass.set(cls)"
+        >
+          <p-radiobutton
+            name="joinClass"
+            [value]="cls"
+            [ngModel]="selectedJoinClass()"
+            (ngModelChange)="selectedJoinClass.set($event)"
+          ></p-radiobutton>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm text-gray-900">{{ cls.name }}</div>
+            <div class="text-xs text-gray-400 font-mono mt-0.5">{{ cls.code }}</div>
+            <div class="text-xs text-gray-500 mt-1 flex gap-3 flex-wrap">
+              <span><i class="pi pi-calendar mr-1"></i>{{ cls.startDate | date:'mediumDate' }} – {{ cls.endDate | date:'mediumDate' }}</span>
+              @if (cls.daysOfWeek) {
+                <span><i class="pi pi-clock mr-1"></i>{{ cls.daysOfWeek }}</span>
+              }
+              @if (cls.maxStudents) {
+                <span><i class="pi pi-users mr-1"></i>{{ cls.currentEnrollment }}/{{ cls.maxStudents }}</span>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showJoinBundleCourseDialog = false"></p-button>
+    <p-button
+      label="Enroll in Class"
+      icon="pi pi-user-plus"
+      severity="help"
+      [loading]="actionLoading()"
+      [disabled]="!selectedJoinClass()"
+      (onClick)="submitJoinBundleCourse()"
+    ></p-button>
   </ng-template>
 </p-dialog>

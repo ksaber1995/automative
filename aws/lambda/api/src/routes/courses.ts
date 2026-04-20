@@ -21,9 +21,13 @@ function mapCourseFromDB(row: any) {
 }
 
 function mapCourseWithEnrollmentCountFromDB(row: any) {
+  const direct = parseInt(row.direct_enrollment_count || '0', 10);
+  const master = parseInt(row.master_enrollment_count || '0', 10);
   return {
     ...mapCourseFromDB(row),
-    enrollmentCount: parseInt(row.enrollment_count || '0', 10),
+    directEnrollmentCount: direct,
+    masterEnrollmentCount: master,
+    enrollmentCount: direct + master,
   };
 }
 
@@ -78,9 +82,11 @@ export const coursesRoutes = {
       let sql = `
         SELECT
           c.*,
-          COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as enrollment_count
+          COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as direct_enrollment_count,
+          COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
         LEFT JOIN enrollments e ON c.id = e.course_id AND e.status != 'DROPPED'
+        LEFT JOIN master_class_enrollments mce ON c.id = mce.course_id AND mce.status != 'DROPPED'
         WHERE c.company_id = $1
       `;
       const params: any[] = [context.companyId];

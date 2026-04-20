@@ -48,39 +48,14 @@ export const enrollmentsRoutes = {
         };
       }
 
-      // Check if this course is covered by an active master enrollment for
-      // the student. If yes, the enrollment is free.
-      const coverage = await queryOne(
-        `SELECT me.id AS master_enrollment_id
-         FROM master_enrollments me
-         INNER JOIN courses c ON c.master_course_id = me.master_course_id
-         WHERE me.company_id = $1 AND me.student_id = $2
-           AND me.status = 'ACTIVE' AND c.id = $3
-         LIMIT 1`,
-        [context.companyId, body.studentId, body.courseId]
-      );
-
-      let paymentMode = body.paymentMode || 'FULL';
-      let downPayment = body.downPayment || 0;
-      let originalPrice = body.originalPrice;
-      let discountPercent = body.discountPercent || 0;
-      let discountAmount = body.discountAmount || 0;
-      let finalPrice = body.finalPrice;
-      let amountPaid = paymentMode === 'FULL' ? finalPrice : downPayment;
-      let notes = body.notes || null;
-      const masterEnrollmentId = coverage?.master_enrollment_id || null;
-
-      if (masterEnrollmentId) {
-        paymentMode = 'FULL';
-        downPayment = 0;
-        originalPrice = 0;
-        discountPercent = 0;
-        discountAmount = 0;
-        finalPrice = 0;
-        amountPaid = 0;
-        const tag = '[Covered by master course bundle]';
-        notes = notes ? `${tag} ${notes}` : tag;
-      }
+      const paymentMode = body.paymentMode || 'FULL';
+      const downPayment = body.downPayment || 0;
+      const originalPrice = body.originalPrice;
+      const discountPercent = body.discountPercent || 0;
+      const discountAmount = body.discountAmount || 0;
+      const finalPrice = body.finalPrice;
+      const amountPaid = paymentMode === 'FULL' ? finalPrice : downPayment;
+      const notes = body.notes || null;
 
       const paymentStatus = computePaymentStatus(finalPrice, amountPaid);
 
@@ -102,7 +77,6 @@ export const enrollmentsRoutes = {
         payment_status: paymentStatus,
         completion_date: null,
         notes,
-        master_enrollment_id: masterEnrollmentId,
       });
 
       // Only record a payment row if money actually changed hands.

@@ -208,6 +208,30 @@ CREATE UNIQUE INDEX uq_master_enrollments_active
     ON master_enrollments(student_id, master_course_id)
     WHERE status = 'ACTIVE';
 
+-- =============================================
+-- MASTER CLASS ENROLLMENTS TABLE
+-- Tracks which specific class a student is attending within a master enrollment bundle.
+-- =============================================
+CREATE TABLE master_class_enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    master_enrollment_id UUID NOT NULL REFERENCES master_enrollments(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    enrolled_at DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'DROPPED')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mce_master_enrollment ON master_class_enrollments(master_enrollment_id);
+CREATE INDEX idx_mce_student ON master_class_enrollments(student_id);
+CREATE INDEX idx_mce_class ON master_class_enrollments(class_id);
+CREATE INDEX idx_mce_company ON master_class_enrollments(company_id);
+
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID NOT NULL,
@@ -694,6 +718,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECU
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_courses_updated_at BEFORE UPDATE ON master_courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_enrollments_updated_at BEFORE UPDATE ON master_enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_master_class_enrollments_updated_at BEFORE UPDATE ON master_class_enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_demo_leads_updated_at BEFORE UPDATE ON demo_leads FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

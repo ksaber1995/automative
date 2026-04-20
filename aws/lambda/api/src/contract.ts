@@ -1470,6 +1470,51 @@ export const contract = c.router({
     },
   },
 
+  // Master class enrollments (joining a class within a bundle)
+  masterClassEnrollments: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/master-class-enrollments',
+      body: z.object({
+        masterEnrollmentId: UUIDSchema,
+        classId: UUIDSchema,
+        courseId: UUIDSchema,
+        branchId: UUIDSchema,
+        enrolledAt: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    listByMasterEnrollment: {
+      method: 'GET' as const,
+      path: '/api/master-class-enrollments',
+      query: z.object({ masterEnrollmentId: UUIDSchema }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    updateStatus: {
+      method: 'PATCH' as const,
+      path: '/api/master-class-enrollments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        status: z.enum(['ACTIVE', 'COMPLETED', 'DROPPED']),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        200: z.any(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
   // Enrollments routes
   enrollments: {
     create: {
@@ -2458,6 +2503,15 @@ export const contract = c.router({
           message: z.string(),
           error: z.string().optional(),
         }),
+      },
+    },
+    createMasterClassEnrollments: {
+      method: 'POST',
+      path: '/api/migrations/create-master-class-enrollments',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
   },
