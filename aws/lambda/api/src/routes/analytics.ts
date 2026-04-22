@@ -57,11 +57,11 @@ export const analyticsRoutes = {
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
       const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue - totalRefunds;
 
-      // --- Company-wide expenses (is_recurring = false to exclude templates) ---
+      // --- Company-wide expenses (actual payments only) ---
       const expenseData = await query(
         `SELECT type, category, COALESCE(SUM(amount), 0) as total_amount
-         FROM expenses
-         WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
+         FROM expense_payments
+         WHERE company_id = $1 AND date >= $2 AND date <= $3
          GROUP BY type, category`,
         [context.companyId, startDate, endDate]
       );
@@ -95,10 +95,9 @@ export const analyticsRoutes = {
       // --- Global overhead (branch_id IS NULL, excluding product-cost categories) ---
       const globalOverheadData = await query(
         `SELECT COALESCE(SUM(amount), 0) as total
-         FROM expenses
+         FROM expense_payments
          WHERE company_id = $1 AND branch_id IS NULL
            AND date >= $2 AND date <= $3
-           AND is_recurring = false
            AND category NOT IN ('COGS', 'INVENTORY')`,
         [context.companyId, startDate, endDate]
       );
@@ -132,10 +131,9 @@ export const analyticsRoutes = {
            ), 0) AS master_revenue,
            -- Direct expenses (explicitly assigned to this branch)
            COALESCE((
-             SELECT SUM(ex.amount) FROM expenses ex
-             WHERE ex.branch_id = b.id AND ex.company_id = $1
-               AND ex.date >= $2 AND ex.date <= $3
-               AND ex.is_recurring = false
+             SELECT SUM(ep.amount) FROM expense_payments ep
+             WHERE ep.branch_id = b.id AND ep.company_id = $1
+               AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS direct_expenses,
            -- Active student count
            (SELECT COUNT(*) FROM enrollments en
@@ -210,8 +208,8 @@ export const analyticsRoutes = {
              AND enrollment_date >= $2 AND enrollment_date <= $3
            UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
-           FROM expenses
-           WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false
+           FROM expense_payments
+           WHERE company_id = $1 AND date >= $2 AND date <= $3
            UNION ALL
            SELECT refund_date as date, 0 as revenue, 0 as expenses, amount as refunds
            FROM refunds

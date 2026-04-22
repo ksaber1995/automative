@@ -10,7 +10,6 @@ export interface Expense {
   description: string;
   date: string;
   isRecurring: boolean;
-  recurringDay?: number;
   parentExpenseId?: string | null;
   distributionMethod?: DistributionMethod;
   vendor?: string;
@@ -22,6 +21,9 @@ export interface Expense {
   bonusAmount?: number | null;
   discountAmount?: number | null;
   adjustmentReason?: string | null;
+  totalPaid?: number;
+  lastPaymentDate?: string | null;
+  paymentCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,7 +36,6 @@ export interface ExpenseCreateDto {
   description: string;
   date: string;
   isRecurring?: boolean;
-  recurringDay?: number;
   distributionMethod?: DistributionMethod;
   vendor?: string;
   invoiceNumber?: string;
@@ -49,9 +50,46 @@ export interface ExpenseUpdateDto {
   date?: string;
   category?: ExpenseCategory;
   isRecurring?: boolean;
-  recurringDay?: number;
   distributionMethod?: DistributionMethod;
   vendor?: string;
   invoiceNumber?: string;
   notes?: string;
+}
+
+export interface ExpensePayment {
+  id: string;
+  companyId: string;
+  expenseId?: string | null;
+  branchId?: string | null;
+  employeeId?: string | null;
+  eventId?: string | null;
+  type: ExpenseType;
+  category: ExpenseCategory;
+  amount: number;
+  date: string;
+  notes?: string | null;
+  vendor?: string | null;
+  invoiceNumber?: string | null;
+  bonusAmount?: number;
+  discountAmount?: number;
+  adjustmentReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpensePaymentCreateDto {
+  expenseId?: string | null;
+  branchId?: string | null;
+  employeeId?: string;
+  eventId?: string;
+  type: ExpenseType;
+  category: ExpenseCategory;
+  amount: number;
+  date: string;
+  notes?: string;
+  vendor?: string;
+  invoiceNumber?: string;
+  bonusAmount?: number;
+  discountAmount?: number;
+  adjustmentReason?: string;
 }

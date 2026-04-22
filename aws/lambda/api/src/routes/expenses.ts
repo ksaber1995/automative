@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { mapPaymentFromDB } from './expense-payments';
 
 function mapExpenseFromDB(row: any) {
   const amount = parseFloat(row.amount);
@@ -14,7 +15,6 @@ function mapExpenseFromDB(row: any) {
     description: row.description,
     date: row.date,
     isRecurring: row.is_recurring,
-    recurringDay: row.recurring_day,
     distributionMethod: row.distribution_method,
     vendor: row.vendor,
     invoiceNumber: row.invoice_number,
@@ -26,6 +26,9 @@ function mapExpenseFromDB(row: any) {
     discountAmount: row.discount_amount ? parseFloat(row.discount_amount) : 0,
     adjustmentReason: row.adjustment_reason || null,
     eventId: row.event_id || null,
+    totalPaid: row.total_paid !== undefined ? parseFloat(row.total_paid) || 0 : undefined,
+    lastPaymentDate: row.last_payment_date || null,
+    paymentCount: row.payment_count !== undefined ? parseInt(row.payment_count) || 0 : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -55,7 +58,6 @@ export const expensesRoutes = {
         description: body.description || null,
         date: body.date,
         is_recurring: body.isRecurring || false,
-        recurring_day: body.recurringDay || null,
         distribution_method: body.distributionMethod || null,
         vendor: body.vendor || null,
         invoice_number: body.invoiceNumber || null,
@@ -85,7 +87,11 @@ export const expensesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      let sql = 'SELECT * FROM expenses WHERE company_id = $1';
+      let sql = `SELECT e.*,
+        COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) as total_paid,
+        (SELECT MAX(ep.date) FROM expense_payments ep WHERE ep.expense_id = e.id) as last_payment_date,
+        (SELECT COUNT(*) FROM expense_payments ep WHERE ep.expense_id = e.id) as payment_count
+        FROM expenses e WHERE e.company_id = $1`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
@@ -96,38 +102,38 @@ export const expensesRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND e.branch_id = $${params.length}`;
       } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND (branch_id = $${params.length} OR branch_id IS NULL)`;
+        sql += ` AND (e.branch_id = $${params.length} OR e.branch_id IS NULL)`;
       }
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
-        sql += ` AND date >= $${params.length}`;
+        sql += ` AND e.date >= $${params.length}`;
       }
 
       if (queryParams.endDate) {
         params.push(queryParams.endDate);
-        sql += ` AND date <= $${params.length}`;
+        sql += ` AND e.date <= $${params.length}`;
       }
 
       if (queryParams.isRecurring !== undefined) {
         params.push(queryParams.isRecurring === 'true');
-        sql += ` AND is_recurring = $${params.length}`;
+        sql += ` AND e.is_recurring = $${params.length}`;
       }
 
       if (queryParams.category) {
         params.push(queryParams.category);
-        sql += ` AND category = $${params.length}`;
+        sql += ` AND e.category = $${params.length}`;
       }
 
       if (queryParams.type) {
         params.push(queryParams.type);
-        sql += ` AND type = $${params.length}`;
+        sql += ` AND e.type = $${params.length}`;
       }
 
-      sql += ' ORDER BY date DESC, created_at DESC';
+      sql += ' ORDER BY e.date DESC, e.created_at DESC';
 
       const expenses = await query(sql, params);
       return {
@@ -151,30 +157,30 @@ export const expensesRoutes = {
       const monthStart = targetMonth + '-01';
       const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
 
-      // 1. Unpaid recurring expense templates for this month
+      // Unpaid recurring expense templates for this month (check expense_payments)
       const recurringTemplates = await query(
         `SELECT e.*, b.name as branch_name
          FROM expenses e
          LEFT JOIN branches b ON e.branch_id = b.id
          WHERE e.company_id = $1 AND e.is_recurring = true
            AND NOT EXISTS (
-             SELECT 1 FROM expenses child
-             WHERE child.recurring_template_id = e.id
-               AND child.date >= $2 AND child.date <= $3
+             SELECT 1 FROM expense_payments ep
+             WHERE ep.expense_id = e.id
+               AND ep.date >= $2 AND ep.date <= $3
            )`,
         [context.companyId, monthStart, monthEnd]
       );
 
-      // 2. Employees with unpaid salary for this month
+      // Employees with unpaid salary for this month (check expense_payments)
       const unpaidEmployees = await query(
         `SELECT e.*, b.name as branch_name
          FROM employees e
          LEFT JOIN branches b ON e.branch_id = b.id
          WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0
            AND NOT EXISTS (
-             SELECT 1 FROM expenses ex
-             WHERE ex.employee_id = e.id AND ex.category = 'SALARIES'
-               AND ex.date >= $2 AND ex.date <= $3
+             SELECT 1 FROM expense_payments ep
+             WHERE ep.employee_id = e.id AND ep.category = 'SALARIES'
+               AND ep.date >= $2 AND ep.date <= $3
            )`,
         [context.companyId, monthStart, monthEnd]
       );
@@ -227,7 +233,11 @@ export const expensesRoutes = {
       }
 
       const expense = await queryOne(
-        'SELECT * FROM expenses WHERE id = $1 AND company_id = $2',
+        `SELECT e.*,
+          COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) as total_paid,
+          (SELECT MAX(ep.date) FROM expense_payments ep WHERE ep.expense_id = e.id) as last_payment_date,
+          (SELECT COUNT(*) FROM expense_payments ep WHERE ep.expense_id = e.id) as payment_count
+         FROM expenses e WHERE e.id = $1 AND e.company_id = $2`,
         [params.id, context.companyId]
       );
 
@@ -301,7 +311,6 @@ export const expensesRoutes = {
       if (body.description !== undefined) updateData.description = body.description;
       if (body.date !== undefined) updateData.date = body.date;
       if (body.isRecurring !== undefined) updateData.is_recurring = body.isRecurring;
-      if (body.recurringDay !== undefined) updateData.recurring_day = body.recurringDay;
       if (body.distributionMethod !== undefined) updateData.distribution_method = body.distributionMethod;
       if (body.vendor !== undefined) updateData.vendor = body.vendor;
       if (body.invoiceNumber !== undefined) updateData.invoice_number = body.invoiceNumber;
@@ -348,6 +357,7 @@ export const expensesRoutes = {
         return { status: 404 as const, body: { message: 'Expense not found' } };
       }
 
+      await query('DELETE FROM expense_payments WHERE expense_id = $1 AND company_id = $2', [params.id, context.companyId]);
       await query('DELETE FROM expenses WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
 
       return { status: 200 as const, body: { message: 'Expense deleted successfully' } };
@@ -356,6 +366,37 @@ export const expensesRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to delete expense' },
+      };
+    }
+  },
+
+  getPayments: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const expense = await queryOne(
+        'SELECT id FROM expenses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!expense) {
+        return { status: 404 as const, body: { message: 'Expense not found' } };
+      }
+
+      const payments = await query(
+        'SELECT * FROM expense_payments WHERE expense_id = $1 AND company_id = $2 ORDER BY date DESC',
+        [params.id, context.companyId]
+      );
+
+      return { status: 200 as const, body: payments.map(mapPaymentFromDB) };
+    } catch (error) {
+      console.error('Get expense payments error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to get payments' },
       };
     }
   },
@@ -375,12 +416,11 @@ export const expensesRoutes = {
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
 
-      // Check if already paid this month
       const monthStart = payDate.substring(0, 7) + '-01';
       const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
 
       const existing = await queryOne(
-        `SELECT id FROM expenses WHERE company_id = $1 AND recurring_template_id = $2 AND date >= $3 AND date <= $4`,
+        `SELECT id FROM expense_payments WHERE company_id = $1 AND expense_id = $2 AND date >= $3 AND date <= $4`,
         [context.companyId, params.id, monthStart, monthEnd]
       );
 
@@ -388,26 +428,23 @@ export const expensesRoutes = {
         return { status: 400 as const, body: { message: 'This expense has already been paid for this month' } };
       }
 
-      const newExpense = await insert('expenses', {
+      const payment = await insert('expense_payments', {
         company_id: context.companyId,
+        expense_id: params.id,
         branch_id: template.branch_id,
         type: template.type,
         category: template.category,
         amount: template.amount,
-        description: template.description,
         date: payDate,
         vendor: template.vendor,
         invoice_number: null,
-        notes: `Auto-generated from recurring expense: ${template.description}`,
-        is_recurring: false,
-        recurring_day: null,
-        recurring_template_id: params.id,
-        distribution_method: template.distribution_method,
-        asset_name: null,
-        amortization_months: null,
+        notes: template.notes,
+        event_id: template.event_id || null,
+        bonus_amount: 0,
+        discount_amount: 0,
       });
 
-      return { status: 201 as const, body: mapExpenseFromDB(newExpense) };
+      return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
       console.error('Pay recurring error:', error);
       return {
@@ -426,7 +463,6 @@ export const expensesRoutes = {
       const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
       const monthLabel = new Date(payDate).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-      // Fetch active employees with salary
       let empSql = 'SELECT * FROM employees WHERE company_id = $1 AND is_active = true AND salary > 0';
       const empParams: any[] = [context.companyId];
 
@@ -445,9 +481,8 @@ export const expensesRoutes = {
       const skipped: string[] = [];
 
       for (const emp of employees) {
-        // Check if salary already paid this month for this employee
         const existing = await queryOne(
-          `SELECT id FROM expenses WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
+          `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
           [context.companyId, emp.id, monthStart, monthEnd]
         );
 
@@ -456,19 +491,20 @@ export const expensesRoutes = {
           continue;
         }
 
-        const expense = await insert('expenses', {
+        const payment = await insert('expense_payments', {
           company_id: context.companyId,
           branch_id: emp.branch_id,
+          employee_id: emp.id,
           type: 'FIXED',
           category: 'SALARIES',
           amount: parseFloat(emp.salary),
-          description: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
           date: payDate,
-          is_recurring: false,
-          employee_id: emp.id,
+          notes: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
+          bonus_amount: 0,
+          discount_amount: 0,
         });
 
-        created.push(mapExpenseFromDB(expense));
+        created.push(mapPaymentFromDB(payment));
       }
 
       return {
@@ -477,8 +513,8 @@ export const expensesRoutes = {
           created: created.length,
           skipped: skipped.length,
           skippedNames: skipped,
-          expenses: created,
-          message: `Created ${created.length} salary expense(s)${skipped.length ? `, skipped ${skipped.length} already paid` : ''}.`,
+          payments: created,
+          message: `Created ${created.length} salary payment(s)${skipped.length ? `, skipped ${skipped.length} already paid` : ''}.`,
         },
       };
     } catch (error) {
@@ -513,7 +549,7 @@ export const expensesRoutes = {
       const monthLabel = new Date(payDate).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
       const existing = await queryOne(
-        `SELECT id FROM expenses WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
+        `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
         [context.companyId, emp.id, monthStart, monthEnd]
       );
 
@@ -530,22 +566,21 @@ export const expensesRoutes = {
         return { status: 400 as const, body: { message: 'Final salary amount must be greater than zero' } };
       }
 
-      const expense = await insert('expenses', {
+      const payment = await insert('expense_payments', {
         company_id: context.companyId,
         branch_id: emp.branch_id,
+        employee_id: emp.id,
         type: 'FIXED',
         category: 'SALARIES',
         amount: finalAmount,
-        description: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
         date: payDate,
-        is_recurring: false,
-        employee_id: emp.id,
+        notes: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
         bonus_amount: bonus,
         discount_amount: discount,
         adjustment_reason: body.adjustmentReason || null,
       });
 
-      return { status: 201 as const, body: mapExpenseFromDB(expense) };
+      return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
       console.error('Pay employee salary error:', error);
       return {
@@ -570,11 +605,11 @@ export const expensesRoutes = {
       if (!emp) return { status: 404 as const, body: { message: 'Employee not found' } };
 
       const rows = await query(
-        `SELECT * FROM expenses WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND is_recurring = false ORDER BY date DESC`,
+        `SELECT * FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' ORDER BY date DESC`,
         [context.companyId, params.employeeId]
       );
 
-      return { status: 200 as const, body: rows.map(mapExpenseFromDB) };
+      return { status: 200 as const, body: rows.map(mapPaymentFromDB) };
     } catch (error) {
       console.error('Get employee salary history error:', error);
       return {

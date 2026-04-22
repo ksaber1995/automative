@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
+import { switchMap } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -25,6 +26,7 @@ import { TranslateModule } from '@ngx-translate/core';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     CardModule,
     ButtonModule,
@@ -67,6 +69,8 @@ export class ExpenseFormComponent implements OnInit {
   branchOptions = signal<{ label: string, value: string }[]>([]);
 
   isCapital = signal(false);
+  payImmediately = signal(false);
+  paymentDate: Date = new Date();
 
   constructor() {
     const today = new Date();
@@ -78,7 +82,6 @@ export class ExpenseFormComponent implements OnInit {
       description: ['', [Validators.required]],
       date: [today, [Validators.required]],
       isRecurring: [false],
-      recurringDay: [1],
       distributionMethod: ['PROPORTIONAL'],
       vendor: [''],
       invoiceNumber: [''],
@@ -117,16 +120,7 @@ export class ExpenseFormComponent implements OnInit {
       amortizationControl?.updateValueAndValidity();
     });
 
-    // Watch for isRecurring changes
-    this.expenseForm.get('isRecurring')?.valueChanges.subscribe(isRecurring => {
-      const recurringDayControl = this.expenseForm.get('recurringDay');
-      if (isRecurring) {
-        recurringDayControl?.setValidators([Validators.required, Validators.min(1), Validators.max(31)]);
-      } else {
-        recurringDayControl?.clearValidators();
-      }
-      recurringDayControl?.updateValueAndValidity();
-    });
+  
   }
 
   ngOnInit() {
@@ -209,17 +203,51 @@ export class ExpenseFormComponent implements OnInit {
         }
       });
     } else {
-      this.expenseService.createExpense(expenseData).subscribe({
-        next: () => {
-          this.notificationService.success('Expense created successfully');
-          this.router.navigate(['/expenses']);
-        },
-        error: (error) => {
-          this.loading.set(false);
-          this.notificationService.error('Failed to create expense');
-          console.error('Create error:', error);
-        }
-      });
+      const create$ = this.expenseService.createExpense(expenseData);
+
+      if (this.payImmediately()) {
+        const payDate = this.paymentDate instanceof Date
+          ? this.paymentDate.toISOString().split('T')[0]
+          : this.paymentDate;
+
+        create$.pipe(
+          switchMap(expense =>
+            this.expenseService.recordPayment({
+              expenseId: expense.id,
+              type: expense.type,
+              category: expense.category,
+              amount: expense.amount,
+              date: payDate,
+              branchId: expense.branchId,
+              vendor: expense.vendor || undefined,
+              invoiceNumber: expense.invoiceNumber || undefined,
+              notes: expense.notes || undefined,
+            })
+          )
+        ).subscribe({
+          next: () => {
+            this.notificationService.success('Expense created and payment recorded');
+            this.router.navigate(['/expenses']);
+          },
+          error: (error) => {
+            this.loading.set(false);
+            this.notificationService.error('Expense created but payment failed');
+            console.error('Payment error:', error);
+          }
+        });
+      } else {
+        create$.subscribe({
+          next: () => {
+            this.notificationService.success('Expense created successfully');
+            this.router.navigate(['/expenses']);
+          },
+          error: (error) => {
+            this.loading.set(false);
+            this.notificationService.error('Failed to create expense');
+            console.error('Create error:', error);
+          }
+        });
+      }
     }
   }
 
@@ -234,7 +262,6 @@ export class ExpenseFormComponent implements OnInit {
   get description() { return this.expenseForm.get('description'); }
   get date() { return this.expenseForm.get('date'); }
   get isRecurring() { return this.expenseForm.get('isRecurring'); }
-  get recurringDay() { return this.expenseForm.get('recurringDay'); }
   get distributionMethod() { return this.expenseForm.get('distributionMethod'); }
   get assetName() { return this.expenseForm.get('assetName'); }
   get amortizationMonths() { return this.expenseForm.get('amortizationMonths'); }

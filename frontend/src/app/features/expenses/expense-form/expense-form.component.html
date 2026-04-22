@@ -150,24 +150,30 @@
           <label for="isRecurring" class="text-sm font-medium">{{ 'EXPENSES.FORM.RECURRING_LABEL' | translate }}</label>
         </div>
 
-        <!-- Recurring Day (only if recurring) -->
-        @if (expenseForm.get('isRecurring')?.value) {
-          <div>
-            <label class="block text-sm font-medium mb-2">
-              {{ 'EXPENSES.FORM.RECURRING_DAY' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <p-inputnumber
-              formControlName="recurringDay"
-              [min]="1"
-              [max]="31"
-              [showButtons]="true"
-              class="w-full"
-              [ngClass]="{'ng-invalid ng-dirty': recurringDay?.invalid && recurringDay?.touched}"></p-inputnumber>
-            @if (recurringDay?.invalid && recurringDay?.touched) {
-              <small class="text-red-500">{{ 'EXPENSES.FORM.RECURRING_DAY_REQUIRED' | translate }}</small>
-            }
-            <small class="text-gray-500 block mt-1">{{ 'EXPENSES.FORM.RECURRING_DAY_HINT' | translate }}</small>
+        <!-- Pay Immediately (create mode only) -->
+        @if (!isEditMode()) {
+          <div class="flex items-center">
+            <p-checkbox
+              [ngModel]="payImmediately()"
+              [ngModelOptions]="{standalone: true}"
+              [binary]="true"
+              inputId="payImmediately"
+              class="mr-2"
+              (ngModelChange)="payImmediately.set($event)"></p-checkbox>
+            <label for="payImmediately" class="text-sm font-medium">Pay immediately</label>
           </div>
+
+          @if (payImmediately()) {
+            <div>
+              <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+              <p-datepicker
+                [(ngModel)]="paymentDate"
+                [ngModelOptions]="{standalone: true}"
+                dateFormat="yy-mm-dd"
+                [showIcon]="true"
+                class="w-full"></p-datepicker>
+            </div>
+          }
         }
 
         <!-- Vendor -->

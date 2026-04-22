@@ -291,7 +291,7 @@ export const branchesRoutes = {
 
       // Get total expenses for this branch
       const expenseResult = await queryOne(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE company_id = $1 AND (branch_id = $2 OR type = $3)',
+        'SELECT COALESCE(SUM(amount), 0) as total FROM expense_payments WHERE company_id = $1 AND (branch_id = $2 OR type = $3)',
         [context.companyId, params.id, 'SHARED']
       );
       const totalExpenses = parseFloat(expenseResult?.total || '0');

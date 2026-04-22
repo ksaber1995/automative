@@ -20,7 +20,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExpenseService } from '../../expenses/services/expense.service';
 import { Employee } from '@shared/interfaces/employee.interface';
-import { Expense } from '@shared/interfaces/expense.interface';
+import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
 import { Branch } from '@shared/interfaces/branch.interface';
 
@@ -327,7 +327,7 @@ export class EmployeeDetailComponent implements OnInit {
   branchName = signal('—');
   branches = signal<Branch[]>([]);
   converting = signal(false);
-  salaryHistory = signal<Expense[]>([]);
+  salaryHistory = signal<ExpensePayment[]>([]);
   historyLoading = signal(false);
 
   showConvertDialog = false;
@@ -350,7 +350,7 @@ export class EmployeeDetailComponent implements OnInit {
     return this.authService.canManageUsers();
   }
 
-  getBaseSalary(item: Expense): number {
+  getBaseSalary(item: ExpensePayment): number {
     return item.amount - (item.bonusAmount || 0) + (item.discountAmount || 0);
   }
 

@@ -9,6 +9,9 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TagModule } from 'primeng/tag';
 import { DialogModule } from 'primeng/dialog';
 import { DatePickerModule } from 'primeng/datepicker';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -21,7 +24,11 @@ import { TranslateModule } from '@ngx-translate/core';
 @Component({
   selector: 'app-expense-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TooltipModule, TagModule, DialogModule, DatePickerModule, DeleteConfirmDialogComponent, TranslateModule],
+  imports: [
+    CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TooltipModule,
+    TagModule, DialogModule, DatePickerModule, InputNumberModule, InputTextModule,
+    TextareaModule, DeleteConfirmDialogComponent, TranslateModule
+  ],
   templateUrl: './expense-list.component.html',
   styleUrl: './expense-list.component.scss'
 })
@@ -50,11 +57,15 @@ export class ExpenseListComponent implements OnInit {
   showDeleteDialog = false;
   expenseToDelete = signal<Expense | null>(null);
 
-  // Pay recurring dialog
-  showPayDialog = false;
-  expenseToPayId = signal<string>('');
-  expenseToPayLabel = signal<string>('');
-  payDate: Date = new Date();
+  // Record payment dialog
+  showPaymentDialog = false;
+  expenseForPayment = signal<Expense | null>(null);
+  paymentAmount: number = 0;
+  paymentDate: Date = new Date();
+  paymentNotes: string = '';
+  paymentVendor: string = '';
+  paymentInvoiceNumber: string = '';
+  recordingPayment = signal(false);
 
   // Pay salaries dialog
   showSalariesDialog = false;
@@ -143,37 +154,61 @@ export class ExpenseListComponent implements OnInit {
     });
   }
 
-  // --- Pay Recurring ---
-  openPayDialog(expense: Expense) {
-    this.expenseToPayId.set(expense.id);
-    this.expenseToPayLabel.set(expense.description);
-    this.payDate = new Date();
-    this.showPayDialog = true;
+  openPaymentDialog(expense: Expense) {
+    this.expenseForPayment.set(expense);
+    this.paymentAmount = expense.amount;
+    this.paymentDate = new Date();
+    this.paymentNotes = '';
+    this.paymentVendor = expense.vendor || '';
+    this.paymentInvoiceNumber = '';
+    this.showPaymentDialog = true;
   }
 
-  confirmPayRecurring() {
-    const dateStr = this.payDate instanceof Date
-      ? this.payDate.toISOString().split('T')[0]
-      : this.payDate;
+  confirmRecordPayment() {
+    const expense = this.expenseForPayment();
+    if (!expense) return;
 
-    this.expenseService.payRecurring(this.expenseToPayId(), dateStr).subscribe({
+    this.recordingPayment.set(true);
+    const dateStr = this.paymentDate instanceof Date
+      ? this.paymentDate.toISOString().split('T')[0]
+      : this.paymentDate;
+
+    this.expenseService.recordPayment({
+      expenseId: expense.id,
+      type: expense.type,
+      category: expense.category,
+      amount: this.paymentAmount,
+      date: dateStr,
+      branchId: expense.branchId,
+      notes: this.paymentNotes || undefined,
+      vendor: this.paymentVendor || undefined,
+      invoiceNumber: this.paymentInvoiceNumber || undefined,
+    }).subscribe({
       next: () => {
-        this.notificationService.success('Expense paid for this month');
-        this.showPayDialog = false;
+        this.recordingPayment.set(false);
+        this.notificationService.success('Payment recorded successfully');
+        this.showPaymentDialog = false;
         this.loadExpenses();
       },
       error: (err) => {
-        this.notificationService.error(err.error?.message || 'Failed to pay expense');
-        this.showPayDialog = false;
+        this.recordingPayment.set(false);
+        this.notificationService.error(err.error?.message || 'Failed to record payment');
       }
     });
   }
 
-  // --- Pay All Salaries ---
   openSalariesDialog() {
     this.salariesDate = new Date();
     this.salariesBranchId = '';
     this.showSalariesDialog = true;
+  }
+
+  viewExpense(expense: Expense) {
+    this.router.navigate(['/expenses', expense.id]);
+  }
+
+  goToManageRecurring() {
+    this.router.navigate(['/expenses/manage-recurring']);
   }
 
   goToSalaries() {
@@ -214,5 +249,15 @@ export class ExpenseListComponent implements OnInit {
       case 'CAPITAL': return 'danger';
       default: return 'info';
     }
+  }
+
+  getPaymentStatus(expense: Expense): { label: string; severity: 'success' | 'warn' | 'danger' | 'secondary' } {
+    const totalPaid = expense.totalPaid ?? 0;
+    if (totalPaid >= expense.amount) {
+      return { label: 'Paid', severity: 'success' };
+    } else if (totalPaid > 0) {
+      return { label: 'Partial', severity: 'warn' };
+    }
+    return { label: 'Unpaid', severity: 'danger' };
   }
 }

@@ -637,7 +637,6 @@ const CreateExpenseSchema = z.object({
   description: z.string().optional(),
   date: z.string(),
   isRecurring: z.boolean().optional(),
-  recurringDay: z.number().optional(),
   distributionMethod: z.string().optional(),
   vendor: z.string().optional(),
   invoiceNumber: z.string().optional(),
@@ -659,7 +658,6 @@ const ExpenseSchema = z.object({
   description: z.string().nullable(),
   date: z.string(),
   isRecurring: z.boolean(),
-  recurringDay: z.number().nullable(),
   distributionMethod: z.string().nullable(),
   vendor: z.string().nullable(),
   invoiceNumber: z.string().nullable(),
@@ -671,8 +669,49 @@ const ExpenseSchema = z.object({
   discountAmount: z.number().nullable(),
   adjustmentReason: z.string().nullable(),
   eventId: UUIDSchema.nullable().optional(),
+  totalPaid: z.number().optional(),
+  lastPaymentDate: z.string().nullable().optional(),
+  paymentCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const ExpensePaymentSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  expenseId: UUIDSchema.nullable(),
+  branchId: UUIDSchema.nullable(),
+  employeeId: UUIDSchema.nullable(),
+  eventId: UUIDSchema.nullable(),
+  type: ExpenseTypeSchema,
+  category: ExpenseCategorySchema,
+  amount: z.number(),
+  date: z.string(),
+  notes: z.string().nullable(),
+  vendor: z.string().nullable(),
+  invoiceNumber: z.string().nullable(),
+  bonusAmount: z.number(),
+  discountAmount: z.number(),
+  adjustmentReason: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const CreateExpensePaymentSchema = z.object({
+  expenseId: OptionalUUIDSchema,
+  branchId: OptionalUUIDSchema,
+  employeeId: OptionalUUIDSchema,
+  eventId: OptionalUUIDSchema,
+  type: ExpenseTypeSchema,
+  category: ExpenseCategorySchema,
+  amount: z.number().positive(),
+  date: z.string(),
+  notes: z.string().optional(),
+  vendor: z.string().optional(),
+  invoiceNumber: z.string().optional(),
+  bonusAmount: z.number().min(0).optional(),
+  discountAmount: z.number().min(0).optional(),
+  adjustmentReason: z.string().optional(),
 });
 
 // =============================================
@@ -1738,7 +1777,7 @@ export const contract = c.router({
           created: z.number(),
           skipped: z.number(),
           skippedNames: z.array(z.string()),
-          expenses: z.array(z.any()),
+          payments: z.array(z.any()),
           message: z.string(),
         }),
         400: z.object({ message: z.string() }),
@@ -1755,7 +1794,7 @@ export const contract = c.router({
         adjustmentReason: z.string().optional(),
       }),
       responses: {
-        201: ExpenseSchema,
+        201: ExpensePaymentSchema,
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
@@ -1765,7 +1804,7 @@ export const contract = c.router({
       path: '/api/expenses/employee/:employeeId/salary-history',
       pathParams: z.object({ employeeId: UUIDSchema }),
       responses: {
-        200: z.array(ExpenseSchema),
+        200: z.array(ExpensePaymentSchema),
         404: z.object({ message: z.string() }),
       },
     },
@@ -1792,7 +1831,7 @@ export const contract = c.router({
       method: 'DELETE',
       path: '/api/expenses/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}),
+      body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -1804,8 +1843,65 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ date: z.string().optional() }),
       responses: {
-        201: ExpenseSchema,
+        201: ExpensePaymentSchema,
         400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    getPayments: {
+      method: 'GET',
+      path: '/api/expenses/:id/payments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(ExpensePaymentSchema),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Expense Payments routes
+  expensePayments: {
+    create: {
+      method: 'POST',
+      path: '/api/expense-payments',
+      body: CreateExpensePaymentSchema,
+      responses: {
+        201: ExpensePaymentSchema,
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/expense-payments',
+      query: z.object({
+        expenseId: UUIDSchema.optional(),
+        branchId: UUIDSchema.optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        category: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(ExpensePaymentSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/expense-payments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: ExpensePaymentSchema,
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/expense-payments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },
@@ -2521,6 +2617,24 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    createExpensePaymentsTable: {
+      method: 'POST',
+      path: '/api/migrations/create-expense-payments-table',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string(), migratedCount: z.number().optional() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    cleanupOrphanedPayments: {
+      method: 'POST',
+      path: '/api/migrations/cleanup-orphaned-payments',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string(), deletedCount: z.number() }),
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },

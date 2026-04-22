@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Expense, ExpenseCreateDto, ExpenseUpdateDto } from '@shared/interfaces/expense.interface';
+import { Expense, ExpenseCreateDto, ExpenseUpdateDto, ExpensePayment, ExpensePaymentCreateDto } from '@shared/interfaces/expense.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -11,25 +11,6 @@ export class ExpenseService {
 
   getAllExpenses(params?: { branchId?: string; type?: string; startDate?: string; endDate?: string; isRecurring?: string; category?: string }): Observable<Expense[]> {
     return this.api.get<Expense[]>('expenses', params);
-  }
-
-  payRecurring(id: string, date?: string): Observable<Expense> {
-    return this.api.post<Expense>(`expenses/${id}/pay`, date ? { date } : {});
-  }
-
-  paySalaries(date?: string, branchId?: string): Observable<{ created: number; skipped: number; skippedNames: string[]; message: string }> {
-    const body: any = {};
-    if (date) body.date = date;
-    if (branchId) body.branchId = branchId;
-    return this.api.post<any>('expenses/pay-salaries', body);
-  }
-
-  getRecurringExpenses(): Observable<Expense[]> {
-    return this.api.get<Expense[]>('expenses/recurring');
-  }
-
-  getExpensesByType(type: string): Observable<Expense[]> {
-    return this.api.get<Expense[]>(`expenses/type/${type}`);
   }
 
   getExpenseById(id: string): Observable<Expense> {
@@ -48,17 +29,44 @@ export class ExpenseService {
     return this.api.delete<Expense>(`expenses/${id}`);
   }
 
-  payEmployeeSalary(employeeId: string, date?: string, bonusAmount?: number, discountAmount?: number, adjustmentReason?: string): Observable<Expense> {
+  getExpensePayments(expenseId: string): Observable<ExpensePayment[]> {
+    return this.api.get<ExpensePayment[]>(`expenses/${expenseId}/payments`);
+  }
+
+  recordPayment(payment: ExpensePaymentCreateDto): Observable<ExpensePayment> {
+    return this.api.post<ExpensePayment>('expense-payments', payment);
+  }
+
+  deletePayment(paymentId: string): Observable<{ message: string }> {
+    return this.api.delete<{ message: string }>(`expense-payments/${paymentId}`);
+  }
+
+  getAllPayments(params?: { expenseId?: string; branchId?: string; startDate?: string; endDate?: string; category?: string }): Observable<ExpensePayment[]> {
+    return this.api.get<ExpensePayment[]>('expense-payments', params);
+  }
+
+  payRecurring(id: string, date?: string): Observable<ExpensePayment> {
+    return this.api.post<ExpensePayment>(`expenses/${id}/pay`, date ? { date } : {});
+  }
+
+  paySalaries(date?: string, branchId?: string): Observable<{ created: number; skipped: number; skippedNames: string[]; message: string }> {
+    const body: any = {};
+    if (date) body.date = date;
+    if (branchId) body.branchId = branchId;
+    return this.api.post<any>('expenses/pay-salaries', body);
+  }
+
+  payEmployeeSalary(employeeId: string, date?: string, bonusAmount?: number, discountAmount?: number, adjustmentReason?: string): Observable<ExpensePayment> {
     const body: any = {};
     if (date) body.date = date;
     if (bonusAmount) body.bonusAmount = bonusAmount;
     if (discountAmount) body.discountAmount = discountAmount;
     if (adjustmentReason) body.adjustmentReason = adjustmentReason;
-    return this.api.post<Expense>(`expenses/pay-employee/${employeeId}`, body);
+    return this.api.post<ExpensePayment>(`expenses/pay-employee/${employeeId}`, body);
   }
 
-  getEmployeeSalaryHistory(employeeId: string): Observable<Expense[]> {
-    return this.api.get<Expense[]>(`expenses/employee/${employeeId}/salary-history`);
+  getEmployeeSalaryHistory(employeeId: string): Observable<ExpensePayment[]> {
+    return this.api.get<ExpensePayment[]>(`expenses/employee/${employeeId}/salary-history`);
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {
@@ -66,7 +74,7 @@ export class ExpenseService {
     return this.api.get<{ items: any[]; totalDue: number; month: string }>('expenses/due', params);
   }
 
-  autoGenerateRecurring(): Observable<{ message: string }> {
-    return this.api.post<{ message: string }>('expenses/auto-generate', {});
+  getRecurringExpenses(): Observable<Expense[]> {
+    return this.api.get<Expense[]>('expenses', { isRecurring: 'true' });
   }
 }

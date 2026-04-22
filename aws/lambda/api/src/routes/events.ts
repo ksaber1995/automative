@@ -218,8 +218,7 @@ export const eventsRoutes = {
       );
       const expenseRow = await queryOne(
         `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
-         FROM expenses WHERE event_id = $1 AND company_id = $2
-         AND (is_recurring IS NULL OR is_recurring = false)`,
+         FROM expense_payments WHERE event_id = $1 AND company_id = $2`,
         [params.id, context.companyId]
       );
       const refundRow = await queryOne(

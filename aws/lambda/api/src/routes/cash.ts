@@ -12,7 +12,7 @@ export const cashRoutes = {
         [context.companyId]
       );
       const expenseResult = await query(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE company_id = $1',
+        'SELECT COALESCE(SUM(amount), 0) as total FROM expense_payments WHERE company_id = $1',
         [context.companyId]
       );
       const withdrawalResult = await query(
@@ -60,7 +60,7 @@ export const cashRoutes = {
           GROUP BY branch_id
         ) mast ON mast.branch_id = b.id
         LEFT JOIN (
-          SELECT branch_id, SUM(amount) AS total FROM expenses
+          SELECT branch_id, SUM(amount) AS total FROM expense_payments
           WHERE company_id = $1
           GROUP BY branch_id
         ) exp ON exp.branch_id = b.id

@@ -540,6 +540,44 @@ CREATE INDEX idx_expenses_category ON expenses(category);
 CREATE INDEX idx_expenses_event ON expenses(event_id);
 
 -- =============================================
+-- EXPENSE PAYMENTS TABLE
+-- Records actual payments made against expense definitions.
+-- expenses = obligation/definition; expense_payments = money actually paid.
+-- =============================================
+CREATE TABLE expense_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL,
+    expense_id UUID,
+    branch_id UUID,
+    employee_id UUID,
+    event_id UUID,
+    type VARCHAR(50) NOT NULL DEFAULT 'VARIABLE' CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
+    category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
+    amount DECIMAL(10, 2) NOT NULL,
+    date DATE NOT NULL,
+    notes TEXT,
+    vendor VARCHAR(255),
+    invoice_number VARCHAR(100),
+    bonus_amount DECIMAL(10, 2) DEFAULT 0,
+    discount_amount DECIMAL(10, 2) DEFAULT 0,
+    adjustment_reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE SET NULL,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_expense_payments_company_id ON expense_payments(company_id);
+CREATE INDEX idx_expense_payments_expense_id ON expense_payments(expense_id);
+CREATE INDEX idx_expense_payments_date ON expense_payments(date);
+CREATE INDEX idx_expense_payments_employee_id ON expense_payments(employee_id);
+CREATE INDEX idx_expense_payments_category ON expense_payments(category);
+CREATE INDEX idx_expense_payments_branch_id ON expense_payments(branch_id);
+
+-- =============================================
 -- CASH STATE TABLE
 -- =============================================
 CREATE TABLE cash_state (

@@ -525,6 +525,98 @@ async function createMasterClassEnrollments() {
   }
 }
 
+async function createExpensePaymentsTable() {
+  console.log('Starting migration: create_expense_payments_table');
+
+  try {
+    const tableExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'expense_payments'
+    `);
+
+    if (tableExists.length > 0) {
+      console.log('✅ expense_payments table already exists');
+      return { success: true, message: 'expense_payments table already exists' };
+    }
+
+    console.log('Creating expense_payments table...');
+
+    await query(`
+      CREATE TABLE expense_payments (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        expense_id UUID REFERENCES expenses(id) ON DELETE SET NULL,
+        branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+        employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+        event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'VARIABLE' CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
+        category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
+        amount DECIMAL(10, 2) NOT NULL,
+        date DATE NOT NULL,
+        notes TEXT,
+        vendor VARCHAR(255),
+        invoice_number VARCHAR(100),
+        bonus_amount DECIMAL(10, 2) DEFAULT 0,
+        discount_amount DECIMAL(10, 2) DEFAULT 0,
+        adjustment_reason TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✓ Created expense_payments table');
+
+    await query(`CREATE INDEX idx_expense_payments_company_id ON expense_payments(company_id)`);
+    await query(`CREATE INDEX idx_expense_payments_expense_id ON expense_payments(expense_id)`);
+    await query(`CREATE INDEX idx_expense_payments_date ON expense_payments(date)`);
+    await query(`CREATE INDEX idx_expense_payments_employee_id ON expense_payments(employee_id)`);
+    await query(`CREATE INDEX idx_expense_payments_category ON expense_payments(category)`);
+    await query(`CREATE INDEX idx_expense_payments_branch_id ON expense_payments(branch_id)`);
+    console.log('✓ Created indexes');
+
+    // Migrate existing non-template expense records to expense_payments
+    const migrated = await query(`
+      INSERT INTO expense_payments (
+        company_id, expense_id, branch_id, employee_id, event_id,
+        type, category, amount, date, notes, vendor, invoice_number,
+        bonus_amount, discount_amount, adjustment_reason,
+        created_at, updated_at
+      )
+      SELECT
+        e.company_id,
+        CASE WHEN e.recurring_template_id IS NOT NULL THEN e.recurring_template_id ELSE e.id END AS expense_id,
+        e.branch_id,
+        e.employee_id,
+        e.event_id,
+        e.type,
+        e.category,
+        e.amount,
+        e.date,
+        e.notes,
+        e.vendor,
+        e.invoice_number,
+        COALESCE(e.bonus_amount, 0),
+        COALESCE(e.discount_amount, 0),
+        e.adjustment_reason,
+        e.created_at,
+        e.updated_at
+      FROM expenses e
+      WHERE e.is_recurring = false
+      RETURNING id
+    `);
+    console.log(`✓ Migrated ${migrated.length} historical expense records to expense_payments`);
+
+    console.log('✅ expense_payments migration completed!');
+    return {
+      success: true,
+      message: `expense_payments table created and ${migrated.length} historical records migrated`,
+      migratedCount: migrated.length,
+    };
+  } catch (error) {
+    console.error('❌ expense_payments migration error:', error);
+    throw error;
+  }
+}
+
 export const migrationsRoutes = {
   runInstructorMigration: async () => {
     try {
@@ -626,6 +718,49 @@ export const migrationsRoutes = {
         body: {
           success: false,
           message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createExpensePaymentsTable: async () => {
+    try {
+      const result = await createExpensePaymentsTable();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  cleanupOrphanedPayments: async () => {
+    try {
+      const result = await query(
+        `DELETE FROM expense_payments
+         WHERE expense_id IS NULL
+           AND employee_id IS NULL
+           AND event_id IS NULL
+         RETURNING id`
+      );
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          message: `Deleted ${result.length} orphaned payment record(s)`,
+          deletedCount: result.length,
+        },
+      };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Cleanup failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

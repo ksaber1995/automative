@@ -8,6 +8,13 @@
         </div>
         <div class="flex gap-2">
           <p-button
+            label="Manage Recurring"
+            icon="pi pi-refresh"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="goToManageRecurring()">
+          </p-button>
+          <p-button
             [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
             icon="pi pi-users"
             severity="warn"
@@ -83,7 +90,10 @@
           <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
           <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
           <th>{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_VENDOR' | translate }}</th>
+          <th>Total Paid</th>
+          <th>Payments</th>
+          <th>Last Payment</th>
+          <th>Status</th>
           <th>{{ 'EXPENSES.LIST.COL_RECURRING' | translate }}</th>
           <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
@@ -94,26 +104,62 @@
           <td><p-tag [value]="'EXPENSES.LIST.' + expense.type | translate" [severity]="getTypeColor(expense.type)"></p-tag></td>
           <td>{{ expense.category }}</td>
           <td>{{ getBranchName(expense.branchId) }}</td>
-          <td>{{ expense.description }}</td>
+          <td>
+            <span
+              class="font-medium text-blue-600 hover:underline cursor-pointer"
+              (click)="viewExpense(expense)">
+              {{ expense.description }}
+            </span>
+          </td>
           <td class="font-semibold">{{ expense.amount | number:'1.2-2' }}</td>
-          <td>{{ expense.vendor || '-' }}</td>
+          <td>
+            @if ((expense.totalPaid ?? 0) > 0) {
+              <span class="text-green-700 font-medium">{{ expense.totalPaid | number:'1.2-2' }}</span>
+            } @else {
+              <span class="text-gray-400 text-sm">—</span>
+            }
+          </td>
+          <td class="text-center">
+            @if ((expense.paymentCount ?? 0) > 0) {
+              <span
+                class="inline-flex items-center gap-1 text-blue-600 font-medium cursor-pointer hover:underline"
+                (click)="viewExpense(expense)">
+                <i class="pi pi-history text-xs"></i>{{ expense.paymentCount }}x
+              </span>
+            } @else {
+              <span class="text-gray-400 text-sm">—</span>
+            }
+          </td>
+          <td>
+            @if (expense.lastPaymentDate) {
+              <span class="text-sm text-gray-600">{{ expense.lastPaymentDate | date:'MMM d, y' }}</span>
+            } @else {
+              <span class="text-gray-400 text-sm">—</span>
+            }
+          </td>
+          <td>
+            <p-tag
+              [value]="getPaymentStatus(expense).label"
+              [severity]="getPaymentStatus(expense).severity">
+            </p-tag>
+          </td>
           <td>
             @if (expense.isRecurring) {
-              <p-tag [value]="'EXPENSES.LIST.RECURRING' | translate" severity="info" icon="pi pi-refresh"></p-tag>
+              <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
             } @else {
               <span class="text-gray-400 text-sm">-</span>
             }
           </td>
           <td>
             <div class="flex gap-1">
-              @if (expense.isRecurring) {
+              @if (authService.canWrite('expenses')) {
                 <p-button
-                  icon="pi pi-check-circle"
+                  icon="pi pi-dollar"
                   [rounded]="true"
                   [text]="true"
                   severity="success"
-                  [pTooltip]="'EXPENSES.LIST.PAY_MONTH' | translate"
-                  (onClick)="openPayDialog(expense)">
+                  pTooltip="Record Payment"
+                  (onClick)="openPaymentDialog(expense)">
                 </p-button>
               }
               @if (authService.canWrite('expenses')) {
@@ -142,7 +188,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
+          <td colspan="12" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -159,31 +205,82 @@
   (cancel)="showDeleteDialog = false">
 </app-delete-confirm-dialog>
 
-<!-- Pay Recurring Dialog -->
+<!-- Record Payment Dialog -->
 <p-dialog
-  [header]="'EXPENSES.LIST.PAY_RECURRING_TITLE' | translate"
-  [(visible)]="showPayDialog"
+  header="Record Payment"
+  [(visible)]="showPaymentDialog"
   [modal]="true"
-  [style]="{ width: '400px' }"
+  [style]="{ width: '480px' }"
   [draggable]="false">
   <div class="flex flex-col gap-4 py-2">
-    <p class="text-gray-700">{{ 'EXPENSES.LIST.PAY_RECURRING_FOR' | translate }}</p>
-    <p class="font-semibold text-blue-700">{{ expenseToPayLabel() }}</p>
+    <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+      <p class="text-sm text-blue-700 font-medium">{{ expenseForPayment()?.description }}</p>
+      <p class="text-xs text-blue-500 mt-1">Expected: {{ expenseForPayment()?.amount | number:'1.2-2' }}</p>
+    </div>
+
     <div>
-      <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.LIST.PAYMENT_DATE' | translate }}</label>
+      <label class="block text-sm font-medium mb-2">Amount *</label>
+      <p-inputnumber
+        [(ngModel)]="paymentAmount"
+        [min]="0.01"
+        [minFractionDigits]="2"
+        [maxFractionDigits]="2"
+        class="w-full">
+      </p-inputnumber>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Payment Date *</label>
       <p-datepicker
-        [(ngModel)]="payDate"
+        [(ngModel)]="paymentDate"
         dateFormat="yy-mm-dd"
         [showIcon]="true"
         class="w-full">
       </p-datepicker>
     </div>
-    <small class="text-gray-500">{{ 'EXPENSES.LIST.ALREADY_PAID_HINT' | translate }}</small>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Vendor</label>
+      <input
+        type="text"
+        pInputText
+        [(ngModel)]="paymentVendor"
+        placeholder="Vendor name"
+        class="w-full" />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Invoice Number</label>
+      <input
+        type="text"
+        pInputText
+        [(ngModel)]="paymentInvoiceNumber"
+        placeholder="Invoice #"
+        class="w-full" />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Notes</label>
+      <textarea
+        pTextarea
+        [(ngModel)]="paymentNotes"
+        placeholder="Optional notes"
+        rows="2"
+        class="w-full">
+      </textarea>
+    </div>
   </div>
   <ng-template pTemplate="footer">
     <div class="flex justify-end gap-2">
-      <p-button [label]="'EXPENSES.LIST.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showPayDialog = false"></p-button>
-      <p-button [label]="'EXPENSES.LIST.CONFIRM_PAYMENT' | translate" severity="success" icon="pi pi-check" (onClick)="confirmPayRecurring()"></p-button>
+      <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
+      <p-button
+        label="Record Payment"
+        severity="success"
+        icon="pi pi-check"
+        [disabled]="recordingPayment()"
+        [loading]="recordingPayment()"
+        (onClick)="confirmRecordPayment()">
+      </p-button>
     </div>
   </ng-template>
 </p-dialog>
@@ -229,6 +326,7 @@
         severity="warn"
         icon="pi pi-users"
         [disabled]="payingSalaries()"
+        [loading]="payingSalaries()"
         (onClick)="confirmPaySalaries()">
       </p-button>
     </div>

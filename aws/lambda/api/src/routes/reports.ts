@@ -74,8 +74,8 @@ export const reportsRoutes = {
          ),
          expense_amt AS (
            SELECT date_trunc('month', date)::date AS m, SUM(amount) AS amt
-           FROM expenses
-           WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false ${branchClause}
+           FROM expense_payments
+           WHERE company_id = $1 AND date >= $2 AND date <= $3 ${branchClause}
            GROUP BY 1
          )
          SELECT
@@ -141,8 +141,8 @@ export const reportsRoutes = {
          ),
          salary AS (
            SELECT date_trunc('month', date)::date AS m, SUM(amount) AS amt, COUNT(*) AS cnt
-           FROM expenses
-           WHERE company_id = $1 AND category = 'SALARIES' AND is_recurring = false
+           FROM expense_payments
+           WHERE company_id = $1 AND category = 'SALARIES'
              AND date >= $2 AND date <= $3 ${branchClause}
            GROUP BY 1
          )
@@ -474,10 +474,9 @@ export const reportsRoutes = {
                AND rf.refund_date >= $2 AND rf.refund_date <= $3
            ), 0) AS refunds,
            COALESCE((
-             SELECT SUM(ex.amount) FROM expenses ex
-             WHERE ex.branch_id = b.id AND ex.company_id = $1
-               AND ex.date >= $2 AND ex.date <= $3
-               AND ex.is_recurring = false
+             SELECT SUM(ep.amount) FROM expense_payments ep
+             WHERE ep.branch_id = b.id AND ep.company_id = $1
+               AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS expenses,
            (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id AND s.is_active = true) AS active_students
          FROM branches b
@@ -584,8 +583,8 @@ export const reportsRoutes = {
 
       const rows = await query(
         `SELECT category, SUM(amount) AS total, COUNT(*) AS count
-         FROM expenses
-         WHERE company_id = $1 AND date >= $2 AND date <= $3 AND is_recurring = false ${branchClause}
+         FROM expense_payments
+         WHERE company_id = $1 AND date >= $2 AND date <= $3 ${branchClause}
          GROUP BY category
          ORDER BY total DESC`,
         params
