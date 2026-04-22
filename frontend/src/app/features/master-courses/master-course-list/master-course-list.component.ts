@@ -149,16 +149,7 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
                       ></p-button>
                     }
                   }
-                  @if (authService.canDelete('master_courses')) {
-                    <p-button
-                      icon="pi pi-trash"
-                      [rounded]="true"
-                      [text]="true"
-                      severity="danger"
-                      (onClick)="confirmDelete(item)"
-                      [pTooltip]="'MASTER_COURSES.LIST.DELETE' | translate"
-                    ></p-button>
-                  }
+             
                 </div>
               </td>
             </tr>
@@ -176,12 +167,7 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
         </p-table>
       </p-card>
 
-      <app-delete-confirm-dialog
-        [(visible)]="showDeleteDialog"
-        [header]="'MASTER_COURSES.LIST.DELETE_TITLE' | translate"
-        [message]="'MASTER_COURSES.LIST.DELETE_MSG' | translate: { name: toDelete()?.name }"
-        (confirm)="doDelete()"
-      ></app-delete-confirm-dialog>
+      
     </div>
   `,
 })
