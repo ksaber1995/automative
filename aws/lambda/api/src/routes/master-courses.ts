@@ -30,6 +30,10 @@ function mapWithCounts(row: any) {
     ...mapMasterCourseFromDB(row),
     linkedCourseCount: parseInt(row.linked_course_count || '0', 10),
     branchCount: parseInt(row.branch_count || '0', 10),
+    studentCount: parseInt(row.student_count || '0', 10),
+    paidCount: parseInt(row.paid_count || '0', 10),
+    partialCount: parseInt(row.partial_count || '0', 10),
+    pendingCount: parseInt(row.pending_count || '0', 10),
   };
 }
 
@@ -83,11 +87,16 @@ export const masterCoursesRoutes = {
           mc.*,
           b.name AS branch_name,
           COUNT(DISTINCT c.id) FILTER (WHERE c.is_active = true) AS linked_course_count,
-          COUNT(DISTINCT c.branch_id) FILTER (WHERE c.is_active = true) AS branch_count
+          COUNT(DISTINCT c.branch_id) FILTER (WHERE c.is_active = true) AS branch_count,
+          COUNT(DISTINCT me.id) FILTER (WHERE me.status != 'CANCELLED') AS student_count,
+          COUNT(DISTINCT me.id) FILTER (WHERE me.payment_status = 'PAID' AND me.status != 'CANCELLED') AS paid_count,
+          COUNT(DISTINCT me.id) FILTER (WHERE me.payment_status = 'PARTIAL' AND me.status != 'CANCELLED') AS partial_count,
+          COUNT(DISTINCT me.id) FILTER (WHERE me.payment_status = 'PENDING' AND me.status != 'CANCELLED') AS pending_count
         FROM master_courses mc
         LEFT JOIN branches b ON b.id = mc.branch_id
         LEFT JOIN master_course_courses mcc ON mcc.master_course_id = mc.id
         LEFT JOIN courses c ON c.id = mcc.course_id
+        LEFT JOIN master_enrollments me ON me.master_course_id = mc.id
         WHERE mc.company_id = $1
         GROUP BY mc.id, b.name
         ORDER BY mc.created_at DESC

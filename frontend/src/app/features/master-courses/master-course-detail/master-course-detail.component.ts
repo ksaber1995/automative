@@ -55,21 +55,49 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
             </p>
           }
         </div>
-        @if (master() && authService.canWrite('master_courses')) {
+        @if (master()) {
           <div class="flex gap-2 flex-wrap">
-            <p-button
-              icon="pi pi-pencil"
-              [label]="'MASTER_COURSES.DETAIL.EDIT' | translate"
-              severity="secondary"
-              [outlined]="true"
-              (onClick)="edit()"
-            ></p-button>
-            <p-button
-              icon="pi pi-plus"
-              [label]="'MASTER_COURSES.DETAIL.ADD_COURSE' | translate"
-              severity="info"
-              (onClick)="openAddDialog()"
-            ></p-button>
+            @if (authService.canWrite('master_courses')) {
+              <p-button
+                icon="pi pi-pencil"
+                [label]="'MASTER_COURSES.DETAIL.EDIT' | translate"
+                severity="secondary"
+                [outlined]="true"
+                (onClick)="edit()"
+              ></p-button>
+              <p-button
+                icon="pi pi-plus"
+                [label]="'MASTER_COURSES.DETAIL.ADD_COURSE' | translate"
+                severity="info"
+                (onClick)="openAddDialog()"
+              ></p-button>
+              @if (master()!.isActive) {
+                <p-button
+                  icon="pi pi-ban"
+                  label="Deactivate"
+                  severity="warn"
+                  [outlined]="true"
+                  (onClick)="toggleActive()"
+                ></p-button>
+              } @else {
+                <p-button
+                  icon="pi pi-check-circle"
+                  label="Activate"
+                  severity="success"
+                  [outlined]="true"
+                  (onClick)="toggleActive()"
+                ></p-button>
+              }
+            }
+            @if (authService.canDelete('master_courses')) {
+              <p-button
+                icon="pi pi-trash"
+                label="Delete"
+                severity="danger"
+                [outlined]="true"
+                (onClick)="confirmDelete()"
+              ></p-button>
+            }
           </div>
         }
       </div>
@@ -276,6 +304,13 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         [message]="'MASTER_COURSES.DETAIL.REMOVE_MSG' | translate: { name: toRemove()?.name }"
         (confirm)="doRemove()"
       ></app-delete-confirm-dialog>
+
+      <app-delete-confirm-dialog
+        [(visible)]="showDeleteDialog"
+        header="Delete Master Course"
+        [message]="'Are you sure you want to delete &quot;' + (master()?.name || '') + '&quot;? This cannot be undone.'"
+        (confirm)="doDelete()"
+      ></app-delete-confirm-dialog>
     </div>
   `,
 })
@@ -303,6 +338,7 @@ export class MasterCourseDetailComponent implements OnInit {
 
   showRemoveDialog = false;
   toRemove = signal<LinkedCourseSummary | null>(null);
+  showDeleteDialog = false;
 
   sumOfLinked = computed(() =>
     (this.linked() || []).reduce((sum, c) => sum + (c.price || 0), 0)
@@ -388,6 +424,35 @@ export class MasterCourseDetailComponent implements OnInit {
       error: (err) => {
         this.notifications.error(err?.error?.message || 'Failed to remove');
         this.showRemoveDialog = false;
+      },
+    });
+  }
+
+  toggleActive() {
+    const m = this.master();
+    if (!m) return;
+    const next = !m.isActive;
+    this.service.update(this.id, { isActive: next }).subscribe({
+      next: () => {
+        this.notifications.success(next ? 'Master course activated' : 'Master course deactivated');
+        this.loadMaster();
+      },
+      error: () => this.notifications.error('Failed to update status'),
+    });
+  }
+
+  confirmDelete() { this.showDeleteDialog = true; }
+
+  doDelete() {
+    this.service.delete(this.id).subscribe({
+      next: () => {
+        this.notifications.success('Master course deleted');
+        this.showDeleteDialog = false;
+        this.router.navigate(['/master-courses']);
+      },
+      error: () => {
+        this.notifications.error('Failed to delete master course');
+        this.showDeleteDialog = false;
       },
     });
   }

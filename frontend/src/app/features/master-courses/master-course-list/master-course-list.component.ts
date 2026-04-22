@@ -11,7 +11,6 @@ import { MasterCourseService } from '../services/master-course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { MasterCourse } from '@shared/interfaces/master-course.interface';
-import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-master-course-list',
@@ -24,7 +23,6 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     TranslateModule,
-    DeleteConfirmDialogComponent,
   ],
   template: `
     <div class="container-custom py-8">
@@ -71,6 +69,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_PRICE' | translate }}</th>
               <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_DURATION' | translate }}</th>
               <th>{{ 'MASTER_COURSES.LIST.COL_LINKED' | translate }}</th>
+              <th>Students</th>
               <th>{{ 'MASTER_COURSES.LIST.COL_STATUS' | translate }}</th>
               <th>{{ 'MASTER_COURSES.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
@@ -84,6 +83,24 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <td>{{ item.defaultDuration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
               <td>
                 <p-tag [value]="item.linkedCourseCount || 0" severity="info"></p-tag>
+              </td>
+              <td>
+                <div class="flex flex-col gap-1">
+                  <span class="text-sm font-medium text-gray-700">{{ item.studentCount || 0 }} total</span>
+                  @if (item.studentCount > 0) {
+                    <div class="flex gap-1 flex-wrap">
+                      @if (item.paidCount > 0) {
+                        <p-tag [value]="item.paidCount + ' paid'" severity="success" styleClass="text-xs"></p-tag>
+                      }
+                      @if (item.partialCount > 0) {
+                        <p-tag [value]="item.partialCount + ' partial'" severity="info" styleClass="text-xs"></p-tag>
+                      }
+                      @if (item.pendingCount > 0) {
+                        <p-tag [value]="item.pendingCount + ' pending'" severity="warn" styleClass="text-xs"></p-tag>
+                      }
+                    </div>
+                  }
+                </div>
               </td>
               <td>
                 <p-tag
@@ -148,7 +165,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="7" class="text-center py-8">
+              <td colspan="8" class="text-center py-8">
                 <div class="text-gray-500">
                   <i class="pi pi-th-large text-4xl mb-3"></i>
                   <p>{{ 'MASTER_COURSES.LIST.EMPTY' | translate }}</p>
@@ -176,8 +193,6 @@ export class MasterCourseListComponent implements OnInit {
 
   items = signal<MasterCourse[]>([]);
   loading = signal(true);
-  showDeleteDialog = false;
-  toDelete = signal<MasterCourse | null>(null);
 
   ngOnInit() { this.load(); }
 
@@ -193,27 +208,6 @@ export class MasterCourseListComponent implements OnInit {
   view(item: MasterCourse) { this.router.navigate(['/master-courses', item.id]); }
   edit(item: MasterCourse) { this.router.navigate(['/master-courses', item.id, 'edit']); }
 
-  confirmDelete(item: MasterCourse) {
-    this.toDelete.set(item);
-    this.showDeleteDialog = true;
-  }
-
-  doDelete() {
-    const item = this.toDelete();
-    if (!item) return;
-    this.service.delete(item.id).subscribe({
-      next: () => {
-        this.notifications.success('Master course deleted');
-        this.showDeleteDialog = false;
-        this.toDelete.set(null);
-        this.load();
-      },
-      error: () => {
-        this.notifications.error('Failed to delete');
-        this.showDeleteDialog = false;
-      },
-    });
-  }
 
   toggleActive(item: MasterCourse) {
     const next = !item.isActive;

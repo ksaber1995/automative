@@ -1079,6 +1079,16 @@ export const contract = c.router({
         200: z.array(CourseSchema),
       },
     },
+    getEnrollments: {
+      method: 'GET',
+      path: '/api/courses/:id/enrollments',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
     getById: {
       method: 'GET',
       path: '/api/courses/:id',

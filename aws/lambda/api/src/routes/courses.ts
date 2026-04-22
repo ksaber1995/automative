@@ -266,6 +266,88 @@ export const coursesRoutes = {
     }
   },
 
+  getEnrollments: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const course = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!course) {
+        return { status: 404 as const, body: { message: 'Course not found' } };
+      }
+
+      if (!canAccessBranch(context, course.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this course' } };
+      }
+
+      const enrollments = await query(
+        `SELECT
+          e.id as enrollment_id,
+          e.student_id,
+          s.first_name as student_first_name,
+          s.last_name as student_last_name,
+          e.class_id,
+          cl.name as class_name,
+          e.enrollment_date,
+          e.status,
+          e.original_price,
+          e.discount_percent,
+          e.discount_amount,
+          e.final_price,
+          e.payment_mode,
+          e.down_payment,
+          e.amount_paid,
+          e.total_refunded,
+          e.payment_status,
+          e.notes,
+          e.created_at
+        FROM enrollments e
+        JOIN students s ON e.student_id = s.id
+        LEFT JOIN classes cl ON e.class_id = cl.id
+        WHERE e.course_id = $1 AND e.company_id = $2 AND e.status != 'DROPPED'
+        ORDER BY e.enrollment_date DESC`,
+        [params.id, context.companyId]
+      );
+
+      return {
+        status: 200 as const,
+        body: enrollments.map((row: any) => ({
+          enrollmentId: row.enrollment_id,
+          studentId: row.student_id,
+          studentFirstName: row.student_first_name,
+          studentLastName: row.student_last_name,
+          classId: row.class_id,
+          className: row.class_name,
+          enrollmentDate: row.enrollment_date,
+          status: row.status,
+          originalPrice: parseFloat(row.original_price),
+          discountPercent: parseFloat(row.discount_percent || 0),
+          discountAmount: parseFloat(row.discount_amount || 0),
+          finalPrice: parseFloat(row.final_price),
+          paymentMode: row.payment_mode || 'FULL',
+          downPayment: parseFloat(row.down_payment || 0),
+          amountPaid: parseFloat(row.amount_paid || 0),
+          totalRefunded: parseFloat(row.total_refunded || 0),
+          paymentStatus: row.payment_status,
+          notes: row.notes,
+          createdAt: row.created_at,
+        })),
+      };
+    } catch (error) {
+      console.error('Get course enrollments error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to get course enrollments' },
+      };
+    }
+  },
+
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
