@@ -49,7 +49,7 @@ export class SessionService {
     return this.api.post<Session>('sessions/start', dto);
   }
 
-  end(id: string, notes?: string): Observable<Session> {
-    return this.api.patch<Session>(`sessions/${id}/end`, { notes });
+  end(id: string, notes?: string, endDate?: string): Observable<Session> {
+    return this.api.patch<Session>(`sessions/${id}/end`, { notes, endDate });
   }
 }

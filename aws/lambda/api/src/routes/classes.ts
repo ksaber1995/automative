@@ -31,6 +31,7 @@ function mapClassWithDetailsFromDB(row: any) {
     branchName: row.branch_name,
     instructorName: row.instructor_name,
     studentCount: parseInt(row.student_count ?? row.current_enrollment ?? '0', 10),
+    hasActiveSession: row.has_active_session === true || row.has_active_session === 'true' || parseInt(row.has_active_session ?? '0', 10) > 0,
   };
 }
 
@@ -112,7 +113,11 @@ export const classesRoutes = {
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
-          ) AS student_count
+          ) AS student_count,
+          EXISTS (
+            SELECT 1 FROM sessions s
+            WHERE s.class_id = c.id AND s.end_date IS NULL
+          ) AS has_active_session
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id
@@ -172,7 +177,11 @@ export const classesRoutes = {
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
-          ) AS student_count
+          ) AS student_count,
+          EXISTS (
+            SELECT 1 FROM sessions s
+            WHERE s.class_id = c.id AND s.end_date IS NULL
+          ) AS has_active_session
         FROM classes c
         LEFT JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON c.branch_id = b.id

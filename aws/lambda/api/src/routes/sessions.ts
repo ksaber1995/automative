@@ -125,8 +125,24 @@ export const sessionsRoutes = {
         return { status: 403 as const, body: { message: 'Access denied to this session' } };
       }
 
+      // Allow caller to supply a custom end date (e.g. forgot to end session yesterday)
+      let endDate: Date;
+      if (body?.endDate) {
+        endDate = new Date(body.endDate);
+        if (isNaN(endDate.getTime())) {
+          return { status: 400 as const, body: { message: 'Invalid endDate provided' } };
+        }
+        // Validate: endDate must not be before startDate
+        const startDate = new Date(existing.start_date);
+        if (endDate < startDate) {
+          return { status: 400 as const, body: { message: 'End date cannot be before start date' } };
+        }
+      } else {
+        endDate = new Date();
+      }
+
       const updateData: any = {
-        end_date: new Date().toISOString(),
+        end_date: endDate.toISOString(),
       };
       if (body?.notes !== undefined) updateData.notes = body.notes;
 

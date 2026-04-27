@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
+import { InputTextModule } from 'primeng/inputtext';
 import { FormsModule } from '@angular/forms';
 import { SessionService, Session } from '../services/session.service';
 import { RoomService, Room } from '../services/room.service';
@@ -18,6 +19,24 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+
+/** Cross-field validator: endTime must not produce a datetime before startDate */
+function endTimeAfterStartValidator(startDate: string) {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const timeVal: string = control.value; // "HH:mm"
+    if (!timeVal || !startDate) return null;
+
+    const start = new Date(startDate);
+    const [hours, minutes] = timeVal.split(':').map(Number);
+    const end = new Date(start);
+    end.setHours(hours, minutes, 0, 0);
+
+    if (end < start) {
+      return { endBeforeStart: true };
+    }
+    return null;
+  };
+}
 
 @Component({
   selector: 'app-sessions-dashboard',
@@ -36,6 +55,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     TextareaModule,
     TooltipModule,
     TabsModule,
+    InputTextModule,
   ],
   template: `
     <div class="container-custom py-8">
@@ -284,7 +304,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     >
       <form [formGroup]="sessionForm" class="space-y-4 pt-2">
 
-        <!-- Step 1: Branch -->
+        <!-- Branch -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Branch <span class="text-red-500">*</span></label>
           <p-select
@@ -302,7 +322,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
           }
         </div>
 
-        <!-- Step 2: Room (filtered by selected branch) -->
+        <!-- Room (filtered by selected branch) -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Room <span class="text-red-500">*</span></label>
           <p-select
@@ -326,7 +346,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
           }
         </div>
 
-        <!-- Class (filtered by branch) -->
+        <!-- Class (filtered by branch — only classes with students, active sessions shown as disabled) -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Class <span class="text-red-500">*</span></label>
           <p-select
@@ -334,11 +354,26 @@ import { Branch } from '@shared/interfaces/branch.interface';
             [options]="dialogActiveClasses()"
             optionLabel="displayName"
             optionValue="id"
+            optionDisabled="hasActiveSession"
             appendTo="body"
             placeholder="Select a class"
             [disabled]="!sessionForm.get('branchId')?.value || loadingDialogClasses()"
             [style]="{ width: '100%' }"
-          ></p-select>
+          >
+            <ng-template pTemplate="item" let-cls>
+              <div class="flex items-center justify-between w-full" [class.opacity-40]="cls.hasActiveSession">
+                <span>{{ cls.displayName }}</span>
+                <span class="flex items-center gap-1 ml-3 shrink-0">
+                  <span class="text-xs text-gray-400">{{ cls.studentCount }} student{{ cls.studentCount !== 1 ? 's' : '' }}</span>
+                  @if (cls.hasActiveSession) {
+                    <span class="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium ml-1">
+                      <i class="pi pi-circle-fill text-orange-500 mr-1" style="font-size:0.45rem"></i>In session
+                    </span>
+                  }
+                </span>
+              </div>
+            </ng-template>
+          </p-select>
           @if (!sessionForm.get('branchId')?.value) {
             <small class="text-gray-400">Select a branch first</small>
           }
@@ -349,7 +384,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <small class="text-red-500">Class is required</small>
           }
           @if (sessionForm.get('branchId')?.value && !loadingDialogClasses() && dialogActiveClasses().length === 0) {
-            <small class="text-orange-500">No active classes found for this branch</small>
+            <small class="text-orange-500">No eligible classes — classes must have enrolled students</small>
           }
         </div>
 
@@ -372,23 +407,88 @@ import { Branch } from '@shared/interfaces/branch.interface';
       </ng-template>
     </p-dialog>
 
-    <!-- End Session Confirm Dialog -->
+    <!-- End Session Dialog -->
     <p-dialog
       [(visible)]="showEndDialog"
       header="End Session"
       [modal]="true"
-      [style]="{ width: '400px' }"
+      [style]="{ width: '440px' }"
+      (onHide)="onEndDialogHide()"
     >
-      <p class="text-gray-600 mb-3">
-        End the session for <strong>{{ endingSession()?.className }}</strong> in room <strong>{{ endingSession()?.roomCode }}</strong>?
-      </p>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-        <textarea pTextarea [(ngModel)]="endNotes" rows="2" placeholder="Any notes about this session" class="w-full"></textarea>
-      </div>
+      @if (endingSession()) {
+        <div class="pt-2 space-y-4">
+          <!-- Session info -->
+          <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+            <p>Ending session for <strong>{{ endingSession()!.className }}</strong> in room <strong>{{ endingSession()!.roomCode }}</strong></p>
+            <p class="text-gray-500 mt-1">
+              <i class="pi pi-clock mr-1"></i>Started: {{ formatDateTime(endingSession()!.startDate) }}
+            </p>
+          </div>
+
+          <form [formGroup]="endSessionForm" class="space-y-4">
+            <!-- End Date (locked — always same as start date) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+                <span class="ml-1 text-xs text-gray-400 font-normal">(same as start date)</span>
+              </label>
+              <input
+                pInputText
+                type="text"
+                [value]="endDateDisplay()"
+                [disabled]="true"
+                class="w-full bg-gray-100 text-gray-500 cursor-not-allowed"
+                style="width:100%"
+              />
+            </div>
+
+            <!-- End Time (editable) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                End Time <span class="text-red-500">*</span>
+              </label>
+              <input
+                pInputText
+                type="time"
+                formControlName="endTime"
+                class="w-full"
+                style="width:100%"
+              />
+              @if (endSessionForm.get('endTime')?.errors?.['required'] && endSessionForm.get('endTime')?.touched) {
+                <small class="text-red-500">End time is required</small>
+              }
+              @if (endSessionForm.get('endTime')?.errors?.['endBeforeStart']) {
+                <small class="text-red-500">
+                  End time cannot be before the session start time ({{ formatTime(endingSession()!.startDate) }})
+                </small>
+              }
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea
+                pTextarea
+                formControlName="notes"
+                rows="2"
+                placeholder="Any notes about this session"
+                class="w-full"
+              ></textarea>
+            </div>
+          </form>
+        </div>
+      }
+
       <ng-template pTemplate="footer">
         <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showEndDialog = false"></p-button>
-        <p-button label="End Session" severity="danger" [loading]="saving()" (onClick)="endSession()"></p-button>
+        <p-button
+          label="End Session"
+          icon="pi pi-stop"
+          severity="danger"
+          [loading]="saving()"
+          [disabled]="endSessionForm.invalid"
+          (onClick)="endSession()"
+        ></p-button>
       </ng-template>
     </p-dialog>
   `,
@@ -415,12 +515,12 @@ export class SessionsDashboardComponent implements OnInit {
   activeTab = 'active';
   showStartDialog = false;
   showEndDialog = false;
-  endNotes = '';
   endingSession = signal<Session | null>(null);
 
   /** Page-level branch filter (null = all branches) */
   selectedBranchId = signal<string | null>(null);
 
+  /** Start session form */
   sessionForm: FormGroup = this.fb.group({
     branchId: ['', Validators.required],
     roomId: ['', Validators.required],
@@ -428,39 +528,47 @@ export class SessionsDashboardComponent implements OnInit {
     notes: [''],
   });
 
+  /** End session form */
+  endSessionForm: FormGroup = this.fb.group({
+    endTime: ['', Validators.required],
+    notes: [''],
+  });
+
+  /** Display-only date label for the locked end-date field */
+  endDateDisplay = signal<string>('');
+
   // ── Page-level filtered rooms ──────────────────────────────────────────────
 
   filteredRooms = computed(() => {
     const all = this.rooms();
     const branchId = this.selectedBranchId();
     if (!branchId) return all;
-    return all.filter(r => r.branchId === branchId);
+    return all.filter((r: Room) => r.branchId === branchId);
   });
 
   filteredActiveSessions = computed(() => {
     const branchId = this.selectedBranchId();
     if (!branchId) return this.activeSessions();
-    return this.activeSessions().filter(s => s.branchId === branchId);
+    return this.activeSessions().filter((s: Session) => s.branchId === branchId);
   });
 
   filteredAllSessions = computed(() => {
     const branchId = this.selectedBranchId();
     if (!branchId) return this.allSessions();
-    return this.allSessions().filter(s => s.branchId === branchId);
+    return this.allSessions().filter((s: Session) => s.branchId === branchId);
   });
 
-  filteredOccupiedRooms = computed(() => this.filteredRooms().filter(r => r.isOccupied));
-  filteredFreeRooms = computed(() => this.filteredRooms().filter(r => !r.isOccupied && r.isActive));
+  filteredOccupiedRooms = computed(() => this.filteredRooms().filter((r: Room) => r.isOccupied));
+  filteredFreeRooms = computed(() => this.filteredRooms().filter((r: Room) => !r.isOccupied && r.isActive));
 
-  // ── Dialog-level data (rooms + classes filtered by branch chosen inside the dialog) ───────
-  // Uses plain signals updated explicitly because reactive form values are not signals.
+  // ── Dialog-level data ───────────────────────────────────────────────────────
   dialogFreeRooms = signal<Room[]>([]);
+  /** Only classes with at least 1 enrolled student; active-session ones are marked disabled */
   dialogActiveClasses = signal<any[]>([]);
   loadingDialogClasses = signal(false);
 
-  // Keep legacy helper used by openStartDialogForRoom
-  freeRooms = computed(() => this.rooms().filter(r => !r.isOccupied && r.isActive));
-  occupiedRooms = computed(() => this.rooms().filter(r => r.isOccupied));
+  freeRooms = computed(() => this.rooms().filter((r: Room) => !r.isOccupied && r.isActive));
+  occupiedRooms = computed(() => this.rooms().filter((r: Room) => r.isOccupied));
 
   ngOnInit() {
     this.loadBranches();
@@ -469,7 +577,7 @@ export class SessionsDashboardComponent implements OnInit {
 
   loadBranches() {
     this.branchService.getActiveBranches().subscribe({
-      next: (b) => this.branches.set(b),
+      next: (b: Branch[]) => this.branches.set(b),
     });
   }
 
@@ -483,7 +591,7 @@ export class SessionsDashboardComponent implements OnInit {
   loadActiveSessions() {
     this.loadingActive.set(true);
     this.sessionService.listActive().subscribe({
-      next: (s) => { this.activeSessions.set(s); this.loadingActive.set(false); },
+      next: (s: Session[]) => { this.activeSessions.set(s); this.loadingActive.set(false); },
       error: () => this.loadingActive.set(false),
     });
   }
@@ -491,7 +599,7 @@ export class SessionsDashboardComponent implements OnInit {
   loadRooms() {
     this.loadingRooms.set(true);
     this.roomService.list().subscribe({
-      next: (r) => { this.rooms.set(r); this.loadingRooms.set(false); },
+      next: (r: Room[]) => { this.rooms.set(r); this.loadingRooms.set(false); },
       error: () => this.loadingRooms.set(false),
     });
   }
@@ -499,14 +607,14 @@ export class SessionsDashboardComponent implements OnInit {
   loadHistory() {
     this.loadingHistory.set(true);
     this.sessionService.list().subscribe({
-      next: (s) => { this.allSessions.set(s); this.loadingHistory.set(false); },
+      next: (s: Session[]) => { this.allSessions.set(s); this.loadingHistory.set(false); },
       error: () => this.loadingHistory.set(false),
     });
   }
 
   loadClasses() {
     this.classService.getActiveClasses().subscribe({
-      next: (classes) => {
+      next: (classes: any[]) => {
         this.activeClasses.set(classes.map((c: any) => ({
           ...c,
           displayName: `${c.name} (${c.code})`,
@@ -546,16 +654,21 @@ export class SessionsDashboardComponent implements OnInit {
     }
     // Rooms — filter from already-loaded list
     this.dialogFreeRooms.set(
-      this.rooms().filter(r => r.branchId === branchId && !r.isOccupied && r.isActive)
+      this.rooms().filter((r: Room) => r.branchId === branchId && !r.isOccupied && r.isActive)
     );
-    // Classes — fetch from API filtered by branch
+    // Classes — fetch from API filtered by branch, then keep only those with students enrolled
     this.loadingDialogClasses.set(true);
     this.classService.getClassesByBranch(branchId).subscribe({
-      next: (classes) => {
-        this.dialogActiveClasses.set(classes.map((c: any) => ({
-          ...c,
-          displayName: `${c.name} (${c.code})`,
-        })));
+      next: (classes: any[]) => {
+        this.dialogActiveClasses.set(
+          classes
+            .filter((c: any) => (c.studentCount ?? 0) > 0)   // only classes with enrolled students
+            .map((c: any) => ({
+              ...c,
+              displayName: `${c.name} (${c.code})`,
+              // hasActiveSession comes from backend; used by optionDisabled
+            }))
+        );
         this.loadingDialogClasses.set(false);
       },
       error: () => this.loadingDialogClasses.set(false),
@@ -579,7 +692,7 @@ export class SessionsDashboardComponent implements OnInit {
         this.notificationService.success('Session started successfully');
         this.loadAll();
       },
-      error: (err) => {
+      error: (err: any) => {
         this.saving.set(false);
         this.notificationService.error(err?.error?.message || 'Failed to start session');
       },
@@ -588,15 +701,49 @@ export class SessionsDashboardComponent implements OnInit {
 
   confirmEndSession(session: Session) {
     this.endingSession.set(session);
-    this.endNotes = '';
+
+    // Default end time = current time (HH:mm)
+    const now = new Date();
+    const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    // Build the locked date display (same date as start date)
+    const startDate = new Date(session.startDate);
+    this.endDateDisplay.set(
+      startDate.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+    );
+
+    // Rebuild end session form with the validator bound to this session's startDate
+    this.endSessionForm = this.fb.group({
+      endTime: [defaultTime, [Validators.required, endTimeAfterStartValidator(session.startDate)]],
+      notes: [''],
+    });
+
     this.showEndDialog = true;
   }
 
+  onEndDialogHide() {
+    this.endingSession.set(null);
+    this.endSessionForm.reset();
+  }
+
   endSession() {
+    if (this.endSessionForm.invalid) { this.endSessionForm.markAllAsTouched(); return; }
+
     const session = this.endingSession();
     if (!session) return;
+
+    // Build the ISO end datetime: start date + chosen time
+    const startDate = new Date(session.startDate);
+    const [hours, minutes] = (this.endSessionForm.value.endTime as string).split(':').map(Number);
+    const endDateTime = new Date(startDate);
+    endDateTime.setHours(hours, minutes, 0, 0);
+
     this.saving.set(true);
-    this.sessionService.end(session.id, this.endNotes || undefined).subscribe({
+    this.sessionService.end(
+      session.id,
+      this.endSessionForm.value.notes || undefined,
+      endDateTime.toISOString(),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         this.showEndDialog = false;
@@ -604,7 +751,7 @@ export class SessionsDashboardComponent implements OnInit {
         this.notificationService.success('Session ended successfully');
         this.loadAll();
       },
-      error: (err) => {
+      error: (err: any) => {
         this.saving.set(false);
         this.notificationService.error(err?.error?.message || 'Failed to end session');
       },
