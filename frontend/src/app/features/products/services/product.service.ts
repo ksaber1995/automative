@@ -58,4 +58,11 @@ export class ProductService {
       operation,
     });
   }
+
+  restockProduct(
+    id: string,
+    data: { quantity: number; costPerUnit: number; date?: string; notes?: string },
+  ): Observable<Product> {
+    return this.api.post<Product>(`products/${id}/restock`, data);
+  }
 }

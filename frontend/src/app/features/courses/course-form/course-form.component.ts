@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
+import { RoomService, Room } from '../../rooms/services/room.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -170,6 +171,24 @@ import { Employee } from '@shared/interfaces/employee.interface';
                 ></p-select>
               </div>
 
+              <!-- Default Room -->
+              <div class="col-span-2">
+                <label for="defaultRoomId" class="block text-sm font-medium text-gray-700 mb-2">
+                  Default Room (Optional)
+                </label>
+                <p-select
+                  id="defaultRoomId"
+                  formControlName="defaultRoomId"
+                  [options]="rooms()"
+                  optionLabel="code"
+                  optionValue="id"
+                  placeholder="Select a default room for this course"
+                  [style]="{ width: '100%' }"
+                  [showClear]="true"
+                ></p-select>
+                <small class="text-gray-400">When starting a session for this course's classes, this room will be pre-selected</small>
+              </div>
+
               <!-- Description -->
               <div class="col-span-2">
                 <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
@@ -222,6 +241,8 @@ export class CourseFormComponent implements OnInit {
   courseId: string | null = null;
   branches = signal<Branch[]>([]);
   employees = signal<any[]>([]);
+  rooms = signal<Room[]>([]);
+  private roomService = inject(RoomService);
 
   constructor() {
     this.courseForm = this.fb.group({
@@ -232,7 +253,8 @@ export class CourseFormComponent implements OnInit {
       price: [0, [Validators.required, Validators.min(0)]],
       duration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
       maxStudents: [null],
-      instructorId: ['']
+      instructorId: [''],
+      defaultRoomId: [null],
     });
   }
 
@@ -244,6 +266,17 @@ export class CourseFormComponent implements OnInit {
       this.isEditMode.set(true);
       this.loadCourse(this.courseId);
     }
+    // Load rooms when branch changes
+    this.courseForm.get('branchId')?.valueChanges.subscribe(branchId => {
+      if (branchId) this.loadRooms(branchId);
+    });
+  }
+
+  loadRooms(branchId: string) {
+    this.roomService.listActive(branchId).subscribe({
+      next: (r) => this.rooms.set(r),
+      error: () => {},
+    });
   }
 
   loadBranches() {
@@ -285,8 +318,11 @@ export class CourseFormComponent implements OnInit {
           price: course.price,
           duration: course.duration,
           maxStudents: course.maxStudents,
-          instructorId: course.instructorId || ''
+          instructorId: course.instructorId || '',
+          defaultRoomId: (course as any).defaultRoomId || null,
         });
+        // Load rooms for the selected branch
+        if (course.branchId) this.loadRooms(course.branchId);
         this.loading.set(false);
       },
       error: () => {

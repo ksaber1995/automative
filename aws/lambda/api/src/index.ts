@@ -37,6 +37,8 @@ import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
 import { demoLeadsRoutes } from './routes/demo-leads';
+import { roomsRoutes } from './routes/rooms';
+import { sessionsRoutes } from './routes/sessions';
 
 // Create the router implementation
 const router = {
@@ -84,6 +86,14 @@ const router = {
   migrations: migrationsRoutes,
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,
+  rooms: roomsRoutes,
+  sessions: {
+    start: sessionsRoutes.start,
+    end: sessionsRoutes.end,
+    list: sessionsRoutes.list,
+    listActive: sessionsRoutes.listActive,
+    getById: sessionsRoutes.getById,
+  },
 };
 
 // Create the Lambda handler

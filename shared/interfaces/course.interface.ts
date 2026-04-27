@@ -9,6 +9,7 @@ export interface Course {
   duration: number;
   maxStudents: number | null;
   instructorId: string | null;
+  defaultRoomId: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

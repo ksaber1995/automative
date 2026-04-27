@@ -135,10 +135,26 @@ export const analyticsRoutes = {
              WHERE ep.branch_id = b.id AND ep.company_id = $1
                AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS direct_expenses,
-           -- Active student count
-           (SELECT COUNT(*) FROM enrollments en
-            WHERE en.branch_id = b.id AND en.company_id = $1
-              AND en.status = 'ACTIVE') AS student_count,
+           -- Students enrolled in courses or master courses within the period
+           (SELECT COUNT(DISTINCT s.student_id) FROM (
+             SELECT student_id FROM enrollments
+             WHERE branch_id = b.id AND company_id = $1
+               AND enrollment_date >= $2 AND enrollment_date <= $3
+             UNION
+             SELECT student_id FROM master_enrollments
+             WHERE branch_id = b.id AND company_id = $1
+               AND enrollment_date >= $2 AND enrollment_date <= $3
+           ) s) AS student_count,
+           -- Distinct courses (regular + master) with enrollments in the period
+           (SELECT COUNT(DISTINCT c.course_ref) FROM (
+             SELECT course_id::text AS course_ref FROM enrollments
+             WHERE branch_id = b.id AND company_id = $1
+               AND enrollment_date >= $2 AND enrollment_date <= $3
+             UNION
+             SELECT master_course_id::text AS course_ref FROM master_enrollments
+             WHERE branch_id = b.id AND company_id = $1
+               AND enrollment_date >= $2 AND enrollment_date <= $3
+           ) c) AS course_count,
            -- Employee count
            (SELECT COUNT(*) FROM employees em
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
@@ -181,6 +197,7 @@ export const analyticsRoutes = {
           netProfit: Math.round(branchNetProfit * 100) / 100,
           profitMargin: Math.round(profitMargin * 10) / 10,
           studentCount: parseInt(b.student_count),
+          courseCount: parseInt(b.course_count),
           employeeCount: parseInt(b.employee_count),
         };
       });
@@ -267,7 +284,7 @@ export const analyticsRoutes = {
               profit: b.netProfit,
               profitMargin: b.profitMargin,
               studentCount: b.studentCount,
-              courseCount: 0,
+              courseCount: b.courseCount,
             })),
           period: { startDate, endDate },
         },

@@ -368,6 +368,85 @@ export const productsRoutes = {
     }
   },
 
+  restock: async ({ params, body, headers }: { params: { id: string }; body: { quantity: number; costPerUnit: number; date?: string; notes?: string }; headers: { authorization: string } }) => {
+    const client = await getClient();
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'products', 'write')) {
+        client.release();
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const product = await queryOne(
+        'SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_active = true',
+        [params.id, context.companyId]
+      );
+      if (!product) {
+        client.release();
+        return { status: 404 as const, body: { message: 'Product not found' } };
+      }
+      if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
+        client.release();
+        return { status: 403 as const, body: { message: 'Access denied to this product' } };
+      }
+
+      const quantity = body.quantity;
+      const costPerUnit = body.costPerUnit;
+      const totalCost = costPerUnit * quantity;
+      const date = body.date || new Date().toISOString().split('T')[0];
+      const newStock = (parseInt(product.stock) || 0) + quantity;
+
+      await client.query('BEGIN');
+
+      await client.query(
+        'UPDATE products SET stock = $1, updated_at = NOW() WHERE id = $2',
+        [newStock, params.id]
+      );
+
+      const expenseResult = await client.query(
+        `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_id)
+         VALUES ($1,$2,'VARIABLE','INVENTORY',$3,$4,$5,$6) RETURNING id`,
+        [
+          context.companyId,
+          product.branch_id,
+          totalCost,
+          `Restock: ${product.name} × ${quantity} units @ ${costPerUnit}`,
+          date,
+          params.id,
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO stock_purchases (company_id, product_id, quantity, cost_per_unit, total_cost, date, notes, expense_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          context.companyId,
+          params.id,
+          quantity,
+          costPerUnit,
+          totalCost,
+          date,
+          body.notes || null,
+          expenseResult.rows[0].id,
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      const updated = await queryOne('SELECT * FROM products WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: mapProductFromDB(updated) };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Restock product error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
+        body: { message: error.message || 'Failed to restock product' },
+      };
+    } finally {
+      client.release();
+    }
+  },
+
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

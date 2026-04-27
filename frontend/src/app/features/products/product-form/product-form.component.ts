@@ -102,10 +102,20 @@ import { ProductCategory } from '@shared/enums/product.enum';
             </div>
 
             <div class="field">
-              <label for="costPrice" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.COST_LABEL' | translate }} *</label>
+              <label for="costPrice" class="block text-sm font-medium mb-2">
+                {{ 'PRODUCTS.FORM.COST_LABEL' | translate }} *
+                @if (isEditMode()) {
+                  <i class="pi pi-lock text-gray-400 ml-1" pTooltip="Use 'Buy More' from the product list to restock at a different price"></i>
+                }
+              </label>
               <p-inputNumber inputId="costPrice" formControlName="costPrice" mode="currency" currency="USD" [minFractionDigits]="2" [min]="0" class="w-full"></p-inputNumber>
-              @if (productForm.get('costPrice')?.invalid && productForm.get('costPrice')?.touched) {
+              @if (!isEditMode() && productForm.get('costPrice')?.invalid && productForm.get('costPrice')?.touched) {
                 <small class="text-red-500">{{ 'PRODUCTS.FORM.COST_REQUIRED' | translate }}</small>
+              }
+              @if (isEditMode()) {
+                <small class="text-gray-400 flex items-center gap-1 mt-1">
+                  <i class="pi pi-info-circle"></i> To restock at a different price, use "Buy More" from the product list.
+                </small>
               }
             </div>
 
@@ -121,10 +131,20 @@ import { ProductCategory } from '@shared/enums/product.enum';
             </div>
 
             <div class="field">
-              <label for="stock" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.STOCK_LABEL' | translate }} *</label>
+              <label for="stock" class="block text-sm font-medium mb-2">
+                {{ isEditMode() ? 'Current Stock' : ('PRODUCTS.FORM.STOCK_LABEL' | translate) }} *
+                @if (isEditMode()) {
+                  <i class="pi pi-lock text-gray-400 ml-1" pTooltip="Use Adjust Stock or Buy More from the product list"></i>
+                }
+              </label>
               <p-inputNumber inputId="stock" formControlName="stock" [min]="0" [showButtons]="true" class="w-full"></p-inputNumber>
-              @if (productForm.get('stock')?.invalid && productForm.get('stock')?.touched) {
+              @if (!isEditMode() && productForm.get('stock')?.invalid && productForm.get('stock')?.touched) {
                 <small class="text-red-500">{{ 'PRODUCTS.FORM.STOCK_REQUIRED' | translate }}</small>
+              }
+              @if (isEditMode()) {
+                <small class="text-gray-400 flex items-center gap-1 mt-1">
+                  <i class="pi pi-info-circle"></i> Manage stock from the product list using Adjust Stock or Buy More.
+                </small>
               }
             </div>
 
@@ -137,7 +157,12 @@ import { ProductCategory } from '@shared/enums/product.enum';
             </div>
 
             <div class="field md:col-span-2">
-              <label for="branchId" class="block text-sm font-medium mb-2">{{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *</label>
+              <label for="branchId" class="block text-sm font-medium mb-2">
+                {{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *
+                @if (isEditMode()) {
+                  <i class="pi pi-lock text-gray-400 ml-1" pTooltip="Branch cannot be changed after creation"></i>
+                }
+              </label>
               <p-select
                 id="branchId"
                 formControlName="branchId"
@@ -148,8 +173,13 @@ import { ProductCategory } from '@shared/enums/product.enum';
                 class="w-full"
                 [style]="{'width': '100%'}">
               </p-select>
-              @if (productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
+              @if (!isEditMode() && productForm.get('branchId')?.invalid && productForm.get('branchId')?.touched) {
                 <small class="text-red-500">{{ 'PRODUCTS.FORM.BRANCH_REQUIRED' | translate }}</small>
+              }
+              @if (isEditMode()) {
+                <small class="text-gray-400 flex items-center gap-1 mt-1">
+                  <i class="pi pi-info-circle"></i> Branch is fixed after creation.
+                </small>
               }
             </div>
           </div>
@@ -209,6 +239,11 @@ import { ProductCategory } from '@shared/enums/product.enum';
       :host ::ng-deep .p-inputnumber-input {
         width: 100%;
       }
+
+      :host ::ng-deep .p-inputnumber.ng-touched.ng-invalid .p-inputtext,
+      :host ::ng-deep .p-select.ng-touched.ng-invalid {
+        border-color: var(--red-500);
+      }
     `,
   ],
 })
@@ -257,7 +292,6 @@ export class ProductFormComponent implements OnInit {
       this.productId.set(id);
       this.loadProduct(id);
     }
-
   }
 
   initForm() {
@@ -284,7 +318,6 @@ export class ProductFormComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading branches:', err);
-        // Still allow form to work, just with no branches available
       },
     });
   }
@@ -304,6 +337,10 @@ export class ProductFormComponent implements OnInit {
           unit: product.unit,
           branchId: product.branchId,
         });
+        // Lock fields that must not be changed after creation
+        this.productForm.get('stock')?.disable();
+        this.productForm.get('branchId')?.disable();
+        this.productForm.get('costPrice')?.disable();
       },
       error: (err) => {
         console.error('Error loading product:', err);
@@ -322,7 +359,10 @@ export class ProductFormComponent implements OnInit {
     }
 
     this.submitting.set(true);
-    const formValue = this.productForm.value;
+    // getRawValue includes disabled controls; we only want enabled ones for PATCH
+    const formValue = this.isEditMode()
+      ? this.productForm.value  // excludes disabled: stock, branchId, costPrice
+      : this.productForm.getRawValue();
 
     const productData = {
       ...formValue,

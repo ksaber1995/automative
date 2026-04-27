@@ -118,6 +118,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/users/users.routes').then(m => m.USERS_ROUTES)
       },
       {
+        path: 'rooms',
+        loadComponent: () => import('./features/rooms/room-list/room-list.component').then(m => m.RoomListComponent)
+      },
+      {
+        path: 'sessions',
+        loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       }

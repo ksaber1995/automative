@@ -303,6 +303,7 @@ const CreateCourseSchema = z.object({
   duration: z.number(),
   maxStudents: z.number().optional(),
   instructorId: OptionalUUIDSchema,
+  defaultRoomId: OptionalUUIDSchema,
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
@@ -831,6 +832,13 @@ const CreateProductSchema = z.object({
   purchaseDate: z.string().optional(),
 });
 
+const RestockProductSchema = z.object({
+  quantity: z.number().int().positive(),
+  costPerUnit: z.number().min(0),
+  date: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 const UpdateProductSchema = z.object({
   name: z.string().optional(),
   code: z.string().optional(),
@@ -869,7 +877,7 @@ const DiscountTypeSchema = z.enum(['NONE', 'PERCENTAGE', 'FIXED_AMOUNT']);
 
 const CreateProductSaleSchema = z.object({
   productId: UUIDSchema,
-  branchId: UUIDSchema,
+  branchId: OptionalUUIDSchema,
   quantity: z.number(),
   discountType: DiscountTypeSchema.optional().default('NONE'),
   discountValue: z.number().optional().default(0),
@@ -2150,6 +2158,17 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
+    restock: {
+      method: 'POST',
+      path: '/api/products/:id/restock',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RestockProductSchema,
+      responses: {
+        200: ProductSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
     update: {
       method: 'PATCH',
       path: '/api/products/:id',
@@ -2745,6 +2764,165 @@ export const contract = c.router({
         400: z.object({ message: z.string() }),
         403: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // ============================================================
+  // Rooms Management
+  // ============================================================
+  rooms: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/rooms',
+      body: z.object({
+        branchId: UUIDSchema,
+        code: z.string(),
+        description: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({
+          id: UUIDSchema,
+          companyId: UUIDSchema,
+          branchId: UUIDSchema,
+          code: z.string(),
+          description: z.string().nullable(),
+          isActive: z.boolean(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+        }),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET' as const,
+      path: '/api/rooms',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    listActive: {
+      method: 'GET' as const,
+      path: '/api/rooms/active',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    getById: {
+      method: 'GET' as const,
+      path: '/api/rooms/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.any(),
+        404: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/rooms/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        code: z.string().optional(),
+        description: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.any(),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/rooms/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // ============================================================
+  // Sessions Management
+  // ============================================================
+  sessions: {
+    start: {
+      method: 'POST' as const,
+      path: '/api/sessions/start',
+      body: z.object({
+        roomId: UUIDSchema,
+        classId: UUIDSchema,
+        branchId: UUIDSchema,
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    end: {
+      method: 'PATCH' as const,
+      path: '/api/sessions/:id/end',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        notes: z.string().optional(),
+      }),
+      responses: {
+        200: z.any(),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET' as const,
+      path: '/api/sessions',
+      query: z.object({
+        branchId: z.string().optional(),
+        classId: z.string().optional(),
+        roomId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    listActive: {
+      method: 'GET' as const,
+      path: '/api/sessions/active',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.any()),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    getById: {
+      method: 'GET' as const,
+      path: '/api/sessions/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.any(),
+        404: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
       },
     },
   },

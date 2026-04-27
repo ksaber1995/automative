@@ -672,7 +672,7 @@ CREATE TABLE product_sales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     product_id UUID NOT NULL,
-    branch_id UUID NOT NULL,
+    branch_id UUID,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
     discount_type VARCHAR(50) DEFAULT 'NONE',
@@ -689,7 +689,7 @@ CREATE TABLE product_sales (
     event_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
@@ -697,6 +697,28 @@ CREATE INDEX idx_product_sales_product_id ON product_sales(product_id);
 CREATE INDEX idx_product_sales_branch_id ON product_sales(branch_id);
 CREATE INDEX idx_product_sales_sale_date ON product_sales(sale_date);
 CREATE INDEX idx_product_sales_event ON product_sales(event_id);
+
+-- =============================================
+-- STOCK PURCHASES TABLE  (migration 025)
+-- Tracks every inventory restock event with the cost paid per unit.
+-- Each row also links to the corresponding INVENTORY expense record.
+-- =============================================
+CREATE TABLE stock_purchases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL,
+    cost_per_unit DECIMAL(10, 2) NOT NULL,
+    total_cost DECIMAL(10, 2) NOT NULL,
+    date DATE NOT NULL,
+    notes TEXT,
+    expense_id UUID REFERENCES expenses(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_stock_purchases_product ON stock_purchases(product_id);
+CREATE INDEX idx_stock_purchases_company ON stock_purchases(company_id);
+CREATE INDEX idx_stock_purchases_date ON stock_purchases(date);
 
 -- =============================================
 -- DEMO LEADS TABLE
