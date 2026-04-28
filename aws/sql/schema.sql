@@ -721,6 +721,73 @@ CREATE INDEX idx_stock_purchases_company ON stock_purchases(company_id);
 CREATE INDEX idx_stock_purchases_date ON stock_purchases(date);
 
 -- =============================================
+-- ROOMS TABLE  (migration 023)
+-- Physical rooms within a branch where sessions take place.
+-- =============================================
+CREATE TABLE rooms (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    code VARCHAR(50) NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (branch_id, code)
+);
+
+CREATE INDEX idx_rooms_company_id ON rooms(company_id);
+CREATE INDEX idx_rooms_branch_id ON rooms(branch_id);
+CREATE INDEX idx_rooms_is_active ON rooms(is_active);
+
+-- Add default_room_id to courses (migration 023)
+ALTER TABLE courses
+    ADD COLUMN default_room_id UUID REFERENCES rooms(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_courses_default_room_id ON courses(default_room_id);
+
+-- =============================================
+-- SESSIONS TABLE  (migration 023)
+-- A live session: a class running in a room at a specific time.
+-- =============================================
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    end_date TIMESTAMP WITH TIME ZONE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_sessions_company_id ON sessions(company_id);
+CREATE INDEX idx_sessions_branch_id ON sessions(branch_id);
+CREATE INDEX idx_sessions_room_id ON sessions(room_id);
+CREATE INDEX idx_sessions_class_id ON sessions(class_id);
+CREATE INDEX idx_sessions_start_date ON sessions(start_date);
+CREATE INDEX idx_sessions_end_date ON sessions(end_date);
+
+-- =============================================
+-- SESSION ATTENDANCE TABLE  (migration 024)
+-- Records which students were present at a given session.
+-- One row per present student; absence = no row.
+-- =============================================
+CREATE TABLE session_attendance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (session_id, student_id)
+);
+
+CREATE INDEX idx_session_attendance_session ON session_attendance(session_id);
+CREATE INDEX idx_session_attendance_student ON session_attendance(student_id);
+
+-- =============================================
 -- DEMO LEADS TABLE
 -- Public "Book a Demo" submissions from the marketing landing page. No
 -- tenant scope — these are pre-customer records reviewed by Netrofit staff.
@@ -777,6 +844,8 @@ CREATE TRIGGER update_withdrawals_updated_at BEFORE UPDATE ON withdrawals FOR EA
 CREATE TRIGGER update_debts_updated_at BEFORE UPDATE ON debts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_sessions_updated_at BEFORE UPDATE ON sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
 -- VIEWS FOR ANALYTICS

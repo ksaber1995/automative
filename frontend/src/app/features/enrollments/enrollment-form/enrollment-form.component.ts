@@ -106,26 +106,31 @@ type EnrollmentType = 'COURSE' | 'MASTER';
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              <!-- Student (only shown when not locked to a single student) -->
-              @if (!studentLocked()) {
-                <div class="col-span-2">
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Student <span class="text-red-500">*</span></label>
-                  <p-select formControlName="studentId" [options]="students()" optionLabel="fullName" optionValue="id"
-                    placeholder="Select a student" [filter]="true" (onChange)="onStudentChange()" [style]="{ width: '100%' }"></p-select>
-                  @if (f['studentId'].invalid && f['studentId'].touched) {
-                    <small class="text-red-500">Student is required</small>
-                  }
-                </div>
-              }
-
               <!-- Branch (only shown when not locked to a student) -->
               @if (!studentLocked()) {
-                <div [class.col-span-2]="enrollmentType() === 'MASTER'">
+                <div class="col-span-2">
                   <label class="block text-sm font-medium text-gray-700 mb-2">Branch <span class="text-red-500">*</span></label>
                   <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
                     placeholder="Select a branch" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
                   @if (f['branchId'].invalid && f['branchId'].touched) {
                     <small class="text-red-500">Branch is required</small>
+                  }
+                </div>
+              }
+
+              <!-- Student (only shown when not locked to a single student) -->
+              @if (!studentLocked()) {
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Student <span class="text-red-500">*</span></label>
+                  <p-select formControlName="studentId" [options]="filteredStudents()" optionLabel="fullName" optionValue="id"
+                    placeholder="Select a student" [filter]="true" (onChange)="onStudentChange()" [style]="{ width: '100%' }"
+                    [disabled]="!f['branchId'].value"></p-select>
+                  @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+                  @if (f['branchId'].value && filteredStudents().length === 0) {
+                    <small class="text-orange-500">No active students for this branch</small>
+                  }
+                  @if (f['studentId'].invalid && f['studentId'].touched) {
+                    <small class="text-red-500">Student is required</small>
                   }
                 </div>
               }
@@ -409,6 +414,12 @@ export class EnrollmentFormComponent implements OnInit {
   downPaymentSig = signal(0);
   coverage = signal<CoverageInfo | null>(null);
 
+  filteredStudents = computed(() => {
+    const branchId = this.selectedBranchId();
+    if (!branchId) return [];
+    return this.students().filter(s => String(s.branchId) === String(branchId));
+  });
+
   filteredCourses = computed(() => {
     const branchId = this.selectedBranchId();
     if (!branchId) return [];
@@ -589,6 +600,10 @@ export class EnrollmentFormComponent implements OnInit {
 
   onBranchChange() {
     this.selectedBranchId.set(this.enrollmentForm.get('branchId')?.value || null);
+    if (!this.studentLocked()) {
+      this.enrollmentForm.patchValue({ studentId: '' });
+      this.coverage.set(null);
+    }
     this.enrollmentForm.patchValue({ courseId: '', classId: '', masterCourseId: '' });
     this.selectedCourseId.set(null);
     this.selectedCourse.set(null);

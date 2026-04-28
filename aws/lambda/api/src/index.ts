@@ -39,6 +39,7 @@ import { usersRoutes } from './routes/users';
 import { demoLeadsRoutes } from './routes/demo-leads';
 import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
+import { attendanceRoutes } from './routes/attendance';
 
 // Create the router implementation
 const router = {
@@ -87,6 +88,7 @@ const router = {
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,
   rooms: roomsRoutes,
+  attendance: attendanceRoutes,
   sessions: {
     start: sessionsRoutes.start,
     end: sessionsRoutes.end,

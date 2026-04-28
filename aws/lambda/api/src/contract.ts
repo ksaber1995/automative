@@ -2657,6 +2657,15 @@ export const contract = c.router({
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
+    createSessionAttendanceTable: {
+      method: 'POST',
+      path: '/api/migrations/create-session-attendance-table',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
   },
 
   // ============================================================
@@ -2853,6 +2862,87 @@ export const contract = c.router({
         400: z.object({ message: z.string() }),
         403: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // ============================================================
+  // Attendance Management
+  // ============================================================
+  attendance: {
+    getBySession: {
+      method: 'GET' as const,
+      path: '/api/attendance/session/:sessionId',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          studentId: UUIDSchema,
+          studentFirstName: z.string(),
+          studentLastName: z.string(),
+          isPresent: z.boolean(),
+          attendanceId: UUIDSchema.nullable().optional(),
+        })),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    saveForSession: {
+      method: 'POST' as const,
+      path: '/api/attendance/session/:sessionId',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      body: z.object({ presentStudentIds: z.array(UUIDSchema) }),
+      responses: {
+        200: z.object({ message: z.string(), presentCount: z.number() }),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    getByStudent: {
+      method: 'GET' as const,
+      path: '/api/attendance/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          sessionId: UUIDSchema,
+          sessionStartDate: z.string(),
+          sessionEndDate: z.string().nullable(),
+          classId: UUIDSchema,
+          className: z.string(),
+          classCode: z.string(),
+          roomCode: z.string().nullable(),
+          isPresent: z.boolean(),
+        })),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    getByClass: {
+      method: 'GET' as const,
+      path: '/api/attendance/class/:classId',
+      pathParams: z.object({ classId: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          sessionId: UUIDSchema,
+          sessionStartDate: z.string(),
+          sessionEndDate: z.string().nullable(),
+          roomCode: z.string().nullable(),
+          totalStudents: z.number(),
+          presentCount: z.number(),
+          absentCount: z.number(),
+        })),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
       },
     },
   },

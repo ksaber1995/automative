@@ -566,6 +566,71 @@
         </ng-template>
       </p-table>
     </p-card>
+    <!-- Attendance History Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-check-square text-indigo-600"></i>
+            Attendance History
+          </h3>
+          <div class="flex items-center gap-3">
+            @if (attendanceRecords().length > 0) {
+              <span class="text-sm text-gray-500">
+                <span class="text-green-600 font-semibold">{{ attendancePresentCount() }}</span> present ·
+                <span class="text-red-500 font-semibold">{{ attendanceAbsentCount() }}</span> absent ·
+                <span class="font-semibold text-indigo-600">{{ attendanceRate() }}%</span> rate
+              </span>
+            }
+          </div>
+        </div>
+      </ng-template>
+
+      @if (loadingAttendance()) {
+        <div class="text-center py-8 text-gray-400">
+          <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+          <p>Loading attendance...</p>
+        </div>
+      } @else if (attendanceRecords().length === 0) {
+        <div class="text-center py-8 text-gray-400">
+          <i class="pi pi-check-square text-4xl mb-3 block"></i>
+          <p>No attendance records yet.</p>
+        </div>
+      } @else {
+        <p-table [value]="attendanceRecords()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Date</th>
+              <th>Class</th>
+              <th>Room</th>
+              <th>Status</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-rec>
+            <tr>
+              <td class="font-medium">{{ formatDate(rec.sessionStartDate) }}</td>
+              <td>
+                <div class="font-medium text-sm">{{ rec.className }}</div>
+                <div class="text-xs text-gray-400 font-mono">{{ rec.classCode }}</div>
+              </td>
+              <td class="text-gray-600 text-sm">{{ rec.roomCode || '—' }}</td>
+              <td>
+                @if (rec.isPresent) {
+                  <span class="inline-flex items-center gap-1.5 text-green-700 font-semibold text-sm">
+                    <i class="pi pi-check-circle text-green-500"></i> Present
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center gap-1.5 text-red-600 font-semibold text-sm">
+                    <i class="pi pi-times-circle text-red-400"></i> Absent
+                  </span>
+                }
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </p-card>
+
   } @else if (loading()) {
     <div class="flex justify-center items-center h-64">
       <i class="pi pi-spin pi-spinner text-4xl"></i>

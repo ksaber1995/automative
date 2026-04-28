@@ -617,6 +617,44 @@ async function createExpensePaymentsTable() {
   }
 }
 
+async function createSessionAttendanceTable() {
+  console.log('Starting migration: create_session_attendance_table');
+
+  try {
+    const tableExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'session_attendance'
+    `);
+
+    if (tableExists.length > 0) {
+      console.log('✅ session_attendance table already exists');
+      return { success: true, message: 'session_attendance table already exists' };
+    }
+
+    await query(`
+      CREATE TABLE session_attendance (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(session_id, student_id)
+      )
+    `);
+    console.log('✓ Created session_attendance table');
+
+    await query(`CREATE INDEX idx_session_attendance_session ON session_attendance(session_id)`);
+    await query(`CREATE INDEX idx_session_attendance_student ON session_attendance(student_id)`);
+    console.log('✓ Created indexes');
+
+    console.log('✅ session_attendance migration completed!');
+    return { success: true, message: 'session_attendance table created successfully' };
+  } catch (error) {
+    console.error('❌ session_attendance migration error:', error);
+    throw error;
+  }
+}
+
 export const migrationsRoutes = {
   runInstructorMigration: async () => {
     try {
@@ -761,6 +799,21 @@ export const migrationsRoutes = {
         body: {
           success: false,
           message: 'Cleanup failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createSessionAttendanceTable: async () => {
+    try {
+      const result = await createSessionAttendanceTable();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

@@ -22,6 +22,7 @@ import { MasterEnrollmentService } from '../../master-courses/services/master-en
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
@@ -60,6 +61,7 @@ export class StudentDetailComponent implements OnInit {
   private masterEnrollmentService = inject(MasterEnrollmentService);
   private masterCourseService = inject(MasterCourseService);
   private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
+  private attendanceService = inject(AttendanceService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -139,6 +141,17 @@ export class StudentDetailComponent implements OnInit {
   private joinBundleCourseId: string | null = null;
   private joinBundleMasterEnrollmentId: string | null = null;
 
+  // Attendance
+  attendanceRecords = signal<StudentAttendanceRecord[]>([]);
+  loadingAttendance = signal(false);
+  attendancePresentCount = computed(() => this.attendanceRecords().filter(r => r.isPresent).length);
+  attendanceAbsentCount = computed(() => this.attendanceRecords().filter(r => !r.isPresent).length);
+  attendanceRate = computed(() => {
+    const total = this.attendanceRecords().length;
+    if (!total) return 0;
+    return Math.round((this.attendancePresentCount() / total) * 100);
+  });
+
   async ngOnInit() {
     this.studentId = this.route.snapshot.paramMap.get('id');
     if (this.studentId) {
@@ -146,7 +159,16 @@ export class StudentDetailComponent implements OnInit {
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
       this.loadMasterEnrollments(this.studentId);
+      this.loadAttendance(this.studentId);
     }
+  }
+
+  loadAttendance(studentId: string) {
+    this.loadingAttendance.set(true);
+    this.attendanceService.getByStudent(studentId).subscribe({
+      next: (records) => { this.attendanceRecords.set(records); this.loadingAttendance.set(false); },
+      error: () => this.loadingAttendance.set(false),
+    });
   }
 
   loadMasterEnrollments(id: string) {

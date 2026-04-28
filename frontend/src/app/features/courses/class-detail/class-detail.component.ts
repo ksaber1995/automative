@@ -10,11 +10,13 @@ import { TabsModule } from 'primeng/tabs';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
+import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
 import { ClassService } from '../services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { SessionService, Session } from '../../rooms/services/session.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
+import { AttendanceService, SessionAttendanceStudent, ClassAttendanceSummary } from '../../rooms/services/attendance.service';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
 
 @Component({
@@ -31,6 +33,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     DialogModule,
     SelectModule,
     TextareaModule,
+    CheckboxModule,
     FormsModule,
   ],
   template: `
@@ -93,17 +96,20 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
           </div>
         </p-card>
 
-        <!-- Tabs: Students + Sessions -->
+        <!-- Tabs: Students + Sessions + Attendance -->
         <p-tabs [value]="activeTab" (valueChange)="onTabChange($event)">
           <p-tablist>
             <p-tab value="students">
               <i class="pi pi-users mr-2"></i>Students
             </p-tab>
-            <p-tab value="sessions" (click)="loadSessions()">
+            <p-tab value="sessions">
               <i class="pi pi-clock mr-2"></i>Sessions
               @if (activeSession()) {
                 <span class="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
               }
+            </p-tab>
+            <p-tab value="attendance">
+              <i class="pi pi-check-square mr-2"></i>Attendance
             </p-tab>
           </p-tablist>
 
@@ -170,8 +176,12 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
                         <p class="text-sm text-orange-700">Started {{ formatDateTime(activeSession()!.startDate) }}</p>
                       </div>
                     </div>
-                    <p-button label="End Session" icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
-                      (onClick)="confirmEndSession(activeSession()!)"></p-button>
+                    <div class="flex gap-2">
+                      <p-button label="Take Attendance" icon="pi pi-check-square" severity="info" [outlined]="true" size="small"
+                        (onClick)="openAttendanceDialog(activeSession()!)"></p-button>
+                      <p-button label="End Session" icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
+                        (onClick)="confirmEndSession(activeSession()!)"></p-button>
+                    </div>
                   </div>
                 }
 
@@ -197,6 +207,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
                       <th>Ended</th>
                       <th>Duration</th>
                       <th>Status</th>
+                      <th>Attendance</th>
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="body" let-s>
@@ -212,14 +223,95 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
                       <td>
                         <p-tag [value]="s.endDate ? 'Ended' : 'Active'" [severity]="s.endDate ? 'secondary' : 'success'"></p-tag>
                       </td>
+                      <td>
+                        <p-button icon="pi pi-check-square" [rounded]="true" [text]="true" severity="info"
+                          (onClick)="openAttendanceDialog(s)" pTooltip="Manage Attendance"></p-button>
+                      </td>
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="emptymessage">
                     <tr>
-                      <td colspan="5" class="text-center py-8 text-gray-400">No sessions recorded for this class</td>
+                      <td colspan="6" class="text-center py-8 text-gray-400">No sessions recorded for this class</td>
                     </tr>
                   </ng-template>
                 </p-table>
+              </div>
+            </p-tabpanel>
+
+            <!-- Attendance Summary Tab -->
+            <p-tabpanel value="attendance">
+              <div class="mt-2">
+                @if (loadingAttendance()) {
+                  <div class="text-center py-12 text-gray-400">
+                    <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+                    <p>Loading attendance...</p>
+                  </div>
+                } @else if (attendanceSummary().length === 0) {
+                  <div class="text-center py-12 text-gray-400">
+                    <i class="pi pi-check-square text-4xl mb-3 block"></i>
+                    <p>No attendance records yet. Start a session and take attendance.</p>
+                  </div>
+                } @else {
+                  <!-- Overall Stats -->
+                  <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-xl p-4 text-center">
+                      <p class="text-2xl font-bold text-blue-700">{{ attendanceSummary().length }}</p>
+                      <p class="text-sm text-blue-600 mt-1">Total Sessions</p>
+                    </div>
+                    <div class="bg-green-50 rounded-xl p-4 text-center">
+                      <p class="text-2xl font-bold text-green-700">{{ avgAttendanceRate() }}%</p>
+                      <p class="text-sm text-green-600 mt-1">Avg Attendance Rate</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4 text-center">
+                      <p class="text-2xl font-bold text-gray-700">{{ attendanceSummary()[0]?.totalStudents ?? 0 }}</p>
+                      <p class="text-sm text-gray-600 mt-1">Enrolled Students</p>
+                    </div>
+                  </div>
+
+                  <p-table [value]="attendanceSummary()" responsiveLayout="scroll">
+                    <ng-template pTemplate="header">
+                      <tr>
+                        <th>Session Date</th>
+                        <th>Room</th>
+                        <th>Present</th>
+                        <th>Absent</th>
+                        <th>Rate</th>
+                        <th>Actions</th>
+                      </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                      <tr>
+                        <td class="font-medium">{{ formatDate(row.sessionStartDate) }}</td>
+                        <td class="text-gray-600">{{ row.roomCode || '—' }}</td>
+                        <td>
+                          <span class="inline-flex items-center gap-1 text-green-700 font-semibold">
+                            <i class="pi pi-check-circle text-green-500"></i>
+                            {{ row.presentCount }}
+                          </span>
+                        </td>
+                        <td>
+                          <span class="inline-flex items-center gap-1 text-red-600 font-semibold">
+                            <i class="pi pi-times-circle text-red-400"></i>
+                            {{ row.absentCount }}
+                          </span>
+                        </td>
+                        <td>
+                          <div class="flex items-center gap-2">
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                              <div class="bg-green-500 h-2 rounded-full"
+                                [style.width]="getRate(row) + '%'"></div>
+                            </div>
+                            <span class="text-sm font-medium">{{ getRate(row) }}%</span>
+                          </div>
+                        </td>
+                        <td>
+                          <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
+                            (onClick)="openAttendanceDialogById(row.sessionId)" pTooltip="Edit Attendance"></p-button>
+                        </td>
+                      </tr>
+                    </ng-template>
+                  </p-table>
+                }
               </div>
             </p-tabpanel>
           </p-tabpanels>
@@ -264,12 +356,76 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
         <p-button label="End Session" severity="danger" [loading]="savingSession()" (onClick)="endSession()"></p-button>
       </ng-template>
     </p-dialog>
+
+    <!-- Attendance Dialog -->
+    <p-dialog
+      [(visible)]="showAttendanceDialog"
+      [header]="'Attendance — ' + formatDateTime(attendanceSession()?.startDate || '')"
+      [modal]="true"
+      [style]="{ width: '520px' }"
+      [closable]="true"
+    >
+      @if (loadingAttendanceStudents()) {
+        <div class="text-center py-8 text-gray-400">
+          <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+          <p>Loading students...</p>
+        </div>
+      } @else {
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-sm text-gray-500">{{ attendanceStudents().length }} students enrolled</span>
+          <div class="flex gap-2">
+            <p-button label="All Present" size="small" severity="success" [outlined]="true" (onClick)="markAll(true)"></p-button>
+            <p-button label="All Absent" size="small" severity="danger" [outlined]="true" (onClick)="markAll(false)"></p-button>
+          </div>
+        </div>
+        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+          @for (student of attendanceStudents(); track student.studentId) {
+            <div class="flex items-center justify-between p-3 rounded-lg border"
+              [class.border-green-200]="student.isPresent"
+              [class.bg-green-50]="student.isPresent"
+              [class.border-gray-200]="!student.isPresent"
+              [class.bg-white]="!student.isPresent">
+              <div class="flex items-center gap-3">
+                <p-checkbox
+                  [(ngModel)]="student.isPresent"
+                  [binary]="true"
+                  [inputId]="'att-' + student.studentId"
+                ></p-checkbox>
+                <label [for]="'att-' + student.studentId" class="cursor-pointer font-medium text-gray-800">
+                  {{ student.studentFirstName }} {{ student.studentLastName }}
+                </label>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                [class.bg-green-100]="student.isPresent"
+                [class.text-green-700]="student.isPresent"
+                [class.bg-gray-100]="!student.isPresent"
+                [class.text-gray-500]="!student.isPresent">
+                {{ student.isPresent ? 'Present' : 'Absent' }}
+              </span>
+            </div>
+          }
+        </div>
+        <div class="mt-3 pt-3 border-t flex items-center justify-between text-sm text-gray-500">
+          <span>
+            <span class="text-green-600 font-semibold">{{ presentCount() }} present</span>
+            &nbsp;·&nbsp;
+            <span class="text-red-500 font-semibold">{{ absentCount() }} absent</span>
+          </span>
+        </div>
+      }
+      <ng-template pTemplate="footer">
+        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showAttendanceDialog = false"></p-button>
+        <p-button label="Save Attendance" icon="pi pi-check" [loading]="savingAttendance()"
+          [disabled]="loadingAttendanceStudents()" (onClick)="saveAttendance()"></p-button>
+      </ng-template>
+    </p-dialog>
   `
 })
 export class ClassDetailComponent implements OnInit {
   private classService = inject(ClassService);
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
+  private attendanceService = inject(AttendanceService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -284,6 +440,15 @@ export class ClassDetailComponent implements OnInit {
   loadingSessions = signal(false);
   savingSession = signal(false);
 
+  // Attendance
+  attendanceSummary = signal<ClassAttendanceSummary[]>([]);
+  loadingAttendance = signal(false);
+  showAttendanceDialog = false;
+  attendanceSession = signal<Session | null>(null);
+  attendanceStudents = signal<SessionAttendanceStudent[]>([]);
+  loadingAttendanceStudents = signal(false);
+  savingAttendance = signal(false);
+
   activeTab = 'students';
   showStartSessionDialog = false;
   showEndSessionDialog = false;
@@ -293,6 +458,14 @@ export class ClassDetailComponent implements OnInit {
   endingSession = signal<Session | null>(null);
 
   activeSession = () => this.sessions().find(s => !s.endDate) ?? null;
+  presentCount = () => this.attendanceStudents().filter(s => s.isPresent).length;
+  absentCount = () => this.attendanceStudents().filter(s => !s.isPresent).length;
+  avgAttendanceRate = () => {
+    const summaries = this.attendanceSummary();
+    if (!summaries.length) return 0;
+    const total = summaries.reduce((sum, s) => sum + (s.totalStudents > 0 ? (s.presentCount / s.totalStudents) * 100 : 0), 0);
+    return Math.round(total / summaries.length);
+  };
 
   ngOnInit() {
     this.classId = this.route.snapshot.paramMap.get('id') || '';
@@ -324,7 +497,6 @@ export class ClassDetailComponent implements OnInit {
       next: (s) => { this.sessions.set(s); this.loadingSessions.set(false); },
       error: () => this.loadingSessions.set(false),
     });
-    // Load free rooms for starting a session
     const cls = this.classDetail();
     this.roomService.listActive(cls?.branchId ?? undefined).subscribe({
       next: (rooms) => this.freeRooms.set(rooms.filter(r => !r.isOccupied)),
@@ -332,9 +504,18 @@ export class ClassDetailComponent implements OnInit {
     });
   }
 
+  loadAttendanceSummary() {
+    this.loadingAttendance.set(true);
+    this.attendanceService.getByClass(this.classId).subscribe({
+      next: (data) => { this.attendanceSummary.set(data); this.loadingAttendance.set(false); },
+      error: () => this.loadingAttendance.set(false),
+    });
+  }
+
   onTabChange(val: string | number | undefined) {
     this.activeTab = val?.toString() ?? 'students';
     if (this.activeTab === 'sessions') this.loadSessions();
+    if (this.activeTab === 'attendance') this.loadAttendanceSummary();
   }
 
   openStartSessionDialog() {
@@ -391,6 +572,65 @@ export class ClassDetailComponent implements OnInit {
     });
   }
 
+  openAttendanceDialog(session: Session) {
+    this.attendanceSession.set(session);
+    this.showAttendanceDialog = true;
+    this.loadingAttendanceStudents.set(true);
+    this.attendanceService.getBySession(session.id).subscribe({
+      next: (students) => {
+        this.attendanceStudents.set(students.map(s => ({ ...s })));
+        this.loadingAttendanceStudents.set(false);
+      },
+      error: () => {
+        this.loadingAttendanceStudents.set(false);
+        this.notificationService.error('Failed to load students');
+      },
+    });
+  }
+
+  openAttendanceDialogById(sessionId: string) {
+    const session = this.sessions().find(s => s.id === sessionId);
+    if (session) {
+      this.openAttendanceDialog(session);
+    } else {
+      // Load from summary — create a minimal session object
+      const summary = this.attendanceSummary().find(s => s.sessionId === sessionId);
+      if (summary) {
+        const fakeSession = { id: sessionId, startDate: summary.sessionStartDate, endDate: summary.sessionEndDate, roomCode: summary.roomCode } as any;
+        this.openAttendanceDialog(fakeSession);
+      }
+    }
+  }
+
+  markAll(present: boolean) {
+    this.attendanceStudents.set(this.attendanceStudents().map(s => ({ ...s, isPresent: present })));
+  }
+
+  saveAttendance() {
+    const session = this.attendanceSession();
+    if (!session) return;
+    this.savingAttendance.set(true);
+    const presentIds = this.attendanceStudents().filter(s => s.isPresent).map(s => s.studentId);
+    this.attendanceService.saveForSession(session.id, presentIds).subscribe({
+      next: (res) => {
+        this.savingAttendance.set(false);
+        this.showAttendanceDialog = false;
+        this.notificationService.success(`Attendance saved — ${res.presentCount} present`);
+        // Refresh attendance summary if on that tab
+        if (this.activeTab === 'attendance') this.loadAttendanceSummary();
+      },
+      error: (err) => {
+        this.savingAttendance.set(false);
+        this.notificationService.error(err?.error?.message || 'Failed to save attendance');
+      },
+    });
+  }
+
+  getRate(row: ClassAttendanceSummary): number {
+    if (!row.totalStudents) return 0;
+    return Math.round((row.presentCount / row.totalStudents) * 100);
+  }
+
   addStudent() {
     const cls = this.classDetail();
     const params: any = { classId: this.classId };
@@ -427,6 +667,7 @@ export class ClassDetailComponent implements OnInit {
   }
 
   formatDateTime(dateStr: string): string {
+    if (!dateStr) return '—';
     return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 

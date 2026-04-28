@@ -513,11 +513,11 @@ export const masterEnrollmentsRoutes = {
         `SELECT me.id AS master_enrollment_id, mc.id AS master_course_id, mc.name AS master_course_name
          FROM master_enrollments me
          INNER JOIN master_courses mc ON mc.id = me.master_course_id
-         INNER JOIN courses c ON c.master_course_id = mc.id
+         INNER JOIN master_course_courses mcc ON mcc.master_course_id = mc.id
          WHERE me.company_id = $1
            AND me.student_id = $2
            AND me.status = 'ACTIVE'
-           AND c.id = $3
+           AND mcc.course_id = $3
          LIMIT 1`,
         [context.companyId, q.studentId, q.courseId]
       );

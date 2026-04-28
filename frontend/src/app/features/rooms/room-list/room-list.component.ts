@@ -156,8 +156,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
 
               <!-- Inactive badge -->
               @if (!room.isActive) {
-                <div class="bg-gray-50 rounded-lg p-2 mb-3 text-center">
-                  <span class="text-xs text-gray-500">Inactive</span>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-2 mb-3 text-center">
+                  <span class="text-xs font-semibold text-red-600 uppercase tracking-wide">Inactive</span>
                 </div>
               }
 
