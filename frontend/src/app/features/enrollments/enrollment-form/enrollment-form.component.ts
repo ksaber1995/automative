@@ -2,6 +2,8 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { switchMap, map } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -164,8 +166,17 @@ type EnrollmentType = 'COURSE' | 'MASTER';
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Course <span class="text-red-500">*</span></label>
                   <p-select formControlName="courseId" [options]="filteredCourses()" optionLabel="name" optionValue="id"
-                    placeholder="Select a course" (onChange)="onCourseChange()" [style]="{ width: '100%' }"
-                    [disabled]="!f['branchId'].value"></p-select>
+                    optionDisabled="disabled" placeholder="Select a course" (onChange)="onCourseChange()"
+                    [style]="{ width: '100%' }" [disabled]="!f['branchId'].value">
+                    <ng-template let-c pTemplate="item">
+                      <div class="flex justify-between items-center gap-3 w-full" [class.opacity-50]="c.disabled">
+                        <span>{{ c.name }}</span>
+                        @if (c.disabled) {
+                          <span class="text-xs text-gray-500 italic">already enrolled</span>
+                        }
+                      </div>
+                    </ng-template>
+                  </p-select>
                   @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
                   @if (f['branchId'].value && filteredCourses().length === 0) {
                     <small class="text-orange-500">No active courses for this branch</small>
@@ -403,6 +414,7 @@ export class EnrollmentFormComponent implements OnInit {
   duplicateMaster = signal(false);
   studentLocked = signal(false);
   studentBranchName = signal<string>('');
+  enrolledCourseIds = signal<Set<string>>(new Set());
 
   // Signals for reactive display — avoids reading form.value in template
   originalPriceSig = signal(0);
@@ -423,10 +435,13 @@ export class EnrollmentFormComponent implements OnInit {
   filteredCourses = computed(() => {
     const branchId = this.selectedBranchId();
     if (!branchId) return [];
-    return this.courses().filter(c => {
-      const courseBranchId = c.branchId ? String(c.branchId) : null;
-      return courseBranchId === String(branchId) || courseBranchId === null;
-    });
+    const enrolled = this.enrolledCourseIds();
+    return this.courses()
+      .filter(c => {
+        const courseBranchId = c.branchId ? String(c.branchId) : null;
+        return courseBranchId === String(branchId) || courseBranchId === null;
+      })
+      .map(c => ({ ...c, disabled: enrolled.has(c.id) }));
   });
 
   filteredClasses = computed(() => {
@@ -504,6 +519,7 @@ export class EnrollmentFormComponent implements OnInit {
         this.studentLocked.set(true);
         this.enrollmentForm.get('studentId')?.disable({ emitEvent: false });
         this.autoSelectStudentBranch(studentId, true);
+        this.loadEnrolledCourseIds(studentId);
       }
     });
 
@@ -603,6 +619,7 @@ export class EnrollmentFormComponent implements OnInit {
     if (!this.studentLocked()) {
       this.enrollmentForm.patchValue({ studentId: '' });
       this.coverage.set(null);
+      this.enrolledCourseIds.set(new Set());
     }
     this.enrollmentForm.patchValue({ courseId: '', classId: '', masterCourseId: '' });
     this.selectedCourseId.set(null);
@@ -700,7 +717,42 @@ export class EnrollmentFormComponent implements OnInit {
   }
 
   onStudentChange() {
+    const studentId = this.enrollmentForm.get('studentId')?.value;
+    this.loadEnrolledCourseIds(studentId);
     this.checkCoverage();
+  }
+
+  loadEnrolledCourseIds(studentId: string | null | undefined) {
+    if (!studentId) {
+      this.enrolledCourseIds.set(new Set());
+      return;
+    }
+    forkJoin({
+      direct: this.enrollmentService.getEnrollmentsByStudent(studentId),
+      masters: this.masterEnrollmentService.getByStudent(studentId),
+    }).pipe(
+      switchMap(({ direct, masters }) => {
+        const directIds = direct
+          .filter(e => e.status === EnrollmentStatus.ACTIVE)
+          .map(e => e.courseId);
+        const activeMasters = masters.filter(m => m.status === 'ACTIVE');
+        if (activeMasters.length === 0) {
+          return of(new Set<string>(directIds));
+        }
+        return forkJoin(
+          activeMasters.map(m => this.masterCourseService.getLinkedCourses(m.masterCourseId))
+        ).pipe(
+          map(linkedLists => {
+            const all = new Set<string>(directIds);
+            linkedLists.forEach(list => list.forEach(c => all.add(c.id)));
+            return all;
+          })
+        );
+      })
+    ).subscribe({
+      next: (ids) => this.enrolledCourseIds.set(ids),
+      error: () => this.enrolledCourseIds.set(new Set()),
+    });
   }
 
   checkCoverage() {

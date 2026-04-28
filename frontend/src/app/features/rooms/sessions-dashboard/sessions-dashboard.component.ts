@@ -12,9 +12,11 @@ import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { InputTextModule } from 'primeng/inputtext';
+import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
 import { SessionService, Session } from '../services/session.service';
 import { RoomService, Room } from '../services/room.service';
+import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
@@ -56,6 +58,7 @@ function endTimeAfterStartValidator(startDate: string) {
     TooltipModule,
     TabsModule,
     InputTextModule,
+    CheckboxModule,
   ],
   template: `
     <div class="container-custom py-8">
@@ -170,15 +173,92 @@ function endTimeAfterStartValidator(startDate: string) {
                       <span><i class="pi pi-clock mr-1"></i>Started {{ formatTime(session.startDate) }}</span>
                       <span class="text-orange-600 font-medium">{{ getDuration(session.startDate) }}</span>
                     </div>
-                    <p-button
-                      label="End Session"
-                      icon="pi pi-stop"
-                      severity="danger"
-                      [outlined]="true"
-                      size="small"
-                      styleClass="w-full"
-                      (onClick)="confirmEndSession(session)"
-                    ></p-button>
+                    <div class="grid grid-cols-2 gap-2">
+                      <p-button
+                        [label]="expandedAttendanceSessionId() === session.id ? 'Hide Attendance' : 'Add Attendance'"
+                        [icon]="expandedAttendanceSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-check-square'"
+                        severity="info"
+                        [outlined]="true"
+                        size="small"
+                        styleClass="w-full"
+                        (onClick)="toggleAttendance(session)"
+                      ></p-button>
+                      <p-button
+                        label="End Session"
+                        icon="pi pi-stop"
+                        severity="danger"
+                        [outlined]="true"
+                        size="small"
+                        styleClass="w-full"
+                        (onClick)="confirmEndSession(session)"
+                      ></p-button>
+                    </div>
+
+                    <!-- Attendance accordion -->
+                    @if (expandedAttendanceSessionId() === session.id) {
+                      <div class="mt-4 pt-4 border-t border-gray-200">
+                        @if (loadingAttendanceFor() === session.id) {
+                          <div class="text-center py-6 text-gray-400">
+                            <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+                            <p class="text-sm">Loading students...</p>
+                          </div>
+                        } @else {
+                          <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-medium text-gray-700">
+                              {{ getAttendanceStudents(session.id).length }} student(s)
+                            </span>
+                          </div>
+                          @if (getAttendanceStudents(session.id).length === 0) {
+                            <div class="text-center py-6 text-gray-400 text-sm">
+                              <i class="pi pi-users text-3xl mb-2 text-gray-300"></i>
+                              <p>No students enrolled in this class</p>
+                            </div>
+                          } @else {
+                            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                              @for (student of getAttendanceStudents(session.id); track student.studentId) {
+                                <div class="flex items-center justify-between p-2 rounded-lg border"
+                                  [class.border-green-200]="student.isPresent"
+                                  [class.bg-green-50]="student.isPresent"
+                                  [class.border-gray-200]="!student.isPresent">
+                                  <div class="flex items-center gap-3">
+                                    <p-checkbox
+                                      [(ngModel)]="student.isPresent"
+                                      [binary]="true"
+                                      [inputId]="'att-' + session.id + '-' + student.studentId"
+                                    ></p-checkbox>
+                                    <label [for]="'att-' + session.id + '-' + student.studentId"
+                                      class="cursor-pointer text-sm font-medium text-gray-800">
+                                      {{ student.studentFirstName }} {{ student.studentLastName }}
+                                    </label>
+                                  </div>
+                                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                    [class.bg-green-100]="student.isPresent"
+                                    [class.text-green-700]="student.isPresent"
+                                    [class.bg-gray-100]="!student.isPresent"
+                                    [class.text-gray-500]="!student.isPresent">
+                                    {{ student.isPresent ? 'Present' : 'Absent' }}
+                                  </span>
+                                </div>
+                              }
+                            </div>
+                            <div class="mt-3 pt-3 border-t flex items-center justify-between">
+                              <span class="text-xs text-gray-500">
+                                <span class="text-green-600 font-semibold">{{ presentCountForSession(session.id) }} present</span>
+                                ·
+                                <span class="text-red-500 font-semibold">{{ absentCountForSession(session.id) }} absent</span>
+                              </span>
+                              <p-button
+                                label="Save Attendance"
+                                icon="pi pi-check"
+                                size="small"
+                                [loading]="savingAttendanceFor() === session.id"
+                                (onClick)="saveAttendanceForSession(session.id)"
+                              ></p-button>
+                            </div>
+                          }
+                        }
+                      </div>
+                    }
                   </div>
                 }
               </div>
@@ -498,6 +578,7 @@ export class SessionsDashboardComponent implements OnInit {
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
   private branchService = inject(BranchService);
+  private attendanceService = inject(AttendanceService);
   private notificationService = inject(NotificationService);
   private fb = inject(FormBuilder);
 
@@ -536,6 +617,12 @@ export class SessionsDashboardComponent implements OnInit {
 
   /** Display-only date label for the locked end-date field */
   endDateDisplay = signal<string>('');
+
+  /** Inline attendance accordion state */
+  expandedAttendanceSessionId = signal<string | null>(null);
+  loadingAttendanceFor = signal<string | null>(null);
+  savingAttendanceFor = signal<string | null>(null);
+  attendanceBySession = signal<Record<string, SessionAttendanceStudent[]>>({});
 
   // ── Page-level filtered rooms ──────────────────────────────────────────────
 
@@ -777,5 +864,63 @@ export class SessionsDashboardComponent implements OnInit {
   formatDuration(mins: number): string {
     if (mins < 60) return `${mins}m`;
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  }
+
+  // ── Attendance accordion ──────────────────────────────────────────────────
+
+  toggleAttendance(session: Session) {
+    if (this.expandedAttendanceSessionId() === session.id) {
+      this.expandedAttendanceSessionId.set(null);
+      return;
+    }
+    this.expandedAttendanceSessionId.set(session.id);
+    if (!this.attendanceBySession()[session.id]) {
+      this.loadAttendanceForSession(session.id);
+    }
+  }
+
+  loadAttendanceForSession(sessionId: string) {
+    this.loadingAttendanceFor.set(sessionId);
+    this.attendanceService.getBySession(sessionId).subscribe({
+      next: (students) => {
+        this.attendanceBySession.set({
+          ...this.attendanceBySession(),
+          [sessionId]: students.map(s => ({ ...s })),
+        });
+        this.loadingAttendanceFor.set(null);
+      },
+      error: () => {
+        this.loadingAttendanceFor.set(null);
+        this.notificationService.error('Failed to load students for attendance');
+      },
+    });
+  }
+
+  getAttendanceStudents(sessionId: string): SessionAttendanceStudent[] {
+    return this.attendanceBySession()[sessionId] || [];
+  }
+
+  presentCountForSession(sessionId: string): number {
+    return this.getAttendanceStudents(sessionId).filter(s => s.isPresent).length;
+  }
+
+  absentCountForSession(sessionId: string): number {
+    return this.getAttendanceStudents(sessionId).filter(s => !s.isPresent).length;
+  }
+
+  saveAttendanceForSession(sessionId: string) {
+    const students = this.getAttendanceStudents(sessionId);
+    const presentIds = students.filter(s => s.isPresent).map(s => s.studentId);
+    this.savingAttendanceFor.set(sessionId);
+    this.attendanceService.saveForSession(sessionId, presentIds).subscribe({
+      next: (res) => {
+        this.savingAttendanceFor.set(null);
+        this.notificationService.success(`Attendance saved — ${res.presentCount} present`);
+      },
+      error: (err: any) => {
+        this.savingAttendanceFor.set(null);
+        this.notificationService.error(err?.error?.message || 'Failed to save attendance');
+      },
+    });
   }
 }

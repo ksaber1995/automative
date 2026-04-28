@@ -40,6 +40,7 @@
           <th>{{ 'STUDENTS.LIST.COL_PARENT' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_CONTACT' | translate }}</th>
           <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
+          <th class="text-center">Courses</th>
           <th pSortableColumn="isActive">{{ 'STUDENTS.LIST.COL_STATUS' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
@@ -58,6 +59,20 @@
             </div>
           </td>
           <td>{{ student.enrollmentDate | date: 'MMM d, y' }}</td>
+          <td>
+            <div class="flex justify-center gap-2">
+              <p-tag
+                [value]="getCounts(student.id).active + ' active'"
+                severity="info"
+                [pTooltip]="'Active enrollments'"
+              ></p-tag>
+              <p-tag
+                [value]="getCounts(student.id).completed + ' done'"
+                severity="success"
+                [pTooltip]="'Completed enrollments'"
+              ></p-tag>
+            </div>
+          </td>
           <td>
             <p-tag
               [value]="student.isActive ? ('STUDENTS.LIST.ACTIVE' | translate) : ('STUDENTS.LIST.INACTIVE' | translate)"
@@ -97,7 +112,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td colspan="8" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

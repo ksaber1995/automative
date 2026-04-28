@@ -12,10 +12,17 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { EnrollmentStatus } from '@shared/enums/enrollment-status.enum';
+
+interface EnrollmentCounts {
+  active: number;
+  completed: number;
+}
 
 @Component({
   selector: 'app-student-list',
@@ -38,6 +45,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 export class StudentListComponent implements OnInit {
   private studentService = inject(StudentService);
   private branchService = inject(BranchService);
+  private enrollmentService = inject(EnrollmentService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -47,10 +55,30 @@ export class StudentListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string | null = null;
+  enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
 
   ngOnInit() {
     this.loadBranches();
     this.loadStudents();
+    this.loadEnrollmentCounts();
+  }
+
+  loadEnrollmentCounts() {
+    this.enrollmentService.getAllEnrollments().subscribe({
+      next: (list) => {
+        const map: Record<string, EnrollmentCounts> = {};
+        for (const e of list) {
+          if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
+          if (e.status === EnrollmentStatus.ACTIVE) map[e.studentId].active++;
+          else if (e.status === EnrollmentStatus.COMPLETED) map[e.studentId].completed++;
+        }
+        this.enrollmentCounts.set(map);
+      }
+    });
+  }
+
+  getCounts(studentId: string): EnrollmentCounts {
+    return this.enrollmentCounts()[studentId] || { active: 0, completed: 0 };
   }
 
   loadBranches() {

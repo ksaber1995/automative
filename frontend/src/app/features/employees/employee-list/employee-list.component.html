@@ -7,25 +7,40 @@
       </div>
     </ng-template>
 
-    <!-- Branch Filter -->
-    <div class="mb-4">
-      <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.BRANCH_FILTER' | translate }}</label>
-      <select
-        id="branchFilter"
-        [(ngModel)]="selectedBranchId"
-        (change)="onBranchFilterChange()"
-        class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option [value]="null">{{ 'EMPLOYEES.LIST.ALL' | translate }}</option>
-        @for (branch of branches(); track branch.id) {
-          <option [value]="branch.id">{{ branch.name }}</option>
-        }
-      </select>
+    <!-- Filters -->
+    <div class="mb-4 flex flex-wrap gap-4">
+      <div>
+        <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.BRANCH_FILTER' | translate }}</label>
+        <select
+          id="branchFilter"
+          [(ngModel)]="selectedBranchId"
+          (change)="onBranchFilterChange()"
+          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option [value]="null">{{ 'EMPLOYEES.LIST.ALL' | translate }}</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="statusFilter" class="block text-sm font-medium mb-2">Status</label>
+        <select
+          id="statusFilter"
+          [ngModel]="statusFilter()"
+          (ngModelChange)="statusFilter.set($event)"
+          class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="active">Active</option>
+          <option value="terminated">Terminated</option>
+          <option value="all">All</option>
+        </select>
+      </div>
     </div>
 
     <!-- Employees Table -->
     <p-table
-      [value]="employees()"
+      [value]="filteredEmployees()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"

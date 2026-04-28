@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -47,6 +47,15 @@ export class EmployeeListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string | null = null;
+  statusFilter = signal<'active' | 'terminated' | 'all'>('active');
+
+  filteredEmployees = computed(() => {
+    const status = this.statusFilter();
+    const list = this.employees();
+    if (status === 'all') return list;
+    if (status === 'active') return list.filter(e => e.isActive);
+    return list.filter(e => !e.isActive);
+  });
 
   ngOnInit() {
     this.loadBranches();
