@@ -126,6 +126,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
       },
       {
+        path: 'timetable',
+        canActivate: [permissionGuard('classes')],
+        loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       }

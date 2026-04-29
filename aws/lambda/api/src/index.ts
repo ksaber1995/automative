@@ -40,6 +40,7 @@ import { demoLeadsRoutes } from './routes/demo-leads';
 import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
+import { timetableRoutes } from './routes/timetable';
 
 // Create the router implementation
 const router = {
@@ -95,6 +96,9 @@ const router = {
     list: sessionsRoutes.list,
     listActive: sessionsRoutes.listActive,
     getById: sessionsRoutes.getById,
+  },
+  timetable: {
+    getDay: timetableRoutes.getDay,
   },
 };
 

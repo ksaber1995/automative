@@ -3016,6 +3016,34 @@ export const contract = c.router({
       },
     },
   },
+
+  // ============================================================
+  // Timetable
+  // ============================================================
+  timetable: {
+    getDay: {
+      method: 'GET' as const,
+      path: '/api/timetable',
+      query: z.object({
+        date: z.string(),
+        branchId: z.string().optional(),
+        teacherId: z.string().optional(),
+        courseId: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          date: z.string(),
+          dayOfWeek: z.string(),
+          entries: z.array(z.any()),
+        }),
+        400: z.object({ message: z.string() }),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+  },
 });
 
 export type Contract = typeof contract;

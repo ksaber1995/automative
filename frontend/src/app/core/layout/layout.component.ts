@@ -251,6 +251,10 @@ export class LayoutComponent implements OnInit {
         visible: auth.canRead('branches'),
       },
       {
+        labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'],
+        visible: auth.canRead('classes'),
+      },
+      {
         labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'],
         visible: auth.canRead('students'),
       },
