@@ -10,7 +10,8 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { CheckboxModule } from 'primeng/checkbox';
-import { ClassService } from '../services/class.service';
+import { ClassService, TeacherAvailabilityConflict } from '../services/class.service';
+import { debounceTime } from 'rxjs/operators';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
@@ -58,6 +59,8 @@ export class ClassFormComponent implements OnInit {
   courseName = signal<string>('');
   courseDefaultInstructor = signal<string | null>(null);
   isGlobalCreate = signal(false);
+  availabilityConflicts = signal<TeacherAvailabilityConflict[]>([]);
+  checkingAvailability = signal(false);
 
   daysOfWeek = [
     { label: 'Sunday', value: 'SUNDAY' },
@@ -127,6 +130,70 @@ export class ClassFormComponent implements OnInit {
         }
       });
     }
+
+    this.classForm.valueChanges
+      .pipe(debounceTime(400))
+      .subscribe(() => this.checkAvailability());
+  }
+
+  private checkAvailability() {
+    const v = this.classForm.value;
+    const instructorId = v.instructorId;
+    const startTime = v.startTime;
+    const endTime = v.endTime;
+    const days: string[] = v.daysOfWeek || [];
+
+    if (!instructorId || !startTime || !endTime || days.length === 0 || !v.startDate) {
+      this.availabilityConflicts.set([]);
+      return;
+    }
+
+    const startDate = v.startDate instanceof Date
+      ? v.startDate.toISOString().split('T')[0]
+      : v.startDate;
+
+    let endDate: string;
+    if (v.numberOfSessions && v.numberOfSessions > 0) {
+      const calc = this.calculateEndDate(
+        v.startDate instanceof Date ? v.startDate : new Date(v.startDate),
+        days,
+        v.numberOfSessions
+      );
+      endDate = calc.toISOString().split('T')[0];
+    } else if (v.endDate) {
+      endDate = v.endDate instanceof Date
+        ? v.endDate.toISOString().split('T')[0]
+        : v.endDate;
+    } else {
+      this.availabilityConflicts.set([]);
+      return;
+    }
+
+    this.checkingAvailability.set(true);
+    this.classService.checkTeacherAvailability({
+      instructorId,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      daysOfWeek: days.join(','),
+      excludeClassId: this.classId || undefined,
+    }).subscribe({
+      next: (result) => {
+        this.availabilityConflicts.set(result.conflicts || []);
+        this.checkingAvailability.set(false);
+      },
+      error: () => {
+        this.checkingAvailability.set(false);
+        this.availabilityConflicts.set([]);
+      },
+    });
+  }
+
+  instructorName(): string {
+    const id = this.classForm.get('instructorId')?.value;
+    const found = this.instructors().find(i => i.value === id);
+    return found?.label || '';
   }
 
   loadCourses() {

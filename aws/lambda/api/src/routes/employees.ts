@@ -245,6 +245,26 @@ export const employeesRoutes = {
         };
       }
 
+      // Block termination if the employee is still assigned as instructor on any non-finished class.
+      const assignedClasses = await query(
+        `SELECT id, name, code
+         FROM classes
+         WHERE instructor_id = $1
+           AND company_id = $2
+           AND COALESCE(is_finished, FALSE) = FALSE`,
+        [params.id, context.companyId]
+      );
+
+      if (assignedClasses.length > 0) {
+        return {
+          status: 400 as const,
+          body: {
+            message: 'Cannot terminate this employee while they are assigned to active classes. Please unassign them from these classes first.',
+            assignedClasses: assignedClasses.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+          },
+        };
+      }
+
       // Soft delete by setting is_active to false
       const employee = await update('employees', params.id, { is_active: false });
 

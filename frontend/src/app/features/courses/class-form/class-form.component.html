@@ -253,6 +253,37 @@
         </div>
       </div>
 
+      <!-- Teacher Availability Warning -->
+      @if (availabilityConflicts().length > 0) {
+        <div class="mt-6 p-4 border border-red-300 bg-red-50 rounded-md">
+          <div class="flex items-start gap-2">
+            <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5"></i>
+            <div class="flex-1">
+              <p class="font-semibold text-red-700">
+                {{ 'CLASSES.FORM.TEACHER_CONFLICT_TITLE' | translate: { name: instructorName() } }}
+              </p>
+              <p class="text-sm text-red-700 mt-1">
+                {{ 'CLASSES.FORM.TEACHER_CONFLICT_HINT' | translate }}
+              </p>
+              <ul class="mt-2 list-disc ms-6 text-sm text-red-700">
+                @for (c of availabilityConflicts(); track c.id) {
+                  <li>
+                    <strong>{{ c.name }}</strong> ({{ c.code }}) —
+                    {{ c.daysOfWeek }} {{ c.startTime }}–{{ c.endTime }}
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      }
+      @if (checkingAvailability() && availabilityConflicts().length === 0) {
+        <div class="mt-3 text-sm text-gray-500 flex items-center gap-2">
+          <i class="pi pi-spin pi-spinner"></i>
+          {{ 'CLASSES.FORM.CHECKING_AVAILABILITY' | translate }}
+        </div>
+      }
+
       <!-- Action Buttons -->
       <div class="flex justify-end gap-2 mt-6 pt-6 border-t">
         <button
@@ -269,7 +300,7 @@
           type="submit"
           [label]="isEditMode() ? ('CLASSES.FORM.UPDATE' | translate) : ('CLASSES.FORM.CREATE' | translate)"
           icon="pi pi-check"
-          [disabled]="classForm.invalid || loading()">
+          [disabled]="classForm.invalid || loading() || availabilityConflicts().length > 0">
           @if (loading()) {
             <i class="pi pi-spin pi-spinner"></i>
           }

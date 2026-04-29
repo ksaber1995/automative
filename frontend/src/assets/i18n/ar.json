@@ -438,7 +438,10 @@
       "NOTES_PLACEHOLDER": "ملاحظات إضافية حول هذا الفصل",
       "CANCEL": "إلغاء",
       "UPDATE": "تحديث الفصل",
-      "CREATE": "إنشاء فصل"
+      "CREATE": "إنشاء فصل",
+      "CHECKING_AVAILABILITY": "جاري التحقق من توفر المدرس...",
+      "TEACHER_CONFLICT_TITLE": "المدرس {{name}} غير متاح في هذا الوقت",
+      "TEACHER_CONFLICT_HINT": "لدى هذا المدرس فصول أخرى متداخلة في هذا الوقت. اختر وقتاً أو يوماً أو مدرساً مختلفاً لتفعيل الحفظ."
     },
     "LIST": {
       "TITLE": "الفصول",
@@ -999,7 +1002,10 @@
       "RESOURCE_PRODUCTS": "المنتجات",
       "RESOURCE_PRODUCT_SALES": "مبيعات المنتجات",
       "RESOURCE_REPORTS": "التقارير",
-      "RESOURCE_USERS": "إدارة المستخدمين"
+      "RESOURCE_USERS": "إدارة المستخدمين",
+      "RESOURCE_ROOMS": "الغرف",
+      "RESOURCE_SESSIONS": "الجلسات",
+      "RESOURCE_TIMETABLE": "الجدول الزمني"
     },
     "DETAIL": {
       "TAB_INFO": "المعلومات",

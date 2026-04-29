@@ -88,6 +88,31 @@ export class CourseDetailComponent implements OnInit {
     { label: 'Full', value: 'FULL' },
   ];
 
+  classStatus(cls: ClassWithDetails): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
+    if (cls.status) return cls.status;
+    if (cls.isFinished) return 'DONE';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (cls.startDate && new Date(cls.startDate).getTime() > today.getTime()) return 'SCHEDULED';
+    return 'IN_PROGRESS';
+  }
+
+  classStatusLabel(cls: ClassWithDetails): string {
+    switch (this.classStatus(cls)) {
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'SCHEDULED': return 'Scheduled';
+      case 'DONE': return 'Done';
+    }
+  }
+
+  classStatusSeverity(cls: ClassWithDetails): 'success' | 'info' | 'secondary' {
+    switch (this.classStatus(cls)) {
+      case 'IN_PROGRESS': return 'success';
+      case 'SCHEDULED': return 'info';
+      case 'DONE': return 'secondary';
+    }
+  }
+
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('id');
     if (this.courseId) {
@@ -242,27 +267,6 @@ export class CourseDetailComponent implements OnInit {
 
   viewStudent(studentId: string) {
     this.router.navigate(['/students', studentId]);
-  }
-
-  deleteClass(classId: string) {
-    this.confirmationService.confirm({
-      message: 'Are you sure you want to deactivate this class?',
-      header: 'Confirm Deactivation',
-      icon: 'pi pi-exclamation-triangle',
-      accept: () => {
-        this.classService.deleteClass(classId).subscribe({
-          next: () => {
-            this.notificationService.success('Class deactivated successfully');
-            if (this.courseId) {
-              this.loadClasses(this.courseId);
-            }
-          },
-          error: () => {
-            this.notificationService.error('Failed to deactivate class');
-          }
-        });
-      }
-    });
   }
 
   paymentLabel(status: string): string {

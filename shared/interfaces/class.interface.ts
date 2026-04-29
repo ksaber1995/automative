@@ -1,3 +1,5 @@
+export type ClassStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'DONE';
+
 export interface Class {
   id: string;
   companyId: string;
@@ -15,6 +17,9 @@ export interface Class {
   currentEnrollment: number;
   notes?: string;
   isActive: boolean;
+  isFinished?: boolean;
+  finishedAt?: string | null;
+  status?: ClassStatus;
   createdAt: string;
   updatedAt: string;
 }

@@ -119,15 +119,17 @@ export const routes: Routes = [
       },
       {
         path: 'rooms',
+        canActivate: [permissionGuard('rooms')],
         loadComponent: () => import('./features/rooms/room-list/room-list.component').then(m => m.RoomListComponent)
       },
       {
         path: 'sessions',
+        canActivate: [permissionGuard('sessions')],
         loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
       },
       {
         path: 'timetable',
-        canActivate: [permissionGuard('classes')],
+        canActivate: [permissionGuard('timetable')],
         loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
       },
       {

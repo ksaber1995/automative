@@ -39,8 +39,8 @@ export class LoginComponent {
 
   constructor() {
     this.loginForm = this.fb.group({
-      email: ['admin@automatemagic.com', [Validators.required, Validators.email]],
-      password: ['password123', [Validators.required, Validators.minLength(6)]],
+      email: ['test@gmail.com', [Validators.required, Validators.email]],
+      password: ['@Aa01097628565', [Validators.required, Validators.minLength(6)]],
       rememberMe: [false]
     });
   }

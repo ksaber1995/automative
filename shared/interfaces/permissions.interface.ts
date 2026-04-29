@@ -34,6 +34,9 @@ export interface UserPermissions {
   users?: Partial<ResourcePermission>;
   master_courses?: Partial<ResourcePermission>;
   events?: Partial<ResourcePermission>;
+  rooms?: Partial<ResourcePermission>;
+  sessions?: Partial<ResourcePermission>;
+  timetable?: Partial<ResourcePermission>;
 }
 
 export type PermissionResource = keyof UserPermissions;
@@ -58,6 +61,9 @@ export const PERMISSION_RESOURCES: PermissionResource[] = [
   'users',
   'master_courses',
   'events',
+  'rooms',
+  'sessions',
+  'timetable',
 ];
 
 export const FINANCIAL_RESOURCES: PermissionResource[] = [
@@ -98,6 +104,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        FULL,
     master_courses: FULL,
     events: FULL,
+    rooms: FULL,
+    sessions: FULL,
+    timetable: FULL,
   },
   [UserRole.ADMIN]: {
     dashboard:    FULL,
@@ -118,6 +127,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        FULL,
     master_courses: FULL,
     events: FULL,
+    rooms: FULL,
+    sessions: FULL,
+    timetable: FULL,
   },
   [UserRole.BRANCH_ADMIN]: {
     dashboard:    READ_ONLY,
@@ -138,6 +150,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: READ_WRITE,
     events: FULL,
+    rooms: FULL,
+    sessions: FULL,
+    timetable: READ_WRITE,
   },
   [UserRole.BRANCH_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -158,6 +173,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: READ_WRITE,
     events: FULL,
+    rooms: FULL,
+    sessions: FULL,
+    timetable: READ_WRITE,
   },
   [UserRole.ACADEMIC_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -178,6 +196,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: FULL,
     events: FULL,
+    rooms: READ_WRITE,
+    sessions: READ_WRITE,
+    timetable: READ_WRITE,
   },
   [UserRole.SALES_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -198,6 +219,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: READ_ONLY,
     events: READ_ONLY,
+    rooms: READ_ONLY,
+    sessions: READ_ONLY,
+    timetable: READ_ONLY,
   },
   [UserRole.ACCOUNTANT]: {
     dashboard:    READ_ONLY,
@@ -218,6 +242,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: READ_ONLY,
     events: READ_ONLY,
+    rooms: READ_ONLY,
+    sessions: READ_ONLY,
+    timetable: READ_ONLY,
   },
   [UserRole.VIEWER]: {
     dashboard:    READ_ONLY,
@@ -238,6 +265,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     users:        NO_ACCESS,
     master_courses: READ_ONLY,
     events: READ_ONLY,
+    rooms: READ_ONLY,
+    sessions: READ_ONLY,
+    timetable: READ_ONLY,
   },
 };
 

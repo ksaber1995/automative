@@ -7,6 +7,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
@@ -28,6 +29,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     ButtonModule,
     TagModule,
     ConfirmDialogModule,
+    DialogModule,
     TooltipModule,
     TranslateModule
   ],
@@ -48,6 +50,10 @@ export class EmployeeListComponent implements OnInit {
   loading = signal(true);
   selectedBranchId: string | null = null;
   statusFilter = signal<'active' | 'terminated' | 'all'>('active');
+
+  showAssignedClassesDialog = signal(false);
+  blockedEmployee = signal<Employee | null>(null);
+  blockingClasses = signal<{ id: string; name: string; code: string }[]>([]);
 
   filteredEmployees = computed(() => {
     const status = this.statusFilter();
@@ -117,10 +123,31 @@ export class EmployeeListComponent implements OnInit {
           next: () => {
             this.notificationService.success('Employee terminated successfully');
             this.loadEmployees();
+          },
+          error: (err) => {
+            const assigned = err?.error?.assignedClasses;
+            if (err?.status === 400 && Array.isArray(assigned) && assigned.length > 0) {
+              this.blockedEmployee.set(employee);
+              this.blockingClasses.set(assigned);
+              this.showAssignedClassesDialog.set(true);
+            } else {
+              this.notificationService.error(err?.error?.message || 'Failed to terminate employee');
+            }
           }
         });
       }
     });
+  }
+
+  goToBlockingClass(classId: string) {
+    this.showAssignedClassesDialog.set(false);
+    this.router.navigate(['/classes', classId]);
+  }
+
+  closeAssignedClassesDialog() {
+    this.showAssignedClassesDialog.set(false);
+    this.blockedEmployee.set(null);
+    this.blockingClasses.set([]);
   }
 
   createEmployee() {

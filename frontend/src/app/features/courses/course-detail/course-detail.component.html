@@ -201,7 +201,7 @@
                     </div>
                   </div>
                   <div class="flex gap-2">
-                    <p-tag [value]="cls.isActive ? 'Active' : 'Inactive'" [severity]="cls.isActive ? 'success' : 'danger'"></p-tag>
+                    <p-tag [value]="classStatusLabel(cls)" [severity]="classStatusSeverity(cls)"></p-tag>
                     <p-tag icon="pi pi-users" [value]="(cls.studentCount || 0) + ' ' + ('DASHBOARD.COL_STUDENTS' | translate)" severity="info"></p-tag>
                   </div>
                 </div>
@@ -213,11 +213,6 @@
                   icon="pi pi-pencil"
                   class="p-button-rounded p-button-text p-button-sm mr-2"
                   (click)="editClass(cls.id); $event.stopPropagation()"></button>
-                <button
-                  pButton
-                  icon="pi pi-trash"
-                  class="p-button-rounded p-button-text p-button-danger p-button-sm"
-                  (click)="deleteClass(cls.id); $event.stopPropagation()"></button>
               </ng-template>
 
               <!-- Class Details -->

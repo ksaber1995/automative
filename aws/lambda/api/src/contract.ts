@@ -45,6 +45,9 @@ const UserPermissionsSchema = z.object({
   users:        ResourcePermissionSchema.optional(),
   master_courses: ResourcePermissionSchema.optional(),
   events:        ResourcePermissionSchema.optional(),
+  rooms:         ResourcePermissionSchema.optional(),
+  sessions:      ResourcePermissionSchema.optional(),
+  timetable:     ResourcePermissionSchema.optional(),
 }).optional().nullable();
 
 // Subscription Tiers
@@ -465,6 +468,8 @@ const UpdateClassSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const ClassStatusSchema = z.enum(['SCHEDULED', 'IN_PROGRESS', 'DONE']);
+
 const ClassSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
@@ -482,6 +487,9 @@ const ClassSchema = z.object({
   currentEnrollment: z.number(),
   notes: z.string().nullable(),
   isActive: z.boolean(),
+  isFinished: z.boolean().optional(),
+  finishedAt: z.string().nullable().optional(),
+  status: ClassStatusSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1470,6 +1478,35 @@ export const contract = c.router({
         200: z.array(ClassSchema),
       },
     },
+    checkTeacherAvailability: {
+      method: 'GET',
+      path: '/api/classes/check-teacher-availability',
+      query: z.object({
+        instructorId: UUIDSchema,
+        startDate: z.string(),
+        endDate: z.string(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        daysOfWeek: z.string().optional(),
+        excludeClassId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.object({
+          available: z.boolean(),
+          conflicts: z.array(z.object({
+            id: UUIDSchema,
+            name: z.string(),
+            code: z.string(),
+            daysOfWeek: z.string().nullable(),
+            startTime: z.string().nullable(),
+            endTime: z.string().nullable(),
+            startDate: z.string(),
+            endDate: z.string(),
+          })),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
     getEnrollments: {
       method: 'GET',
       path: '/api/classes/:id/enrollments',
@@ -1522,6 +1559,17 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    finish: {
+      method: 'POST',
+      path: '/api/classes/:id/finish',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ClassSchema,
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },
@@ -2020,6 +2068,14 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string() }),
+        400: z.object({
+          message: z.string(),
+          assignedClasses: z.array(z.object({
+            id: UUIDSchema,
+            name: z.string(),
+            code: z.string(),
+          })).optional(),
+        }),
         404: z.object({ message: z.string() }),
       },
     },

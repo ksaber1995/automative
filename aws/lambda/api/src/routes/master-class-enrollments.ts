@@ -50,10 +50,13 @@ export const masterClassEnrollmentsRoutes = {
 
       // Verify the class belongs to the right branch and course
       const cls = await queryOne(
-        `SELECT id, branch_id FROM classes WHERE id = $1 AND course_id = $2`,
+        `SELECT id, branch_id, is_finished FROM classes WHERE id = $1 AND course_id = $2`,
         [body.classId, body.courseId]
       );
       if (!cls) return { status: 404 as const, body: { message: 'Class not found for this course' } };
+      if (cls.is_finished) {
+        return { status: 400 as const, body: { message: 'This class is finished. Enrollment is closed.' } };
+      }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return { status: 403 as const, body: { message: 'Access denied to this branch' } };

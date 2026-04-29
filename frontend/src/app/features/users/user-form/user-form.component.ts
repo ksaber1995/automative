@@ -52,6 +52,9 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
   product_sales:{ label: 'USERS.FORM.RESOURCE_PRODUCT_SALES', icon: 'pi pi-shopping-cart' },
   reports:      { label: 'USERS.FORM.RESOURCE_REPORTS',       icon: 'pi pi-chart-bar',   financial: true },
   users:        { label: 'USERS.FORM.RESOURCE_USERS',         icon: 'pi pi-user-edit' },
+  rooms:        { label: 'USERS.FORM.RESOURCE_ROOMS',         icon: 'pi pi-building' },
+  sessions:     { label: 'USERS.FORM.RESOURCE_SESSIONS',      icon: 'pi pi-clock' },
+  timetable:    { label: 'USERS.FORM.RESOURCE_TIMETABLE',     icon: 'pi pi-calendar-clock' },
 };
 
 @Component({

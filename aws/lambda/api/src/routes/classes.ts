@@ -1,6 +1,37 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
 
+let classSchemaInitPromise: Promise<void> | null = null;
+async function ensureClassStatusColumns(): Promise<void> {
+  if (!classSchemaInitPromise) {
+    classSchemaInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`);
+        await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`);
+      } catch (e) {
+        classSchemaInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return classSchemaInitPromise;
+}
+
+function timeToMinutes(time: string | null | undefined): number {
+  if (!time) return 0;
+  const [hh, mm] = String(time).split(':').map(Number);
+  return (hh || 0) * 60 + (mm || 0);
+}
+
+function deriveStatus(row: any): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
+  if (row.is_finished) return 'DONE';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = row.start_date ? new Date(row.start_date) : null;
+  if (start && start.getTime() > today.getTime()) return 'SCHEDULED';
+  return 'IN_PROGRESS';
+}
+
 function mapClassFromDB(row: any) {
   return {
     id: row.id,
@@ -19,6 +50,9 @@ function mapClassFromDB(row: any) {
     currentEnrollment: row.current_enrollment || 0,
     notes: row.notes,
     isActive: row.is_active,
+    isFinished: !!row.is_finished,
+    finishedAt: row.finished_at || null,
+    status: deriveStatus(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -38,6 +72,7 @@ function mapClassWithDetailsFromDB(row: any) {
 export const classesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'classes', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
@@ -96,6 +131,7 @@ export const classesRoutes = {
 
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'classes', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
@@ -163,6 +199,7 @@ export const classesRoutes = {
 
   listActive: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
 
       let sql = `
@@ -225,8 +262,85 @@ export const classesRoutes = {
     }
   },
 
+  checkTeacherAvailability: async ({ query: queryParams, headers }: { query: { instructorId: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureClassStatusColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'classes', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const { instructorId, startDate, endDate, startTime, endTime, daysOfWeek, excludeClassId } = queryParams;
+
+      if (!instructorId || !startDate || !endDate || !startTime || !endTime || !daysOfWeek) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+
+      const newDays = daysOfWeek.split(',').map(d => d.trim()).filter(Boolean);
+      if (newDays.length === 0) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+
+      const params: any[] = [context.companyId, instructorId, endDate, startDate];
+      let sql = `
+        SELECT id, name, code, days_of_week, start_time, end_time, start_date, end_date
+        FROM classes
+        WHERE company_id = $1
+          AND instructor_id = $2
+          AND is_active = true
+          AND COALESCE(is_finished, false) = false
+          AND start_date <= $3
+          AND end_date >= $4
+          AND start_time IS NOT NULL
+          AND end_time IS NOT NULL
+          AND days_of_week IS NOT NULL
+      `;
+      if (excludeClassId) {
+        params.push(excludeClassId);
+        sql += ` AND id != $${params.length}`;
+      }
+
+      const rows = await query(sql, params);
+
+      const newStart = timeToMinutes(startTime);
+      const newEnd = timeToMinutes(endTime);
+
+      const conflicts = rows
+        .filter((row: any) => {
+          const existingDays: string[] = String(row.days_of_week || '')
+            .split(',')
+            .map((d: string) => d.trim())
+            .filter(Boolean);
+          if (!existingDays.some(d => newDays.includes(d))) return false;
+
+          const existingStart = timeToMinutes(row.start_time);
+          const existingEnd = timeToMinutes(row.end_time);
+          return newStart < existingEnd && existingStart < newEnd;
+        })
+        .map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          code: row.code,
+          daysOfWeek: row.days_of_week,
+          startTime: row.start_time,
+          endTime: row.end_time,
+          startDate: row.start_date,
+          endDate: row.end_date,
+        }));
+
+      return { status: 200 as const, body: { available: conflicts.length === 0, conflicts } };
+    } catch (error) {
+      console.error('Check teacher availability error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
+        body: { message: error instanceof Error ? error.message : 'Failed to check availability' },
+      };
+    }
+  },
+
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'classes', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
@@ -458,6 +572,7 @@ export const classesRoutes = {
 
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'classes', 'delete')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
@@ -482,6 +597,13 @@ export const classesRoutes = {
         };
       }
 
+      if (existing.is_finished) {
+        return {
+          status: 400 as const,
+          body: { message: 'Cannot deactivate a finished class.' },
+        };
+      }
+
       const classRecord = await update('classes', params.id, { is_active: false });
 
       if (!classRecord) {
@@ -500,6 +622,59 @@ export const classesRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Failed to delete class' },
+      };
+    }
+  },
+
+  finish: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureClassStatusColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'classes', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return { status: 404 as const, body: { message: 'Class not found' } };
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this class' } };
+      }
+
+      if (existing.is_finished) {
+        return { status: 400 as const, body: { message: 'Class is already finished' } };
+      }
+
+      const activeSession = await queryOne(
+        'SELECT id FROM sessions WHERE class_id = $1 AND end_date IS NULL',
+        [params.id]
+      );
+      if (activeSession) {
+        return { status: 400 as const, body: { message: 'Cannot finish a class with an active session running. End the session first.' } };
+      }
+
+      const updated = await update('classes', params.id, {
+        is_finished: true,
+        finished_at: new Date().toISOString(),
+        is_active: false,
+      });
+
+      if (!updated) {
+        return { status: 404 as const, body: { message: 'Class not found' } };
+      }
+
+      return { status: 200 as const, body: mapClassFromDB(updated) };
+    } catch (error) {
+      console.error('Finish class error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
+        body: { message: error.message || 'Failed to finish class' },
       };
     }
   },

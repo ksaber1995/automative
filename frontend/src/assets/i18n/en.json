@@ -438,7 +438,10 @@
       "NOTES_PLACEHOLDER": "Additional notes about this class",
       "CANCEL": "Cancel",
       "UPDATE": "Update Class",
-      "CREATE": "Create Class"
+      "CREATE": "Create Class",
+      "CHECKING_AVAILABILITY": "Checking teacher availability...",
+      "TEACHER_CONFLICT_TITLE": "Teacher {{name}} is not free at this time",
+      "TEACHER_CONFLICT_HINT": "This teacher already has the following overlapping class(es). Pick a different time, day, or teacher to enable saving."
     },
     "LIST": {
       "TITLE": "Classes",
@@ -999,7 +1002,10 @@
       "RESOURCE_PRODUCTS": "Products",
       "RESOURCE_PRODUCT_SALES": "Product Sales",
       "RESOURCE_REPORTS": "Reports",
-      "RESOURCE_USERS": "User Mgmt"
+      "RESOURCE_USERS": "User Mgmt",
+      "RESOURCE_ROOMS": "Rooms",
+      "RESOURCE_SESSIONS": "Sessions",
+      "RESOURCE_TIMETABLE": "Timetable"
     },
     "DETAIL": {
       "TAB_INFO": "Information",

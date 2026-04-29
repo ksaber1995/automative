@@ -11,6 +11,8 @@ import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { CheckboxModule } from 'primeng/checkbox';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { FormsModule } from '@angular/forms';
 import { ClassService } from '../services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -34,19 +36,36 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     SelectModule,
     TextareaModule,
     CheckboxModule,
+    ConfirmDialogModule,
     FormsModule,
   ],
+  providers: [ConfirmationService],
   template: `
     <div class="container-custom py-8">
       <!-- Header -->
       <div class="flex items-center gap-4 mb-6">
         <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()" pTooltip="Back to Classes"></p-button>
         <div class="flex-1">
-          <h1 class="text-3xl font-bold text-gray-900">{{ classDetail()?.name || 'Class Details' }}</h1>
+          <div class="flex items-center gap-3">
+            <h1 class="text-3xl font-bold text-gray-900">{{ classDetail()?.name || 'Class Details' }}</h1>
+            @if (classDetail()) {
+              <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
+            }
+          </div>
           <p class="text-gray-500 mt-1">{{ classDetail()?.code }}</p>
         </div>
-        <p-button label="Add Student" icon="pi pi-user-plus" (onClick)="addStudent()"></p-button>
+        @if (!isFinished()) {
+          <p-button label="Add Student" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
+          <p-button label="Finish Class" icon="pi pi-check-circle" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>
+        } @else {
+          <div class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
+            <i class="pi pi-check-circle"></i>
+            <span class="font-medium">Course finished{{ classDetail()?.finishedAt ? ' on ' + formatDate(classDetail()!.finishedAt!) : '' }}</span>
+          </div>
+        }
       </div>
+
+      <p-confirmDialog></p-confirmDialog>
 
       @if (loadingClass()) {
         <div class="text-center py-16 text-gray-400">
@@ -91,7 +110,9 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
             </div>
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
-              <p-tag [value]="classDetail()?.isActive ? 'Active' : 'Inactive'" [severity]="classDetail()?.isActive ? 'success' : 'danger'"></p-tag>
+              @if (classDetail()) {
+                <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
+              }
             </div>
           </div>
         </p-card>
@@ -117,8 +138,13 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
             <!-- Students Tab -->
             <p-tabpanel value="students">
               <div class="flex justify-end mb-3 mt-2">
-                <p-button label="Add Student" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
+                <p-button label="Add Student" icon="pi pi-user-plus" severity="secondary" [outlined]="true" [disabled]="isFinished()" (onClick)="addStudent()"></p-button>
               </div>
+              @if (isFinished()) {
+                <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 mb-3">
+                  This class is finished — new enrollments are closed.
+                </div>
+              }
               <p-table
                 [value]="enrollments()"
                 [loading]="loadingEnrollments()"
@@ -186,9 +212,14 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
                 }
 
                 <!-- Start Session Button -->
-                @if (!activeSession()) {
+                @if (!activeSession() && !isFinished()) {
                   <div class="flex justify-end mb-3">
                     <p-button label="Start Session" icon="pi pi-play" size="small" (onClick)="openStartSessionDialog()"></p-button>
+                  </div>
+                }
+                @if (isFinished()) {
+                  <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 mb-3">
+                    This class is finished — sessions cannot be started.
                   </div>
                 }
 
@@ -429,6 +460,7 @@ export class ClassDetailComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private confirmationService = inject(ConfirmationService);
 
   classId = '';
   classDetail = signal<ClassWithDetails | null>(null);
@@ -439,6 +471,9 @@ export class ClassDetailComponent implements OnInit {
   loadingEnrollments = signal(true);
   loadingSessions = signal(false);
   savingSession = signal(false);
+  finishing = signal(false);
+
+  isFinished = () => this.classDetail()?.status === 'DONE' || !!this.classDetail()?.isFinished;
 
   // Attendance
   attendanceSummary = signal<ClassAttendanceSummary[]>([]);
@@ -645,6 +680,55 @@ export class ClassDetailComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/classes']);
+  }
+
+  confirmFinishCourse() {
+    const cls = this.classDetail();
+    if (!cls) return;
+    this.confirmationService.confirm({
+      header: 'Finish Class',
+      message: `Mark "${cls.name}" as finished? Once finished, no new enrollments and no sessions can be started for this class. This cannot be undone here.`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Finish Class',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-success',
+      accept: () => this.finishCourse(),
+    });
+  }
+
+  finishCourse() {
+    if (this.finishing()) return;
+    this.finishing.set(true);
+    this.classService.finishClass(this.classId).subscribe({
+      next: (updated) => {
+        this.finishing.set(false);
+        this.notificationService.success('Course marked as finished');
+        const current = this.classDetail();
+        this.classDetail.set(current ? { ...current, ...updated } : null);
+      },
+      error: (err) => {
+        this.finishing.set(false);
+        this.notificationService.error(err?.error?.message || 'Failed to finish class');
+      },
+    });
+  }
+
+  statusLabel(status?: string): string {
+    switch (status) {
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'SCHEDULED': return 'Scheduled';
+      case 'DONE': return 'Done';
+      default: return 'Unknown';
+    }
+  }
+
+  statusTagSeverity(status?: string): 'success' | 'info' | 'secondary' | 'warn' {
+    switch (status) {
+      case 'IN_PROGRESS': return 'success';
+      case 'SCHEDULED': return 'info';
+      case 'DONE': return 'secondary';
+      default: return 'warn';
+    }
   }
 
   statusSeverity(status: string): 'success' | 'danger' | 'warn' | 'info' | 'secondary' {

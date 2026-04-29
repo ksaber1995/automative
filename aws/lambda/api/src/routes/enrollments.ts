@@ -48,6 +48,16 @@ export const enrollmentsRoutes = {
         };
       }
 
+      if (body.classId) {
+        const targetClass = await queryOne(
+          'SELECT id, is_finished FROM classes WHERE id = $1 AND company_id = $2',
+          [body.classId, context.companyId]
+        );
+        if (targetClass && targetClass.is_finished) {
+          return { status: 400 as const, body: { message: 'This class is finished. Enrollment is closed.' } };
+        }
+      }
+
       const paymentMode = body.paymentMode || 'FULL';
       const downPayment = body.downPayment || 0;
       const originalPrice = body.originalPrice;

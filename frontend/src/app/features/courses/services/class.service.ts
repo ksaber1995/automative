@@ -56,4 +56,34 @@ export class ClassService {
   deleteClass(id: string): Observable<Class> {
     return this.api.delete<Class>(`classes/${id}`);
   }
+
+  finishClass(id: string): Observable<Class> {
+    return this.api.post<Class>(`classes/${id}/finish`, {});
+  }
+
+  checkTeacherAvailability(params: {
+    instructorId: string;
+    startDate: string;
+    endDate: string;
+    startTime?: string;
+    endTime?: string;
+    daysOfWeek?: string;
+    excludeClassId?: string;
+  }): Observable<{ available: boolean; conflicts: TeacherAvailabilityConflict[] }> {
+    return this.api.get<{ available: boolean; conflicts: TeacherAvailabilityConflict[] }>(
+      'classes/check-teacher-availability',
+      params as any
+    );
+  }
+}
+
+export interface TeacherAvailabilityConflict {
+  id: string;
+  name: string;
+  code: string;
+  daysOfWeek: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  startDate: string;
+  endDate: string;
 }

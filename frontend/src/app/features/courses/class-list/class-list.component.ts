@@ -8,12 +8,13 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ClassService } from '../services/class.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { ClassWithDetails } from '@shared/interfaces/class.interface';
+import { ClassStatus, ClassWithDetails } from '@shared/interfaces/class.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -28,6 +29,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     SelectModule,
+    TabsModule,
     TranslateModule,
     DeleteConfirmDialogComponent
   ],
@@ -94,9 +96,26 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         </div>
       </p-card>
 
+      <p-tabs [value]="activeStatus()" (valueChange)="onStatusTabChange($event)" styleClass="mb-4">
+        <p-tablist>
+          <p-tab value="IN_PROGRESS">
+            <i class="pi pi-spin pi-spinner mr-2"></i>In Progress
+            <span class="ml-2 text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">{{ countByStatus('IN_PROGRESS') }}</span>
+          </p-tab>
+          <p-tab value="SCHEDULED">
+            <i class="pi pi-calendar mr-2"></i>Scheduled
+            <span class="ml-2 text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">{{ countByStatus('SCHEDULED') }}</span>
+          </p-tab>
+          <p-tab value="DONE">
+            <i class="pi pi-check-circle mr-2"></i>Done
+            <span class="ml-2 text-xs bg-gray-100 text-gray-700 rounded-full px-2 py-0.5">{{ countByStatus('DONE') }}</span>
+          </p-tab>
+        </p-tablist>
+      </p-tabs>
+
       <p-card>
         <p-table
-          [value]="classes()"
+          [value]="filteredClasses()"
           [loading]="loading()"
           [paginator]="true"
           [rows]="10"
@@ -154,8 +173,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               </td>
               <td>
                 <p-tag
-                  [value]="classItem.isActive ? ('CLASSES.LIST.ACTIVE' | translate) : ('CLASSES.LIST.INACTIVE' | translate)"
-                  [severity]="classItem.isActive ? 'success' : 'danger'"
+                  [value]="statusLabel(classItem.status)"
+                  [severity]="statusSeverity(classItem.status)"
                 ></p-tag>
               </td>
               <td>
@@ -168,15 +187,17 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     (onClick)="viewClass(classItem)"
                     [pTooltip]="'CLASSES.LIST.VIEW' | translate"
                   ></p-button>
-                  <p-button
-                    icon="pi pi-pencil"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="warn"
-                    (onClick)="editClass(classItem)"
-                    [pTooltip]="'CLASSES.LIST.EDIT' | translate"
-                  ></p-button>
-                  @if (classItem.isActive) {
+                  @if (classItem.status !== 'DONE') {
+                    <p-button
+                      icon="pi pi-pencil"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="editClass(classItem)"
+                      [pTooltip]="'CLASSES.LIST.EDIT' | translate"
+                    ></p-button>
+                  }
+                  @if (classItem.isActive && classItem.status !== 'DONE') {
                     <p-button
                       icon="pi pi-trash"
                       [rounded]="true"
@@ -227,6 +248,44 @@ export class ClassListComponent implements OnInit {
   loading = signal(true);
   showDeleteDialog = false;
   classToDelete = signal<ClassWithDetails | null>(null);
+  activeStatus = signal<ClassStatus>('IN_PROGRESS');
+
+  filteredClasses = () => this.classes().filter(c => (c.status ?? this.deriveStatus(c)) === this.activeStatus());
+
+  countByStatus(status: ClassStatus): number {
+    return this.classes().filter(c => (c.status ?? this.deriveStatus(c)) === status).length;
+  }
+
+  onStatusTabChange(val: string | number | undefined) {
+    const v = (val?.toString() ?? 'IN_PROGRESS') as ClassStatus;
+    this.activeStatus.set(v);
+  }
+
+  statusLabel(status?: ClassStatus | string): string {
+    switch (status) {
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'SCHEDULED': return 'Scheduled';
+      case 'DONE': return 'Done';
+      default: return 'Unknown';
+    }
+  }
+
+  statusSeverity(status?: ClassStatus | string): 'success' | 'info' | 'secondary' | 'warn' {
+    switch (status) {
+      case 'IN_PROGRESS': return 'success';
+      case 'SCHEDULED': return 'info';
+      case 'DONE': return 'secondary';
+      default: return 'warn';
+    }
+  }
+
+  private deriveStatus(c: ClassWithDetails): ClassStatus {
+    if (c.isFinished) return 'DONE';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (c.startDate && new Date(c.startDate).getTime() > today.getTime()) return 'SCHEDULED';
+    return 'IN_PROGRESS';
+  }
 
   // Filter from route params (when viewing classes for a specific course)
   filterByCourseId: string | null = null;

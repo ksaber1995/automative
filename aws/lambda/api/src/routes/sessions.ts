@@ -63,6 +63,10 @@ export const sessionsRoutes = {
         return { status: 404 as const, body: { message: 'Class not found' } };
       }
 
+      if (cls.is_finished) {
+        return { status: 400 as const, body: { message: 'This class is finished. Sessions cannot be started.' } };
+      }
+
       // Check if room is already occupied
       const activeSession = await queryOne(
         'SELECT id FROM sessions WHERE room_id = $1 AND end_date IS NULL',
