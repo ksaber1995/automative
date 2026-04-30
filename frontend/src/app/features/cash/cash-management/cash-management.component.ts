@@ -230,6 +230,20 @@ export class CashManagementComponent implements OnInit {
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
   }
 
+  absVal(v: number): number {
+    return Math.abs(v);
+  }
+
+  hasUnallocatedCashActivity(): boolean {
+    const c = this.current();
+    if (!c) return false;
+    return (
+      (c.unallocatedRevenue || 0) !== 0 ||
+      (c.unallocatedExpenses || 0) !== 0 ||
+      (c.unallocatedAdjustments || 0) !== 0
+    );
+  }
+
   typeSeverity(type: CashAdjustmentType): 'success' | 'danger' | 'warn' {
     if (type === 'DEPOSIT') return 'success';
     if (type === 'WITHDRAWAL') return 'danger';

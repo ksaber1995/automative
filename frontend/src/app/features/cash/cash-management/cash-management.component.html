@@ -46,6 +46,23 @@
                 </span>
               </span>
             </div>
+            @if (hasUnallocatedCashActivity()) {
+              <div class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs">
+                <div class="font-semibold text-amber-900 mb-1">{{ 'CASH.UNALLOCATED_NOTE' | translate }}</div>
+                <div class="text-amber-800 flex flex-col gap-0.5">
+                  <span>{{ 'CASH.SUM_BRANCH_CASH' | translate }}: {{ formatCurrency(current()?.sumBranchCash || 0) }}</span>
+                  @if ((current()?.unallocatedRevenue || 0) > 0) {
+                    <span>+ {{ 'CASH.UNALLOCATED_REVENUE' | translate }}: {{ formatCurrency(current()?.unallocatedRevenue || 0) }}</span>
+                  }
+                  @if ((current()?.unallocatedExpenses || 0) > 0) {
+                    <span>− {{ 'CASH.UNALLOCATED_EXPENSES' | translate }}: {{ formatCurrency(current()?.unallocatedExpenses || 0) }}</span>
+                  }
+                  @if ((current()?.unallocatedAdjustments || 0) !== 0) {
+                    <span>{{ ((current()?.unallocatedAdjustments || 0) >= 0 ? '+ ' : '− ') }}{{ 'CASH.UNALLOC_ADJUSTMENTS' | translate }}: {{ formatCurrency(absVal(current()?.unallocatedAdjustments || 0)) }}</span>
+                  }
+                </div>
+              </div>
+            }
           }
         }
       </div>

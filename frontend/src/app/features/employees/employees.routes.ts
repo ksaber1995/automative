@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const EMPLOYEES_ROUTES: Routes = [
   {
@@ -7,10 +8,12 @@ export const EMPLOYEES_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('employees', 'write')],
     loadComponent: () => import('./employee-form/employee-form.component').then(m => m.EmployeeFormComponent)
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('employees', 'write')],
     loadComponent: () => import('./employee-form/employee-form.component').then(m => m.EmployeeFormComponent)
   },
   {

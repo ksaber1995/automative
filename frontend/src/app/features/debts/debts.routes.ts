@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const DEBTS_ROUTES: Routes = [
   {
@@ -10,6 +11,7 @@ export const DEBTS_ROUTES: Routes = [
   },
   {
     path: 'new',
+    canActivate: [permissionGuard('debts', 'write')],
     loadComponent: () =>
       import('./debt-form/debt-form.component').then(
         (m) => m.DebtFormComponent
@@ -17,6 +19,7 @@ export const DEBTS_ROUTES: Routes = [
   },
   {
     path: 'edit/:id',
+    canActivate: [permissionGuard('debts', 'write')],
     loadComponent: () =>
       import('./debt-form/debt-form.component').then(
         (m) => m.DebtFormComponent
@@ -24,6 +27,7 @@ export const DEBTS_ROUTES: Routes = [
   },
   {
     path: ':id/payment',
+    canActivate: [permissionGuard('debts', 'write')],
     loadComponent: () =>
       import('./debt-payment/debt-payment.component').then(
         (m) => m.DebtPaymentComponent

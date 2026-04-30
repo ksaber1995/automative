@@ -246,6 +246,23 @@ export class OverviewComponent implements OnInit {
     return profit >= 0 ? 'success' : 'danger';
   }
 
+  hasUnallocatedActivity(data: DashboardMetrics | null): boolean {
+    if (!data) return false;
+    const c = data.companyWideSummary;
+    return (c.unallocatedRevenue || 0) !== 0 || (c.unallocatedExpenses || 0) !== 0;
+  }
+
+  getProfitBreakdownTooltip(data: DashboardMetrics): string {
+    const c = data.companyWideSummary;
+    const parts = [
+      `Sum of branches: ${this.formatCurrency(c.sumBranchNetProfit || 0)}`,
+    ];
+    if ((c.unallocatedRevenue || 0) > 0) parts.push(`+ Unallocated revenue: ${this.formatCurrency(c.unallocatedRevenue || 0)}`);
+    if ((c.unallocatedExpenses || 0) > 0) parts.push(`- Unallocated expenses: ${this.formatCurrency(c.unallocatedExpenses || 0)}`);
+    parts.push(`= Net profit: ${this.formatCurrency(c.netProfit)}`);
+    return parts.join('\n');
+  }
+
   navigateTo(path: string) {
     this.router.navigate([path]);
   }

@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const PRODUCTS_ROUTES: Routes = [
   {
@@ -15,6 +16,7 @@ export const PRODUCTS_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('products', 'write')],
     loadComponent: () =>
       import('./product-form/product-form.component').then(
         (m) => m.ProductFormComponent,
@@ -22,6 +24,7 @@ export const PRODUCTS_ROUTES: Routes = [
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('products', 'write')],
     loadComponent: () =>
       import('./product-form/product-form.component').then(
         (m) => m.ProductFormComponent,
@@ -29,6 +32,7 @@ export const PRODUCTS_ROUTES: Routes = [
   },
   {
     path: 'sell',
+    canActivate: [permissionGuard('product_sales', 'write')],
     loadComponent: () =>
       import('./product-sale/product-sale.component').then(
         (m) => m.ProductSaleComponent,
@@ -36,6 +40,7 @@ export const PRODUCTS_ROUTES: Routes = [
   },
   {
     path: 'sales',
+    canActivate: [permissionGuard('product_sales')],
     loadComponent: () =>
       import('./sales-history/sales-history.component').then(
         (m) => m.SalesHistoryComponent,

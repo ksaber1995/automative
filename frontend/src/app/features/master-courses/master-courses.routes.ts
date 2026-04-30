@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const MASTER_COURSES_ROUTES: Routes = [
   {
@@ -10,6 +11,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('master_courses', 'write')],
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent
@@ -17,6 +19,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('master_courses', 'write')],
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent

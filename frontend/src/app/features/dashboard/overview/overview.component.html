@@ -52,12 +52,29 @@
 
       <p-card class="bg-gradient-to-br from-green-50 to-green-100">
         <div class="flex items-center justify-between">
-          <div>
-            <div class="text-sm text-gray-600 mb-1">{{ 'DASHBOARD.NET_PROFIT' | translate }}</div>
+          <div class="flex-1">
+            <div class="text-sm text-gray-600 mb-1 flex items-center gap-1">
+              <span>{{ 'DASHBOARD.NET_PROFIT' | translate }}</span>
+              @if (hasUnallocatedActivity(data)) {
+                <i class="pi pi-info-circle text-amber-500 text-xs"
+                   [pTooltip]="getProfitBreakdownTooltip(data)" tooltipPosition="top"></i>
+              }
+            </div>
             <div class="text-2xl font-bold" [class.text-green-600]="data.companyWideSummary.netProfit >= 0"
               [class.text-red-600]="data.companyWideSummary.netProfit < 0">
               {{ formatCurrency(data.companyWideSummary.netProfit) }}
             </div>
+            @if (hasUnallocatedActivity(data)) {
+              <div class="text-xs text-amber-700 mt-1 flex flex-col gap-0.5">
+                <span>{{ 'DASHBOARD.SUM_BRANCH_NET' | translate }}: {{ formatCurrency(data.companyWideSummary.sumBranchNetProfit || 0) }}</span>
+                @if ((data.companyWideSummary.unallocatedRevenue || 0) > 0) {
+                  <span>{{ 'DASHBOARD.UNALLOCATED_REVENUE' | translate }}: {{ formatCurrency(data.companyWideSummary.unallocatedRevenue || 0) }}</span>
+                }
+                @if ((data.companyWideSummary.unallocatedExpenses || 0) > 0) {
+                  <span>{{ 'DASHBOARD.UNALLOCATED_EXPENSES' | translate }}: -{{ formatCurrency(data.companyWideSummary.unallocatedExpenses || 0) }}</span>
+                }
+              </div>
+            }
           </div>
           <i class="pi pi-chart-bar text-4xl text-green-400"></i>
         </div>

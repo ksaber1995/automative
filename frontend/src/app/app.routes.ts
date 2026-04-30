@@ -1,7 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { permissionGuard } from './core/guards/permission.guard';
+import { permissionGuard, roleGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
+import { UserRole } from '@shared/enums/user-role.enum';
 
 export const routes: Routes = [
   {
@@ -89,17 +90,13 @@ export const routes: Routes = [
         loadChildren: () => import('./features/reports/reports.routes').then(m => m.REPORTS_ROUTES)
       },
       {
-        path: 'withdrawals',
-        canActivate: [permissionGuard('withdrawals')],
-        loadChildren: () => import('./features/withdrawals/withdrawals.routes').then(m => m.WITHDRAWALS_ROUTES)
-      },
-      {
         path: 'refunds',
         canActivate: [permissionGuard('refunds')],
         loadChildren: () => import('./features/refunds/refunds.routes').then(m => m.REFUNDS_ROUTES)
       },
       {
         path: 'dues',
+        canActivate: [permissionGuard('enrollments')],
         loadChildren: () => import('./features/dues/dues.routes').then(m => m.DUES_ROUTES)
       },
       {
@@ -139,6 +136,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
+        canActivate: [roleGuard([UserRole.GLOBAL_ADMIN, UserRole.ADMIN, UserRole.BRANCH_ADMIN])],
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       }
     ]

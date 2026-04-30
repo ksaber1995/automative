@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const BRANCHES_ROUTES: Routes = [
   {
@@ -7,6 +8,7 @@ export const BRANCHES_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('branches', 'write')],
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   },
   {
@@ -15,6 +17,7 @@ export const BRANCHES_ROUTES: Routes = [
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('branches', 'write')],
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   }
 ];

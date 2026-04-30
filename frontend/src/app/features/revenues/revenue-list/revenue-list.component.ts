@@ -9,6 +9,7 @@ import { TagModule } from 'primeng/tag';
 import { RevenueService, RevenueItem } from '../services/revenue.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -24,6 +25,7 @@ export class RevenueListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private authService = inject(AuthService);
 
   revenues = signal<RevenueItem[]>([]);
   branches = signal<Branch[]>([]);
@@ -89,9 +91,14 @@ export class RevenueListComponent implements OnInit {
     return 'danger';
   }
 
-  getBranchName(branchId: string): string {
+  getBranchName(branchId: string | null | undefined): string {
+    if (!branchId) return 'Company-level';
     const branch = this.branches().find(b => b.id === branchId);
     return branch ? branch.name : 'Unknown';
+  }
+
+  canSeeCompanyLevel(): boolean {
+    return this.authService.isGlobalAdmin();
   }
 
   navigateToSource(revenue: RevenueItem) {

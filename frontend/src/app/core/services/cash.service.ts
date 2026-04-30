@@ -7,6 +7,10 @@ export interface CurrentCashResponse {
   baseCash?: number;
   adjustmentsTotal?: number;
   unallocatedAdjustments?: number;
+  unallocatedRevenue?: number;
+  unallocatedExpenses?: number;
+  unallocatedNet?: number;
+  sumBranchCash?: number;
   byBranch: BranchCash[];
 }
 

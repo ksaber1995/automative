@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const USERS_ROUTES: Routes = [
   {
@@ -7,10 +8,12 @@ export const USERS_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('users', 'write')],
     loadComponent: () => import('./user-form/user-form.component').then(m => m.UserFormComponent),
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('users', 'write')],
     loadComponent: () => import('./user-form/user-form.component').then(m => m.UserFormComponent),
   },
   {

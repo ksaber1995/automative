@@ -15,6 +15,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SafeUser } from '@shared/interfaces/user.interface';
 import { UserRole, ROLE_LABELS, NEW_ROLES } from '@shared/enums/user-role.enum';
 import {
@@ -151,6 +152,9 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                 <div class="field">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
                     {{ 'USERS.FORM.ROLE' | translate }} <span class="text-red-500">*</span>
+                    @if (isSelf) {
+                      <span class="ml-2 text-xs text-amber-600">{{ 'USERS.FORM.SELF_ROLE_LOCKED' | translate }}</span>
+                    }
                   </label>
                   <p-select
                     formControlName="role"
@@ -207,7 +211,25 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
 
             <!-- ── TAB 2: Permissions ──────────────────────────────────────── -->
             <p-tabpanel value="1">
-              <div class="pt-4 space-y-4">
+              <div class="pt-4 space-y-4" [class.opacity-60]="isPermissionsLocked()" [class.pointer-events-none]="isPermissionsLocked()">
+                @if (isSelf) {
+                  <div class="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <i class="pi pi-lock text-amber-600 text-lg mt-0.5"></i>
+                    <div>
+                      <p class="text-sm font-medium text-amber-900">{{ 'USERS.FORM.SELF_PERM_LOCKED_TITLE' | translate }}</p>
+                      <p class="text-xs text-amber-700 mt-0.5">{{ 'USERS.FORM.SELF_PERM_LOCKED_BODY' | translate }}</p>
+                    </div>
+                  </div>
+                }
+                @if (isAdminRoleSelected()) {
+                  <div class="flex items-start gap-3 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                    <i class="pi pi-shield text-purple-600 text-lg mt-0.5"></i>
+                    <div>
+                      <p class="text-sm font-medium text-purple-900">{{ 'USERS.FORM.ADMIN_PERM_LOCKED_TITLE' | translate }}</p>
+                      <p class="text-xs text-purple-700 mt-0.5">{{ 'USERS.FORM.ADMIN_PERM_LOCKED_BODY' | translate }}</p>
+                    </div>
+                  </div>
+                }
                 <!-- Role defaults notice -->
                 <div class="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <i class="pi pi-info-circle text-blue-500 text-lg mt-0.5"></i>
@@ -340,10 +362,12 @@ export class UserFormComponent implements OnInit {
   private userService = inject(UserService);
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
+  private authService = inject(AuthService);
 
   UserRole = UserRole;
   isEdit = false;
   userId: string | null = null;
+  isSelf = false;
   loading = signal(true);
   saving = signal(false);
 
@@ -376,6 +400,10 @@ export class UserFormComponent implements OnInit {
   ngOnInit() {
     this.userId = this.route.snapshot.paramMap.get('id');
     this.isEdit = !!this.userId;
+    this.isSelf = this.isEdit && this.userId === this.authService.currentUser()?.id;
+    if (this.isSelf) {
+      this.form.get('role')!.disable();
+    }
 
     if (!this.isEdit) {
       this.form.get('password')!.setValidators([Validators.required, Validators.minLength(6)]);
@@ -400,6 +428,10 @@ export class UserFormComponent implements OnInit {
           });
           this.selectedRole = user.role as UserRole;
           this.applyPermissionsToRows(user.permissions);
+          // GLOBAL_ADMIN/ADMIN always show as fully granted — role defaults are FULL.
+          if (this.selectedRole === UserRole.GLOBAL_ADMIN || this.selectedRole === UserRole.ADMIN) {
+            this.grantAll();
+          }
           this.loading.set(false);
         },
         error: () => {
@@ -464,6 +496,19 @@ export class UserFormComponent implements OnInit {
   onRoleChange(role: UserRole) {
     this.selectedRole = role;
     this.initPermissionRows(role);
+    // GLOBAL_ADMIN/ADMIN always run with role defaults (FULL access). Force the
+    // matrix to that state so the user sees what will actually apply.
+    if (role === UserRole.GLOBAL_ADMIN || role === UserRole.ADMIN) {
+      this.grantAll();
+    }
+  }
+
+  isAdminRoleSelected(): boolean {
+    return this.selectedRole === UserRole.GLOBAL_ADMIN || this.selectedRole === UserRole.ADMIN;
+  }
+
+  isPermissionsLocked(): boolean {
+    return this.isSelf || this.isAdminRoleSelected();
   }
 
   onPermissionChange(_row: PermissionRow) {
@@ -509,7 +554,9 @@ export class UserFormComponent implements OnInit {
     }
 
     const val = this.form.getRawValue();
-    const permissions = this.buildPermissionsFromRows();
+    const isAdminRole = val.role === UserRole.GLOBAL_ADMIN || val.role === UserRole.ADMIN;
+    // Admin roles use role defaults — never store custom overrides for them.
+    const permissions = isAdminRole ? null : this.buildPermissionsFromRows();
     const branchIds: string[] = val.branchIds ?? [];
     const primaryBranchId = branchIds[0] ?? null;
 
@@ -520,11 +567,14 @@ export class UserFormComponent implements OnInit {
         firstName: val.firstName,
         lastName: val.lastName,
         email: val.email,
-        role: val.role,
         branchId: primaryBranchId,
         branchIds,
-        permissions,
       };
+      // Users cannot change their own role or permissions — backend enforces too
+      if (!this.isSelf) {
+        dto.role = val.role;
+        dto.permissions = permissions;
+      }
       if (val.password) dto.password = val.password;
 
       this.userService.update(this.userId!, dto).subscribe({

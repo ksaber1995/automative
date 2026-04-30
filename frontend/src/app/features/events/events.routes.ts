@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const EVENTS_ROUTES: Routes = [
   {
@@ -8,11 +9,13 @@ export const EVENTS_ROUTES: Routes = [
   },
   {
     path: 'create',
+    canActivate: [permissionGuard('events', 'write')],
     loadComponent: () =>
       import('./event-form/event-form.component').then((m) => m.EventFormComponent),
   },
   {
     path: ':id/edit',
+    canActivate: [permissionGuard('events', 'write')],
     loadComponent: () =>
       import('./event-form/event-form.component').then((m) => m.EventFormComponent),
   },

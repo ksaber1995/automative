@@ -296,7 +296,6 @@ export class LayoutComponent implements OnInit {
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
       { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
-      { labelKey: 'NAV.WITHDRAWALS', icon: 'pi pi-wallet', routerLink: ['/withdrawals'], visible: auth.canRead('withdrawals') },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);
