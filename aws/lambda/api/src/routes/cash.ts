@@ -124,10 +124,29 @@ export const cashRoutes = {
     try {
       await ensureCashAdjustmentsTable();
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'cash', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const aggs = await fetchCashAggregates(context.companyId);
       const baseCash = aggs.totalEnrollPaid + aggs.totalProductSales + aggs.totalMasterPaid
         - aggs.totalExpenses - aggs.totalRefunds - aggs.totalWithdrawals;
+
+      // Surface activity that isn't tagged to any branch — product_sales with no
+      // branch_id and expense_payments with no branch_id. These are part of the
+      // company total but never roll up into a branch row, so callers need to
+      // know about them to reconcile sum(byBranch) with totalCash.
+      const unallocActivity = await query(
+        `SELECT
+           COALESCE((SELECT SUM(total_amount) FROM product_sales
+                     WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_revenue,
+           COALESCE((SELECT SUM(amount) FROM expense_payments
+                     WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_expenses`,
+        [context.companyId]
+      );
+      const unallocatedRevenue = parseFloat(unallocActivity[0]?.unalloc_revenue || '0');
+      const unallocatedExpenses = parseFloat(unallocActivity[0]?.unalloc_expenses || '0');
+      const unallocatedNet = unallocatedRevenue - unallocatedExpenses;
 
       const adj = await fetchAdjustmentTotals(context.companyId);
       const totalCash = baseCash + adj.overall;
@@ -202,6 +221,8 @@ export const cashRoutes = {
         };
       });
 
+      const sumBranchCash = byBranch.reduce((s: number, r: any) => s + r.cash, 0);
+
       return {
         status: 200 as const,
         body: {
@@ -209,6 +230,10 @@ export const cashRoutes = {
           baseCash: Math.round(baseCash * 100) / 100,
           adjustmentsTotal: Math.round(adj.overall * 100) / 100,
           unallocatedAdjustments: Math.round(adj.unallocatedAdjustments * 100) / 100,
+          unallocatedRevenue: Math.round(unallocatedRevenue * 100) / 100,
+          unallocatedExpenses: Math.round(unallocatedExpenses * 100) / 100,
+          unallocatedNet: Math.round(unallocatedNet * 100) / 100,
+          sumBranchCash: Math.round(sumBranchCash * 100) / 100,
           byBranch,
         },
       };
@@ -373,7 +398,9 @@ export const cashRoutes = {
   flow: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      void context;
+      if (!checkGranularPermission(context, 'cash', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
       return { status: 200 as const, body: [] };
     } catch (error) {
       console.error('Get cash flow error:', error);

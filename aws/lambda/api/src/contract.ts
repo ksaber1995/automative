@@ -48,6 +48,7 @@ const UserPermissionsSchema = z.object({
   rooms:         ResourcePermissionSchema.optional(),
   sessions:      ResourcePermissionSchema.optional(),
   timetable:     ResourcePermissionSchema.optional(),
+  cash:          ResourcePermissionSchema.optional(),
 }).optional().nullable();
 
 // Subscription Tiers
@@ -2405,6 +2406,10 @@ export const contract = c.router({
           baseCash: z.number().optional(),
           adjustmentsTotal: z.number().optional(),
           unallocatedAdjustments: z.number().optional(),
+          unallocatedRevenue: z.number().optional(),
+          unallocatedExpenses: z.number().optional(),
+          unallocatedNet: z.number().optional(),
+          sumBranchCash: z.number().optional(),
           byBranch: z.array(z.object({
             branchId: UUIDSchema,
             branchName: z.string(),
@@ -2761,6 +2766,15 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string(), deletedCount: z.number() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    clearAdminPermissions: {
+      method: 'POST',
+      path: '/api/migrations/clear-admin-permissions',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string(), clearedCount: z.number() }),
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },

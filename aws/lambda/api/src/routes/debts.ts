@@ -90,6 +90,9 @@ export const debtsRoutes = {
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'debts', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // TODO: Implement when debts table is created
       // When implemented, verify: WHERE id = $1 AND company_id = $2
@@ -109,6 +112,9 @@ export const debtsRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'debts', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // TODO: Implement when debts table is created
       // When implemented, verify ownership: WHERE id = $1 AND company_id = $2
@@ -128,6 +134,9 @@ export const debtsRoutes = {
   delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'debts', 'delete')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       // TODO: Implement when debts table is created
       // When implemented, verify ownership: WHERE id = $1 AND company_id = $2

@@ -66,13 +66,24 @@ export const analyticsRoutes = {
         [context.companyId, startDate, endDate]
       );
 
-      const fixedExpenses = expenseData.filter((e: any) => e.type === 'FIXED').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
-      const variableExpenses = expenseData.filter((e: any) => e.type === 'VARIABLE' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
-      const sharedExpenses = expenseData.filter((e: any) => e.type === 'SHARED').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
-      const capitalExpenses = expenseData.filter((e: any) => e.type === 'CAPITAL').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      // Display buckets — non-overlapping. Each row contributes to exactly ONE
+      // type bucket OR cogsExpenses (mutually exclusive), so totalExpenses is
+      // the simple sum.
       const cogsExpenses = expenseData.filter((e: any) => e.category === 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const fixedExpenses = expenseData.filter((e: any) => e.type === 'FIXED' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const variableExpenses = expenseData.filter((e: any) => e.type === 'VARIABLE' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const sharedExpenses = expenseData.filter((e: any) => e.type === 'SHARED' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
+      const capitalExpenses = expenseData.filter((e: any) => e.type === 'CAPITAL' && e.category !== 'COGS').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
       const salaries = expenseData.filter((e: any) => e.category === 'SALARIES').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
-      const totalExpenses = fixedExpenses + variableExpenses + sharedExpenses + capitalExpenses + cogsExpenses;
+      // Authoritative total — single SUM, not derived from buckets, so a
+      // miscategorised row can never silently drop or double-count.
+      const totalExpensesRow = await query(
+        `SELECT COALESCE(SUM(amount), 0) as total
+         FROM expense_payments
+         WHERE company_id = $1 AND date >= $2 AND date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
+      const totalExpenses = parseFloat(totalExpensesRow[0]?.total || '0');
       const grossProfit = totalRevenue - cogsExpenses;
       const netProfit = totalRevenue - totalExpenses;
 
@@ -107,6 +118,8 @@ export const analyticsRoutes = {
       // Captures product_sales with no branch + every expense_payment with no branch
       // (overhead AND COGS). These are not attributable to any specific branch and
       // must reconcile against the company-wide total so branch sums add up.
+      // enrollments and master_enrollments require a branch_id (NOT NULL), so
+      // unallocated revenue can only come from product_sales.
       const unallocRevData = await query(
         `SELECT COALESCE(SUM(total_amount), 0) as total
          FROM product_sales
@@ -283,6 +296,8 @@ export const analyticsRoutes = {
         [context.companyId, startDate, endDate]
       );
 
+      const sumBranchNetProfit = branchSummaries.reduce((s: number, b: any) => s + b.netProfit, 0);
+
       return {
         status: 200 as const,
         body: {
@@ -306,6 +321,10 @@ export const analyticsRoutes = {
             availableCash: currentCash - totalOutstandingDebts,
             inventoryValue,
             globalOverhead: totalGlobalOverhead,
+            unallocatedRevenue,
+            unallocatedExpenses,
+            unallocatedNetProfit,
+            sumBranchNetProfit: Math.round(sumBranchNetProfit * 100) / 100,
             allocationMethod,
             companyLevelUnallocated: {
               revenue: unallocatedRevenue,

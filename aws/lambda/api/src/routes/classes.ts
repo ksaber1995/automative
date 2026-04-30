@@ -201,6 +201,9 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'classes', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `
         SELECT
@@ -469,6 +472,9 @@ export const classesRoutes = {
   getEnrollments: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const cls = await queryOne(
         'SELECT * FROM classes WHERE id = $1 AND company_id = $2',

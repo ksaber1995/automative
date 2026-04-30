@@ -14,6 +14,10 @@ export interface FinancialSummary {
   availableCash?: number;
   allocationMethod: string;
   globalOverhead: number;
+  unallocatedRevenue?: number;
+  unallocatedExpenses?: number;
+  unallocatedNetProfit?: number;
+  sumBranchNetProfit?: number;
 }
 
 export interface BranchFinancialSummary extends FinancialSummary {

@@ -160,6 +160,10 @@ export const usersRoutes = {
       // Determine primary branchId (first in branchIds, or explicit branchId)
       const primaryBranchId = body.branchId || body.branchIds?.[0] || null;
 
+      // GLOBAL_ADMIN/ADMIN always run with role defaults (FULL access). Custom
+      // permissions on these roles are forbidden so admins can never be locked
+      // out of their own account.
+      const isAdminRole = body.role === 'GLOBAL_ADMIN' || body.role === 'ADMIN';
       const newUser = await insert<any>('users', {
         company_id: context.companyId,
         email: body.email,
@@ -169,7 +173,7 @@ export const usersRoutes = {
         role: body.role,
         branch_id: primaryBranchId,
         linked_employee_id: body.linkedEmployeeId || null,
-        permissions: body.permissions ? JSON.stringify(body.permissions) : null,
+        permissions: isAdminRole ? null : (body.permissions ? JSON.stringify(body.permissions) : null),
         is_active: true,
       });
 
@@ -203,16 +207,31 @@ export const usersRoutes = {
         return { status: 400 as const, body: { message: 'You cannot deactivate your own account' } };
       }
 
+      // Block self-elevation: a user cannot change their own role or permissions.
+      const isSelf = params.id === context.userId;
+      if (isSelf && body.role !== undefined && body.role !== existing.role) {
+        return { status: 400 as const, body: { message: 'You cannot change your own role' } };
+      }
+      if (isSelf && 'permissions' in body) {
+        return { status: 400 as const, body: { message: 'You cannot change your own permissions' } };
+      }
+
       // Build update fields
       const updates: Record<string, any> = {};
       if (body.email !== undefined) updates.email = body.email;
       if (body.firstName !== undefined) updates.first_name = body.firstName;
       if (body.lastName !== undefined) updates.last_name = body.lastName;
-      if (body.role !== undefined) updates.role = body.role;
+      if (body.role !== undefined && !isSelf) updates.role = body.role;
       if (body.isActive !== undefined) updates.is_active = body.isActive;
       if ('linkedEmployeeId' in body) updates.linked_employee_id = body.linkedEmployeeId;
-      if ('permissions' in body) {
+      if ('permissions' in body && !isSelf) {
         updates.permissions = body.permissions ? JSON.stringify(body.permissions) : null;
+      }
+      // GLOBAL_ADMIN/ADMIN always run with role defaults — strip any custom
+      // permissions so the matrix can never lock them out.
+      const finalRole = (updates.role as string | undefined) ?? existing.role;
+      if (finalRole === 'GLOBAL_ADMIN' || finalRole === 'ADMIN') {
+        updates.permissions = null;
       }
 
       // Update primary branch
@@ -257,11 +276,19 @@ export const usersRoutes = {
         return { status: 403 as const, body: { message: 'Only Global Admins can update permissions' } };
       }
 
+      if (params.id === context.userId) {
+        return { status: 400 as const, body: { message: 'You cannot change your own permissions' } };
+      }
+
       const existing = await queryOne<any>(
-        'SELECT id FROM users WHERE id = $1 AND company_id = $2',
+        'SELECT id, role FROM users WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
       if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+
+      if (existing.role === 'GLOBAL_ADMIN' || existing.role === 'ADMIN') {
+        return { status: 400 as const, body: { message: 'GLOBAL_ADMIN/ADMIN always have full permissions and cannot be customised' } };
+      }
 
       await updateUser(
         params.id,

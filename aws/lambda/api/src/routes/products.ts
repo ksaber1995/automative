@@ -136,6 +136,9 @@ export const productsRoutes = {
   getAvailable: async ({ params, headers }: { params: { branchId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'products', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       if (!canAccessBranch(context, params.branchId)) {
         return {
@@ -170,6 +173,9 @@ export const productsRoutes = {
   getLowStock: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'products', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `
         SELECT * FROM products
@@ -312,6 +318,9 @@ export const productsRoutes = {
   adjustStock: async ({ params, body, headers }: { params: { id: string }; body: { quantity: number; operation: 'add' | 'subtract' }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'products', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const product = await queryOne(
         'SELECT * FROM products WHERE id = $1 AND company_id = $2',

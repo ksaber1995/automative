@@ -27,8 +27,15 @@ export const revenuesRoutes = {
       const includeMasters = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'MASTER_ENROLLMENT';
 
       // Shared filters — push once, reuse positional index for every branch.
+      // Sentinel value "NULL" means "company-level only" (no branch_id) — only
+      // global admins / accountants are allowed to see this slice.
+      const companyLevelOnly = queryParams.branchId === 'NULL';
       let branchIdx: number | null = null;
-      if (queryParams.branchId) {
+      if (companyLevelOnly) {
+        if (!isGlobalAdmin(context)) {
+          return { status: 403 as const, body: { message: 'Only Global Admins can view company-level revenue' } };
+        }
+      } else if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
           return { status: 403 as const, body: { message: 'Access denied to this branch' } };
         }
@@ -45,7 +52,9 @@ export const revenuesRoutes = {
 
       const parts: string[] = [];
 
-      if (includeEnrollments) {
+      // Company-level (branch_id IS NULL) revenue can only come from product_sales —
+      // enrollments and master_enrollments have NOT NULL branch_id.
+      if (includeEnrollments && !companyLevelOnly) {
         let sql = `SELECT
           'ENROLLMENT' as source,
           e.id as source_id,
@@ -93,16 +102,17 @@ export const revenuesRoutes = {
           NULL as student_id,
           ps.created_at
         FROM product_sales ps
-        JOIN branches b ON ps.branch_id = b.id
+        LEFT JOIN branches b ON ps.branch_id = b.id
         JOIN products p ON ps.product_id = p.id
         WHERE ps.company_id = $1`;
-        if (branchIdx) sql += ` AND ps.branch_id = $${branchIdx}`;
+        if (companyLevelOnly) sql += ` AND ps.branch_id IS NULL`;
+        else if (branchIdx) sql += ` AND ps.branch_id = $${branchIdx}`;
         if (startIdx) sql += ` AND ps.sale_date >= $${startIdx}`;
         if (endIdx) sql += ` AND ps.sale_date <= $${endIdx}`;
         parts.push(sql);
       }
 
-      if (includeMasters) {
+      if (includeMasters && !companyLevelOnly) {
         let sql = `SELECT
           'MASTER_ENROLLMENT' as source,
           me.id as source_id,

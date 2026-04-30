@@ -152,6 +152,9 @@ export const expensesRoutes = {
   getDue: async ({ query: queryParams, headers }: { query: { month?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const targetMonth = queryParams.month || new Date().toISOString().substring(0, 7);
       const monthStart = targetMonth + '-01';
@@ -404,6 +407,9 @@ export const expensesRoutes = {
   payRecurring: async ({ params, body, headers }: { params: { id: string }; body: { date?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const template = await queryOne(
         'SELECT * FROM expenses WHERE id = $1 AND company_id = $2 AND is_recurring = true',
@@ -457,6 +463,9 @@ export const expensesRoutes = {
   paySalaries: async ({ body, headers }: { body: { date?: string; branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
       const monthStart = payDate.substring(0, 7) + '-01';

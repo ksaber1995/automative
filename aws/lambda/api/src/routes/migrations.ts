@@ -819,4 +819,31 @@ export const migrationsRoutes = {
       };
     }
   },
+  clearAdminPermissions: async () => {
+    try {
+      const result = await query(
+        `UPDATE users
+         SET permissions = NULL
+         WHERE role IN ('GLOBAL_ADMIN', 'ADMIN') AND permissions IS NOT NULL
+         RETURNING id`
+      );
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          message: `Cleared custom permissions on ${result.length} GLOBAL_ADMIN/ADMIN user(s)`,
+          clearedCount: result.length,
+        },
+      };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
 };

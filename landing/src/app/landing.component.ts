@@ -13,9 +13,7 @@ const LANG_STORAGE_KEY = 'netrofit.lang';
 
 interface Benefit { icon: string; titleKey: string; textKey: string; }
 interface Feature { icon: string; titleKey: string; textKey: string; }
-interface Testimonial { quoteKey: string; authorKey: string; roleKey: string; }
 interface Faq { qKey: string; aKey: string; }
-interface Partner { name: string; logo?: string; }
 interface RoadmapPhase {
   phase: string;
   icon: string;
@@ -43,7 +41,6 @@ interface RoadmapPhase {
           <a href="#features" class="hover:text-brand-600">{{ 'NAV.FEATURES' | translate }}</a>
           <a href="#pricing" class="hover:text-brand-600">{{ 'NAV.PRICING' | translate }}</a>
           <a href="#roadmap" class="hover:text-brand-600">{{ 'NAV.ROADMAP' | translate }}</a>
-          <a href="#partners" class="hover:text-brand-600">{{ 'NAV.PARTNERS' | translate }}</a>
           <a href="#faq" class="hover:text-brand-600">{{ 'NAV.FAQ' | translate }}</a>
         </nav>
         <div class="flex items-center gap-2">
@@ -88,23 +85,27 @@ interface RoadmapPhase {
           </div>
         </div>
 
-        <!-- Stats strip -->
+        <!-- Value-prop strip -->
         <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div class="text-3xl font-extrabold text-brand-600">100+</div>
-            <div class="text-sm text-gray-500 mt-1">{{ 'HERO.STAT_CENTERS' | translate }}</div>
+            <div class="text-3xl">🏢</div>
+            <div class="text-sm font-semibold text-gray-900 mt-2">{{ 'HERO.VP_MULTIBRANCH_TITLE' | translate }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'HERO.VP_MULTIBRANCH_TEXT' | translate }}</div>
           </div>
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div class="text-3xl font-extrabold text-brand-600">25K+</div>
-            <div class="text-sm text-gray-500 mt-1">{{ 'HERO.STAT_STUDENTS' | translate }}</div>
+            <div class="text-3xl">💰</div>
+            <div class="text-sm font-semibold text-gray-900 mt-2">{{ 'HERO.VP_FINANCE_TITLE' | translate }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'HERO.VP_FINANCE_TEXT' | translate }}</div>
           </div>
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div class="text-3xl font-extrabold text-brand-600">30hrs</div>
-            <div class="text-sm text-gray-500 mt-1">{{ 'HERO.STAT_HOURS' | translate }}</div>
+            <div class="text-3xl">🌐</div>
+            <div class="text-sm font-semibold text-gray-900 mt-2">{{ 'HERO.VP_BILINGUAL_TITLE' | translate }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'HERO.VP_BILINGUAL_TEXT' | translate }}</div>
           </div>
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div class="text-3xl font-extrabold text-brand-600">4.9/5</div>
-            <div class="text-sm text-gray-500 mt-1">{{ 'HERO.STAT_RATING' | translate }}</div>
+            <div class="text-3xl">🔒</div>
+            <div class="text-sm font-semibold text-gray-900 mt-2">{{ 'HERO.VP_RBAC_TITLE' | translate }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ 'HERO.VP_RBAC_TEXT' | translate }}</div>
           </div>
         </div>
       </div>
@@ -342,49 +343,6 @@ interface RoadmapPhase {
       </div>
     </section>
 
-    <!-- PARTNERS -->
-    <section id="partners" class="py-20 bg-gray-50">
-      <div class="container-custom">
-        <div class="text-center mb-10">
-          <p class="text-sm font-semibold text-brand-600 uppercase tracking-wider">{{ 'PARTNERS.KICKER' | translate }}</p>
-          <h2 class="mt-2 text-3xl font-bold text-gray-900">{{ 'PARTNERS.HEADING' | translate }}</h2>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 items-center">
-          @for (p of partners; track p.name) {
-            <div class="h-16 rounded-lg bg-white border border-gray-100 flex items-center justify-center p-3">
-              @if (p.logo) {
-                <img
-                  [src]="p.logo"
-                  [alt]="p.name"
-                  class="max-h-10 max-w-full object-contain opacity-70 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-200"
-                  (error)="onPartnerLogoError($event, p)" />
-              } @else {
-                <span class="text-gray-400 font-semibold text-sm">{{ p.name }}</span>
-              }
-            </div>
-          }
-        </div>
-
-        <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-          @for (t of testimonials; track t.authorKey) {
-            <div class="p-6 rounded-2xl bg-white border border-gray-100">
-              <div class="text-yellow-400 mb-3">★★★★★</div>
-              <p class="text-gray-700 italic">"{{ t.quoteKey | translate }}"</p>
-              <div class="mt-4 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 flex items-center justify-center text-white font-bold">
-                  {{ (t.authorKey | translate)[0] }}
-                </div>
-                <div>
-                  <div class="font-semibold text-gray-900 text-sm">{{ t.authorKey | translate }}</div>
-                  <div class="text-xs text-gray-500">{{ t.roleKey | translate }}</div>
-                </div>
-              </div>
-            </div>
-          }
-        </div>
-      </div>
-    </section>
-
     <!-- FAQ -->
     <section id="faq" class="py-20 bg-white">
       <div class="container-custom max-w-3xl">
@@ -578,29 +536,34 @@ export class LandingComponent {
   ];
 
   features: Feature[] = [
-    { icon: '🎓', titleKey: 'FEATURES.ITEMS.STUDENTS_TITLE', textKey: 'FEATURES.ITEMS.STUDENTS_TEXT' },
-    { icon: '📚', titleKey: 'FEATURES.ITEMS.COURSES_TITLE', textKey: 'FEATURES.ITEMS.COURSES_TEXT' },
-    { icon: '📦', titleKey: 'FEATURES.ITEMS.INVENTORY_TITLE', textKey: 'FEATURES.ITEMS.INVENTORY_TEXT' },
-    { icon: '🧾', titleKey: 'FEATURES.ITEMS.EXPENSES_TITLE', textKey: 'FEATURES.ITEMS.EXPENSES_TEXT' },
-    { icon: '📈', titleKey: 'FEATURES.ITEMS.ANALYTICS_TITLE', textKey: 'FEATURES.ITEMS.ANALYTICS_TEXT' },
-    { icon: '🎁', titleKey: 'FEATURES.ITEMS.BUNDLES_TITLE', textKey: 'FEATURES.ITEMS.BUNDLES_TEXT' },
-  ];
-
-  // Partner logos. Drop a PNG / SVG into `public/partners/` and reference it
-  // here. When `logo` is omitted the card falls back to the partner name.
-  partners: Partner[] = [
-    { name: 'Vodafone Cash', logo: 'partners/vodafone-cash.svg' },
-    { name: 'Fawry',         logo: 'partners/fawry.svg' },
-    { name: 'InstaPay',      logo: 'partners/instapay.svg' },
-    { name: 'Mada',          logo: 'partners/mada.svg' },
-    { name: 'STC Pay',       logo: 'partners/stc-pay.svg' },
-    { name: 'WhatsApp',      logo: 'partners/whatsapp.svg' },
-  ];
-
-  testimonials: Testimonial[] = [
-    { quoteKey: 'TESTIMONIALS.T1_QUOTE', authorKey: 'TESTIMONIALS.T1_AUTHOR', roleKey: 'TESTIMONIALS.T1_ROLE' },
-    { quoteKey: 'TESTIMONIALS.T2_QUOTE', authorKey: 'TESTIMONIALS.T2_AUTHOR', roleKey: 'TESTIMONIALS.T2_ROLE' },
-    { quoteKey: 'TESTIMONIALS.T3_QUOTE', authorKey: 'TESTIMONIALS.T3_AUTHOR', roleKey: 'TESTIMONIALS.T3_ROLE' },
+    { icon: '🏢', titleKey: 'FEATURES.ITEMS.MULTIBRANCH_TITLE',    textKey: 'FEATURES.ITEMS.MULTIBRANCH_TEXT' },
+    { icon: '📊', titleKey: 'FEATURES.ITEMS.DASHBOARD_TITLE',      textKey: 'FEATURES.ITEMS.DASHBOARD_TEXT' },
+    { icon: '🎓', titleKey: 'FEATURES.ITEMS.STUDENTS_TITLE',       textKey: 'FEATURES.ITEMS.STUDENTS_TEXT' },
+    { icon: '📚', titleKey: 'FEATURES.ITEMS.COURSES_TITLE',        textKey: 'FEATURES.ITEMS.COURSES_TEXT' },
+    { icon: '🎁', titleKey: 'FEATURES.ITEMS.BUNDLES_TITLE',        textKey: 'FEATURES.ITEMS.BUNDLES_TEXT' },
+    { icon: '📅', titleKey: 'FEATURES.ITEMS.CLASSES_TITLE',        textKey: 'FEATURES.ITEMS.CLASSES_TEXT' },
+    { icon: '🕘', titleKey: 'FEATURES.ITEMS.SESSIONS_TITLE',       textKey: 'FEATURES.ITEMS.SESSIONS_TEXT' },
+    { icon: '🗓️', titleKey: 'FEATURES.ITEMS.TIMETABLE_TITLE',      textKey: 'FEATURES.ITEMS.TIMETABLE_TEXT' },
+    { icon: '🚪', titleKey: 'FEATURES.ITEMS.ROOMS_TITLE',          textKey: 'FEATURES.ITEMS.ROOMS_TEXT' },
+    { icon: '✅', titleKey: 'FEATURES.ITEMS.ATTENDANCE_TITLE',     textKey: 'FEATURES.ITEMS.ATTENDANCE_TEXT' },
+    { icon: '👨‍🏫', titleKey: 'FEATURES.ITEMS.EMPLOYEES_TITLE',    textKey: 'FEATURES.ITEMS.EMPLOYEES_TEXT' },
+    { icon: '💵', titleKey: 'FEATURES.ITEMS.PAYROLL_TITLE',        textKey: 'FEATURES.ITEMS.PAYROLL_TEXT' },
+    { icon: '📝', titleKey: 'FEATURES.ITEMS.ENROLLMENTS_TITLE',    textKey: 'FEATURES.ITEMS.ENROLLMENTS_TEXT' },
+    { icon: '💳', titleKey: 'FEATURES.ITEMS.INSTALLMENTS_TITLE',   textKey: 'FEATURES.ITEMS.INSTALLMENTS_TEXT' },
+    { icon: '💰', titleKey: 'FEATURES.ITEMS.REVENUES_TITLE',       textKey: 'FEATURES.ITEMS.REVENUES_TEXT' },
+    { icon: '🧾', titleKey: 'FEATURES.ITEMS.EXPENSES_TITLE',       textKey: 'FEATURES.ITEMS.EXPENSES_TEXT' },
+    { icon: '🔁', titleKey: 'FEATURES.ITEMS.RECURRING_TITLE',      textKey: 'FEATURES.ITEMS.RECURRING_TEXT' },
+    { icon: '↩️', titleKey: 'FEATURES.ITEMS.REFUNDS_TITLE',        textKey: 'FEATURES.ITEMS.REFUNDS_TEXT' },
+    { icon: '🏧', titleKey: 'FEATURES.ITEMS.WITHDRAWALS_TITLE',    textKey: 'FEATURES.ITEMS.WITHDRAWALS_TEXT' },
+    { icon: '📉', titleKey: 'FEATURES.ITEMS.DEBTS_TITLE',          textKey: 'FEATURES.ITEMS.DEBTS_TEXT' },
+    { icon: '👛', titleKey: 'FEATURES.ITEMS.CASH_TITLE',           textKey: 'FEATURES.ITEMS.CASH_TEXT' },
+    { icon: '📦', titleKey: 'FEATURES.ITEMS.INVENTORY_TITLE',      textKey: 'FEATURES.ITEMS.INVENTORY_TEXT' },
+    { icon: '🛒', titleKey: 'FEATURES.ITEMS.SALES_TITLE',          textKey: 'FEATURES.ITEMS.SALES_TEXT' },
+    { icon: '🚩', titleKey: 'FEATURES.ITEMS.EVENTS_TITLE',         textKey: 'FEATURES.ITEMS.EVENTS_TEXT' },
+    { icon: '📈', titleKey: 'FEATURES.ITEMS.ANALYTICS_TITLE',      textKey: 'FEATURES.ITEMS.ANALYTICS_TEXT' },
+    { icon: '📑', titleKey: 'FEATURES.ITEMS.REPORTS_TITLE',        textKey: 'FEATURES.ITEMS.REPORTS_TEXT' },
+    { icon: '🔒', titleKey: 'FEATURES.ITEMS.RBAC_TITLE',           textKey: 'FEATURES.ITEMS.RBAC_TEXT' },
+    { icon: '🌍', titleKey: 'FEATURES.ITEMS.BILINGUAL_TITLE',      textKey: 'FEATURES.ITEMS.BILINGUAL_TEXT' },
   ];
 
   roadmapPhases: RoadmapPhase[] = [
@@ -735,13 +698,6 @@ export class LandingComponent {
 
   toggleLang() {
     this.lang.set(this.lang() === 'en' ? 'ar' : 'en');
-  }
-
-  // If a partner logo file is missing (404), drop the logo ref so the card
-  // falls back to the partner name on the next render.
-  onPartnerLogoError(event: Event, p: Partner) {
-    (event.target as HTMLImageElement).style.display = 'none';
-    this.partners = this.partners.map((x) => (x.name === p.name ? { name: x.name } : x));
   }
 
   private applyDir(l: Lang) {

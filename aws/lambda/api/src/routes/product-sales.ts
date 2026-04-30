@@ -283,6 +283,9 @@ export const productSalesRoutes = {
   topProducts: async ({ query: queryParams, headers }: { query: { branchId?: string; limit?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
 
       let sql = `
         SELECT
