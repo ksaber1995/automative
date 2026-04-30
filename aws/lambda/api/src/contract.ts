@@ -2402,7 +2402,17 @@ export const contract = c.router({
       responses: {
         200: z.object({
           totalCash: z.number(),
-          byBranch: z.array(z.any()),
+          baseCash: z.number().optional(),
+          adjustmentsTotal: z.number().optional(),
+          unallocatedAdjustments: z.number().optional(),
+          byBranch: z.array(z.object({
+            branchId: UUIDSchema,
+            branchName: z.string(),
+            baseCash: z.number().optional(),
+            branchAdjustments: z.number().optional(),
+            distributedAdjustments: z.number().optional(),
+            cash: z.number(),
+          })),
         }),
       },
     },
@@ -2413,12 +2423,53 @@ export const contract = c.router({
         200: z.any(),
       },
     },
+    listAdjustments: {
+      method: 'GET',
+      path: '/api/cash/adjustments',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          companyId: UUIDSchema,
+          branchId: UUIDSchema.nullable(),
+          branchName: z.string().nullable(),
+          type: z.enum(['DEPOSIT', 'WITHDRAWAL', 'ADJUSTMENT']),
+          amount: z.number(),
+          observedAmount: z.number().nullable(),
+          systemAmount: z.number().nullable(),
+          date: z.string(),
+          notes: z.string().nullable(),
+          createdByUserId: UUIDSchema.nullable(),
+          createdAt: z.string(),
+        })),
+      },
+    },
     adjust: {
       method: 'POST',
       path: '/api/cash/adjust',
-      body: z.any(),
+      body: z.object({
+        type: z.enum(['DEPOSIT', 'WITHDRAWAL', 'ADJUSTMENT']),
+        branchId: OptionalUUIDSchema,
+        amount: z.number().optional(),
+        observedAmount: z.number().optional(),
+        date: z.string().optional(),
+        notes: z.string().optional().nullable(),
+      }),
       responses: {
-        200: z.any(),
+        201: z.any(),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    deleteAdjustment: {
+      method: 'DELETE',
+      path: '/api/cash/adjustments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string(), id: UUIDSchema }),
+        404: z.object({ message: z.string() }),
       },
     },
     flow: {

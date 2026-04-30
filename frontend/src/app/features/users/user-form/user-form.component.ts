@@ -55,6 +55,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
   rooms:        { label: 'USERS.FORM.RESOURCE_ROOMS',         icon: 'pi pi-building' },
   sessions:     { label: 'USERS.FORM.RESOURCE_SESSIONS',      icon: 'pi pi-clock' },
   timetable:    { label: 'USERS.FORM.RESOURCE_TIMETABLE',     icon: 'pi pi-calendar-clock' },
+  cash:         { label: 'USERS.FORM.RESOURCE_CASH',          icon: 'pi pi-wallet',      financial: true },
 };
 
 @Component({

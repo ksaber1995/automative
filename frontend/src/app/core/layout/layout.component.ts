@@ -1,6 +1,7 @@
-import { Component, signal, OnInit, inject, computed } from '@angular/core';
+import { Component, signal, OnInit, inject, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { MenuModule } from 'primeng/menu';
@@ -12,14 +13,23 @@ import { SubscriptionService } from '../services/subscription.service';
 import { LanguageService } from '../services/language.service';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 
-interface NavItem {
-  labelKey?: string;
-  icon?: string;
-  routerLink?: string[];
-  separator?: boolean;
-  sectionLabel?: boolean;
+interface NavLeaf {
+  labelKey: string;
+  icon: string;
+  routerLink: string[];
   visible: boolean;
 }
+
+interface NavGroup {
+  groupKey: string;
+  labelKey: string;
+  icon: string;
+  children: NavLeaf[];
+}
+
+type NavEntry =
+  | { kind: 'leaf'; leaf: NavLeaf }
+  | { kind: 'group'; group: NavGroup };
 
 @Component({
   selector: 'app-layout',
@@ -100,26 +110,49 @@ interface NavItem {
         [class.w-64]="sidebarVisible()"
         [class.w-0]="!sidebarVisible()">
         @if (sidebarVisible()) {
-          <nav class="p-4">
+          <nav class="p-3">
             <div class="space-y-0.5">
-              @for (item of visibleMenuItems(); track $index) {
-                @if (item.sectionLabel) {
-                  <div class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {{ item.labelKey! | translate }}
-                  </div>
-                } @else if (item.separator) {
-                  <div class="border-t border-gray-100 my-2"></div>
-                } @else {
+              @for (entry of visibleMenuEntries(); track entryTrackBy($index, entry)) {
+                @if (entry.kind === 'leaf') {
                   <a
-                    [routerLink]="item.routerLink"
+                    [routerLink]="entry.leaf.routerLink"
                     routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
-                    [routerLinkActiveOptions]="{ exact: item.routerLink?.length === 1 }"
+                    [routerLinkActiveOptions]="{ exact: entry.leaf.routerLink.length === 1 }"
                     class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm"
                     [class.border-r-4]="languageService.isRtl()"
                     [class.border-l-4]="!languageService.isRtl()">
-                    <i [class]="item.icon + ' text-base'"></i>
-                    <span class="font-medium">{{ item.labelKey! | translate }}</span>
+                    <i [class]="entry.leaf.icon + ' text-base'"></i>
+                    <span class="font-medium">{{ entry.leaf.labelKey | translate }}</span>
                   </a>
+                } @else {
+                  <button type="button"
+                    (click)="toggleGroup(entry.group.groupKey)"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all text-sm">
+                    <i [class]="entry.group.icon + ' text-base'"></i>
+                    <span class="font-medium flex-1 text-start">{{ entry.group.labelKey | translate }}</span>
+                    <i class="pi text-xs text-gray-400 transition-transform"
+                       [class.pi-chevron-down]="isGroupOpen(entry.group.groupKey)"
+                       [class.pi-chevron-right]="!isGroupOpen(entry.group.groupKey) && !languageService.isRtl()"
+                       [class.pi-chevron-left]="!isGroupOpen(entry.group.groupKey) && languageService.isRtl()"></i>
+                  </button>
+                  @if (isGroupOpen(entry.group.groupKey)) {
+                    <div class="space-y-0.5 mb-1"
+                         [class.ms-4]="!languageService.isRtl()"
+                         [class.me-4]="languageService.isRtl()">
+                      @for (child of entry.group.children; track child.routerLink[0]) {
+                        <a
+                          [routerLink]="child.routerLink"
+                          routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
+                          [routerLinkActiveOptions]="{ exact: child.routerLink.length === 1 }"
+                          class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm"
+                          [class.border-r-4]="languageService.isRtl()"
+                          [class.border-l-4]="!languageService.isRtl()">
+                          <i [class]="child.icon + ' text-sm'"></i>
+                          <span>{{ child.labelKey | translate }}</span>
+                        </a>
+                      }
+                    </div>
+                  }
                 }
               }
             </div>
@@ -209,113 +242,135 @@ export class LayoutComponent implements OnInit {
 
   ngOnInit() {
     this.subscriptionService.load().subscribe({ error: () => {} });
+    this.syncOpenGroupFromUrl(this.router.url);
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(e => this.syncOpenGroupFromUrl(e.urlAfterRedirects || e.url));
   }
 
-  // ─── Computed menu (permission-aware) ────────────────────────────────────
+  // ─── Computed menu (permission-aware, grouped) ──────────────────────────
 
-  visibleMenuItems = computed<NavItem[]>(() => {
+  openGroups = signal<Set<string>>(new Set<string>());
+
+  visibleMenuEntries = computed<NavEntry[]>(() => {
     const auth = this.authService;
-    const all: NavItem[] = [
-      {
-        labelKey: 'NAV.DASHBOARD', icon: 'pi pi-home', routerLink: ['/dashboard'],
-        visible: auth.canRead('dashboard'),
-      },
-      { separator: true, visible: true },
-      { labelKey: 'NAV.SECTIONS.MANAGEMENT', sectionLabel: true, visible: true },
-      {
-        labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'],
-        visible: auth.canRead('branches'),
-      },
-      {
-        labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'],
-        visible: auth.canRead('courses'),
-      },
-      {
-        labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'],
-        visible: auth.canRead('master_courses'),
-      },
-      {
-        labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'],
-        visible: auth.canRead('events'),
-      },
-      {
-        labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'],
-        visible: auth.canRead('classes'),
-      },
-      {
-        labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'],
-        visible: auth.canRead('rooms'),
-      },
-      {
-        labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'],
-        visible: auth.canRead('sessions'),
-      },
-      {
-        labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'],
-        visible: auth.canRead('timetable'),
-      },
-      {
-        labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'],
-        visible: auth.canRead('students'),
-      },
-      {
-        labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'],
-        visible: auth.canRead('employees'),
-      },
-      { separator: true, visible: auth.canAccessFinancials() },
-      { labelKey: 'NAV.SECTIONS.FINANCIAL', sectionLabel: true, visible: auth.canAccessFinancials() },
-      {
-        labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'],
-        visible: auth.canRead('revenues'),
-      },
-      {
-        labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'],
-        visible: auth.canRead('expenses'),
-      },
-      {
-        labelKey: 'NAV.WITHDRAWALS', icon: 'pi pi-wallet', routerLink: ['/withdrawals'],
-        visible: auth.canRead('withdrawals'),
-      },
-      {
-        labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'],
-        visible: auth.canRead('refunds'),
-      },
-      {
-        labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'],
-        visible: auth.canRead('enrollments'),
-      },
-      { separator: true, visible: auth.canRead('products') },
-      { labelKey: 'NAV.SECTIONS.INVENTORY', sectionLabel: true, visible: auth.canRead('products') },
-      {
-        labelKey: 'NAV.PRODUCTS', icon: 'pi pi-box', routerLink: ['/products/list'],
-        visible: auth.canRead('products'),
-      },
-      {
-        labelKey: 'NAV.SELL_PRODUCT', icon: 'pi pi-shopping-cart', routerLink: ['/products/sell'],
-        visible: auth.canWrite('product_sales'),
-      },
-      {
-        labelKey: 'NAV.SALES_HISTORY', icon: 'pi pi-history', routerLink: ['/products/sales'],
-        visible: auth.canRead('product_sales'),
-      },
-      { separator: true, visible: auth.canRead('reports') },
-      {
-        labelKey: 'NAV.REPORTS', icon: 'pi pi-chart-bar', routerLink: ['/reports'],
-        visible: auth.canRead('reports'),
-      },
-      { separator: true, visible: true },
-      {
-        labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'],
-        visible: auth.canRead('users'),
-      },
-      {
-        labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'],
-        visible: true,
-      },
-    ];
+    const entries: NavEntry[] = [];
 
-    return all.filter(item => item.visible);
+    // Dashboard (standalone)
+    if (auth.canRead('dashboard')) {
+      entries.push({ kind: 'leaf', leaf: {
+        labelKey: 'NAV.DASHBOARD', icon: 'pi pi-home', routerLink: ['/dashboard'], visible: true,
+      }});
+    }
+
+    // Academic
+    const academic: NavLeaf[] = [
+      { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('master_courses') },
+      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('classes') },
+      { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('rooms') },
+      { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('sessions') },
+      { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('timetable') },
+      { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('events') },
+    ].filter(c => c.visible);
+    if (academic.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'academic', labelKey: 'NAV.GROUPS.ACADEMIC', icon: 'pi pi-graduation-cap', children: academic,
+      }});
+    }
+
+    // People & Branches
+    const people: NavLeaf[] = [
+      { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('branches') },
+      { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
+      { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') },
+    ].filter(c => c.visible);
+    if (people.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'people', labelKey: 'NAV.GROUPS.PEOPLE', icon: 'pi pi-users', children: people,
+      }});
+    }
+
+    // Financial
+    const financial: NavLeaf[] = [
+      { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') },
+      { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
+      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
+      { labelKey: 'NAV.WITHDRAWALS', icon: 'pi pi-wallet', routerLink: ['/withdrawals'], visible: auth.canRead('withdrawals') },
+      { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
+      { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
+    ].filter(c => c.visible);
+    if (financial.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'financial', labelKey: 'NAV.GROUPS.FINANCIAL', icon: 'pi pi-money-bill', children: financial,
+      }});
+    }
+
+    // Inventory
+    const inventory: NavLeaf[] = [
+      { labelKey: 'NAV.PRODUCTS', icon: 'pi pi-box', routerLink: ['/products/list'], visible: auth.canRead('products') },
+      { labelKey: 'NAV.SELL_PRODUCT', icon: 'pi pi-shopping-cart', routerLink: ['/products/sell'], visible: auth.canWrite('product_sales') },
+      { labelKey: 'NAV.SALES_HISTORY', icon: 'pi pi-history', routerLink: ['/products/sales'], visible: auth.canRead('product_sales') },
+    ].filter(c => c.visible);
+    if (inventory.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'inventory', labelKey: 'NAV.GROUPS.INVENTORY', icon: 'pi pi-box', children: inventory,
+      }});
+    }
+
+    // Reports (standalone)
+    if (auth.canRead('reports')) {
+      entries.push({ kind: 'leaf', leaf: {
+        labelKey: 'NAV.REPORTS', icon: 'pi pi-chart-bar', routerLink: ['/reports'], visible: true,
+      }});
+    }
+
+    // Admin
+    const admin: NavLeaf[] = [
+      { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
+      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
+    ].filter(c => c.visible);
+    if (admin.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'admin', labelKey: 'NAV.GROUPS.ADMIN', icon: 'pi pi-shield', children: admin,
+      }});
+    }
+
+    return entries;
   });
+
+  toggleGroup(key: string) {
+    this.openGroups.update(s => {
+      const next = new Set(s);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  isGroupOpen(key: string): boolean {
+    return this.openGroups().has(key);
+  }
+
+  entryTrackBy(index: number, entry: NavEntry): string {
+    return entry.kind === 'leaf' ? 'L:' + entry.leaf.routerLink[0] : 'G:' + entry.group.groupKey;
+  }
+
+  /** Auto-open the group that contains the current URL so the active item is visible. */
+  private syncOpenGroupFromUrl(url: string) {
+    const groups = this.visibleMenuEntries().filter(e => e.kind === 'group');
+    for (const e of groups) {
+      if (e.kind !== 'group') continue;
+      const match = e.group.children.some(c => url === c.routerLink[0] || url.startsWith(c.routerLink[0] + '/'));
+      if (match) {
+        this.openGroups.update(s => {
+          if (s.has(e.group.groupKey)) return s;
+          const next = new Set(s);
+          next.add(e.group.groupKey);
+          return next;
+        });
+      }
+    }
+  }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 

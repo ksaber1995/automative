@@ -77,70 +77,42 @@
       </p-card>
     </div>
 
-    <!-- Cash Management Cards -->
-    @if (data.companyWideSummary.currentCash !== undefined) {
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <!-- <p-card class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                <i class="pi pi-wallet text-cyan-600"></i>
-                <span>{{ 'DASHBOARD.CURRENT_CASH' | translate }}</span>
-              </div>
+    <!-- Current Cash Card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <p-card
+        class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200 cursor-pointer hover:shadow-md transition-shadow"
+        (click)="navigateTo('/cash')">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
+              <i class="pi pi-wallet text-cyan-600"></i>
+              <span>{{ 'DASHBOARD.CURRENT_CASH' | translate }}</span>
+            </div>
+            @if (cashLoading()) {
               <div class="text-2xl font-bold text-cyan-600">
-                {{ formatCurrency(data.companyWideSummary.currentCash || 0) }}
+                <i class="pi pi-spin pi-spinner"></i>
               </div>
-              <div class="text-xs text-gray-500 mt-1">{{ 'DASHBOARD.CASH_ON_HAND' | translate }}</div>
-            </div>
-            <div class="flex flex-col gap-2">
-              <button
-                pButton
-                icon="pi pi-eye"
-                class="p-button-rounded p-button-text p-button-sm"
-                [pTooltip]="'DASHBOARD.VIEW_DETAILS' | translate"
-                (click)="navigateTo('/withdrawals')">
-              </button>
-              <button
-                pButton
-                icon="pi pi-plus"
-                class="p-button-rounded p-button-text p-button-success p-button-sm"
-                [pTooltip]="'DASHBOARD.ADJUST_CASH' | translate"
-                (click)="navigateTo('/withdrawals/new')">
-              </button>
-            </div>
-          </div>
-        </p-card> -->
-
-        <!-- Outstanding Debts card (commented out)
-        <p-card class="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200">
-          ...
-        </p-card>
-        -->
-
-        <!-- <p-card class="bg-gradient-to-br from-teal-50 to-teal-100 border-2 border-teal-200">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                <i class="pi pi-check-circle text-teal-600"></i>
-                <span>{{ 'DASHBOARD.AVAILABLE_CASH' | translate }}</span>
-              </div>
+            } @else {
               <div class="text-2xl font-bold"
-                [class.text-teal-600]="(data.companyWideSummary.availableCash || 0) >= 0"
-                [class.text-red-600]="(data.companyWideSummary.availableCash || 0) < 0">
-                {{ formatCurrency(data.companyWideSummary.availableCash || 0) }}
+                   [class.text-cyan-600]="(currentCash()?.totalCash || 0) >= 0"
+                   [class.text-red-600]="(currentCash()?.totalCash || 0) < 0">
+                {{ formatCurrency(currentCash()?.totalCash || 0) }}
               </div>
               <div class="text-xs text-gray-500 mt-1">
-                {{ 'DASHBOARD.CASH_MINUS_DEBTS' | translate }}
-                @if ((data.companyWideSummary.availableCash || 0) < 0) {
-                  <span class="text-red-600 font-semibold ml-1">⚠️ {{ 'DASHBOARD.NEGATIVE' | translate }}</span>
+                {{ 'DASHBOARD.CASH_ON_HAND' | translate }}
+                @if ((currentCash()?.adjustmentsTotal || 0) !== 0) {
+                  <span class="ms-1">
+                    ({{ ((currentCash()?.adjustmentsTotal || 0) >= 0 ? '+' : '') + formatCurrency(currentCash()?.adjustmentsTotal || 0) }}
+                    {{ 'DASHBOARD.FROM_ADJUSTMENTS' | translate }})
+                  </span>
                 }
               </div>
-            </div>
-            <i class="pi pi-money-bill text-4xl text-teal-400"></i>
+            }
           </div>
-        </p-card> -->
-      </div>
-    }
+          <i class="pi pi-wallet text-4xl text-cyan-400"></i>
+        </div>
+      </p-card>
+    </div>
 
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

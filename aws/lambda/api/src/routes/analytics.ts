@@ -103,6 +103,28 @@ export const analyticsRoutes = {
       );
       const totalGlobalOverhead = parseFloat(globalOverheadData[0]?.total || '0');
 
+      // --- Company-level (unallocated) revenue & expenses ---
+      // Captures product_sales with no branch + every expense_payment with no branch
+      // (overhead AND COGS). These are not attributable to any specific branch and
+      // must reconcile against the company-wide total so branch sums add up.
+      const unallocRevData = await query(
+        `SELECT COALESCE(SUM(total_amount), 0) as total
+         FROM product_sales
+         WHERE company_id = $1 AND branch_id IS NULL
+           AND sale_date >= $2 AND sale_date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
+      const unallocExpData = await query(
+        `SELECT COALESCE(SUM(amount), 0) as total
+         FROM expense_payments
+         WHERE company_id = $1 AND branch_id IS NULL
+           AND date >= $2 AND date <= $3`,
+        [context.companyId, startDate, endDate]
+      );
+      const unallocatedRevenue = parseFloat(unallocRevData[0]?.total || '0');
+      const unallocatedExpenses = parseFloat(unallocExpData[0]?.total || '0');
+      const unallocatedNetProfit = unallocatedRevenue - unallocatedExpenses;
+
       // --- Branch P&L ---
       const branchRawData = await query(
         `SELECT
@@ -135,6 +157,15 @@ export const analyticsRoutes = {
              WHERE ep.branch_id = b.id AND ep.company_id = $1
                AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS direct_expenses,
+           -- Refunds attributable to this branch (joined via the parent enrollment)
+           COALESCE((
+             SELECT SUM(r.amount) FROM refunds r
+             LEFT JOIN enrollments e ON r.enrollment_id = e.id
+             LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+             WHERE r.company_id = $1
+               AND r.refund_date >= $2 AND r.refund_date <= $3
+               AND COALESCE(e.branch_id, me.branch_id) = b.id
+           ), 0) AS refunds_amount,
            -- Students enrolled in courses or master courses within the period
            (SELECT COUNT(DISTINCT s.student_id) FROM (
              SELECT student_id FROM enrollments
@@ -164,36 +195,51 @@ export const analyticsRoutes = {
         [context.companyId, startDate, endDate]
       );
 
-      const totalBranchRevenue = branchRawData.reduce((s: number, b: any) =>
-        s + parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0'), 0);
+      // Net branch revenue (after subtracting per-branch refunds) drives proportional allocation.
+      const branchNetRevenues = branchRawData.map((b: any) => {
+        const gross = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
+        const refunds = parseFloat(b.refunds_amount || '0');
+        return gross - refunds;
+      });
+      const totalBranchRevenue = branchNetRevenues.reduce((s, v) => s + v, 0);
       const branchCount = branchRawData.length;
 
-      const branchSummaries = branchRawData.map((b: any) => {
-        const revenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
+      // In PROPORTIONAL/EQUAL modes the company-level unallocated P&L is pushed
+      // down to branches so sum(branches) == totalNetProfit. In OVERHEAD it stays
+      // at the company level and is reported as a separate bucket.
+      const distributeUnallocated = allocationMethod !== 'OVERHEAD';
+
+      const branchSummaries = branchRawData.map((b: any, i: number) => {
+        const grossRevenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
+        const refunds = parseFloat(b.refunds_amount || '0');
+        const netRevenue = grossRevenue - refunds;
         const directExpenses = parseFloat(b.direct_expenses);
 
-        let allocatedOverhead = 0;
-        if (allocationMethod === 'PROPORTIONAL') {
-          allocatedOverhead = totalBranchRevenue > 0
-            ? totalGlobalOverhead * (revenue / totalBranchRevenue)
-            : (branchCount > 0 ? totalGlobalOverhead / branchCount : 0);
-        } else if (allocationMethod === 'EQUAL') {
-          allocatedOverhead = branchCount > 0 ? totalGlobalOverhead / branchCount : 0;
+        let allocatedUnallocated = 0;
+        if (distributeUnallocated) {
+          if (allocationMethod === 'PROPORTIONAL') {
+            allocatedUnallocated = totalBranchRevenue > 0
+              ? unallocatedNetProfit * (netRevenue / totalBranchRevenue)
+              : (branchCount > 0 ? unallocatedNetProfit / branchCount : 0);
+          } else if (allocationMethod === 'EQUAL') {
+            allocatedUnallocated = branchCount > 0 ? unallocatedNetProfit / branchCount : 0;
+          }
         }
-        // OVERHEAD: allocatedOverhead stays 0 — shown at company level only
 
-        const totalBranchExpenses = directExpenses + allocatedOverhead;
-        const branchNetProfit = revenue - totalBranchExpenses;
-        const profitMargin = revenue > 0 ? (branchNetProfit / revenue) * 100 : 0;
+        const totalBranchExpenses = directExpenses;
+        const branchNetProfit = netRevenue - totalBranchExpenses + allocatedUnallocated;
+        const profitMargin = netRevenue > 0 ? (branchNetProfit / netRevenue) * 100 : 0;
 
         return {
           branchId: b.id,
           branchName: b.name,
           branchCode: b.code,
-          totalRevenue: revenue,
+          totalRevenue: netRevenue,
+          grossRevenue,
+          refunds: Math.round(refunds * 100) / 100,
           directExpenses,
-          allocatedOverhead: Math.round(allocatedOverhead * 100) / 100,
-          totalExpenses: Math.round(totalBranchExpenses * 100) / 100,
+          allocatedOverhead: Math.round(allocatedUnallocated * 100) / 100,
+          totalExpenses: Math.round((totalBranchExpenses - allocatedUnallocated) * 100) / 100,
           netProfit: Math.round(branchNetProfit * 100) / 100,
           profitMargin: Math.round(profitMargin * 10) / 10,
           studentCount: parseInt(b.student_count),
@@ -261,6 +307,12 @@ export const analyticsRoutes = {
             inventoryValue,
             globalOverhead: totalGlobalOverhead,
             allocationMethod,
+            companyLevelUnallocated: {
+              revenue: unallocatedRevenue,
+              expenses: unallocatedExpenses,
+              netProfit: unallocatedNetProfit,
+              distributed: distributeUnallocated,
+            },
           },
           branchSummaries,
           revenueByMonth: monthlyRevenue.map((m: any) => ({

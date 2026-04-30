@@ -133,6 +133,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
       },
       {
+        path: 'cash',
+        canActivate: [permissionGuard('cash')],
+        loadChildren: () => import('./features/cash/cash.routes').then(m => m.CASH_ROUTES)
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       }

@@ -80,10 +80,12 @@ CREATE TABLE users (
         'GLOBAL_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
         'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER'
     )),
-    -- Granular per-resource permissions JSON (migration 006).
-    granular_permissions JSONB,
+    -- Granular per-resource permissions JSON (migration 006 / runtime).
+    permissions JSONB,
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     branch_id UUID,
+    -- Optional link from a user account to an employee record (runtime).
+    linked_employee_id UUID,
     -- Email verification (migration 010).
     email_verified BOOLEAN DEFAULT false,
     email_verification_token VARCHAR(255),
@@ -99,6 +101,7 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_branch_id ON users(branch_id);
 CREATE INDEX idx_users_company_id ON users(company_id);
 CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_linked_employee_id ON users(linked_employee_id);
 
 -- =============================================
 -- USER_BRANCHES TABLE  (migration 006)
@@ -232,6 +235,22 @@ CREATE INDEX idx_mce_student ON master_class_enrollments(student_id);
 CREATE INDEX idx_mce_class ON master_class_enrollments(class_id);
 CREATE INDEX idx_mce_company ON master_class_enrollments(company_id);
 
+-- =============================================
+-- MASTER ENROLLMENT PAYMENTS TABLE
+-- Installment / partial payments against a master_enrollment's final_price.
+-- =============================================
+CREATE TABLE master_enrollment_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    master_enrollment_id UUID NOT NULL REFERENCES master_enrollments(id) ON DELETE CASCADE,
+    company_id UUID NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    payment_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mep_me_id ON master_enrollment_payments(master_enrollment_id);
+
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID NOT NULL,
@@ -283,6 +302,9 @@ CREATE TABLE classes (
     current_enrollment INTEGER DEFAULT 0,
     notes TEXT,
     is_active BOOLEAN DEFAULT true,
+    -- Lifecycle: marks a class as finished (runtime: ensureClassStatusColumns).
+    is_finished BOOLEAN NOT NULL DEFAULT false,
+    finished_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
@@ -591,6 +613,30 @@ CREATE TABLE cash_state (
 
 -- Initialize cash state with a single row
 INSERT INTO cash_state (current_balance) VALUES (0);
+
+-- =============================================
+-- CASH ADJUSTMENTS TABLE
+-- Manual deposits, withdrawals, and discrepancy fixes that sit on top of the
+-- derived cash balance (revenue − expenses − stakeholder withdrawals).
+-- DEPOSIT/WITHDRAWAL store a signed amount; ADJUSTMENT also records what the
+-- user observed vs. what the system thought the balance was at adjustment time.
+-- =============================================
+CREATE TABLE cash_adjustments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('DEPOSIT', 'WITHDRAWAL', 'ADJUSTMENT')),
+    amount DECIMAL(15, 2) NOT NULL,
+    observed_amount DECIMAL(15, 2),
+    system_amount DECIMAL(15, 2),
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    notes TEXT,
+    created_by_user_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cash_adj_company_date ON cash_adjustments(company_id, date DESC);
+CREATE INDEX idx_cash_adj_branch ON cash_adjustments(branch_id);
 
 -- =============================================
 -- WITHDRAWALS TABLE

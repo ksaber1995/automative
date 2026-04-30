@@ -1,0 +1,298 @@
+<div class="container mx-auto p-6 max-w-6xl">
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ 'CASH.TITLE' | translate }}</h1>
+
+  <!-- Filter bar -->
+  <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+    <label class="text-sm text-gray-700 font-medium">{{ 'CASH.SCOPE_FILTER' | translate }}</label>
+    <p-select
+      [(ngModel)]="filterValue"
+      [options]="filterOptions()"
+      optionLabel="label"
+      optionValue="value"
+      (onChange)="onFilterChange()"
+      styleClass="w-full md:w-72"></p-select>
+  </div>
+
+  <!-- Filtered Balance Card -->
+  <p-card class="mb-6 bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-2">
+      <div class="flex-1">
+        <div class="text-sm text-gray-600 mb-2 flex items-center gap-2">
+          <i class="pi pi-wallet text-cyan-600"></i>
+          <span>
+            @switch (filterValue) {
+              @case ('__ALL__') { {{ 'CASH.CURRENT_BALANCE' | translate }} }
+              @case ('__COMPANY__') { {{ 'CASH.COMPANY_LEVEL_BALANCE' | translate }} }
+              @default { {{ 'CASH.BRANCH_BALANCE' | translate }} }
+            }
+          </span>
+        </div>
+        @if (loading()) {
+          <i class="pi pi-spin pi-spinner text-2xl text-cyan-600"></i>
+        } @else {
+          <div class="text-4xl font-bold"
+               [class.text-cyan-700]="filteredBalance() >= 0"
+               [class.text-red-600]="filteredBalance() < 0">
+            {{ formatCurrency(filteredBalance()) }}
+          </div>
+          @if (filterValue === '__ALL__' && current()) {
+            <div class="text-sm text-gray-600 mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              <span>{{ 'CASH.BASE_CASH' | translate }}: {{ formatCurrency(current()?.baseCash || 0) }}</span>
+              <span>
+                {{ 'CASH.ADJUSTMENTS_TOTAL' | translate }}:
+                <span [class.text-green-700]="(current()?.adjustmentsTotal || 0) > 0"
+                      [class.text-red-700]="(current()?.adjustmentsTotal || 0) < 0">
+                  {{ ((current()?.adjustmentsTotal || 0) >= 0 ? '+' : '') + formatCurrency(current()?.adjustmentsTotal || 0) }}
+                </span>
+              </span>
+            </div>
+          }
+        }
+      </div>
+      @if (canWrite()) {
+        <div class="flex flex-wrap gap-2">
+          <button pButton type="button" icon="pi pi-plus" severity="success"
+                  [label]="'CASH.ADD_DEPOSIT' | translate"
+                  (click)="openDialog('DEPOSIT')"></button>
+          <button pButton type="button" icon="pi pi-minus" severity="danger"
+                  [label]="'CASH.ADD_WITHDRAWAL' | translate"
+                  (click)="openDialog('WITHDRAWAL')"></button>
+          <button pButton type="button" icon="pi pi-pencil" severity="warn"
+                  [label]="'CASH.RECORD_ADJUSTMENT' | translate"
+                  (click)="openDialog('ADJUSTMENT')"></button>
+        </div>
+      }
+    </div>
+  </p-card>
+
+  <!-- Per-branch breakdown (only when ALL is selected) -->
+  @if (filterValue === '__ALL__' && (current()?.byBranch?.length || 0) > 0) {
+    <p-card class="mb-6">
+      <ng-template pTemplate="header">
+        <div class="p-4 font-semibold text-lg">{{ 'CASH.BY_BRANCH_TITLE' | translate }}</div>
+      </ng-template>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (b of current()?.byBranch || []; track b.branchId) {
+          <div class="p-4 rounded-lg border bg-white">
+            <div class="text-sm text-gray-600">{{ b.branchName }}</div>
+            <div class="text-2xl font-bold mt-1"
+                 [class.text-cyan-700]="b.cash >= 0"
+                 [class.text-red-600]="b.cash < 0">
+              {{ formatCurrency(b.cash) }}
+            </div>
+            <div class="text-xs text-gray-500 mt-1 space-y-0.5">
+              <div>{{ 'CASH.BASE_CASH' | translate }}: {{ formatCurrency(b.baseCash || 0) }}</div>
+              @if ((b.branchAdjustments || 0) !== 0) {
+                <div>{{ 'CASH.BRANCH_ADJ' | translate }}:
+                  <span [class.text-green-700]="(b.branchAdjustments || 0) > 0" [class.text-red-700]="(b.branchAdjustments || 0) < 0">
+                    {{ ((b.branchAdjustments || 0) >= 0 ? '+' : '') + formatCurrency(b.branchAdjustments || 0) }}
+                  </span>
+                </div>
+              }
+              @if ((b.distributedAdjustments || 0) !== 0) {
+                <div>{{ 'CASH.DISTRIBUTED_ADJ' | translate }}:
+                  <span [class.text-green-700]="(b.distributedAdjustments || 0) > 0" [class.text-red-700]="(b.distributedAdjustments || 0) < 0">
+                    {{ ((b.distributedAdjustments || 0) >= 0 ? '+' : '') + formatCurrency(b.distributedAdjustments || 0) }}
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </p-card>
+  }
+
+  <!-- History Table -->
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="p-4 font-semibold text-lg">{{ 'CASH.HISTORY_TITLE' | translate }}</div>
+    </ng-template>
+
+    <p-table [value]="adjustments()" [loading]="adjustmentsLoading()"
+             [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10, 20, 50]"
+             responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>{{ 'CASH.COL_DATE' | translate }}</th>
+          <th>{{ 'CASH.COL_SCOPE' | translate }}</th>
+          <th>{{ 'CASH.COL_TYPE' | translate }}</th>
+          <th class="text-right">{{ 'CASH.COL_AMOUNT' | translate }}</th>
+          <th class="text-right">{{ 'CASH.COL_OBSERVED' | translate }}</th>
+          <th class="text-right">{{ 'CASH.COL_SYSTEM' | translate }}</th>
+          <th>{{ 'CASH.COL_NOTES' | translate }}</th>
+          @if (canDelete()) {
+            <th class="text-center">{{ 'CASH.COL_ACTIONS' | translate }}</th>
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td>{{ row.date | date: 'mediumDate' }}</td>
+          <td>
+            @if (row.branchId) {
+              <span class="text-sm">{{ row.branchName }}</span>
+            } @else {
+              <p-tag severity="info" [value]="'CASH.SCOPE_COMPANY_TAG' | translate"></p-tag>
+            }
+          </td>
+          <td>
+            <p-tag [severity]="typeSeverity(row.type)"
+                   [value]="typeLabel(row.type) | translate"></p-tag>
+          </td>
+          <td class="text-right font-semibold"
+              [class.text-green-700]="row.amount > 0"
+              [class.text-red-700]="row.amount < 0">
+            {{ row.amount >= 0 ? '+' : '' }}{{ formatCurrency(row.amount) }}
+          </td>
+          <td class="text-right text-gray-700">
+            {{ row.observedAmount !== null ? formatCurrency(row.observedAmount) : '—' }}
+          </td>
+          <td class="text-right text-gray-700">
+            {{ row.systemAmount !== null ? formatCurrency(row.systemAmount) : '—' }}
+          </td>
+          <td class="text-sm text-gray-600">{{ row.notes || '—' }}</td>
+          @if (canDelete()) {
+            <td class="text-center">
+              <button pButton type="button" icon="pi pi-trash" severity="danger"
+                      [text]="true" [rounded]="true"
+                      [pTooltip]="'CASH.DELETE' | translate"
+                      (click)="confirmDelete(row)"></button>
+            </td>
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td [attr.colspan]="canDelete() ? 8 : 7" class="text-center text-gray-500 py-8">
+            {{ 'CASH.NO_HISTORY' | translate }}
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <!-- Dialog -->
+  <p-dialog [(visible)]="showDialog" [modal]="true" [style]="{ width: '520px' }"
+            [draggable]="false" [resizable]="false">
+    <ng-template pTemplate="header">
+      <span class="font-semibold">
+        @switch (dialogType) {
+          @case ('DEPOSIT') { {{ 'CASH.DIALOG_DEPOSIT_TITLE' | translate }} }
+          @case ('WITHDRAWAL') { {{ 'CASH.DIALOG_WITHDRAWAL_TITLE' | translate }} }
+          @case ('ADJUSTMENT') { {{ 'CASH.DIALOG_ADJUSTMENT_TITLE' | translate }} }
+        }
+      </span>
+    </ng-template>
+
+    <div class="flex flex-col gap-4">
+      <!-- Branch picker (with "Company - distribute equally" option) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'CASH.SCOPE_LABEL' | translate }}
+        </label>
+        <p-select
+          [(ngModel)]="dialogBranchId"
+          [options]="branchPickerOptions()"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"></p-select>
+        <small class="text-gray-500">
+          @if (dialogBranchId) {
+            {{ 'CASH.SCOPE_BRANCH_HINT' | translate }}
+          } @else {
+            {{ 'CASH.SCOPE_COMPANY_HINT' | translate }}
+          }
+        </small>
+      </div>
+
+      @if (dialogType === 'ADJUSTMENT') {
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'CASH.SYSTEM_CASH' | translate }}
+          </label>
+          <div class="text-lg font-semibold text-gray-700">
+            {{ formatCurrency(systemCashPreview()) }}
+          </div>
+          <small class="text-gray-500">{{ 'CASH.SYSTEM_CASH_HINT' | translate }}</small>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'CASH.OBSERVED_CASH' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <p-inputnumber [(ngModel)]="observedAmount" [min]="0" [showButtons]="false"
+                         mode="decimal" [minFractionDigits]="2"
+                         styleClass="w-full"
+                         [placeholder]="'CASH.OBSERVED_PLACEHOLDER' | translate"></p-inputnumber>
+          <small class="text-gray-500">{{ 'CASH.OBSERVED_HINT' | translate }}</small>
+        </div>
+
+        @if (observedAmount !== null) {
+          <div class="p-3 rounded-md"
+               [class.bg-green-50]="adjustmentDelta() > 0"
+               [class.bg-red-50]="adjustmentDelta() < 0"
+               [class.bg-gray-50]="adjustmentDelta() === 0">
+            <div class="text-sm text-gray-600">{{ 'CASH.DELTA' | translate }}</div>
+            <div class="text-xl font-bold"
+                 [class.text-green-700]="adjustmentDelta() > 0"
+                 [class.text-red-700]="adjustmentDelta() < 0"
+                 [class.text-gray-700]="adjustmentDelta() === 0">
+              {{ adjustmentDelta() >= 0 ? '+' : '' }}{{ formatCurrency(adjustmentDelta()) }}
+            </div>
+          </div>
+        }
+      } @else {
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'CASH.AMOUNT' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <p-inputnumber [(ngModel)]="amount" [min]="0" [showButtons]="false"
+                         mode="decimal" [minFractionDigits]="2"
+                         styleClass="w-full"
+                         [placeholder]="'CASH.AMOUNT_PLACEHOLDER' | translate"></p-inputnumber>
+        </div>
+      }
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'CASH.DATE' | translate }}
+        </label>
+        <p-datepicker [(ngModel)]="date" [showIcon]="true" styleClass="w-full"></p-datepicker>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'CASH.NOTES' | translate }}
+          @if (dialogType === 'ADJUSTMENT') {
+            <span class="text-gray-500 text-xs">({{ 'CASH.NOTES_ADJUSTMENT_HINT' | translate }})</span>
+          }
+        </label>
+        <textarea pTextarea [(ngModel)]="notes" rows="3" class="w-full"
+                  [placeholder]="'CASH.NOTES_PLACEHOLDER' | translate"></textarea>
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <button pButton type="button" severity="secondary" [outlined]="true"
+              [label]="'CASH.CANCEL' | translate"
+              (click)="showDialog = false"
+              [disabled]="saving()"></button>
+      <button pButton type="button" icon="pi pi-check"
+              [label]="'CASH.SAVE' | translate"
+              (click)="submit()"
+              [disabled]="!canSubmit() || saving()">
+        @if (saving()) {
+          <i class="pi pi-spin pi-spinner ms-2"></i>
+        }
+      </button>
+    </ng-template>
+  </p-dialog>
+
+  <app-delete-confirm-dialog
+    [(visible)]="showDeleteDialog"
+    [header]="'CASH.DELETE_TITLE' | translate"
+    [message]="'CASH.DELETE_MSG' | translate"
+    (confirm)="doDelete()">
+  </app-delete-confirm-dialog>
+</div>

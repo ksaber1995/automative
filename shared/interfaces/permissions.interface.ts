@@ -37,6 +37,7 @@ export interface UserPermissions {
   rooms?: Partial<ResourcePermission>;
   sessions?: Partial<ResourcePermission>;
   timetable?: Partial<ResourcePermission>;
+  cash?: Partial<ResourcePermission>;
 }
 
 export type PermissionResource = keyof UserPermissions;
@@ -64,6 +65,7 @@ export const PERMISSION_RESOURCES: PermissionResource[] = [
   'rooms',
   'sessions',
   'timetable',
+  'cash',
 ];
 
 export const FINANCIAL_RESOURCES: PermissionResource[] = [
@@ -73,6 +75,7 @@ export const FINANCIAL_RESOURCES: PermissionResource[] = [
   'refunds',
   'debts',
   'reports',
+  'cash',
 ];
 
 const FULL: ResourcePermission = { read: true, write: true, delete: true };
@@ -107,6 +110,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: FULL,
     sessions: FULL,
     timetable: FULL,
+    cash: FULL,
   },
   [UserRole.ADMIN]: {
     dashboard:    FULL,
@@ -130,6 +134,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: FULL,
     sessions: FULL,
     timetable: FULL,
+    cash: FULL,
   },
   [UserRole.BRANCH_ADMIN]: {
     dashboard:    READ_ONLY,
@@ -153,6 +158,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: FULL,
     sessions: FULL,
     timetable: READ_WRITE,
+    cash: READ_ONLY,
   },
   [UserRole.BRANCH_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -176,6 +182,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: FULL,
     sessions: FULL,
     timetable: READ_WRITE,
+    cash: READ_ONLY,
   },
   [UserRole.ACADEMIC_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -199,6 +206,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: READ_WRITE,
     sessions: READ_WRITE,
     timetable: READ_WRITE,
+    cash: NO_ACCESS,
   },
   [UserRole.SALES_MANAGER]: {
     dashboard:    READ_ONLY,
@@ -222,6 +230,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: READ_ONLY,
     sessions: READ_ONLY,
     timetable: READ_ONLY,
+    cash: NO_ACCESS,
   },
   [UserRole.ACCOUNTANT]: {
     dashboard:    READ_ONLY,
@@ -245,6 +254,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: READ_ONLY,
     sessions: READ_ONLY,
     timetable: READ_ONLY,
+    cash: FULL,
   },
   [UserRole.VIEWER]: {
     dashboard:    READ_ONLY,
@@ -268,6 +278,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     rooms: READ_ONLY,
     sessions: READ_ONLY,
     timetable: READ_ONLY,
+    cash: NO_ACCESS,
   },
 };
 

@@ -12,6 +12,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { AnalyticsService } from '../services/analytics.service';
 import { ExpenseService } from '../../expenses/services/expense.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { CashService, CurrentCashResponse } from '../../../core/services/cash.service';
 import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 
 @Component({
@@ -25,6 +26,7 @@ export class OverviewComponent implements OnInit {
   private analyticsService = inject(AnalyticsService);
   private expenseService = inject(ExpenseService);
   private notificationService = inject(NotificationService);
+  private cashService = inject(CashService);
   private router = inject(Router);
 
   dashboardData = signal<DashboardMetrics | null>(null);
@@ -32,6 +34,8 @@ export class OverviewComponent implements OnInit {
   dueExpenses = signal<{ items: any[]; totalDue: number; month: string } | null>(null);
   dueLoading = signal(false);
   payingId = signal<string | null>(null);
+  currentCash = signal<CurrentCashResponse | null>(null);
+  cashLoading = signal(false);
 
   revenueChartData: any;
   revenueChartOptions: any;
@@ -41,7 +45,21 @@ export class OverviewComponent implements OnInit {
   ngOnInit() {
     this.loadDashboard();
     this.loadDueExpenses();
+    this.loadCurrentCash();
     this.initChartOptions();
+  }
+
+  loadCurrentCash() {
+    this.cashLoading.set(true);
+    this.cashService.getCurrentCash().subscribe({
+      next: (data) => {
+        this.currentCash.set(data);
+        this.cashLoading.set(false);
+      },
+      error: () => {
+        this.cashLoading.set(false);
+      }
+    });
   }
 
   loadDashboard() {
