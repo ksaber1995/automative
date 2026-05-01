@@ -7,7 +7,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
@@ -33,6 +33,7 @@ export class LoginComponent {
   private authService = inject(AuthService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   loginForm: FormGroup;
   loading = signal(false);
@@ -56,20 +57,20 @@ export class LoginComponent {
 
     this.authService.login({ email, password }).subscribe({
       next: () => {
-        this.notificationService.success('Login successful!');
+        this.notificationService.success(this.translate.instant('AUTH.LOGIN.SUCCESS'));
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.loading.set(false);
         if (error.status === 403 && error.error?.code === 'EMAIL_NOT_VERIFIED') {
-          this.notificationService.error('Please verify your email before logging in.');
+          this.notificationService.error(this.translate.instant('AUTH.LOGIN.EMAIL_NOT_VERIFIED'));
           this.router.navigate(['/auth/verify-email'], {
             queryParams: { email: error.error.email },
           });
           return;
         }
         this.notificationService.error(
-          error.error?.message || 'Login failed. Please check your credentials.'
+          error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED')
         );
       },
       complete: () => {

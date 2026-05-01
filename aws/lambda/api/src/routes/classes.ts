@@ -74,7 +74,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'write')) {
+      if (!checkGranularPermission(context, 'courses', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -133,7 +133,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'read')) {
+      if (!checkGranularPermission(context, 'courses', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -201,7 +201,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'read')) {
+      if (!checkGranularPermission(context, 'courses', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -269,7 +269,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'read')) {
+      if (!checkGranularPermission(context, 'courses', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -345,7 +345,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'read')) {
+      if (!checkGranularPermission(context, 'courses', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -401,7 +401,7 @@ export const classesRoutes = {
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'write')) {
+      if (!checkGranularPermission(context, 'courses', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -580,7 +580,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'delete')) {
+      if (!checkGranularPermission(context, 'courses', 'delete')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -636,7 +636,7 @@ export const classesRoutes = {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'classes', 'write')) {
+      if (!checkGranularPermission(context, 'courses', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 

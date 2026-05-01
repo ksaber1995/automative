@@ -24,29 +24,25 @@ import {
 } from '@shared/interfaces/permissions.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 
-const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; financial?: boolean }> = {
+const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; hint?: string; financial?: boolean }> = {
   dashboard:    { label: 'Dashboard',      icon: 'pi pi-home' },
   branches:     { label: 'Branches',       icon: 'pi pi-building' },
-  courses:      { label: 'Courses',        icon: 'pi pi-book' },
-  master_courses: { label: 'Master Courses', icon: 'pi pi-th-large' },
+  courses:      { label: 'Courses',        icon: 'pi pi-book',
+    hint: 'Includes Classes, Master Courses, Rooms, Sessions, Timetable' },
   events:       { label: 'Events',          icon: 'pi pi-flag' },
-  classes:      { label: 'Classes',        icon: 'pi pi-calendar' },
   students:     { label: 'Students',       icon: 'pi pi-users' },
   enrollments:  { label: 'Enrollments',    icon: 'pi pi-id-card' },
   employees:    { label: 'Employees',      icon: 'pi pi-user' },
   revenues:     { label: 'Revenues',       icon: 'pi pi-dollar',      financial: true },
   expenses:     { label: 'Expenses',       icon: 'pi pi-money-bill',  financial: true },
-  withdrawals:  { label: 'Withdrawals',    icon: 'pi pi-wallet',      financial: true },
   refunds:      { label: 'Refunds',        icon: 'pi pi-replay',      financial: true },
   debts:        { label: 'Debts',          icon: 'pi pi-credit-card', financial: true },
   products:     { label: 'Products',       icon: 'pi pi-box' },
   product_sales:{ label: 'Product Sales',  icon: 'pi pi-shopping-cart' },
   reports:      { label: 'Reports',        icon: 'pi pi-chart-bar',   financial: true },
   users:        { label: 'User Mgmt',      icon: 'pi pi-user-edit' },
-  rooms:        { label: 'Rooms',          icon: 'pi pi-building' },
-  sessions:     { label: 'Sessions',       icon: 'pi pi-clock' },
-  timetable:    { label: 'Timetable',      icon: 'pi pi-calendar-clock' },
-  cash:         { label: 'Current Cash',   icon: 'pi pi-wallet',      financial: true },
+  cash:         { label: 'Current Cash',   icon: 'pi pi-wallet',      financial: true,
+    hint: 'Includes Withdrawals' },
 };
 
 @Component({
@@ -234,11 +230,14 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                       <tr class="border-b border-gray-100 hover:bg-gray-50"
                         [class.bg-amber-50]="RESOURCE_META[resource].financial">
                         <td class="px-4 py-2.5">
-                          <div class="flex items-center gap-2">
+                          <div class="flex items-center gap-2 flex-wrap">
                             <i [class]="RESOURCE_META[resource].icon + ' text-gray-400 text-sm'"></i>
                             <span class="text-gray-700">{{ RESOURCE_META[resource].label }}</span>
                             @if (RESOURCE_META[resource].financial) {
                               <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{{ 'USERS.FORM.SECTION_FINANCIAL' | translate }}</span>
+                            }
+                            @if (RESOURCE_META[resource].hint) {
+                              <span class="text-xs text-gray-500 italic w-full">{{ RESOURCE_META[resource].hint }}</span>
                             }
                           </div>
                         </td>

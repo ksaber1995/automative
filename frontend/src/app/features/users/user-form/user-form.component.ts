@@ -32,31 +32,28 @@ interface PermissionRow {
   write: boolean;
   delete: boolean;
   isFinancial?: boolean;
+  hint?: string;
 }
 
-const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; financial?: boolean }> = {
+const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; hint?: string; financial?: boolean }> = {
   dashboard:    { label: 'USERS.FORM.RESOURCE_DASHBOARD',     icon: 'pi pi-home' },
   branches:     { label: 'USERS.FORM.RESOURCE_BRANCHES',      icon: 'pi pi-building' },
-  courses:      { label: 'USERS.FORM.RESOURCE_COURSES',       icon: 'pi pi-book' },
-  master_courses: { label: 'USERS.FORM.RESOURCE_MASTER_COURSES', icon: 'pi pi-th-large' },
+  courses:      { label: 'USERS.FORM.RESOURCE_COURSES',       icon: 'pi pi-book',
+    hint: 'USERS.FORM.RESOURCE_COURSES_HINT' },
   events:       { label: 'USERS.FORM.RESOURCE_EVENTS',       icon: 'pi pi-flag' },
-  classes:      { label: 'USERS.FORM.RESOURCE_CLASSES',       icon: 'pi pi-calendar' },
   students:     { label: 'USERS.FORM.RESOURCE_STUDENTS',      icon: 'pi pi-users' },
   enrollments:  { label: 'USERS.FORM.RESOURCE_ENROLLMENTS',   icon: 'pi pi-id-card' },
   employees:    { label: 'USERS.FORM.RESOURCE_EMPLOYEES',     icon: 'pi pi-user' },
   revenues:     { label: 'USERS.FORM.RESOURCE_REVENUES',      icon: 'pi pi-dollar',      financial: true },
   expenses:     { label: 'USERS.FORM.RESOURCE_EXPENSES',      icon: 'pi pi-money-bill',  financial: true },
-  withdrawals:  { label: 'USERS.FORM.RESOURCE_WITHDRAWALS',   icon: 'pi pi-wallet',      financial: true },
   refunds:      { label: 'USERS.FORM.RESOURCE_REFUNDS',       icon: 'pi pi-replay',      financial: true },
   debts:        { label: 'USERS.FORM.RESOURCE_DEBTS',         icon: 'pi pi-credit-card', financial: true },
   products:     { label: 'USERS.FORM.RESOURCE_PRODUCTS',      icon: 'pi pi-box' },
   product_sales:{ label: 'USERS.FORM.RESOURCE_PRODUCT_SALES', icon: 'pi pi-shopping-cart' },
   reports:      { label: 'USERS.FORM.RESOURCE_REPORTS',       icon: 'pi pi-chart-bar',   financial: true },
   users:        { label: 'USERS.FORM.RESOURCE_USERS',         icon: 'pi pi-user-edit' },
-  rooms:        { label: 'USERS.FORM.RESOURCE_ROOMS',         icon: 'pi pi-building' },
-  sessions:     { label: 'USERS.FORM.RESOURCE_SESSIONS',      icon: 'pi pi-clock' },
-  timetable:    { label: 'USERS.FORM.RESOURCE_TIMETABLE',     icon: 'pi pi-calendar-clock' },
-  cash:         { label: 'USERS.FORM.RESOURCE_CASH',          icon: 'pi pi-wallet',      financial: true },
+  cash:         { label: 'USERS.FORM.RESOURCE_CASH',          icon: 'pi pi-wallet',      financial: true,
+    hint: 'USERS.FORM.RESOURCE_CASH_HINT' },
 };
 
 @Component({
@@ -292,11 +289,14 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; f
                           <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                             [class.bg-amber-50]="row.isFinancial">
                             <td class="px-4 py-3">
-                              <div class="flex items-center gap-2">
+                              <div class="flex items-center gap-2 flex-wrap">
                                 <i [class]="row.icon + ' text-gray-400'"></i>
                                 <span class="text-gray-700 font-medium">{{ row.label | translate }}</span>
                                 @if (row.isFinancial) {
                                   <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{{ 'USERS.FORM.SECTION_FINANCIAL' | translate }}</span>
+                                }
+                                @if (row.hint) {
+                                  <span class="text-xs text-gray-500 italic w-full">{{ row.hint | translate }}</span>
                                 }
                               </div>
                             </td>
@@ -453,6 +453,7 @@ export class UserFormComponent implements OnInit {
         label: RESOURCE_META[resource].label,
         icon: RESOURCE_META[resource].icon,
         isFinancial: RESOURCE_META[resource].financial,
+        hint: RESOURCE_META[resource].hint,
         read: def.read ?? false,
         write: def.write ?? false,
         delete: def.delete ?? false,
@@ -463,10 +464,10 @@ export class UserFormComponent implements OnInit {
 
   buildSections() {
     const academic = this.permissionRows.filter(r =>
-      ['dashboard','branches','courses','classes','students','enrollments','employees'].includes(r.resource)
+      ['dashboard','branches','courses','events','students','enrollments','employees'].includes(r.resource)
     );
     const financial = this.permissionRows.filter(r =>
-      ['revenues','expenses','withdrawals','refunds','debts','reports'].includes(r.resource)
+      ['revenues','expenses','cash','refunds','debts','reports'].includes(r.resource)
     );
     const inventory = this.permissionRows.filter(r =>
       ['products','product_sales'].includes(r.resource)

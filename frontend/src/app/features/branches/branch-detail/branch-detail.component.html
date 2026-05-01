@@ -14,20 +14,22 @@
           <p class="text-gray-600 text-lg">{{ 'BRANCHES.DETAIL.CODE' | translate }} {{ b.code }}</p>
         </div>
         <div class="flex gap-2">
-          <p-button
-            [label]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
-            [icon]="b.isActive ? 'pi pi-times-circle' : 'pi pi-check-circle'"
-            [severity]="b.isActive ? 'danger' : 'success'"
-            [outlined]="true"
-            (onClick)="toggleBranchStatus()"
-            [pTooltip]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
-          ></p-button>
-          <p-button
-            [label]="'BRANCHES.DETAIL.EDIT' | translate"
-            icon="pi pi-pencil"
-            severity="warn"
-            (onClick)="editBranch()"
-          ></p-button>
+          @if (authService.canWrite('branches')) {
+            <p-button
+              [label]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
+              [icon]="b.isActive ? 'pi pi-times-circle' : 'pi pi-check-circle'"
+              [severity]="b.isActive ? 'danger' : 'success'"
+              [outlined]="true"
+              (onClick)="toggleBranchStatus()"
+              [pTooltip]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
+            ></p-button>
+            <p-button
+              [label]="'BRANCHES.DETAIL.EDIT' | translate"
+              icon="pi pi-pencil"
+              severity="warn"
+              (onClick)="editBranch()"
+            ></p-button>
+          }
           <p-button
             [label]="'BRANCHES.DETAIL.BACK' | translate"
             icon="pi pi-arrow-left"

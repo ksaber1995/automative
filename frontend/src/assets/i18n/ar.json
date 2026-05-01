@@ -68,7 +68,10 @@
       "SIGN_IN": "تسجيل الدخول",
       "NO_ACCOUNT": "ليس لديك حساب؟",
       "SIGN_UP": "إنشاء حساب",
-      "COPYRIGHT": "2026 نتروفيت. جميع الحقوق محفوظة."
+      "COPYRIGHT": "2026 نتروفيت. جميع الحقوق محفوظة.",
+      "SUCCESS": "تم تسجيل الدخول بنجاح!",
+      "EMAIL_NOT_VERIFIED": "يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.",
+      "FAILED": "فشل تسجيل الدخول. يرجى التحقق من بياناتك."
     },
     "REGISTER": {
       "TITLE": "أنشئ حساب شركتك",
@@ -107,7 +110,12 @@
       "TERMS": "بإنشاء حساب، فإنك توافق على شروط الخدمة وسياسة الخصوصية. سيتم إنشاء فرع افتراضي لشركتك تلقائياً.",
       "SUBMIT": "إنشاء حساب الشركة",
       "ALREADY_ACCOUNT": "لديك حساب بالفعل؟",
-      "SIGN_IN": "تسجيل الدخول"
+      "SIGN_IN": "تسجيل الدخول",
+      "OPTIONAL": "(اختياري)",
+      "PASSWORD_REQUIRED": "كلمة المرور مطلوبة",
+      "INDUSTRY_VALUE": "مركز تقني",
+      "SUCCESS": "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني للحصول على رمز التحقق.",
+      "FAILED": "فشل التسجيل. يرجى المحاولة مرة أخرى."
     },
     "VERIFY_EMAIL": {
       "BRAND": "أوتوميت ماجيك",
@@ -1006,25 +1014,21 @@
       "RESOURCE_DASHBOARD": "لوحة التحكم",
       "RESOURCE_BRANCHES": "الفروع",
       "RESOURCE_COURSES": "الكورسات",
-      "RESOURCE_MASTER_COURSES": "الكورسات الرئيسية",
+      "RESOURCE_COURSES_HINT": "تشمل الفصول والكورسات الرئيسية والغرف والجلسات والجدول الزمني",
       "RESOURCE_EVENTS": "الفعاليات",
-      "RESOURCE_CLASSES": "الفصول",
       "RESOURCE_STUDENTS": "الطلاب",
       "RESOURCE_ENROLLMENTS": "التسجيلات",
       "RESOURCE_EMPLOYEES": "الموظفون",
       "RESOURCE_REVENUES": "الإيرادات",
       "RESOURCE_EXPENSES": "المصروفات",
-      "RESOURCE_WITHDRAWALS": "المسحوبات",
       "RESOURCE_REFUNDS": "الاستردادات",
       "RESOURCE_DEBTS": "الديون",
       "RESOURCE_PRODUCTS": "المنتجات",
       "RESOURCE_PRODUCT_SALES": "مبيعات المنتجات",
       "RESOURCE_REPORTS": "التقارير",
       "RESOURCE_USERS": "إدارة المستخدمين",
-      "RESOURCE_ROOMS": "الغرف",
-      "RESOURCE_SESSIONS": "الجلسات",
-      "RESOURCE_TIMETABLE": "الجدول الزمني",
-      "RESOURCE_CASH": "الكاش الحالي"
+      "RESOURCE_CASH": "الكاش الحالي",
+      "RESOURCE_CASH_HINT": "تشمل المسحوبات"
     },
     "DETAIL": {
       "TAB_INFO": "المعلومات",

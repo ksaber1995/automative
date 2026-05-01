@@ -11,6 +11,7 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface BranchStats {
@@ -47,6 +48,7 @@ export class BranchDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  authService = inject(AuthService);
 
   branch = signal<Branch | null>(null);
   stats = signal<BranchStats | null>(null);

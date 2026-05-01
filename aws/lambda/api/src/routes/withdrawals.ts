@@ -25,7 +25,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'write')) {
+      if (!checkGranularPermission(context, 'cash', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -63,7 +63,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+      if (!checkGranularPermission(context, 'cash', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -105,7 +105,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+      if (!checkGranularPermission(context, 'cash', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -184,7 +184,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+      if (!checkGranularPermission(context, 'cash', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -229,7 +229,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'read')) {
+      if (!checkGranularPermission(context, 'cash', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -267,7 +267,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'write')) {
+      if (!checkGranularPermission(context, 'cash', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -322,7 +322,7 @@ export const withdrawalsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
 
-      if (!checkGranularPermission(context, 'withdrawals', 'delete')) {
+      if (!checkGranularPermission(context, 'cash', 'delete')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 

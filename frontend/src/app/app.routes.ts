@@ -36,7 +36,7 @@ export const routes: Routes = [
       },
       {
         path: 'master-courses',
-        canActivate: [permissionGuard('master_courses')],
+        canActivate: [permissionGuard('courses')],
         loadChildren: () => import('./features/master-courses/master-courses.routes').then(m => m.MASTER_COURSES_ROUTES)
       },
       {
@@ -46,17 +46,17 @@ export const routes: Routes = [
       },
       {
         path: 'classes',
-        canActivate: [permissionGuard('classes')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)
       },
       {
         path: 'classes/create',
-        canActivate: [permissionGuard('classes')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/courses/class-form/class-form.component').then(m => m.ClassFormComponent)
       },
       {
         path: 'classes/:id',
-        canActivate: [permissionGuard('classes')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/courses/class-detail/class-detail.component').then(m => m.ClassDetailComponent)
       },
       {
@@ -116,17 +116,17 @@ export const routes: Routes = [
       },
       {
         path: 'rooms',
-        canActivate: [permissionGuard('rooms')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/rooms/room-list/room-list.component').then(m => m.RoomListComponent)
       },
       {
         path: 'sessions',
-        canActivate: [permissionGuard('sessions')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
       },
       {
         path: 'timetable',
-        canActivate: [permissionGuard('timetable')],
+        canActivate: [permissionGuard('courses')],
         loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
       },
       {

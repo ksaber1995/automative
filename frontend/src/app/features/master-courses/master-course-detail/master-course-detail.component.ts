@@ -57,7 +57,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         </div>
         @if (master()) {
           <div class="flex gap-2 flex-wrap">
-            @if (authService.canWrite('master_courses')) {
+            @if (authService.canWrite('courses')) {
               <p-button
                 icon="pi pi-pencil"
                 [label]="'MASTER_COURSES.DETAIL.EDIT' | translate"
@@ -89,7 +89,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                 ></p-button>
               }
             }
-            @if (authService.canDelete('master_courses')) {
+            @if (authService.canDelete('courses')) {
               <p-button
                 icon="pi pi-trash"
                 label="Delete"
@@ -151,7 +151,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               <th class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_PRICE' | translate }}</th>
               <th class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_DURATION' | translate }}</th>
               <th>{{ 'MASTER_COURSES.DETAIL.COL_STATUS' | translate }}</th>
-              @if (authService.canWrite('master_courses')) {
+              @if (authService.canWrite('courses')) {
                 <th>{{ 'MASTER_COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
               }
             </tr>
@@ -168,7 +168,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                   [severity]="row.isActive ? 'success' : 'danger'"
                 ></p-tag>
               </td>
-              @if (authService.canWrite('master_courses')) {
+              @if (authService.canWrite('courses')) {
                 <td>
                   <p-button
                     icon="pi pi-times"
@@ -184,7 +184,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td [attr.colspan]="authService.canWrite('master_courses') ? 6 : 5" class="text-center py-6 text-gray-500">
+              <td [attr.colspan]="authService.canWrite('courses') ? 6 : 5" class="text-center py-6 text-gray-500">
                 {{ 'MASTER_COURSES.DETAIL.NO_LINKED' | translate }}
               </td>
             </tr>

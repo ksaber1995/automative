@@ -846,4 +846,61 @@ export const migrationsRoutes = {
       };
     }
   },
+  // Merge legacy permission keys into the consolidated resources:
+  //   classes, master_courses, rooms, sessions, timetable -> courses
+  //   withdrawals -> cash
+  // Existing per-action overrides are OR'd into the target so users keep at
+  // least the broadest access they had on any source resource.
+  mergePermissions: async () => {
+    try {
+      const users = await query(
+        `SELECT id, permissions FROM users
+         WHERE permissions IS NOT NULL
+           AND (permissions ?| array['classes','master_courses','rooms','sessions','timetable','withdrawals'])`
+      );
+      const courseSources = ['classes', 'master_courses', 'rooms', 'sessions', 'timetable'];
+      const cashSources = ['withdrawals'];
+      let mergedCount = 0;
+      for (const u of users) {
+        const perms = { ...(u.permissions || {}) } as Record<string, any>;
+        const mergeInto = (target: string, sources: string[]) => {
+          const merged = { ...(perms[target] || {}) };
+          for (const src of sources) {
+            const sp = perms[src];
+            if (!sp) continue;
+            for (const action of ['read', 'write', 'delete']) {
+              if (sp[action] === true) merged[action] = true;
+              else if (sp[action] === false && merged[action] === undefined) merged[action] = false;
+            }
+          }
+          if (Object.keys(merged).length > 0) perms[target] = merged;
+        };
+        mergeInto('courses', courseSources);
+        mergeInto('cash', cashSources);
+        for (const k of [...courseSources, ...cashSources]) delete perms[k];
+        await query(
+          `UPDATE users SET permissions = $1::jsonb WHERE id = $2`,
+          [JSON.stringify(perms), u.id]
+        );
+        mergedCount++;
+      }
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          message: `Merged legacy permission keys for ${mergedCount} user(s)`,
+          mergedCount,
+        },
+      };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Permission merge failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
 };

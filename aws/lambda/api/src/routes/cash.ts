@@ -124,7 +124,10 @@ export const cashRoutes = {
     try {
       await ensureCashAdjustmentsTable();
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'cash', 'read')) {
+      if (
+        !checkGranularPermission(context, 'cash', 'read') &&
+        !checkGranularPermission(context, 'dashboard', 'read')
+      ) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 

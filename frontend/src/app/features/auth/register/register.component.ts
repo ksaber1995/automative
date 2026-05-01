@@ -6,7 +6,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RegisterDto } from '@shared/interfaces/user.interface';
 
 @Component({
@@ -21,6 +21,7 @@ export class RegisterComponent {
   private authService = inject(AuthService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   registerForm: FormGroup;
   loading = signal(false);
@@ -70,9 +71,7 @@ export class RegisterComponent {
 
     this.authService.register(dto).subscribe({
       next: (response) => {
-        this.notificationService.success(
-          'Registration successful! Please check your email for the verification code.'
-        );
+        this.notificationService.success(this.translate.instant('AUTH.REGISTER.SUCCESS'));
         this.router.navigate(['/auth/verify-email'], {
           queryParams: { email: response.email },
         });
@@ -80,7 +79,7 @@ export class RegisterComponent {
       error: (error) => {
         this.loading.set(false);
         this.notificationService.error(
-          error.error?.message || 'Registration failed. Please try again.'
+          error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED')
         );
       }
     });

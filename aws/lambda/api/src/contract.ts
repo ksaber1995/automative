@@ -2787,6 +2787,15 @@ export const contract = c.router({
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
+    mergePermissions: {
+      method: 'POST',
+      path: '/api/migrations/merge-permissions',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string(), mergedCount: z.number() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
   },
 
   // ============================================================

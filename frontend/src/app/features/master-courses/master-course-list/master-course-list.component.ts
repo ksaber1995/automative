@@ -35,7 +35,7 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
             {{ 'MASTER_COURSES.LIST.SUBTITLE' | translate }}
           </p>
         </div>
-        @if (authService.canWrite('master_courses')) {
+        @if (authService.canWrite('courses')) {
           <p-button
             [label]="'MASTER_COURSES.LIST.ADD' | translate"
             icon="pi pi-plus"
@@ -118,7 +118,7 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
                     (onClick)="view(item)"
                     [pTooltip]="'MASTER_COURSES.LIST.VIEW' | translate"
                   ></p-button>
-                  @if (authService.canWrite('master_courses')) {
+                  @if (authService.canWrite('courses')) {
                     <p-button
                       icon="pi pi-pencil"
                       [rounded]="true"
@@ -128,7 +128,7 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
                       [pTooltip]="'MASTER_COURSES.LIST.EDIT' | translate"
                     ></p-button>
                   }
-                  @if (authService.canWrite('master_courses')) {
+                  @if (authService.canWrite('courses')) {
                     @if (item.isActive) {
                       <p-button
                         icon="pi pi-ban"

@@ -10,11 +10,13 @@ import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 
 // ─── Permission types (inlined to avoid cross-rootDir imports) ──────────────
 
+// `courses` permission also covers Classes, Master Courses, Rooms, Sessions, Timetable.
+// `cash` permission also covers Withdrawals.
 type PermissionResource =
-  | 'dashboard' | 'branches' | 'courses' | 'classes' | 'students'
-  | 'enrollments' | 'employees' | 'revenues' | 'expenses' | 'withdrawals'
+  | 'dashboard' | 'branches' | 'courses' | 'students'
+  | 'enrollments' | 'employees' | 'revenues' | 'expenses'
   | 'refunds' | 'debts' | 'products' | 'product_sales' | 'reports' | 'users'
-  | 'master_courses' | 'events' | 'rooms' | 'sessions' | 'timetable' | 'cash';
+  | 'events' | 'cash';
 
 type PermissionAction = 'read' | 'write' | 'delete';
 
@@ -28,64 +30,64 @@ const NO_ACCESS: ResourcePermission = { read: false, write: false, delete: false
 
 const ROLE_DEFAULTS: Record<string, UserPermissions> = {
   GLOBAL_ADMIN: {
-    dashboard: FULL, branches: FULL, courses: FULL, classes: FULL,
+    dashboard: FULL, branches: FULL, courses: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
-    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
-    master_courses: FULL, events: FULL, rooms: FULL, sessions: FULL, timetable: FULL, cash: FULL,
+    events: FULL, cash: FULL,
   },
   ADMIN: {
-    dashboard: FULL, branches: FULL, courses: FULL, classes: FULL,
+    dashboard: FULL, branches: FULL, courses: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
-    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
-    master_courses: FULL, events: FULL, rooms: FULL, sessions: FULL, timetable: FULL, cash: FULL,
+    events: FULL, cash: FULL,
   },
   BRANCH_ADMIN: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
-    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
-    master_courses: READ_WRITE, events: FULL, rooms: FULL, sessions: FULL, timetable: READ_WRITE, cash: READ_ONLY,
+    events: FULL, cash: READ_ONLY,
   },
   BRANCH_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
-    expenses: FULL, withdrawals: FULL, refunds: FULL, debts: FULL,
+    expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
-    master_courses: READ_WRITE, events: FULL, rooms: FULL, sessions: FULL, timetable: READ_WRITE, cash: READ_ONLY,
+    events: FULL, cash: READ_ONLY,
   },
   ACADEMIC_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL, classes: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
     students: FULL, enrollments: READ_WRITE, employees: READ_ONLY,
-    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
-    master_courses: FULL, events: FULL, rooms: READ_WRITE, sessions: READ_WRITE, timetable: READ_WRITE, cash: NO_ACCESS,
+    events: FULL, cash: NO_ACCESS,
   },
   SALES_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
     students: READ_WRITE, enrollments: READ_WRITE, employees: READ_ONLY,
-    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: FULL,
     product_sales: FULL, reports: NO_ACCESS, users: NO_ACCESS,
-    master_courses: READ_ONLY, events: READ_ONLY, rooms: READ_ONLY, sessions: READ_ONLY, timetable: READ_ONLY, cash: NO_ACCESS,
+    events: READ_ONLY, cash: NO_ACCESS,
   },
   ACCOUNTANT: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
     students: READ_ONLY, enrollments: READ_ONLY, employees: READ_ONLY,
-    revenues: FULL, expenses: FULL, withdrawals: FULL, refunds: FULL,
+    revenues: FULL, expenses: FULL, refunds: FULL,
     debts: FULL, products: READ_ONLY, product_sales: READ_ONLY,
     reports: FULL, users: NO_ACCESS,
-    master_courses: READ_ONLY, events: READ_ONLY, rooms: READ_ONLY, sessions: READ_ONLY, timetable: READ_ONLY, cash: FULL,
+    events: READ_ONLY, cash: FULL,
   },
   VIEWER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY, classes: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
     students: READ_ONLY, enrollments: READ_ONLY, employees: NO_ACCESS,
-    revenues: NO_ACCESS, expenses: NO_ACCESS, withdrawals: NO_ACCESS,
+    revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
-    master_courses: READ_ONLY, events: READ_ONLY, rooms: READ_ONLY, sessions: READ_ONLY, timetable: READ_ONLY, cash: NO_ACCESS,
+    events: READ_ONLY, cash: NO_ACCESS,
   },
 };
 

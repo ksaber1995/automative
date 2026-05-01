@@ -266,11 +266,11 @@ export class LayoutComponent implements OnInit {
     // Academic
     const academic: NavLeaf[] = [
       { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('courses') },
-      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('master_courses') },
-      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('classes') },
-      { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('rooms') },
-      { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('sessions') },
-      { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('timetable') },
+      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('courses') },
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('events') },
     ].filter(c => c.visible);
     if (academic.length) {
