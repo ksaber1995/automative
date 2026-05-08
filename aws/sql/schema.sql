@@ -600,6 +600,68 @@ CREATE INDEX idx_expense_payments_category ON expense_payments(category);
 CREATE INDEX idx_expense_payments_branch_id ON expense_payments(branch_id);
 
 -- =============================================
+-- INSTALLMENT PLANS TABLE
+-- An installment_plan represents a financed purchase paid over N months with
+-- an optional downpayment. Downpayment hits expense_payments immediately.
+-- Each scheduled month is an installment_schedule row; paying it creates an
+-- expense_payments row and links it back via payment_id.
+-- =============================================
+CREATE TABLE installment_plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL DEFAULT 'CAPITAL' CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
+    category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
+    total_amount DECIMAL(12, 2) NOT NULL,
+    downpayment_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    financed_amount DECIMAL(12, 2) NOT NULL,
+    months_count INTEGER NOT NULL CHECK (months_count > 0),
+    monthly_amount DECIMAL(12, 2) NOT NULL,
+    start_date DATE NOT NULL,
+    vendor VARCHAR(255),
+    invoice_number VARCHAR(100),
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'CANCELED')),
+    downpayment_payment_id UUID REFERENCES expense_payments(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_installment_plans_company_id ON installment_plans(company_id);
+CREATE INDEX idx_installment_plans_branch_id ON installment_plans(branch_id);
+CREATE INDEX idx_installment_plans_status ON installment_plans(status);
+CREATE INDEX idx_installment_plans_start_date ON installment_plans(start_date);
+
+-- =============================================
+-- INSTALLMENT SCHEDULE TABLE
+-- One row per scheduled monthly installment. Paying creates an expense_payments
+-- row and links it via payment_id; status flips to PAID.
+-- =============================================
+CREATE TABLE installment_schedule (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_id UUID NOT NULL REFERENCES installment_plans(id) ON DELETE CASCADE,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    installment_number INTEGER NOT NULL,
+    due_date DATE NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'SKIPPED')),
+    payment_id UUID REFERENCES expense_payments(id) ON DELETE SET NULL,
+    paid_date DATE,
+    paid_amount DECIMAL(12, 2),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(plan_id, installment_number)
+);
+
+CREATE INDEX idx_installment_schedule_plan_id ON installment_schedule(plan_id);
+CREATE INDEX idx_installment_schedule_company_id ON installment_schedule(company_id);
+CREATE INDEX idx_installment_schedule_status ON installment_schedule(status);
+CREATE INDEX idx_installment_schedule_due_date ON installment_schedule(due_date);
+
+-- =============================================
 -- CASH STATE TABLE
 -- =============================================
 CREATE TABLE cash_state (
@@ -892,6 +954,8 @@ CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_sessions_updated_at BEFORE UPDATE ON sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_installment_plans_updated_at BEFORE UPDATE ON installment_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_installment_schedule_updated_at BEFORE UPDATE ON installment_schedule FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
 -- VIEWS FOR ANALYTICS

@@ -7,6 +7,7 @@ export * from './interfaces/enrollment.interface';
 export * from './interfaces/employee.interface';
 export * from './interfaces/revenue.interface';
 export * from './interfaces/expense.interface';
+export * from './interfaces/installment.interface';
 export * from './interfaces/analytics.interface';
 
 // Export all enums

@@ -211,6 +211,10 @@ export class ExpenseListComponent implements OnInit {
     this.router.navigate(['/expenses/manage-recurring']);
   }
 
+  goToInstallments() {
+    this.router.navigate(['/expenses/installments']);
+  }
+
   goToSalaries() {
     this.router.navigate(['/expenses/salaries']);
   }

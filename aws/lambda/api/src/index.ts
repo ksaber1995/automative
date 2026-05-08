@@ -22,6 +22,7 @@ import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
 import { expensePaymentsRoutes } from './routes/expense-payments';
+import { installmentsRoutes } from './routes/installments';
 import { analyticsRoutes } from './routes/analytics';
 import { employeesRoutes } from './routes/employees';
 import { withdrawalsRoutes } from './routes/withdrawals';
@@ -84,6 +85,7 @@ const router = {
   revenues: revenuesRoutes,
   expenses: expensesRoutes,
   expensePayments: expensePaymentsRoutes,
+  installments: installmentsRoutes,
   analytics: analyticsRoutes,
   companies: companiesRoutes,
   employees: employeesRoutes,

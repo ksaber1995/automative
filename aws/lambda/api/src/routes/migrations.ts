@@ -617,6 +617,90 @@ async function createExpensePaymentsTable() {
   }
 }
 
+async function createInstallmentTables() {
+  console.log('Starting migration: create_installment_tables');
+
+  try {
+    const plansExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'installment_plans'
+    `);
+    const scheduleExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'installment_schedule'
+    `);
+
+    if (plansExists.length > 0 && scheduleExists.length > 0) {
+      console.log('✅ installment_plans and installment_schedule tables already exist');
+      return { success: true, message: 'installment tables already exist' };
+    }
+
+    if (plansExists.length === 0) {
+      await query(`
+        CREATE TABLE installment_plans (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          type VARCHAR(50) NOT NULL DEFAULT 'CAPITAL' CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
+          category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
+          total_amount DECIMAL(12, 2) NOT NULL,
+          downpayment_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+          financed_amount DECIMAL(12, 2) NOT NULL,
+          months_count INTEGER NOT NULL CHECK (months_count > 0),
+          monthly_amount DECIMAL(12, 2) NOT NULL,
+          start_date DATE NOT NULL,
+          vendor VARCHAR(255),
+          invoice_number VARCHAR(100),
+          notes TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'CANCELED')),
+          downpayment_payment_id UUID REFERENCES expense_payments(id) ON DELETE SET NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await query(`CREATE INDEX idx_installment_plans_company_id ON installment_plans(company_id)`);
+      await query(`CREATE INDEX idx_installment_plans_branch_id ON installment_plans(branch_id)`);
+      await query(`CREATE INDEX idx_installment_plans_status ON installment_plans(status)`);
+      await query(`CREATE INDEX idx_installment_plans_start_date ON installment_plans(start_date)`);
+      console.log('✓ Created installment_plans table');
+    }
+
+    if (scheduleExists.length === 0) {
+      await query(`
+        CREATE TABLE installment_schedule (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          plan_id UUID NOT NULL REFERENCES installment_plans(id) ON DELETE CASCADE,
+          company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          installment_number INTEGER NOT NULL,
+          due_date DATE NOT NULL,
+          amount DECIMAL(12, 2) NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'SKIPPED')),
+          payment_id UUID REFERENCES expense_payments(id) ON DELETE SET NULL,
+          paid_date DATE,
+          paid_amount DECIMAL(12, 2),
+          notes TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(plan_id, installment_number)
+        )
+      `);
+      await query(`CREATE INDEX idx_installment_schedule_plan_id ON installment_schedule(plan_id)`);
+      await query(`CREATE INDEX idx_installment_schedule_company_id ON installment_schedule(company_id)`);
+      await query(`CREATE INDEX idx_installment_schedule_status ON installment_schedule(status)`);
+      await query(`CREATE INDEX idx_installment_schedule_due_date ON installment_schedule(due_date)`);
+      console.log('✓ Created installment_schedule table');
+    }
+
+    console.log('✅ installment tables migration completed!');
+    return { success: true, message: 'installment_plans and installment_schedule created successfully' };
+  } catch (error) {
+    console.error('❌ installment tables migration error:', error);
+    throw error;
+  }
+}
+
 async function createSessionAttendanceTable() {
   console.log('Starting migration: create_session_attendance_table');
 
@@ -807,6 +891,21 @@ export const migrationsRoutes = {
   createSessionAttendanceTable: async () => {
     try {
       const result = await createSessionAttendanceTable();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createInstallmentTables: async () => {
+    try {
+      const result = await createInstallmentTables();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

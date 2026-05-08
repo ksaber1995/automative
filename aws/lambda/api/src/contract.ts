@@ -1916,6 +1916,97 @@ export const contract = c.router({
     },
   },
 
+  // Installments routes
+  installments: {
+    create: {
+      method: 'POST',
+      path: '/api/installments',
+      body: z.object({
+        branchId: OptionalUUIDSchema,
+        name: z.string().min(1),
+        description: z.string().optional(),
+        type: ExpenseTypeSchema.optional(),
+        category: ExpenseCategorySchema,
+        totalAmount: z.number().positive(),
+        downpaymentAmount: z.number().min(0).optional(),
+        monthsCount: z.number().int().min(1),
+        startDate: z.string(),
+        vendor: z.string().optional(),
+        invoiceNumber: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({
+          plan: z.any(),
+          schedule: z.array(z.any()),
+          downpaymentPayment: z.any().nullable(),
+        }),
+        400: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/installments',
+      query: z.object({
+        branchId: UUIDSchema.optional(),
+        status: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/installments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({
+          plan: z.any(),
+          schedule: z.array(z.any()),
+          downpaymentPayment: z.any().nullable(),
+        }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/installments/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    pay: {
+      method: 'POST',
+      path: '/api/installments/:id/schedule/:scheduleId/pay',
+      pathParams: z.object({ id: UUIDSchema, scheduleId: UUIDSchema }),
+      body: z.object({
+        date: z.string().optional(),
+        amount: z.number().positive().optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({ payment: z.any(), schedule: z.any() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    unpay: {
+      method: 'DELETE',
+      path: '/api/installments/:id/schedule/:scheduleId/pay',
+      pathParams: z.object({ id: UUIDSchema, scheduleId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+
   // Expense Payments routes
   expensePayments: {
     create: {
@@ -2781,6 +2872,15 @@ export const contract = c.router({
     createSessionAttendanceTable: {
       method: 'POST',
       path: '/api/migrations/create-session-attendance-table',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    createInstallmentTables: {
+      method: 'POST',
+      path: '/api/migrations/create-installment-tables',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

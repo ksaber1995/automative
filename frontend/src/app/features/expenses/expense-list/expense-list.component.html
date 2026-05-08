@@ -15,6 +15,13 @@
             (onClick)="goToManageRecurring()">
           </p-button>
           <p-button
+            label="Installments"
+            icon="pi pi-credit-card"
+            severity="info"
+            [outlined]="true"
+            (onClick)="goToInstallments()">
+          </p-button>
+          <p-button
             [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
             icon="pi pi-users"
             severity="warn"
