@@ -1219,6 +1219,72 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: { 200: EventPLSchema, 404: z.object({ message: z.string() }) },
     },
+    listSubscriptions: {
+      method: 'GET',
+      path: '/api/events/:eventId/subscriptions',
+      pathParams: z.object({ eventId: UUIDSchema }),
+      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+    },
+    createSubscription: {
+      method: 'POST',
+      path: '/api/events/:eventId/subscriptions',
+      pathParams: z.object({ eventId: UUIDSchema }),
+      body: z.object({
+        studentId: OptionalUUIDSchema,
+        externalFirstName: z.string().optional(),
+        externalLastName: z.string().optional(),
+        externalAge: z.number().optional(),
+        externalMobile: z.string().optional(),
+        amount: z.number(),
+        paymentDate: z.string(),
+        paymentMethod: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    deleteSubscription: {
+      method: 'DELETE',
+      path: '/api/events/subscriptions/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    listExpenses: {
+      method: 'GET',
+      path: '/api/events/:eventId/expenses',
+      pathParams: z.object({ eventId: UUIDSchema }),
+      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+    },
+    listRefunds: {
+      method: 'GET',
+      path: '/api/events/:eventId/refunds',
+      pathParams: z.object({ eventId: UUIDSchema }),
+      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+    },
+    createRefund: {
+      method: 'POST',
+      path: '/api/events/:eventId/refunds',
+      pathParams: z.object({ eventId: UUIDSchema }),
+      body: z.object({
+        amount: z.number(),
+        refundDate: z.string(),
+        type: z.enum(['FULL', 'PARTIAL']).optional(),
+        reason: z.string().optional(),
+        studentId: OptionalUUIDSchema,
+      }),
+      responses: {
+        201: z.any(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 
   // Demo leads (public contact form from landing page)
@@ -1359,6 +1425,16 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/master-enrollments/by-student/:studentId',
       pathParams: z.object({ studentId: UUIDSchema }),
+      responses: { 200: z.array(z.any()) },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/master-enrollments',
+      query: z.object({
+        status: z.string().optional(),
+        branchId: OptionalUUIDSchema,
+        studentId: OptionalUUIDSchema,
+      }),
       responses: { 200: z.array(z.any()) },
     },
     create: {
@@ -2893,6 +2969,15 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string(), mergedCount: z.number() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    createEventFeatureTables: {
+      method: 'POST',
+      path: '/api/migrations/create-event-feature-tables',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },

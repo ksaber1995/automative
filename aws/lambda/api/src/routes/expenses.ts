@@ -49,9 +49,22 @@ export const expensesRoutes = {
         };
       }
 
+      // If linked to an event, derive branch from the event automatically.
+      // Event branch is the source of truth — explicit branchId is ignored when eventId is set.
+      let resolvedBranchId: string | null = body.branchId || null;
+      if (body.eventId) {
+        const event = await queryOne(
+          'SELECT branch_id FROM events WHERE id = $1 AND company_id = $2',
+          [body.eventId, context.companyId]
+        );
+        if (event) {
+          resolvedBranchId = event.branch_id || null;
+        }
+      }
+
       const expense = await insert('expenses', {
         company_id: context.companyId,
-        branch_id: body.branchId || null,
+        branch_id: resolvedBranchId,
         type: body.type,
         category: body.category,
         amount: body.amount,

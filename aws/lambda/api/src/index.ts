@@ -18,6 +18,7 @@ import { masterCoursesRoutes } from './routes/master-courses';
 import { masterEnrollmentsRoutes } from './routes/master-enrollments';
 import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments';
 import { eventsRoutes } from './routes/events';
+import { eventSubscriptionsRoutes } from './routes/event-subscriptions';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
@@ -60,6 +61,7 @@ const router = {
   masterEnrollments: {
     coverageCheck: masterEnrollmentsRoutes.coverageCheck,
     listByStudent: masterEnrollmentsRoutes.listByStudent,
+    list: masterEnrollmentsRoutes.list,
     create: masterEnrollmentsRoutes.create,
     getPayments: masterEnrollmentsRoutes.getPayments,
     addPayment: masterEnrollmentsRoutes.addPayment,
@@ -69,7 +71,15 @@ const router = {
     getById: masterEnrollmentsRoutes.getById,
   },
   masterClassEnrollments: masterClassEnrollmentsRoutes,
-  events: eventsRoutes,
+  events: {
+    ...eventsRoutes,
+    listSubscriptions: eventSubscriptionsRoutes.listByEvent,
+    createSubscription: eventSubscriptionsRoutes.create,
+    deleteSubscription: eventSubscriptionsRoutes.remove,
+    listExpenses: eventSubscriptionsRoutes.listExpenses,
+    listRefunds: eventSubscriptionsRoutes.listRefunds,
+    createRefund: eventSubscriptionsRoutes.createRefund,
+  },
   classes: {
     create: classesRoutes.create,
     list: classesRoutes.list,

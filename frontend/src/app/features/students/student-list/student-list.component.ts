@@ -13,11 +13,12 @@ import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { ClassService } from '../../courses/services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
-import { EnrollmentStatus } from '@shared/enums/enrollment-status.enum';
+import { Class } from '@shared/interfaces/class.interface';
 
 interface EnrollmentCounts {
   active: number;
@@ -46,6 +47,7 @@ export class StudentListComponent implements OnInit {
   private studentService = inject(StudentService);
   private branchService = inject(BranchService);
   private enrollmentService = inject(EnrollmentService);
+  private classService = inject(ClassService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -64,16 +66,30 @@ export class StudentListComponent implements OnInit {
   }
 
   loadEnrollmentCounts() {
-    this.enrollmentService.getAllEnrollments().subscribe({
-      next: (list) => {
-        const map: Record<string, EnrollmentCounts> = {};
-        for (const e of list) {
-          if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
-          if (e.status === EnrollmentStatus.ACTIVE) map[e.studentId].active++;
-          else if (e.status === EnrollmentStatus.COMPLETED) map[e.studentId].completed++;
-        }
-        this.enrollmentCounts.set(map);
+    let enrollments: { studentId: string; classId: string }[] = [];
+    let classes: Class[] = [];
+    let pending = 2;
+    const finalize = () => {
+      pending--;
+      if (pending !== 0) return;
+      const classDoneById = new Map(
+        classes.map(c => [c.id, c.status === 'DONE' || c.isFinished === true])
+      );
+      const map: Record<string, EnrollmentCounts> = {};
+      for (const e of enrollments) {
+        if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
+        if (classDoneById.get(e.classId)) map[e.studentId].completed++;
+        else map[e.studentId].active++;
       }
+      this.enrollmentCounts.set(map);
+    };
+    this.enrollmentService.getAllEnrollments().subscribe({
+      next: (list) => { enrollments = list; finalize(); },
+      error: () => finalize(),
+    });
+    this.classService.getAllClasses().subscribe({
+      next: (list) => { classes = list; finalize(); },
+      error: () => finalize(),
     });
   }
 

@@ -99,7 +99,18 @@
       @if (masterEnrollments().length === 0) {
         <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_MASTER_ENROLLMENTS' | translate }}</div>
       } @else {
-        <p-table [value]="masterEnrollments()" responsiveLayout="scroll"
+        <p-tabs value="active-master">
+          <p-tablist>
+            <p-tab value="active-master">
+              <i class="pi pi-bolt mr-2"></i>Active ({{ activeMasterEnrollments().length }})
+            </p-tab>
+            <p-tab value="finished-master">
+              <i class="pi pi-check-circle mr-2"></i>Finished ({{ finishedMasterEnrollments().length }})
+            </p-tab>
+          </p-tablist>
+          <p-tabpanels>
+            <p-tabpanel value="active-master">
+        <p-table [value]="activeMasterEnrollments()" responsiveLayout="scroll"
           [expandedRowKeys]="expandedMasterRows" dataKey="id"
           (onRowExpand)="onMasterRowExpand($event)">
           <ng-template pTemplate="header">
@@ -333,6 +344,44 @@
             </tr>
           </ng-template>
         </p-table>
+            </p-tabpanel>
+            <p-tabpanel value="finished-master">
+              @if (finishedMasterEnrollments().length === 0) {
+                <div class="text-center py-6 text-gray-500">No finished master enrollments yet.</div>
+              } @else {
+                <p-table [value]="finishedMasterEnrollments()" responsiveLayout="scroll" dataKey="id">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th>{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }}</th>
+                      <th>{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }}</th>
+                      <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
+                      <th class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }}</th>
+                      <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-me>
+                    <tr>
+                      <td>
+                        <div class="font-medium">{{ me.masterCourseName }}</div>
+                        <div class="text-xs text-gray-500 font-mono">{{ me.masterCourseCode }}</div>
+                      </td>
+                      <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
+                      <td class="text-right">
+                        <div class="font-semibold">{{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }}</div>
+                      </td>
+                      <td class="text-center">
+                        <p-tag [value]="me.completedCourses + ' / ' + me.totalCourses" severity="success"></p-tag>
+                      </td>
+                      <td>
+                        <p-tag [value]="me.status" severity="info"></p-tag>
+                      </td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              }
+            </p-tabpanel>
+          </p-tabpanels>
+        </p-tabs>
       }
     </p-card>
 
@@ -345,7 +394,18 @@
         </div>
       </ng-template>
 
-      <p-table [value]="enrollments()" responsiveLayout="scroll" [expandedRowKeys]="expandedRows" dataKey="id">
+      <p-tabs value="active-courses">
+        <p-tablist>
+          <p-tab value="active-courses">
+            <i class="pi pi-bolt mr-2"></i>Active ({{ activeEnrollments().length }})
+          </p-tab>
+          <p-tab value="finished-courses">
+            <i class="pi pi-check-circle mr-2"></i>Finished ({{ finishedEnrollments().length }})
+          </p-tab>
+        </p-tablist>
+        <p-tabpanels>
+          <p-tabpanel value="active-courses">
+      <p-table [value]="activeEnrollments()" responsiveLayout="scroll" [expandedRowKeys]="expandedRows" dataKey="id">
         <ng-template pTemplate="header">
           <tr>
             <th style="width: 3rem"></th>
@@ -565,6 +625,46 @@
           </tr>
         </ng-template>
       </p-table>
+          </p-tabpanel>
+          <p-tabpanel value="finished-courses">
+            @if (finishedEnrollments().length === 0) {
+              <div class="text-center py-6 text-gray-500">No finished courses yet.</div>
+            } @else {
+              <p-table [value]="finishedEnrollments()" responsiveLayout="scroll" dataKey="id">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</th>
+                    <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
+                    <th>Completion Date</th>
+                    <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
+                    <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-enrollment>
+                  <tr>
+                    <td>
+                      <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
+                      <div class="text-sm text-gray-500">{{ getCourseCode(enrollment.courseId) }}</div>
+                    </td>
+                    <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
+                    <td class="text-sm">
+                      @if (enrollment.completionDate) {
+                        {{ formatDate(enrollment.completionDate) }}
+                      } @else {
+                        <span class="text-gray-400">—</span>
+                      }
+                    </td>
+                    <td class="text-right font-semibold text-green-600">{{ enrollment.finalPrice.toFixed(2) }}</td>
+                    <td>
+                      <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            }
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
     </p-card>
     <!-- Attendance History Card -->
     <p-card class="mt-6">

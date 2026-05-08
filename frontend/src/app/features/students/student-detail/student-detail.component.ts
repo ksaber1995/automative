@@ -13,6 +13,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -48,6 +49,11 @@ import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface'
     TextareaModule,
     RadioButtonModule,
     ProgressBarModule,
+    TabsModule,
+    Tab,
+    TabList,
+    TabPanel,
+    TabPanels,
     TranslateModule,
   ],
   templateUrl: './student-detail.component.html',
@@ -69,6 +75,16 @@ export class StudentDetailComponent implements OnInit {
   student = signal<Student | null>(null);
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
+  classDoneMap = signal<Map<string, boolean>>(new Map());
+
+  private isEnrollmentFinished(e: Enrollment): boolean {
+    return this.classDoneMap().get(e.classId) === true;
+  }
+
+  activeEnrollments = computed(() => this.enrollments().filter(e => !this.isEnrollmentFinished(e)));
+  finishedEnrollments = computed(() => this.enrollments().filter(e => this.isEnrollmentFinished(e)));
+  activeMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status !== 'COMPLETED'));
+  finishedMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status === 'COMPLETED'));
   courses = new Map<string, Course>();
   loading = signal(true);
   studentId: string | null = null;
@@ -156,11 +172,24 @@ export class StudentDetailComponent implements OnInit {
     this.studentId = this.route.snapshot.paramMap.get('id');
     if (this.studentId) {
       await this.loadCourses();
+      this.loadClassesForDoneMap();
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
       this.loadMasterEnrollments(this.studentId);
       this.loadAttendance(this.studentId);
     }
+  }
+
+  loadClassesForDoneMap() {
+    this.classService.getAllClasses().subscribe({
+      next: (classes) => {
+        const map = new Map<string, boolean>();
+        for (const c of classes) {
+          map.set(c.id, c.status === 'DONE' || c.isFinished === true);
+        }
+        this.classDoneMap.set(map);
+      },
+    });
   }
 
   loadAttendance(studentId: string) {

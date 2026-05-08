@@ -739,6 +739,80 @@ async function createSessionAttendanceTable() {
   }
 }
 
+async function createEventFeatureMigration() {
+  console.log('Starting migration: event_subscriptions + relax refunds');
+  try {
+    // 1) event_subscriptions table
+    const subsExists = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'event_subscriptions'
+    `);
+    if (subsExists.length === 0) {
+      await query(`
+        CREATE TABLE event_subscriptions (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+          branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+          student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+          external_first_name VARCHAR(100),
+          external_last_name VARCHAR(100),
+          external_age INTEGER,
+          external_mobile VARCHAR(50),
+          amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+          payment_date DATE NOT NULL,
+          payment_method VARCHAR(50),
+          notes TEXT,
+          revenue_id UUID,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          CHECK (
+            (student_id IS NOT NULL) OR
+            (external_first_name IS NOT NULL AND external_last_name IS NOT NULL)
+          )
+        )
+      `);
+      await query(`CREATE INDEX idx_event_subs_company ON event_subscriptions(company_id)`);
+      await query(`CREATE INDEX idx_event_subs_event ON event_subscriptions(event_id)`);
+      await query(`CREATE INDEX idx_event_subs_branch ON event_subscriptions(branch_id)`);
+      await query(`CREATE INDEX idx_event_subs_student ON event_subscriptions(student_id)`);
+      console.log('✓ Created event_subscriptions table');
+    } else {
+      console.log('✓ event_subscriptions table already exists');
+    }
+
+    // 2) Drop the refunds CHECK that requires enrollment_id XOR master_enrollment_id
+    //    (event-only refunds need both to be NULL)
+    const constraintRows = await query(`
+      SELECT con.conname
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      WHERE rel.relname = 'refunds' AND con.contype = 'c'
+    `);
+    for (const c of constraintRows) {
+      // Drop any check constraints on refunds; we re-add the bare minimum below.
+      await query(`ALTER TABLE refunds DROP CONSTRAINT IF EXISTS ${c.conname}`);
+    }
+    console.log(`✓ Dropped ${constraintRows.length} CHECK constraint(s) on refunds`);
+
+    // 3) Make refunds.student_id nullable so event-only refunds can omit it.
+    await query(`ALTER TABLE refunds ALTER COLUMN student_id DROP NOT NULL`);
+    console.log('✓ refunds.student_id is now nullable');
+
+    // Re-add type CHECK (we dropped all CHECKs above; type values are still fixed).
+    await query(`
+      ALTER TABLE refunds
+      ADD CONSTRAINT refunds_type_check CHECK (type IN ('FULL', 'PARTIAL'))
+    `);
+    console.log('✓ Re-added refunds_type_check');
+
+    return { success: true, message: 'event subscriptions + refunds constraints applied' };
+  } catch (error) {
+    console.error('❌ Event feature migration error:', error);
+    throw error;
+  }
+}
+
 export const migrationsRoutes = {
   runInstructorMigration: async () => {
     try {
@@ -950,6 +1024,21 @@ export const migrationsRoutes = {
   //   withdrawals -> cash
   // Existing per-action overrides are OR'd into the target so users keep at
   // least the broadest access they had on any source resource.
+  createEventFeatureTables: async () => {
+    try {
+      const result = await createEventFeatureMigration();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   mergePermissions: async () => {
     try {
       const users = await query(

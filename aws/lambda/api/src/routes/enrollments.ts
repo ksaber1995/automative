@@ -377,23 +377,31 @@ export const enrollmentsRoutes = {
       const params: any[] = [context.companyId];
       let idx = 2;
 
-      if (q.branchId) { conditions.push(`e.branch_id = $${idx++}`); params.push(q.branchId); }
+      if (q.branchId) {
+        conditions.push(`COALESCE(e.branch_id, ev.branch_id) = $${idx++}`);
+        params.push(q.branchId);
+      }
       if (q.studentId) { conditions.push(`r.student_id = $${idx++}`); params.push(q.studentId); }
       if (q.type) { conditions.push(`r.type = $${idx++}`); params.push(q.type); }
       if (q.startDate) { conditions.push(`r.refund_date >= $${idx++}`); params.push(q.startDate); }
       if (q.endDate) { conditions.push(`r.refund_date <= $${idx++}`); params.push(q.endDate); }
 
+      // LEFT JOINs so event-only refunds (no enrollment) and refunds without student
+      // are still included in the global list.
       const refunds = await query(
         `SELECT r.*,
-                s.first_name || ' ' || s.last_name AS student_name,
+                CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name ELSE NULL END AS student_name,
                 c.name AS course_name,
-                b.name AS branch_name,
-                e.branch_id
+                COALESCE(b.name, evb.name) AS branch_name,
+                COALESCE(e.branch_id, ev.branch_id) AS branch_id,
+                ev.name AS event_name
          FROM refunds r
-         JOIN enrollments e ON r.enrollment_id = e.id
-         JOIN students s ON r.student_id = s.id
-         JOIN courses c ON e.course_id = c.id
-         JOIN branches b ON e.branch_id = b.id
+         LEFT JOIN enrollments e ON r.enrollment_id = e.id
+         LEFT JOIN students s ON r.student_id = s.id
+         LEFT JOIN courses c ON e.course_id = c.id
+         LEFT JOIN branches b ON e.branch_id = b.id
+         LEFT JOIN events ev ON r.event_id = ev.id
+         LEFT JOIN branches evb ON ev.branch_id = evb.id
          WHERE ${conditions.join(' AND ')}
          ORDER BY r.refund_date DESC, r.created_at DESC`,
         params
@@ -410,6 +418,8 @@ export const enrollmentsRoutes = {
           courseName: r.course_name,
           branchName: r.branch_name,
           branchId: r.branch_id,
+          eventId: r.event_id || null,
+          eventName: r.event_name || null,
           amount: parseFloat(r.amount),
           refundDate: r.refund_date,
           type: r.type,

@@ -23,6 +23,10 @@ export class MasterEnrollmentService {
     return this.api.post<MasterEnrollmentProgress>('master-enrollments', dto);
   }
 
+  list(params?: { status?: string; branchId?: string; studentId?: string }): Observable<MasterEnrollmentProgress[]> {
+    return this.api.get<MasterEnrollmentProgress[]>('master-enrollments', params);
+  }
+
   getByStudent(studentId: string): Observable<MasterEnrollmentProgress[]> {
     return this.api.get<MasterEnrollmentProgress[]>(`master-enrollments/by-student/${studentId}`);
   }

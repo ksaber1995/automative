@@ -434,14 +434,51 @@ CREATE INDEX idx_events_company ON events(company_id);
 CREATE INDEX idx_events_branch ON events(branch_id);
 
 -- =============================================
+-- EVENT SUBSCRIPTIONS TABLE
+-- Records who paid to attend an event. The subscriber is either an existing
+-- student (student_id) or a one-off external person (external_* columns).
+-- A linked revenue row is created on subscription create and tracked in
+-- revenue_id for cleanup on subscription delete.
+-- =============================================
+CREATE TABLE event_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+    external_first_name VARCHAR(100),
+    external_last_name VARCHAR(100),
+    external_age INTEGER,
+    external_mobile VARCHAR(50),
+    amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_date DATE NOT NULL,
+    payment_method VARCHAR(50),
+    notes TEXT,
+    revenue_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (
+        (student_id IS NOT NULL) OR
+        (external_first_name IS NOT NULL AND external_last_name IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_event_subs_company ON event_subscriptions(company_id);
+CREATE INDEX idx_event_subs_event ON event_subscriptions(event_id);
+CREATE INDEX idx_event_subs_branch ON event_subscriptions(branch_id);
+CREATE INDEX idx_event_subs_student ON event_subscriptions(student_id);
+
+-- =============================================
 -- REFUNDS TABLE
 -- =============================================
+-- Refunds may attach to: an enrollment, a master_enrollment, OR an event (event-only).
+-- student_id is optional (event refunds may have no specific student or be external).
 CREATE TABLE refunds (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     enrollment_id UUID,
     master_enrollment_id UUID,
     company_id UUID NOT NULL,
-    student_id UUID NOT NULL,
+    student_id UUID,
     event_id UUID,
     amount DECIMAL(10, 2) NOT NULL,
     refund_date DATE NOT NULL,
@@ -451,11 +488,7 @@ CREATE TABLE refunds (
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
-    CHECK (
-        (enrollment_id IS NOT NULL AND master_enrollment_id IS NULL) OR
-        (enrollment_id IS NULL AND master_enrollment_id IS NOT NULL)
-    )
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);

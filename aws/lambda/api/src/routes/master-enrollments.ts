@@ -84,9 +84,15 @@ const SELECT_WITH_PROGRESS = `
     b.name AS branch_name,
     (SELECT COUNT(*) FROM master_course_courses mcc WHERE mcc.master_course_id = me.master_course_id) AS total_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce
-      WHERE mce.master_enrollment_id = me.id AND mce.status = 'COMPLETED') AS completed_courses,
+       INNER JOIN classes cl ON cl.id = mce.class_id
+      WHERE mce.master_enrollment_id = me.id
+        AND mce.status != 'DROPPED'
+        AND COALESCE(cl.is_finished, false) = true) AS completed_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce
-      WHERE mce.master_enrollment_id = me.id AND mce.status = 'ACTIVE') AS active_courses,
+       INNER JOIN classes cl ON cl.id = mce.class_id
+      WHERE mce.master_enrollment_id = me.id
+        AND mce.status != 'DROPPED'
+        AND COALESCE(cl.is_finished, false) = false) AS active_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce
       WHERE mce.master_enrollment_id = me.id AND mce.status = 'DROPPED') AS pending_courses
   FROM master_enrollments me
@@ -96,6 +102,47 @@ const SELECT_WITH_PROGRESS = `
 `;
 
 export const masterEnrollmentsRoutes = {
+  list: async ({ query: queryParams, headers }: { query: { status?: string; branchId?: string; studentId?: string }; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const conditions: string[] = ['me.company_id = $1'];
+      const params: any[] = [context.companyId];
+
+      if (queryParams.status) {
+        params.push(queryParams.status);
+        conditions.push(`me.status = $${params.length}`);
+      }
+      if (queryParams.studentId) {
+        params.push(queryParams.studentId);
+        conditions.push(`me.student_id = $${params.length}`);
+      }
+      if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        }
+        params.push(queryParams.branchId);
+        conditions.push(`me.branch_id = $${params.length}`);
+      }
+
+      const rows = await query(
+        `${SELECT_WITH_PROGRESS} WHERE ${conditions.join(' AND ')} ORDER BY me.enrollment_date DESC`,
+        params
+      );
+      const filtered = rows.filter((r: any) => canAccessBranch(context, r.branch_id));
+      return { status: 200 as const, body: filtered.map(mapWithProgress) };
+    } catch (error: any) {
+      console.error('List master enrollments error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to list master enrollments' },
+      };
+    }
+  },
+
   create: async ({ body, headers }: { body: any; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

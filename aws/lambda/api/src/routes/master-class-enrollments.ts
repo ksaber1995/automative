@@ -10,6 +10,11 @@ import {
 type AuthHeaders = { authorization: string };
 
 function mapRow(row: any) {
+  // Derive effective status: a class being finished completes the master-class enrollment,
+  // unless the student dropped it. Pure DB-derived; no separate sync job needed.
+  const rawStatus: string = row.status;
+  const classFinished = row.class_is_finished === true;
+  const effectiveStatus = rawStatus !== 'DROPPED' && classFinished ? 'COMPLETED' : rawStatus;
   return {
     id: row.id,
     companyId: row.company_id,
@@ -19,7 +24,7 @@ function mapRow(row: any) {
     courseId: row.course_id,
     branchId: row.branch_id,
     enrolledAt: row.enrolled_at,
-    status: row.status,
+    status: effectiveStatus,
     notes: row.notes,
     className: row.class_name ?? null,
     classCode: row.class_code ?? null,
@@ -110,6 +115,7 @@ export const masterClassEnrollmentsRoutes = {
       const rows = await query(
         `SELECT mce.*,
            cl.name AS class_name, cl.code AS class_code,
+           cl.is_finished AS class_is_finished,
            co.name AS course_name
          FROM master_class_enrollments mce
          LEFT JOIN classes cl ON cl.id = mce.class_id

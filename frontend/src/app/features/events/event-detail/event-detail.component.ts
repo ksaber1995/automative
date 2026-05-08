@@ -1,170 +1,143 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { DividerModule } from 'primeng/divider';
+import { TableModule } from 'primeng/table';
+import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
+import { RadioButtonModule } from 'primeng/radiobutton';
+import { CheckboxModule } from 'primeng/checkbox';
+import { TooltipModule } from 'primeng/tooltip';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
-import { EventService } from '../services/event.service';
+import {
+  EventService,
+  EventSubscription,
+  EventExpense,
+  EventRefund,
+} from '../services/event.service';
+import { StudentService } from '../../students/services/student.service';
+import { ExpenseService } from '../../expenses/services/expense.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { EventModel, EventPL } from '@shared/interfaces/event.interface';
+import { Student } from '@shared/interfaces/student.interface';
+import { ExpenseCategory, ExpenseType } from '@shared/enums/expense-type.enum';
 
 @Component({
   selector: 'app-event-detail',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     CardModule,
     ButtonModule,
     TagModule,
     DividerModule,
+    TableModule,
+    DialogModule,
+    InputTextModule,
+    InputNumberModule,
+    TextareaModule,
+    SelectModule,
+    DatePickerModule,
+    RadioButtonModule,
+    CheckboxModule,
+    TooltipModule,
+    ConfirmDialogModule,
     TranslateModule,
   ],
-  template: `
-    <div class="container-custom py-8">
-      <div class="mb-6 flex justify-between items-start">
-        <div>
-          <p-button
-            icon="pi pi-arrow-left"
-            [text]="true"
-            [label]="'EVENTS.DETAIL.BACK' | translate"
-            (onClick)="back()"
-          ></p-button>
-          <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ event()?.name }}</h1>
-          <div class="flex gap-2 mt-2">
-            @if (event(); as e) {
-              <p-tag [value]="('EVENTS.TYPE.' + e.eventType) | translate" severity="info"></p-tag>
-              <p-tag [value]="('EVENTS.STATUS.' + e.status) | translate" [severity]="statusSeverity(e.status)"></p-tag>
-            }
-          </div>
-        </div>
-        @if (event() && authService.canWrite('events')) {
-          <p-button
-            icon="pi pi-pencil"
-            [label]="'EVENTS.DETAIL.EDIT' | translate"
-            severity="secondary"
-            [outlined]="true"
-            (onClick)="edit()"
-          ></p-button>
-        }
-      </div>
-
-      @if (event(); as e) {
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <p-card>
-            <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.LOCATION' | translate }}</div>
-            <div class="text-lg font-semibold">{{ e.location || '—' }}</div>
-          </p-card>
-          <p-card>
-            <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.DATES' | translate }}</div>
-            <div class="text-lg font-semibold">
-              {{ (e.startDate | date: 'mediumDate') || '—' }}
-              @if (e.endDate && e.endDate !== e.startDate) {
-                → {{ e.endDate | date: 'mediumDate' }}
-              }
-            </div>
-          </p-card>
-        </div>
-
-        @if (e.description) {
-          <p-card styleClass="mb-6">
-            <div class="text-sm text-gray-500 mb-2">{{ 'EVENTS.DETAIL.DESCRIPTION' | translate }}</div>
-            <div class="text-gray-800 whitespace-pre-line">{{ e.description }}</div>
-          </p-card>
-        }
-      }
-
-      <p-card>
-        <ng-template pTemplate="header">
-          <div class="px-6 py-4 border-b">
-            <h3 class="text-xl font-semibold">{{ 'EVENTS.DETAIL.PL_TITLE' | translate }}</h3>
-            <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.PL_DESC' | translate }}</p>
-          </div>
-        </ng-template>
-
-        @if (pl(); as p) {
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-green-50 p-4 rounded">
-              <div class="text-sm text-green-700 font-medium mb-1">
-                {{ 'EVENTS.DETAIL.REVENUE' | translate }}
-                <span class="text-gray-500 ml-2">({{ p.revenueCount }})</span>
-              </div>
-              <div class="text-2xl font-bold text-green-700">{{ p.revenue.toFixed(2) }}</div>
-            </div>
-
-            <div class="bg-red-50 p-4 rounded">
-              <div class="text-sm text-red-700 font-medium mb-1">
-                {{ 'EVENTS.DETAIL.EXPENSES' | translate }}
-                <span class="text-gray-500 ml-2">({{ p.expenseCount }})</span>
-              </div>
-              <div class="text-2xl font-bold text-red-700">{{ p.expenses.toFixed(2) }}</div>
-            </div>
-
-            <div class="bg-orange-50 p-4 rounded">
-              <div class="text-sm text-orange-700 font-medium mb-1">
-                {{ 'EVENTS.DETAIL.REFUNDS' | translate }}
-                <span class="text-gray-500 ml-2">({{ p.refundCount }})</span>
-              </div>
-              <div class="text-2xl font-bold text-orange-700">{{ p.refunds.toFixed(2) }}</div>
-            </div>
-
-            <div class="bg-blue-50 p-4 rounded">
-              <div class="text-sm text-blue-700 font-medium mb-1">
-                {{ 'EVENTS.DETAIL.PRODUCT_MARGIN' | translate }}
-                <span class="text-gray-500 ml-2">({{ p.productSaleCount }})</span>
-              </div>
-              <div class="text-2xl font-bold text-blue-700">{{ p.productMargin.toFixed(2) }}</div>
-              <div class="text-xs text-gray-500 mt-1">
-                {{ 'EVENTS.DETAIL.PRODUCT_REVENUE' | translate }}: {{ p.productRevenue.toFixed(2) }}
-                · {{ 'EVENTS.DETAIL.PRODUCT_COST' | translate }}: {{ p.productCost.toFixed(2) }}
-              </div>
-            </div>
-          </div>
-
-          <p-divider></p-divider>
-
-          <div
-            class="flex justify-between items-center p-4 rounded"
-            [ngClass]="p.netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'"
-          >
-            <div>
-              <div class="text-sm font-medium">{{ 'EVENTS.DETAIL.NET_PROFIT' | translate }}</div>
-              <div class="text-xs text-gray-600 mt-1">
-                {{ 'EVENTS.DETAIL.NET_FORMULA' | translate }}
-              </div>
-            </div>
-            <div
-              class="text-3xl font-bold"
-              [ngClass]="p.netProfit >= 0 ? 'text-green-700' : 'text-red-700'"
-            >
-              {{ p.netProfit.toFixed(2) }}
-            </div>
-          </div>
-
-        } @else {
-          <div class="text-center py-8 text-gray-500">
-            <i class="pi pi-spin pi-spinner text-2xl"></i>
-          </div>
-        }
-      </p-card>
-    </div>
-  `,
+  providers: [ConfirmationService],
+  templateUrl: './event-detail.component.html',
+  styles: [],
 })
 export class EventDetailComponent implements OnInit {
   private service = inject(EventService);
+  private studentService = inject(StudentService);
+  private expenseService = inject(ExpenseService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private notifications = inject(NotificationService);
+  private confirmationService = inject(ConfirmationService);
   authService = inject(AuthService);
 
   id!: string;
   event = signal<EventModel | null>(null);
   pl = signal<EventPL | null>(null);
 
+  subscriptions = signal<EventSubscription[]>([]);
+  expenses = signal<EventExpense[]>([]);
+  refunds = signal<EventRefund[]>([]);
+
+  // Lookup
+  students = signal<Student[]>([]);
+  studentOptions = signal<{ label: string; value: string }[]>([]);
+
+  // Dialogs
+  showSubscriptionDialog = false;
+  showExpenseDialog = false;
+  showRefundDialog = false;
+
+  // Subscription form
+  subType: 'STUDENT' | 'EXTERNAL' = 'STUDENT';
+  subStudentId: string | null = null;
+  subFirstName = '';
+  subLastName = '';
+  subAge: number | null = null;
+  subMobile = '';
+  subAmount: number | null = null;
+  subPaymentDate: Date = new Date();
+  subPaymentMethod: string | null = null;
+  subNotes = '';
+
+  // Expense form
+  expCategory: string = ExpenseCategory.OTHER;
+  expAmount: number | null = null;
+  expDescription = '';
+  expDate: Date = new Date();
+  expVendor = '';
+  expInvoice = '';
+  expNotes = '';
+  expPayNow = true;
+
+  // Refund form
+  refAmount: number | null = null;
+  refDate: Date = new Date();
+  refType: 'FULL' | 'PARTIAL' = 'PARTIAL';
+  refReason = '';
+  refStudentId: string | null = null;
+
+  saving = signal(false);
+
+  paymentMethodOptions = [
+    { label: 'Cash', value: 'CASH' },
+    { label: 'Bank Transfer', value: 'BANK_TRANSFER' },
+    { label: 'Credit Card', value: 'CREDIT_CARD' },
+    { label: 'Check', value: 'CHECK' },
+  ];
+
+  expenseCategoryOptions = Object.values(ExpenseCategory).map(c => ({ label: c, value: c }));
+
   ngOnInit() {
     this.id = this.route.snapshot.paramMap.get('id')!;
+    this.loadEvent();
+    this.loadPL();
+    this.loadSubscriptions();
+    this.loadExpenses();
+    this.loadRefunds();
+    this.loadStudents();
+  }
+
+  loadEvent() {
     this.service.getById(this.id).subscribe({
       next: (e) => this.event.set(e),
       error: () => {
@@ -172,22 +145,264 @@ export class EventDetailComponent implements OnInit {
         this.router.navigate(['/events']);
       },
     });
-    this.service.getPL(this.id).subscribe({
-      next: (p) => this.pl.set(p),
+  }
+
+  loadPL() {
+    this.service.getPL(this.id).subscribe({ next: (p) => this.pl.set(p) });
+  }
+
+  loadSubscriptions() {
+    this.service.listSubscriptions(this.id).subscribe({
+      next: (rows) => this.subscriptions.set(rows),
     });
   }
 
-  edit() { this.router.navigate(['/events', this.id, 'edit']); }
-  back() { this.router.navigate(['/events']); }
+  loadExpenses() {
+    this.service.listExpenses(this.id).subscribe({
+      next: (rows) => this.expenses.set(rows),
+    });
+  }
+
+  loadRefunds() {
+    this.service.listRefunds(this.id).subscribe({
+      next: (rows) => this.refunds.set(rows),
+    });
+  }
+
+  loadStudents() {
+    this.studentService.getAllStudents().subscribe({
+      next: (list) => {
+        this.students.set(list);
+        this.studentOptions.set(
+          list.map((s) => ({ label: `${s.firstName} ${s.lastName}`, value: s.id }))
+        );
+      },
+    });
+  }
+
+  // ─── Subscription dialog ────────────────────────────────────────────────
+  openSubscriptionDialog() {
+    this.subType = 'STUDENT';
+    this.subStudentId = null;
+    this.subFirstName = '';
+    this.subLastName = '';
+    this.subAge = null;
+    this.subMobile = '';
+    this.subAmount = null;
+    this.subPaymentDate = new Date();
+    this.subPaymentMethod = null;
+    this.subNotes = '';
+    this.showSubscriptionDialog = true;
+  }
+
+  submitSubscription() {
+    if (!this.subAmount || !this.subPaymentDate) return;
+    if (this.subType === 'STUDENT' && !this.subStudentId) {
+      this.notifications.error('Pick a student');
+      return;
+    }
+    if (this.subType === 'EXTERNAL' && (!this.subFirstName || !this.subLastName)) {
+      this.notifications.error('First and last name required');
+      return;
+    }
+
+    this.saving.set(true);
+    const dto =
+      this.subType === 'STUDENT'
+        ? {
+            studentId: this.subStudentId!,
+            amount: this.subAmount,
+            paymentDate: this.subPaymentDate.toISOString().split('T')[0],
+            paymentMethod: this.subPaymentMethod || undefined,
+            notes: this.subNotes || undefined,
+          }
+        : {
+            externalFirstName: this.subFirstName,
+            externalLastName: this.subLastName,
+            externalAge: this.subAge ?? undefined,
+            externalMobile: this.subMobile || undefined,
+            amount: this.subAmount,
+            paymentDate: this.subPaymentDate.toISOString().split('T')[0],
+            paymentMethod: this.subPaymentMethod || undefined,
+            notes: this.subNotes || undefined,
+          };
+
+    this.service.createSubscription(this.id, dto).subscribe({
+      next: () => {
+        this.notifications.success('Subscription added');
+        this.showSubscriptionDialog = false;
+        this.saving.set(false);
+        this.loadSubscriptions();
+        this.loadPL();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.notifications.error(err?.error?.message || 'Failed to add subscription');
+      },
+    });
+  }
+
+  deleteSubscription(sub: EventSubscription) {
+    this.confirmationService.confirm({
+      message: 'Delete this subscription? Linked revenue (if any) will also be removed.',
+      header: 'Confirm Delete',
+      icon: 'pi pi-exclamation-triangle',
+      accept: () => {
+        this.service.deleteSubscription(sub.id).subscribe({
+          next: () => {
+            this.notifications.success('Subscription deleted');
+            this.loadSubscriptions();
+            this.loadPL();
+          },
+          error: (err) => {
+            this.notifications.error(err?.error?.message || 'Failed to delete');
+          },
+        });
+      },
+    });
+  }
+
+  // ─── Expense dialog ─────────────────────────────────────────────────────
+  openExpenseDialog() {
+    this.expCategory = ExpenseCategory.OTHER;
+    this.expAmount = null;
+    this.expDescription = '';
+    this.expDate = new Date();
+    this.expVendor = '';
+    this.expInvoice = '';
+    this.expNotes = '';
+    this.expPayNow = true;
+    this.showExpenseDialog = true;
+  }
+
+  submitExpense() {
+    if (!this.expAmount || !this.expDescription || !this.expDate) {
+      this.notifications.error('Fill required fields');
+      return;
+    }
+    this.saving.set(true);
+    const dateStr = this.expDate.toISOString().split('T')[0];
+    const expenseData: any = {
+      type: ExpenseType.VARIABLE,
+      category: this.expCategory,
+      amount: this.expAmount,
+      description: this.expDescription,
+      date: dateStr,
+      isRecurring: false,
+      eventId: this.id,
+      vendor: this.expVendor || null,
+      invoiceNumber: this.expInvoice || null,
+      notes: this.expNotes || null,
+      // branchId omitted — backend derives from event
+    };
+
+    this.expenseService.createExpense(expenseData).subscribe({
+      next: (created) => {
+        if (this.expPayNow) {
+          this.expenseService
+            .recordPayment({
+              expenseId: created.id,
+              type: created.type,
+              category: created.category,
+              amount: created.amount,
+              date: dateStr,
+              branchId: created.branchId,
+              vendor: created.vendor || undefined,
+              invoiceNumber: created.invoiceNumber || undefined,
+              notes: created.notes || undefined,
+            })
+            .subscribe({
+              next: () => {
+                this.notifications.success('Expense recorded and paid');
+                this.finishExpense();
+              },
+              error: (err) => {
+                this.saving.set(false);
+                this.notifications.error(err?.error?.message || 'Expense created but payment failed');
+                this.loadExpenses();
+              },
+            });
+        } else {
+          this.notifications.success('Expense added');
+          this.finishExpense();
+        }
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.notifications.error(err?.error?.message || 'Failed to add expense');
+      },
+    });
+  }
+
+  private finishExpense() {
+    this.showExpenseDialog = false;
+    this.saving.set(false);
+    this.loadExpenses();
+    this.loadPL();
+  }
+
+  // ─── Refund dialog ──────────────────────────────────────────────────────
+  openRefundDialog() {
+    this.refAmount = null;
+    this.refDate = new Date();
+    this.refType = 'PARTIAL';
+    this.refReason = '';
+    this.refStudentId = null;
+    this.showRefundDialog = true;
+  }
+
+  submitRefund() {
+    if (!this.refAmount || !this.refDate) return;
+    this.saving.set(true);
+    this.service
+      .createRefund(this.id, {
+        amount: this.refAmount,
+        refundDate: this.refDate.toISOString().split('T')[0],
+        type: this.refType,
+        reason: this.refReason || undefined,
+        studentId: this.refStudentId || undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.notifications.success('Refund issued');
+          this.showRefundDialog = false;
+          this.saving.set(false);
+          this.loadRefunds();
+          this.loadPL();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.notifications.error(err?.error?.message || 'Failed to issue refund');
+        },
+      });
+  }
+
+  // ─── Helpers ────────────────────────────────────────────────────────────
+  edit() {
+    this.router.navigate(['/events', this.id, 'edit']);
+  }
+
+  back() {
+    this.router.navigate(['/events']);
+  }
 
   statusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
     switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'PLANNED': return 'info';
-      case 'COMPLETED': return 'secondary';
-      case 'CANCELLED': return 'danger';
-      default: return 'info';
+      case 'ACTIVE':
+        return 'success';
+      case 'PLANNED':
+        return 'info';
+      case 'COMPLETED':
+        return 'secondary';
+      case 'CANCELLED':
+        return 'danger';
+      default:
+        return 'info';
     }
   }
 
+  subscriberLabel(s: EventSubscription): string {
+    if (s.studentName) return s.studentName;
+    return `${s.externalFirstName ?? ''} ${s.externalLastName ?? ''}`.trim() || '—';
+  }
 }

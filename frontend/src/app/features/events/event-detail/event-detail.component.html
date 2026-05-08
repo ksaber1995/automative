@@ -1,0 +1,475 @@
+<div class="container-custom py-8">
+  <div class="mb-6 flex justify-between items-start">
+    <div>
+      <p-button
+        icon="pi pi-arrow-left"
+        [text]="true"
+        [label]="'EVENTS.DETAIL.BACK' | translate"
+        (onClick)="back()"
+      ></p-button>
+      <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ event()?.name }}</h1>
+      <div class="flex gap-2 mt-2">
+        @if (event(); as e) {
+          <p-tag [value]="('EVENTS.TYPE.' + e.eventType) | translate" severity="info"></p-tag>
+          <p-tag [value]="('EVENTS.STATUS.' + e.status) | translate" [severity]="statusSeverity(e.status)"></p-tag>
+        }
+      </div>
+    </div>
+    @if (event() && authService.canWrite('events')) {
+      <p-button
+        icon="pi pi-pencil"
+        [label]="'EVENTS.DETAIL.EDIT' | translate"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="edit()"
+      ></p-button>
+    }
+  </div>
+
+  @if (event(); as e) {
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <p-card>
+        <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.LOCATION' | translate }}</div>
+        <div class="text-lg font-semibold">{{ e.location || '—' }}</div>
+      </p-card>
+      <p-card>
+        <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.DATES' | translate }}</div>
+        <div class="text-lg font-semibold">
+          {{ (e.startDate | date: 'mediumDate') || '—' }}
+          @if (e.endDate && e.endDate !== e.startDate) {
+            → {{ e.endDate | date: 'mediumDate' }}
+          }
+        </div>
+      </p-card>
+    </div>
+
+    @if (e.description) {
+      <p-card styleClass="mb-6">
+        <div class="text-sm text-gray-500 mb-2">{{ 'EVENTS.DETAIL.DESCRIPTION' | translate }}</div>
+        <div class="text-gray-800 whitespace-pre-line">{{ e.description }}</div>
+      </p-card>
+    }
+  }
+
+  <!-- P&L -->
+  <p-card styleClass="mb-6">
+    <ng-template pTemplate="header">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-xl font-semibold">{{ 'EVENTS.DETAIL.PL_TITLE' | translate }}</h3>
+        <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.PL_DESC' | translate }}</p>
+      </div>
+    </ng-template>
+
+    @if (pl(); as p) {
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-green-50 p-4 rounded">
+          <div class="text-sm text-green-700 font-medium mb-1">
+            {{ 'EVENTS.DETAIL.REVENUE' | translate }}
+            <span class="text-gray-500 ml-2">({{ p.revenueCount }})</span>
+          </div>
+          <div class="text-2xl font-bold text-green-700">{{ p.revenue.toFixed(2) }}</div>
+        </div>
+
+        <div class="bg-red-50 p-4 rounded">
+          <div class="text-sm text-red-700 font-medium mb-1">
+            {{ 'EVENTS.DETAIL.EXPENSES' | translate }}
+            <span class="text-gray-500 ml-2">({{ p.expenseCount }})</span>
+          </div>
+          <div class="text-2xl font-bold text-red-700">{{ p.expenses.toFixed(2) }}</div>
+        </div>
+
+        <div class="bg-orange-50 p-4 rounded">
+          <div class="text-sm text-orange-700 font-medium mb-1">
+            {{ 'EVENTS.DETAIL.REFUNDS' | translate }}
+            <span class="text-gray-500 ml-2">({{ p.refundCount }})</span>
+          </div>
+          <div class="text-2xl font-bold text-orange-700">{{ p.refunds.toFixed(2) }}</div>
+        </div>
+
+        <div class="bg-blue-50 p-4 rounded">
+          <div class="text-sm text-blue-700 font-medium mb-1">
+            {{ 'EVENTS.DETAIL.PRODUCT_MARGIN' | translate }}
+            <span class="text-gray-500 ml-2">({{ p.productSaleCount }})</span>
+          </div>
+          <div class="text-2xl font-bold text-blue-700">{{ p.productMargin.toFixed(2) }}</div>
+          <div class="text-xs text-gray-500 mt-1">
+            {{ 'EVENTS.DETAIL.PRODUCT_REVENUE' | translate }}: {{ p.productRevenue.toFixed(2) }}
+            · {{ 'EVENTS.DETAIL.PRODUCT_COST' | translate }}: {{ p.productCost.toFixed(2) }}
+          </div>
+        </div>
+      </div>
+
+      <p-divider></p-divider>
+
+      <div
+        class="flex justify-between items-center p-4 rounded"
+        [ngClass]="p.netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'"
+      >
+        <div>
+          <div class="text-sm font-medium">{{ 'EVENTS.DETAIL.NET_PROFIT' | translate }}</div>
+          <div class="text-xs text-gray-600 mt-1">
+            {{ 'EVENTS.DETAIL.NET_FORMULA' | translate }}
+          </div>
+        </div>
+        <div
+          class="text-3xl font-bold"
+          [ngClass]="p.netProfit >= 0 ? 'text-green-700' : 'text-red-700'"
+        >
+          {{ p.netProfit.toFixed(2) }}
+        </div>
+      </div>
+    } @else {
+      <div class="text-center py-8 text-gray-500">
+        <i class="pi pi-spin pi-spinner text-2xl"></i>
+      </div>
+    }
+  </p-card>
+
+  <!-- Subscriptions -->
+  <p-card styleClass="mb-6">
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center px-6 py-4 border-b">
+        <div>
+          <h3 class="text-xl font-semibold flex items-center gap-2">
+            <i class="pi pi-users text-green-600"></i>
+            Subscribers
+            <span class="text-gray-400 text-base font-normal">({{ subscriptions().length }})</span>
+          </h3>
+          <p class="text-sm text-gray-500 mt-1">Students or external attendees who paid for this event</p>
+        </div>
+        @if (authService.canWrite('events')) {
+          <p-button icon="pi pi-plus" label="Add Subscriber" severity="success" (onClick)="openSubscriptionDialog()"></p-button>
+        }
+      </div>
+    </ng-template>
+
+    <p-table [value]="subscriptions()" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Subscriber</th>
+          <th>Type</th>
+          <th>Mobile / Age</th>
+          <th class="text-right">Amount</th>
+          <th>Date</th>
+          <th>Method</th>
+          <th></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-s>
+        <tr>
+          <td class="font-medium">{{ subscriberLabel(s) }}</td>
+          <td>
+            @if (s.studentId) {
+              <p-tag value="Student" severity="info"></p-tag>
+            } @else {
+              <p-tag value="External" severity="warn"></p-tag>
+            }
+          </td>
+          <td class="text-sm text-gray-600">
+            @if (s.externalMobile) { <div>{{ s.externalMobile }}</div> }
+            @if (s.externalAge) { <div class="text-xs text-gray-400">Age: {{ s.externalAge }}</div> }
+          </td>
+          <td class="text-right font-semibold text-green-600">{{ s.amount.toFixed(2) }}</td>
+          <td>{{ s.paymentDate | date: 'mediumDate' }}</td>
+          <td class="text-sm text-gray-500">{{ s.paymentMethod || '—' }}</td>
+          <td>
+            @if (authService.canWrite('events')) {
+              <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
+                pTooltip="Delete" (onClick)="deleteSubscription(s)"></p-button>
+            }
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center py-6 text-gray-400">No subscribers yet.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <!-- Expenses -->
+  <p-card styleClass="mb-6">
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center px-6 py-4 border-b">
+        <div>
+          <h3 class="text-xl font-semibold flex items-center gap-2">
+            <i class="pi pi-wallet text-red-600"></i>
+            Expenses
+            <span class="text-gray-400 text-base font-normal">({{ expenses().length }})</span>
+          </h3>
+          <p class="text-sm text-gray-500 mt-1">Costs tied to this event — branch is auto-linked from the event</p>
+        </div>
+        @if (authService.canWrite('expenses')) {
+          <p-button icon="pi pi-plus" label="Add Expense" severity="danger" (onClick)="openExpenseDialog()"></p-button>
+        }
+      </div>
+    </ng-template>
+
+    <p-table [value]="expenses()" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Date</th>
+          <th>Vendor</th>
+          <th class="text-right">Amount</th>
+          <th class="text-right">Paid</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-e>
+        <tr>
+          <td class="font-medium">{{ e.description || '—' }}</td>
+          <td><p-tag [value]="e.category" severity="secondary"></p-tag></td>
+          <td>{{ e.date | date: 'mediumDate' }}</td>
+          <td class="text-sm text-gray-600">{{ e.vendor || '—' }}</td>
+          <td class="text-right font-semibold">{{ e.amount.toFixed(2) }}</td>
+          <td class="text-right">
+            @if (e.totalPaid >= e.amount) {
+              <span class="text-green-600 font-semibold">{{ e.totalPaid.toFixed(2) }}</span>
+            } @else if (e.totalPaid > 0) {
+              <span class="text-orange-600">{{ e.totalPaid.toFixed(2) }}</span>
+            } @else {
+              <span class="text-gray-400">0.00</span>
+            }
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="6" class="text-center py-6 text-gray-400">No expenses yet.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <!-- Refunds -->
+  <p-card styleClass="mb-6">
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center px-6 py-4 border-b">
+        <div>
+          <h3 class="text-xl font-semibold flex items-center gap-2">
+            <i class="pi pi-replay text-orange-600"></i>
+            Refunds
+            <span class="text-gray-400 text-base font-normal">({{ refunds().length }})</span>
+          </h3>
+          <p class="text-sm text-gray-500 mt-1">Money returned to subscribers or attendees</p>
+        </div>
+        @if (authService.canWrite('events')) {
+          <p-button icon="pi pi-plus" label="Add Refund" severity="warn" (onClick)="openRefundDialog()"></p-button>
+        }
+      </div>
+    </ng-template>
+
+    <p-table [value]="refunds()" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Date</th>
+          <th>Student</th>
+          <th>Type</th>
+          <th class="text-right">Amount</th>
+          <th>Reason</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-r>
+        <tr>
+          <td>{{ r.refundDate | date: 'mediumDate' }}</td>
+          <td>{{ r.studentName || '—' }}</td>
+          <td><p-tag [value]="r.type" severity="warn"></p-tag></td>
+          <td class="text-right font-semibold text-orange-600">-{{ r.amount.toFixed(2) }}</td>
+          <td class="text-sm text-gray-600">{{ r.reason || '—' }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="5" class="text-center py-6 text-gray-400">No refunds yet.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+</div>
+
+<!-- Add Subscriber Dialog -->
+<p-dialog [(visible)]="showSubscriptionDialog" [modal]="true" header="Add Subscriber" [style]="{ width: '520px' }">
+  <div class="grid gap-4">
+    <!-- Subscriber type -->
+    <div>
+      <label class="block text-sm font-medium mb-2">Subscriber Type <span class="text-red-500">*</span></label>
+      <div class="flex gap-6">
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="subType" value="STUDENT" [(ngModel)]="subType"></p-radiobutton>
+          <span>Student</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="subType" value="EXTERNAL" [(ngModel)]="subType"></p-radiobutton>
+          <span>External (not in system)</span>
+        </label>
+      </div>
+    </div>
+
+    @if (subType === 'STUDENT') {
+      <div>
+        <label class="block text-sm font-medium mb-2">Student <span class="text-red-500">*</span></label>
+        <p-select
+          [(ngModel)]="subStudentId"
+          [options]="studentOptions()"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Pick a student"
+          [filter]="true"
+          filterBy="label"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
+    } @else {
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-2">First name <span class="text-red-500">*</span></label>
+          <input pInputText [(ngModel)]="subFirstName" class="w-full" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Last name <span class="text-red-500">*</span></label>
+          <input pInputText [(ngModel)]="subLastName" class="w-full" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Age</label>
+          <p-inputnumber [(ngModel)]="subAge" [min]="0" [max]="120" [style]="{ width: '100%' }" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Mobile</label>
+          <input pInputText [(ngModel)]="subMobile" class="w-full" />
+        </div>
+      </div>
+    }
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+        <p-inputnumber [(ngModel)]="subAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Payment date <span class="text-red-500">*</span></label>
+        <p-datepicker [(ngModel)]="subPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Payment method</label>
+      <p-select [(ngModel)]="subPaymentMethod" [options]="paymentMethodOptions" optionLabel="label" optionValue="value" placeholder="Optional" [showClear]="true" [style]="{ width: '100%' }"></p-select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Notes</label>
+      <textarea pTextarea [(ngModel)]="subNotes" rows="2" class="w-full"></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showSubscriptionDialog = false"></p-button>
+    <p-button label="Add" icon="pi pi-check" severity="success" [loading]="saving()"
+      [disabled]="!subAmount || !subPaymentDate"
+      (onClick)="submitSubscription()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Add Expense Dialog -->
+<p-dialog [(visible)]="showExpenseDialog" [modal]="true" header="Add Event Expense" [style]="{ width: '520px' }">
+  <div class="grid gap-4">
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Category <span class="text-red-500">*</span></label>
+        <p-select [(ngModel)]="expCategory" [options]="expenseCategoryOptions" optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+        <p-inputnumber [(ngModel)]="expAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Description <span class="text-red-500">*</span></label>
+      <input pInputText [(ngModel)]="expDescription" class="w-full" />
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
+        <p-datepicker [(ngModel)]="expDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Vendor</label>
+        <input pInputText [(ngModel)]="expVendor" class="w-full" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Invoice #</label>
+      <input pInputText [(ngModel)]="expInvoice" class="w-full" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Notes</label>
+      <textarea pTextarea [(ngModel)]="expNotes" rows="2" class="w-full"></textarea>
+    </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox [(ngModel)]="expPayNow" [binary]="true" inputId="expPayNow"></p-checkbox>
+      <label for="expPayNow" class="text-sm font-medium">Pay immediately (record payment)</label>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showExpenseDialog = false"></p-button>
+    <p-button label="Add" icon="pi pi-check" severity="danger" [loading]="saving()"
+      [disabled]="!expAmount || !expDescription || !expDate"
+      (onClick)="submitExpense()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Add Refund Dialog -->
+<p-dialog [(visible)]="showRefundDialog" [modal]="true" header="Add Event Refund" [style]="{ width: '520px' }">
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">Type <span class="text-red-500">*</span></label>
+      <div class="flex gap-6">
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="refType" value="FULL" [(ngModel)]="refType"></p-radiobutton>
+          <span>Full</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <p-radiobutton name="refType" value="PARTIAL" [(ngModel)]="refType"></p-radiobutton>
+          <span>Partial</span>
+        </label>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+        <p-inputnumber [(ngModel)]="refAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
+        <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Student (optional)</label>
+      <p-select
+        [(ngModel)]="refStudentId"
+        [options]="studentOptions()"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Refund for a specific student"
+        [filter]="true"
+        filterBy="label"
+        [showClear]="true"
+        [style]="{ width: '100%' }"
+      ></p-select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">Reason</label>
+      <textarea pTextarea [(ngModel)]="refReason" rows="2" class="w-full"></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
+    <p-button label="Issue Refund" icon="pi pi-replay" severity="warn" [loading]="saving()"
+      [disabled]="!refAmount || !refDate"
+      (onClick)="submitRefund()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<p-confirmDialog></p-confirmDialog>
