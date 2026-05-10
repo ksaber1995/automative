@@ -16,7 +16,7 @@ export async function sendOtpEmail(
     },
     Message: {
       Subject: {
-        Data: 'Verify your Automate Magic account',
+        Data: 'Verify your Netrofit account',
         Charset: 'UTF-8',
       },
       Body: {
@@ -36,8 +36,8 @@ export async function sendOtpEmail(
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Automate Magic</h1>
-              <p style="margin:6px 0 0;color:#bfdbfe;font-size:13px;">Business Management Platform</p>
+              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Netrofit</h1>
+              <p style="margin:6px 0 0;color:#bfdbfe;font-size:13px;">Multi-branch academy management</p>
             </td>
           </tr>
           <!-- Body -->
@@ -46,7 +46,7 @@ export async function sendOtpEmail(
               <h2 style="margin:0 0 16px;color:#1e293b;font-size:20px;font-weight:600;">Verify your email address</h2>
               <p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6;">Hi ${firstName},</p>
               <p style="margin:0 0 28px;color:#475569;font-size:15px;line-height:1.6;">
-                Thank you for registering with Automate Magic. Enter the code below to verify your email and activate your account.
+                Thank you for registering with Netrofit. Enter the code below to verify your email and activate your account.
               </p>
               <!-- OTP Box -->
               <table width="100%" cellpadding="0" cellspacing="0">
@@ -71,7 +71,7 @@ export async function sendOtpEmail(
           <tr>
             <td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
               <p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">
-                &copy; ${new Date().getFullYear()} Automate Magic. All rights reserved.
+                &copy; ${new Date().getFullYear()} Netrofit. All rights reserved.
               </p>
             </td>
           </tr>
@@ -88,7 +88,7 @@ export async function sendOtpEmail(
           Data: [
             `Hello ${firstName},`,
             '',
-            'Thank you for registering with Automate Magic.',
+            'Thank you for registering with Netrofit.',
             'Your email verification code is:',
             '',
             `  ${otp}`,

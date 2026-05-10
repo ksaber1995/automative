@@ -49,7 +49,7 @@ const router = {
   auth: {
     login: authRoutes.login,
     register: authRoutes.register,
-    verifyEmail: authRoutes.verifyEmail,
+    verifyPhone: authRoutes.verifyPhone,
     resendOtp: authRoutes.resendOtp,
     profile: authRoutes.profile,
   },

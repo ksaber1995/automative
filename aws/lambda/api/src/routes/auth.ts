@@ -1,26 +1,104 @@
 import bcrypt from 'bcryptjs';
 import { query, queryOne, getClient } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { sendOtpEmail } from '../utils/email';
+import { sendOtpWhatsApp, normalizeLocalPhone, normalizeCountryCode } from '../utils/whatsapp';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Resolves a login identifier to a user. Accepts an email or a phone number
+// in any common shape (local with leading 0, international with or without +).
+// Returns null if no user matches.
+async function findUserByIdentifier(identifier: string): Promise<any | null> {
+  const trimmed = (identifier || '').trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes('@')) {
+    return queryOne<any>(
+      `SELECT u.*,
+              c.is_active as company_is_active,
+              c.subscription_status,
+              c.name as company_name,
+              c.code as company_code
+       FROM users u
+       JOIN companies c ON u.company_id = c.id
+       WHERE LOWER(u.email) = LOWER($1)`,
+      [trimmed]
+    );
+  }
+
+  // Phone path. Strip leading 0 / non-digits.
+  const local = normalizeLocalPhone(trimmed);
+  if (!local) return null;
+
+  // Try exact match first (works when user types just the local subscriber digits
+  // — that's how phones are stored). If nothing matches, try ENDSWITH so users
+  // who paste in country code prefixes still resolve.
+  const direct = await queryOne<any>(
+    `SELECT u.*,
+            c.is_active as company_is_active,
+            c.subscription_status,
+            c.name as company_name,
+            c.code as company_code
+     FROM users u
+     JOIN companies c ON u.company_id = c.id
+     WHERE u.phone = $1
+     LIMIT 1`,
+    [local]
+  );
+  if (direct) return direct;
+
+  return queryOne<any>(
+    `SELECT u.*,
+            c.is_active as company_is_active,
+            c.subscription_status,
+            c.name as company_name,
+            c.code as company_code
+     FROM users u
+     JOIN companies c ON u.company_id = c.id
+     WHERE u.phone IS NOT NULL AND $1 LIKE '%' || u.phone
+     LIMIT 1`,
+    [local]
+  );
+}
+
+function buildSafeUser(user: any, branchIds: string[]) {
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    role: user.role,
+    companyId: user.company_id,
+    branchId: user.branch_id,
+    branchIds,
+    linkedEmployeeId: user.linked_employee_id ?? null,
+    permissions: user.permissions ?? null,
+    isActive: user.is_active,
+    countryCode: user.country_code ?? null,
+    phone: user.phone ?? null,
+    phoneVerified: user.phone_verified ?? false,
+  };
+}
+
+async function loadBranchIds(user: any): Promise<string[]> {
+  let branchIds: string[] = [];
+  try {
+    const userBranches = await query<any>(
+      'SELECT branch_id FROM user_branches WHERE user_id = $1',
+      [user.id]
+    );
+    branchIds = userBranches.map((r: any) => r.branch_id);
+  } catch {}
+  if (branchIds.length === 0 && user.branch_id) branchIds = [user.branch_id];
+  return branchIds;
+}
+
 export const authRoutes = {
-  login: async ({ body }: { body: { email: string; password: string } }) => {
+  login: async ({ body }: { body: { identifier: string; password: string } }) => {
     try {
-      const user = await queryOne<any>(
-        `SELECT u.*,
-                c.is_active as company_is_active,
-                c.subscription_status,
-                c.name as company_name,
-                c.code as company_code
-         FROM users u
-         JOIN companies c ON u.company_id = c.id
-         WHERE u.email = $1`,
-        [body.email]
-      );
+      const user = await findUserByIdentifier(body.identifier);
 
       if (!user) {
         return { status: 401 as const, body: { message: 'Invalid credentials' } };
@@ -43,27 +121,20 @@ export const authRoutes = {
         return { status: 401 as const, body: { message: 'User account is inactive' } };
       }
 
-      // Block unverified emails
-      if (!user.email_verified) {
+      // Block unverified phones
+      if (!user.phone_verified) {
         return {
           status: 403 as const,
           body: {
-            message: 'Please verify your email address before logging in.',
-            code: 'EMAIL_NOT_VERIFIED',
-            email: user.email,
+            message: 'Please verify your phone number before logging in.',
+            code: 'PHONE_NOT_VERIFIED',
+            countryCode: user.country_code ?? '',
+            phone: user.phone ?? '',
           },
         };
       }
 
-      let branchIds: string[] = [];
-      try {
-        const userBranches = await query<any>(
-          'SELECT branch_id FROM user_branches WHERE user_id = $1',
-          [user.id]
-        );
-        branchIds = userBranches.map((r: any) => r.branch_id);
-      } catch {}
-      if (branchIds.length === 0 && user.branch_id) branchIds = [user.branch_id];
+      const branchIds = await loadBranchIds(user);
 
       const payload = {
         id: user.id,
@@ -82,19 +153,7 @@ export const authRoutes = {
         body: {
           accessToken,
           refreshToken,
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.first_name,
-            lastName: user.last_name,
-            role: user.role,
-            companyId: user.company_id,
-            branchId: user.branch_id,
-            branchIds,
-            linkedEmployeeId: user.linked_employee_id ?? null,
-            permissions: user.permissions ?? null,
-            isActive: user.is_active,
-          },
+          user: buildSafeUser(user, branchIds),
         },
       };
     } catch (error) {
@@ -115,11 +174,22 @@ export const authRoutes = {
       lastName: string;
       email: string;
       password: string;
-      phone?: string;
+      countryCode: string;
+      phone: string;
       timezone?: string;
     };
   }) => {
     const client = await getClient();
+
+    const countryCode = normalizeCountryCode(body.countryCode);
+    const phone = normalizeLocalPhone(body.phone);
+
+    if (!countryCode) {
+      return { status: 400 as const, body: { message: 'Country code is required.' } };
+    }
+    if (!phone) {
+      return { status: 400 as const, body: { message: 'Phone number is required.' } };
+    }
 
     try {
       await client.query('BEGIN');
@@ -140,6 +210,15 @@ export const authRoutes = {
       if (existingUser) {
         await client.query('ROLLBACK');
         return { status: 400 as const, body: { message: 'User email already exists' } };
+      }
+
+      const existingPhone = await queryOne(
+        'SELECT id FROM users WHERE phone = $1',
+        [phone]
+      );
+      if (existingPhone) {
+        await client.query('ROLLBACK');
+        return { status: 400 as const, body: { message: 'A user with this phone number already exists.' } };
       }
 
       const companyCode = body.companyCode || `COMP-${Date.now().toString(36).toUpperCase()}`;
@@ -166,7 +245,7 @@ export const authRoutes = {
          RETURNING *`,
         [
           company.id, `${body.companyName} - Main Branch`, 'MAIN',
-          body.companyEmail, body.phone || null, true, new Date(),
+          body.companyEmail, `+${countryCode}${phone}`, true, new Date(),
         ]
       );
       const branch = branchRes.rows[0];
@@ -180,13 +259,13 @@ export const authRoutes = {
       const userRes = await client.query(
         `INSERT INTO users
           (company_id, branch_id, email, password, first_name, last_name, role,
-           is_active, email_verified, email_otp, email_otp_expires_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           is_active, country_code, phone, phone_verified, phone_otp, phone_otp_expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
           company.id, branch.id, body.email, hashedPassword,
           body.firstName, body.lastName, 'ADMIN', true,
-          false, otp, otpExpiresAt,
+          countryCode, phone, false, otp, otpExpiresAt,
         ]
       );
       const user = userRes.rows[0];
@@ -219,18 +298,19 @@ export const authRoutes = {
 
       await client.query('COMMIT');
 
-      // Send OTP email (best-effort — failure does not block registration)
+      // Send OTP via WhatsApp (best-effort — failure does not block registration)
       try {
-        await sendOtpEmail(user.email, otp, user.first_name);
-      } catch (emailError) {
-        console.error('Failed to send OTP email after registration:', emailError);
+        await sendOtpWhatsApp(countryCode, phone, otp);
+      } catch (otpError) {
+        console.error('Failed to send WhatsApp OTP after registration:', otpError);
       }
 
       return {
         status: 201 as const,
         body: {
-          email: user.email,
-          message: 'Registration successful. Please check your email for your 6-digit verification code.',
+          countryCode,
+          phone,
+          message: 'Registration successful. Please check WhatsApp for your 6-digit verification code.',
         },
       };
     } catch (error: any) {
@@ -246,6 +326,8 @@ export const authRoutes = {
           message = 'Company code is already taken. Please choose a different code.';
         } else if (table === 'companies' && detail.includes('email')) {
           message = 'A company with this email already exists.';
+        } else if (constraint.includes('phone') || detail.includes('phone')) {
+          message = 'A user with this phone number already exists.';
         } else if (table === 'users' || constraint.includes('users')) {
           message = 'An account with this email already exists.';
         } else if (table === 'branches' || constraint.includes('branches')) {
@@ -260,53 +342,51 @@ export const authRoutes = {
     }
   },
 
-  verifyEmail: async ({ body }: { body: { email: string; otp: string } }) => {
+  verifyPhone: async ({
+    body,
+  }: {
+    body: { countryCode: string; phone: string; otp: string };
+  }) => {
     try {
+      const countryCode = normalizeCountryCode(body.countryCode);
+      const phone = normalizeLocalPhone(body.phone);
+
       const user = await queryOne<any>(
         `SELECT u.*, c.is_active as company_is_active, c.name as company_name
          FROM users u
          JOIN companies c ON u.company_id = c.id
-         WHERE u.email = $1`,
-        [body.email]
+         WHERE u.phone = $1 AND u.country_code = $2`,
+        [phone, countryCode]
       );
 
       if (!user) {
         return { status: 400 as const, body: { message: 'Invalid verification request.' } };
       }
 
-      if (user.email_verified) {
-        return { status: 400 as const, body: { message: 'Email is already verified.' } };
+      if (user.phone_verified) {
+        return { status: 400 as const, body: { message: 'Phone number is already verified.' } };
       }
 
-      if (!user.email_otp || user.email_otp !== body.otp) {
+      if (!user.phone_otp || user.phone_otp !== body.otp) {
         return { status: 400 as const, body: { message: 'Invalid verification code.' } };
       }
 
-      if (!user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
+      if (!user.phone_otp_expires_at || new Date(user.phone_otp_expires_at) < new Date()) {
         return {
           status: 400 as const,
           body: { message: 'Verification code has expired. Please request a new one.' },
         };
       }
 
-      // Mark verified and clear OTP
       await query(
         `UPDATE users
-         SET email_verified = TRUE, email_otp = NULL, email_otp_expires_at = NULL,
+         SET phone_verified = TRUE, phone_otp = NULL, phone_otp_expires_at = NULL,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [user.id]
       );
 
-      let branchIds: string[] = [];
-      try {
-        const userBranches = await query<any>(
-          'SELECT branch_id FROM user_branches WHERE user_id = $1',
-          [user.id]
-        );
-        branchIds = userBranches.map((r: any) => r.branch_id);
-      } catch {}
-      if (branchIds.length === 0 && user.branch_id) branchIds = [user.branch_id];
+      const branchIds = await loadBranchIds(user);
 
       const payload = {
         id: user.id,
@@ -325,44 +405,39 @@ export const authRoutes = {
         body: {
           accessToken,
           refreshToken,
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.first_name,
-            lastName: user.last_name,
-            role: user.role,
-            companyId: user.company_id,
-            branchId: user.branch_id,
-            branchIds,
-            linkedEmployeeId: user.linked_employee_id ?? null,
-            permissions: user.permissions ?? null,
-            isActive: user.is_active,
-          },
+          user: buildSafeUser({ ...user, phone_verified: true }, branchIds),
         },
       };
     } catch (error) {
-      console.error('Verify email error:', error);
+      console.error('Verify phone error:', error);
       return { status: 400 as const, body: { message: 'Verification failed. Please try again.' } };
     }
   },
 
-  resendOtp: async ({ body }: { body: { email: string } }) => {
+  resendOtp: async ({
+    body,
+  }: {
+    body: { countryCode: string; phone: string };
+  }) => {
     try {
+      const countryCode = normalizeCountryCode(body.countryCode);
+      const phone = normalizeLocalPhone(body.phone);
+
       const user = await queryOne<any>(
-        'SELECT * FROM users WHERE email = $1',
-        [body.email]
+        'SELECT * FROM users WHERE phone = $1 AND country_code = $2',
+        [phone, countryCode]
       );
 
       if (!user) {
-        // Generic response to avoid email enumeration
+        // Generic response to avoid enumeration
         return {
           status: 200 as const,
-          body: { message: 'If your email is registered, a new verification code has been sent.' },
+          body: { message: 'If your phone is registered, a new verification code has been sent.' },
         };
       }
 
-      if (user.email_verified) {
-        return { status: 400 as const, body: { message: 'This email is already verified.' } };
+      if (user.phone_verified) {
+        return { status: 400 as const, body: { message: 'This phone number is already verified.' } };
       }
 
       const otp = generateOtp();
@@ -370,20 +445,20 @@ export const authRoutes = {
 
       await query(
         `UPDATE users
-         SET email_otp = $1, email_otp_expires_at = $2, updated_at = CURRENT_TIMESTAMP
+         SET phone_otp = $1, phone_otp_expires_at = $2, updated_at = CURRENT_TIMESTAMP
          WHERE id = $3`,
         [otp, otpExpiresAt, user.id]
       );
 
       try {
-        await sendOtpEmail(user.email, otp, user.first_name);
-      } catch (emailError) {
-        console.error('Failed to send OTP email on resend:', emailError);
+        await sendOtpWhatsApp(countryCode, phone, otp);
+      } catch (otpError) {
+        console.error('Failed to send WhatsApp OTP on resend:', otpError);
       }
 
       return {
         status: 200 as const,
-        body: { message: 'A new verification code has been sent to your email.' },
+        body: { message: 'A new verification code has been sent to your WhatsApp.' },
       };
     } catch (error) {
       console.error('Resend OTP error:', error);
@@ -417,19 +492,7 @@ export const authRoutes = {
 
       return {
         status: 200 as const,
-        body: {
-          id: user.id,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          role: user.role,
-          companyId: user.company_id,
-          branchId: user.branch_id,
-          branchIds,
-          linkedEmployeeId: user.linked_employee_id ?? null,
-          permissions: user.permissions ?? null,
-          isActive: user.is_active,
-        },
+        body: buildSafeUser(user, branchIds),
       };
     } catch (error) {
       console.error('Profile error:', error);

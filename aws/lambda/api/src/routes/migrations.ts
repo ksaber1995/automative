@@ -813,7 +813,60 @@ async function createEventFeatureMigration() {
   }
 }
 
+async function runPhoneAuthMigration() {
+  console.log('Starting migration: add phone auth columns to users');
+
+  // 1) Add the columns we need for phone-based registration / verification.
+  await query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS country_code VARCHAR(8),
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(32),
+      ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS phone_otp VARCHAR(6),
+      ADD COLUMN IF NOT EXISTS phone_otp_expires_at TIMESTAMPTZ
+  `);
+
+  // 2) Backfill existing users to verified = true so we don't lock anyone out
+  //    when login starts checking phone_verified.
+  await query(`
+    UPDATE users
+    SET phone_verified = TRUE
+    WHERE phone IS NOT NULL AND phone_verified = FALSE
+  `);
+
+  // 3) Unique index on phone so phone is a usable login key.
+  //    Partial index avoids blocking pre-existing rows that have NULL phone.
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique
+    ON users (phone)
+    WHERE phone IS NOT NULL
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_users_phone_lookup
+    ON users (phone)
+  `);
+
+  console.log('✅ Phone auth migration applied');
+  return { success: true, message: 'Phone auth columns added to users table' };
+}
+
 export const migrationsRoutes = {
+  runPhoneAuthMigration: async () => {
+    try {
+      const result = await runPhoneAuthMigration();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   runInstructorMigration: async () => {
     try {
       const result = await runInstructorMigration();

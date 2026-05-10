@@ -1,213 +1,319 @@
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4">
-  <div class="w-full max-w-2xl">
-    <p-card>
-      <ng-template pTemplate="header">
-        <div class="p-4 text-center">
-          <h2 class="text-2xl font-bold">{{ 'AUTH.REGISTER.TITLE' | translate }}</h2>
-          <p class="text-gray-600 mt-1">{{ 'AUTH.REGISTER.SUBTITLE' | translate }}</p>
+<div class="min-h-screen flex bg-white">
+  <!-- ─── Left: brand panel (lg+) ───────────────────────────────────────── -->
+  <aside class="hidden lg:flex lg:w-2/5 relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
+    <!-- Decorative grid -->
+    <div class="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <!-- Soft glow -->
+    <div class="absolute -top-32 -end-32 w-96 h-96 rounded-full bg-primary-400/30 blur-3xl"></div>
+    <div class="absolute -bottom-32 -start-32 w-96 h-96 rounded-full bg-primary-300/20 blur-3xl"></div>
+
+    <div class="relative z-10 flex flex-col justify-between p-12 w-full">
+      <!-- Logo + brand -->
+      <div class="flex items-center gap-3">
+        <img src="assets/img/logo.png" alt="Netrofit" class="h-11 w-auto rounded-lg bg-white/10 p-1 backdrop-blur" />
+        <div>
+          <div class="text-xl font-bold tracking-tight">{{ 'AUTH.LOGIN.BRAND' | translate }}</div>
+          <div class="text-xs text-primary-100">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</div>
         </div>
-      </ng-template>
+      </div>
 
-      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-        <!-- Company Information Section -->
-        <div class="mb-6">
-          <h3 class="text-lg font-semibold mb-3 pb-2 border-b">{{ 'AUTH.REGISTER.COMPANY_SECTION' | translate }}</h3>
+      <!-- Marketing copy -->
+      <div class="max-w-md">
+        <h2 class="text-4xl font-extrabold leading-tight mb-4">{{ 'AUTH.REGISTER.MARKETING_HEADLINE' | translate }}</h2>
+        <p class="text-primary-100 text-base leading-relaxed mb-8">{{ 'AUTH.REGISTER.MARKETING_SUBLINE' | translate }}</p>
 
-          <!-- Company Name -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.COMPANY_NAME' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              formControlName="companyName"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="companyName?.invalid && companyName?.touched"
-              [placeholder]="'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER' | translate" />
-            @if (companyName?.invalid && companyName?.touched) {
-              <small class="text-red-500">
-                @if (companyName?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_NAME_REQUIRED' | translate }} }
-                @if (companyName?.errors?.['minlength']) { {{ 'AUTH.REGISTER.COMPANY_NAME_MIN' | translate }} }
-              </small>
-            }
-          </div>
+        <ul class="space-y-3">
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.REGISTER.MARKETING_FEATURE_1' | translate }}</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.REGISTER.MARKETING_FEATURE_2' | translate }}</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.REGISTER.MARKETING_FEATURE_3' | translate }}</span>
+          </li>
+        </ul>
+      </div>
 
-          <!-- Company Email -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.COMPANY_EMAIL' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              formControlName="companyEmail"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="companyEmail?.invalid && companyEmail?.touched"
-              [placeholder]="'AUTH.REGISTER.COMPANY_EMAIL_PLACEHOLDER' | translate" />
-            @if (companyEmail?.invalid && companyEmail?.touched) {
-              <small class="text-red-500">
-                @if (companyEmail?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_EMAIL_REQUIRED' | translate }} }
-                @if (companyEmail?.errors?.['email']) { {{ 'AUTH.REGISTER.EMAIL_INVALID' | translate }} }
-              </small>
-            }
-          </div>
+      <!-- Footer -->
+      <div class="text-xs text-primary-100/80">
+        &copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}
+      </div>
+    </div>
+  </aside>
 
-          <!-- Company Code & Industry (Optional) -->
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">
-                {{ 'AUTH.REGISTER.COMPANY_CODE' | translate }} <span class="text-gray-500 text-xs">{{ 'AUTH.REGISTER.OPTIONAL' | translate }}</span>
-              </label>
-              <input
-                type="text"
-                formControlName="companyCode"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                [placeholder]="'AUTH.REGISTER.COMPANY_CODE_PLACEHOLDER' | translate" />
-              <small class="text-gray-500 text-xs">{{ 'AUTH.REGISTER.COMPANY_CODE_HINT' | translate }}</small>
-            </div>
+  <!-- ─── Right: form ───────────────────────────────────────────────────── -->
+  <main class="flex-1 flex flex-col">
+    <!-- Top bar: language toggle -->
+    <div class="flex items-center justify-end px-6 py-4">
+      <button type="button"
+        (click)="languageService.toggle()"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 text-xs font-medium text-gray-600 hover:border-primary-500 hover:text-primary-600 transition-colors">
+        <i class="pi pi-globe text-sm"></i>
+        <span>{{ 'AUTH.REGISTER.LANGUAGE_TOGGLE' | translate }}</span>
+      </button>
+    </div>
 
-            <div>
-              <label class="block text-sm font-medium mb-2">{{ 'AUTH.REGISTER.INDUSTRY' | translate }}</label>
-              <input
-                type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
-                [value]="'AUTH.REGISTER.INDUSTRY_VALUE' | translate"
-                readonly />
-            </div>
-          </div>
+    <div class="flex-1 flex items-start justify-center px-6 pb-10">
+      <div class="w-full max-w-2xl">
+        <!-- Mobile logo -->
+        <div class="lg:hidden text-center mb-8">
+          <img src="assets/img/logo.png" alt="Netrofit" class="h-12 w-auto mx-auto mb-2" />
+          <div class="text-sm text-gray-500">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</div>
         </div>
 
-        <!-- User Information Section -->
-        <div class="mb-6">
-          <h3 class="text-lg font-semibold mb-3 pb-2 border-b">{{ 'AUTH.REGISTER.USER_SECTION' | translate }}</h3>
-
-          <!-- Name Fields -->
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">
-                {{ 'AUTH.REGISTER.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                formControlName="firstName"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                [class.border-red-500]="firstName?.invalid && firstName?.touched"
-                [placeholder]="'AUTH.REGISTER.FIRST_NAME_PLACEHOLDER' | translate" />
-              @if (firstName?.invalid && firstName?.touched) {
-                <small class="text-red-500">{{ 'AUTH.REGISTER.FIRST_NAME_REQUIRED' | translate }}</small>
-              }
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium mb-2">
-                {{ 'AUTH.REGISTER.LAST_NAME' | translate }} <span class="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                formControlName="lastName"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                [class.border-red-500]="lastName?.invalid && lastName?.touched"
-                [placeholder]="'AUTH.REGISTER.LAST_NAME_PLACEHOLDER' | translate" />
-              @if (lastName?.invalid && lastName?.touched) {
-                <small class="text-red-500">{{ 'AUTH.REGISTER.LAST_NAME_REQUIRED' | translate }}</small>
-              }
-            </div>
-          </div>
-
-          <!-- Email -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.YOUR_EMAIL' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              formControlName="email"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="email?.invalid && email?.touched"
-              [placeholder]="'AUTH.REGISTER.YOUR_EMAIL_PLACEHOLDER' | translate" />
-            @if (email?.invalid && email?.touched) {
-              <small class="text-red-500">
-                @if (email?.errors?.['required']) { {{ 'AUTH.REGISTER.EMAIL_REQUIRED' | translate }} }
-                @if (email?.errors?.['email']) { {{ 'AUTH.REGISTER.EMAIL_INVALID' | translate }} }
-              </small>
-            }
-          </div>
-
-          <!-- Phone (Optional) -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.PHONE' | translate }} <span class="text-gray-500 text-xs">{{ 'AUTH.REGISTER.OPTIONAL' | translate }}</span>
-            </label>
-            <input
-              type="tel"
-              formControlName="phone"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [placeholder]="'AUTH.REGISTER.PHONE_PLACEHOLDER' | translate" />
-          </div>
-
-          <!-- Password -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.PASSWORD' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              formControlName="password"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="password?.invalid && password?.touched"
-              [placeholder]="'AUTH.REGISTER.PASSWORD_MIN' | translate" />
-            @if (password?.invalid && password?.touched) {
-              <small class="text-red-500">
-                @if (password?.errors?.['required']) { {{ 'AUTH.REGISTER.PASSWORD_REQUIRED' | translate }} }
-                @if (password?.errors?.['minlength']) { {{ 'AUTH.REGISTER.PASSWORD_MIN' | translate }} }
-              </small>
-            }
-          </div>
-
-          <!-- Confirm Password -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">
-              {{ 'AUTH.REGISTER.CONFIRM_PASSWORD' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              formControlName="confirmPassword"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              [class.border-red-500]="confirmPassword?.invalid && confirmPassword?.touched"
-              [placeholder]="'AUTH.REGISTER.CONFIRM_PASSWORD_PLACEHOLDER' | translate" />
-            @if (confirmPassword?.invalid && confirmPassword?.touched) {
-              <small class="text-red-500">
-                @if (confirmPassword?.errors?.['required']) { {{ 'AUTH.REGISTER.CONFIRM_REQUIRED' | translate }} }
-                @if (confirmPassword?.errors?.['passwordMismatch']) { {{ 'AUTH.REGISTER.PASSWORDS_MISMATCH' | translate }} }
-              </small>
-            }
-          </div>
+        <!-- Heading -->
+        <div class="mb-8">
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'AUTH.REGISTER.TITLE' | translate }}</h1>
+          <p class="text-gray-500 mt-2">{{ 'AUTH.REGISTER.SUBTITLE' | translate }}</p>
         </div>
 
-        <!-- Terms & Conditions Notice -->
-        <div class="mb-4 p-3 bg-blue-50 rounded-md">
-          <p class="text-sm text-gray-700">
-            {{ 'AUTH.REGISTER.TERMS' | translate }}
-          </p>
-        </div>
+        <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-8">
+          <!-- ─── Company Information ─────────────────────────────────── -->
+          <section>
+            <div class="flex items-center gap-2 mb-4">
+              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-50 text-primary-600">
+                <i class="pi pi-building text-sm"></i>
+              </span>
+              <h3 class="text-base font-semibold text-gray-900">{{ 'AUTH.REGISTER.COMPANY_SECTION' | translate }}</h3>
+            </div>
 
-        <!-- Submit Button -->
-        <button
-          pButton
-          type="submit"
-          [label]="'AUTH.REGISTER.SUBMIT' | translate"
-          class="w-full"
-          [disabled]="loading()"></button>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'AUTH.REGISTER.COMPANY_NAME' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  formControlName="companyName"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                  [class.border-red-500]="companyName?.invalid && companyName?.touched"
+                  [placeholder]="'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER' | translate" />
+                @if (companyName?.invalid && companyName?.touched) {
+                  <small class="text-red-500 mt-1 block">
+                    @if (companyName?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_NAME_REQUIRED' | translate }} }
+                    @if (companyName?.errors?.['minlength']) { {{ 'AUTH.REGISTER.COMPANY_NAME_MIN' | translate }} }
+                  </small>
+                }
+              </div>
 
-        <!-- Login Link -->
-        <div class="text-center mt-4">
-          <p class="text-gray-600">
-            {{ 'AUTH.REGISTER.ALREADY_ACCOUNT' | translate }}
-            <a routerLink="/auth/login" class="text-blue-600 hover:text-blue-700 font-medium ml-1">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'AUTH.REGISTER.COMPANY_EMAIL' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  formControlName="companyEmail"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                  [class.border-red-500]="companyEmail?.invalid && companyEmail?.touched"
+                  [placeholder]="'AUTH.REGISTER.COMPANY_EMAIL_PLACEHOLDER' | translate" />
+                @if (companyEmail?.invalid && companyEmail?.touched) {
+                  <small class="text-red-500 mt-1 block">
+                    @if (companyEmail?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_EMAIL_REQUIRED' | translate }} }
+                    @if (companyEmail?.errors?.['email']) { {{ 'AUTH.REGISTER.EMAIL_INVALID' | translate }} }
+                  </small>
+                }
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'AUTH.REGISTER.COMPANY_CODE' | translate }}
+                    <span class="text-gray-400 text-xs font-normal">{{ 'AUTH.REGISTER.OPTIONAL' | translate }}</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="companyCode"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [placeholder]="'AUTH.REGISTER.COMPANY_CODE_PLACEHOLDER' | translate" />
+                  <small class="text-gray-500 text-xs mt-1 block">{{ 'AUTH.REGISTER.COMPANY_CODE_HINT' | translate }}</small>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.REGISTER.INDUSTRY' | translate }}</label>
+                  <input
+                    type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                    [value]="'AUTH.REGISTER.INDUSTRY_VALUE' | translate"
+                    readonly />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ─── User Information ────────────────────────────────────── -->
+          <section>
+            <div class="flex items-center gap-2 mb-4">
+              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-50 text-primary-600">
+                <i class="pi pi-user text-sm"></i>
+              </span>
+              <h3 class="text-base font-semibold text-gray-900">{{ 'AUTH.REGISTER.USER_SECTION' | translate }}</h3>
+            </div>
+
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'AUTH.REGISTER.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="firstName"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [class.border-red-500]="firstName?.invalid && firstName?.touched"
+                    [placeholder]="'AUTH.REGISTER.FIRST_NAME_PLACEHOLDER' | translate" />
+                  @if (firstName?.invalid && firstName?.touched) {
+                    <small class="text-red-500 mt-1 block">{{ 'AUTH.REGISTER.FIRST_NAME_REQUIRED' | translate }}</small>
+                  }
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'AUTH.REGISTER.LAST_NAME' | translate }} <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="lastName"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [class.border-red-500]="lastName?.invalid && lastName?.touched"
+                    [placeholder]="'AUTH.REGISTER.LAST_NAME_PLACEHOLDER' | translate" />
+                  @if (lastName?.invalid && lastName?.touched) {
+                    <small class="text-red-500 mt-1 block">{{ 'AUTH.REGISTER.LAST_NAME_REQUIRED' | translate }}</small>
+                  }
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'AUTH.REGISTER.YOUR_EMAIL' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  formControlName="email"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                  [class.border-red-500]="email?.invalid && email?.touched"
+                  [placeholder]="'AUTH.REGISTER.YOUR_EMAIL_PLACEHOLDER' | translate" />
+                @if (email?.invalid && email?.touched) {
+                  <small class="text-red-500 mt-1 block">
+                    @if (email?.errors?.['required']) { {{ 'AUTH.REGISTER.EMAIL_REQUIRED' | translate }} }
+                    @if (email?.errors?.['email']) { {{ 'AUTH.REGISTER.EMAIL_INVALID' | translate }} }
+                  </small>
+                }
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'AUTH.REGISTER.PHONE' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <div class="flex gap-2">
+                  <div class="w-28 shrink-0">
+                    <div class="flex items-center border border-gray-300 rounded-md focus-within:border-primary-500 overflow-hidden transition-colors"
+                         [class.border-red-500]="countryCode?.invalid && countryCode?.touched">
+                      <span class="px-2 text-gray-500 select-none">+</span>
+                      <input
+                        type="tel"
+                        inputmode="numeric"
+                        formControlName="countryCode"
+                        class="w-full px-2 py-2 outline-none"
+                        [placeholder]="'AUTH.REGISTER.COUNTRY_CODE_PLACEHOLDER' | translate" />
+                    </div>
+                  </div>
+                  <input
+                    type="tel"
+                    inputmode="numeric"
+                    formControlName="phone"
+                    class="flex-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [class.border-red-500]="phone?.invalid && phone?.touched"
+                    [placeholder]="'AUTH.REGISTER.PHONE_PLACEHOLDER' | translate" />
+                </div>
+                <small class="text-gray-500 text-xs mt-1 block">{{ 'AUTH.REGISTER.PHONE_HINT' | translate }}</small>
+                @if ((countryCode?.invalid && countryCode?.touched) || (phone?.invalid && phone?.touched)) {
+                  <small class="block text-red-500 mt-1">
+                    @if (countryCode?.errors?.['required']) { {{ 'AUTH.REGISTER.COUNTRY_CODE_REQUIRED' | translate }} }
+                    @else if (phone?.errors?.['required']) { {{ 'AUTH.REGISTER.PHONE_REQUIRED' | translate }} }
+                  </small>
+                }
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'AUTH.REGISTER.PASSWORD' | translate }} <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    formControlName="password"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [class.border-red-500]="password?.invalid && password?.touched"
+                    [placeholder]="'AUTH.REGISTER.PASSWORD_MIN' | translate" />
+                  @if (password?.invalid && password?.touched) {
+                    <small class="text-red-500 mt-1 block">
+                      @if (password?.errors?.['required']) { {{ 'AUTH.REGISTER.PASSWORD_REQUIRED' | translate }} }
+                      @if (password?.errors?.['minlength']) { {{ 'AUTH.REGISTER.PASSWORD_MIN' | translate }} }
+                    </small>
+                  }
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'AUTH.REGISTER.CONFIRM_PASSWORD' | translate }} <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    formControlName="confirmPassword"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
+                    [class.border-red-500]="confirmPassword?.invalid && confirmPassword?.touched"
+                    [placeholder]="'AUTH.REGISTER.CONFIRM_PASSWORD_PLACEHOLDER' | translate" />
+                  @if (confirmPassword?.invalid && confirmPassword?.touched) {
+                    <small class="text-red-500 mt-1 block">
+                      @if (confirmPassword?.errors?.['required']) { {{ 'AUTH.REGISTER.CONFIRM_REQUIRED' | translate }} }
+                      @if (confirmPassword?.errors?.['passwordMismatch']) { {{ 'AUTH.REGISTER.PASSWORDS_MISMATCH' | translate }} }
+                    </small>
+                  }
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Terms notice -->
+          <div class="p-4 bg-primary-50 border border-primary-100 rounded-lg">
+            <p class="text-sm text-gray-700 leading-relaxed">
+              <i class="pi pi-info-circle text-primary-600 me-1"></i>
+              {{ 'AUTH.REGISTER.TERMS' | translate }}
+            </p>
+          </div>
+
+          <!-- Submit -->
+          <button
+            pButton
+            type="submit"
+            [label]="'AUTH.REGISTER.SUBMIT' | translate"
+            class="w-full"
+            [disabled]="loading()"></button>
+
+          <!-- Login link -->
+          <div class="text-center">
+            <span class="text-gray-600 text-sm">{{ 'AUTH.REGISTER.ALREADY_ACCOUNT' | translate }} </span>
+            <a routerLink="/auth/login" class="text-primary-600 hover:text-primary-700 text-sm font-semibold">
               {{ 'AUTH.REGISTER.SIGN_IN' | translate }}
             </a>
-          </p>
+          </div>
+        </form>
+
+        <!-- Mobile footer -->
+        <div class="lg:hidden text-center mt-10 text-gray-400 text-xs">
+          &copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}
         </div>
-      </form>
-    </p-card>
-  </div>
+      </div>
+    </div>
+  </main>
 </div>

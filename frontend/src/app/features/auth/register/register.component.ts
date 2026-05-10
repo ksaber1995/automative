@@ -6,6 +6,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { LanguageService } from '../../../core/services/language.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RegisterDto } from '@shared/interfaces/user.interface';
 
@@ -22,6 +23,7 @@ export class RegisterComponent {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  languageService = inject(LanguageService);
 
   registerForm: FormGroup;
   loading = signal(false);
@@ -39,7 +41,8 @@ export class RegisterComponent {
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
-      phone: ['']
+      countryCode: ['20', [Validators.required, Validators.pattern(/^\+?\d{1,5}$/)]],
+      phone: ['', [Validators.required, Validators.pattern(/^\d{4,15}$/)]]
     }, {
       validators: this.passwordMatchValidator
     });
@@ -66,14 +69,22 @@ export class RegisterComponent {
     this.loading.set(true);
     const { confirmPassword, ...registerData } = this.registerForm.value;
 
-    // Type-safe registration data
-    const dto: RegisterDto = registerData;
+    // Strip + and any non-digits client-side so the user can paste "+20"
+    // and the trunk-zero on the local number.
+    const dto: RegisterDto = {
+      ...registerData,
+      countryCode: String(registerData.countryCode || '').replace(/\D/g, ''),
+      phone: String(registerData.phone || '').replace(/\D/g, '').replace(/^0+/, ''),
+    };
 
     this.authService.register(dto).subscribe({
       next: (response) => {
         this.notificationService.success(this.translate.instant('AUTH.REGISTER.SUCCESS'));
-        this.router.navigate(['/auth/verify-email'], {
-          queryParams: { email: response.email },
+        this.router.navigate(['/auth/verify-phone'], {
+          queryParams: {
+            countryCode: response.countryCode,
+            phone: response.phone,
+          },
         });
       },
       error: (error) => {
@@ -94,5 +105,6 @@ export class RegisterComponent {
   get email() { return this.registerForm.get('email'); }
   get password() { return this.registerForm.get('password'); }
   get confirmPassword() { return this.registerForm.get('confirmPassword'); }
+  get countryCode() { return this.registerForm.get('countryCode'); }
   get phone() { return this.registerForm.get('phone'); }
 }

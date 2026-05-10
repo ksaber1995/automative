@@ -5,12 +5,12 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
-  selector: 'app-verify-email',
+  selector: 'app-verify-phone',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, InputTextModule, TranslateModule],
   template: `
@@ -19,8 +19,8 @@ import { NotificationService } from '../../../core/services/notification.service
 
         <!-- Logo -->
         <div class="text-center mb-8">
-          <img src="assets/img/logo.png" [alt]="'AUTH.VERIFY_EMAIL.BRAND' | translate" class="h-12 mx-auto mb-3">
-          <p class="text-gray-500 text-sm">{{ 'AUTH.VERIFY_EMAIL.BRAND_SUBTITLE' | translate }}</p>
+          <img src="assets/img/logo.png" [alt]="'AUTH.VERIFY_PHONE.BRAND' | translate" class="h-12 mx-auto mb-3">
+          <p class="text-gray-500 text-sm">{{ 'AUTH.VERIFY_PHONE.BRAND_SUBTITLE' | translate }}</p>
         </div>
 
         <p-card>
@@ -28,14 +28,14 @@ import { NotificationService } from '../../../core/services/notification.service
 
             <!-- Icon -->
             <div class="text-center mb-6">
-              <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                <i class="pi pi-envelope text-3xl text-blue-600"></i>
+              <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                <i class="pi pi-whatsapp text-3xl text-green-600"></i>
               </div>
-              <h2 class="text-2xl font-bold text-gray-800 mb-2">{{ 'AUTH.VERIFY_EMAIL.TITLE' | translate }}</h2>
+              <h2 class="text-2xl font-bold text-gray-800 mb-2">{{ 'AUTH.VERIFY_PHONE.TITLE' | translate }}</h2>
               <p class="text-gray-500 text-sm">
-                {{ 'AUTH.VERIFY_EMAIL.SENT_TO' | translate }}
+                {{ 'AUTH.VERIFY_PHONE.SENT_TO' | translate }}
               </p>
-              <p class="text-blue-600 font-semibold text-sm mt-1">{{ maskedEmail() }}</p>
+              <p class="text-blue-600 font-semibold text-sm mt-1">{{ maskedPhone() }}</p>
             </div>
 
             <!-- OTP Form -->
@@ -43,7 +43,7 @@ import { NotificationService } from '../../../core/services/notification.service
 
               <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ 'AUTH.VERIFY_EMAIL.OTP_LABEL' | translate }}
+                  {{ 'AUTH.VERIFY_PHONE.OTP_LABEL' | translate }}
                 </label>
                 <input
                   pInputText
@@ -51,7 +51,7 @@ import { NotificationService } from '../../../core/services/notification.service
                   type="text"
                   inputmode="numeric"
                   maxlength="6"
-                  [placeholder]="'AUTH.VERIFY_EMAIL.OTP_PLACEHOLDER' | translate"
+                  [placeholder]="'AUTH.VERIFY_PHONE.OTP_PLACEHOLDER' | translate"
                   class="w-full text-center text-2xl font-mono tracking-widest"
                   [class.ng-invalid]="otp?.invalid && otp?.touched"
                   [class.ng-dirty]="otp?.dirty"
@@ -59,9 +59,9 @@ import { NotificationService } from '../../../core/services/notification.service
                 />
                 @if (otp?.invalid && otp?.touched) {
                   <p class="text-red-500 text-xs mt-1">
-                    @if (otp?.errors?.['required']) { {{ 'AUTH.VERIFY_EMAIL.OTP_REQUIRED' | translate }} }
-                    @if (otp?.errors?.['minlength'] || otp?.errors?.['maxlength']) { {{ 'AUTH.VERIFY_EMAIL.OTP_LENGTH' | translate }} }
-                    @if (otp?.errors?.['pattern']) { {{ 'AUTH.VERIFY_EMAIL.OTP_DIGITS' | translate }} }
+                    @if (otp?.errors?.['required']) { {{ 'AUTH.VERIFY_PHONE.OTP_REQUIRED' | translate }} }
+                    @if (otp?.errors?.['minlength'] || otp?.errors?.['maxlength']) { {{ 'AUTH.VERIFY_PHONE.OTP_LENGTH' | translate }} }
+                    @if (otp?.errors?.['pattern']) { {{ 'AUTH.VERIFY_PHONE.OTP_DIGITS' | translate }} }
                   </p>
                 }
               </div>
@@ -69,7 +69,7 @@ import { NotificationService } from '../../../core/services/notification.service
               <button
                 pButton
                 type="submit"
-                [label]="'AUTH.VERIFY_EMAIL.VERIFY_BTN' | translate"
+                [label]="'AUTH.VERIFY_PHONE.VERIFY_BTN' | translate"
                 icon="pi pi-check"
                 class="w-full"
                 [loading]="loading()"
@@ -79,16 +79,16 @@ import { NotificationService } from '../../../core/services/notification.service
 
             <!-- Resend -->
             <div class="mt-6 text-center">
-              <p class="text-sm text-gray-500 mb-2">{{ 'AUTH.VERIFY_EMAIL.NO_CODE' | translate }}</p>
+              <p class="text-sm text-gray-500 mb-2">{{ 'AUTH.VERIFY_PHONE.NO_CODE' | translate }}</p>
               @if (resendCooldown() > 0) {
                 <p class="text-sm text-gray-400">
-                  {{ 'AUTH.VERIFY_EMAIL.RESEND_COOLDOWN' | translate: { seconds: resendCooldown() } }}
+                  {{ 'AUTH.VERIFY_PHONE.RESEND_COOLDOWN' | translate: { seconds: resendCooldown() } }}
                 </p>
               } @else {
                 <button
                   pButton
                   type="button"
-                  [label]="'AUTH.VERIFY_EMAIL.RESEND_BTN' | translate"
+                  [label]="'AUTH.VERIFY_PHONE.RESEND_BTN' | translate"
                   icon="pi pi-refresh"
                   class="p-button-text p-button-sm"
                   [loading]="resending()"
@@ -101,7 +101,7 @@ import { NotificationService } from '../../../core/services/notification.service
             <!-- Back to login -->
             <div class="mt-4 text-center">
               <a routerLink="/auth/login" class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                <i class="pi pi-arrow-left text-xs mr-1"></i>{{ 'AUTH.VERIFY_EMAIL.BACK_LOGIN' | translate }}
+                <i class="pi pi-arrow-left text-xs mr-1"></i>{{ 'AUTH.VERIFY_PHONE.BACK_LOGIN' | translate }}
               </a>
             </div>
 
@@ -111,19 +111,21 @@ import { NotificationService } from '../../../core/services/notification.service
     </div>
   `,
 })
-export class VerifyEmailComponent implements OnInit, OnDestroy {
+export class VerifyPhoneComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   otpForm: FormGroup;
   loading = signal(false);
   resending = signal(false);
   resendCooldown = signal(0);
 
-  private email = '';
+  private countryCode = '';
+  private phone = '';
   private cooldownTimer: any;
 
   constructor() {
@@ -141,9 +143,11 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.email = this.route.snapshot.queryParamMap.get('email') || '';
-    if (!this.email) {
+    this.countryCode = this.route.snapshot.queryParamMap.get('countryCode') || '';
+    this.phone = this.route.snapshot.queryParamMap.get('phone') || '';
+    if (!this.phone || !this.countryCode) {
       this.router.navigate(['/auth/login']);
+      return;
     }
     // Start initial cooldown so user waits before spamming resend
     this.startCooldown(60);
@@ -153,13 +157,11 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
     clearInterval(this.cooldownTimer);
   }
 
-  maskedEmail(): string {
-    if (!this.email) return '';
-    const [local, domain] = this.email.split('@');
-    if (!local || !domain) return this.email;
-    const visible = local.slice(0, 2);
-    const masked = '*'.repeat(Math.max(local.length - 2, 2));
-    return `${visible}${masked}@${domain}`;
+  maskedPhone(): string {
+    if (!this.phone) return '';
+    const last = this.phone.slice(-4);
+    const masked = '*'.repeat(Math.max(this.phone.length - 4, 2));
+    return `+${this.countryCode} ${masked}${last}`;
   }
 
   onSubmit() {
@@ -171,15 +173,15 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     const { otp } = this.otpForm.value;
 
-    this.authService.verifyEmail(this.email, otp).subscribe({
+    this.authService.verifyPhone(this.countryCode, this.phone, otp).subscribe({
       next: () => {
-        this.notificationService.success('Email verified successfully! Welcome to Automate Magic.');
+        this.notificationService.success(this.translate.instant('AUTH.VERIFY_PHONE.VERIFY_SUCCESS'));
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.loading.set(false);
         this.notificationService.error(
-          error.error?.message || 'Verification failed. Please check the code and try again.'
+          error.error?.message || this.translate.instant('AUTH.VERIFY_PHONE.VERIFY_FAILED')
         );
       },
     });
@@ -187,16 +189,16 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
 
   resendOtp() {
     this.resending.set(true);
-    this.authService.resendOtp(this.email).subscribe({
+    this.authService.resendOtp(this.countryCode, this.phone).subscribe({
       next: (res: any) => {
         this.resending.set(false);
-        this.notificationService.success(res.message || 'A new code has been sent to your email.');
+        this.notificationService.success(res.message || this.translate.instant('AUTH.VERIFY_PHONE.RESEND_SUCCESS'));
         this.startCooldown(60);
       },
       error: (error) => {
         this.resending.set(false);
         this.notificationService.error(
-          error.error?.message || 'Failed to resend code. Please try again.'
+          error.error?.message || this.translate.instant('AUTH.VERIFY_PHONE.RESEND_FAILED')
         );
       },
     });

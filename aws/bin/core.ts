@@ -6,37 +6,83 @@ import { CoreStack } from '../lib/core-stack';
 import { LandingStack } from '../lib/landing-stack';
 
 const app = new cdk.App();
-
-// Get stage from context or default to 'dev'
-const stage = app.node.tryGetContext('stage') || 'dev';
 const account = process.env.CDK_DEFAULT_ACCOUNT || '365729671026';
+const apiRegion = process.env.CDK_DEFAULT_REGION || 'eu-west-1';
 
-// Create the main stack
-new CoreStack(app, `AutomateMagicStack-${stage}`, {
-  stage,
+// ─── DEV ────────────────────────────────────────────────────────────────────
+new CoreStack(app, `AutomateMagicStack-dev`, {
+  stage: 'dev',
   dbName: 'automative',
-  env: {
-    account,
-    region: process.env.CDK_DEFAULT_REGION || 'eu-west-1',
-  },
-  description: `Netrofit Application Stack (${stage})`,
+  env: { account, region: apiRegion },
+  description: `Netrofit Application Stack (dev)`,
   tags: {
-    Environment: stage,
+    Environment: 'dev',
     Application: 'AutomateMagic',
     ManagedBy: 'CDK',
   },
 });
 
 // Marketing landing page — must live in us-east-1 because ACM certs attached
-// to CloudFront distributions must be issued in us-east-1.
-new LandingStack(app, `NetrofitLandingStack-${stage}`, {
+// to CloudFront distributions must be issued in us-east-1. Single instance
+// (apex netrofit.com is intrinsically prod-grade); no separate prod copy.
+new LandingStack(app, `NetrofitLandingStack-dev`, {
   domainName: 'netrofit.com',
   sourcePath: path.resolve(__dirname, '../../landing/dist/netrofit-landing/browser'),
   env: { account, region: 'us-east-1' },
-  description: `Netrofit Landing Page (${stage})`,
+  description: `Netrofit Landing Page (dev)`,
   tags: {
-    Environment: stage,
+    Environment: 'dev',
     Application: 'NetrofitLanding',
+    ManagedBy: 'CDK',
+  },
+});
+
+// Dev frontend Angular app at dev.netrofit.com (calls dev API directly).
+new LandingStack(app, `NetrofitFrontendStack-dev`, {
+  domainName: 'dev.netrofit.com',
+  wwwDomain: 'www.dev.netrofit.com',
+  sourcePath: path.resolve(__dirname, '../../frontend/dist/automate-magic-frontend/browser'),
+  env: { account, region: 'us-east-1' },
+  description: `Netrofit Frontend App (dev)`,
+  tags: {
+    Environment: 'dev',
+    Application: 'NetrofitFrontend',
+    ManagedBy: 'CDK',
+  },
+});
+
+// ─── PROD ───────────────────────────────────────────────────────────────────
+// Separate Aurora cluster, separate API, separate Lambda. SES identity stays
+// owned by the dev stack to avoid the duplicate-identity error.
+new CoreStack(app, `AutomateMagicStack-prod`, {
+  stage: 'prod',
+  dbName: 'automative_prod',
+  apiCustomDomain: 'prod.api.netrofit.net',
+  createSesIdentity: false,
+  env: { account, region: apiRegion },
+  description: `Netrofit Application Stack (prod)`,
+  tags: {
+    Environment: 'prod',
+    Application: 'AutomateMagic',
+    ManagedBy: 'CDK',
+  },
+});
+
+// Prod frontend at app.netrofit.com — same-origin /api/* proxy to API Gateway
+// custom domain so the network tab only ever shows app.netrofit.com.
+new LandingStack(app, `NetrofitFrontendStack-prod`, {
+  domainName: 'app.netrofit.com',
+  wwwDomain: 'www.app.netrofit.com',
+  sourcePath: path.resolve(__dirname, '../../frontend/dist/automate-magic-frontend-prod/browser'),
+  apiProxy: {
+    originDomain: 'prod.api.netrofit.net',
+    pathPattern: '/api/*',
+  },
+  env: { account, region: 'us-east-1' },
+  description: `Netrofit Frontend App (prod)`,
+  tags: {
+    Environment: 'prod',
+    Application: 'NetrofitFrontend',
     ManagedBy: 'CDK',
   },
 });

@@ -29,6 +29,9 @@ export interface SafeUser {
   linkedEmployeeId?: string | null;
   permissions?: UserPermissions | null;
   isActive: boolean;
+  countryCode?: string | null;
+  phone?: string | null;
+  phoneVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,7 +71,7 @@ export interface ConvertEmployeeToUserDto {
 }
 
 export interface LoginDto {
-  email: string;
+  identifier: string; // email or phone (with or without country code / leading 0)
   password: string;
 }
 
@@ -85,7 +88,8 @@ export interface RegisterDto {
   lastName: string;
   email: string;
   password: string;
-  phone?: string;
+  countryCode: string;
+  phone: string;
 }
 
 export interface CompanySummary {
@@ -104,6 +108,7 @@ export interface AuthResponse {
 }
 
 export interface RegisterResponse {
-  email: string;
+  countryCode: string;
+  phone: string;
   message: string;
 }

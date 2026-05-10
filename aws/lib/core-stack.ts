@@ -3,14 +3,23 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as ses from 'aws-cdk-lib/aws-ses';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
 export interface CoreStackProps extends cdk.StackProps {
   stage?: string;
   dbName?: string;
+  /** Optional custom domain for API Gateway, e.g. "prod.api.netrofit.net". Cert is regional, in this stack's region. */
+  apiCustomDomain?: string;
+  /**
+   * Whether this stack should claim the SES domain identity for netrofit.com.
+   * Only one stack per account+region can own it — defaults to true; set false on duplicate stacks.
+   */
+  createSesIdentity?: boolean;
 }
 
 export class CoreStack extends cdk.Stack {
@@ -23,6 +32,7 @@ export class CoreStack extends cdk.Stack {
 
     const stage = props?.stage || 'dev';
     const dbName = props?.dbName || 'automative';
+    const createSesIdentity = props?.createSesIdentity ?? true;
 
     // =============================================
     // VPC - Virtual Private Cloud
@@ -160,6 +170,28 @@ export class CoreStack extends cdk.Stack {
       resources: ['*'],
     }));
 
+    // =============================================
+    // SES Domain Identity (Easy DKIM enabled by default)
+    // =============================================
+    // Verifies netrofit.com so the Lambda can send `From: anything@netrofit.com`.
+    // After deploy, paste the 3 DKIM CNAMEs (in stack outputs) into Squarespace
+    // DNS — once propagated, AWS marks the identity verified automatically.
+    if (createSesIdentity) {
+      const emailIdentity = new ses.EmailIdentity(this, 'NetrofitEmailIdentity', {
+        identity: ses.Identity.domain('netrofit.com'),
+      });
+
+      new cdk.CfnOutput(this, 'SesDkim1', {
+        value: `${emailIdentity.dkimDnsTokenName1} CNAME ${emailIdentity.dkimDnsTokenValue1}`,
+      });
+      new cdk.CfnOutput(this, 'SesDkim2', {
+        value: `${emailIdentity.dkimDnsTokenName2} CNAME ${emailIdentity.dkimDnsTokenValue2}`,
+      });
+      new cdk.CfnOutput(this, 'SesDkim3', {
+        value: `${emailIdentity.dkimDnsTokenName3} CNAME ${emailIdentity.dkimDnsTokenValue3}`,
+      });
+    }
+
     // API Lambda Function
     this.apiLambda = new lambda.Function(this, 'ApiLambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -175,8 +207,9 @@ export class CoreStack extends cdk.Stack {
         JWT_REFRESH_SECRET_ARN: jwtRefreshSecret.secretArn,
         JWT_EXPIRATION: '365d',
         JWT_REFRESH_EXPIRATION: '365d',
-        // SES sender — must be a verified identity in AWS SES (email or domain)
-        SENDER_EMAIL: 'noreply@automate-magic.com',
+        // SES sender — must be a verified identity in AWS SES (email or domain).
+        // netrofit.com is verified via the SES EmailIdentity construct above.
+        SENDER_EMAIL: 'noreply@netrofit.com',
       },
       vpc,
       vpcSubnets: {
@@ -229,6 +262,38 @@ export class CoreStack extends cdk.Stack {
 
     // Also add root path
     this.api.root.addMethod('ANY', lambdaIntegration);
+
+    // =============================================
+    // Optional API Gateway Custom Domain
+    // =============================================
+    if (props?.apiCustomDomain) {
+      const apiCert = new acm.Certificate(this, 'ApiCustomDomainCert', {
+        domainName: props.apiCustomDomain,
+        validation: acm.CertificateValidation.fromDns(),
+      });
+
+      const apiDomain = new apigateway.DomainName(this, 'ApiCustomDomainName', {
+        domainName: props.apiCustomDomain,
+        certificate: apiCert,
+        endpointType: apigateway.EndpointType.REGIONAL,
+        securityPolicy: apigateway.SecurityPolicy.TLS_1_2,
+      });
+
+      new apigateway.BasePathMapping(this, 'ApiCustomDomainBasePathMapping', {
+        domainName: apiDomain,
+        restApi: this.api,
+        stage: this.api.deploymentStage,
+      });
+
+      new cdk.CfnOutput(this, 'ApiCustomDomain', {
+        value: props.apiCustomDomain,
+        description: 'Custom domain for API Gateway',
+      });
+      new cdk.CfnOutput(this, 'ApiCustomDomainTarget', {
+        value: apiDomain.domainNameAliasDomainName,
+        description: `Point ${props.apiCustomDomain} CNAME at this value.`,
+      });
+    }
 
     // =============================================
     // Outputs

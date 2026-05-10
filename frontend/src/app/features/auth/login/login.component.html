@@ -1,99 +1,147 @@
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700 p-4">
-  <div class="w-full max-w-md">
-    <div class="text-center mb-8">
-      <h1 class="text-4xl font-bold text-white mb-2">{{ 'AUTH.LOGIN.BRAND' | translate }}</h1>
-      <p class="text-primary-100">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</p>
-    </div>
+<div class="min-h-screen flex bg-white">
+  <!-- ─── Left: brand panel (lg+) ───────────────────────────────────────── -->
+  <aside class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
+    <!-- Decorative grid -->
+    <div class="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <!-- Soft glow -->
+    <div class="absolute -top-32 -end-32 w-96 h-96 rounded-full bg-primary-400/30 blur-3xl"></div>
+    <div class="absolute -bottom-32 -start-32 w-96 h-96 rounded-full bg-primary-300/20 blur-3xl"></div>
 
-    <p-card>
-      <div class="text-center mb-6">
-        <h2 class="text-2xl font-semibold text-gray-800">{{ 'AUTH.LOGIN.WELCOME' | translate }}</h2>
-        <p class="text-gray-600 mt-2">{{ 'AUTH.LOGIN.SIGN_IN_SUBTITLE' | translate }}</p>
+    <div class="relative z-10 flex flex-col justify-between p-12 w-full">
+      <!-- Logo + brand -->
+      <div class="flex items-center gap-3">
+        <img src="assets/img/logo.png" alt="Netrofit" class="h-11 w-auto rounded-lg bg-white/10 p-1 backdrop-blur" />
+        <div>
+          <div class="text-xl font-bold tracking-tight">{{ 'AUTH.LOGIN.BRAND' | translate }}</div>
+          <div class="text-xs text-primary-100">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</div>
+        </div>
       </div>
 
-      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-4">
-        <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.EMAIL' | translate }}</label>
-          <input
-            pInputText
-            id="email"
-            formControlName="email"
-            type="email"
-            [placeholder]="'AUTH.LOGIN.EMAIL_PLACEHOLDER' | translate"
-            class="w-full"
-            [class.ng-invalid]="email?.invalid && email?.touched"
-          />
-          @if (email?.invalid && email?.touched) {
-            <small class="text-red-600">
-              @if (email?.errors?.['required']) {
-                <span>{{ 'AUTH.LOGIN.EMAIL_REQUIRED' | translate }}</span>
-              }
-              @if (email?.errors?.['email']) {
-                <span>{{ 'AUTH.LOGIN.EMAIL_INVALID' | translate }}</span>
-              }
-            </small>
-          }
-        </div>
+      <!-- Marketing copy -->
+      <div class="max-w-md">
+        <h2 class="text-4xl font-extrabold leading-tight mb-4">{{ 'AUTH.LOGIN.MARKETING_HEADLINE' | translate }}</h2>
+        <p class="text-primary-100 text-base leading-relaxed mb-8">{{ 'AUTH.LOGIN.MARKETING_SUBLINE' | translate }}</p>
 
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.PASSWORD' | translate }}</label>
-          <p-password
-            id="password"
-            formControlName="password"
-            [toggleMask]="true"
-            [feedback]="false"
-            [placeholder]="'AUTH.LOGIN.PASSWORD_PLACEHOLDER' | translate"
-            styleClass="w-full"
-            inputStyleClass="w-full"
-            [class.ng-invalid]="password?.invalid && password?.touched"
-          ></p-password>
-          @if (password?.invalid && password?.touched) {
-            <small class="text-red-600">
-              @if (password?.errors?.['required']) {
-                <span>{{ 'AUTH.LOGIN.PASSWORD_REQUIRED' | translate }}</span>
-              }
-              @if (password?.errors?.['minlength']) {
-                <span>{{ 'AUTH.LOGIN.PASSWORD_MIN' | translate }}</span>
-              }
-            </small>
-          }
-        </div>
+        <ul class="space-y-3">
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.LOGIN.MARKETING_FEATURE_1' | translate }}</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.LOGIN.MARKETING_FEATURE_2' | translate }}</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-white/15 backdrop-blur shrink-0">
+              <i class="pi pi-check text-xs"></i>
+            </span>
+            <span class="text-sm">{{ 'AUTH.LOGIN.MARKETING_FEATURE_3' | translate }}</span>
+          </li>
+        </ul>
+      </div>
 
-        <!-- <div class="flex items-center justify-between">
-          <div class="flex items-center">
-            <p-checkbox
-              formControlName="rememberMe"
-              [binary]="true"
-              inputId="rememberMe"
-            ></p-checkbox>
-            <label for="rememberMe" class="ml-2 text-sm text-gray-700 cursor-pointer">
-              Remember me
-            </label>
-          </div>
-          <a href="#" class="text-sm text-primary-600 hover:text-primary-700">
-            Forgot password?
-          </a>
-        </div> -->
-
-        <p-button
-          type="submit"
-          [label]="'AUTH.LOGIN.SIGN_IN' | translate"
-          [loading]="loading()"
-          [disabled]="loading()"
-          styleClass="w-full mt-8"
-        ></p-button>
-
-        <div class="text-center mt-4">
-          <span class="text-gray-600 text-sm">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }} </span>
-          <a routerLink="/auth/register" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
-            {{ 'AUTH.LOGIN.SIGN_UP' | translate }}
-          </a>
-        </div>
-      </form>
-    </p-card>
-
-    <div class="text-center mt-6 text-primary-100 text-sm">
-      <p>&copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}</p>
+      <!-- Footer -->
+      <div class="text-xs text-primary-100/80">
+        &copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}
+      </div>
     </div>
-  </div>
+  </aside>
+
+  <!-- ─── Right: form ───────────────────────────────────────────────────── -->
+  <main class="flex-1 flex flex-col">
+    <!-- Top bar: language toggle -->
+    <div class="flex items-center justify-end px-6 py-4">
+      <button type="button"
+        (click)="languageService.toggle()"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 text-xs font-medium text-gray-600 hover:border-primary-500 hover:text-primary-600 transition-colors">
+        <i class="pi pi-globe text-sm"></i>
+        <span>{{ 'AUTH.LOGIN.LANGUAGE_TOGGLE' | translate }}</span>
+      </button>
+    </div>
+
+    <div class="flex-1 flex items-center justify-center px-6 pb-10">
+      <div class="w-full max-w-md">
+        <!-- Mobile logo -->
+        <div class="lg:hidden text-center mb-8">
+          <img src="assets/img/logo.png" alt="Netrofit" class="h-12 w-auto mx-auto mb-2" />
+          <div class="text-sm text-gray-500">{{ 'AUTH.LOGIN.SUBTITLE' | translate }}</div>
+        </div>
+
+        <!-- Heading -->
+        <div class="mb-8">
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'AUTH.LOGIN.WELCOME' | translate }}</h1>
+          <p class="text-gray-500 mt-2">{{ 'AUTH.LOGIN.SIGN_IN_SUBTITLE' | translate }}</p>
+        </div>
+
+        <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-5">
+          <div>
+            <label for="identifier" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.IDENTIFIER' | translate }}</label>
+            <input
+              pInputText
+              id="identifier"
+              formControlName="identifier"
+              type="text"
+              autocomplete="username"
+              [placeholder]="'AUTH.LOGIN.IDENTIFIER_PLACEHOLDER' | translate"
+              class="w-full"
+              [class.ng-invalid]="identifier?.invalid && identifier?.touched"
+            />
+            @if (identifier?.invalid && identifier?.touched) {
+              <small class="text-red-600 mt-1 block">
+                <span>{{ 'AUTH.LOGIN.IDENTIFIER_REQUIRED' | translate }}</span>
+              </small>
+            }
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.LOGIN.PASSWORD' | translate }}</label>
+            <p-password
+              id="password"
+              formControlName="password"
+              [toggleMask]="true"
+              [feedback]="false"
+              [placeholder]="'AUTH.LOGIN.PASSWORD_PLACEHOLDER' | translate"
+              styleClass="w-full"
+              inputStyleClass="w-full"
+              [class.ng-invalid]="password?.invalid && password?.touched"
+            ></p-password>
+            @if (password?.invalid && password?.touched) {
+              <small class="text-red-600 mt-1 block">
+                @if (password?.errors?.['required']) {
+                  <span>{{ 'AUTH.LOGIN.PASSWORD_REQUIRED' | translate }}</span>
+                }
+                @if (password?.errors?.['minlength']) {
+                  <span>{{ 'AUTH.LOGIN.PASSWORD_MIN' | translate }}</span>
+                }
+              </small>
+            }
+          </div>
+
+          <p-button
+            type="submit"
+            [label]="'AUTH.LOGIN.SIGN_IN' | translate"
+            [loading]="loading()"
+            [disabled]="loading()"
+            styleClass="w-full mt-2"
+          ></p-button>
+
+          <div class="text-center pt-2">
+            <span class="text-gray-600 text-sm">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }} </span>
+            <a routerLink="/auth/register" class="text-primary-600 hover:text-primary-700 text-sm font-semibold">
+              {{ 'AUTH.LOGIN.SIGN_UP' | translate }}
+            </a>
+          </div>
+        </form>
+
+        <!-- Mobile footer -->
+        <div class="lg:hidden text-center mt-10 text-gray-400 text-xs">
+          &copy; {{ 'AUTH.LOGIN.COPYRIGHT' | translate }}
+        </div>
+      </div>
+    </div>
+  </main>
 </div>

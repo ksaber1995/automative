@@ -122,7 +122,10 @@ const CompanySchema = z.object({
 // Auth Schemas
 // =============================================
 const LoginRequestSchema = z.object({
-  email: z.string().email(),
+  // Identifier can be either an email address or a phone number.
+  // Phone is normalized server-side, so users can enter either local
+  // ("01097628565") or international ("201097628565" / "+201097628565") format.
+  identifier: z.string().min(3),
   password: z.string().min(6),
 });
 
@@ -137,21 +140,26 @@ const RegisterRequestSchema = z.object({
   lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  phone: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
+  // Phone is now required — it's the channel we use to verify the account.
+  countryCode: z.string().min(1),
+  phone: z.string().min(4),
 });
 
 const RegisterResponseSchema = z.object({
-  email: z.string(),
+  phone: z.string(),
+  countryCode: z.string(),
   message: z.string(),
 });
 
-const VerifyEmailRequestSchema = z.object({
-  email: z.string().email(),
+const VerifyPhoneRequestSchema = z.object({
+  countryCode: z.string().min(1),
+  phone: z.string().min(4),
   otp: z.string().length(6),
 });
 
 const ResendOtpRequestSchema = z.object({
-  email: z.string().email(),
+  countryCode: z.string().min(1),
+  phone: z.string().min(4),
 });
 
 const SafeUserSchema = z.object({
@@ -166,6 +174,9 @@ const SafeUserSchema = z.object({
   linkedEmployeeId: UUIDSchema.nullable().optional(),
   permissions: UserPermissionsSchema,
   isActive: z.boolean(),
+  countryCode: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  phoneVerified: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -935,7 +946,12 @@ export const contract = c.router({
       responses: {
         200: AuthResponseSchema,
         401: z.object({ message: z.string() }),
-        403: z.object({ message: z.string(), code: z.string(), email: z.string() }),
+        403: z.object({
+          message: z.string(),
+          code: z.string(),
+          countryCode: z.string().optional(),
+          phone: z.string().optional(),
+        }),
       },
     },
     register: {
@@ -947,10 +963,10 @@ export const contract = c.router({
         400: z.object({ message: z.string() }),
       },
     },
-    verifyEmail: {
+    verifyPhone: {
       method: 'POST',
-      path: '/api/auth/verify-email',
-      body: VerifyEmailRequestSchema,
+      path: '/api/auth/verify-phone',
+      body: VerifyPhoneRequestSchema,
       responses: {
         200: AuthResponseSchema,
         400: z.object({ message: z.string() }),
@@ -2975,6 +2991,15 @@ export const contract = c.router({
     createEventFeatureTables: {
       method: 'POST',
       path: '/api/migrations/create-event-feature-tables',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    runPhoneAuthMigration: {
+      method: 'POST',
+      path: '/api/migrations/add-phone-auth',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

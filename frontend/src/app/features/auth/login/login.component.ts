@@ -10,6 +10,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { LanguageService } from '../../../core/services/language.service';
 
 @Component({
   selector: 'app-login',
@@ -34,14 +35,15 @@ export class LoginComponent {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  languageService = inject(LanguageService);
 
   loginForm: FormGroup;
   loading = signal(false);
 
   constructor() {
     this.loginForm = this.fb.group({
-      email: ['test@gmail.com', [Validators.required, Validators.email]],
-      password: ['@Aa01097628565', [Validators.required, Validators.minLength(6)]],
+      identifier: ['', [Validators.required, Validators.minLength(3)]],
+      password: ['', [Validators.required, Validators.minLength(6)]],
       rememberMe: [false]
     });
   }
@@ -53,19 +55,22 @@ export class LoginComponent {
     }
 
     this.loading.set(true);
-    const { email, password } = this.loginForm.value;
+    const { identifier, password } = this.loginForm.value;
 
-    this.authService.login({ email, password }).subscribe({
+    this.authService.login({ identifier: String(identifier).trim(), password }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('AUTH.LOGIN.SUCCESS'));
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.loading.set(false);
-        if (error.status === 403 && error.error?.code === 'EMAIL_NOT_VERIFIED') {
-          this.notificationService.error(this.translate.instant('AUTH.LOGIN.EMAIL_NOT_VERIFIED'));
-          this.router.navigate(['/auth/verify-email'], {
-            queryParams: { email: error.error.email },
+        if (error.status === 403 && error.error?.code === 'PHONE_NOT_VERIFIED') {
+          this.notificationService.error(this.translate.instant('AUTH.LOGIN.PHONE_NOT_VERIFIED'));
+          this.router.navigate(['/auth/verify-phone'], {
+            queryParams: {
+              countryCode: error.error.countryCode || '',
+              phone: error.error.phone || '',
+            },
           });
           return;
         }
@@ -79,8 +84,8 @@ export class LoginComponent {
     });
   }
 
-  get email() {
-    return this.loginForm.get('email');
+  get identifier() {
+    return this.loginForm.get('identifier');
   }
 
   get password() {

@@ -75,8 +75,8 @@ export class AuthService {
     return this.http.post<RegisterResponse>(`${environment.apiUrl}/auth/register`, userData);
   }
 
-  verifyEmail(email: string, otp: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/verify-email`, { email, otp })
+  verifyPhone(countryCode: string, phone: string, otp: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/verify-phone`, { countryCode, phone, otp })
       .pipe(
         tap(response => {
           this.setTokens(response.accessToken, response.refreshToken);
@@ -90,8 +90,8 @@ export class AuthService {
       );
   }
 
-  resendOtp(email: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/resend-otp`, { email });
+  resendOtp(countryCode: string, phone: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/resend-otp`, { countryCode, phone });
   }
 
   logout(): void {

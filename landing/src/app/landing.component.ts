@@ -32,9 +32,8 @@ interface RoadmapPhase {
     <!-- Sticky top nav -->
     <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
       <div class="container-custom h-16 flex items-center justify-between">
-        <a href="#top" class="flex items-center gap-2">
-          <img src="logo.svg" alt="Netrofit" class="w-9 h-9 rounded-lg" />
-          <span class="font-bold text-lg text-gray-900">Netrofit</span>
+        <a href="#top" class="flex items-center">
+          <img src="logo.png" alt="Netrofit" class="w-12 h-12 rounded-lg" />
         </a>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
           <a href="#benefits" class="hover:text-brand-600">{{ 'NAV.BENEFITS' | translate }}</a>
@@ -162,26 +161,38 @@ interface RoadmapPhase {
           <h2 class="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">{{ 'PRICING.HEADING' | translate }}</h2>
           <p class="mt-4 text-lg text-gray-600">{{ 'PRICING.SUB' | translate }}</p>
 
-          <div class="mt-8 inline-flex items-center gap-2 p-1 rounded-full bg-gray-100">
+          <div class="mt-8 inline-flex items-stretch gap-1 p-1.5 rounded-full bg-gray-100 shadow-inner">
             <button
               (click)="billing.set('annual')"
               [class.bg-white]="billing() === 'annual'"
-              [class.shadow]="billing() === 'annual'"
+              [class.shadow-md]="billing() === 'annual'"
               [class.text-brand-700]="billing() === 'annual'"
+              [class.ring-2]="billing() === 'annual'"
+              [class.ring-brand-500]="billing() === 'annual'"
               [class.text-gray-500]="billing() !== 'annual'"
-              class="px-4 py-2 rounded-full font-medium text-sm">
-              {{ 'PRICING.TOGGLE_ANNUAL' | translate }}
+              class="relative px-5 py-2.5 rounded-full font-semibold text-sm flex items-center gap-2 transition-all">
+              <span>{{ 'PRICING.TOGGLE_ANNUAL' | translate }}</span>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold tracking-wide">
+                {{ 'PRICING.SAVE_BADGE' | translate }}
+              </span>
             </button>
             <button
               (click)="billing.set('monthly')"
               [class.bg-white]="billing() === 'monthly'"
-              [class.shadow]="billing() === 'monthly'"
+              [class.shadow-md]="billing() === 'monthly'"
               [class.text-brand-700]="billing() === 'monthly'"
               [class.text-gray-500]="billing() !== 'monthly'"
-              class="px-4 py-2 rounded-full font-medium text-sm">
+              class="px-5 py-2.5 rounded-full font-semibold text-sm transition-all">
               {{ 'PRICING.TOGGLE_MONTHLY' | translate }}
             </button>
           </div>
+
+          @if (billing() === 'monthly') {
+            <div class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 inline-flex items-center gap-2 px-3 py-1.5 rounded-full">
+              <span>💡</span>
+              <span>{{ 'PRICING.SWITCH_HINT' | translate }}</span>
+            </div>
+          }
 
           <div class="mt-4 inline-flex items-center gap-2 p-1 rounded-full bg-gray-100">
             <button
@@ -204,7 +215,7 @@ interface RoadmapPhase {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           @for (p of pricing(); track p.tierKey; let i = $index) {
             <div
-              class="relative p-8 rounded-2xl border-2"
+              class="relative p-8 rounded-2xl border-2 transition-all"
               [class.border-brand-600]="i === 1"
               [class.shadow-2xl]="i === 1"
               [class.border-gray-100]="i !== 1">
@@ -215,14 +226,39 @@ interface RoadmapPhase {
               }
               <h3 class="font-bold text-xl text-gray-900">{{ p.tierKey | translate }}</h3>
               <p class="text-sm text-gray-500 mt-1">{{ p.subtitleKey | translate }}</p>
-              <div class="mt-6">
-                <span class="text-4xl font-extrabold text-gray-900">{{ p.price | number }}</span>
-                <span class="text-gray-500 ms-1">{{ currency() }}{{ 'PRICING.PER_MONTH' | translate }}</span>
-              </div>
+
               @if (billing() === 'annual') {
-                <div class="text-sm text-green-600 font-medium mt-1">{{ 'PRICING.BILLED_ANNUALLY' | translate }}</div>
+                <div class="mt-6 flex items-baseline gap-2 flex-wrap">
+                  <span class="text-lg font-medium text-gray-400 line-through">{{ p.monthlyPrice | number }}</span>
+                  <span class="text-4xl font-extrabold text-gray-900">{{ p.price | number }}</span>
+                  <span class="text-gray-500">{{ currency() }}{{ 'PRICING.PER_MONTH' | translate }}</span>
+                </div>
+                <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-emerald-900 font-medium">{{ 'PRICING.YEAR_TOTAL' | translate }}</span>
+                    <span class="text-emerald-900 font-extrabold">{{ p.annualTotal | number }} {{ currency() }}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-emerald-700">{{ 'PRICING.YOU_SAVE' | translate }}</span>
+                    <span class="text-emerald-700 font-bold">{{ p.annualSavings | number }} {{ currency() }} / {{ 'PRICING.YEAR_LABEL' | translate }}</span>
+                  </div>
+                </div>
               } @else {
-                <div class="text-sm text-gray-400 mt-1">{{ 'PRICING.BILLED_MONTHLY' | translate }}</div>
+                <div class="mt-6 flex items-baseline gap-2">
+                  <span class="text-4xl font-extrabold text-gray-900">{{ p.price | number }}</span>
+                  <span class="text-gray-500">{{ currency() }}{{ 'PRICING.PER_MONTH' | translate }}</span>
+                </div>
+                <div class="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-1">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">{{ 'PRICING.YEAR_TOTAL' | translate }}</span>
+                    <span class="text-gray-900 font-bold">{{ p.yearAtMonthly | number }} {{ currency() }}</span>
+                  </div>
+                  <button (click)="billing.set('annual')"
+                    class="w-full mt-1 text-left text-xs text-amber-700 hover:text-amber-900 font-semibold flex items-center gap-1">
+                    <span>↩</span>
+                    <span>{{ 'PRICING.SWITCH_TO_ANNUAL' | translate: { amount: p.annualSavings | number, currency: currency() } }}</span>
+                  </button>
+                </div>
               }
               <ul class="mt-6 space-y-3">
                 @for (featKey of p.featureKeys; track featKey) {
@@ -380,9 +416,8 @@ interface RoadmapPhase {
     <footer class="py-10 bg-gray-900 text-gray-400 text-sm">
       <div class="container-custom flex flex-col md:flex-row justify-between gap-6">
         <div>
-          <div class="flex items-center gap-2 mb-2">
-            <img src="logo.svg" alt="Netrofit" class="w-7 h-7 rounded" />
-            <span class="font-bold text-white">Netrofit</span>
+          <div class="flex items-center mb-2">
+            <img src="logo.png" alt="Netrofit" class="w-10 h-10 rounded" />
           </div>
           <p>{{ 'FOOTER.COPY' | translate: { year: currentYear } }}</p>
         </div>
@@ -403,10 +438,12 @@ interface RoadmapPhase {
 
     <!-- Demo modal -->
     @if (showModal()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      <!-- Outer container scrolls on mobile so tall forms aren't cut off; sheet on phones, centered card on tablets+ -->
+      <div class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm"
            (click)="closeModal()">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 sm:p-8"
-             (click)="$event.stopPropagation()">
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+          <div class="bg-white shadow-2xl w-full max-w-lg p-5 pb-8 sm:p-8 rounded-t-2xl sm:rounded-2xl"
+               (click)="$event.stopPropagation()">
           @if (submitted()) {
             <div class="text-center py-6">
               <div class="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-4xl mx-auto mb-4">✓</div>
@@ -415,12 +452,13 @@ interface RoadmapPhase {
               <button (click)="closeModal()" class="btn-primary mt-6">{{ 'MODAL.CLOSE' | translate }}</button>
             </div>
           } @else {
-            <div class="flex justify-between items-start mb-6">
-              <div>
-                <h3 class="text-2xl font-bold text-gray-900">{{ 'MODAL.TITLE' | translate }}</h3>
+            <div class="flex justify-between items-start gap-3 mb-5">
+              <div class="min-w-0">
+                <h3 class="text-xl sm:text-2xl font-bold text-gray-900">{{ 'MODAL.TITLE' | translate }}</h3>
                 <p class="text-sm text-gray-500 mt-1">{{ 'MODAL.SUB' | translate }}</p>
               </div>
-              <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <button (click)="closeModal()" aria-label="Close"
+                class="shrink-0 -mt-1 -mr-1 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-2xl leading-none">×</button>
             </div>
 
             <form (ngSubmit)="submit()" #f="ngForm" class="space-y-4">
@@ -485,6 +523,7 @@ interface RoadmapPhase {
               <p class="text-xs text-gray-500 text-center">{{ 'MODAL.FINE_PRINT' | translate }}</p>
             </form>
           }
+          </div>
         </div>
       </div>
     }
@@ -532,7 +571,7 @@ export class LandingComponent {
     { icon: '💰', titleKey: 'BENEFITS.ITEMS.INSTALLMENTS_TITLE', textKey: 'BENEFITS.ITEMS.INSTALLMENTS_TEXT' },
     { icon: '🇦🇪', titleKey: 'BENEFITS.ITEMS.ARABIC_TITLE', textKey: 'BENEFITS.ITEMS.ARABIC_TEXT' },
     { icon: '👨‍🏫', titleKey: 'BENEFITS.ITEMS.PAYROLL_TITLE', textKey: 'BENEFITS.ITEMS.PAYROLL_TEXT' },
-    { icon: '📱', titleKey: 'BENEFITS.ITEMS.MOBILE_TITLE', textKey: 'BENEFITS.ITEMS.MOBILE_TEXT' },
+    { icon: '🔐', titleKey: 'BENEFITS.ITEMS.ROLES_TITLE', textKey: 'BENEFITS.ITEMS.ROLES_TEXT' },
   ];
 
   features: Feature[] = [
@@ -629,48 +668,54 @@ export class LandingComponent {
       pro: { monthly: 1798, annual: 1438 },
     };
     const p = cur === 'EGP' ? egp : sar;
-    const key: 'monthly' | 'annual' = isAnnual ? 'annual' : 'monthly';
+
+    const buildPlan = (
+      tierKey: string,
+      subtitleKey: string,
+      sourceTag: string,
+      tier: { monthly: number; annual: number },
+      featureKeys: string[],
+    ) => {
+      const monthlyEquiv = isAnnual ? tier.annual : tier.monthly;
+      const annualTotal = tier.annual * 12;
+      const yearAtMonthly = tier.monthly * 12;
+      const annualSavings = yearAtMonthly - annualTotal;
+      return {
+        tierKey,
+        subtitleKey,
+        sourceTag,
+        price: monthlyEquiv,
+        monthlyPrice: tier.monthly,
+        annualMonthly: tier.annual,
+        annualTotal,
+        yearAtMonthly,
+        annualSavings,
+        featureKeys,
+      };
+    };
 
     return [
-      {
-        tierKey: 'PRICING.PLANS.STARTER_TIER',
-        subtitleKey: 'PRICING.PLANS.STARTER_SUB',
-        sourceTag: 'starter',
-        price: p.starter[key],
-        featureKeys: [
-          'PRICING.PLANS.STARTER_FEAT_1',
-          'PRICING.PLANS.STARTER_FEAT_2',
-          'PRICING.PLANS.STARTER_FEAT_3',
-          'PRICING.PLANS.STARTER_FEAT_4',
-          'PRICING.PLANS.STARTER_FEAT_5',
-        ],
-      },
-      {
-        tierKey: 'PRICING.PLANS.GROWTH_TIER',
-        subtitleKey: 'PRICING.PLANS.GROWTH_SUB',
-        sourceTag: 'growth',
-        price: p.growth[key],
-        featureKeys: [
-          'PRICING.PLANS.GROWTH_FEAT_1',
-          'PRICING.PLANS.GROWTH_FEAT_2',
-          'PRICING.PLANS.GROWTH_FEAT_3',
-          'PRICING.PLANS.GROWTH_FEAT_4',
-          'PRICING.PLANS.GROWTH_FEAT_5',
-        ],
-      },
-      {
-        tierKey: 'PRICING.PLANS.PRO_TIER',
-        subtitleKey: 'PRICING.PLANS.PRO_SUB',
-        sourceTag: 'pro',
-        price: p.pro[key],
-        featureKeys: [
-          'PRICING.PLANS.PRO_FEAT_1',
-          'PRICING.PLANS.PRO_FEAT_2',
-          'PRICING.PLANS.PRO_FEAT_3',
-          'PRICING.PLANS.PRO_FEAT_4',
-          'PRICING.PLANS.PRO_FEAT_5',
-        ],
-      },
+      buildPlan('PRICING.PLANS.STARTER_TIER', 'PRICING.PLANS.STARTER_SUB', 'starter', p.starter, [
+        'PRICING.PLANS.STARTER_FEAT_1',
+        'PRICING.PLANS.STARTER_FEAT_2',
+        'PRICING.PLANS.STARTER_FEAT_3',
+        'PRICING.PLANS.STARTER_FEAT_4',
+        'PRICING.PLANS.STARTER_FEAT_5',
+      ]),
+      buildPlan('PRICING.PLANS.GROWTH_TIER', 'PRICING.PLANS.GROWTH_SUB', 'growth', p.growth, [
+        'PRICING.PLANS.GROWTH_FEAT_1',
+        'PRICING.PLANS.GROWTH_FEAT_2',
+        'PRICING.PLANS.GROWTH_FEAT_3',
+        'PRICING.PLANS.GROWTH_FEAT_4',
+        'PRICING.PLANS.GROWTH_FEAT_5',
+      ]),
+      buildPlan('PRICING.PLANS.PRO_TIER', 'PRICING.PLANS.PRO_SUB', 'pro', p.pro, [
+        'PRICING.PLANS.PRO_FEAT_1',
+        'PRICING.PLANS.PRO_FEAT_2',
+        'PRICING.PLANS.PRO_FEAT_3',
+        'PRICING.PLANS.PRO_FEAT_4',
+        'PRICING.PLANS.PRO_FEAT_5',
+      ]),
     ];
   });
 

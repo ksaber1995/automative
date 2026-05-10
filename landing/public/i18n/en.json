@@ -42,8 +42,8 @@
       "ARABIC_TEXT": "Full RTL support. Your staff can use it from day one — no English barrier.",
       "PAYROLL_TITLE": "Payroll + attendance",
       "PAYROLL_TEXT": "Track instructor sessions, salaries, and bonuses. Print payslips in one click.",
-      "MOBILE_TITLE": "Mobile-friendly",
-      "MOBILE_TEXT": "Check your numbers from your phone at any time. Built for how you actually work."
+      "ROLES_TITLE": "Roles & permissions",
+      "ROLES_TEXT": "Give every team member exactly the access they need — branch managers, instructors, accountants — with granular per-feature controls."
     }
   },
   "FEATURES": {
@@ -112,12 +112,18 @@
     "KICKER": "Simple, transparent pricing",
     "HEADING": "Pick a plan. Start today.",
     "SUB": "Save 25% when you pay annually. All plans include unlimited users and Arabic support.",
-    "TOGGLE_ANNUAL": "Annual · Save 25%",
+    "TOGGLE_ANNUAL": "Annual",
     "TOGGLE_MONTHLY": "Monthly",
+    "SAVE_BADGE": "SAVE 25%",
     "BILLED_ANNUALLY": "✓ Billed annually",
     "BILLED_MONTHLY": "Billed monthly",
     "PER_MONTH": "/mo",
     "MOST_POPULAR": "MOST POPULAR",
+    "YEAR_TOTAL": "Total billed yearly",
+    "YOU_SAVE": "You save",
+    "YEAR_LABEL": "year",
+    "SWITCH_HINT": "Switch to annual and save 25% — already factored into the price below.",
+    "SWITCH_TO_ANNUAL": "Save {{amount}} {{currency}}/yr → switch to annual",
     "CTA": "Book a Demo",
     "CUSTOM_PREFIX": "Need more? We offer white-label and custom plans for franchises.",
     "CUSTOM_CTA": "Talk to us →",
