@@ -9,6 +9,11 @@ const app = new cdk.App();
 const account = process.env.CDK_DEFAULT_ACCOUNT || '365729671026';
 const apiRegion = process.env.CDK_DEFAULT_REGION || 'eu-west-1';
 
+// Route 53 zone for netrofit.com. Migrated from Google Cloud DNS on 2026-05-10
+// because Google's zone couldn't apex-ALIAS to CloudFront. Referenced read-only
+// by every netrofit.* stack so CDK can manage their A/AAAA alias records.
+const netrofitZoneId = 'Z09915202RRKLGYSVZZTS';
+
 // ─── DEV ────────────────────────────────────────────────────────────────────
 new CoreStack(app, `AutomateMagicStack-dev`, {
   stage: 'dev',
@@ -28,6 +33,12 @@ new CoreStack(app, `AutomateMagicStack-dev`, {
 new LandingStack(app, `NetrofitLandingStack-dev`, {
   domainName: 'netrofit.com',
   sourcePath: path.resolve(__dirname, '../../landing/dist/netrofit-landing/browser'),
+  hostedZoneId: netrofitZoneId,
+  // Apex stack owns the zone-wide TXTs so we don't get duplicate-record CFN errors.
+  zoneApexTxtRecords: {
+    spf: 'v=spf1 -all',
+    dmarc: 'v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s',
+  },
   env: { account, region: 'us-east-1' },
   description: `Netrofit Landing Page (dev)`,
   tags: {
@@ -42,6 +53,7 @@ new LandingStack(app, `NetrofitFrontendStack-dev`, {
   domainName: 'dev.netrofit.com',
   wwwDomain: 'www.dev.netrofit.com',
   sourcePath: path.resolve(__dirname, '../../frontend/dist/automate-magic-frontend/browser'),
+  hostedZoneId: netrofitZoneId,
   env: { account, region: 'us-east-1' },
   description: `Netrofit Frontend App (dev)`,
   tags: {
@@ -78,6 +90,7 @@ new LandingStack(app, `NetrofitFrontendStack-prod`, {
     originDomain: 'prod.api.netrofit.net',
     pathPattern: '/api/*',
   },
+  hostedZoneId: netrofitZoneId,
   env: { account, region: 'us-east-1' },
   description: `Netrofit Frontend App (prod)`,
   tags: {

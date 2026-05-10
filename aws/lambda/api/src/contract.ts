@@ -1289,11 +1289,11 @@ export const contract = c.router({
       path: '/api/events/:eventId/refunds',
       pathParams: z.object({ eventId: UUIDSchema }),
       body: z.object({
+        subscriptionId: UUIDSchema,
         amount: z.number(),
         refundDate: z.string(),
         type: z.enum(['FULL', 'PARTIAL']).optional(),
         reason: z.string().optional(),
-        studentId: OptionalUUIDSchema,
       }),
       responses: {
         201: z.any(),
@@ -2973,6 +2973,15 @@ export const contract = c.router({
     createInstallmentTables: {
       method: 'POST',
       path: '/api/migrations/create-installment-tables',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addRefundSubscriptionLink: {
+      method: 'POST',
+      path: '/api/migrations/add-refund-subscription-link',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

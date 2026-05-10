@@ -150,6 +150,7 @@
           <th>Type</th>
           <th>Mobile / Age</th>
           <th class="text-right">Amount</th>
+          <th class="text-right">Refunded</th>
           <th>Date</th>
           <th>Method</th>
           <th></th>
@@ -170,10 +171,27 @@
             @if (s.externalAge) { <div class="text-xs text-gray-400">Age: {{ s.externalAge }}</div> }
           </td>
           <td class="text-right font-semibold text-green-600">{{ s.amount.toFixed(2) }}</td>
+          <td class="text-right">
+            @if (s.refundedAmount && s.refundedAmount > 0) {
+              @if (refundRemaining(s) <= 0) {
+                <span class="text-orange-600 font-semibold">-{{ s.refundedAmount.toFixed(2) }}</span>
+                <div class="text-xs text-gray-400">Fully refunded</div>
+              } @else {
+                <span class="text-orange-600">-{{ s.refundedAmount.toFixed(2) }}</span>
+                <div class="text-xs text-gray-400">Remaining: {{ refundRemaining(s).toFixed(2) }}</div>
+              }
+            } @else {
+              <span class="text-gray-400">—</span>
+            }
+          </td>
           <td>{{ s.paymentDate | date: 'mediumDate' }}</td>
           <td class="text-sm text-gray-500">{{ s.paymentMethod || '—' }}</td>
-          <td>
+          <td class="whitespace-nowrap">
             @if (authService.canWrite('events')) {
+              <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
+                pTooltip="Refund"
+                [disabled]="refundRemaining(s) <= 0"
+                (onClick)="openRefundDialog(s)"></p-button>
               <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
                 pTooltip="Delete" (onClick)="deleteSubscription(s)"></p-button>
             }
@@ -182,7 +200,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-6 text-gray-400">No subscribers yet.</td>
+          <td colspan="8" class="text-center py-6 text-gray-400">No subscribers yet.</td>
         </tr>
       </ng-template>
     </p-table>
@@ -246,18 +264,13 @@
   <!-- Refunds -->
   <p-card styleClass="mb-6">
     <ng-template pTemplate="header">
-      <div class="flex justify-between items-center px-6 py-4 border-b">
-        <div>
-          <h3 class="text-xl font-semibold flex items-center gap-2">
-            <i class="pi pi-replay text-orange-600"></i>
-            Refunds
-            <span class="text-gray-400 text-base font-normal">({{ refunds().length }})</span>
-          </h3>
-          <p class="text-sm text-gray-500 mt-1">Money returned to subscribers or attendees</p>
-        </div>
-        @if (authService.canWrite('events')) {
-          <p-button icon="pi pi-plus" label="Add Refund" severity="warn" (onClick)="openRefundDialog()"></p-button>
-        }
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-xl font-semibold flex items-center gap-2">
+          <i class="pi pi-replay text-orange-600"></i>
+          Refunds
+          <span class="text-gray-400 text-base font-normal">({{ refunds().length }})</span>
+        </h3>
+        <p class="text-sm text-gray-500 mt-1">Issued from a subscriber row above. Refunds are always tied to a subscription.</p>
       </div>
     </ng-template>
 
@@ -419,55 +432,74 @@
   </ng-template>
 </p-dialog>
 
-<!-- Add Refund Dialog -->
-<p-dialog [(visible)]="showRefundDialog" [modal]="true" header="Add Event Refund" [style]="{ width: '520px' }">
-  <div class="grid gap-4">
-    <div>
-      <label class="block text-sm font-medium mb-2">Type <span class="text-red-500">*</span></label>
-      <div class="flex gap-6">
-        <label class="flex items-center gap-2">
-          <p-radiobutton name="refType" value="FULL" [(ngModel)]="refType"></p-radiobutton>
-          <span>Full</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <p-radiobutton name="refType" value="PARTIAL" [(ngModel)]="refType"></p-radiobutton>
-          <span>Partial</span>
-        </label>
+<!-- Refund Subscription Dialog -->
+<p-dialog [(visible)]="showRefundDialog" [modal]="true" header="Refund Subscription" [style]="{ width: '520px' }">
+  @if (refSubscription) {
+    <div class="grid gap-4">
+      <!-- Subscription summary -->
+      <div class="bg-gray-50 p-3 rounded border">
+        <div class="text-sm text-gray-500">Subscriber</div>
+        <div class="font-medium">{{ subscriberLabel(refSubscription) }}</div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-sm">
+          <div>
+            <div class="text-gray-500">Original</div>
+            <div class="font-semibold text-green-600">{{ refSubscription.amount.toFixed(2) }}</div>
+          </div>
+          <div>
+            <div class="text-gray-500">Already refunded</div>
+            <div class="font-semibold text-orange-600">{{ (refSubscription.refundedAmount || 0).toFixed(2) }}</div>
+          </div>
+          <div>
+            <div class="text-gray-500">Remaining</div>
+            <div class="font-semibold text-blue-700">{{ refundRemaining(refSubscription).toFixed(2) }}</div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-2">Refund amount <span class="text-red-500">*</span></label>
+          <p-inputnumber
+            [(ngModel)]="refAmount"
+            (ngModelChange)="onRefundAmountChange()"
+            mode="decimal"
+            [minFractionDigits]="2"
+            [maxFractionDigits]="2"
+            [min]="0"
+            [max]="refundRemaining(refSubscription)"
+            [style]="{ width: '100%' }" />
+          <div class="text-xs text-gray-500 mt-1">Max: {{ refundRemaining(refSubscription).toFixed(2) }}</div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
+          <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+        </div>
+      </div>
+
       <div>
-        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
-        <p-inputnumber [(ngModel)]="refAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
+        <label class="block text-sm font-medium mb-2">Type</label>
+        <div class="flex gap-6">
+          <label class="flex items-center gap-2">
+            <p-radiobutton name="refType" value="FULL" [(ngModel)]="refType"></p-radiobutton>
+            <span>Full (refund the remaining)</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <p-radiobutton name="refType" value="PARTIAL" [(ngModel)]="refType"></p-radiobutton>
+            <span>Partial</span>
+          </label>
+        </div>
       </div>
+
       <div>
-        <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
-        <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+        <label class="block text-sm font-medium mb-2">Reason</label>
+        <textarea pTextarea [(ngModel)]="refReason" rows="2" class="w-full"></textarea>
       </div>
     </div>
-    <div>
-      <label class="block text-sm font-medium mb-2">Student (optional)</label>
-      <p-select
-        [(ngModel)]="refStudentId"
-        [options]="studentOptions()"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="Refund for a specific student"
-        [filter]="true"
-        filterBy="label"
-        [showClear]="true"
-        [style]="{ width: '100%' }"
-      ></p-select>
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-2">Reason</label>
-      <textarea pTextarea [(ngModel)]="refReason" rows="2" class="w-full"></textarea>
-    </div>
-  </div>
+  }
   <ng-template pTemplate="footer">
     <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
     <p-button label="Issue Refund" icon="pi pi-replay" severity="warn" [loading]="saving()"
-      [disabled]="!refAmount || !refDate"
+      [disabled]="!refSubscription || !refAmount || !refDate || refAmount <= 0 || refAmount > refundRemaining(refSubscription)"
       (onClick)="submitRefund()"></p-button>
   </ng-template>
 </p-dialog>

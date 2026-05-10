@@ -5,6 +5,8 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -21,6 +23,26 @@ export interface LandingStackProps extends cdk.StackProps {
     originDomain: string;        // e.g. "prod.api.netrofit.net"
     pathPattern?: string;        // default "/api/*"
     originPath?: string;         // optional origin path prefix (e.g. "/prod" for raw execute-api)
+  };
+  /**
+   * Optional Route 53 zone in which to create A/AAAA alias records pointing
+   * `domainName` (and `wwwDomain`, if any) at this stack's CloudFront distro.
+   * The zone itself is referenced read-only — CDK will not create or destroy it.
+   *
+   * Migration note: deploying with this set when the same A/AAAA records already
+   * exist in the zone will fail with "record already exists". Delete the existing
+   * records imperatively (or import them) before turning this on.
+   */
+  hostedZoneId?: string;
+  /** Defaults to the last two labels of `domainName` (e.g. "netrofit.com"). */
+  hostedZoneName?: string;
+  /**
+   * Zone-apex TXT records (SPF / DMARC). Only set this on ONE stack per zone,
+   * typically the apex landing stack — otherwise CFN will conflict on duplicates.
+   */
+  zoneApexTxtRecords?: {
+    spf?: string;     // e.g. "v=spf1 -all"
+    dmarc?: string;   // e.g. "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s"
   };
 }
 
@@ -115,6 +137,64 @@ function handler(event) {
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
       });
+    }
+
+    // ─── Optional Route 53 alias records ────────────────────────────────────
+    // Cert validation is intentionally still acm.CertificateValidation.fromDns()
+    // (no zone arg) — passing a zone changes the CFN property and forces cert
+    // replacement, which we want to avoid for already-issued certs.
+    if (props.hostedZoneId) {
+      const zoneName =
+        props.hostedZoneName ?? props.domainName.split('.').slice(-2).join('.');
+      const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
+        hostedZoneId: props.hostedZoneId,
+        zoneName,
+      });
+      const aliasTarget = route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution),
+      );
+
+      new route53.ARecord(this, 'AliasA', {
+        zone,
+        recordName: props.domainName,
+        target: aliasTarget,
+      });
+      new route53.AaaaRecord(this, 'AliasAAAA', {
+        zone,
+        recordName: props.domainName,
+        target: aliasTarget,
+      });
+      if (wwwDomain) {
+        new route53.ARecord(this, 'WwwAliasA', {
+          zone,
+          recordName: wwwDomain,
+          target: aliasTarget,
+        });
+        new route53.AaaaRecord(this, 'WwwAliasAAAA', {
+          zone,
+          recordName: wwwDomain,
+          target: aliasTarget,
+        });
+      }
+
+      if (props.zoneApexTxtRecords) {
+        if (props.zoneApexTxtRecords.spf) {
+          new route53.TxtRecord(this, 'ApexSpf', {
+            zone,
+            recordName: zoneName,
+            values: [props.zoneApexTxtRecords.spf],
+            ttl: cdk.Duration.hours(1),
+          });
+        }
+        if (props.zoneApexTxtRecords.dmarc) {
+          new route53.TxtRecord(this, 'ApexDmarc', {
+            zone,
+            recordName: `_dmarc.${zoneName}`,
+            values: [props.zoneApexTxtRecords.dmarc],
+            ttl: cdk.Duration.hours(1),
+          });
+        }
+      }
     }
 
     // ─── Upload built assets ────────────────────────────────────────────────

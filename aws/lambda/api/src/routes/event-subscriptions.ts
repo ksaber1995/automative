@@ -22,6 +22,7 @@ function mapRow(row: any) {
     externalAge: row.external_age,
     externalMobile: row.external_mobile,
     amount: parseFloat(row.amount || '0'),
+    refundedAmount: parseFloat(row.refunded_amount || '0'),
     paymentDate: row.payment_date,
     paymentMethod: row.payment_method,
     notes: row.notes,
@@ -48,7 +49,8 @@ export const eventSubscriptionsRoutes = {
         `SELECT es.*,
                 CASE WHEN s.id IS NOT NULL
                   THEN s.first_name || ' ' || s.last_name
-                  ELSE NULL END AS student_name
+                  ELSE NULL END AS student_name,
+                COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.subscription_id = es.id), 0) AS refunded_amount
          FROM event_subscriptions es
          LEFT JOIN students s ON s.id = es.student_id
          WHERE es.event_id = $1 AND es.company_id = $2
@@ -213,9 +215,15 @@ export const eventSubscriptionsRoutes = {
 
       const rows = await query(
         `SELECT r.*,
-                CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name ELSE NULL END AS student_name
+                CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name
+                     WHEN es.id IS NOT NULL THEN COALESCE(
+                       NULLIF(TRIM(CONCAT(es.external_first_name, ' ', es.external_last_name)), ''),
+                       NULL
+                     )
+                     ELSE NULL END AS subscriber_name
          FROM refunds r
          LEFT JOIN students s ON s.id = r.student_id
+         LEFT JOIN event_subscriptions es ON es.id = r.subscription_id
          WHERE r.event_id = $1 AND r.company_id = $2
            AND r.enrollment_id IS NULL AND r.master_enrollment_id IS NULL
          ORDER BY r.refund_date DESC, r.created_at DESC`,
@@ -226,8 +234,9 @@ export const eventSubscriptionsRoutes = {
         body: rows.map((r: any) => ({
           id: r.id,
           eventId: r.event_id,
+          subscriptionId: r.subscription_id,
           studentId: r.student_id,
-          studentName: r.student_name,
+          studentName: r.subscriber_name,
           amount: parseFloat(r.amount),
           refundDate: r.refund_date,
           type: r.type,
@@ -256,16 +265,50 @@ export const eventSubscriptionsRoutes = {
       );
       if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
 
+      if (!body.subscriptionId) {
+        return { status: 400 as const, body: { message: 'subscriptionId is required' } };
+      }
+      const sub = await queryOne(
+        `SELECT id, amount, student_id
+         FROM event_subscriptions
+         WHERE id = $1 AND event_id = $2 AND company_id = $3`,
+        [body.subscriptionId, params.eventId, context.companyId]
+      );
+      if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this event' } };
+
       const amount = typeof body.amount === 'number' ? body.amount : parseFloat(body.amount);
       if (!Number.isFinite(amount) || amount <= 0) {
         return { status: 400 as const, body: { message: 'Refund amount must be a positive number' } };
       }
-      const type = body.type === 'PARTIAL' ? 'PARTIAL' : 'FULL';
+
+      const subAmount = parseFloat(sub.amount || '0');
+      const priorRow = await queryOne(
+        `SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE subscription_id = $1`,
+        [sub.id]
+      );
+      const priorRefunded = parseFloat(priorRow?.total || '0');
+      const remaining = +(subAmount - priorRefunded).toFixed(2);
+
+      // Allow a tiny tolerance for floating-point drift across decimal columns.
+      if (amount > remaining + 0.005) {
+        return {
+          status: 400 as const,
+          body: {
+            message: `Refund exceeds remaining refundable amount (${remaining.toFixed(2)})`,
+          },
+        };
+      }
+
+      const type = body.type === 'PARTIAL' ? 'PARTIAL'
+        : body.type === 'FULL' ? 'FULL'
+        : Math.abs(amount - remaining) < 0.005 && Math.abs(priorRefunded) < 0.005 ? 'FULL'
+        : 'PARTIAL';
 
       const refund = await insert('refunds', {
         company_id: context.companyId,
         event_id: params.eventId,
-        student_id: body.studentId || null,
+        subscription_id: sub.id,
+        student_id: sub.student_id,
         enrollment_id: null,
         master_enrollment_id: null,
         amount,
@@ -279,6 +322,7 @@ export const eventSubscriptionsRoutes = {
         body: {
           id: refund.id,
           eventId: refund.event_id,
+          subscriptionId: refund.subscription_id,
           studentId: refund.student_id,
           amount: parseFloat(refund.amount),
           refundDate: refund.refund_date,

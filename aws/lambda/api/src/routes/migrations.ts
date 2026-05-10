@@ -813,6 +813,60 @@ async function createEventFeatureMigration() {
   }
 }
 
+async function addRefundSubscriptionLink() {
+  console.log('Starting migration: add subscription_id to refunds (CASCADE)');
+
+  // 1) Add the column if missing. When fresh, default to CASCADE.
+  await query(`
+    ALTER TABLE refunds
+      ADD COLUMN IF NOT EXISTS subscription_id UUID
+        REFERENCES event_subscriptions(id) ON DELETE CASCADE
+  `);
+
+  // 2) Earlier installs created this FK with ON DELETE SET NULL. Detect and
+  //    upgrade to CASCADE so deleting a subscription wipes its refunds.
+  const existing = await query<{ conname: string; deltype: string }>(`
+    SELECT con.conname, con.confdeltype AS deltype
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    WHERE rel.relname = 'refunds'
+      AND con.contype = 'f'
+      AND con.conkey @> ARRAY[(
+        SELECT attnum FROM pg_attribute
+        WHERE attrelid = rel.oid AND attname = 'subscription_id'
+      )]::smallint[]
+  `);
+  for (const c of existing) {
+    if (c.deltype !== 'c') {
+      console.log(`Upgrading ${c.conname} from delete_rule=${c.deltype} to CASCADE`);
+      await query(`ALTER TABLE refunds DROP CONSTRAINT ${c.conname}`);
+      await query(`
+        ALTER TABLE refunds
+          ADD CONSTRAINT refunds_subscription_id_fkey
+          FOREIGN KEY (subscription_id) REFERENCES event_subscriptions(id) ON DELETE CASCADE
+      `);
+    }
+  }
+
+  // 3) Purge orphan event-refunds whose subscription was already wiped by the
+  //    legacy SET NULL behaviour. Scope strictly to event-refunds.
+  const orphans = await query(`
+    DELETE FROM refunds
+    WHERE subscription_id IS NULL
+      AND event_id IS NOT NULL
+      AND enrollment_id IS NULL
+      AND master_enrollment_id IS NULL
+    RETURNING id
+  `);
+  console.log(`Deleted ${orphans.length} orphan event refund(s)`);
+
+  await query(`CREATE INDEX IF NOT EXISTS idx_refunds_subscription ON refunds(subscription_id)`);
+  return {
+    success: true,
+    message: `refunds.subscription_id CASCADE applied; ${orphans.length} orphan(s) removed`,
+  };
+}
+
 async function runPhoneAuthMigration() {
   console.log('Starting migration: add phone auth columns to users');
 
@@ -1033,6 +1087,21 @@ export const migrationsRoutes = {
   createInstallmentTables: async () => {
     try {
       const result = await createInstallmentTables();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addRefundSubscriptionLink: async () => {
+    try {
+      const result = await addRefundSubscriptionLink();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

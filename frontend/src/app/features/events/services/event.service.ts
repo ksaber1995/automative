@@ -76,6 +76,7 @@ export interface EventSubscription {
   externalAge: number | null;
   externalMobile: string | null;
   amount: number;
+  refundedAmount: number;
   paymentDate: string;
   paymentMethod: string | null;
   notes: string | null;
@@ -116,6 +117,7 @@ export interface EventExpense {
 export interface EventRefund {
   id: string;
   eventId: string;
+  subscriptionId: string | null;
   studentId: string | null;
   studentName: string | null;
   amount: number;
@@ -126,9 +128,9 @@ export interface EventRefund {
 }
 
 export interface EventRefundCreateDto {
+  subscriptionId: string;
   amount: number;
   refundDate: string;
   type?: 'FULL' | 'PARTIAL';
   reason?: string;
-  studentId?: string | null;
 }

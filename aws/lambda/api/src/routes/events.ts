@@ -209,17 +209,25 @@ export const eventsRoutes = {
       );
       if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
 
+      // Revenue: use event_subscriptions as the source of truth.
+      // The auto-mirrored revenues row only exists when the event has a branch_id
+      // (revenues.branch_id is NOT NULL), so events with no branch would otherwise
+      // report zero revenue even when subscriptions exist.
       const revenueRow = await queryOne(
-        `SELECT COALESCE(SUM(r.amount), 0) AS total, COUNT(*) AS count
-         FROM revenues r
-         INNER JOIN branches b ON b.id = r.branch_id
-         WHERE r.event_id = $1 AND b.company_id = $2`,
+        `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+         FROM event_subscriptions WHERE event_id = $1 AND company_id = $2`,
         [params.id, context.companyId]
       );
+      // Expenses: match payments by their own event_id OR by the parent expense's
+      // event_id. recordPayment historically didn't propagate eventId, so payments
+      // linked to event-tagged expenses can have event_id NULL on the payment row.
       const expenseRow = await queryOne(
-        `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
-         FROM expense_payments WHERE event_id = $1 AND company_id = $2`,
-        [params.id, context.companyId]
+        `SELECT COALESCE(SUM(ep.amount), 0) AS total, COUNT(*) AS count
+         FROM expense_payments ep
+         LEFT JOIN expenses e ON e.id = ep.expense_id
+         WHERE ep.company_id = $1
+           AND (ep.event_id = $2 OR e.event_id = $2)`,
+        [context.companyId, params.id]
       );
       const refundRow = await queryOne(
         `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count

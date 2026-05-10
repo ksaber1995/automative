@@ -109,12 +109,12 @@ export class EventDetailComponent implements OnInit {
   expNotes = '';
   expPayNow = true;
 
-  // Refund form
+  // Refund form (always tied to a specific subscription)
+  refSubscription: EventSubscription | null = null;
   refAmount: number | null = null;
   refDate: Date = new Date();
   refType: 'FULL' | 'PARTIAL' = 'PARTIAL';
   refReason = '';
-  refStudentId: string | null = null;
 
   saving = signal(false);
 
@@ -244,7 +244,7 @@ export class EventDetailComponent implements OnInit {
 
   deleteSubscription(sub: EventSubscription) {
     this.confirmationService.confirm({
-      message: 'Delete this subscription? Linked revenue (if any) will also be removed.',
+      message: 'Delete this subscription? Linked revenue and any refunds issued against it will also be removed.',
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
@@ -307,6 +307,7 @@ export class EventDetailComponent implements OnInit {
               amount: created.amount,
               date: dateStr,
               branchId: created.branchId,
+              eventId: this.id,
               vendor: created.vendor || undefined,
               invoiceNumber: created.invoiceNumber || undefined,
               notes: created.notes || undefined,
@@ -341,32 +342,55 @@ export class EventDetailComponent implements OnInit {
     this.loadPL();
   }
 
-  // ─── Refund dialog ──────────────────────────────────────────────────────
-  openRefundDialog() {
-    this.refAmount = null;
+  // ─── Refund dialog (per subscription) ──────────────────────────────────
+  refundRemaining(s: EventSubscription): number {
+    return +(s.amount - (s.refundedAmount || 0)).toFixed(2);
+  }
+
+  openRefundDialog(sub: EventSubscription) {
+    const remaining = this.refundRemaining(sub);
+    if (remaining <= 0) {
+      this.notifications.error('This subscription has already been fully refunded');
+      return;
+    }
+    this.refSubscription = sub;
+    this.refAmount = remaining;
     this.refDate = new Date();
-    this.refType = 'PARTIAL';
+    this.refType = 'FULL';
     this.refReason = '';
-    this.refStudentId = null;
     this.showRefundDialog = true;
   }
 
+  onRefundAmountChange() {
+    if (!this.refSubscription || this.refAmount == null) return;
+    const remaining = this.refundRemaining(this.refSubscription);
+    this.refType = Math.abs(this.refAmount - remaining) < 0.005 ? 'FULL' : 'PARTIAL';
+  }
+
   submitRefund() {
-    if (!this.refAmount || !this.refDate) return;
+    if (!this.refSubscription || !this.refAmount || !this.refDate) return;
+    const remaining = this.refundRemaining(this.refSubscription);
+    if (this.refAmount > remaining + 0.005) {
+      this.notifications.error(`Cannot refund more than the remaining amount (${remaining.toFixed(2)})`);
+      return;
+    }
+
     this.saving.set(true);
     this.service
       .createRefund(this.id, {
+        subscriptionId: this.refSubscription.id,
         amount: this.refAmount,
         refundDate: this.refDate.toISOString().split('T')[0],
         type: this.refType,
         reason: this.refReason || undefined,
-        studentId: this.refStudentId || undefined,
       })
       .subscribe({
         next: () => {
           this.notifications.success('Refund issued');
           this.showRefundDialog = false;
           this.saving.set(false);
+          this.refSubscription = null;
+          this.loadSubscriptions();
           this.loadRefunds();
           this.loadPL();
         },
