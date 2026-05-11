@@ -92,6 +92,12 @@ CREATE TABLE users (
     email_verification_expires TIMESTAMP WITH TIME ZONE,
     password_reset_token VARCHAR(255),
     password_reset_expires TIMESTAMP WITH TIME ZONE,
+    -- Phone-based registration / WhatsApp OTP verification.
+    country_code VARCHAR(8),
+    phone VARCHAR(32),
+    phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    phone_otp VARCHAR(6),
+    phone_otp_expires_at TIMESTAMPTZ,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -102,6 +108,8 @@ CREATE INDEX idx_users_branch_id ON users(branch_id);
 CREATE INDEX idx_users_company_id ON users(company_id);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_linked_employee_id ON users(linked_employee_id);
+CREATE UNIQUE INDEX idx_users_phone_unique ON users(phone) WHERE phone IS NOT NULL;
+CREATE INDEX idx_users_phone_lookup ON users(phone);
 
 -- =============================================
 -- USER_BRANCHES TABLE  (migration 006)
@@ -125,6 +133,7 @@ CREATE INDEX idx_user_branches_company_id ON user_branches(company_id);
 -- =============================================
 CREATE TABLE branches (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
     address TEXT,
@@ -141,6 +150,7 @@ CREATE TABLE branches (
     FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE INDEX idx_branches_company_id ON branches(company_id);
 CREATE UNIQUE INDEX branches_company_id_code_key ON branches(company_id, code);
 CREATE INDEX idx_branches_manager_id ON branches(manager_id);
 
@@ -254,6 +264,7 @@ CREATE INDEX idx_mep_me_id ON master_enrollment_payments(master_enrollment_id);
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID NOT NULL,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
     description TEXT,
@@ -266,10 +277,11 @@ CREATE TABLE courses (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
-    UNIQUE(branch_id, code)
+    CONSTRAINT courses_company_id_code_key UNIQUE(company_id, code)
 );
 
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
+CREATE INDEX idx_courses_company_id ON courses(company_id);
 CREATE INDEX idx_courses_code ON courses(code);
 
 CREATE TABLE master_course_courses (
@@ -290,6 +302,7 @@ CREATE TABLE classes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     course_id UUID NOT NULL,
     branch_id UUID NOT NULL,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     instructor_id UUID,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
@@ -310,11 +323,12 @@ CREATE TABLE classes (
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
-    UNIQUE(branch_id, code)
+    CONSTRAINT classes_company_id_code_key UNIQUE(company_id, code)
 );
 
 CREATE INDEX idx_classes_course_id ON classes(course_id);
 CREATE INDEX idx_classes_branch_id ON classes(branch_id);
+CREATE INDEX idx_classes_company_id ON classes(company_id);
 CREATE INDEX idx_classes_instructor_id ON classes(instructor_id);
 
 -- =============================================
@@ -332,6 +346,7 @@ CREATE TABLE students (
     parent_email VARCHAR(255),
     address TEXT,
     branch_id UUID NOT NULL,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT true,
     enrollment_date DATE NOT NULL,
     churn_date DATE,
@@ -343,6 +358,7 @@ CREATE TABLE students (
 );
 
 CREATE INDEX idx_students_branch_id ON students(branch_id);
+CREATE INDEX idx_students_company_id ON students(company_id);
 CREATE INDEX idx_students_enrollment_date ON students(enrollment_date);
 CREATE INDEX idx_students_churn_date ON students(churn_date);
 CREATE INDEX idx_students_email ON students(email);
@@ -518,6 +534,7 @@ CREATE TABLE employees (
     hire_date DATE,
     notes TEXT,
     branch_id UUID,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_global BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -526,6 +543,7 @@ CREATE TABLE employees (
 );
 
 CREATE INDEX idx_employees_branch_id ON employees(branch_id);
+CREATE INDEX idx_employees_company_id ON employees(company_id);
 CREATE INDEX idx_employees_is_global ON employees(is_global);
 
 -- =============================================
@@ -566,6 +584,7 @@ CREATE INDEX idx_revenues_event ON revenues(event_id);
 CREATE TABLE expenses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN ('FIXED', 'VARIABLE', 'SHARED', 'CAPITAL')),
     category VARCHAR(50) NOT NULL CHECK (category IN ('SALARIES', 'RENT', 'UTILITIES', 'ELECTRICITY', 'INTERNET', 'WATER', 'MARKETING', 'SUPPLIES', 'EQUIPMENT', 'MAINTENANCE', 'INSURANCE', 'SOFTWARE', 'ADMINISTRATION', 'COGS', 'INVENTORY', 'OTHER')),
     amount DECIMAL(10, 2) NOT NULL,
@@ -595,6 +614,7 @@ CREATE TABLE expenses (
 );
 
 CREATE INDEX idx_expenses_branch_id ON expenses(branch_id);
+CREATE INDEX idx_expenses_company_id ON expenses(company_id);
 CREATE INDEX idx_expenses_date ON expenses(date);
 CREATE INDEX idx_expenses_type ON expenses(type);
 CREATE INDEX idx_expenses_category ON expenses(category);
@@ -709,11 +729,11 @@ CREATE TABLE cash_state (
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
     notes TEXT,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Initialize cash state with a single row
-INSERT INTO cash_state (current_balance) VALUES (0);
+CREATE INDEX idx_cash_state_company_id ON cash_state(company_id);
 
 -- =============================================
 -- CASH ADJUSTMENTS TABLE
@@ -745,13 +765,13 @@ CREATE INDEX idx_cash_adj_branch ON cash_adjustments(branch_id);
 CREATE TABLE withdrawals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id UUID,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     amount DECIMAL(10, 2) NOT NULL,
     withdrawal_date DATE NOT NULL,
     reason TEXT,
     category VARCHAR(50) DEFAULT 'OTHER',
     payment_method VARCHAR(50) DEFAULT 'CASH',
     stakeholders JSONB DEFAULT '[]',
-    notes TEXT,
     receipt_url TEXT,
     approved_by UUID,
     status VARCHAR(50) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
@@ -763,9 +783,37 @@ CREATE TABLE withdrawals (
 );
 
 CREATE INDEX idx_withdrawals_branch_id ON withdrawals(branch_id);
-CREATE INDEX idx_withdrawals_date ON withdrawals(date);
+CREATE INDEX idx_withdrawals_company_id ON withdrawals(company_id);
+CREATE INDEX idx_withdrawals_date ON withdrawals(withdrawal_date);
 CREATE INDEX idx_withdrawals_status ON withdrawals(status);
 
+
+-- =============================================
+-- DEBTS TABLE
+-- Debts owed to external creditors. Routes are stubbed (see routes/debts.ts)
+-- but the table is kept in the schema to match the dev database.
+-- =============================================
+CREATE TABLE debts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    branch_id UUID,
+    creditor_name VARCHAR(255) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    remaining_amount DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    due_date DATE,
+    status VARCHAR(50) NOT NULL,
+    notes TEXT,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_debts_company_id ON debts(company_id);
+CREATE INDEX idx_debts_branch_id ON debts(branch_id);
+CREATE INDEX idx_debts_status ON debts(status);
+CREATE INDEX idx_debts_due_date ON debts(due_date);
 
 -- =============================================
 -- DEBT PAYMENTS TABLE
@@ -799,16 +847,18 @@ CREATE TABLE products (
     min_stock INTEGER DEFAULT 0 NOT NULL,
     unit VARCHAR(50) NOT NULL,
     branch_id UUID NOT NULL,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     event_id UUID,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
-    UNIQUE(branch_id, code)
+    CONSTRAINT products_company_id_code_key UNIQUE(company_id, code)
 );
 
 CREATE INDEX idx_products_branch_id ON products(branch_id);
+CREATE INDEX idx_products_company_id ON products(company_id);
 CREATE INDEX idx_products_code ON products(code);
 CREATE INDEX idx_products_event ON products(event_id);
 
