@@ -45,7 +45,7 @@ export interface Refund {
   enrollmentId: string | null;
   masterEnrollmentId: string | null;
   companyId: string;
-  studentId: string;
+  studentId: string | null;
   amount: number;
   refundDate: string;
   type: 'FULL' | 'PARTIAL';
@@ -53,11 +53,19 @@ export interface Refund {
   createdAt: string;
 }
 
+export type RefundSourceKind = 'ENROLLMENT' | 'MASTER_ENROLLMENT' | 'EVENT' | 'PRODUCT_SALE';
+
 export interface RefundWithDetails extends Refund {
-  studentName: string;
-  courseName: string;
-  branchName: string;
-  branchId: string;
+  studentName: string | null;
+  courseName: string | null;
+  branchName: string | null;
+  branchId: string | null;
+  eventId?: string | null;
+  eventName?: string | null;
+  productSaleId?: string | null;
+  productName?: string | null;
+  customerName?: string | null;
+  source: RefundSourceKind;
 }
 
 export interface DueEnrollment {

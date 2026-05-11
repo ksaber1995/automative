@@ -22,11 +22,19 @@ export interface Session {
   durationMinutes?: number | null;
 }
 
+export interface StartSessionTeacher {
+  employeeId: string;
+  role?: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT';
+  status?: 'PRESENT' | 'ABSENT';
+  notes?: string | null;
+}
+
 export interface StartSessionDto {
   roomId: string;
   classId: string;
   branchId: string;
   notes?: string;
+  teachers?: StartSessionTeacher[];
 }
 
 @Injectable({ providedIn: 'root' })

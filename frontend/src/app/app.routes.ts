@@ -130,6 +130,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
       },
       {
+        path: 'attendance/teachers',
+        canActivate: [permissionGuard('courses')],
+        loadComponent: () => import('./features/attendance/teacher-attendance-list/teacher-attendance-list.component').then(m => m.TeacherAttendanceListComponent)
+      },
+      {
         path: 'cash',
         canActivate: [permissionGuard('cash')],
         loadChildren: () => import('./features/cash/cash.routes').then(m => m.CASH_ROUTES)

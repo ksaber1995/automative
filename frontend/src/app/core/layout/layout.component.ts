@@ -271,6 +271,7 @@ export class LayoutComponent implements OnInit {
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('courses') },
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('courses') },
       { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('courses') },
+      { labelKey: 'NAV.TEACHER_ATTENDANCE', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('courses') },
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('events') },
     ].filter(c => c.visible);
     if (academic.length) {

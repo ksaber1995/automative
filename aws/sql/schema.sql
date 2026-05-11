@@ -424,6 +424,9 @@ CREATE TABLE events (
     start_date DATE,
     end_date DATE,
     status VARCHAR(16) NOT NULL DEFAULT 'PLANNED',
+    -- Optional default subscription fee. When set, new event_subscriptions
+    -- prefill the amount field with this value.
+    subscription_price DECIMAL(10, 2),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -480,6 +483,7 @@ CREATE TABLE refunds (
     company_id UUID NOT NULL,
     student_id UUID,
     event_id UUID,
+    product_sale_id UUID,
     amount DECIMAL(10, 2) NOT NULL,
     refund_date DATE NOT NULL,
     type VARCHAR(20) NOT NULL CHECK (type IN ('FULL', 'PARTIAL')),
@@ -488,7 +492,8 @@ CREATE TABLE refunds (
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);
@@ -496,6 +501,7 @@ CREATE INDEX idx_refunds_master_enrollment_id ON refunds(master_enrollment_id);
 CREATE INDEX idx_refunds_company_id ON refunds(company_id);
 CREATE INDEX idx_refunds_student_id ON refunds(student_id);
 CREATE INDEX idx_refunds_event ON refunds(event_id);
+CREATE INDEX idx_refunds_product_sale ON refunds(product_sale_id);
 
 -- =============================================
 -- EMPLOYEES TABLE
@@ -927,6 +933,27 @@ CREATE TABLE session_attendance (
 
 CREATE INDEX idx_session_attendance_session ON session_attendance(session_id);
 CREATE INDEX idx_session_attendance_student ON session_attendance(student_id);
+
+-- =============================================
+-- SESSION TEACHER ATTENDANCE TABLE
+-- Records which teachers (employees) attended a given session and in what role.
+-- Default: one row per session for the class's assigned instructor (role=PRIMARY,
+-- status=PRESENT). Additional rows for substitutes/assistants. If the primary
+-- was a no-show, flip their status to ABSENT and add a SUBSTITUTE.
+-- =============================================
+CREATE TABLE session_teacher_attendance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    role VARCHAR(16) NOT NULL DEFAULT 'PRIMARY' CHECK (role IN ('PRIMARY', 'SUBSTITUTE', 'ASSISTANT')),
+    status VARCHAR(8) NOT NULL DEFAULT 'PRESENT' CHECK (status IN ('PRESENT', 'ABSENT')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (session_id, employee_id)
+);
+
+CREATE INDEX idx_session_teacher_attendance_session ON session_teacher_attendance(session_id);
+CREATE INDEX idx_session_teacher_attendance_employee ON session_teacher_attendance(employee_id);
 
 -- =============================================
 -- DEMO LEADS TABLE

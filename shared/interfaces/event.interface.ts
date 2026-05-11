@@ -13,6 +13,7 @@ export interface EventModel {
   startDate: string | null;
   endDate: string | null;
   status: EventStatus | string;
+  subscriptionPrice: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +29,7 @@ export interface EventCreateDto {
   startDate?: string;
   endDate?: string;
   status?: EventStatus;
+  subscriptionPrice?: number | null;
 }
 
 export interface EventUpdateDto extends Partial<EventCreateDto> {

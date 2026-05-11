@@ -867,6 +867,59 @@ async function addRefundSubscriptionLink() {
   };
 }
 
+async function addEventSubscriptionPrice() {
+  console.log('Starting migration: add subscription_price to events');
+  await query(`
+    ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS subscription_price DECIMAL(10, 2)
+  `);
+  return { success: true, message: 'events.subscription_price ready' };
+}
+
+async function addProductSaleRefundLink() {
+  console.log('Starting migration: add product_sale_id to refunds');
+  await query(`
+    ALTER TABLE refunds
+      ADD COLUMN IF NOT EXISTS product_sale_id UUID
+  `);
+  // FK is added only if it doesn't already exist. Drop-and-add is safer in case
+  // the column existed without the constraint.
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'refunds' AND constraint_name = 'refunds_product_sale_id_fkey'
+      ) THEN
+        ALTER TABLE refunds
+          ADD CONSTRAINT refunds_product_sale_id_fkey
+          FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE CASCADE;
+      END IF;
+    END$$;
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_refunds_product_sale ON refunds(product_sale_id)`);
+  return { success: true, message: 'refunds.product_sale_id ready' };
+}
+
+async function createSessionTeacherAttendanceTable() {
+  console.log('Starting migration: create session_teacher_attendance');
+  await query(`
+    CREATE TABLE IF NOT EXISTS session_teacher_attendance (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      role VARCHAR(16) NOT NULL DEFAULT 'PRIMARY' CHECK (role IN ('PRIMARY', 'SUBSTITUTE', 'ASSISTANT')),
+      status VARCHAR(8) NOT NULL DEFAULT 'PRESENT' CHECK (status IN ('PRESENT', 'ABSENT')),
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (session_id, employee_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_session_teacher_attendance_session ON session_teacher_attendance(session_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_session_teacher_attendance_employee ON session_teacher_attendance(employee_id)`);
+  return { success: true, message: 'session_teacher_attendance ready' };
+}
+
 async function runPhoneAuthMigration() {
   console.log('Starting migration: add phone auth columns to users');
 
@@ -1102,6 +1155,51 @@ export const migrationsRoutes = {
   addRefundSubscriptionLink: async () => {
     try {
       const result = await addRefundSubscriptionLink();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addEventSubscriptionPrice: async () => {
+    try {
+      const result = await addEventSubscriptionPrice();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addProductSaleRefundLink: async () => {
+    try {
+      const result = await addProductSaleRefundLink();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createSessionTeacherAttendanceTable: async () => {
+    try {
+      const result = await createSessionTeacherAttendanceTable();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

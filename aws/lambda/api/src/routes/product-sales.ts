@@ -23,6 +23,9 @@ function mapProductSaleFromDB(row: any) {
     customerPhone: row.customer_phone,
     notes: row.notes,
     eventId: row.event_id || null,
+    totalRefunded: row.total_refunded !== undefined && row.total_refunded !== null
+      ? parseFloat(row.total_refunded) || 0
+      : 0,
     createdAt: row.created_at,
   };
 }
@@ -131,7 +134,11 @@ export const productSalesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      let sql = `SELECT ps.*, p.name AS product_name FROM product_sales ps LEFT JOIN products p ON ps.product_id = p.id WHERE ps.company_id = $1`;
+      let sql = `SELECT ps.*, p.name AS product_name,
+                        COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
+                 FROM product_sales ps
+                 LEFT JOIN products p ON ps.product_id = p.id
+                 WHERE ps.company_id = $1`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
@@ -350,7 +357,10 @@ export const productSalesRoutes = {
       }
 
       const sale = await queryOne(
-        'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',
+        `SELECT ps.*,
+                COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
+         FROM product_sales ps
+         WHERE ps.id = $1 AND ps.company_id = $2`,
         [params.id, context.companyId]
       );
 
@@ -377,6 +387,109 @@ export const productSalesRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
         body: { message: error.message || 'Product sale not found' },
+      };
+    }
+  },
+
+  listRefunds: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+      const sale = await queryOne(
+        'SELECT id, branch_id FROM product_sales WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!sale) return { status: 404 as const, body: { message: 'Product sale not found' } };
+      if (sale.branch_id && !canAccessBranch(context, sale.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this product sale' } };
+      }
+      const refunds = await query(
+        'SELECT * FROM refunds WHERE product_sale_id = $1 AND company_id = $2 ORDER BY refund_date ASC',
+        [params.id, context.companyId]
+      );
+      return {
+        status: 200 as const,
+        body: refunds.map((r: any) => ({
+          id: r.id,
+          enrollmentId: r.enrollment_id,
+          companyId: r.company_id,
+          studentId: r.student_id,
+          amount: parseFloat(r.amount),
+          refundDate: r.refund_date,
+          type: r.type,
+          reason: r.reason,
+          createdAt: r.created_at,
+        })),
+      };
+    } catch (error) {
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to list refunds' },
+      };
+    }
+  },
+
+  createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+      const sale = await queryOne(
+        'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!sale) return { status: 404 as const, body: { message: 'Product sale not found' } };
+      if (sale.branch_id && !canAccessBranch(context, sale.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this product sale' } };
+      }
+
+      const refundAmount = parseFloat(body.amount);
+      const total = parseFloat(sale.total_amount);
+      const alreadyRefunded = parseFloat(
+        (await queryOne(
+          'SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE product_sale_id = $1',
+          [params.id]
+        ))?.total || 0
+      );
+      const remaining = total - alreadyRefunded;
+
+      if (refundAmount <= 0) {
+        return { status: 400 as const, body: { message: 'Refund amount must be positive' } };
+      }
+      if (refundAmount > remaining) {
+        return { status: 400 as const, body: { message: `Cannot refund more than remaining (${remaining.toFixed(2)})` } };
+      }
+
+      const refund = await insert('refunds', {
+        product_sale_id: params.id,
+        company_id: context.companyId,
+        amount: refundAmount,
+        refund_date: body.refundDate,
+        type: body.type,
+        reason: body.reason || null,
+      });
+
+      return {
+        status: 201 as const,
+        body: {
+          id: refund.id,
+          enrollmentId: refund.enrollment_id,
+          companyId: refund.company_id,
+          studentId: refund.student_id,
+          amount: parseFloat(refund.amount),
+          refundDate: refund.refund_date,
+          type: refund.type,
+          reason: refund.reason,
+          createdAt: refund.created_at,
+        },
+      };
+    } catch (error: any) {
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
+        body: { message: error.message || 'Failed to create refund' },
       };
     }
   },

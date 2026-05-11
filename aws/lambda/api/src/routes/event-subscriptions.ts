@@ -107,28 +107,8 @@ export const eventSubscriptionsRoutes = {
         notes: body.notes || null,
       });
 
-      // Auto-create a revenue row so the subscription shows on /revenues.
-      // revenues.branch_id is NOT NULL — only auto-create when event has a branch.
-      if (amount > 0 && event.branch_id) {
-        const description = isStudent
-          ? `Event subscription: ${event.name}`
-          : `Event subscription (external: ${body.externalFirstName} ${body.externalLastName}): ${event.name}`;
-        const revenue = await insert('revenues', {
-          branch_id: event.branch_id,
-          event_id: params.eventId,
-          student_id: isStudent ? body.studentId : null,
-          amount,
-          description,
-          date: paymentDate,
-          payment_method: body.paymentMethod || null,
-          notes: body.notes || null,
-        });
-        await query(
-          'UPDATE event_subscriptions SET revenue_id = $1 WHERE id = $2',
-          [revenue.id, sub.id]
-        );
-        sub.revenue_id = revenue.id;
-      }
+      // The /revenues list now sources event revenue directly from
+      // event_subscriptions, so no mirrored revenues row is needed.
 
       const row = await queryOne(
         `SELECT es.*,

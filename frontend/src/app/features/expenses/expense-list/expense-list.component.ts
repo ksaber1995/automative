@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,14 +12,21 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
+import { TabsModule } from 'primeng/tabs';
 import { ExpenseService } from '../services/expense.service';
+import { InstallmentService } from '../services/installment.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Expense } from '@shared/interfaces/expense.interface';
+import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
+import { Employee } from '@shared/interfaces/employee.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { InstallmentPlan } from '@shared/interfaces/installment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { TranslateModule } from '@ngx-translate/core';
+
+type ExpenseTab = 'all' | 'due' | 'direct' | 'salaries' | 'installments' | 'events';
 
 @Component({
   selector: 'app-expense-list',
@@ -27,21 +34,62 @@ import { TranslateModule } from '@ngx-translate/core';
   imports: [
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TooltipModule,
     TagModule, DialogModule, DatePickerModule, InputNumberModule, InputTextModule,
-    TextareaModule, DeleteConfirmDialogComponent, TranslateModule
+    TextareaModule, TabsModule, DeleteConfirmDialogComponent, TranslateModule
   ],
   templateUrl: './expense-list.component.html',
   styleUrl: './expense-list.component.scss'
 })
 export class ExpenseListComponent implements OnInit {
   private expenseService = inject(ExpenseService);
+  private installmentService = inject(InstallmentService);
   private branchService = inject(BranchService);
+  private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   authService = inject(AuthService);
 
   expenses = signal<Expense[]>([]);
   branches = signal<Branch[]>([]);
+  employees = signal<Employee[]>([]);
   loading = signal(true);
+
+  // Tab state
+  activeTab = signal<ExpenseTab>('all');
+
+  // Per-tab data
+  dueItems = signal<any[]>([]);
+  dueLoading = signal(false);
+  dueMonth = signal<string>(new Date().toISOString().substring(0, 7));
+  dueTotal = signal<number>(0);
+
+  salaryPayments = signal<ExpensePayment[]>([]);
+  salaryLoading = signal(false);
+
+  installmentPlans = signal<InstallmentPlan[]>([]);
+  installmentLoading = signal(false);
+
+  // Derived row counts for tab badges
+  directCount = computed(() =>
+    this.expenses().filter(e => !e.eventId && (e.category as string) !== 'SALARIES').length
+  );
+  eventsCount = computed(() => this.expenses().filter(e => !!e.eventId).length);
+
+  filteredExpenses = computed(() => {
+    const all = this.expenses();
+    switch (this.activeTab()) {
+      case 'direct':
+        return all.filter(e => !e.eventId && (e.category as string) !== 'SALARIES');
+      case 'events':
+        return all.filter(e => !!e.eventId);
+      case 'all':
+      default:
+        return all;
+    }
+  });
+
+  filteredTotal = computed(() =>
+    this.filteredExpenses().reduce((sum, e) => sum + e.amount, 0)
+  );
 
   // Filters
   selectedBranchId: string = '';
@@ -81,6 +129,9 @@ export class ExpenseListComponent implements OnInit {
 
   ngOnInit() {
     this.loadBranches();
+    this.employeeService.getAllEmployees().subscribe({
+      next: (emps) => this.employees.set(emps),
+    });
     this.loadExpenses();
   }
 
@@ -112,6 +163,93 @@ export class ExpenseListComponent implements OnInit {
 
   onFilterChange() {
     this.loadExpenses();
+  }
+
+  setTab(tab: ExpenseTab) {
+    this.activeTab.set(tab);
+    if (tab === 'due' && this.dueItems().length === 0) {
+      this.loadDue();
+    } else if (tab === 'salaries' && this.salaryPayments().length === 0) {
+      this.loadSalaryPayments();
+    } else if (tab === 'installments' && this.installmentPlans().length === 0) {
+      this.loadInstallments();
+    }
+  }
+
+  loadDue() {
+    this.dueLoading.set(true);
+    this.expenseService.getDue(this.dueMonth()).subscribe({
+      next: (res) => {
+        this.dueItems.set(res.items || []);
+        this.dueTotal.set(res.totalDue || 0);
+        this.dueLoading.set(false);
+      },
+      error: () => this.dueLoading.set(false),
+    });
+  }
+
+  loadSalaryPayments() {
+    this.salaryLoading.set(true);
+    const params: any = { category: 'SALARIES' };
+    if (this.selectedBranchId) params.branchId = this.selectedBranchId;
+    if (this.startDate) params.startDate = this.startDate;
+    if (this.endDate) params.endDate = this.endDate;
+    this.expenseService.getAllPayments(params).subscribe({
+      next: (payments) => {
+        this.salaryPayments.set(payments.filter(p => !!p.employeeId));
+        this.salaryLoading.set(false);
+      },
+      error: () => this.salaryLoading.set(false),
+    });
+  }
+
+  loadInstallments() {
+    this.installmentLoading.set(true);
+    const params: any = {};
+    if (this.selectedBranchId) params.branchId = this.selectedBranchId;
+    this.installmentService.list(params).subscribe({
+      next: (plans) => {
+        this.installmentPlans.set(plans);
+        this.installmentLoading.set(false);
+      },
+      error: () => this.installmentLoading.set(false),
+    });
+  }
+
+  getEmployeeName(employeeId?: string | null): string {
+    if (!employeeId) return '—';
+    const e = this.employees().find(x => x.id === employeeId);
+    return e ? `${e.firstName} ${e.lastName}` : 'Unknown';
+  }
+
+  installmentProgress(plan: InstallmentPlan): string {
+    const paid = plan.paidCount ?? 0;
+    return `${paid} / ${plan.monthsCount}`;
+  }
+
+  installmentStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'secondary' | 'danger' {
+    if (status === 'COMPLETED') return 'success';
+    if (status === 'CANCELED') return 'danger';
+    return 'info';
+  }
+
+  dueItemTypeSeverity(type: string): 'success' | 'info' | 'warn' | 'secondary' {
+    if (type === 'salary') return 'warn';
+    if (type === 'recurring') return 'info';
+    return 'secondary';
+  }
+
+  goToDuesPay(item: any) {
+    // Recurring → expense detail (pay button), Salary → salaries page.
+    if (item.type === 'salary') {
+      this.router.navigate(['/expenses/salaries']);
+    } else if (item.templateId) {
+      this.router.navigate(['/expenses', item.templateId]);
+    }
+  }
+
+  goToInstallmentDetail(plan: InstallmentPlan) {
+    this.router.navigate(['/expenses/installments', plan.id]);
   }
 
   clearFilters() {

@@ -31,7 +31,7 @@ export class RevenueListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
-  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'ALL' = 'ALL';
+  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'ALL' = 'ALL';
   startDate: string = '';
   endDate: string = '';
   totalRevenue: number = 0;
@@ -75,6 +75,7 @@ export class RevenueListComponent implements OnInit {
   getSourceBadge(source: string): { severity: 'success' | 'info' | 'warn' | 'secondary'; label: string } {
     if (source === 'ENROLLMENT') return { severity: 'success', label: 'Course' };
     if (source === 'MASTER_ENROLLMENT') return { severity: 'secondary', label: 'Bundle' };
+    if (source === 'EVENT') return { severity: 'warn', label: 'Event' };
     return { severity: 'info', label: 'Product' };
   }
 
@@ -109,6 +110,10 @@ export class RevenueListComponent implements OnInit {
       // so the user can view/cancel/refund the enrollment row.
       if (revenue.studentId) {
         this.router.navigate(['/students', revenue.studentId]);
+      }
+    } else if (revenue.source === 'EVENT') {
+      if (revenue.eventId) {
+        this.router.navigate(['/events', revenue.eventId]);
       }
     } else {
       this.router.navigate(['/products/sales']);

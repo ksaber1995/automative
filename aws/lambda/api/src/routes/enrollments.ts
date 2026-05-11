@@ -366,7 +366,7 @@ export const enrollmentsRoutes = {
     }
   },
 
-  listRefunds: async ({ query: q, headers }: { query: { branchId?: string; studentId?: string; type?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
+  listRefunds: async ({ query: q, headers }: { query: { branchId?: string; studentId?: string; type?: string; source?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
@@ -378,7 +378,7 @@ export const enrollmentsRoutes = {
       let idx = 2;
 
       if (q.branchId) {
-        conditions.push(`COALESCE(e.branch_id, ev.branch_id) = $${idx++}`);
+        conditions.push(`COALESCE(e.branch_id, me.branch_id, ev.branch_id, ps.branch_id) = $${idx++}`);
         params.push(q.branchId);
       }
       if (q.studentId) { conditions.push(`r.student_id = $${idx++}`); params.push(q.studentId); }
@@ -386,22 +386,46 @@ export const enrollmentsRoutes = {
       if (q.startDate) { conditions.push(`r.refund_date >= $${idx++}`); params.push(q.startDate); }
       if (q.endDate) { conditions.push(`r.refund_date <= $${idx++}`); params.push(q.endDate); }
 
-      // LEFT JOINs so event-only refunds (no enrollment) and refunds without student
-      // are still included in the global list.
+      if (q.source && q.source !== 'ALL') {
+        switch (q.source) {
+          case 'ENROLLMENT': conditions.push(`r.enrollment_id IS NOT NULL`); break;
+          case 'MASTER_ENROLLMENT': conditions.push(`r.master_enrollment_id IS NOT NULL`); break;
+          case 'EVENT': conditions.push(`r.event_id IS NOT NULL AND r.enrollment_id IS NULL AND r.master_enrollment_id IS NULL`); break;
+          case 'PRODUCT_SALE': conditions.push(`r.product_sale_id IS NOT NULL`); break;
+        }
+      }
+
+      // LEFT JOINs cover every refund source (enrollment, master enrollment,
+      // event-only, or product sale) in a single global list.
       const refunds = await query(
         `SELECT r.*,
                 CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name ELSE NULL END AS student_name,
-                c.name AS course_name,
-                COALESCE(b.name, evb.name) AS branch_name,
-                COALESCE(e.branch_id, ev.branch_id) AS branch_id,
-                ev.name AS event_name
+                COALESCE(c.name, mc.name) AS course_name,
+                COALESCE(b.name, mcb.name, evb.name, psb.name) AS branch_name,
+                COALESCE(e.branch_id, me.branch_id, ev.branch_id, ps.branch_id) AS branch_id,
+                ev.name AS event_name,
+                p.name AS product_name,
+                ps.customer_name AS customer_name,
+                CASE
+                  WHEN r.product_sale_id IS NOT NULL THEN 'PRODUCT_SALE'
+                  WHEN r.master_enrollment_id IS NOT NULL THEN 'MASTER_ENROLLMENT'
+                  WHEN r.enrollment_id IS NOT NULL THEN 'ENROLLMENT'
+                  WHEN r.event_id IS NOT NULL THEN 'EVENT'
+                  ELSE 'ENROLLMENT'
+                END AS source
          FROM refunds r
          LEFT JOIN enrollments e ON r.enrollment_id = e.id
          LEFT JOIN students s ON r.student_id = s.id
          LEFT JOIN courses c ON e.course_id = c.id
          LEFT JOIN branches b ON e.branch_id = b.id
+         LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+         LEFT JOIN master_courses mc ON me.master_course_id = mc.id
+         LEFT JOIN branches mcb ON me.branch_id = mcb.id
          LEFT JOIN events ev ON r.event_id = ev.id
          LEFT JOIN branches evb ON ev.branch_id = evb.id
+         LEFT JOIN product_sales ps ON r.product_sale_id = ps.id
+         LEFT JOIN products p ON ps.product_id = p.id
+         LEFT JOIN branches psb ON ps.branch_id = psb.id
          WHERE ${conditions.join(' AND ')}
          ORDER BY r.refund_date DESC, r.created_at DESC`,
         params
@@ -420,6 +444,10 @@ export const enrollmentsRoutes = {
           branchId: r.branch_id,
           eventId: r.event_id || null,
           eventName: r.event_name || null,
+          productSaleId: r.product_sale_id || null,
+          productName: r.product_name || null,
+          customerName: r.customer_name || null,
+          source: r.source,
           amount: parseFloat(r.amount),
           refundDate: r.refund_date,
           type: r.type,

@@ -22,6 +22,9 @@ function mapEventFromDB(row: any) {
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status,
+    subscriptionPrice: row.subscription_price !== null && row.subscription_price !== undefined
+      ? parseFloat(row.subscription_price)
+      : null,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -50,6 +53,7 @@ export const eventsRoutes = {
         start_date: body.startDate || null,
         end_date: body.endDate || null,
         status: body.status || 'PLANNED',
+        subscription_price: body.subscriptionPrice ?? null,
         is_active: true,
       });
 
@@ -158,6 +162,9 @@ export const eventsRoutes = {
       if (body.startDate !== undefined) updateData.start_date = body.startDate;
       if (body.endDate !== undefined) updateData.end_date = body.endDate;
       if (body.status !== undefined) updateData.status = body.status;
+      if (body.subscriptionPrice !== undefined) {
+        updateData.subscription_price = body.subscriptionPrice;
+      }
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
       const row = await update('events', params.id, updateData);

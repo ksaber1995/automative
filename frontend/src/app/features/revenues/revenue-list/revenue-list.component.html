@@ -9,7 +9,7 @@
     </ng-template>
 
     <!-- Filters -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.BRANCH' | translate }}</label>
         <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
@@ -20,6 +20,16 @@
           @for (branch of branches(); track branch.id) {
             <option [value]="branch.id">{{ branch.name }}</option>
           }
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.SOURCE' | translate }}</label>
+        <select [(ngModel)]="selectedSource" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+          <option value="ALL">{{ 'REVENUES.LIST.ALL_SOURCES' | translate }}</option>
+          <option value="ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_ENROLLMENT' | translate }}</option>
+          <option value="MASTER_ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_MASTER_ENROLLMENT' | translate }}</option>
+          <option value="EVENT">{{ 'REVENUES.LIST.SOURCE_EVENT' | translate }}</option>
+          <option value="PRODUCT_SALE">{{ 'REVENUES.LIST.SOURCE_PRODUCT_SALE' | translate }}</option>
         </select>
       </div>
       <div>
@@ -94,6 +104,8 @@
                 {{ 'REVENUES.LIST.VIEW_ENROLLMENT' | translate }}
               } @else if (revenue.source === 'MASTER_ENROLLMENT') {
                 {{ 'REVENUES.LIST.VIEW_BUNDLE' | translate }}
+              } @else if (revenue.source === 'EVENT') {
+                {{ 'REVENUES.LIST.VIEW_EVENT' | translate }}
               } @else {
                 {{ 'REVENUES.LIST.VIEW_SALE' | translate }}
               }

@@ -243,8 +243,12 @@ export class EventDetailComponent implements OnInit {
   }
 
   deleteSubscription(sub: EventSubscription) {
+    const refunded = sub.refundedAmount || 0;
+    const message = refunded > 0
+      ? `This subscription has ${refunded.toFixed(2)} in refunds against it. Deleting it will also delete those refund records and the linked revenue. Continue?`
+      : 'Delete this subscription? Linked revenue (if any) will also be removed.';
     this.confirmationService.confirm({
-      message: 'Delete this subscription? Linked revenue and any refunds issued against it will also be removed.',
+      message,
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {

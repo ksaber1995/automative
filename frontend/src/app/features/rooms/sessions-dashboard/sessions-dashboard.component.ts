@@ -14,13 +14,27 @@ import { TabsModule } from 'primeng/tabs';
 import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
-import { SessionService, Session } from '../services/session.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { SessionService, Session, StartSessionTeacher } from '../services/session.service';
 import { RoomService, Room } from '../services/room.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { EmployeeService } from '../../employees/services/employee.service';
+import { LanguageService } from '../../../core/services/language.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+
+interface DialogTeacherRow {
+  employeeId: string;
+  role: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT';
+  status: 'PRESENT' | 'ABSENT';
+}
+
+interface TeacherOption {
+  id: string;
+  displayName: string;
+}
 
 /** Cross-field validator: endTime must not produce a datetime before startDate */
 function endTimeAfterStartValidator(startDate: string) {
@@ -59,30 +73,31 @@ function endTimeAfterStartValidator(startDate: string) {
     TabsModule,
     InputTextModule,
     CheckboxModule,
+    TranslateModule,
   ],
   template: `
     <div class="container-custom py-8">
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Sessions</h1>
-          <p class="text-gray-600 mt-1">Track room usage and manage active sessions</p>
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.TITLE' | translate }}</h1>
+          <p class="text-gray-600 mt-1">{{ 'SESSIONS_DASHBOARD.SUBTITLE' | translate }}</p>
         </div>
-        <p-button label="Start Session" icon="pi pi-play" (onClick)="openStartDialog()"></p-button>
+        <p-button [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate" icon="pi pi-play" (onClick)="openStartDialog()"></p-button>
       </div>
 
       <!-- Stats -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">Active Sessions</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'SESSIONS_DASHBOARD.STAT_ACTIVE' | translate }}</p>
           <p class="text-3xl font-bold text-indigo-600">{{ filteredActiveSessions().length }}</p>
         </div>
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">Occupied Rooms</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'SESSIONS_DASHBOARD.STAT_OCCUPIED' | translate }}</p>
           <p class="text-3xl font-bold text-red-600">{{ filteredOccupiedRooms().length }}</p>
         </div>
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">Free Rooms</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'SESSIONS_DASHBOARD.STAT_FREE' | translate }}</p>
           <p class="text-3xl font-bold text-green-600">{{ filteredFreeRooms().length }}</p>
         </div>
       </div>
@@ -98,14 +113,14 @@ function endTimeAfterStartValidator(startDate: string) {
             optionLabel="name"
             optionValue="id"
             appendTo="body"
-            placeholder="All Branches"
+            [placeholder]="'SESSIONS_DASHBOARD.ALL_BRANCHES' | translate"
             [showClear]="true"
             [style]="{ width: '100%' }"
           ></p-select>
         </div>
         @if (selectedBranchId()) {
           <p-button
-            label="Clear Filter"
+            [label]="'SESSIONS_DASHBOARD.CLEAR_FILTER' | translate"
             icon="pi pi-times"
             severity="secondary"
             [outlined]="true"
@@ -120,18 +135,18 @@ function endTimeAfterStartValidator(startDate: string) {
         <p-tablist>
           <p-tab value="active">
             <i class="pi pi-circle-fill text-green-500 mr-2"></i>
-            Active Sessions
+            {{ 'SESSIONS_DASHBOARD.TAB_ACTIVE' | translate }}
             @if (filteredActiveSessions().length > 0) {
               <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ filteredActiveSessions().length }}</span>
             }
           </p-tab>
           <p-tab value="rooms">
             <i class="pi pi-building mr-2"></i>
-            Room Status
+            {{ 'SESSIONS_DASHBOARD.TAB_ROOMS' | translate }}
           </p-tab>
           <p-tab value="history">
             <i class="pi pi-history mr-2"></i>
-            Session History
+            {{ 'SESSIONS_DASHBOARD.TAB_HISTORY' | translate }}
           </p-tab>
         </p-tablist>
 
@@ -141,14 +156,14 @@ function endTimeAfterStartValidator(startDate: string) {
             @if (loadingActive()) {
               <div class="text-center py-12 text-gray-400">
                 <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
-                <p>Loading active sessions...</p>
+                <p>{{ 'SESSIONS_DASHBOARD.LOADING_ACTIVE' | translate }}</p>
               </div>
             }
             @if (!loadingActive() && filteredActiveSessions().length === 0) {
               <div class="text-center py-12 text-gray-400">
                 <i class="pi pi-check-circle text-5xl text-green-300 mb-3"></i>
-                <p class="text-lg">No active sessions</p>
-                <p class="text-sm">{{ selectedBranchId() ? 'No active sessions for this branch' : 'All rooms are currently free' }}</p>
+                <p class="text-lg">{{ 'SESSIONS_DASHBOARD.NO_ACTIVE_TITLE' | translate }}</p>
+                <p class="text-sm">{{ (selectedBranchId() ? 'SESSIONS_DASHBOARD.NO_ACTIVE_HINT_BRANCH' : 'SESSIONS_DASHBOARD.NO_ACTIVE_HINT_ALL') | translate }}</p>
               </div>
             }
             @if (!loadingActive() && filteredActiveSessions().length > 0) {
@@ -159,23 +174,23 @@ function endTimeAfterStartValidator(startDate: string) {
                       <div>
                         <div class="flex items-center gap-2 mb-1">
                           <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                          <span class="text-xs font-semibold text-green-700 uppercase tracking-wide">Live</span>
+                          <span class="text-xs font-semibold text-green-700 uppercase tracking-wide">{{ 'SESSIONS_DASHBOARD.LIVE' | translate }}</span>
                         </div>
                         <h3 class="font-bold text-gray-900 text-lg">{{ session.className }}</h3>
                         <p class="text-sm text-gray-500">{{ session.courseName }}</p>
                       </div>
                       <div class="text-right">
-                        <p class="text-xs text-gray-500">Room</p>
+                        <p class="text-xs text-gray-500">{{ 'SESSIONS_DASHBOARD.ROOM' | translate }}</p>
                         <p class="font-bold text-indigo-700 text-lg">{{ session.roomCode }}</p>
                       </div>
                     </div>
                     <div class="flex items-center justify-between text-sm text-gray-600 mb-4">
-                      <span><i class="pi pi-clock mr-1"></i>Started {{ formatTime(session.startDate) }}</span>
+                      <span><i class="pi pi-clock mr-1"></i>{{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(session.startDate) } }}</span>
                       <span class="text-orange-600 font-medium">{{ getDuration(session.startDate) }}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                       <p-button
-                        [label]="expandedAttendanceSessionId() === session.id ? 'Hide Attendance' : 'Add Attendance'"
+                        [label]="(expandedAttendanceSessionId() === session.id ? 'SESSIONS_DASHBOARD.HIDE_ATTENDANCE' : 'SESSIONS_DASHBOARD.ADD_ATTENDANCE') | translate"
                         [icon]="expandedAttendanceSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-check-square'"
                         severity="info"
                         [outlined]="true"
@@ -184,7 +199,7 @@ function endTimeAfterStartValidator(startDate: string) {
                         (onClick)="toggleAttendance(session)"
                       ></p-button>
                       <p-button
-                        label="End Session"
+                        [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
                         icon="pi pi-stop"
                         severity="danger"
                         [outlined]="true"
@@ -200,18 +215,18 @@ function endTimeAfterStartValidator(startDate: string) {
                         @if (loadingAttendanceFor() === session.id) {
                           <div class="text-center py-6 text-gray-400">
                             <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
-                            <p class="text-sm">Loading students...</p>
+                            <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_STUDENTS' | translate }}</p>
                           </div>
                         } @else {
                           <div class="flex items-center justify-between mb-3">
                             <span class="text-sm font-medium text-gray-700">
-                              {{ getAttendanceStudents(session.id).length }} student(s)
+                              {{ 'SESSIONS_DASHBOARD.STUDENT_COUNT' | translate: { count: getAttendanceStudents(session.id).length } }}
                             </span>
                           </div>
                           @if (getAttendanceStudents(session.id).length === 0) {
                             <div class="text-center py-6 text-gray-400 text-sm">
                               <i class="pi pi-users text-3xl mb-2 text-gray-300"></i>
-                              <p>No students enrolled in this class</p>
+                              <p>{{ 'SESSIONS_DASHBOARD.NO_STUDENTS_ENROLLED' | translate }}</p>
                             </div>
                           } @else {
                             <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -236,19 +251,19 @@ function endTimeAfterStartValidator(startDate: string) {
                                     [class.text-green-700]="student.isPresent"
                                     [class.bg-gray-100]="!student.isPresent"
                                     [class.text-gray-500]="!student.isPresent">
-                                    {{ student.isPresent ? 'Present' : 'Absent' }}
+                                    {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
                                   </span>
                                 </div>
                               }
                             </div>
                             <div class="mt-3 pt-3 border-t flex items-center justify-between">
                               <span class="text-xs text-gray-500">
-                                <span class="text-green-600 font-semibold">{{ presentCountForSession(session.id) }} present</span>
+                                <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCountForSession(session.id) } }}</span>
                                 ·
-                                <span class="text-red-500 font-semibold">{{ absentCountForSession(session.id) }} absent</span>
+                                <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCountForSession(session.id) } }}</span>
                               </span>
                               <p-button
-                                label="Save Attendance"
+                                [label]="'SESSIONS_DASHBOARD.SAVE_ATTENDANCE' | translate"
                                 icon="pi pi-check"
                                 size="small"
                                 [loading]="savingAttendanceFor() === session.id"
@@ -284,7 +299,7 @@ function endTimeAfterStartValidator(startDate: string) {
                         <span class="font-bold text-gray-900">{{ room.code }}</span>
                       </div>
                       <p-tag
-                        [value]="room.isOccupied ? 'Occupied' : 'Free'"
+                        [value]="(room.isOccupied ? 'SESSIONS_DASHBOARD.ROOM_OCCUPIED' : 'SESSIONS_DASHBOARD.ROOM_FREE') | translate"
                         [severity]="room.isOccupied ? 'danger' : 'success'"
                       ></p-tag>
                     </div>
@@ -296,11 +311,11 @@ function endTimeAfterStartValidator(startDate: string) {
                     }
                     @if (room.activeSession) {
                       <p class="text-sm font-medium text-red-800">{{ room.activeSession.className }}</p>
-                      <p class="text-xs text-red-600">Since {{ formatTime(room.activeSession.startDate) }}</p>
+                      <p class="text-xs text-red-600">{{ 'SESSIONS_DASHBOARD.SINCE' | translate: { time: formatTime(room.activeSession.startDate) } }}</p>
                     }
                     @if (!room.isOccupied) {
                       <p-button
-                        label="Start Session"
+                        [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
                         icon="pi pi-play"
                         size="small"
                         styleClass="w-full mt-2"
@@ -312,7 +327,7 @@ function endTimeAfterStartValidator(startDate: string) {
                 @if (filteredRooms().length === 0) {
                   <div class="col-span-3 text-center py-12 text-gray-400">
                     <i class="pi pi-building text-5xl text-gray-300 mb-3"></i>
-                    <p class="text-lg">No rooms found for this branch</p>
+                    <p class="text-lg">{{ 'SESSIONS_DASHBOARD.NO_ROOMS_BRANCH' | translate }}</p>
                   </div>
                 }
               </div>
@@ -331,13 +346,13 @@ function endTimeAfterStartValidator(startDate: string) {
             >
               <ng-template pTemplate="header">
                 <tr>
-                  <th>Room</th>
-                  <th>Class</th>
-                  <th>Course</th>
-                  <th>Started</th>
-                  <th>Ended</th>
-                  <th>Duration</th>
-                  <th>Status</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_CLASS' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_COURSE' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }}</th>
+                  <th>{{ 'SESSIONS_DASHBOARD.COL_STATUS' | translate }}</th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-session>
@@ -358,7 +373,7 @@ function endTimeAfterStartValidator(startDate: string) {
                   </td>
                   <td>
                     <p-tag
-                      [value]="session.endDate ? 'Ended' : 'Active'"
+                      [value]="(session.endDate ? 'SESSIONS_DASHBOARD.STATUS_ENDED' : 'SESSIONS_DASHBOARD.STATUS_ACTIVE') | translate"
                       [severity]="session.endDate ? 'secondary' : 'success'"
                     ></p-tag>
                   </td>
@@ -366,7 +381,7 @@ function endTimeAfterStartValidator(startDate: string) {
               </ng-template>
               <ng-template pTemplate="emptymessage">
                 <tr>
-                  <td colspan="7" class="text-center py-8 text-gray-400">No sessions found</td>
+                  <td colspan="7" class="text-center py-8 text-gray-400">{{ 'SESSIONS_DASHBOARD.NO_SESSIONS' | translate }}</td>
                 </tr>
               </ng-template>
             </p-table>
@@ -378,7 +393,7 @@ function endTimeAfterStartValidator(startDate: string) {
     <!-- Start Session Dialog -->
     <p-dialog
       [(visible)]="showStartDialog"
-      header="Start Session"
+      [header]="'SESSIONS_DASHBOARD.DIALOG_START_TITLE' | translate"
       [modal]="true"
       [style]="{ width: '480px' }"
     >
@@ -386,49 +401,49 @@ function endTimeAfterStartValidator(startDate: string) {
 
         <!-- Branch -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Branch <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_BRANCH' | translate }} <span class="text-red-500">*</span></label>
           <p-select
             formControlName="branchId"
             [options]="branches()"
             optionLabel="name"
             optionValue="id"
             appendTo="body"
-            placeholder="Select a branch"
+            [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_BRANCH' | translate"
             [style]="{ width: '100%' }"
             (onChange)="onDialogBranchChange()"
           ></p-select>
           @if (sessionForm.get('branchId')?.invalid && sessionForm.get('branchId')?.touched) {
-            <small class="text-red-500">Branch is required</small>
+            <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_BRANCH_REQUIRED' | translate }}</small>
           }
         </div>
 
         <!-- Room (filtered by selected branch) -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Room <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_ROOM' | translate }} <span class="text-red-500">*</span></label>
           <p-select
             formControlName="roomId"
             [options]="dialogFreeRooms()"
             optionLabel="code"
             optionValue="id"
             appendTo="body"
-            placeholder="Select a free room"
+            [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_ROOM' | translate"
             [disabled]="!sessionForm.get('branchId')?.value"
             [style]="{ width: '100%' }"
           ></p-select>
           @if (!sessionForm.get('branchId')?.value) {
-            <small class="text-gray-400">Select a branch first</small>
+            <small class="text-gray-400">{{ 'SESSIONS_DASHBOARD.PICK_BRANCH_FIRST' | translate }}</small>
           }
           @if (sessionForm.get('roomId')?.invalid && sessionForm.get('roomId')?.touched) {
-            <small class="text-red-500">Room is required</small>
+            <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_ROOM_REQUIRED' | translate }}</small>
           }
           @if (sessionForm.get('branchId')?.value && dialogFreeRooms().length === 0) {
-            <small class="text-orange-500">No free rooms available in this branch</small>
+            <small class="text-orange-500">{{ 'SESSIONS_DASHBOARD.NO_FREE_ROOMS' | translate }}</small>
           }
         </div>
 
         <!-- Class (filtered by branch — only classes with students, active sessions shown as disabled) -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Class <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_CLASS' | translate }} <span class="text-red-500">*</span></label>
           <p-select
             formControlName="classId"
             [options]="dialogActiveClasses()"
@@ -436,18 +451,19 @@ function endTimeAfterStartValidator(startDate: string) {
             optionValue="id"
             optionDisabled="hasActiveSession"
             appendTo="body"
-            placeholder="Select a class"
+            [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_CLASS' | translate"
             [disabled]="!sessionForm.get('branchId')?.value || loadingDialogClasses()"
             [style]="{ width: '100%' }"
+            (onChange)="onDialogClassChange()"
           >
             <ng-template pTemplate="item" let-cls>
               <div class="flex items-center justify-between w-full" [class.opacity-40]="cls.hasActiveSession">
                 <span>{{ cls.displayName }}</span>
                 <span class="flex items-center gap-1 ml-3 shrink-0">
-                  <span class="text-xs text-gray-400">{{ cls.studentCount }} student{{ cls.studentCount !== 1 ? 's' : '' }}</span>
+                  <span class="text-xs text-gray-400">{{ 'SESSIONS_DASHBOARD.STUDENTS_SHORT' | translate: { count: cls.studentCount } }}</span>
                   @if (cls.hasActiveSession) {
                     <span class="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium ml-1">
-                      <i class="pi pi-circle-fill text-orange-500 mr-1" style="font-size:0.45rem"></i>In session
+                      <i class="pi pi-circle-fill text-orange-500 mr-1" style="font-size:0.45rem"></i>{{ 'SESSIONS_DASHBOARD.IN_SESSION' | translate }}
                     </span>
                   }
                 </span>
@@ -455,30 +471,100 @@ function endTimeAfterStartValidator(startDate: string) {
             </ng-template>
           </p-select>
           @if (!sessionForm.get('branchId')?.value) {
-            <small class="text-gray-400">Select a branch first</small>
+            <small class="text-gray-400">{{ 'SESSIONS_DASHBOARD.PICK_BRANCH_FIRST' | translate }}</small>
           }
           @if (loadingDialogClasses()) {
-            <small class="text-gray-400"><i class="pi pi-spin pi-spinner mr-1"></i>Loading classes...</small>
+            <small class="text-gray-400"><i class="pi pi-spin pi-spinner mr-1"></i>{{ 'SESSIONS_DASHBOARD.LOADING_CLASSES' | translate }}</small>
           }
           @if (sessionForm.get('classId')?.invalid && sessionForm.get('classId')?.touched) {
-            <small class="text-red-500">Class is required</small>
+            <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_CLASS_REQUIRED' | translate }}</small>
           }
           @if (sessionForm.get('branchId')?.value && !loadingDialogClasses() && dialogActiveClasses().length === 0) {
-            <small class="text-orange-500">No eligible classes — classes must have enrolled students</small>
+            <small class="text-orange-500">{{ 'SESSIONS_DASHBOARD.NO_ELIGIBLE_CLASSES' | translate }}</small>
           }
         </div>
 
         <!-- Notes -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-          <textarea pTextarea formControlName="notes" rows="2" placeholder="Optional notes" class="w-full"></textarea>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_NOTES' | translate }}</label>
+          <textarea pTextarea formControlName="notes" rows="2" [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_NOTES' | translate" class="w-full"></textarea>
+        </div>
+
+        <!-- Teacher attendance -->
+        <div class="border-t border-gray-200 pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700">{{ 'SESSIONS_DASHBOARD.TEACHERS_TITLE' | translate }}</label>
+              <p class="text-xs text-gray-500">{{ 'SESSIONS_DASHBOARD.TEACHERS_DESC' | translate }}</p>
+            </div>
+          </div>
+
+          @if (dialogTeachers().length > 0) {
+            <div class="space-y-2 mb-2">
+              @for (t of dialogTeachers(); track t.employeeId) {
+                <div class="grid grid-cols-12 gap-2 items-center bg-gray-50 border border-gray-200 rounded-md p-2">
+                  <div class="col-span-4 text-sm font-medium truncate" [title]="employeeLabel(t.employeeId)">
+                    {{ employeeLabel(t.employeeId) }}
+                  </div>
+                  <div class="col-span-3">
+                    <p-select
+                      [options]="roleOptions()"
+                      [ngModel]="t.role"
+                      (ngModelChange)="updateTeacherRole(t.employeeId, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                      optionLabel="label"
+                      optionValue="value"
+                      appendTo="body"
+                      [style]="{ width: '100%' }"
+                    ></p-select>
+                  </div>
+                  <div class="col-span-3">
+                    <p-select
+                      [options]="statusOptions()"
+                      [ngModel]="t.status"
+                      (ngModelChange)="updateTeacherStatus(t.employeeId, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                      optionLabel="label"
+                      optionValue="value"
+                      appendTo="body"
+                      [style]="{ width: '100%' }"
+                    ></p-select>
+                  </div>
+                  <div class="col-span-2 flex justify-end">
+                    <p-button icon="pi pi-times" severity="danger" [text]="true" [rounded]="true"
+                      [pTooltip]="'SESSIONS_DASHBOARD.TEACHER_REMOVE' | translate"
+                      (onClick)="removeTeacherFromDialog(t.employeeId)"></p-button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="flex items-center gap-2">
+            <p-select
+              [options]="availableEmployees()"
+              [(ngModel)]="newTeacherEmployeeId"
+              [ngModelOptions]="{ standalone: true }"
+              optionLabel="displayName"
+              optionValue="id"
+              appendTo="body"
+              [placeholder]="'SESSIONS_DASHBOARD.ADD_TEACHER' | translate"
+              [filter]="true"
+              filterBy="displayName"
+              [showClear]="true"
+              [style]="{ flex: '1' }"
+            ></p-select>
+            <p-button icon="pi pi-plus" severity="secondary"
+              [disabled]="!newTeacherEmployeeId"
+              (onClick)="addTeacherToDialog()"></p-button>
+          </div>
         </div>
       </form>
 
       <ng-template pTemplate="footer">
-        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showStartDialog = false"></p-button>
+        <p-button [label]="'SESSIONS_DASHBOARD.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showStartDialog = false"></p-button>
         <p-button
-          label="Start Session"
+          [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
           icon="pi pi-play"
           [loading]="saving()"
           [disabled]="sessionForm.invalid"
@@ -490,7 +576,7 @@ function endTimeAfterStartValidator(startDate: string) {
     <!-- End Session Dialog -->
     <p-dialog
       [(visible)]="showEndDialog"
-      header="End Session"
+      [header]="'SESSIONS_DASHBOARD.DIALOG_END_TITLE' | translate"
       [modal]="true"
       [style]="{ width: '440px' }"
       (onHide)="onEndDialogHide()"
@@ -499,9 +585,9 @@ function endTimeAfterStartValidator(startDate: string) {
         <div class="pt-2 space-y-4">
           <!-- Session info -->
           <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
-            <p>Ending session for <strong>{{ endingSession()!.className }}</strong> in room <strong>{{ endingSession()!.roomCode }}</strong></p>
+            <p [innerHTML]="'SESSIONS_DASHBOARD.ENDING_FOR' | translate: { className: endingSession()!.className, roomCode: endingSession()!.roomCode }"></p>
             <p class="text-gray-500 mt-1">
-              <i class="pi pi-clock mr-1"></i>Started: {{ formatDateTime(endingSession()!.startDate) }}
+              <i class="pi pi-clock mr-1"></i>{{ 'SESSIONS_DASHBOARD.STARTED_LABEL' | translate: { time: formatDateTime(endingSession()!.startDate) } }}
             </p>
           </div>
 
@@ -509,8 +595,8 @@ function endTimeAfterStartValidator(startDate: string) {
             <!-- End Date (locked — always same as start date) -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">
-                End Date
-                <span class="ml-1 text-xs text-gray-400 font-normal">(same as start date)</span>
+                {{ 'SESSIONS_DASHBOARD.END_DATE' | translate }}
+                <span class="ml-1 text-xs text-gray-400 font-normal">{{ 'SESSIONS_DASHBOARD.SAME_AS_START' | translate }}</span>
               </label>
               <input
                 pInputText
@@ -525,7 +611,7 @@ function endTimeAfterStartValidator(startDate: string) {
             <!-- End Time (editable) -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">
-                End Time <span class="text-red-500">*</span>
+                {{ 'SESSIONS_DASHBOARD.END_TIME' | translate }} <span class="text-red-500">*</span>
               </label>
               <input
                 pInputText
@@ -535,23 +621,23 @@ function endTimeAfterStartValidator(startDate: string) {
                 style="width:100%"
               />
               @if (endSessionForm.get('endTime')?.errors?.['required'] && endSessionForm.get('endTime')?.touched) {
-                <small class="text-red-500">End time is required</small>
+                <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_END_TIME_REQUIRED' | translate }}</small>
               }
               @if (endSessionForm.get('endTime')?.errors?.['endBeforeStart']) {
                 <small class="text-red-500">
-                  End time cannot be before the session start time ({{ formatTime(endingSession()!.startDate) }})
+                  {{ 'SESSIONS_DASHBOARD.ERR_END_BEFORE_START' | translate: { time: formatTime(endingSession()!.startDate) } }}
                 </small>
               }
             </div>
 
             <!-- Notes -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.NOTES_OPTIONAL' | translate }}</label>
               <textarea
                 pTextarea
                 formControlName="notes"
                 rows="2"
-                placeholder="Any notes about this session"
+                [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_END_NOTES' | translate"
                 class="w-full"
               ></textarea>
             </div>
@@ -560,9 +646,9 @@ function endTimeAfterStartValidator(startDate: string) {
       }
 
       <ng-template pTemplate="footer">
-        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showEndDialog = false"></p-button>
+        <p-button [label]="'SESSIONS_DASHBOARD.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showEndDialog = false"></p-button>
         <p-button
-          label="End Session"
+          [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
           icon="pi pi-stop"
           severity="danger"
           [loading]="saving()"
@@ -579,8 +665,89 @@ export class SessionsDashboardComponent implements OnInit {
   private classService = inject(ClassService);
   private branchService = inject(BranchService);
   private attendanceService = inject(AttendanceService);
+  private employeeService = inject(EmployeeService);
   private notificationService = inject(NotificationService);
   private fb = inject(FormBuilder);
+
+  // ── Teacher attendance in Start dialog ─────────────────────────────────────
+  dialogTeachers = signal<DialogTeacherRow[]>([]);
+  allEmployees = signal<TeacherOption[]>([]);
+  /** Employees not yet picked in dialogTeachers — used to populate the "add" select. */
+  availableEmployees = computed<TeacherOption[]>(() => {
+    const used = new Set(this.dialogTeachers().map((t) => t.employeeId));
+    return this.allEmployees().filter((e) => !used.has(e.id));
+  });
+  newTeacherEmployeeId: string | null = null;
+  private translate = inject(TranslateService);
+  private languageService = inject(LanguageService);
+
+  /** Role/status option labels — recompute when the active language changes. */
+  roleOptions = computed<{ label: string; value: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT' }[]>(() => {
+    this.languageService.currentLang(); // dependency
+    return [
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_PRIMARY'), value: 'PRIMARY' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_SUBSTITUTE'), value: 'SUBSTITUTE' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_ASSISTANT'), value: 'ASSISTANT' },
+    ];
+  });
+  statusOptions = computed<{ label: string; value: 'PRESENT' | 'ABSENT' }[]>(() => {
+    this.languageService.currentLang();
+    return [
+      { label: this.translate.instant('SESSIONS_DASHBOARD.STATUS_PRESENT'), value: 'PRESENT' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.STATUS_ABSENT'), value: 'ABSENT' },
+    ];
+  });
+
+  employeeLabel(id: string): string {
+    return this.allEmployees().find((e) => e.id === id)?.displayName || '—';
+  }
+
+  addTeacherToDialog() {
+    if (!this.newTeacherEmployeeId) return;
+    const exists = this.dialogTeachers().some((t) => t.employeeId === this.newTeacherEmployeeId);
+    if (exists) return;
+    const primaryAlreadyPresent = this.dialogTeachers().some(
+      (t) => t.role === 'PRIMARY' && t.status === 'PRESENT',
+    );
+    this.dialogTeachers.update((rows) => [
+      ...rows,
+      {
+        employeeId: this.newTeacherEmployeeId!,
+        role: primaryAlreadyPresent ? 'SUBSTITUTE' : 'PRIMARY',
+        status: 'PRESENT',
+      },
+    ]);
+    this.newTeacherEmployeeId = null;
+  }
+
+  removeTeacherFromDialog(employeeId: string) {
+    this.dialogTeachers.update((rows) => rows.filter((t) => t.employeeId !== employeeId));
+  }
+
+  updateTeacherRole(employeeId: string, role: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT') {
+    this.dialogTeachers.update((rows) =>
+      rows.map((t) => (t.employeeId === employeeId ? { ...t, role } : t)),
+    );
+  }
+
+  updateTeacherStatus(employeeId: string, status: 'PRESENT' | 'ABSENT') {
+    this.dialogTeachers.update((rows) =>
+      rows.map((t) => (t.employeeId === employeeId ? { ...t, status } : t)),
+    );
+  }
+
+  /** Prefill the dialog's teacher list with the class's instructor when the class changes. */
+  onDialogClassChange() {
+    const classId = this.sessionForm.get('classId')?.value;
+    if (!classId) return;
+    // If the user already added rows, don't overwrite — they're driving.
+    if (this.dialogTeachers().length > 0) return;
+    const cls = this.dialogActiveClasses().find((c) => c.id === classId);
+    const instructorId = cls?.instructorId || cls?.instructor_id;
+    if (instructorId) {
+      this.dialogTeachers.set([{ employeeId: instructorId, role: 'PRIMARY', status: 'PRESENT' }]);
+    }
+  }
 
   activeSessions = signal<Session[]>([]);
   allSessions = signal<Session[]>([]);
@@ -673,6 +840,20 @@ export class SessionsDashboardComponent implements OnInit {
     this.loadRooms();
     this.loadHistory();
     this.loadClasses();
+    this.loadEmployees();
+  }
+
+  loadEmployees() {
+    this.employeeService.getAllEmployees().subscribe({
+      next: (list: any[]) => {
+        this.allEmployees.set(
+          list.map((e: any) => ({
+            id: e.id,
+            displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
+          })),
+        );
+      },
+    });
   }
 
   loadActiveSessions() {
@@ -728,6 +909,8 @@ export class SessionsDashboardComponent implements OnInit {
       classId: ['', Validators.required],
       notes: [''],
     });
+    this.dialogTeachers.set([]);
+    this.newTeacherEmployeeId = null;
   }
 
   /** When the branch changes inside the dialog, reset room + class and reload both for the branch */
@@ -767,21 +950,28 @@ export class SessionsDashboardComponent implements OnInit {
     this.saving.set(true);
     const val = this.sessionForm.value;
 
+    const teachers: StartSessionTeacher[] = this.dialogTeachers().map((t) => ({
+      employeeId: t.employeeId,
+      role: t.role,
+      status: t.status,
+    }));
+
     this.sessionService.start({
       roomId: val.roomId,
       classId: val.classId,
       branchId: val.branchId,
       notes: val.notes || undefined,
+      teachers: teachers.length > 0 ? teachers : undefined,
     }).subscribe({
       next: () => {
         this.saving.set(false);
         this.showStartDialog = false;
-        this.notificationService.success('Session started successfully');
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
         this.loadAll();
       },
       error: (err: any) => {
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to start session');
+        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_START_FAILED'));
       },
     });
   }
@@ -835,12 +1025,12 @@ export class SessionsDashboardComponent implements OnInit {
         this.saving.set(false);
         this.showEndDialog = false;
         this.endingSession.set(null);
-        this.notificationService.success('Session ended successfully');
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_ENDED'));
         this.loadAll();
       },
       error: (err: any) => {
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to end session');
+        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_END_FAILED'));
       },
     });
   }
@@ -891,7 +1081,7 @@ export class SessionsDashboardComponent implements OnInit {
       },
       error: () => {
         this.loadingAttendanceFor.set(null);
-        this.notificationService.error('Failed to load students for attendance');
+        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_LOAD_STUDENTS_FAILED'));
       },
     });
   }
@@ -915,11 +1105,11 @@ export class SessionsDashboardComponent implements OnInit {
     this.attendanceService.saveForSession(sessionId, presentIds).subscribe({
       next: (res) => {
         this.savingAttendanceFor.set(null);
-        this.notificationService.success(`Attendance saved — ${res.presentCount} present`);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVED', { count: res.presentCount }));
       },
       error: (err: any) => {
         this.savingAttendanceFor.set(null);
-        this.notificationService.error(err?.error?.message || 'Failed to save attendance');
+        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVE_FAILED'));
       },
     });
   }

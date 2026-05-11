@@ -11,6 +11,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RoomService, Room, CreateRoomDto, UpdateRoomDto } from '../services/room.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -33,30 +34,31 @@ import { Branch } from '@shared/interfaces/branch.interface';
     SelectModule,
     CheckboxModule,
     TooltipModule,
+    TranslateModule,
   ],
   template: `
     <div class="container-custom py-8">
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Rooms</h1>
-          <p class="text-gray-600 mt-1">Manage rooms and monitor occupancy in real time</p>
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'ROOMS.TITLE' | translate }}</h1>
+          <p class="text-gray-600 mt-1">{{ 'ROOMS.SUBTITLE' | translate }}</p>
         </div>
-        <p-button label="Add Room" icon="pi pi-plus" (onClick)="openCreateDialog()"></p-button>
+        <p-button [label]="'ROOMS.ADD' | translate" icon="pi pi-plus" (onClick)="openCreateDialog()"></p-button>
       </div>
 
       <!-- Stats -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">Total Rooms</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'ROOMS.STATS_TOTAL' | translate }}</p>
           <p class="text-3xl font-bold text-gray-900">{{ filteredRooms().length }}</p>
         </div>
         <div class="bg-white rounded-xl border border-red-100 p-5">
-          <p class="text-sm text-gray-500 mb-1">Occupied</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'ROOMS.STATS_OCCUPIED' | translate }}</p>
           <p class="text-3xl font-bold text-red-600">{{ occupiedCount() }}</p>
         </div>
         <div class="bg-white rounded-xl border border-green-100 p-5">
-          <p class="text-sm text-gray-500 mb-1">Available</p>
+          <p class="text-sm text-gray-500 mb-1">{{ 'ROOMS.STATS_AVAILABLE' | translate }}</p>
           <p class="text-3xl font-bold text-green-600">{{ freeCount() }}</p>
         </div>
       </div>
@@ -71,7 +73,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
             optionLabel="name"
             optionValue="id"
             appendTo="body"
-            placeholder="All Branches"
+            [placeholder]="'ROOMS.ALL_BRANCHES' | translate"
             [showClear]="true"
             [style]="{ width: '100%' }"
             (onChange)="onBranchFilterChange()"
@@ -79,7 +81,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
         </div>
         @if (selectedBranchId() !== null) {
           <p-button
-            label="Clear Filter"
+            [label]="'ROOMS.CLEAR_FILTER' | translate"
             icon="pi pi-times"
             severity="secondary"
             [outlined]="true"
@@ -93,7 +95,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
       @if (loading()) {
         <div class="text-center py-16 text-gray-400">
           <i class="pi pi-spin pi-spinner text-4xl mb-3"></i>
-          <p>Loading rooms...</p>
+          <p>{{ 'ROOMS.LOADING' | translate }}</p>
         </div>
       }
 
@@ -102,13 +104,13 @@ import { Branch } from '@shared/interfaces/branch.interface';
         <div class="text-center py-16 bg-white rounded-xl border border-gray-200">
           <i class="pi pi-building text-5xl text-gray-300 mb-4"></i>
           @if (selectedBranchId() !== null) {
-            <p class="text-gray-500 text-lg">No rooms found for this branch</p>
-            <p class="text-gray-400 text-sm mb-4">Try selecting a different branch or clear the filter</p>
-            <p-button label="Clear Filter" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="clearBranchFilter()"></p-button>
+            <p class="text-gray-500 text-lg">{{ 'ROOMS.EMPTY_BRANCH' | translate }}</p>
+            <p class="text-gray-400 text-sm mb-4">{{ 'ROOMS.EMPTY_BRANCH_HINT' | translate }}</p>
+            <p-button [label]="'ROOMS.CLEAR_FILTER' | translate" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="clearBranchFilter()"></p-button>
           } @else {
-            <p class="text-gray-500 text-lg">No rooms found</p>
-            <p class="text-gray-400 text-sm mb-4">Add your first room to get started</p>
-            <p-button label="Add Room" icon="pi pi-plus" (onClick)="openCreateDialog()"></p-button>
+            <p class="text-gray-500 text-lg">{{ 'ROOMS.EMPTY' | translate }}</p>
+            <p class="text-gray-400 text-sm mb-4">{{ 'ROOMS.EMPTY_HINT' | translate }}</p>
+            <p-button [label]="'ROOMS.ADD' | translate" icon="pi pi-plus" (onClick)="openCreateDialog()"></p-button>
           }
         </div>
       }
@@ -132,7 +134,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                   </div>
                 </div>
                 <p-tag
-                  [value]="room.isOccupied ? 'Occupied' : 'Free'"
+                  [value]="(room.isOccupied ? 'ROOMS.TAG_OCCUPIED' : 'ROOMS.TAG_FREE') | translate"
                   [severity]="room.isOccupied ? 'danger' : 'success'"
                 ></p-tag>
               </div>
@@ -145,11 +147,11 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <!-- Active Session Info -->
               @if (room.activeSession) {
                 <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 mb-3">
-                  <p class="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-1">Active Session</p>
+                  <p class="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-1">{{ 'ROOMS.ACTIVE_SESSION' | translate }}</p>
                   <p class="text-sm font-bold text-orange-900">{{ room.activeSession.className }}</p>
                   <p class="text-xs text-orange-600 mt-0.5">
                     <i class="pi pi-clock mr-1"></i>
-                    Started {{ formatTime(room.activeSession.startDate) }}
+                    {{ 'ROOMS.STARTED_AT' | translate: { time: formatTime(room.activeSession.startDate) } }}
                   </p>
                 </div>
               }
@@ -157,14 +159,14 @@ import { Branch } from '@shared/interfaces/branch.interface';
               <!-- Inactive badge -->
               @if (!room.isActive) {
                 <div class="bg-red-50 border border-red-200 rounded-lg p-2 mb-3 text-center">
-                  <span class="text-xs font-semibold text-red-600 uppercase tracking-wide">Inactive</span>
+                  <span class="text-xs font-semibold text-red-600 uppercase tracking-wide">{{ 'ROOMS.INACTIVE' | translate }}</span>
                 </div>
               }
 
               <!-- Actions -->
               <div class="flex gap-2 pt-3 border-t border-gray-100">
                 <p-button
-                  label="Edit"
+                  [label]="'ROOMS.EDIT' | translate"
                   icon="pi pi-pencil"
                   severity="secondary"
                   [outlined]="true"
@@ -178,7 +180,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                   [outlined]="true"
                   size="small"
                   (onClick)="confirmDelete(room)"
-                  pTooltip="Delete Room"
+                  [pTooltip]="'ROOMS.DELETE_TOOLTIP' | translate"
                 ></p-button>
               </div>
             </div>

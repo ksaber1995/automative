@@ -380,6 +380,7 @@ const CreateEventSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   status: EventStatusSchema.optional(),
+  subscriptionPrice: z.number().nullable().optional(),
 });
 
 const UpdateEventSchema = CreateEventSchema.partial().extend({
@@ -398,6 +399,7 @@ const EventSchema = z.object({
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
   status: z.string(),
+  subscriptionPrice: z.number().nullable(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -586,9 +588,9 @@ const DueEnrollmentSchema = z.object({
 
 const RefundSchema = z.object({
   id: UUIDSchema,
-  enrollmentId: UUIDSchema,
+  enrollmentId: UUIDSchema.nullable(),
   companyId: UUIDSchema,
-  studentId: UUIDSchema,
+  studentId: UUIDSchema.nullable(),
   amount: z.number(),
   refundDate: z.string(),
   type: z.enum(['FULL', 'PARTIAL']),
@@ -597,10 +599,16 @@ const RefundSchema = z.object({
 });
 
 const RefundWithDetailsSchema = RefundSchema.extend({
-  studentName: z.string(),
-  courseName: z.string(),
-  branchName: z.string(),
-  branchId: UUIDSchema,
+  studentName: z.string().nullable(),
+  courseName: z.string().nullable(),
+  branchName: z.string().nullable(),
+  branchId: UUIDSchema.nullable(),
+  eventId: UUIDSchema.nullable().optional(),
+  eventName: z.string().nullable().optional(),
+  productSaleId: UUIDSchema.nullable().optional(),
+  productName: z.string().nullable().optional(),
+  customerName: z.string().nullable().optional(),
+  source: z.enum(['ENROLLMENT', 'MASTER_ENROLLMENT', 'EVENT', 'PRODUCT_SALE']),
 });
 
 const CreateRefundSchema = z.object({
@@ -616,10 +624,11 @@ const CreateRefundSchema = z.object({
 const RevenueItemSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
-  branchId: UUIDSchema,
-  branchName: z.string(),
-  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE']),
+  branchId: UUIDSchema.nullable(),
+  branchName: z.string().nullable(),
+  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT']),
   sourceId: UUIDSchema,
+  studentId: UUIDSchema.nullable(),
   amount: z.number(),
   totalRefunded: z.number(),
   description: z.string(),
@@ -629,6 +638,8 @@ const RevenueItemSchema = z.object({
   studentName: z.string().nullable(),
   courseName: z.string().nullable(),
   productName: z.string().nullable(),
+  eventId: UUIDSchema.nullable(),
+  eventName: z.string().nullable(),
   createdAt: z.string(),
 });
 
@@ -636,6 +647,8 @@ const RevenueSummarySchema = z.object({
   totalRevenue: z.number(),
   enrollmentRevenue: z.number(),
   productRevenue: z.number(),
+  masterRevenue: z.number(),
+  eventRevenue: z.number(),
   byBranch: z.array(z.object({
     branchId: z.string(),
     branchName: z.string(),
@@ -655,13 +668,13 @@ const CreateExpenseSchema = z.object({
   type: ExpenseTypeSchema,
   category: ExpenseCategorySchema,
   amount: z.number(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   date: z.string(),
   isRecurring: z.boolean().optional(),
-  distributionMethod: z.string().optional(),
-  vendor: z.string().optional(),
-  invoiceNumber: z.string().optional(),
-  notes: z.string().optional(),
+  distributionMethod: z.string().nullish(),
+  vendor: z.string().nullish(),
+  invoiceNumber: z.string().nullish(),
+  notes: z.string().nullish(),
   assetName: z.string().nullish(),
   amortizationMonths: z.number().int().min(1).nullish(),
   eventId: OptionalUUIDSchema,
@@ -727,12 +740,12 @@ const CreateExpensePaymentSchema = z.object({
   category: ExpenseCategorySchema,
   amount: z.number().positive(),
   date: z.string(),
-  notes: z.string().optional(),
-  vendor: z.string().optional(),
-  invoiceNumber: z.string().optional(),
+  notes: z.string().nullish(),
+  vendor: z.string().nullish(),
+  invoiceNumber: z.string().nullish(),
   bonusAmount: z.number().min(0).optional(),
   discountAmount: z.number().min(0).optional(),
-  adjustmentReason: z.string().optional(),
+  adjustmentReason: z.string().nullish(),
 });
 
 // =============================================
@@ -930,6 +943,7 @@ const ProductSaleSchema = z.object({
   customerPhone: z.string().nullable(),
   notes: z.string().nullable(),
   eventId: UUIDSchema.nullable().optional(),
+  totalRefunded: z.number().optional(),
   createdAt: z.string(),
 });
 
@@ -1754,6 +1768,7 @@ export const contract = c.router({
         branchId: OptionalUUIDSchema,
         studentId: OptionalUUIDSchema,
         type: z.enum(['FULL', 'PARTIAL']).optional(),
+        source: z.enum(['ENROLLMENT', 'MASTER_ENROLLMENT', 'EVENT', 'PRODUCT_SALE', 'ALL']).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
@@ -1847,7 +1862,7 @@ export const contract = c.router({
       path: '/api/revenues',
       query: z.object({
         branchId: UUIDSchema.optional(),
-        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'ALL']).optional(),
+        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'ALL']).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
@@ -2502,6 +2517,26 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
+    listRefunds: {
+      method: 'GET',
+      path: '/api/product-sales/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(RefundSchema),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    createRefund: {
+      method: 'POST',
+      path: '/api/product-sales/:id/refunds',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CreateRefundSchema,
+      responses: {
+        201: RefundSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 
   // Debts routes
@@ -2988,6 +3023,33 @@ export const contract = c.router({
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
+    addEventSubscriptionPrice: {
+      method: 'POST',
+      path: '/api/migrations/add-event-subscription-price',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addProductSaleRefundLink: {
+      method: 'POST',
+      path: '/api/migrations/add-product-sale-refund-link',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    createSessionTeacherAttendanceTable: {
+      method: 'POST',
+      path: '/api/migrations/create-session-teacher-attendance-table',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
     mergePermissions: {
       method: 'POST',
       path: '/api/migrations/merge-permissions',
@@ -3294,6 +3356,89 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    getTeachersBySession: {
+      method: 'GET' as const,
+      path: '/api/attendance/teachers/session/:sessionId',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          sessionId: UUIDSchema,
+          employeeId: UUIDSchema,
+          employeeFirstName: z.string(),
+          employeeLastName: z.string(),
+          employeePosition: z.string().nullable(),
+          role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']),
+          status: z.enum(['PRESENT', 'ABSENT']),
+          notes: z.string().nullable(),
+          createdAt: z.string(),
+        })),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    saveTeachersForSession: {
+      method: 'POST' as const,
+      path: '/api/attendance/teachers/session/:sessionId',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      body: z.object({
+        teachers: z.array(z.object({
+          employeeId: UUIDSchema,
+          role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']),
+          status: z.enum(['PRESENT', 'ABSENT']),
+          notes: z.string().nullish(),
+        })),
+      }),
+      responses: {
+        200: z.object({ message: z.string(), count: z.number() }),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    getTeachersHistory: {
+      method: 'GET' as const,
+      path: '/api/attendance/teachers',
+      query: z.object({
+        branchId: UUIDSchema.optional(),
+        employeeId: UUIDSchema.optional(),
+        classId: UUIDSchema.optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          sessionId: UUIDSchema,
+          employeeId: UUIDSchema,
+          employeeFirstName: z.string(),
+          employeeLastName: z.string(),
+          employeePosition: z.string().nullable(),
+          role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']),
+          status: z.enum(['PRESENT', 'ABSENT']),
+          notes: z.string().nullable(),
+          sessionStartDate: z.string(),
+          sessionEndDate: z.string().nullable(),
+          durationMinutes: z.number().nullable(),
+          branchId: UUIDSchema.nullable(),
+          branchName: z.string().nullable(),
+          classId: UUIDSchema.nullable(),
+          className: z.string().nullable(),
+          classCode: z.string().nullable(),
+          courseName: z.string().nullable(),
+          roomCode: z.string().nullable(),
+        })),
+        401: z.object({ message: z.string() }),
+        402: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
   },
 
   // ============================================================
@@ -3308,6 +3453,12 @@ export const contract = c.router({
         classId: UUIDSchema,
         branchId: UUIDSchema,
         notes: z.string().optional(),
+        teachers: z.array(z.object({
+          employeeId: UUIDSchema,
+          role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']).optional(),
+          status: z.enum(['PRESENT', 'ABSENT']).optional(),
+          notes: z.string().nullish(),
+        })).optional(),
       }),
       responses: {
         201: z.any(),

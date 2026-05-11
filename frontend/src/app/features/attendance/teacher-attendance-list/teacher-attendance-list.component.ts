@@ -1,0 +1,284 @@
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { CardModule } from 'primeng/card';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+import { SelectModule } from 'primeng/select';
+import { ButtonModule } from 'primeng/button';
+import { TranslateModule } from '@ngx-translate/core';
+import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../services/teacher-attendance.service';
+import { BranchService } from '../../branches/services/branch.service';
+import { EmployeeService } from '../../employees/services/employee.service';
+import { Branch } from '@shared/interfaces/branch.interface';
+
+interface TeacherOption {
+  id: string;
+  displayName: string;
+}
+
+@Component({
+  selector: 'app-teacher-attendance-list',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    CardModule,
+    TableModule,
+    TagModule,
+    SelectModule,
+    ButtonModule,
+    TranslateModule,
+  ],
+  template: `
+    <div class="container mx-auto p-6">
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="p-4">
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+              <i class="pi pi-user-edit text-blue-600"></i>
+              {{ 'TEACHER_ATTENDANCE.TITLE' | translate }}
+            </h2>
+            <p class="text-gray-600 mt-1">{{ 'TEACHER_ATTENDANCE.SUBTITLE' | translate }}</p>
+          </div>
+        </ng-template>
+
+        <!-- Filters -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
+              {{ 'TEACHER_ATTENDANCE.FILTER_BRANCH' | translate }}
+            </label>
+            <p-select
+              [options]="branches()"
+              [(ngModel)]="selectedBranchId"
+              (ngModelChange)="load()"
+              optionLabel="name"
+              optionValue="id"
+              appendTo="body"
+              [placeholder]="'TEACHER_ATTENDANCE.ALL_BRANCHES' | translate"
+              [showClear]="true"
+              [style]="{ width: '100%' }"
+            ></p-select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
+              {{ 'TEACHER_ATTENDANCE.FILTER_TEACHER' | translate }}
+            </label>
+            <p-select
+              [options]="teachers()"
+              [(ngModel)]="selectedEmployeeId"
+              (ngModelChange)="load()"
+              optionLabel="displayName"
+              optionValue="id"
+              appendTo="body"
+              [placeholder]="'TEACHER_ATTENDANCE.ALL_TEACHERS' | translate"
+              [showClear]="true"
+              [filter]="true"
+              filterBy="displayName"
+              [style]="{ width: '100%' }"
+            ></p-select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
+              {{ 'TEACHER_ATTENDANCE.FILTER_START_DATE' | translate }}
+            </label>
+            <input type="date" [(ngModel)]="startDate" (change)="load()"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
+              {{ 'TEACHER_ATTENDANCE.FILTER_END_DATE' | translate }}
+            </label>
+            <input type="date" [(ngModel)]="endDate" (change)="load()"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+          </div>
+          <div class="flex items-end">
+            @if (hasActiveFilters()) {
+              <p-button [label]="'TEACHER_ATTENDANCE.CLEAR_FILTERS' | translate"
+                icon="pi pi-times" [outlined]="true" severity="secondary"
+                (onClick)="clearFilters()" styleClass="w-full"></p-button>
+            }
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p class="text-xs text-gray-500 uppercase font-semibold">
+              {{ 'TEACHER_ATTENDANCE.SUMMARY_TOTAL' | translate }}
+            </p>
+            <p class="text-2xl font-bold">{{ rows().length }}</p>
+          </div>
+          <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p class="text-xs text-green-700 uppercase font-semibold">
+              {{ 'TEACHER_ATTENDANCE.SUMMARY_PRESENT' | translate }}
+            </p>
+            <p class="text-2xl font-bold text-green-700">{{ presentCount() }}</p>
+          </div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p class="text-xs text-red-700 uppercase font-semibold">
+              {{ 'TEACHER_ATTENDANCE.SUMMARY_ABSENT' | translate }}
+            </p>
+            <p class="text-2xl font-bold text-red-700">{{ absentCount() }}</p>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <p-table
+          [value]="rows()"
+          [loading]="loading()"
+          [paginator]="true"
+          [rows]="15"
+          responsiveLayout="scroll"
+        >
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_DATE' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_TEACHER' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_CLASS' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_BRANCH' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_ROLE' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_STATUS' | translate }}</th>
+              <th class="text-right">{{ 'TEACHER_ATTENDANCE.COL_DURATION' | translate }}</th>
+              <th>{{ 'TEACHER_ATTENDANCE.COL_NOTES' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-row>
+            <tr>
+              <td class="whitespace-nowrap">
+                <div class="text-sm">{{ row.sessionStartDate | date: 'mediumDate' }}</div>
+                <div class="text-xs text-gray-500">{{ row.sessionStartDate | date: 'shortTime' }}</div>
+              </td>
+              <td class="font-medium">
+                {{ row.employeeFirstName }} {{ row.employeeLastName }}
+                @if (row.employeePosition) {
+                  <div class="text-xs text-gray-500">{{ row.employeePosition }}</div>
+                }
+              </td>
+              <td>
+                @if (row.className) {
+                  <div>{{ row.className }}</div>
+                  @if (row.courseName) {
+                    <div class="text-xs text-gray-500">{{ row.courseName }}</div>
+                  }
+                } @else {
+                  <span class="text-gray-400">—</span>
+                }
+              </td>
+              <td>{{ row.branchName || '—' }}</td>
+              <td>
+                <p-tag
+                  [value]="('TEACHER_ATTENDANCE.ROLE_' + row.role) | translate"
+                  [severity]="roleSeverity(row.role)"
+                ></p-tag>
+              </td>
+              <td>
+                <p-tag
+                  [value]="('TEACHER_ATTENDANCE.STATUS_' + row.status) | translate"
+                  [severity]="row.status === 'PRESENT' ? 'success' : 'danger'"
+                ></p-tag>
+              </td>
+              <td class="text-right">
+                @if (row.durationMinutes !== null) {
+                  {{ formatDuration(row.durationMinutes) }}
+                } @else {
+                  <span class="text-gray-400">—</span>
+                }
+              </td>
+              <td class="text-sm text-gray-600">{{ row.notes || '' }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="8" class="text-center py-8 text-gray-400">
+                <i class="pi pi-inbox text-4xl mb-2 block"></i>
+                <p>{{ 'TEACHER_ATTENDANCE.NO_DATA' | translate }}</p>
+                <p class="text-sm">{{ 'TEACHER_ATTENDANCE.NO_DATA_HINT' | translate }}</p>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    </div>
+  `,
+})
+export class TeacherAttendanceListComponent implements OnInit {
+  private attendanceService = inject(TeacherAttendanceService);
+  private branchService = inject(BranchService);
+  private employeeService = inject(EmployeeService);
+
+  rows = signal<TeacherAttendanceHistoryRow[]>([]);
+  branches = signal<Branch[]>([]);
+  teachers = signal<TeacherOption[]>([]);
+  loading = signal(false);
+
+  selectedBranchId: string | null = null;
+  selectedEmployeeId: string | null = null;
+  startDate: string = '';
+  endDate: string = '';
+
+  presentCount = computed(() => this.rows().filter((r) => r.status === 'PRESENT').length);
+  absentCount = computed(() => this.rows().filter((r) => r.status === 'ABSENT').length);
+
+  hasActiveFilters = computed(() =>
+    !!this.selectedBranchId || !!this.selectedEmployeeId || !!this.startDate || !!this.endDate,
+  );
+
+  ngOnInit() {
+    this.branchService.getActiveBranches().subscribe({
+      next: (b) => this.branches.set(b),
+    });
+    this.employeeService.getAllEmployees().subscribe({
+      next: (employees) => {
+        const list = employees.map((e: any) => ({
+          id: e.id,
+          displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
+        }));
+        this.teachers.set(list);
+      },
+    });
+    this.load();
+  }
+
+  load() {
+    this.loading.set(true);
+    const filters: any = {};
+    if (this.selectedBranchId) filters.branchId = this.selectedBranchId;
+    if (this.selectedEmployeeId) filters.employeeId = this.selectedEmployeeId;
+    if (this.startDate) filters.startDate = this.startDate;
+    if (this.endDate) filters.endDate = this.endDate;
+
+    this.attendanceService.getHistory(filters).subscribe({
+      next: (rows) => {
+        this.rows.set(rows);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.rows.set([]);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  clearFilters() {
+    this.selectedBranchId = null;
+    this.selectedEmployeeId = null;
+    this.startDate = '';
+    this.endDate = '';
+    this.load();
+  }
+
+  roleSeverity(role: string): 'success' | 'info' | 'warn' | 'secondary' {
+    if (role === 'PRIMARY') return 'success';
+    if (role === 'SUBSTITUTE') return 'warn';
+    return 'info';
+  }
+
+  formatDuration(minutes: number): string {
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  }
+}

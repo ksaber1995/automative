@@ -132,13 +132,13 @@
         <div>
           <h3 class="text-xl font-semibold flex items-center gap-2">
             <i class="pi pi-users text-green-600"></i>
-            Subscribers
+            {{ 'EVENTS.DETAIL.SUBSCRIBERS_TITLE' | translate }}
             <span class="text-gray-400 text-base font-normal">({{ subscriptions().length }})</span>
           </h3>
-          <p class="text-sm text-gray-500 mt-1">Students or external attendees who paid for this event</p>
+          <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.SUBSCRIBERS_DESC' | translate }}</p>
         </div>
         @if (authService.canWrite('events')) {
-          <p-button icon="pi pi-plus" label="Add Subscriber" severity="success" (onClick)="openSubscriptionDialog()"></p-button>
+          <p-button icon="pi pi-plus" [label]="'EVENTS.DETAIL.ADD_SUBSCRIBER' | translate" severity="success" (onClick)="openSubscriptionDialog()"></p-button>
         }
       </div>
     </ng-template>
@@ -146,13 +146,13 @@
     <p-table [value]="subscriptions()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Subscriber</th>
-          <th>Type</th>
-          <th>Mobile / Age</th>
-          <th class="text-right">Amount</th>
-          <th class="text-right">Refunded</th>
-          <th>Date</th>
-          <th>Method</th>
+          <th>{{ 'EVENTS.DETAIL.COL_SUBSCRIBER' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_TYPE' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_MOBILE_AGE' | translate }}</th>
+          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
+          <th class="text-right">{{ 'EVENTS.DETAIL.COL_REFUNDED' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_METHOD' | translate }}</th>
           <th></th>
         </tr>
       </ng-template>
@@ -161,24 +161,24 @@
           <td class="font-medium">{{ subscriberLabel(s) }}</td>
           <td>
             @if (s.studentId) {
-              <p-tag value="Student" severity="info"></p-tag>
+              <p-tag [value]="'EVENTS.DETAIL.TAG_STUDENT' | translate" severity="info"></p-tag>
             } @else {
-              <p-tag value="External" severity="warn"></p-tag>
+              <p-tag [value]="'EVENTS.DETAIL.TAG_EXTERNAL' | translate" severity="warn"></p-tag>
             }
           </td>
           <td class="text-sm text-gray-600">
             @if (s.externalMobile) { <div>{{ s.externalMobile }}</div> }
-            @if (s.externalAge) { <div class="text-xs text-gray-400">Age: {{ s.externalAge }}</div> }
+            @if (s.externalAge) { <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.AGE_PREFIX' | translate }}: {{ s.externalAge }}</div> }
           </td>
           <td class="text-right font-semibold text-green-600">{{ s.amount.toFixed(2) }}</td>
           <td class="text-right">
             @if (s.refundedAmount && s.refundedAmount > 0) {
               @if (refundRemaining(s) <= 0) {
                 <span class="text-orange-600 font-semibold">-{{ s.refundedAmount.toFixed(2) }}</span>
-                <div class="text-xs text-gray-400">Fully refunded</div>
+                <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.FULLY_REFUNDED' | translate }}</div>
               } @else {
                 <span class="text-orange-600">-{{ s.refundedAmount.toFixed(2) }}</span>
-                <div class="text-xs text-gray-400">Remaining: {{ refundRemaining(s).toFixed(2) }}</div>
+                <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.REMAINING_PREFIX' | translate }}: {{ refundRemaining(s).toFixed(2) }}</div>
               }
             } @else {
               <span class="text-gray-400">—</span>
@@ -189,18 +189,18 @@
           <td class="whitespace-nowrap">
             @if (authService.canWrite('events')) {
               <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
-                pTooltip="Refund"
+                [pTooltip]="'EVENTS.DETAIL.TOOLTIP_REFUND' | translate"
                 [disabled]="refundRemaining(s) <= 0"
                 (onClick)="openRefundDialog(s)"></p-button>
               <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
-                pTooltip="Delete" (onClick)="deleteSubscription(s)"></p-button>
+                [pTooltip]="'EVENTS.DETAIL.TOOLTIP_DELETE' | translate" (onClick)="deleteSubscription(s)"></p-button>
             }
           </td>
         </tr>
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center py-6 text-gray-400">No subscribers yet.</td>
+          <td colspan="8" class="text-center py-6 text-gray-400">{{ 'EVENTS.DETAIL.NO_SUBSCRIBERS' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -213,13 +213,13 @@
         <div>
           <h3 class="text-xl font-semibold flex items-center gap-2">
             <i class="pi pi-wallet text-red-600"></i>
-            Expenses
+            {{ 'EVENTS.DETAIL.EXPENSES_TITLE' | translate }}
             <span class="text-gray-400 text-base font-normal">({{ expenses().length }})</span>
           </h3>
-          <p class="text-sm text-gray-500 mt-1">Costs tied to this event — branch is auto-linked from the event</p>
+          <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.EXPENSES_DESC' | translate }}</p>
         </div>
         @if (authService.canWrite('expenses')) {
-          <p-button icon="pi pi-plus" label="Add Expense" severity="danger" (onClick)="openExpenseDialog()"></p-button>
+          <p-button icon="pi pi-plus" [label]="'EVENTS.DETAIL.ADD_EXPENSE' | translate" severity="danger" (onClick)="openExpenseDialog()"></p-button>
         }
       </div>
     </ng-template>
@@ -227,12 +227,12 @@
     <p-table [value]="expenses()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Description</th>
-          <th>Category</th>
-          <th>Date</th>
-          <th>Vendor</th>
-          <th class="text-right">Amount</th>
-          <th class="text-right">Paid</th>
+          <th>{{ 'EVENTS.DETAIL.COL_EXP_DESCRIPTION' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_CATEGORY' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_VENDOR' | translate }}</th>
+          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
+          <th class="text-right">{{ 'EVENTS.DETAIL.COL_PAID' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-e>
@@ -255,7 +255,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="6" class="text-center py-6 text-gray-400">No expenses yet.</td>
+          <td colspan="6" class="text-center py-6 text-gray-400">{{ 'EVENTS.DETAIL.NO_EXPENSES' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -267,21 +267,21 @@
       <div class="px-6 py-4 border-b">
         <h3 class="text-xl font-semibold flex items-center gap-2">
           <i class="pi pi-replay text-orange-600"></i>
-          Refunds
+          {{ 'EVENTS.DETAIL.REFUNDS_TITLE' | translate }}
           <span class="text-gray-400 text-base font-normal">({{ refunds().length }})</span>
         </h3>
-        <p class="text-sm text-gray-500 mt-1">Issued from a subscriber row above. Refunds are always tied to a subscription.</p>
+        <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.REFUNDS_DESC' | translate }}</p>
       </div>
     </ng-template>
 
     <p-table [value]="refunds()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Date</th>
-          <th>Student</th>
-          <th>Type</th>
-          <th class="text-right">Amount</th>
-          <th>Reason</th>
+          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_STUDENT' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_TYPE' | translate }}</th>
+          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
+          <th>{{ 'EVENTS.DETAIL.COL_REASON' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-r>
@@ -295,7 +295,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="5" class="text-center py-6 text-gray-400">No refunds yet.</td>
+          <td colspan="5" class="text-center py-6 text-gray-400">{{ 'EVENTS.DETAIL.NO_REFUNDS' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -303,32 +303,32 @@
 </div>
 
 <!-- Add Subscriber Dialog -->
-<p-dialog [(visible)]="showSubscriptionDialog" [modal]="true" header="Add Subscriber" [style]="{ width: '520px' }">
+<p-dialog [(visible)]="showSubscriptionDialog" [modal]="true" [header]="'EVENTS.DETAIL.DIALOG_ADD_SUBSCRIBER' | translate" [style]="{ width: '520px' }">
   <div class="grid gap-4">
     <!-- Subscriber type -->
     <div>
-      <label class="block text-sm font-medium mb-2">Subscriber Type <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_SUBSCRIBER_TYPE' | translate }} <span class="text-red-500">*</span></label>
       <div class="flex gap-6">
         <label class="flex items-center gap-2">
           <p-radiobutton name="subType" value="STUDENT" [(ngModel)]="subType"></p-radiobutton>
-          <span>Student</span>
+          <span>{{ 'EVENTS.DETAIL.OPT_STUDENT' | translate }}</span>
         </label>
         <label class="flex items-center gap-2">
           <p-radiobutton name="subType" value="EXTERNAL" [(ngModel)]="subType"></p-radiobutton>
-          <span>External (not in system)</span>
+          <span>{{ 'EVENTS.DETAIL.OPT_EXTERNAL' | translate }}</span>
         </label>
       </div>
     </div>
 
     @if (subType === 'STUDENT') {
       <div>
-        <label class="block text-sm font-medium mb-2">Student <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.OPT_STUDENT' | translate }} <span class="text-red-500">*</span></label>
         <p-select
           [(ngModel)]="subStudentId"
           [options]="studentOptions()"
           optionLabel="label"
           optionValue="value"
-          placeholder="Pick a student"
+          [placeholder]="'EVENTS.DETAIL.PLACEHOLDER_STUDENT' | translate"
           [filter]="true"
           filterBy="label"
           [style]="{ width: '100%' }"
@@ -337,19 +337,19 @@
     } @else {
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium mb-2">First name <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_FIRST_NAME' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText [(ngModel)]="subFirstName" class="w-full" />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-2">Last name <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_LAST_NAME' | translate }} <span class="text-red-500">*</span></label>
           <input pInputText [(ngModel)]="subLastName" class="w-full" />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-2">Age</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_AGE' | translate }}</label>
           <p-inputnumber [(ngModel)]="subAge" [min]="0" [max]="120" [style]="{ width: '100%' }" />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-2">Mobile</label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_MOBILE' | translate }}</label>
           <input pInputText [(ngModel)]="subMobile" class="w-full" />
         </div>
       </div>
@@ -357,100 +357,100 @@
 
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_AMOUNT' | translate }} <span class="text-red-500">*</span></label>
         <p-inputnumber [(ngModel)]="subAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Payment date <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
         <p-datepicker [(ngModel)]="subPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
       </div>
     </div>
 
     <div>
-      <label class="block text-sm font-medium mb-2">Payment method</label>
-      <p-select [(ngModel)]="subPaymentMethod" [options]="paymentMethodOptions" optionLabel="label" optionValue="value" placeholder="Optional" [showClear]="true" [style]="{ width: '100%' }"></p-select>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_PAYMENT_METHOD' | translate }}</label>
+      <p-select [(ngModel)]="subPaymentMethod" [options]="paymentMethodOptions" optionLabel="label" optionValue="value" [placeholder]="'EVENTS.DETAIL.PLACEHOLDER_OPTIONAL' | translate" [showClear]="true" [style]="{ width: '100%' }"></p-select>
     </div>
 
     <div>
-      <label class="block text-sm font-medium mb-2">Notes</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_NOTES' | translate }}</label>
       <textarea pTextarea [(ngModel)]="subNotes" rows="2" class="w-full"></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showSubscriptionDialog = false"></p-button>
-    <p-button label="Add" icon="pi pi-check" severity="success" [loading]="saving()"
+    <p-button [label]="'EVENTS.DETAIL.BTN_CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showSubscriptionDialog = false"></p-button>
+    <p-button [label]="'EVENTS.DETAIL.BTN_ADD' | translate" icon="pi pi-check" severity="success" [loading]="saving()"
       [disabled]="!subAmount || !subPaymentDate"
       (onClick)="submitSubscription()"></p-button>
   </ng-template>
 </p-dialog>
 
 <!-- Add Expense Dialog -->
-<p-dialog [(visible)]="showExpenseDialog" [modal]="true" header="Add Event Expense" [style]="{ width: '520px' }">
+<p-dialog [(visible)]="showExpenseDialog" [modal]="true" [header]="'EVENTS.DETAIL.DIALOG_ADD_EXPENSE' | translate" [style]="{ width: '520px' }">
   <div class="grid gap-4">
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-sm font-medium mb-2">Category <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_CATEGORY' | translate }} <span class="text-red-500">*</span></label>
         <p-select [(ngModel)]="expCategory" [options]="expenseCategoryOptions" optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_AMOUNT' | translate }} <span class="text-red-500">*</span></label>
         <p-inputnumber [(ngModel)]="expAmount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" />
       </div>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Description <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DESCRIPTION' | translate }} <span class="text-red-500">*</span></label>
       <input pInputText [(ngModel)]="expDescription" class="w-full" />
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DATE' | translate }} <span class="text-red-500">*</span></label>
         <p-datepicker [(ngModel)]="expDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Vendor</label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_VENDOR' | translate }}</label>
         <input pInputText [(ngModel)]="expVendor" class="w-full" />
       </div>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Invoice #</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_INVOICE_NUMBER' | translate }}</label>
       <input pInputText [(ngModel)]="expInvoice" class="w-full" />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Notes</label>
+      <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_NOTES' | translate }}</label>
       <textarea pTextarea [(ngModel)]="expNotes" rows="2" class="w-full"></textarea>
     </div>
     <div class="flex items-center gap-2">
       <p-checkbox [(ngModel)]="expPayNow" [binary]="true" inputId="expPayNow"></p-checkbox>
-      <label for="expPayNow" class="text-sm font-medium">Pay immediately (record payment)</label>
+      <label for="expPayNow" class="text-sm font-medium">{{ 'EVENTS.DETAIL.FIELD_PAY_NOW' | translate }}</label>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showExpenseDialog = false"></p-button>
-    <p-button label="Add" icon="pi pi-check" severity="danger" [loading]="saving()"
+    <p-button [label]="'EVENTS.DETAIL.BTN_CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showExpenseDialog = false"></p-button>
+    <p-button [label]="'EVENTS.DETAIL.BTN_ADD' | translate" icon="pi pi-check" severity="danger" [loading]="saving()"
       [disabled]="!expAmount || !expDescription || !expDate"
       (onClick)="submitExpense()"></p-button>
   </ng-template>
 </p-dialog>
 
 <!-- Refund Subscription Dialog -->
-<p-dialog [(visible)]="showRefundDialog" [modal]="true" header="Refund Subscription" [style]="{ width: '520px' }">
+<p-dialog [(visible)]="showRefundDialog" [modal]="true" [header]="'EVENTS.DETAIL.DIALOG_REFUND_TITLE' | translate" [style]="{ width: '520px' }">
   @if (refSubscription) {
     <div class="grid gap-4">
       <!-- Subscription summary -->
       <div class="bg-gray-50 p-3 rounded border">
-        <div class="text-sm text-gray-500">Subscriber</div>
+        <div class="text-sm text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_SUBSCRIBER' | translate }}</div>
         <div class="font-medium">{{ subscriberLabel(refSubscription) }}</div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-sm">
           <div>
-            <div class="text-gray-500">Original</div>
+            <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_ORIGINAL' | translate }}</div>
             <div class="font-semibold text-green-600">{{ refSubscription.amount.toFixed(2) }}</div>
           </div>
           <div>
-            <div class="text-gray-500">Already refunded</div>
+            <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_REFUNDED' | translate }}</div>
             <div class="font-semibold text-orange-600">{{ (refSubscription.refundedAmount || 0).toFixed(2) }}</div>
           </div>
           <div>
-            <div class="text-gray-500">Remaining</div>
+            <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_REMAINING' | translate }}</div>
             <div class="font-semibold text-blue-700">{{ refundRemaining(refSubscription).toFixed(2) }}</div>
           </div>
         </div>
@@ -458,7 +458,7 @@
 
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium mb-2">Refund amount <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_REFUND_AMOUNT' | translate }} <span class="text-red-500">*</span></label>
           <p-inputnumber
             [(ngModel)]="refAmount"
             (ngModelChange)="onRefundAmountChange()"
@@ -468,37 +468,37 @@
             [min]="0"
             [max]="refundRemaining(refSubscription)"
             [style]="{ width: '100%' }" />
-          <div class="text-xs text-gray-500 mt-1">Max: {{ refundRemaining(refSubscription).toFixed(2) }}</div>
+          <div class="text-xs text-gray-500 mt-1">{{ 'EVENTS.DETAIL.MAX_PREFIX' | translate }}: {{ refundRemaining(refSubscription).toFixed(2) }}</div>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-2">Date <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DATE' | translate }} <span class="text-red-500">*</span></label>
           <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
         </div>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-2">Type</label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_TYPE' | translate }}</label>
         <div class="flex gap-6">
           <label class="flex items-center gap-2">
             <p-radiobutton name="refType" value="FULL" [(ngModel)]="refType"></p-radiobutton>
-            <span>Full (refund the remaining)</span>
+            <span>{{ 'EVENTS.DETAIL.OPT_FULL_REFUND' | translate }}</span>
           </label>
           <label class="flex items-center gap-2">
             <p-radiobutton name="refType" value="PARTIAL" [(ngModel)]="refType"></p-radiobutton>
-            <span>Partial</span>
+            <span>{{ 'EVENTS.DETAIL.OPT_PARTIAL_REFUND' | translate }}</span>
           </label>
         </div>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-2">Reason</label>
+        <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_REASON' | translate }}</label>
         <textarea pTextarea [(ngModel)]="refReason" rows="2" class="w-full"></textarea>
       </div>
     </div>
   }
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
-    <p-button label="Issue Refund" icon="pi pi-replay" severity="warn" [loading]="saving()"
+    <p-button [label]="'EVENTS.DETAIL.BTN_CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showRefundDialog = false"></p-button>
+    <p-button [label]="'EVENTS.DETAIL.BTN_ISSUE_REFUND' | translate" icon="pi pi-replay" severity="warn" [loading]="saving()"
       [disabled]="!refSubscription || !refAmount || !refDate || refAmount <= 0 || refAmount > refundRemaining(refSubscription)"
       (onClick)="submitRefund()"></p-button>
   </ng-template>

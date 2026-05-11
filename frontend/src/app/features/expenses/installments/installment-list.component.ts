@@ -7,6 +7,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -20,7 +21,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
-    TooltipModule, DeleteConfirmDialogComponent,
+    TooltipModule, DeleteConfirmDialogComponent, TranslateModule,
   ],
   template: `
     <div class="container mx-auto p-6">
@@ -28,12 +29,12 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         <ng-template pTemplate="header">
           <div class="flex justify-between items-center p-4">
             <div>
-              <h2 class="text-2xl font-bold">Installment Plans</h2>
-              <p class="text-gray-600 mt-1">Track financed purchases paid over time</p>
+              <h2 class="text-2xl font-bold">{{ 'INSTALLMENTS.LIST.TITLE' | translate }}</h2>
+              <p class="text-gray-600 mt-1">{{ 'INSTALLMENTS.LIST.SUBTITLE' | translate }}</p>
             </div>
             <div class="flex gap-2">
               <p-button
-                label="Back to Expenses"
+                [label]="'INSTALLMENTS.LIST.BACK_TO_EXPENSES' | translate"
                 icon="pi pi-arrow-left"
                 severity="secondary"
                 [outlined]="true"
@@ -41,7 +42,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
               </p-button>
               @if (authService.canWrite('expenses')) {
                 <p-button
-                  label="New Installment"
+                  [label]="'INSTALLMENTS.LIST.NEW' | translate"
                   icon="pi pi-plus"
                   (onClick)="newPlan()">
                 </p-button>
@@ -53,19 +54,19 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         <!-- Summary -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p class="text-xs text-blue-700 uppercase">Active Plans</p>
+            <p class="text-xs text-blue-700 uppercase">{{ 'INSTALLMENTS.LIST.STAT_ACTIVE' | translate }}</p>
             <p class="text-2xl font-bold text-blue-900">{{ activeCount() }}</p>
           </div>
           <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p class="text-xs text-green-700 uppercase">Completed</p>
+            <p class="text-xs text-green-700 uppercase">{{ 'INSTALLMENTS.LIST.STAT_COMPLETED' | translate }}</p>
             <p class="text-2xl font-bold text-green-900">{{ completedCount() }}</p>
           </div>
           <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p class="text-xs text-amber-700 uppercase">Total Financed</p>
+            <p class="text-xs text-amber-700 uppercase">{{ 'INSTALLMENTS.LIST.STAT_TOTAL_FINANCED' | translate }}</p>
             <p class="text-2xl font-bold text-amber-900">{{ totalFinanced() | number:'1.2-2' }}</p>
           </div>
           <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <p class="text-xs text-purple-700 uppercase">Remaining</p>
+            <p class="text-xs text-purple-700 uppercase">{{ 'INSTALLMENTS.LIST.STAT_REMAINING' | translate }}</p>
             <p class="text-2xl font-bold text-purple-900">{{ remainingTotal() | number:'1.2-2' }}</p>
           </div>
         </div>
@@ -73,21 +74,21 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         <!-- Filters -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <div>
-            <label class="block text-sm font-medium mb-1">Branch</label>
+            <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.LIST.BRANCH' | translate }}</label>
             <select [(ngModel)]="selectedBranchId" (change)="load()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-              <option value="">All branches</option>
+              <option value="">{{ 'INSTALLMENTS.LIST.ALL_BRANCHES' | translate }}</option>
               @for (b of branches(); track b.id) {
                 <option [value]="b.id">{{ b.name }}</option>
               }
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Status</label>
+            <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.LIST.STATUS' | translate }}</label>
             <select [(ngModel)]="selectedStatus" (change)="load()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-              <option value="">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELED">Canceled</option>
+              <option value="">{{ 'INSTALLMENTS.LIST.ALL' | translate }}</option>
+              <option value="ACTIVE">{{ 'INSTALLMENTS.LIST.STATUS_ACTIVE' | translate }}</option>
+              <option value="COMPLETED">{{ 'INSTALLMENTS.LIST.STATUS_COMPLETED' | translate }}</option>
+              <option value="CANCELED">{{ 'INSTALLMENTS.LIST.STATUS_CANCELED' | translate }}</option>
             </select>
           </div>
         </div>
@@ -96,17 +97,17 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
         <p-table [value]="plans()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
-              <th>Name</th>
-              <th>Branch</th>
-              <th>Category</th>
-              <th>Total</th>
-              <th>Down</th>
-              <th>Monthly</th>
-              <th>Months</th>
-              <th>Progress</th>
-              <th>Next Due</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_NAME' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_BRANCH' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_CATEGORY' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_TOTAL' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_DOWN' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_MONTHLY' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_MONTHS' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_PROGRESS' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_NEXT_DUE' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_STATUS' | translate }}</th>
+              <th>{{ 'INSTALLMENTS.LIST.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-plan>
@@ -143,7 +144,10 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                 }
               </td>
               <td>
-                <p-tag [value]="plan.status" [severity]="statusSeverity(plan.status)"></p-tag>
+                <p-tag
+                  [value]="('INSTALLMENTS.LIST.STATUS_' + plan.status) | translate"
+                  [severity]="statusSeverity(plan.status)">
+                </p-tag>
               </td>
               <td>
                 <div class="flex gap-1">
@@ -152,7 +156,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                     [rounded]="true"
                     [text]="true"
                     severity="info"
-                    pTooltip="View"
+                    [pTooltip]="'INSTALLMENTS.LIST.VIEW' | translate"
                     (onClick)="viewPlan(plan)">
                   </p-button>
                   @if (authService.canDelete('expenses')) {
@@ -161,7 +165,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
                       [rounded]="true"
                       [text]="true"
                       severity="danger"
-                      pTooltip="Delete"
+                      [pTooltip]="'INSTALLMENTS.LIST.DELETE' | translate"
                       (onClick)="confirmDelete(plan)">
                     </p-button>
                   }
@@ -172,7 +176,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
           <ng-template pTemplate="emptymessage">
             <tr>
               <td colspan="11" class="text-center py-8 text-gray-500">
-                No installment plans yet. Click "New Installment" to create one.
+                {{ 'INSTALLMENTS.LIST.NO_DATA' | translate }}
               </td>
             </tr>
           </ng-template>
@@ -183,8 +187,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     <app-delete-confirm-dialog
       [visible]="showDeleteDialog"
       (visibleChange)="showDeleteDialog = $event"
-      header="Delete Installment Plan"
-      [message]="'This will permanently remove the plan, its schedule, and all linked payments (including the downpayment). Continue?'"
+      [header]="'INSTALLMENTS.LIST.DELETE_TITLE' | translate"
+      [message]="'INSTALLMENTS.LIST.DELETE_CONFIRM' | translate"
       (confirm)="doDelete()"
       (cancel)="showDeleteDialog = false">
     </app-delete-confirm-dialog>
@@ -195,6 +199,7 @@ export class InstallmentListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   plans = signal<InstallmentPlan[]>([]);
@@ -242,20 +247,20 @@ export class InstallmentListComponent implements OnInit {
     if (!p) return;
     this.installmentService.delete(p.id).subscribe({
       next: () => {
-        this.notificationService.success('Installment plan deleted');
+        this.notificationService.success(this.translate.instant('INSTALLMENTS.LIST.MSG_DELETED'));
         this.showDeleteDialog = false;
         this.planToDelete.set(null);
         this.load();
       },
       error: (err) => {
-        this.notificationService.error(err.error?.message || 'Failed to delete plan');
+        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.LIST.MSG_DELETE_FAILED'));
         this.showDeleteDialog = false;
       },
     });
   }
 
   getBranchName(branchId?: string | null): string {
-    if (!branchId) return 'Global';
+    if (!branchId) return this.translate.instant('INSTALLMENTS.LIST.GLOBAL');
     return this.branches().find(b => b.id === branchId)?.name || '—';
   }
 

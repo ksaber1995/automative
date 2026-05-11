@@ -1,5 +1,5 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 export const attendanceRoutes = {
   /**
@@ -249,6 +249,239 @@ export const attendanceRoutes = {
       return {
         status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to get class attendance' },
+      };
+    }
+  },
+
+  // ============================================================
+  // Teacher attendance — who taught (or was supposed to teach) a session
+  // ============================================================
+
+  /**
+   * GET /api/attendance/teachers/session/:sessionId
+   * Returns the teacher roster for a single session.
+   */
+  getTeachersBySession: async ({ params, headers }: { params: { sessionId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const session = await queryOne(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) return { status: 404 as const, body: { message: 'Session not found' } };
+      if (!canAccessBranch(context, session.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+      }
+
+      const rows = await query(
+        `SELECT
+           sta.id,
+           sta.session_id,
+           sta.employee_id,
+           sta.role,
+           sta.status,
+           sta.notes,
+           sta.created_at,
+           e.first_name,
+           e.last_name,
+           e.position
+         FROM session_teacher_attendance sta
+         JOIN employees e ON e.id = sta.employee_id
+         WHERE sta.session_id = $1
+         ORDER BY sta.role ASC, e.first_name ASC, e.last_name ASC`,
+        [params.sessionId]
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((row: any) => ({
+          id: row.id,
+          sessionId: row.session_id,
+          employeeId: row.employee_id,
+          employeeFirstName: row.first_name,
+          employeeLastName: row.last_name,
+          employeePosition: row.position,
+          role: row.role,
+          status: row.status,
+          notes: row.notes,
+          createdAt: row.created_at,
+        })),
+      };
+    } catch (error) {
+      console.error('Get session teacher attendance error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to get teacher attendance' },
+      };
+    }
+  },
+
+  /**
+   * POST /api/attendance/teachers/session/:sessionId
+   * Replaces the teacher roster for a session.
+   * Body: { teachers: [{ employeeId, role, status, notes? }] }
+   */
+  saveTeachersForSession: async ({ params, body, headers }: { params: { sessionId: string }; body: { teachers: Array<{ employeeId: string; role: string; status: string; notes?: string | null }> }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'write')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const session = await queryOne(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) return { status: 404 as const, body: { message: 'Session not found' } };
+      if (!canAccessBranch(context, session.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+      }
+
+      const teachers = Array.isArray(body?.teachers) ? body.teachers : [];
+
+      await query('DELETE FROM session_teacher_attendance WHERE session_id = $1', [params.sessionId]);
+
+      for (const t of teachers) {
+        if (!t.employeeId) continue;
+        await query(
+          `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (session_id, employee_id) DO NOTHING`,
+          [
+            params.sessionId,
+            t.employeeId,
+            t.role || 'PRIMARY',
+            t.status || 'PRESENT',
+            t.notes || null,
+          ]
+        );
+      }
+
+      return { status: 200 as const, body: { message: 'Teacher attendance saved', count: teachers.length } };
+    } catch (error) {
+      console.error('Save teacher attendance error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to save teacher attendance' },
+      };
+    }
+  },
+
+  /**
+   * GET /api/attendance/teachers
+   * Cross-employee teacher attendance log with filters.
+   */
+  getTeachersHistory: async ({ query: queryParams, headers }: { query: { branchId?: string; employeeId?: string; classId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'courses', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const params: any[] = [context.companyId];
+      let sql = `
+        SELECT
+          sta.id,
+          sta.session_id,
+          sta.employee_id,
+          sta.role,
+          sta.status,
+          sta.notes,
+          sta.created_at,
+          e.first_name,
+          e.last_name,
+          e.position,
+          s.start_date AS session_start_date,
+          s.end_date AS session_end_date,
+          s.branch_id,
+          s.class_id,
+          cl.name AS class_name,
+          cl.code AS class_code,
+          co.name AS course_name,
+          b.name AS branch_name,
+          r.code AS room_code
+        FROM session_teacher_attendance sta
+        JOIN sessions s ON s.id = sta.session_id
+        JOIN employees e ON e.id = sta.employee_id
+        LEFT JOIN classes cl ON cl.id = s.class_id
+        LEFT JOIN courses co ON co.id = cl.course_id
+        LEFT JOIN branches b ON b.id = s.branch_id
+        LEFT JOIN rooms r ON r.id = s.room_id
+        WHERE s.company_id = $1
+      `;
+
+      if (queryParams.branchId) {
+        if (!canAccessBranch(context, queryParams.branchId)) {
+          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        }
+        params.push(queryParams.branchId);
+        sql += ` AND s.branch_id = $${params.length}`;
+      } else if (!isGlobalAdmin(context) && context.branchId) {
+        params.push(context.branchId);
+        sql += ` AND s.branch_id = $${params.length}`;
+      }
+
+      if (queryParams.employeeId) {
+        params.push(queryParams.employeeId);
+        sql += ` AND sta.employee_id = $${params.length}`;
+      }
+
+      if (queryParams.classId) {
+        params.push(queryParams.classId);
+        sql += ` AND s.class_id = $${params.length}`;
+      }
+
+      if (queryParams.startDate) {
+        params.push(queryParams.startDate);
+        sql += ` AND s.start_date >= $${params.length}`;
+      }
+
+      if (queryParams.endDate) {
+        params.push(queryParams.endDate);
+        sql += ` AND s.start_date <= $${params.length}`;
+      }
+
+      sql += ' ORDER BY s.start_date DESC, e.first_name ASC';
+
+      const rows = await query(sql, params);
+      return {
+        status: 200 as const,
+        body: rows.map((row: any) => {
+          const start = row.session_start_date ? new Date(row.session_start_date) : null;
+          const end = row.session_end_date ? new Date(row.session_end_date) : null;
+          const durationMinutes = start && end ? Math.round((end.getTime() - start.getTime()) / 60000) : null;
+          return {
+            id: row.id,
+            sessionId: row.session_id,
+            employeeId: row.employee_id,
+            employeeFirstName: row.first_name,
+            employeeLastName: row.last_name,
+            employeePosition: row.position,
+            role: row.role,
+            status: row.status,
+            notes: row.notes,
+            sessionStartDate: row.session_start_date,
+            sessionEndDate: row.session_end_date,
+            durationMinutes,
+            branchId: row.branch_id,
+            branchName: row.branch_name,
+            classId: row.class_id,
+            className: row.class_name,
+            classCode: row.class_code,
+            courseName: row.course_name,
+            roomCode: row.room_code,
+          };
+        }),
+      };
+    } catch (error) {
+      console.error('Get teacher attendance history error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to get teacher attendance history' },
       };
     }
   },

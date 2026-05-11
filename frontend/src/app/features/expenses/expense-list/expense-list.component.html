@@ -15,13 +15,6 @@
             (onClick)="goToManageRecurring()">
           </p-button>
           <p-button
-            label="Installments"
-            icon="pi pi-credit-card"
-            severity="info"
-            [outlined]="true"
-            (onClick)="goToInstallments()">
-          </p-button>
-          <p-button
             [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
             icon="pi pi-users"
             severity="warn"
@@ -36,171 +29,443 @@
       </div>
     </ng-template>
 
-    <!-- Filters -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.BRANCH' | translate }}</label>
-        <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">{{ 'EXPENSES.LIST.ALL_BRANCHES' | translate }}</option>
-          @for (branch of branches(); track branch.id) {
-            <option [value]="branch.id">{{ branch.name }}</option>
+    <!-- Tabs -->
+    <p-tabs [value]="activeTab()" (valueChange)="setTab($any($event))">
+      <p-tablist>
+        <p-tab value="all">
+          <i class="pi pi-list mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_ALL' | translate }}
+          <span class="ml-2 bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ expenses().length }}</span>
+        </p-tab>
+        <p-tab value="due">
+          <i class="pi pi-clock text-amber-600 mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_DUE' | translate }}
+          @if (dueItems().length > 0) {
+            <span class="ml-2 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ dueItems().length }}</span>
           }
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.TYPE_LABEL' | translate }}</label>
-        <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">{{ 'EXPENSES.LIST.ALL_TYPES' | translate }}</option>
-          <option value="FIXED">{{ 'EXPENSES.LIST.FIXED' | translate }}</option>
-          <option value="VARIABLE">{{ 'EXPENSES.LIST.VARIABLE' | translate }}</option>
-          <option value="SHARED">{{ 'EXPENSES.LIST.SHARED' | translate }}</option>
-          <option value="CAPITAL">{{ 'EXPENSES.LIST.CAPITAL' | translate }}</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.CATEGORY' | translate }}</label>
-        <select [(ngModel)]="selectedCategory" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">{{ 'EXPENSES.LIST.ALL_CATEGORIES' | translate }}</option>
-          @for (cat of categories; track cat) {
-            <option [value]="cat">{{ cat }}</option>
+        </p-tab>
+        <p-tab value="direct">
+          <i class="pi pi-receipt text-blue-600 mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_DIRECT' | translate }}
+          <span class="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ directCount() }}</span>
+        </p-tab>
+        <p-tab value="salaries">
+          <i class="pi pi-users text-orange-600 mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_SALARIES' | translate }}
+          @if (salaryPayments().length > 0) {
+            <span class="ml-2 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ salaryPayments().length }}</span>
           }
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.RECURRING' | translate }}</label>
-        <select [(ngModel)]="selectedRecurring" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">{{ 'EXPENSES.LIST.ALL' | translate }}</option>
-          <option value="true">{{ 'EXPENSES.LIST.RECURRING_ONLY' | translate }}</option>
-          <option value="false">{{ 'EXPENSES.LIST.NON_RECURRING' | translate }}</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.START_DATE' | translate }}</label>
-        <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
-      </div>
-      <div class="flex flex-col justify-between">
-        <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.END_DATE' | translate }}</label>
-        <div class="flex gap-1">
-          <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
-          <button pButton icon="pi pi-filter-slash" class="p-button-outlined p-button-sm" (click)="clearFilters()" [pTooltip]="'EXPENSES.LIST.CLEAR_FILTERS' | translate"></button>
-        </div>
-      </div>
-    </div>
+        </p-tab>
+        <p-tab value="installments">
+          <i class="pi pi-credit-card text-violet-600 mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_INSTALLMENTS' | translate }}
+          @if (installmentPlans().length > 0) {
+            <span class="ml-2 bg-violet-100 text-violet-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ installmentPlans().length }}</span>
+          }
+        </p-tab>
+        <p-tab value="events">
+          <i class="pi pi-flag text-pink-600 mr-2"></i>
+          {{ 'EXPENSES.LIST.TAB_EVENTS' | translate }}
+          <span class="ml-2 bg-pink-100 text-pink-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ eventsCount() }}</span>
+        </p-tab>
+      </p-tablist>
 
-    <!-- Table -->
-    <p-table [value]="expenses()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
-      <ng-template pTemplate="header">
-        <tr>
-          <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_TYPE' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
-          <th>Total Paid</th>
-          <th>Payments</th>
-          <th>Last Payment</th>
-          <th>Status</th>
-          <th>{{ 'EXPENSES.LIST.COL_RECURRING' | translate }}</th>
-          <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-expense>
-        <tr>
-          <td>{{ expense.date | date: 'MMM d, y' }}</td>
-          <td><p-tag [value]="'EXPENSES.LIST.' + expense.type | translate" [severity]="getTypeColor(expense.type)"></p-tag></td>
-          <td>{{ expense.category }}</td>
-          <td>{{ getBranchName(expense.branchId) }}</td>
-          <td>
-            <span
-              class="font-medium text-blue-600 hover:underline cursor-pointer"
-              (click)="viewExpense(expense)">
-              {{ expense.description }}
-            </span>
-          </td>
-          <td class="font-semibold">{{ expense.amount | number:'1.2-2' }}</td>
-          <td>
-            @if ((expense.totalPaid ?? 0) > 0) {
-              <span class="text-green-700 font-medium">{{ expense.totalPaid | number:'1.2-2' }}</span>
-            } @else {
-              <span class="text-gray-400 text-sm">—</span>
-            }
-          </td>
-          <td class="text-center">
-            @if ((expense.paymentCount ?? 0) > 0) {
-              <span
-                class="inline-flex items-center gap-1 text-blue-600 font-medium cursor-pointer hover:underline"
-                (click)="viewExpense(expense)">
-                <i class="pi pi-history text-xs"></i>{{ expense.paymentCount }}x
-              </span>
-            } @else {
-              <span class="text-gray-400 text-sm">—</span>
-            }
-          </td>
-          <td>
-            @if (expense.lastPaymentDate) {
-              <span class="text-sm text-gray-600">{{ expense.lastPaymentDate | date:'MMM d, y' }}</span>
-            } @else {
-              <span class="text-gray-400 text-sm">—</span>
-            }
-          </td>
-          <td>
-            <p-tag
-              [value]="getPaymentStatus(expense).label"
-              [severity]="getPaymentStatus(expense).severity">
-            </p-tag>
-          </td>
-          <td>
-            @if (expense.isRecurring) {
-              <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
-            } @else {
-              <span class="text-gray-400 text-sm">-</span>
-            }
-          </td>
-          <td>
-            <div class="flex gap-1">
-              @if (authService.canWrite('expenses')) {
-                <p-button
-                  icon="pi pi-dollar"
-                  [rounded]="true"
-                  [text]="true"
-                  severity="success"
-                  pTooltip="Record Payment"
-                  (onClick)="openPaymentDialog(expense)">
-                </p-button>
-              }
-              @if (authService.canWrite('expenses')) {
-                <p-button
-                  icon="pi pi-pencil"
-                  [rounded]="true"
-                  [text]="true"
-                  severity="warn"
-                  [pTooltip]="'EXPENSES.LIST.EDIT' | translate"
-                  (onClick)="editExpense(expense)">
-                </p-button>
-              }
-              @if (authService.canDelete('expenses')) {
-                <p-button
-                  icon="pi pi-trash"
-                  [rounded]="true"
-                  [text]="true"
-                  severity="danger"
-                  [pTooltip]="'EXPENSES.LIST.DELETE' | translate"
-                  (onClick)="confirmDelete(expense)">
-                </p-button>
-              }
+      <p-tabpanels>
+        <!-- ============ All ============ -->
+        <p-tabpanel value="all">
+          <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
+        </p-tabpanel>
+
+        <!-- ============ Due This Month ============ -->
+        <p-tabpanel value="due">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="text-sm text-gray-600">
+                {{ 'EXPENSES.LIST.DUE_HINT' | translate }} <span class="font-semibold">{{ dueMonth() }}</span>
+              </p>
+              <p class="text-2xl font-bold text-amber-700 mt-1">
+                {{ dueTotal() | number:'1.2-2' }}
+              </p>
             </div>
-          </td>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="emptymessage">
-        <tr>
-          <td colspan="12" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
-        </tr>
-      </ng-template>
-    </p-table>
+            <p-button
+              [label]="'EXPENSES.LIST.REFRESH' | translate"
+              icon="pi pi-refresh"
+              severity="secondary"
+              [outlined]="true"
+              (onClick)="loadDue()">
+            </p-button>
+          </div>
+
+          <p-table [value]="dueItems()" [loading]="dueLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'EXPENSES.LIST.COL_KIND' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-item>
+              <tr>
+                <td>
+                  <p-tag
+                    [value]="('EXPENSES.LIST.DUE_TYPE_' + (item.type | uppercase)) | translate"
+                    [severity]="dueItemTypeSeverity(item.type)">
+                  </p-tag>
+                </td>
+                <td class="font-medium">{{ item.label }}</td>
+                <td>{{ item.branchName || ('EXPENSES.LIST.GLOBAL' | translate) }}</td>
+                <td>{{ item.category }}</td>
+                <td class="text-right font-semibold">{{ item.amount | number:'1.2-2' }}</td>
+                <td>
+                  @if (authService.canWrite('expenses')) {
+                    <p-button
+                      icon="pi pi-arrow-right"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="success"
+                      [pTooltip]="'EXPENSES.LIST.GO_PAY' | translate"
+                      (onClick)="goToDuesPay(item)">
+                    </p-button>
+                  }
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="6" class="text-center py-8 text-gray-500">
+                  <i class="pi pi-check-circle text-3xl text-green-500 mb-2 block"></i>
+                  {{ 'EXPENSES.LIST.NO_DUES' | translate }}
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============ Direct ============ -->
+        <p-tabpanel value="direct">
+          <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
+        </p-tabpanel>
+
+        <!-- ============ Salaries ============ -->
+        <p-tabpanel value="salaries">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-gray-600">{{ 'EXPENSES.LIST.SALARIES_HINT' | translate }}</p>
+            <p-button
+              [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
+              icon="pi pi-cog"
+              severity="warn"
+              [outlined]="true"
+              (onClick)="goToSalaries()">
+            </p-button>
+          </div>
+
+          <p-table [value]="salaryPayments()" [loading]="salaryLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_EMPLOYEE' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_BONUS' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_DISCOUNT' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_NOTES' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-p>
+              <tr>
+                <td>{{ p.date | date: 'MMM d, y' }}</td>
+                <td class="font-medium">{{ getEmployeeName(p.employeeId) }}</td>
+                <td>{{ getBranchName(p.branchId) }}</td>
+                <td class="text-right font-semibold text-green-700">{{ p.amount | number:'1.2-2' }}</td>
+                <td class="text-right">
+                  @if (p.bonusAmount && p.bonusAmount > 0) {
+                    <span class="text-blue-600">+{{ p.bonusAmount | number:'1.2-2' }}</span>
+                  } @else {
+                    <span class="text-gray-400">—</span>
+                  }
+                </td>
+                <td class="text-right">
+                  @if (p.discountAmount && p.discountAmount > 0) {
+                    <span class="text-red-600">-{{ p.discountAmount | number:'1.2-2' }}</span>
+                  } @else {
+                    <span class="text-gray-400">—</span>
+                  }
+                </td>
+                <td class="text-sm text-gray-600">{{ p.notes || p.adjustmentReason || '' }}</td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="7" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_SALARIES' | translate }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============ Installments ============ -->
+        <p-tabpanel value="installments">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-gray-600">{{ 'EXPENSES.LIST.INSTALLMENTS_HINT' | translate }}</p>
+            <p-button
+              [label]="'EXPENSES.LIST.MANAGE_INSTALLMENTS' | translate"
+              icon="pi pi-cog"
+              severity="info"
+              [outlined]="true"
+              (onClick)="goToInstallments()">
+            </p-button>
+          </div>
+
+          <p-table [value]="installmentPlans()" [loading]="installmentLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'EXPENSES.LIST.COL_NAME' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_VENDOR' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_TOTAL' | translate }}</th>
+                <th class="text-right">{{ 'EXPENSES.LIST.COL_MONTHLY' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_PROGRESS' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_NEXT_DUE' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_STATUS' | translate }}</th>
+                <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-plan>
+              <tr>
+                <td class="font-medium">
+                  <span class="text-blue-600 hover:underline cursor-pointer" (click)="goToInstallmentDetail(plan)">
+                    {{ plan.name }}
+                  </span>
+                </td>
+                <td>{{ getBranchName(plan.branchId) }}</td>
+                <td>{{ plan.vendor || '—' }}</td>
+                <td class="text-right font-semibold">{{ plan.totalAmount | number:'1.2-2' }}</td>
+                <td class="text-right">{{ plan.monthlyAmount | number:'1.2-2' }}</td>
+                <td>
+                  <span class="text-sm font-medium">{{ installmentProgress(plan) }}</span>
+                  @if (plan.paidAmount) {
+                    <div class="text-xs text-gray-500">{{ plan.paidAmount | number:'1.2-2' }} paid</div>
+                  }
+                </td>
+                <td>
+                  @if (plan.nextDueDate) {
+                    {{ plan.nextDueDate | date: 'MMM d, y' }}
+                  } @else {
+                    <span class="text-gray-400">—</span>
+                  }
+                </td>
+                <td>
+                  <p-tag
+                    [value]="('EXPENSES.LIST.INSTALLMENT_STATUS_' + plan.status) | translate"
+                    [severity]="installmentStatusSeverity(plan.status)">
+                  </p-tag>
+                </td>
+                <td>
+                  <p-button
+                    icon="pi pi-eye"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="info"
+                    [pTooltip]="'EXPENSES.LIST.VIEW' | translate"
+                    (onClick)="goToInstallmentDetail(plan)">
+                  </p-button>
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="9" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_INSTALLMENTS' | translate }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============ Events ============ -->
+        <p-tabpanel value="events">
+          <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
+        </p-tabpanel>
+      </p-tabpanels>
+    </p-tabs>
   </p-card>
 </div>
+
+<!-- ============ Shared expense table (used by All / Direct / Events tabs) ============ -->
+<ng-template #expenseTablePanel>
+  <!-- Filters -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.BRANCH' | translate }}</label>
+      <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+        <option value="">{{ 'EXPENSES.LIST.ALL_BRANCHES' | translate }}</option>
+        @for (branch of branches(); track branch.id) {
+          <option [value]="branch.id">{{ branch.name }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.TYPE_LABEL' | translate }}</label>
+      <select [(ngModel)]="selectedType" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+        <option value="">{{ 'EXPENSES.LIST.ALL_TYPES' | translate }}</option>
+        <option value="FIXED">{{ 'EXPENSES.LIST.FIXED' | translate }}</option>
+        <option value="VARIABLE">{{ 'EXPENSES.LIST.VARIABLE' | translate }}</option>
+        <option value="SHARED">{{ 'EXPENSES.LIST.SHARED' | translate }}</option>
+        <option value="CAPITAL">{{ 'EXPENSES.LIST.CAPITAL' | translate }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.CATEGORY' | translate }}</label>
+      <select [(ngModel)]="selectedCategory" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+        <option value="">{{ 'EXPENSES.LIST.ALL_CATEGORIES' | translate }}</option>
+        @for (cat of categories; track cat) {
+          <option [value]="cat">{{ cat }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.RECURRING' | translate }}</label>
+      <select [(ngModel)]="selectedRecurring" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+        <option value="">{{ 'EXPENSES.LIST.ALL' | translate }}</option>
+        <option value="true">{{ 'EXPENSES.LIST.RECURRING_ONLY' | translate }}</option>
+        <option value="false">{{ 'EXPENSES.LIST.NON_RECURRING' | translate }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.START_DATE' | translate }}</label>
+      <input type="date" [(ngModel)]="startDate" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+    </div>
+    <div class="flex flex-col justify-between">
+      <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.END_DATE' | translate }}</label>
+      <div class="flex gap-1">
+        <input type="date" [(ngModel)]="endDate" (change)="onFilterChange()" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
+        <button pButton icon="pi pi-filter-slash" class="p-button-outlined p-button-sm" (click)="clearFilters()" [pTooltip]="'EXPENSES.LIST.CLEAR_FILTERS' | translate"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subtotal for this tab -->
+  <div class="text-sm text-gray-600 mb-2">
+    {{ 'EXPENSES.LIST.TAB_SUBTOTAL' | translate }}:
+    <span class="font-semibold text-gray-900">{{ filteredTotal() | number:'1.2-2' }}</span>
+  </div>
+
+  <!-- Table -->
+  <p-table [value]="filteredExpenses()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_TYPE' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_TOTAL_PAID' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_PAYMENTS' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_LAST_PAYMENT' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_STATUS' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_RECURRING' | translate }}</th>
+        <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-expense>
+      <tr>
+        <td>{{ expense.date | date: 'MMM d, y' }}</td>
+        <td><p-tag [value]="'EXPENSES.LIST.' + expense.type | translate" [severity]="getTypeColor(expense.type)"></p-tag></td>
+        <td>{{ expense.category }}</td>
+        <td>{{ getBranchName(expense.branchId) }}</td>
+        <td>
+          <span
+            class="font-medium text-blue-600 hover:underline cursor-pointer"
+            (click)="viewExpense(expense)">
+            {{ expense.description }}
+          </span>
+          @if (expense.eventId) {
+            <p-tag value="Event" severity="warn" styleClass="ml-2 text-xs"></p-tag>
+          }
+        </td>
+        <td class="font-semibold">{{ expense.amount | number:'1.2-2' }}</td>
+        <td>
+          @if ((expense.totalPaid ?? 0) > 0) {
+            <span class="text-green-700 font-medium">{{ expense.totalPaid | number:'1.2-2' }}</span>
+          } @else {
+            <span class="text-gray-400 text-sm">—</span>
+          }
+        </td>
+        <td class="text-center">
+          @if ((expense.paymentCount ?? 0) > 0) {
+            <span
+              class="inline-flex items-center gap-1 text-blue-600 font-medium cursor-pointer hover:underline"
+              (click)="viewExpense(expense)">
+              <i class="pi pi-history text-xs"></i>{{ expense.paymentCount }}x
+            </span>
+          } @else {
+            <span class="text-gray-400 text-sm">—</span>
+          }
+        </td>
+        <td>
+          @if (expense.lastPaymentDate) {
+            <span class="text-sm text-gray-600">{{ expense.lastPaymentDate | date:'MMM d, y' }}</span>
+          } @else {
+            <span class="text-gray-400 text-sm">—</span>
+          }
+        </td>
+        <td>
+          <p-tag
+            [value]="getPaymentStatus(expense).label"
+            [severity]="getPaymentStatus(expense).severity">
+          </p-tag>
+        </td>
+        <td>
+          @if (expense.isRecurring) {
+            <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
+          } @else {
+            <span class="text-gray-400 text-sm">-</span>
+          }
+        </td>
+        <td>
+          <div class="flex gap-1">
+            @if (authService.canWrite('expenses')) {
+              <p-button
+                icon="pi pi-dollar"
+                [rounded]="true"
+                [text]="true"
+                severity="success"
+                pTooltip="Record Payment"
+                (onClick)="openPaymentDialog(expense)">
+              </p-button>
+            }
+            @if (authService.canWrite('expenses')) {
+              <p-button
+                icon="pi pi-pencil"
+                [rounded]="true"
+                [text]="true"
+                severity="warn"
+                [pTooltip]="'EXPENSES.LIST.EDIT' | translate"
+                (onClick)="editExpense(expense)">
+              </p-button>
+            }
+            @if (authService.canDelete('expenses')) {
+              <p-button
+                icon="pi pi-trash"
+                [rounded]="true"
+                [text]="true"
+                severity="danger"
+                [pTooltip]="'EXPENSES.LIST.DELETE' | translate"
+                (onClick)="confirmDelete(expense)">
+              </p-button>
+            }
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="12" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</ng-template>
 
 <!-- Delete Confirm Dialog -->
 <app-delete-confirm-dialog

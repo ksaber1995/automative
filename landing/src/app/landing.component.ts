@@ -212,7 +212,7 @@ interface RoadmapPhase {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           @for (p of pricing(); track p.tierKey; let i = $index) {
             <div
               class="relative p-8 rounded-2xl border-2 transition-all"
@@ -227,20 +227,32 @@ interface RoadmapPhase {
               <h3 class="font-bold text-xl text-gray-900">{{ p.tierKey | translate }}</h3>
               <p class="text-sm text-gray-500 mt-1">{{ p.subtitleKey | translate }}</p>
 
-              @if (billing() === 'annual') {
+              @if (p.isCustom) {
+                <div class="mt-6 flex items-baseline gap-2">
+                  <span class="text-4xl font-extrabold text-gray-900">{{ 'PRICING.CUSTOM_LABEL' | translate }}</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">{{ 'PRICING.CUSTOM_BILLING' | translate }}</div>
+                <div class="mt-3 p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="text-indigo-700 text-base">📞</span>
+                    <span class="text-indigo-900 font-semibold">
+                      {{ p.hintKey | translate }}
+                    </span>
+                  </div>
+                </div>
+              } @else if (billing() === 'annual') {
                 <div class="mt-6 flex items-baseline gap-2 flex-wrap">
                   <span class="text-lg font-medium text-gray-400 line-through">{{ p.monthlyPrice | number }}</span>
                   <span class="text-4xl font-extrabold text-gray-900">{{ p.price | number }}</span>
                   <span class="text-gray-500">{{ currency() }}{{ 'PRICING.PER_MONTH' | translate }}</span>
                 </div>
-                <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-emerald-900 font-medium">{{ 'PRICING.YEAR_TOTAL' | translate }}</span>
-                    <span class="text-emerald-900 font-extrabold">{{ p.annualTotal | number }} {{ currency() }}</span>
-                  </div>
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-emerald-700">{{ 'PRICING.YOU_SAVE' | translate }}</span>
-                    <span class="text-emerald-700 font-bold">{{ p.annualSavings | number }} {{ currency() }} / {{ 'PRICING.YEAR_LABEL' | translate }}</span>
+                <div class="mt-1 text-xs text-gray-500">{{ 'PRICING.BILLED_ANNUALLY' | translate }}</div>
+                <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="text-emerald-700 text-base">💰</span>
+                    <span class="text-emerald-900 font-semibold">
+                      {{ 'PRICING.SAVE_PER_MONTH' | translate: { amount: p.monthlySavings | number, currency: currency() } }}
+                    </span>
                   </div>
                 </div>
               } @else {
@@ -248,17 +260,16 @@ interface RoadmapPhase {
                   <span class="text-4xl font-extrabold text-gray-900">{{ p.price | number }}</span>
                   <span class="text-gray-500">{{ currency() }}{{ 'PRICING.PER_MONTH' | translate }}</span>
                 </div>
-                <div class="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-1">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-600">{{ 'PRICING.YEAR_TOTAL' | translate }}</span>
-                    <span class="text-gray-900 font-bold">{{ p.yearAtMonthly | number }} {{ currency() }}</span>
+                <div class="mt-1 text-xs text-gray-500">{{ 'PRICING.BILLED_MONTHLY' | translate }}</div>
+                <button (click)="billing.set('annual')"
+                  class="mt-3 w-full p-3 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors text-left">
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="text-amber-700 text-base">↩</span>
+                    <span class="text-amber-900 font-semibold">
+                      {{ 'PRICING.SWITCH_TO_ANNUAL_MONTHLY' | translate: { amount: p.monthlySavings | number, currency: currency() } }}
+                    </span>
                   </div>
-                  <button (click)="billing.set('annual')"
-                    class="w-full mt-1 text-left text-xs text-amber-700 hover:text-amber-900 font-semibold flex items-center gap-1">
-                    <span>↩</span>
-                    <span>{{ 'PRICING.SWITCH_TO_ANNUAL' | translate: { amount: p.annualSavings | number, currency: currency() } }}</span>
-                  </button>
-                </div>
+                </button>
               }
               <ul class="mt-6 space-y-3">
                 @for (featKey of p.featureKeys; track featKey) {
@@ -271,9 +282,9 @@ interface RoadmapPhase {
               <button
                 (click)="openDemo('pricing-' + p.sourceTag)"
                 class="mt-8 w-full"
-                [class.btn-primary]="i === 1"
-                [class.btn-secondary]="i !== 1">
-                {{ 'PRICING.CTA' | translate }}
+                [class.btn-primary]="i === 1 || p.isCustom"
+                [class.btn-secondary]="i !== 1 && !p.isCustom">
+                {{ p.ctaKey | translate }}
               </button>
             </div>
           }
@@ -658,14 +669,14 @@ export class LandingComponent {
     const cur = this.currency();
 
     const egp = {
-      starter: { monthly: 1922, annual: 1538 },
-      growth: { monthly: 3838, annual: 3070 },
-      pro: { monthly: 6398, annual: 5118 },
+      starter: { monthly: 2000, annual: 1500 },
+      growth: { monthly: 4000, annual: 3000 },
+      pro: { monthly: 6800, annual: 5100 },
     };
     const sar = {
-      starter: { monthly: 538, annual: 430 },
-      growth: { monthly: 1078, annual: 862 },
-      pro: { monthly: 1798, annual: 1438 },
+      starter: { monthly: 560, annual: 420 },
+      growth: { monthly: 1120, annual: 840 },
+      pro: { monthly: 1800, annual: 1350 },
     };
     const p = cur === 'EGP' ? egp : sar;
 
@@ -680,16 +691,21 @@ export class LandingComponent {
       const annualTotal = tier.annual * 12;
       const yearAtMonthly = tier.monthly * 12;
       const annualSavings = yearAtMonthly - annualTotal;
+      const monthlySavings = tier.monthly - tier.annual;
       return {
         tierKey,
         subtitleKey,
         sourceTag,
+        isCustom: false,
+        ctaKey: 'PRICING.CTA',
+        hintKey: '',
         price: monthlyEquiv,
         monthlyPrice: tier.monthly,
         annualMonthly: tier.annual,
         annualTotal,
         yearAtMonthly,
         annualSavings,
+        monthlySavings,
         featureKeys,
       };
     };
@@ -716,6 +732,30 @@ export class LandingComponent {
         'PRICING.PLANS.PRO_FEAT_4',
         'PRICING.PLANS.PRO_FEAT_5',
       ]),
+      // Custom / enterprise — no fixed price. Featured when a customer has
+      // 1,200+ students, needs custom SLA, integrations, or white-label.
+      {
+        tierKey: 'PRICING.PLANS.ENTERPRISE_TIER',
+        subtitleKey: 'PRICING.PLANS.ENTERPRISE_SUB',
+        sourceTag: 'enterprise',
+        isCustom: true,
+        ctaKey: 'PRICING.CUSTOM_CTA_BTN',
+        hintKey: 'PRICING.CUSTOM_HINT',
+        price: 0,
+        monthlyPrice: 0,
+        annualMonthly: 0,
+        annualTotal: 0,
+        yearAtMonthly: 0,
+        annualSavings: 0,
+        monthlySavings: 0,
+        featureKeys: [
+          'PRICING.PLANS.ENTERPRISE_FEAT_1',
+          'PRICING.PLANS.ENTERPRISE_FEAT_2',
+          'PRICING.PLANS.ENTERPRISE_FEAT_3',
+          'PRICING.PLANS.ENTERPRISE_FEAT_4',
+          'PRICING.PLANS.ENTERPRISE_FEAT_5',
+        ],
+      },
     ];
   });
 

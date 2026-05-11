@@ -70,4 +70,17 @@ export class ProductSaleService {
   ): Observable<ProductSale> {
     return this.api.patch<ProductSale>(`product-sales/${id}`, sale);
   }
+
+  createRefund(saleId: string, dto: {
+    type: 'FULL' | 'PARTIAL';
+    amount: number;
+    refundDate: string;
+    reason?: string;
+  }): Observable<any> {
+    return this.api.post(`product-sales/${saleId}/refunds`, dto);
+  }
+
+  getRefunds(saleId: string): Observable<any[]> {
+    return this.api.get<any[]>(`product-sales/${saleId}/refunds`);
+  }
 }

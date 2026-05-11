@@ -22,6 +22,8 @@ export interface ProductSale {
   customerPhone?: string;
   revenueId: string;
   date: string;
+  saleDate: string;
+  totalRefunded?: number;
   createdAt: string;
   updatedAt: string;
 }

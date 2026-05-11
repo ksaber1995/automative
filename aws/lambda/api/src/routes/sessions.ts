@@ -95,6 +95,32 @@ export const sessionsRoutes = {
         notes: body.notes || null,
       });
 
+      // Teacher attendance — optional. If the caller provided an explicit list,
+      // use it verbatim. Otherwise fall back to the class's assigned instructor
+      // as PRIMARY/PRESENT (if any).
+      const teachers: Array<{ employeeId: string; role?: string; status?: string; notes?: string }> =
+        Array.isArray(body.teachers) ? body.teachers : [];
+
+      if (teachers.length === 0 && cls.instructor_id) {
+        teachers.push({ employeeId: cls.instructor_id, role: 'PRIMARY', status: 'PRESENT' });
+      }
+
+      for (const t of teachers) {
+        if (!t.employeeId) continue;
+        await query(
+          `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (session_id, employee_id) DO NOTHING`,
+          [
+            session.id,
+            t.employeeId,
+            t.role || 'PRIMARY',
+            t.status || 'PRESENT',
+            t.notes || null,
+          ]
+        );
+      }
+
       return { status: 201 as const, body: mapSessionFromDB(session) };
     } catch (error) {
       console.error('Start session error:', error);

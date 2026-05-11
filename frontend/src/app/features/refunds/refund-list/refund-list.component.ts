@@ -10,8 +10,9 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
+import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { RefundService } from '../services/refund.service';
+import { RefundService, RefundSource } from '../services/refund.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
@@ -23,7 +24,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
     CommonModule, FormsModule,
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, DatePickerModule, InputTextModule, TooltipModule,
-    TranslateModule,
+    TabsModule, TranslateModule,
   ],
   template: `
     <div class="space-y-4">
@@ -95,25 +96,50 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
         </div>
       </p-card>
 
-      <!-- Table -->
+      <!-- Source tabs -->
       <p-card>
+        <p-tabs [value]="activeSource()" (valueChange)="setSource($any($event))">
+          <p-tablist>
+            <p-tab value="ALL">
+              <i class="pi pi-list mr-2"></i>
+              {{ 'REFUNDS.LIST.TAB_ALL' | translate }}
+            </p-tab>
+            <p-tab value="ENROLLMENT">
+              <i class="pi pi-book mr-2 text-green-600"></i>
+              {{ 'REFUNDS.LIST.TAB_COURSE' | translate }}
+            </p-tab>
+            <p-tab value="MASTER_ENROLLMENT">
+              <i class="pi pi-th-large mr-2 text-violet-600"></i>
+              {{ 'REFUNDS.LIST.TAB_BUNDLE' | translate }}
+            </p-tab>
+            <p-tab value="EVENT">
+              <i class="pi pi-flag mr-2 text-amber-600"></i>
+              {{ 'REFUNDS.LIST.TAB_EVENT' | translate }}
+            </p-tab>
+            <p-tab value="PRODUCT_SALE">
+              <i class="pi pi-shopping-bag mr-2 text-pink-600"></i>
+              {{ 'REFUNDS.LIST.TAB_PRODUCT' | translate }}
+            </p-tab>
+          </p-tablist>
+        </p-tabs>
+
         <p-table
           [value]="refunds()"
           [loading]="loading()"
           [paginator]="true"
           [rows]="15"
           [rowsPerPageOptions]="[15, 30, 50]"
-          [globalFilterFields]="['studentName', 'courseName', 'branchName', 'reason']"
+          [globalFilterFields]="['studentName', 'courseName', 'branchName', 'reason', 'productName', 'customerName']"
           responsiveLayout="scroll"
-          styleClass="p-datatable-sm"
+          styleClass="p-datatable-sm mt-3"
           sortField="refundDate"
           [sortOrder]="-1"
         >
           <ng-template pTemplate="header">
             <tr>
               <th pSortableColumn="refundDate">{{ 'REFUNDS.LIST.COL_DATE' | translate }} <p-sortIcon field="refundDate"></p-sortIcon></th>
-              <th pSortableColumn="studentName">{{ 'REFUNDS.LIST.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
-              <th pSortableColumn="courseName">{{ 'REFUNDS.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+              <th pSortableColumn="source">{{ 'REFUNDS.LIST.COL_SOURCE' | translate }} <p-sortIcon field="source"></p-sortIcon></th>
+              <th>{{ 'REFUNDS.LIST.COL_DESC' | translate }}</th>
               <th pSortableColumn="branchName">{{ 'REFUNDS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
               <th pSortableColumn="type">{{ 'REFUNDS.LIST.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
               <th pSortableColumn="amount" class="text-right">{{ 'REFUNDS.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
@@ -126,10 +152,30 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
             <tr>
               <td class="text-sm">{{ formatDate(refund.refundDate) }}</td>
               <td>
-                <span class="font-medium">{{ refund.studentName }}</span>
+                <p-tag
+                  [value]="('REFUNDS.LIST.SOURCE_' + refund.source) | translate"
+                  [severity]="sourceSeverity(refund.source)">
+                </p-tag>
               </td>
-              <td class="text-sm text-gray-600">{{ refund.courseName }}</td>
-              <td class="text-sm text-gray-500">{{ refund.branchName }}</td>
+              <td>
+                @if (refund.source === 'PRODUCT_SALE') {
+                  <div class="font-medium">{{ refund.productName || '—' }}</div>
+                  @if (refund.customerName) {
+                    <div class="text-xs text-gray-500">{{ refund.customerName }}</div>
+                  }
+                } @else if (refund.source === 'EVENT') {
+                  <div class="font-medium">{{ refund.eventName || '—' }}</div>
+                  @if (refund.studentName) {
+                    <div class="text-xs text-gray-500">{{ refund.studentName }}</div>
+                  }
+                } @else {
+                  <div class="font-medium">{{ refund.studentName || '—' }}</div>
+                  @if (refund.courseName) {
+                    <div class="text-xs text-gray-500">{{ refund.courseName }}</div>
+                  }
+                }
+              </td>
+              <td class="text-sm text-gray-500">{{ refund.branchName || '—' }}</td>
               <td>
                 <p-tag
                   [value]="refund.type === 'FULL' ? ('REFUNDS.LIST.FULL_REFUND' | translate) : ('REFUNDS.LIST.PARTIAL_REFUND' | translate)"
@@ -148,8 +194,8 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
                   [rounded]="true"
                   [text]="true"
                   severity="secondary"
-                  [pTooltip]="'REFUNDS.LIST.VIEW_ENROLLMENT' | translate"
-                  (onClick)="viewEnrollment(refund)"
+                  [pTooltip]="'REFUNDS.LIST.VIEW_SOURCE' | translate"
+                  (onClick)="viewSource(refund)"
                 ></p-button>
               </td>
             </tr>
@@ -190,6 +236,7 @@ export class RefundListComponent implements OnInit {
 
   refunds = signal<RefundWithDetails[]>([]);
   loading = signal(true);
+  activeSource = signal<RefundSource>('ALL');
 
   // Filters
   filterBranch: string | null = null;
@@ -220,11 +267,27 @@ export class RefundListComponent implements OnInit {
     });
   }
 
+  setSource(source: RefundSource) {
+    this.activeSource.set(source);
+    this.load();
+  }
+
+  sourceSeverity(source: string): 'success' | 'info' | 'warn' | 'secondary' | 'danger' {
+    switch (source) {
+      case 'ENROLLMENT': return 'success';
+      case 'MASTER_ENROLLMENT': return 'secondary';
+      case 'EVENT': return 'warn';
+      case 'PRODUCT_SALE': return 'info';
+      default: return 'secondary';
+    }
+  }
+
   load() {
     this.loading.set(true);
     const filters: any = {};
     if (this.filterBranch) filters.branchId = this.filterBranch;
     if (this.filterType) filters.type = this.filterType;
+    if (this.activeSource() !== 'ALL') filters.source = this.activeSource();
     if (this.filterStartDate) filters.startDate = this.filterStartDate.toISOString().split('T')[0];
     if (this.filterEndDate) filters.endDate = this.filterEndDate.toISOString().split('T')[0];
 
@@ -249,8 +312,16 @@ export class RefundListComponent implements OnInit {
     this.load();
   }
 
-  viewEnrollment(refund: RefundWithDetails) {
-    this.router.navigate(['/students', refund.studentId]);
+  viewSource(refund: RefundWithDetails) {
+    if (refund.source === 'PRODUCT_SALE') {
+      this.router.navigate(['/products/sales']);
+    } else if (refund.source === 'EVENT' && refund.eventId) {
+      this.router.navigate(['/events', refund.eventId]);
+    } else if (refund.studentId) {
+      this.router.navigate(['/students', refund.studentId]);
+    } else {
+      this.router.navigate(['/refunds']);
+    }
   }
 
   formatDate(dateStr: string): string {

@@ -21,6 +21,7 @@ export interface Expense {
   bonusAmount?: number | null;
   discountAmount?: number | null;
   adjustmentReason?: string | null;
+  eventId?: string | null;
   totalPaid?: number;
   lastPaymentDate?: string | null;
   paymentCount?: number;

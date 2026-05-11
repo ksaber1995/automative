@@ -6,10 +6,12 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule } from '@ngx-translate/core';
 import { TimetableService, TimetableEntry } from './timetable.service';
 import { BranchService } from '../branches/services/branch.service';
 import { CourseService } from '../courses/services/course.service';
 import { EmployeeService } from '../employees/services/employee.service';
+import { LanguageService } from '../../core/services/language.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface PositionedEntry extends TimetableEntry {
@@ -67,20 +69,21 @@ function toLocalISODate(d: Date): string {
     DatePickerModule,
     TagModule,
     TooltipModule,
+    TranslateModule,
   ],
   template: `
     <div class="container-custom py-6 px-2 md:px-4">
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Time Table</h1>
-          <p class="text-gray-600 mt-1">Daily schedule of classes across your branches</p>
+          <h1 class="text-3xl font-bold text-gray-900">{{ 'TIMETABLE.TITLE' | translate }}</h1>
+          <p class="text-gray-600 mt-1">{{ 'TIMETABLE.SUBTITLE' | translate }}</p>
         </div>
 
         <!-- Date navigation -->
         <div class="flex items-center gap-2">
           <p-button icon="pi pi-chevron-left" [outlined]="true" severity="secondary"
-            (onClick)="shiftDay(-1)" pTooltip="Previous day"></p-button>
+            (onClick)="shiftDay(-1)" [pTooltip]="'TIMETABLE.PREV_DAY' | translate"></p-button>
 
           <p-datepicker
             [(ngModel)]="selectedDate"
@@ -91,9 +94,9 @@ function toLocalISODate(d: Date): string {
           ></p-datepicker>
 
           <p-button icon="pi pi-chevron-right" [outlined]="true" severity="secondary"
-            (onClick)="shiftDay(1)" pTooltip="Next day"></p-button>
+            (onClick)="shiftDay(1)" [pTooltip]="'TIMETABLE.NEXT_DAY' | translate"></p-button>
 
-          <p-button label="Today" icon="pi pi-calendar" [outlined]="true"
+          <p-button [label]="'TIMETABLE.TODAY' | translate" icon="pi pi-calendar" [outlined]="true"
             severity="secondary" (onClick)="goToToday()"></p-button>
         </div>
       </div>
@@ -107,15 +110,15 @@ function toLocalISODate(d: Date): string {
           </div>
           <div class="flex items-center gap-6">
             <div>
-              <p class="text-xs text-indigo-100">Scheduled</p>
+              <p class="text-xs text-indigo-100">{{ 'TIMETABLE.STAT_SCHEDULED' | translate }}</p>
               <p class="text-2xl font-bold">{{ filteredEntries().length }}</p>
             </div>
             <div>
-              <p class="text-xs text-indigo-100">In progress</p>
+              <p class="text-xs text-indigo-100">{{ 'TIMETABLE.STAT_IN_PROGRESS' | translate }}</p>
               <p class="text-2xl font-bold">{{ inProgressCount() }}</p>
             </div>
             <div>
-              <p class="text-xs text-indigo-100">Students</p>
+              <p class="text-xs text-indigo-100">{{ 'TIMETABLE.STAT_STUDENTS' | translate }}</p>
               <p class="text-2xl font-bold">{{ totalStudents() }}</p>
             </div>
           </div>
@@ -126,7 +129,7 @@ function toLocalISODate(d: Date): string {
       <div class="bg-white rounded-xl border border-gray-200 p-4 mb-5">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Branch</label>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'TIMETABLE.FILTER_BRANCH' | translate }}</label>
             <p-select
               [options]="branches()"
               [(ngModel)]="selectedBranchId"
@@ -134,13 +137,13 @@ function toLocalISODate(d: Date): string {
               optionLabel="name"
               optionValue="id"
               appendTo="body"
-              placeholder="All Branches"
+              [placeholder]="'TIMETABLE.ALL_BRANCHES' | translate"
               [showClear]="true"
               [style]="{ width: '100%' }"
             ></p-select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Teacher</label>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'TIMETABLE.FILTER_TEACHER' | translate }}</label>
             <p-select
               [options]="teachers()"
               [(ngModel)]="selectedTeacherId"
@@ -148,7 +151,7 @@ function toLocalISODate(d: Date): string {
               optionLabel="displayName"
               optionValue="id"
               appendTo="body"
-              placeholder="All Teachers"
+              [placeholder]="'TIMETABLE.ALL_TEACHERS' | translate"
               [showClear]="true"
               [filter]="true"
               filterBy="displayName"
@@ -156,7 +159,7 @@ function toLocalISODate(d: Date): string {
             ></p-select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Course</label>
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'TIMETABLE.FILTER_COURSE' | translate }}</label>
             <p-select
               [options]="courses()"
               [(ngModel)]="selectedCourseId"
@@ -164,7 +167,7 @@ function toLocalISODate(d: Date): string {
               optionLabel="name"
               optionValue="id"
               appendTo="body"
-              placeholder="All Courses"
+              [placeholder]="'TIMETABLE.ALL_COURSES' | translate"
               [showClear]="true"
               [filter]="true"
               filterBy="name"
@@ -173,7 +176,7 @@ function toLocalISODate(d: Date): string {
           </div>
           <div class="flex items-end">
             @if (hasActiveFilters()) {
-              <p-button label="Clear filters" icon="pi pi-times" [outlined]="true"
+              <p-button [label]="'TIMETABLE.CLEAR_FILTERS' | translate" icon="pi pi-times" [outlined]="true"
                 severity="secondary" (onClick)="clearFilters()"
                 styleClass="w-full"></p-button>
             }
@@ -185,15 +188,15 @@ function toLocalISODate(d: Date): string {
       @if (loading()) {
         <div class="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
           <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
-          <p>Loading schedule…</p>
+          <p>{{ 'TIMETABLE.LOADING' | translate }}</p>
         </div>
       }
 
       @if (!loading() && filteredEntries().length === 0) {
         <div class="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
           <i class="pi pi-calendar text-5xl text-gray-300 mb-3"></i>
-          <p class="text-lg font-medium text-gray-600">No classes scheduled</p>
-          <p class="text-sm">No classes match the current filters for this day.</p>
+          <p class="text-lg font-medium text-gray-600">{{ 'TIMETABLE.EMPTY_TITLE' | translate }}</p>
+          <p class="text-sm">{{ 'TIMETABLE.EMPTY_HINT' | translate }}</p>
         </div>
       }
 
@@ -216,7 +219,7 @@ function toLocalISODate(d: Date): string {
             <div class="flex-1 relative">
               <div class="h-10 border-b border-gray-200 bg-gray-50 px-4 flex items-center">
                 <span class="text-sm font-semibold text-gray-700">{{ dayOfWeekLabel() }}</span>
-                <span class="text-xs text-gray-400 ml-2">— {{ filteredEntries().length }} class(es)</span>
+                <span class="text-xs text-gray-400 ml-2">{{ 'TIMETABLE.CLASS_COUNT' | translate: { count: filteredEntries().length } }}</span>
               </div>
 
               <!-- Background grid lines -->
@@ -262,7 +265,7 @@ function toLocalISODate(d: Date): string {
                         @if (entry.isInProgress) {
                           <span class="shrink-0 inline-flex items-center gap-1 bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                             <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                            LIVE
+                            {{ 'TIMETABLE.LIVE' | translate }}
                           </span>
                         }
                       </div>
@@ -289,7 +292,7 @@ function toLocalISODate(d: Date): string {
                         @if (entry.roomCode) {
                           <div class="flex items-center gap-1 opacity-80">
                             <i class="pi pi-map-marker text-[10px]"></i>
-                            <span class="truncate">Room {{ entry.roomCode }}</span>
+                            <span class="truncate">{{ 'TIMETABLE.ROOM_PREFIX' | translate: { code: entry.roomCode } }}</span>
                           </div>
                         }
                       </div>
@@ -323,6 +326,7 @@ export class TimetableComponent implements OnInit {
   private branchService = inject(BranchService);
   private courseService = inject(CourseService);
   private employeeService = inject(EmployeeService);
+  private languageService = inject(LanguageService);
 
   hours = HOURS;
   hourHeight = HOUR_HEIGHT_PX;
@@ -441,7 +445,7 @@ export class TimetableComponent implements OnInit {
 
   formattedDateLabel = computed(() => {
     const d = this.selectedDate;
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString(this.localeTag(), {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -450,8 +454,12 @@ export class TimetableComponent implements OnInit {
 
   dayOfWeekLabel = computed(() => {
     const d = this.selectedDate;
-    return d.toLocaleDateString(undefined, { weekday: 'long' });
+    return d.toLocaleDateString(this.localeTag(), { weekday: 'long' });
   });
+
+  private localeTag(): string {
+    return this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-US';
+  }
 
   showNowLine = computed(() => {
     const today = new Date();
@@ -474,7 +482,7 @@ export class TimetableComponent implements OnInit {
   nowLabel = computed(() => {
     this.nowTick();
     const now = new Date();
-    return now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return now.toLocaleTimeString(this.localeTag(), { hour: '2-digit', minute: '2-digit' });
   });
 
   ngOnInit() {
@@ -564,19 +572,18 @@ export class TimetableComponent implements OnInit {
   }
 
   formatHour(hour: number): string {
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const h = hour % 12 === 0 ? 12 : hour % 12;
-    return `${h} ${ampm}`;
+    const d = new Date();
+    d.setHours(hour, 0, 0, 0);
+    return d.toLocaleTimeString(this.localeTag(), { hour: 'numeric' });
   }
 
   formatTimeShort(time: string | null): string {
     if (!time) return '';
     const parsed = parseHHMM(time);
     if (!parsed) return time;
-    const ampm = parsed.h >= 12 ? 'PM' : 'AM';
-    const h = parsed.h % 12 === 0 ? 12 : parsed.h % 12;
-    const m = String(parsed.m).padStart(2, '0');
-    return `${h}:${m} ${ampm}`;
+    const d = new Date();
+    d.setHours(parsed.h, parsed.m, 0, 0);
+    return d.toLocaleTimeString(this.localeTag(), { hour: 'numeric', minute: '2-digit' });
   }
 
   entryClasses(entry: TimetableEntry): string {
