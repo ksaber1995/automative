@@ -17,7 +17,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-expense-form',
@@ -46,6 +46,7 @@ export class ExpenseFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   expenseForm: FormGroup;
   loading = signal(false);
@@ -57,17 +58,36 @@ export class ExpenseFormComponent implements OnInit {
   expenseCategories = Object.values(ExpenseCategory);
   distributionMethods = Object.values(DistributionMethod);
 
-  // Options arrays for PrimeNG selects
-  expenseTypeOptions = Object.values(ExpenseType).map(type => ({ label: type, value: type }));
-  expenseCategoryOptions = Object.values(ExpenseCategory).map(cat => ({ label: cat, value: cat }));
-  distributionMethodOptions = Object.values(DistributionMethod).map(method => ({ label: method, value: method }));
+  // Options arrays for PrimeNG selects — labels resolve through the i18n keys so the
+  // dropdown reflects the active language. Rebuilt on language change.
+  expenseTypeOptions: { label: string; value: string }[] = [];
+  expenseCategoryOptions: { label: string; value: string }[] = [];
+  distributionMethodOptions: { label: string; value: string }[] = [];
   branchOptions = signal<{ label: string, value: string }[]>([]);
 
   isCapital = signal(false);
   payImmediately = signal(false);
   paymentDate: Date = new Date();
 
+  private rebuildLocalizedOptions() {
+    this.expenseTypeOptions = Object.values(ExpenseType).map((type) => ({
+      label: this.translate.instant('EXPENSES.LIST.' + type),
+      value: type,
+    }));
+    this.expenseCategoryOptions = Object.values(ExpenseCategory).map((cat) => ({
+      label: this.translate.instant('EXPENSES.CATEGORY_VALUES.' + cat),
+      value: cat,
+    }));
+    this.distributionMethodOptions = Object.values(DistributionMethod).map((method) => ({
+      label: this.translate.instant('EXPENSES.DIST.' + method),
+      value: method,
+    }));
+  }
+
   constructor() {
+    this.rebuildLocalizedOptions();
+    this.translate.onLangChange.subscribe(() => this.rebuildLocalizedOptions());
+
     const today = new Date();
     this.expenseForm = this.fb.group({
       branchId: [''],

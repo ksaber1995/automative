@@ -601,4 +601,116 @@ export const reportsRoutes = {
       return handleError(error, 'Failed to compute expenses by category');
     }
   },
+
+  // Per-event P&L within a date range.
+  // The date range is matched against events.start_date (falling back to created_at
+  // when start_date is NULL) so that events without a scheduled start still show up
+  // when they were created in the period.
+  profitByEvent: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'reports', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+      const { startDate, endDate } = defaultRange(q);
+      const branchClause = q.branchId ? ' AND e.branch_id = $4' : '';
+      const params: any[] = [context.companyId, startDate, endDate];
+      if (q.branchId) params.push(q.branchId);
+
+      const rows = await query(
+        `SELECT
+           e.id,
+           e.name,
+           e.code,
+           e.event_type,
+           e.status,
+           e.start_date,
+           e.end_date,
+           e.branch_id,
+           b.name AS branch_name,
+           COALESCE(rev.total, 0) AS revenue,
+           COALESCE(rev.count, 0) AS subscriber_count,
+           COALESCE(exp.total, 0) AS expenses,
+           COALESCE(exp.count, 0) AS expense_count,
+           COALESCE(ref.total, 0) AS refunds,
+           COALESCE(ref.count, 0) AS refund_count,
+           COALESCE(prod.revenue, 0) AS product_revenue,
+           COALESCE(prod.cost, 0) AS product_cost
+         FROM events e
+         LEFT JOIN branches b ON b.id = e.branch_id
+         LEFT JOIN (
+           SELECT event_id, SUM(amount) AS total, COUNT(*) AS count
+           FROM event_subscriptions
+           WHERE company_id = $1
+           GROUP BY event_id
+         ) rev ON rev.event_id = e.id
+         LEFT JOIN (
+           SELECT COALESCE(ep.event_id, ex.event_id) AS event_id,
+                  SUM(ep.amount) AS total,
+                  COUNT(*) AS count
+           FROM expense_payments ep
+           LEFT JOIN expenses ex ON ex.id = ep.expense_id
+           WHERE ep.company_id = $1
+             AND (ep.event_id IS NOT NULL OR ex.event_id IS NOT NULL)
+           GROUP BY COALESCE(ep.event_id, ex.event_id)
+         ) exp ON exp.event_id = e.id
+         LEFT JOIN (
+           SELECT event_id, SUM(amount) AS total, COUNT(*) AS count
+           FROM refunds
+           WHERE company_id = $1 AND event_id IS NOT NULL
+           GROUP BY event_id
+         ) ref ON ref.event_id = e.id
+         LEFT JOIN (
+           SELECT ps.event_id,
+                  SUM(ps.total_amount) AS revenue,
+                  SUM(COALESCE(p.cost_price, 0) * ps.quantity) AS cost
+           FROM product_sales ps
+           LEFT JOIN products p ON p.id = ps.product_id
+           WHERE ps.company_id = $1 AND ps.event_id IS NOT NULL
+           GROUP BY ps.event_id
+         ) prod ON prod.event_id = e.id
+         WHERE e.company_id = $1
+           AND COALESCE(e.start_date, e.created_at::date) >= $2
+           AND COALESCE(e.start_date, e.created_at::date) <= $3
+           ${branchClause}
+         ORDER BY COALESCE(e.start_date, e.created_at::date) DESC, e.name ASC`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => {
+          const revenue = parseFloat(r.revenue);
+          const expenses = parseFloat(r.expenses);
+          const refunds = parseFloat(r.refunds);
+          const productRevenue = parseFloat(r.product_revenue);
+          const productCost = parseFloat(r.product_cost);
+          const productMargin = productRevenue - productCost;
+          return {
+            eventId: r.id,
+            name: r.name,
+            code: r.code,
+            eventType: r.event_type,
+            status: r.status,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            branchId: r.branch_id,
+            branchName: r.branch_name,
+            subscriberCount: parseInt(r.subscriber_count, 10),
+            revenue,
+            expenses,
+            expenseCount: parseInt(r.expense_count, 10),
+            refunds,
+            refundCount: parseInt(r.refund_count, 10),
+            productRevenue,
+            productCost,
+            productMargin,
+            netProfit: revenue + productMargin - expenses - refunds,
+          };
+        }),
+      };
+    } catch (error) {
+      return handleError(error, 'Failed to compute profit by event');
+    }
+  },
 };

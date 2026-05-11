@@ -192,40 +192,40 @@ import { Branch } from '@shared/interfaces/branch.interface';
     <!-- Create/Edit Dialog -->
     <p-dialog
       [(visible)]="showDialog"
-      [header]="editingRoom() ? 'Edit Room' : 'Add Room'"
+      [header]="(editingRoom() ? 'ROOMS.DIALOG_EDIT' : 'ROOMS.DIALOG_ADD') | translate"
       [modal]="true"
       [style]="{ width: '480px' }"
       [closable]="true"
     >
       <form [formGroup]="roomForm" (ngSubmit)="saveRoom()" class="space-y-4 pt-2">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Room Code <span class="text-red-500">*</span></label>
-          <input pInputText formControlName="code" placeholder="e.g. R101, Lab-A" class="w-full"
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'ROOMS.FIELD_CODE' | translate }} <span class="text-red-500">*</span></label>
+          <input pInputText formControlName="code" [placeholder]="'ROOMS.FIELD_CODE_PLACEHOLDER' | translate" class="w-full"
                  [class.border-red-500]="roomForm.get('code')?.invalid && roomForm.get('code')?.touched"/>
           @if (roomForm.get('code')?.invalid && roomForm.get('code')?.touched) {
-            <small class="text-red-500">Code is required</small>
+            <small class="text-red-500">{{ 'ROOMS.FIELD_CODE_REQUIRED' | translate }}</small>
           }
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea pTextarea formControlName="description" rows="2" placeholder="Optional description" class="w-full"></textarea>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'ROOMS.FIELD_DESCRIPTION' | translate }}</label>
+          <textarea pTextarea formControlName="description" rows="2" [placeholder]="'ROOMS.FIELD_DESCRIPTION_PLACEHOLDER' | translate" class="w-full"></textarea>
         </div>
 
         @if (!editingRoom()) {
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Branch <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'ROOMS.FIELD_BRANCH' | translate }} <span class="text-red-500">*</span></label>
             <p-select
               formControlName="branchId"
               [options]="branches()"
               optionLabel="name"
               optionValue="id"
               appendTo="body"
-              placeholder="Select a branch"
+              [placeholder]="'ROOMS.FIELD_BRANCH_PLACEHOLDER' | translate"
               [style]="{ width: '100%' }"
             ></p-select>
             @if (roomForm.get('branchId')?.invalid && roomForm.get('branchId')?.touched) {
-              <small class="text-red-500">Branch is required</small>
+              <small class="text-red-500">{{ 'ROOMS.FIELD_BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
         }
@@ -233,15 +233,15 @@ import { Branch } from '@shared/interfaces/branch.interface';
         @if (editingRoom()) {
           <div class="flex items-center gap-2">
             <p-checkbox formControlName="isActive" [binary]="true" inputId="isActive"></p-checkbox>
-            <label for="isActive" class="text-sm text-gray-700 cursor-pointer">Active</label>
+            <label for="isActive" class="text-sm text-gray-700 cursor-pointer">{{ 'ROOMS.FIELD_ACTIVE' | translate }}</label>
           </div>
         }
       </form>
 
       <ng-template pTemplate="footer">
-        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="closeDialog()"></p-button>
+        <p-button [label]="'ROOMS.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeDialog()"></p-button>
         <p-button
-          [label]="editingRoom() ? 'Update' : 'Create'"
+          [label]="(editingRoom() ? 'ROOMS.UPDATE' : 'ROOMS.CREATE') | translate"
           [loading]="saving()"
           [disabled]="roomForm.invalid"
           (onClick)="saveRoom()"
@@ -252,17 +252,14 @@ import { Branch } from '@shared/interfaces/branch.interface';
     <!-- Delete Confirm Dialog -->
     <p-dialog
       [(visible)]="showDeleteDialog"
-      header="Delete Room"
+      [header]="'ROOMS.DELETE_TITLE' | translate"
       [modal]="true"
       [style]="{ width: '400px' }"
     >
-      <p class="text-gray-600">
-        Are you sure you want to delete room <strong>{{ deletingRoom()?.code }}</strong>?
-        This action cannot be undone.
-      </p>
+      <p class="text-gray-600" [innerHTML]="'ROOMS.DELETE_CONFIRM' | translate: { code: deletingRoom()?.code }"></p>
       <ng-template pTemplate="footer">
-        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showDeleteDialog = false"></p-button>
-        <p-button label="Delete" severity="danger" [loading]="saving()" (onClick)="deleteRoom()"></p-button>
+        <p-button [label]="'ROOMS.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showDeleteDialog = false"></p-button>
+        <p-button [label]="'ROOMS.DELETE' | translate" severity="danger" [loading]="saving()" (onClick)="deleteRoom()"></p-button>
       </ng-template>
     </p-dialog>
   `,

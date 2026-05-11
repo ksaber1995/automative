@@ -82,7 +82,8 @@ function toLocalISODate(d: Date): string {
 
         <!-- Date navigation -->
         <div class="flex items-center gap-2">
-          <p-button icon="pi pi-chevron-left" [outlined]="true" severity="secondary"
+          <p-button [icon]="languageService.isRtl() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
+            [outlined]="true" severity="secondary"
             (onClick)="shiftDay(-1)" [pTooltip]="'TIMETABLE.PREV_DAY' | translate"></p-button>
 
           <p-datepicker
@@ -93,7 +94,8 @@ function toLocalISODate(d: Date): string {
             [style]="{ width: '170px' }"
           ></p-datepicker>
 
-          <p-button icon="pi pi-chevron-right" [outlined]="true" severity="secondary"
+          <p-button [icon]="languageService.isRtl() ? 'pi pi-chevron-left' : 'pi pi-chevron-right'"
+            [outlined]="true" severity="secondary"
             (onClick)="shiftDay(1)" [pTooltip]="'TIMETABLE.NEXT_DAY' | translate"></p-button>
 
           <p-button [label]="'TIMETABLE.TODAY' | translate" icon="pi pi-calendar" [outlined]="true"
@@ -326,7 +328,7 @@ export class TimetableComponent implements OnInit {
   private branchService = inject(BranchService);
   private courseService = inject(CourseService);
   private employeeService = inject(EmployeeService);
-  private languageService = inject(LanguageService);
+  languageService = inject(LanguageService);
 
   hours = HOURS;
   hourHeight = HOUR_HEIGHT_PX;

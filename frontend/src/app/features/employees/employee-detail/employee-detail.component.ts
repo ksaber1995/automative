@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -13,12 +13,14 @@ import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExpenseService } from '../../expenses/services/expense.service';
+import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../attendance/services/teacher-attendance.service';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
@@ -30,7 +32,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DividerModule,
     DialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
-    TableModule, TooltipModule,
+    TableModule, TooltipModule, TranslateModule,
   ],
   template: `
     <div class="container mx-auto p-6 max-w-5xl">
@@ -44,18 +46,18 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="back()"></p-button>
             <h1 class="text-2xl font-bold">{{ employee()!.firstName }} {{ employee()!.lastName }}</h1>
             <p-tag
-              [value]="employee()!.isActive ? 'Active' : 'Inactive'"
+              [value]="employee()!.isActive ? ('EMPLOYEES.DETAIL.ACTIVE' | translate) : ('EMPLOYEES.DETAIL.INACTIVE' | translate)"
               [severity]="employee()!.isActive ? 'success' : 'danger'">
             </p-tag>
           </div>
-          <p-button label="Edit" icon="pi pi-pencil" severity="warn" (onClick)="edit()"></p-button>
+          <p-button [label]="'EMPLOYEES.DETAIL.EDIT' | translate" icon="pi pi-pencil" severity="warn" (onClick)="edit()"></p-button>
           @if (canManageUsers() && true) {
-            <p-button label="Convert to User" icon="pi pi-user-plus" severity="info"
+            <p-button [label]="'EMPLOYEES.DETAIL.CONVERT_TO_USER' | translate" icon="pi pi-user-plus" severity="info"
               (onClick)="showConvertDialog = true">
             </p-button>
           } @else if (false) {
             <span class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-              <i class="pi pi-link"></i> Has user account
+              <i class="pi pi-link"></i> {{ 'EMPLOYEES.DETAIL.HAS_USER_ACCOUNT' | translate }}
             </span>
           }
         </div>
@@ -67,27 +69,27 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <ng-template pTemplate="header">
               <div class="flex items-center gap-2 px-4 pt-4">
                 <i class="pi pi-user text-blue-500"></i>
-                <span class="font-semibold text-gray-700">Personal Information</span>
+                <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.PERSONAL_INFO' | translate }}</span>
               </div>
             </ng-template>
             <div class="space-y-3">
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Full Name</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.FULL_NAME' | translate }}</span>
                 <span class="font-medium">{{ employee()!.firstName }} {{ employee()!.lastName }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Email</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.EMAIL' | translate }}</span>
                 <span class="font-medium">{{ employee()!.email || '—' }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Phone</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.PHONE' | translate }}</span>
                 <span class="font-medium">{{ employee()!.phone || '—' }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Hire Date</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.HIRE_DATE' | translate }}</span>
                 <span class="font-medium">{{ employee()!.hireDate ? (employee()!.hireDate | date:'mediumDate') : '—' }}</span>
               </div>
             </div>
@@ -98,29 +100,29 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <ng-template pTemplate="header">
               <div class="flex items-center gap-2 px-4 pt-4">
                 <i class="pi pi-briefcase text-green-500"></i>
-                <span class="font-semibold text-gray-700">Job Details</span>
+                <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.JOB_DETAILS' | translate }}</span>
               </div>
             </ng-template>
             <div class="space-y-3">
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Position</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.POSITION' | translate }}</span>
                 <span class="font-medium">{{ employee()!.position || '—' }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Department</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.DEPARTMENT' | translate }}</span>
                 <span class="font-medium">{{ employee()!.department || '—' }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Branch</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.BRANCH' | translate }}</span>
                 <span class="font-medium">{{ branchName() }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Scope</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.SCOPE' | translate }}</span>
                 <p-tag
-                  [value]="employee()!.isGlobal ? 'Global' : 'Branch'"
+                  [value]="employee()!.isGlobal ? ('EMPLOYEES.DETAIL.GLOBAL' | translate) : ('EMPLOYEES.DETAIL.BRANCH_SCOPE' | translate)"
                   [severity]="employee()!.isGlobal ? 'success' : 'info'">
                 </p-tag>
               </div>
@@ -132,12 +134,12 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <ng-template pTemplate="header">
               <div class="flex items-center gap-2 px-4 pt-4">
                 <i class="pi pi-dollar text-amber-500"></i>
-                <span class="font-semibold text-gray-700">Compensation</span>
+                <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.COMPENSATION' | translate }}</span>
               </div>
             </ng-template>
             <div class="space-y-3">
               <div class="flex justify-between items-center">
-                <span class="text-gray-500 text-sm">Monthly Salary</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.MONTHLY_SALARY' | translate }}</span>
                 <span class="text-2xl font-bold text-green-600">
                   {{ employee()!.salary ? (employee()!.salary | number:'1.2-2') : '—' }}
                 </span>
@@ -145,7 +147,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
               @if (employee()!.salary && employee()!.salary > 0) {
                 <p-divider styleClass="my-2"></p-divider>
                 <div class="flex justify-between">
-                  <span class="text-gray-500 text-sm">Annual (est.)</span>
+                  <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.ANNUAL_EST' | translate }}</span>
                   <span class="font-medium text-gray-700">{{ (employee()!.salary * 12) | number:'1.2-2' }}</span>
                 </div>
               }
@@ -157,24 +159,24 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <ng-template pTemplate="header">
               <div class="flex items-center gap-2 px-4 pt-4">
                 <i class="pi pi-info-circle text-gray-400"></i>
-                <span class="font-semibold text-gray-700">Record Info</span>
+                <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.RECORD_INFO' | translate }}</span>
               </div>
             </ng-template>
             <div class="space-y-3">
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Employee ID</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.EMPLOYEE_ID' | translate }}</span>
                 <span class="font-mono text-xs text-gray-500">{{ employee()!.id.substring(0, 8) }}...</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Created</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.CREATED' | translate }}</span>
                 <span class="font-medium text-sm">{{ employee()!.createdAt | date:'mediumDate' }}</span>
               </div>
               <p-divider styleClass="my-2"></p-divider>
               <div class="flex justify-between">
-                <span class="text-gray-500 text-sm">Status</span>
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.STATUS' | translate }}</span>
                 <p-tag
-                  [value]="employee()!.isActive ? 'Active' : 'Terminated'"
+                  [value]="employee()!.isActive ? ('EMPLOYEES.DETAIL.ACTIVE' | translate) : ('EMPLOYEES.DETAIL.TERMINATED' | translate)"
                   [severity]="employee()!.isActive ? 'success' : 'danger'">
                 </p-tag>
               </div>
@@ -188,8 +190,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
           <ng-template pTemplate="header">
             <div class="flex items-center gap-2 px-4 pt-4">
               <i class="pi pi-history text-purple-500"></i>
-              <span class="font-semibold text-gray-700">Salary Payment History</span>
-              <span class="text-xs text-gray-400 ml-auto mr-4">{{ salaryHistory().length }} payment(s)</span>
+              <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.SALARY_HISTORY' | translate }}</span>
+              <span class="text-xs text-gray-400 ml-auto mr-4">{{ 'EMPLOYEES.DETAIL.PAYMENTS_COUNT' | translate:{ count: salaryHistory().length } }}</span>
             </div>
           </ng-template>
 
@@ -201,12 +203,12 @@ import { Branch } from '@shared/interfaces/branch.interface';
             <p-table [value]="salaryHistory()" [paginator]="salaryHistory().length > 10" [rows]="10" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
-                  <th>Date</th>
-                  <th class="text-right">Base Salary</th>
-                  <th class="text-right text-green-600">Bonus</th>
-                  <th class="text-right text-red-600">Discount</th>
-                  <th class="text-right font-semibold">Total Paid</th>
-                  <th>Reason</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }}</th>
+                  <th class="text-right">{{ 'EMPLOYEES.DETAIL.COL_BASE_SALARY' | translate }}</th>
+                  <th class="text-right text-green-600">{{ 'EMPLOYEES.DETAIL.COL_BONUS' | translate }}</th>
+                  <th class="text-right text-red-600">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }}</th>
+                  <th class="text-right font-semibold">{{ 'EMPLOYEES.DETAIL.COL_TOTAL_PAID' | translate }}</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_REASON' | translate }}</th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-item>
@@ -243,7 +245,112 @@ import { Branch } from '@shared/interfaces/branch.interface';
                 <tr>
                   <td colspan="6" class="text-center py-8 text-gray-400">
                     <i class="pi pi-inbox text-2xl mb-2 block"></i>
-                    No salary payments recorded yet.
+                    {{ 'EMPLOYEES.DETAIL.NO_PAYMENTS' | translate }}
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          }
+        </p-card>
+
+        <!-- Teacher Attendance History -->
+        <p-card styleClass="mt-6">
+          <ng-template pTemplate="header">
+            <div class="flex items-center gap-2 px-4 pt-4">
+              <i class="pi pi-user-edit text-blue-500"></i>
+              <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.ATTENDANCE_HISTORY' | translate }}</span>
+              <span class="text-xs text-gray-400 ml-auto mr-4">
+                {{ 'EMPLOYEES.DETAIL.SESSIONS_COUNT' | translate:{ count: attendanceHistory().length } }}
+              </span>
+            </div>
+          </ng-template>
+
+          @if (attendanceLoading()) {
+            <div class="flex justify-center py-8">
+              <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+            </div>
+          } @else {
+            <!-- Summary -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+              <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p class="text-xs text-gray-500 uppercase font-semibold">
+                  {{ 'EMPLOYEES.DETAIL.TOTAL_SESSIONS' | translate }}
+                </p>
+                <p class="text-2xl font-bold">{{ attendanceHistory().length }}</p>
+              </div>
+              <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p class="text-xs text-green-700 uppercase font-semibold">
+                  {{ 'EMPLOYEES.DETAIL.PRESENT_COUNT' | translate }}
+                </p>
+                <p class="text-2xl font-bold text-green-700">{{ attendancePresentCount() }}</p>
+              </div>
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p class="text-xs text-red-700 uppercase font-semibold">
+                  {{ 'EMPLOYEES.DETAIL.ABSENT_COUNT' | translate }}
+                </p>
+                <p class="text-2xl font-bold text-red-700">{{ attendanceAbsentCount() }}</p>
+              </div>
+            </div>
+
+            <p-table
+              [value]="attendanceHistory()"
+              [paginator]="attendanceHistory().length > 10"
+              [rows]="10"
+              responsiveLayout="scroll"
+            >
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }}</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_CLASS' | translate }}</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_BRANCH' | translate }}</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_ROLE' | translate }}</th>
+                  <th>{{ 'EMPLOYEES.DETAIL.COL_STATUS' | translate }}</th>
+                  <th class="text-right">{{ 'EMPLOYEES.DETAIL.COL_DURATION' | translate }}</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-row>
+                <tr>
+                  <td class="whitespace-nowrap">
+                    <div class="text-sm font-medium">{{ row.sessionStartDate | date: 'mediumDate' }}</div>
+                    <div class="text-xs text-gray-500">{{ row.sessionStartDate | date: 'shortTime' }}</div>
+                  </td>
+                  <td>
+                    @if (row.className) {
+                      <div>{{ row.className }}</div>
+                      @if (row.courseName) {
+                        <div class="text-xs text-gray-500">{{ row.courseName }}</div>
+                      }
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
+                  <td class="text-sm">{{ row.branchName || '—' }}</td>
+                  <td>
+                    <p-tag
+                      [value]="('EMPLOYEES.DETAIL.ROLE_' + row.role) | translate"
+                      [severity]="attendanceRoleSeverity(row.role)"
+                    ></p-tag>
+                  </td>
+                  <td>
+                    <p-tag
+                      [value]="('EMPLOYEES.DETAIL.STATUS_' + row.status) | translate"
+                      [severity]="row.status === 'PRESENT' ? 'success' : 'danger'"
+                    ></p-tag>
+                  </td>
+                  <td class="text-right text-sm">
+                    @if (row.durationMinutes !== null) {
+                      {{ formatDuration(row.durationMinutes) }}
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="6" class="text-center py-8 text-gray-400">
+                    <i class="pi pi-inbox text-2xl mb-2 block"></i>
+                    {{ 'EMPLOYEES.DETAIL.NO_ATTENDANCE' | translate }}
                   </td>
                 </tr>
               </ng-template>
@@ -254,58 +361,56 @@ import { Branch } from '@shared/interfaces/branch.interface';
       } @else {
         <div class="text-center py-16 text-gray-500">
           <i class="pi pi-exclamation-circle text-4xl mb-4 block"></i>
-          <p>Employee not found.</p>
-          <p-button label="Back to Employees" severity="secondary" (onClick)="back()" styleClass="mt-4"></p-button>
+          <p>{{ 'EMPLOYEES.DETAIL.NOT_FOUND' | translate }}</p>
+          <p-button [label]="'EMPLOYEES.DETAIL.BACK_TO_EMPLOYEES' | translate" severity="secondary" (onClick)="back()" styleClass="mt-4"></p-button>
         </div>
       }
     </div>
 
     <!-- Convert to User Dialog -->
-    <p-dialog [(visible)]="showConvertDialog" header="Convert Employee to User"
+    <p-dialog [(visible)]="showConvertDialog" [header]="'EMPLOYEES.DETAIL.CONVERT_DIALOG_TITLE' | translate"
       [modal]="true" [style]="{ width: '520px' }" [closable]="true">
       <div class="space-y-5 pt-2">
         <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <i class="pi pi-info-circle text-blue-500 mt-0.5"></i>
-          <p class="text-sm text-blue-700">
-            This will create a system user account linked to
-            <strong>{{ employee()?.firstName }} {{ employee()?.lastName }}</strong>.
-            They will be able to log in with the email and password you set.
+          <p class="text-sm text-blue-700"
+            [innerHTML]="'EMPLOYEES.DETAIL.CONVERT_DIALOG_INFO' | translate:{ name: (employee()?.firstName + ' ' + employee()?.lastName) }">
           </p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2 field">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Login Email <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.LOGIN_EMAIL' | translate }} <span class="text-red-500">*</span></label>
             <input pInputText [(ngModel)]="convertForm.email" type="email"
-              [placeholder]="employee()?.email || 'user@company.com'"
+              [placeholder]="employee()?.email || ('EMPLOYEES.DETAIL.EMAIL_PLACEHOLDER' | translate)"
               class="w-full" />
           </div>
           <div class="col-span-2 field">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.PASSWORD' | translate }} <span class="text-red-500">*</span></label>
             <p-password [(ngModel)]="convertForm.password" [toggleMask]="true" [feedback]="true"
-              placeholder="Min. 6 characters" styleClass="w-full" [inputStyleClass]="'w-full'">
+              [placeholder]="'EMPLOYEES.DETAIL.PASSWORD_PLACEHOLDER' | translate" styleClass="w-full" [inputStyleClass]="'w-full'">
             </p-password>
           </div>
           <div class="col-span-2 field">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.ROLE' | translate }} <span class="text-red-500">*</span></label>
             <p-select [(ngModel)]="convertForm.role" [options]="roleOptions"
-              placeholder="Select role" styleClass="w-full">
+              [placeholder]="'EMPLOYEES.DETAIL.SELECT_ROLE' | translate" styleClass="w-full">
             </p-select>
           </div>
           <div class="col-span-2 field">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Branch Access</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.BRANCH_ACCESS' | translate }}</label>
             <p-multiSelect [(ngModel)]="convertForm.branchIds" [options]="branches()"
-              optionLabel="name" optionValue="id" placeholder="Select branches"
+              optionLabel="name" optionValue="id" [placeholder]="'EMPLOYEES.DETAIL.SELECT_BRANCHES' | translate"
               styleClass="w-full">
             </p-multiSelect>
           </div>
         </div>
       </div>
       <ng-template pTemplate="footer">
-        <button pButton label="Cancel" severity="secondary" class="p-button-outlined"
+        <button pButton [label]="'EMPLOYEES.DETAIL.CANCEL' | translate" severity="secondary" class="p-button-outlined"
           (click)="showConvertDialog = false">
         </button>
-        <button pButton label="Create User Account" icon="pi pi-user-plus"
+        <button pButton [label]="'EMPLOYEES.DETAIL.CREATE_USER_ACCOUNT' | translate" icon="pi pi-user-plus"
           [loading]="converting()" (click)="convertToUser()">
         </button>
       </ng-template>
@@ -319,6 +424,8 @@ export class EmployeeDetailComponent implements OnInit {
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
   private expenseService = inject(ExpenseService);
+  private teacherAttendanceService = inject(TeacherAttendanceService);
+  private translate = inject(TranslateService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -330,6 +437,11 @@ export class EmployeeDetailComponent implements OnInit {
   salaryHistory = signal<ExpensePayment[]>([]);
   historyLoading = signal(false);
 
+  attendanceHistory = signal<TeacherAttendanceHistoryRow[]>([]);
+  attendanceLoading = signal(false);
+  attendancePresentCount = computed(() => this.attendanceHistory().filter((r) => r.status === 'PRESENT').length);
+  attendanceAbsentCount = computed(() => this.attendanceHistory().filter((r) => r.status === 'ABSENT').length);
+
   showConvertDialog = false;
   convertForm = {
     email: '',
@@ -339,11 +451,11 @@ export class EmployeeDetailComponent implements OnInit {
   };
 
   roleOptions = [
-    { label: 'Branch Admin', value: UserRole.BRANCH_ADMIN },
-    { label: 'Academic Manager', value: UserRole.ACADEMIC_MANAGER },
-    { label: 'Sales Manager', value: UserRole.SALES_MANAGER },
-    { label: 'Accountant', value: UserRole.ACCOUNTANT },
-    { label: 'Viewer', value: UserRole.VIEWER },
+    { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_BRANCH_ADMIN'), value: UserRole.BRANCH_ADMIN },
+    { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_ACADEMIC_MANAGER'), value: UserRole.ACADEMIC_MANAGER },
+    { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_SALES_MANAGER'), value: UserRole.SALES_MANAGER },
+    { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_ACCOUNTANT'), value: UserRole.ACCOUNTANT },
+    { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_VIEWER'), value: UserRole.VIEWER },
   ];
 
   canManageUsers(): boolean {
@@ -367,16 +479,17 @@ export class EmployeeDetailComponent implements OnInit {
           this.branchService.getActiveBranches().subscribe({
             next: (branches) => {
               const branch = branches.find(b => b.id === emp.branchId);
-              this.branchName.set(branch?.name || 'Unknown');
+              this.branchName.set(branch?.name || this.translate.instant('EMPLOYEES.DETAIL.UNKNOWN_BRANCH'));
             }
           });
         } else {
-          this.branchName.set(emp.isGlobal ? 'All Branches' : '—');
+          this.branchName.set(emp.isGlobal ? this.translate.instant('EMPLOYEES.DETAIL.ALL_BRANCHES') : '—');
         }
         this.loadSalaryHistory(id);
+        this.loadAttendanceHistory(id);
       },
       error: () => {
-        this.notificationService.error('Employee not found');
+        this.notificationService.error(this.translate.instant('EMPLOYEES.DETAIL.ERR_NOT_FOUND'));
         this.loading.set(false);
         this.router.navigate(['/employees']);
       }
@@ -396,6 +509,33 @@ export class EmployeeDetailComponent implements OnInit {
     });
   }
 
+  private loadAttendanceHistory(employeeId: string) {
+    this.attendanceLoading.set(true);
+    this.teacherAttendanceService.getHistory({ employeeId }).subscribe({
+      next: (rows) => {
+        this.attendanceHistory.set(rows);
+        this.attendanceLoading.set(false);
+      },
+      error: () => {
+        this.attendanceHistory.set([]);
+        this.attendanceLoading.set(false);
+      }
+    });
+  }
+
+  attendanceRoleSeverity(role: string): 'success' | 'info' | 'warn' | 'secondary' {
+    if (role === 'PRIMARY') return 'success';
+    if (role === 'SUBSTITUTE') return 'warn';
+    return 'info';
+  }
+
+  formatDuration(minutes: number): string {
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  }
+
   edit() {
     this.router.navigate(['/employees', this.employee()!.id, 'edit']);
   }
@@ -407,7 +547,7 @@ export class EmployeeDetailComponent implements OnInit {
   convertToUser() {
     const f = this.convertForm;
     if (!f.email || !f.password || f.password.length < 6 || !f.role) {
-      this.notificationService.error('Please fill all required fields (password min. 6 chars)');
+      this.notificationService.error(this.translate.instant('EMPLOYEES.DETAIL.ERR_FIELDS_REQUIRED'));
       return;
     }
     this.converting.set(true);
@@ -419,12 +559,12 @@ export class EmployeeDetailComponent implements OnInit {
       branchIds: f.branchIds,
     }).subscribe({
       next: (user) => {
-        this.notificationService.success(`User account created for ${user.firstName} ${user.lastName}`);
+        this.notificationService.success(this.translate.instant('EMPLOYEES.DETAIL.USER_CREATED', { name: `${user.firstName} ${user.lastName}` }));
         this.showConvertDialog = false;
         this.converting.set(false);
       },
       error: (e) => {
-        this.notificationService.error(e.error?.message || 'Failed to create user account');
+        this.notificationService.error(e.error?.message || this.translate.instant('EMPLOYEES.DETAIL.ERR_CREATE_USER'));
         this.converting.set(false);
       }
     });

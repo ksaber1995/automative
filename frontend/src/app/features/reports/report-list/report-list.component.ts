@@ -23,6 +23,7 @@ import {
   ProfitByBranchRow,
   ProfitByProductRow,
   ExpenseCategoryRow,
+  ProfitByEventRow,
 } from '../services/report.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -138,6 +139,7 @@ import { NotificationService } from '../../../core/services/notification.service
           <p-tab value="2"><i class="pi pi-book mr-2"></i>{{ 'REPORTS.TAB_COURSES' | translate }}</p-tab>
           <p-tab value="3"><i class="pi pi-building mr-2"></i>{{ 'REPORTS.TAB_BRANCHES' | translate }}</p-tab>
           <p-tab value="4"><i class="pi pi-box mr-2"></i>{{ 'REPORTS.TAB_PRODUCTS' | translate }}</p-tab>
+          <p-tab value="5"><i class="pi pi-flag mr-2"></i>{{ 'REPORTS.TAB_EVENTS' | translate }}</p-tab>
         </p-tablist>
 
         <p-tabpanels>
@@ -387,6 +389,102 @@ import { NotificationService } from '../../../core/services/notification.service
               </p-card>
             </div>
           </p-tabpanel>
+
+          <!-- ── EVENTS ─────────────────────────────────────────── -->
+          <p-tabpanel value="5">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-4">
+              <p-card>
+                <div class="text-sm text-gray-500">{{ 'REPORTS.EVENT_KPI_REVENUE' | translate }}</div>
+                <div class="text-2xl font-bold text-green-700">{{ eventTotalRevenue() | number:'1.0-0' }}</div>
+              </p-card>
+              <p-card>
+                <div class="text-sm text-gray-500">{{ 'REPORTS.EVENT_KPI_EXPENSES' | translate }}</div>
+                <div class="text-2xl font-bold text-red-700">{{ eventTotalExpenses() | number:'1.0-0' }}</div>
+              </p-card>
+              <p-card>
+                <div class="text-sm text-gray-500">{{ 'REPORTS.EVENT_KPI_NET_PROFIT' | translate }}</div>
+                <div class="text-2xl font-bold"
+                  [class.text-green-700]="eventTotalNetProfit() >= 0"
+                  [class.text-red-700]="eventTotalNetProfit() < 0">
+                  {{ eventTotalNetProfit() | number:'1.0-0' }}
+                </div>
+              </p-card>
+            </div>
+
+            <p-card styleClass="mt-4">
+              <ng-template pTemplate="header">
+                <div class="px-6 pt-4 pb-2">
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.EVENTS_CHART_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.EVENTS_CHART_DESC' | translate }}</p>
+                </div>
+              </ng-template>
+              @if (eventChart()) {
+                <p-chart type="bar" [data]="eventChart()" [options]="stackedBarOpts" [style]="{ height: '360px' }"></p-chart>
+              } @else {
+                <div class="text-center py-8 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</div>
+              }
+            </p-card>
+
+            <p-card styleClass="mt-4">
+              <ng-template pTemplate="header">
+                <div class="px-6 pt-4 pb-2">
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.EVENT_TABLE_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.EVENT_TABLE_DESC' | translate }}</p>
+                </div>
+              </ng-template>
+              <p-table [value]="profitEvents()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>{{ 'REPORTS.COL_EVENT' | translate }}</th>
+                    <th>{{ 'REPORTS.COL_TYPE' | translate }}</th>
+                    <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
+                    <th>{{ 'REPORTS.COL_STATUS' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_SUBSCRIBERS' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_REVENUE' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_PRODUCT_MARGIN' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_REFUNDS' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_EXPENSES' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.COL_NET_PROFIT' | translate }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-row>
+                  <tr>
+                    <td class="font-medium">
+                      {{ row.name }}
+                      @if (row.code) {
+                        <span class="text-xs text-gray-500 font-mono">{{ row.code }}</span>
+                      }
+                    </td>
+                    <td>
+                      <p-tag [value]="('EVENTS.TYPE.' + row.eventType) | translate" severity="info"></p-tag>
+                    </td>
+                    <td>{{ row.branchName || '—' }}</td>
+                    <td>
+                      <p-tag [value]="('EVENTS.STATUS.' + row.status) | translate"
+                        [severity]="eventStatusSeverity(row.status)"></p-tag>
+                    </td>
+                    <td class="text-right">{{ row.subscriberCount }}</td>
+                    <td class="text-right text-green-700 font-semibold">{{ row.revenue | number:'1.2-2' }}</td>
+                    <td class="text-right"
+                      [class.text-green-700]="row.productMargin >= 0"
+                      [class.text-red-700]="row.productMargin < 0">
+                      {{ row.productMargin | number:'1.2-2' }}
+                    </td>
+                    <td class="text-right text-red-700">{{ row.refunds | number:'1.2-2' }}</td>
+                    <td class="text-right text-red-700">{{ row.expenses | number:'1.2-2' }}</td>
+                    <td class="text-right font-bold"
+                      [class.text-green-700]="row.netProfit >= 0"
+                      [class.text-red-700]="row.netProfit < 0">
+                      {{ row.netProfit | number:'1.2-2' }}
+                    </td>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                  <tr><td colspan="10" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+                </ng-template>
+              </p-table>
+            </p-card>
+          </p-tabpanel>
         </p-tabpanels>
       </p-tabs>
     </div>
@@ -416,6 +514,7 @@ export class ReportListComponent implements OnInit {
   profitBranches = signal<ProfitByBranchRow[]>([]);
   profitProducts = signal<ProfitByProductRow[]>([]);
   expenseCats = signal<ExpenseCategoryRow[]>([]);
+  profitEvents = signal<ProfitByEventRow[]>([]);
 
   // KPIs
   totalRevenue = computed(() => this.monthlyPL().reduce((s, r) => s + r.revenue, 0));
@@ -572,6 +671,45 @@ export class ReportListComponent implements OnInit {
     };
   });
 
+  eventTotalRevenue = computed(() => this.profitEvents().reduce((s, r) => s + r.revenue + r.productMargin, 0));
+  eventTotalExpenses = computed(() => this.profitEvents().reduce((s, r) => s + r.expenses + r.refunds, 0));
+  eventTotalNetProfit = computed(() => this.profitEvents().reduce((s, r) => s + r.netProfit, 0));
+
+  eventChart = computed(() => {
+    const data = this.profitEvents();
+    if (!data.length) return null;
+    return {
+      labels: data.map((e) => e.name),
+      datasets: [
+        {
+          label: this.translate.instant('REPORTS.CHART_REVENUE'),
+          data: data.map((e) => e.revenue + e.productMargin),
+          backgroundColor: '#10b981',
+        },
+        {
+          label: this.translate.instant('REPORTS.CHART_EXPENSES'),
+          data: data.map((e) => e.expenses + e.refunds),
+          backgroundColor: '#ef4444',
+        },
+        {
+          label: this.translate.instant('REPORTS.CHART_NET_PROFIT'),
+          data: data.map((e) => e.netProfit),
+          backgroundColor: '#3b82f6',
+        },
+      ],
+    };
+  });
+
+  eventStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'secondary' | 'danger' {
+    switch (status) {
+      case 'ACTIVE': return 'success';
+      case 'PLANNED': return 'info';
+      case 'COMPLETED': return 'secondary';
+      case 'CANCELLED': return 'danger';
+      default: return 'info';
+    }
+  }
+
   expenseCatChart = computed(() => {
     const data = this.expenseCats();
     if (!data.length) return null;
@@ -631,6 +769,7 @@ export class ReportListComponent implements OnInit {
       profitBranches: this.reportService.profitByBranch(f),
       profitProducts: this.reportService.profitByProduct(f),
       expenseCats: this.reportService.expensesByCategory(f),
+      profitEvents: this.reportService.profitByEvent(f),
     }).subscribe({
       next: (res) => {
         this.monthlyPL.set(res.monthlyPL);
@@ -642,6 +781,7 @@ export class ReportListComponent implements OnInit {
         this.profitBranches.set(res.profitBranches);
         this.profitProducts.set(res.profitProducts);
         this.expenseCats.set(res.expenseCats);
+        this.profitEvents.set(res.profitEvents);
         this.loading.set(false);
       },
       error: (err) => {

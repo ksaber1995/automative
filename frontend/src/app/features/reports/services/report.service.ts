@@ -92,6 +92,28 @@ export interface ExpenseCategoryRow {
   count: number;
 }
 
+export interface ProfitByEventRow {
+  eventId: string;
+  name: string;
+  code: string | null;
+  eventType: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  branchId: string | null;
+  branchName: string | null;
+  subscriberCount: number;
+  revenue: number;
+  expenses: number;
+  expenseCount: number;
+  refunds: number;
+  refundCount: number;
+  productRevenue: number;
+  productCost: number;
+  productMargin: number;
+  netProfit: number;
+}
+
 export interface ReportFilters {
   startDate?: string;
   endDate?: string;
@@ -136,5 +158,9 @@ export class ReportService {
 
   expensesByCategory(filters: ReportFilters = {}): Observable<ExpenseCategoryRow[]> {
     return this.api.get<ExpenseCategoryRow[]>('reports/expenses-by-category', filters);
+  }
+
+  profitByEvent(filters: ReportFilters = {}): Observable<ProfitByEventRow[]> {
+    return this.api.get<ProfitByEventRow[]>('reports/profit-by-event', filters);
   }
 }

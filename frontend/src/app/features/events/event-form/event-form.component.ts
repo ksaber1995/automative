@@ -9,7 +9,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EventService } from '../services/event.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -56,7 +56,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                 </label>
                 <p-select
                   formControlName="eventType"
-                  [options]="typeOptions"
+                  [options]="typeOptions()"
                   optionLabel="label"
                   optionValue="value"
                   [style]="{ width: '100%' }"
@@ -69,7 +69,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
                 </label>
                 <p-select
                   formControlName="status"
-                  [options]="statusOptions"
+                  [options]="statusOptions()"
                   optionLabel="label"
                   optionValue="value"
                   [style]="{ width: '100%' }"
@@ -167,6 +167,7 @@ export class EventFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   form: FormGroup;
   loading = signal(false);
@@ -174,23 +175,16 @@ export class EventFormComponent implements OnInit {
   id: string | null = null;
   branches = signal<Branch[]>([]);
 
-  typeOptions = [
-    { label: 'Trip', value: 'TRIP' },
-    { label: 'Competition', value: 'COMPETITION' },
-    { label: 'Workshop', value: 'WORKSHOP' },
-    { label: 'Seminar', value: 'SEMINAR' },
-    { label: 'Camp', value: 'CAMP' },
-    { label: 'Other', value: 'OTHER' },
-  ];
+  private readonly typeValues = ['TRIP', 'COMPETITION', 'WORKSHOP', 'SEMINAR', 'CAMP', 'OTHER'] as const;
+  private readonly statusValues = ['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const;
 
-  statusOptions = [
-    { label: 'Planned', value: 'PLANNED' },
-    { label: 'Active', value: 'ACTIVE' },
-    { label: 'Completed', value: 'COMPLETED' },
-    { label: 'Cancelled', value: 'CANCELLED' },
-  ];
+  typeOptions = signal<{ label: string; value: string }[]>([]);
+  statusOptions = signal<{ label: string; value: string }[]>([]);
 
   constructor() {
+    this.rebuildOptions();
+    this.translate.onLangChange.subscribe(() => this.rebuildOptions());
+
     this.form = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
       code: [''],
@@ -285,6 +279,15 @@ export class EventFormComponent implements OnInit {
   }
 
   cancel() { this.router.navigate(['/events']); }
+
+  private rebuildOptions() {
+    this.typeOptions.set(this.typeValues.map(v => ({
+      label: this.translate.instant('EVENTS.TYPE.' + v), value: v,
+    })));
+    this.statusOptions.set(this.statusValues.map(v => ({
+      label: this.translate.instant('EVENTS.STATUS.' + v), value: v,
+    })));
+  }
 
   private toIsoDate(d: any): string {
     if (d instanceof Date) return d.toISOString().split('T')[0];

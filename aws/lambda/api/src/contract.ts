@@ -2798,6 +2798,16 @@ export const contract = c.router({
       }),
       responses: { 200: z.array(z.any()) },
     },
+    profitByEvent: {
+      method: 'GET',
+      path: '/api/reports/profit-by-event',
+      query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: { 200: z.array(z.any()) },
+    },
   },
 
   // Debug routes (development only)

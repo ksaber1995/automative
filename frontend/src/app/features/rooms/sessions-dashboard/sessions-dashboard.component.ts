@@ -18,6 +18,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session, StartSessionTeacher } from '../services/session.service';
 import { RoomService, Room } from '../services/room.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
+import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
@@ -188,7 +189,7 @@ function endTimeAfterStartValidator(startDate: string) {
                       <span><i class="pi pi-clock mr-1"></i>{{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(session.startDate) } }}</span>
                       <span class="text-orange-600 font-medium">{{ getDuration(session.startDate) }}</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-3 gap-2">
                       <p-button
                         [label]="(expandedAttendanceSessionId() === session.id ? 'SESSIONS_DASHBOARD.HIDE_ATTENDANCE' : 'SESSIONS_DASHBOARD.ADD_ATTENDANCE') | translate"
                         [icon]="expandedAttendanceSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-check-square'"
@@ -197,6 +198,15 @@ function endTimeAfterStartValidator(startDate: string) {
                         size="small"
                         styleClass="w-full"
                         (onClick)="toggleAttendance(session)"
+                      ></p-button>
+                      <p-button
+                        [label]="(expandedTeachersSessionId() === session.id ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
+                        [icon]="expandedTeachersSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-user-edit'"
+                        severity="warn"
+                        [outlined]="true"
+                        size="small"
+                        styleClass="w-full"
+                        (onClick)="toggleTeachers(session)"
                       ></p-button>
                       <p-button
                         [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
@@ -208,6 +218,96 @@ function endTimeAfterStartValidator(startDate: string) {
                         (onClick)="confirmEndSession(session)"
                       ></p-button>
                     </div>
+
+                    <!-- Teacher attendance accordion -->
+                    @if (expandedTeachersSessionId() === session.id) {
+                      <div class="mt-4 pt-4 border-t border-gray-200">
+                        @if (loadingTeachersFor() === session.id) {
+                          <div class="text-center py-6 text-gray-400">
+                            <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+                            <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_TEACHERS' | translate }}</p>
+                          </div>
+                        } @else {
+                          <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-semibold text-gray-700">{{ 'SESSIONS_DASHBOARD.TEACHERS_TITLE' | translate }}</span>
+                            <span class="text-xs text-gray-500">{{ 'SESSIONS_DASHBOARD.TEACHERS_DESC' | translate }}</span>
+                          </div>
+
+                          @if (getTeacherRows(session.id).length > 0) {
+                            <div class="space-y-2 mb-3">
+                              @for (t of getTeacherRows(session.id); track t.employeeId) {
+                                <div class="grid grid-cols-12 gap-2 items-center bg-gray-50 border border-gray-200 rounded-md p-2">
+                                  <div class="col-span-4 text-sm font-medium truncate" [title]="employeeLabel(t.employeeId)">
+                                    {{ employeeLabel(t.employeeId) }}
+                                  </div>
+                                  <div class="col-span-3">
+                                    <p-select
+                                      [options]="roleOptions()"
+                                      [ngModel]="t.role"
+                                      (ngModelChange)="updateSessionTeacherRole(session.id, t.employeeId, $event)"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      optionLabel="label"
+                                      optionValue="value"
+                                      appendTo="body"
+                                      [style]="{ width: '100%' }"
+                                    ></p-select>
+                                  </div>
+                                  <div class="col-span-3">
+                                    <p-select
+                                      [options]="statusOptions()"
+                                      [ngModel]="t.status"
+                                      (ngModelChange)="updateSessionTeacherStatus(session.id, t.employeeId, $event)"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      optionLabel="label"
+                                      optionValue="value"
+                                      appendTo="body"
+                                      [style]="{ width: '100%' }"
+                                    ></p-select>
+                                  </div>
+                                  <div class="col-span-2 flex justify-end">
+                                    <p-button icon="pi pi-times" severity="danger" [text]="true" [rounded]="true"
+                                      [pTooltip]="'SESSIONS_DASHBOARD.TEACHER_REMOVE' | translate"
+                                      (onClick)="removeSessionTeacher(session.id, t.employeeId)"></p-button>
+                                  </div>
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <p class="text-xs text-gray-400 mb-3">{{ 'SESSIONS_DASHBOARD.NO_TEACHERS_YET' | translate }}</p>
+                          }
+
+                          <div class="flex items-center gap-2">
+                            <p-select
+                              [options]="availableEmployeesFor(session.id)"
+                              [ngModel]="newSessionTeacherIds[session.id] || null"
+                              (ngModelChange)="newSessionTeacherIds[session.id] = $event"
+                              [ngModelOptions]="{ standalone: true }"
+                              optionLabel="displayName"
+                              optionValue="id"
+                              appendTo="body"
+                              [placeholder]="'SESSIONS_DASHBOARD.ADD_TEACHER' | translate"
+                              [filter]="true"
+                              filterBy="displayName"
+                              [showClear]="true"
+                              [style]="{ flex: '1' }"
+                            ></p-select>
+                            <p-button icon="pi pi-plus" severity="secondary"
+                              [disabled]="!newSessionTeacherIds[session.id]"
+                              (onClick)="addSessionTeacher(session.id)"></p-button>
+                          </div>
+
+                          <div class="mt-3 pt-3 border-t flex justify-end">
+                            <p-button
+                              [label]="'SESSIONS_DASHBOARD.SAVE_TEACHERS' | translate"
+                              icon="pi pi-check"
+                              size="small"
+                              [loading]="savingTeachersFor() === session.id"
+                              (onClick)="saveTeachersForSession(session.id)"
+                            ></p-button>
+                          </div>
+                        }
+                      </div>
+                    }
 
                     <!-- Attendance accordion -->
                     @if (expandedAttendanceSessionId() === session.id) {
@@ -237,7 +337,8 @@ function endTimeAfterStartValidator(startDate: string) {
                                   [class.border-gray-200]="!student.isPresent">
                                   <div class="flex items-center gap-3">
                                     <p-checkbox
-                                      [(ngModel)]="student.isPresent"
+                                      [ngModel]="student.isPresent"
+                                      (ngModelChange)="toggleStudentPresence(session.id, student, $event)"
                                       [binary]="true"
                                       [inputId]="'att-' + session.id + '-' + student.studentId"
                                     ></p-checkbox>
@@ -262,13 +363,23 @@ function endTimeAfterStartValidator(startDate: string) {
                                 ·
                                 <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCountForSession(session.id) } }}</span>
                               </span>
-                              <p-button
-                                [label]="'SESSIONS_DASHBOARD.SAVE_ATTENDANCE' | translate"
-                                icon="pi pi-check"
-                                size="small"
-                                [loading]="savingAttendanceFor() === session.id"
-                                (onClick)="saveAttendanceForSession(session.id)"
-                              ></p-button>
+                              <span class="text-xs flex items-center gap-1"
+                                [class.text-gray-400]="attendanceSaveState()[session.id] !== 'saving' && attendanceSaveState()[session.id] !== 'error'"
+                                [class.text-blue-500]="attendanceSaveState()[session.id] === 'saving'"
+                                [class.text-red-500]="attendanceSaveState()[session.id] === 'error'">
+                                @if (attendanceSaveState()[session.id] === 'saving') {
+                                  <i class="pi pi-spin pi-spinner"></i>
+                                  {{ 'SESSIONS_DASHBOARD.SAVING' | translate }}
+                                } @else if (attendanceSaveState()[session.id] === 'saved') {
+                                  <i class="pi pi-check"></i>
+                                  {{ 'SESSIONS_DASHBOARD.SAVED' | translate }}
+                                } @else if (attendanceSaveState()[session.id] === 'error') {
+                                  <i class="pi pi-times"></i>
+                                  {{ 'SESSIONS_DASHBOARD.SAVE_FAILED' | translate }}
+                                } @else {
+                                  {{ 'SESSIONS_DASHBOARD.AUTOSAVES' | translate }}
+                                }
+                              </span>
                             </div>
                           }
                         }
@@ -665,6 +776,7 @@ export class SessionsDashboardComponent implements OnInit {
   private classService = inject(ClassService);
   private branchService = inject(BranchService);
   private attendanceService = inject(AttendanceService);
+  private teacherAttendanceService = inject(TeacherAttendanceService);
   private employeeService = inject(EmployeeService);
   private notificationService = inject(NotificationService);
   private fb = inject(FormBuilder);
@@ -790,6 +902,21 @@ export class SessionsDashboardComponent implements OnInit {
   loadingAttendanceFor = signal<string | null>(null);
   savingAttendanceFor = signal<string | null>(null);
   attendanceBySession = signal<Record<string, SessionAttendanceStudent[]>>({});
+  /** Per-session UI state for the auto-save indicator */
+  attendanceSaveState = signal<Record<string, 'saving' | 'saved' | 'error' | undefined>>({});
+  /** Pending debounce timers per session, keyed by sessionId */
+  private attendanceSaveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  /** Timers that clear the "Saved" badge after a moment */
+  private attendanceSavedClearTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  private readonly ATTENDANCE_SAVE_DEBOUNCE_MS = 600;
+
+  /** Inline teacher-attendance accordion state */
+  expandedTeachersSessionId = signal<string | null>(null);
+  loadingTeachersFor = signal<string | null>(null);
+  savingTeachersFor = signal<string | null>(null);
+  teachersBySession = signal<Record<string, DialogTeacherRow[]>>({});
+  /** ngModel target for the "add teacher" select inside each session card. Keyed by sessionId. */
+  newSessionTeacherIds: Record<string, string | null> = {};
 
   // ── Page-level filtered rooms ──────────────────────────────────────────────
 
@@ -899,7 +1026,29 @@ export class SessionsDashboardComponent implements OnInit {
 
   openStartDialogForRoom(room: Room) {
     this.buildSessionForm(room.id, room.branchId);
+    this.populateDialogOptionsForBranch(room.branchId);
     this.showStartDialog = true;
+  }
+
+  private populateDialogOptionsForBranch(branchId: string) {
+    this.dialogFreeRooms.set(
+      this.rooms().filter((r: Room) => r.branchId === branchId && !r.isOccupied && r.isActive)
+    );
+    this.loadingDialogClasses.set(true);
+    this.classService.getClassesByBranch(branchId).subscribe({
+      next: (classes: any[]) => {
+        this.dialogActiveClasses.set(
+          classes
+            .filter((c: any) => (c.studentCount ?? 0) > 0)
+            .map((c: any) => ({
+              ...c,
+              displayName: `${c.name} (${c.code})`,
+            }))
+        );
+        this.loadingDialogClasses.set(false);
+      },
+      error: () => this.loadingDialogClasses.set(false),
+    });
   }
 
   buildSessionForm(roomId?: string, branchId?: string) {
@@ -922,27 +1071,7 @@ export class SessionsDashboardComponent implements OnInit {
       this.dialogActiveClasses.set([]);
       return;
     }
-    // Rooms — filter from already-loaded list
-    this.dialogFreeRooms.set(
-      this.rooms().filter((r: Room) => r.branchId === branchId && !r.isOccupied && r.isActive)
-    );
-    // Classes — fetch from API filtered by branch, then keep only those with students enrolled
-    this.loadingDialogClasses.set(true);
-    this.classService.getClassesByBranch(branchId).subscribe({
-      next: (classes: any[]) => {
-        this.dialogActiveClasses.set(
-          classes
-            .filter((c: any) => (c.studentCount ?? 0) > 0)   // only classes with enrolled students
-            .map((c: any) => ({
-              ...c,
-              displayName: `${c.name} (${c.code})`,
-              // hasActiveSession comes from backend; used by optionDisabled
-            }))
-        );
-        this.loadingDialogClasses.set(false);
-      },
-      error: () => this.loadingDialogClasses.set(false),
-    });
+    this.populateDialogOptionsForBranch(branchId);
   }
 
   startSession() {
@@ -1098,18 +1227,152 @@ export class SessionsDashboardComponent implements OnInit {
     return this.getAttendanceStudents(sessionId).filter(s => !s.isPresent).length;
   }
 
-  saveAttendanceForSession(sessionId: string) {
+  /**
+   * Called when the user toggles a student's checkbox. Updates local state immediately
+   * and schedules a debounced save so rapid toggles only fire one network call.
+   */
+  toggleStudentPresence(sessionId: string, student: SessionAttendanceStudent, value: boolean) {
+    const updated = this.getAttendanceStudents(sessionId).map((s) =>
+      s.studentId === student.studentId ? { ...s, isPresent: value } : s,
+    );
+    this.attendanceBySession.set({
+      ...this.attendanceBySession(),
+      [sessionId]: updated,
+    });
+
+    if (this.attendanceSaveTimers[sessionId]) {
+      clearTimeout(this.attendanceSaveTimers[sessionId]);
+    }
+    if (this.attendanceSavedClearTimers[sessionId]) {
+      clearTimeout(this.attendanceSavedClearTimers[sessionId]);
+      delete this.attendanceSavedClearTimers[sessionId];
+    }
+    this.attendanceSaveTimers[sessionId] = setTimeout(() => {
+      delete this.attendanceSaveTimers[sessionId];
+      this.flushAttendanceSave(sessionId);
+    }, this.ATTENDANCE_SAVE_DEBOUNCE_MS);
+  }
+
+  private flushAttendanceSave(sessionId: string) {
     const students = this.getAttendanceStudents(sessionId);
-    const presentIds = students.filter(s => s.isPresent).map(s => s.studentId);
-    this.savingAttendanceFor.set(sessionId);
+    const presentIds = students.filter((s) => s.isPresent).map((s) => s.studentId);
+    this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'saving' });
     this.attendanceService.saveForSession(sessionId, presentIds).subscribe({
-      next: (res) => {
-        this.savingAttendanceFor.set(null);
-        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVED', { count: res.presentCount }));
+      next: () => {
+        this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'saved' });
+        this.attendanceSavedClearTimers[sessionId] = setTimeout(() => {
+          const next = { ...this.attendanceSaveState() };
+          delete next[sessionId];
+          this.attendanceSaveState.set(next);
+          delete this.attendanceSavedClearTimers[sessionId];
+        }, 2000);
       },
       error: (err: any) => {
-        this.savingAttendanceFor.set(null);
-        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVE_FAILED'));
+        this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'error' });
+        this.notificationService.error(
+          err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVE_FAILED'),
+        );
+      },
+    });
+  }
+
+  // ── Live teacher-attendance editor on the active session card ──────────────
+
+  toggleTeachers(session: Session) {
+    if (this.expandedTeachersSessionId() === session.id) {
+      this.expandedTeachersSessionId.set(null);
+      return;
+    }
+    this.expandedTeachersSessionId.set(session.id);
+    if (!this.teachersBySession()[session.id]) {
+      this.loadTeachersForSession(session.id);
+    }
+  }
+
+  loadTeachersForSession(sessionId: string) {
+    this.loadingTeachersFor.set(sessionId);
+    this.teacherAttendanceService.getBySession(sessionId).subscribe({
+      next: (rows: SessionTeacherAttendanceRow[]) => {
+        this.teachersBySession.set({
+          ...this.teachersBySession(),
+          [sessionId]: rows.map((r) => ({
+            employeeId: r.employeeId,
+            role: r.role,
+            status: r.status,
+          })),
+        });
+        this.loadingTeachersFor.set(null);
+      },
+      error: () => {
+        this.loadingTeachersFor.set(null);
+        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_LOAD_TEACHERS_FAILED'));
+      },
+    });
+  }
+
+  getTeacherRows(sessionId: string): DialogTeacherRow[] {
+    return this.teachersBySession()[sessionId] || [];
+  }
+
+  availableEmployeesFor(sessionId: string): TeacherOption[] {
+    const used = new Set(this.getTeacherRows(sessionId).map((t) => t.employeeId));
+    return this.allEmployees().filter((e) => !used.has(e.id));
+  }
+
+  addSessionTeacher(sessionId: string) {
+    const empId = this.newSessionTeacherIds[sessionId];
+    if (!empId) return;
+    const rows = this.getTeacherRows(sessionId);
+    if (rows.some((t) => t.employeeId === empId)) return;
+    const primaryAlreadyPresent = rows.some((t) => t.role === 'PRIMARY' && t.status === 'PRESENT');
+    const newRow: DialogTeacherRow = {
+      employeeId: empId,
+      role: primaryAlreadyPresent ? 'SUBSTITUTE' : 'PRIMARY',
+      status: 'PRESENT',
+    };
+    this.teachersBySession.set({
+      ...this.teachersBySession(),
+      [sessionId]: [...rows, newRow],
+    });
+    this.newSessionTeacherIds[sessionId] = null;
+  }
+
+  removeSessionTeacher(sessionId: string, employeeId: string) {
+    this.teachersBySession.set({
+      ...this.teachersBySession(),
+      [sessionId]: this.getTeacherRows(sessionId).filter((t) => t.employeeId !== employeeId),
+    });
+  }
+
+  updateSessionTeacherRole(sessionId: string, employeeId: string, role: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT') {
+    this.teachersBySession.set({
+      ...this.teachersBySession(),
+      [sessionId]: this.getTeacherRows(sessionId).map((t) => (t.employeeId === employeeId ? { ...t, role } : t)),
+    });
+  }
+
+  updateSessionTeacherStatus(sessionId: string, employeeId: string, status: 'PRESENT' | 'ABSENT') {
+    this.teachersBySession.set({
+      ...this.teachersBySession(),
+      [sessionId]: this.getTeacherRows(sessionId).map((t) => (t.employeeId === employeeId ? { ...t, status } : t)),
+    });
+  }
+
+  saveTeachersForSession(sessionId: string) {
+    const payload = this.getTeacherRows(sessionId).map((t) => ({
+      employeeId: t.employeeId,
+      role: t.role,
+      status: t.status,
+    }));
+    this.savingTeachersFor.set(sessionId);
+    this.teacherAttendanceService.saveForSession(sessionId, payload).subscribe({
+      next: (res) => {
+        this.savingTeachersFor.set(null);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVED', { count: res.count }));
+      },
+      error: (err: any) => {
+        this.savingTeachersFor.set(null);
+        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVE_FAILED'));
       },
     });
   }
