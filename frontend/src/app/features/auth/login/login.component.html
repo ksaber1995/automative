@@ -121,6 +121,12 @@
             }
           </div>
 
+          <div class="flex justify-end -mt-2">
+            <a routerLink="/auth/forgot-password" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              {{ 'AUTH.LOGIN.FORGOT_PASSWORD' | translate }}
+            </a>
+          </div>
+
           <p-button
             type="submit"
             [label]="'AUTH.LOGIN.SIGN_IN' | translate"

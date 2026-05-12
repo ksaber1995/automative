@@ -42,3 +42,28 @@
 
   After adding all four, save. ACM will validate the new cert within ~5-30 min, the dev deploy will unblock, and
   www.dev.netrofit.com + www.app.netrofit.com will start resolving to the app.
+
+
+
+
+
+
+
+
+
+
+
+   Fast — verify your test recipient(s) so you can keep testing today:
+  aws ses verify-email-identity --email-address karimali201094@gmail.com --profile personal --region eu-west-1
+  Then open the verification email AWS sends to that inbox and click the link. After that, registration emails to that address will go through. Repeat for every test address you want to use.
+
+  Right — request production access (no per-recipient ceremony, higher quota):
+  aws sesv2 put-account-details --profile personal --region eu-west-1 `
+    --mail-type TRANSACTIONAL `
+    --website-url https://netrofit.com `
+    --use-case-description "Transactional email: account verification OTPs and password resets for SaaS users." `
+    --production-access-enabled
+  Or do it in the SES console → Account dashboard → "Request production access". Usually approved within a day.
+ 
+  Also worth noting: the code currently swallows this SES error (try { await sendOtpEmail(...) } catch (otpError) { console.error(...) } at auth.ts:322–326), so the API returns a happy 201 to the frontend even when no email actually goes
+   out. That's why the frontend gave you no signal. You may want to surface it (return 502/warning) at least in dev, but that's a separate decision.

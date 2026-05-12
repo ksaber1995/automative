@@ -52,6 +52,8 @@ const router = {
     register: authRoutes.register,
     verifyEmail: authRoutes.verifyEmail,
     resendEmailOtp: authRoutes.resendEmailOtp,
+    forgotPassword: authRoutes.forgotPassword,
+    resetPassword: authRoutes.resetPassword,
     profile: authRoutes.profile,
   },
   students: studentsRoutes,

@@ -1,10 +1,21 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query, queryOne, getClient } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { sendOtpEmail } from '../utils/email';
+import { sendOtpEmail, sendPasswordResetEmail } from '../utils/email';
 import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
+
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function generateResetToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function resolveFrontendBase(): string {
+  return (process.env.FRONTEND_BASE_URL || 'http://localhost:4200').replace(/\/$/, '');
+}
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -472,6 +483,122 @@ export const authRoutes = {
     } catch (error) {
       console.error('Resend email OTP error:', error);
       return { status: 400 as const, body: { message: 'Failed to resend code. Please try again.' } };
+    }
+  },
+
+  forgotPassword: async ({
+    body,
+  }: {
+    body: { email: string; recaptchaToken?: string };
+  }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
+    const email = (body.email || '').trim().toLowerCase();
+    enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
+
+    const captcha = await verifyRecaptcha(body.recaptchaToken, {
+      expectedAction: 'forgot_password',
+      remoteIp: getClientIp(),
+    });
+    if (!captcha.ok) {
+      return { status: 400 as const, body: { message: captcha.reason } };
+    }
+
+    // Always respond 200 to avoid leaking which addresses are registered.
+    const genericResponse = {
+      status: 200 as const,
+      body: { message: 'If an account exists for that email, a reset link has been sent.' },
+    };
+
+    if (!email) return genericResponse;
+
+    try {
+      const user = await queryOne<any>(
+        'SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
+      if (!user) return genericResponse;
+
+      const token = generateResetToken();
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+      await query(
+        `UPDATE users
+         SET password_reset_token = $1, password_reset_expires = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [token, expiresAt, user.id]
+      );
+
+      const resetLink = `${resolveFrontendBase()}/auth/reset-password?token=${encodeURIComponent(token)}`;
+
+      try {
+        await sendPasswordResetEmail(user.email, user.first_name, resetLink);
+      } catch (err) {
+        console.error('Failed to send password reset email:', err);
+      }
+
+      return genericResponse;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      return genericResponse;
+    }
+  },
+
+  resetPassword: async ({
+    body,
+  }: {
+    body: { token: string; password: string };
+  }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
+    try {
+      const token = (body.token || '').trim();
+      if (!token) {
+        return { status: 400 as const, body: { message: 'Reset token is required.' } };
+      }
+      if (!body.password || body.password.length < 6) {
+        return { status: 400 as const, body: { message: 'Password must be at least 6 characters.' } };
+      }
+
+      const user = await queryOne<any>(
+        `SELECT id, password_reset_expires
+         FROM users
+         WHERE password_reset_token = $1`,
+        [token]
+      );
+
+      if (!user) {
+        return {
+          status: 400 as const,
+          body: { message: 'Invalid or expired reset link. Please request a new one.' },
+        };
+      }
+
+      if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
+        return {
+          status: 400 as const,
+          body: { message: 'This reset link has expired. Please request a new one.' },
+        };
+      }
+
+      const hashedPassword = await bcrypt.hash(body.password, 10);
+
+      await query(
+        `UPDATE users
+         SET password = $1,
+             password_reset_token = NULL,
+             password_reset_expires = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [hashedPassword, user.id]
+      );
+
+      return {
+        status: 200 as const,
+        body: { message: 'Password updated. You can now sign in with your new password.' },
+      };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { status: 400 as const, body: { message: 'Could not reset password. Please try again.' } };
     }
   },
 

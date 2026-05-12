@@ -214,6 +214,10 @@ export class CoreStack extends cdk.Stack {
         // (dev), verifyRecaptcha skips the check and allows requests through.
         // TODO: move to Secrets Manager once we're past the first deploy.
         RECAPTCHA_V3_SECRET_KEY: process.env.RECAPTCHA_V3_SECRET_KEY ?? '6LcwMOYsAAAAALzbgYLfn0a7YuW9-MNufQL9M9Kp',
+        // Used to build absolute URLs in transactional emails (password reset).
+        // Override per stage. localhost:4200 keeps dev links functional when
+        // the developer is running `ng serve` locally.
+        FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200',
       },
       vpc,
       vpcSubnets: {

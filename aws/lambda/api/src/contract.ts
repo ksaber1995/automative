@@ -163,6 +163,16 @@ const ResendEmailOtpRequestSchema = z.object({
   email: z.string().email(),
 });
 
+const ForgotPasswordRequestSchema = z.object({
+  email: z.string().email(),
+  recaptchaToken: z.string().optional(),
+});
+
+const ResetPasswordRequestSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(6),
+});
+
 const SafeUserSchema = z.object({
   id: UUIDSchema,
   email: z.string(),
@@ -989,6 +999,24 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/auth/resend-email-otp',
       body: ResendEmailOtpRequestSchema,
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    forgotPassword: {
+      method: 'POST',
+      path: '/api/auth/forgot-password',
+      body: ForgotPasswordRequestSchema,
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    resetPassword: {
+      method: 'POST',
+      path: '/api/auth/reset-password',
+      body: ResetPasswordRequestSchema,
       responses: {
         200: z.object({ message: z.string() }),
         400: z.object({ message: z.string() }),

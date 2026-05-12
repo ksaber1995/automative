@@ -94,6 +94,14 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/resend-email-otp`, { email });
   }
 
+  forgotPassword(email: string, recaptchaToken?: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/forgot-password`, { email, recaptchaToken });
+  }
+
+  resetPassword(token: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/reset-password`, { token, password });
+  }
+
   logout(): void {
     localStorage.removeItem(environment.jwtTokenKey);
     localStorage.removeItem(environment.refreshTokenKey);
