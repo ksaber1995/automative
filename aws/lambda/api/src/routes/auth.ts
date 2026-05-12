@@ -1,11 +1,22 @@
 import bcrypt from 'bcryptjs';
 import { query, queryOne, getClient } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { sendOtpWhatsApp, normalizeLocalPhone, normalizeCountryCode } from '../utils/whatsapp';
+import { sendOtpEmail } from '../utils/email';
+import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
+import { getClientIp } from '../utils/request-context';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function normalizePhone(input: string | null | undefined): string {
+  const digits = (input || '').replace(/\D/g, '');
+  return digits.startsWith('0') ? digits.slice(1) : digits;
+}
+
+function normalizeCountryCode(input: string | null | undefined): string {
+  return (input || '').replace(/\D/g, '');
 }
 
 // Resolves a login identifier to a user. Accepts an email or a phone number
@@ -20,8 +31,7 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
       `SELECT u.*,
               c.is_active as company_is_active,
               c.subscription_status,
-              c.name as company_name,
-              c.code as company_code
+              c.name as company_name
        FROM users u
        JOIN companies c ON u.company_id = c.id
        WHERE LOWER(u.email) = LOWER($1)`,
@@ -29,19 +39,14 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
     );
   }
 
-  // Phone path. Strip leading 0 / non-digits.
-  const local = normalizeLocalPhone(trimmed);
+  const local = normalizePhone(trimmed);
   if (!local) return null;
 
-  // Try exact match first (works when user types just the local subscriber digits
-  // — that's how phones are stored). If nothing matches, try ENDSWITH so users
-  // who paste in country code prefixes still resolve.
   const direct = await queryOne<any>(
     `SELECT u.*,
             c.is_active as company_is_active,
             c.subscription_status,
-            c.name as company_name,
-            c.code as company_code
+            c.name as company_name
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone = $1
@@ -54,8 +59,7 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
     `SELECT u.*,
             c.is_active as company_is_active,
             c.subscription_status,
-            c.name as company_name,
-            c.code as company_code
+            c.name as company_name
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone IS NOT NULL AND $1 LIKE '%' || u.phone
@@ -79,7 +83,7 @@ function buildSafeUser(user: any, branchIds: string[]) {
     isActive: user.is_active,
     countryCode: user.country_code ?? null,
     phone: user.phone ?? null,
-    phoneVerified: user.phone_verified ?? false,
+    emailVerified: user.email_verified ?? false,
   };
 }
 
@@ -124,15 +128,14 @@ export const authRoutes = {
         return { status: 401 as const, body: { message: 'User account is inactive' } };
       }
 
-      // Block unverified phones
-      if (!user.phone_verified) {
+      // Block unverified emails — users must finish the OTP flow first.
+      if (!user.email_verified) {
         return {
           status: 403 as const,
           body: {
-            message: 'Please verify your phone number before logging in.',
-            code: 'PHONE_NOT_VERIFIED',
-            countryCode: user.country_code ?? '',
-            phone: user.phone ?? '',
+            message: 'Please verify your email address before logging in.',
+            code: 'EMAIL_NOT_VERIFIED',
+            email: user.email,
           },
         };
       }
@@ -170,8 +173,6 @@ export const authRoutes = {
   }: {
     body: {
       companyName: string;
-      companyEmail: string;
-      companyCode?: string;
       industry?: string;
       firstName: string;
       lastName: string;
@@ -180,15 +181,23 @@ export const authRoutes = {
       countryCode: string;
       phone: string;
       timezone?: string;
+      recaptchaToken?: string;
     };
   }) => {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     enforce(RATE_LIMITS.AUTH_EMAIL, (body.email || '').trim().toLowerCase() || null);
 
-    const client = await getClient();
+    const captcha = await verifyRecaptcha(body.recaptchaToken, {
+      expectedAction: 'register',
+      remoteIp: getClientIp(),
+    });
+    if (!captcha.ok) {
+      return { status: 400 as const, body: { message: captcha.reason } };
+    }
 
     const countryCode = normalizeCountryCode(body.countryCode);
-    const phone = normalizeLocalPhone(body.phone);
+    const phone = normalizePhone(body.phone);
+    const email = (body.email || '').trim().toLowerCase();
 
     if (!countryCode) {
       return { status: 400 as const, body: { message: 'Country code is required.' } };
@@ -196,26 +205,22 @@ export const authRoutes = {
     if (!phone) {
       return { status: 400 as const, body: { message: 'Phone number is required.' } };
     }
+    if (!email) {
+      return { status: 400 as const, body: { message: 'Email is required.' } };
+    }
+
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
 
-      const existingCompany = await queryOne(
-        'SELECT id FROM companies WHERE email = $1',
-        [body.companyEmail]
-      );
-      if (existingCompany) {
-        await client.query('ROLLBACK');
-        return { status: 400 as const, body: { message: 'Company already exists with this email' } };
-      }
-
       const existingUser = await queryOne(
-        'SELECT id FROM users WHERE email = $1',
-        [body.email]
+        'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
       );
       if (existingUser) {
         await client.query('ROLLBACK');
-        return { status: 400 as const, body: { message: 'User email already exists' } };
+        return { status: 400 as const, body: { message: 'An account with this email already exists.' } };
       }
 
       const existingPhone = await queryOne(
@@ -227,17 +232,15 @@ export const authRoutes = {
         return { status: 400 as const, body: { message: 'A user with this phone number already exists.' } };
       }
 
-      const companyCode = body.companyCode || `COMP-${Date.now().toString(36).toUpperCase()}`;
-
       const companyRes = await client.query(
         `INSERT INTO companies
-          (name, code, email, industry, subscription_tier, subscription_status,
+          (name, industry, subscription_tier, subscription_status,
            subscription_start_date, subscription_end_date, max_branches, max_users,
            timezone, currency, locale, is_active, onboarding_completed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
-          body.companyName, companyCode, body.companyEmail, 'Tech Center',
+          body.companyName, body.industry || 'Tech Center',
           'BASIC', 'TRIAL',
           new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false,
@@ -251,25 +254,25 @@ export const authRoutes = {
          RETURNING *`,
         [
           company.id, `${body.companyName} - Main Branch`, 'MAIN',
-          body.companyEmail, `+${countryCode}${phone}`, true, new Date(),
+          email, `+${countryCode}${phone}`, true, new Date(),
         ]
       );
       const branch = branchRes.rows[0];
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
 
-      // Generate OTP before INSERT so it's part of the transaction
+      // Generate OTP before INSERT so it's part of the transaction.
       const otp = generateOtp();
       const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
       const userRes = await client.query(
         `INSERT INTO users
           (company_id, branch_id, email, password, first_name, last_name, role,
-           is_active, country_code, phone, phone_verified, phone_otp, phone_otp_expires_at)
+           is_active, country_code, phone, email_verified, email_otp, email_otp_expires_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
-          company.id, branch.id, body.email, hashedPassword,
+          company.id, branch.id, email, hashedPassword,
           body.firstName, body.lastName, 'ADMIN', true,
           countryCode, phone, false, otp, otpExpiresAt,
         ]
@@ -304,19 +307,18 @@ export const authRoutes = {
 
       await client.query('COMMIT');
 
-      // Send OTP via WhatsApp (best-effort — failure does not block registration)
+      // Send OTP via SES (best-effort — failure does not block registration).
       try {
-        await sendOtpWhatsApp(countryCode, phone, otp);
+        await sendOtpEmail(email, otp, body.firstName);
       } catch (otpError) {
-        console.error('Failed to send WhatsApp OTP after registration:', otpError);
+        console.error('Failed to send verification email after registration:', otpError);
       }
 
       return {
         status: 201 as const,
         body: {
-          countryCode,
-          phone,
-          message: 'Registration successful. Please check WhatsApp for your 6-digit verification code.',
+          email,
+          message: 'Registration successful. Please check your email for the 6-digit verification code.',
         },
       };
     } catch (error: any) {
@@ -328,16 +330,10 @@ export const authRoutes = {
         const table: string = error?.table || '';
         const detail: string = error?.detail || '';
         let message = 'Registration failed due to a conflict.';
-        if (constraint === 'companies_code_key') {
-          message = 'Company code is already taken. Please choose a different code.';
-        } else if (table === 'companies' && detail.includes('email')) {
-          message = 'A company with this email already exists.';
-        } else if (constraint.includes('phone') || detail.includes('phone')) {
+        if (constraint.includes('phone') || detail.includes('phone')) {
           message = 'A user with this phone number already exists.';
         } else if (table === 'users' || constraint.includes('users')) {
           message = 'An account with this email already exists.';
-        } else if (table === 'branches' || constraint.includes('branches')) {
-          message = 'Company code is already taken. Please choose a different code.';
         }
         return { status: 400 as const, body: { message } };
       }
@@ -348,42 +344,40 @@ export const authRoutes = {
     }
   },
 
-  verifyPhone: async ({
+  verifyEmail: async ({
     body,
   }: {
-    body: { countryCode: string; phone: string; otp: string };
+    body: { email: string; otp: string };
   }) => {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
-      const countryCode = normalizeCountryCode(body.countryCode);
-      const phone = normalizeLocalPhone(body.phone);
-      // Per-phone cap on OTP attempts so an attacker can't brute-force a
+      const email = (body.email || '').trim().toLowerCase();
+      // Per-email cap on OTP attempts so an attacker can't brute-force a
       // known target even from a fresh IP. Six-digit OTPs only give 10^6
       // entropy, so this is essential.
-      const phoneKey = countryCode && phone ? `${countryCode}:${phone}` : null;
-      enforce(RATE_LIMITS.AUTH_EMAIL, phoneKey);
+      enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
       const user = await queryOne<any>(
         `SELECT u.*, c.is_active as company_is_active, c.name as company_name
          FROM users u
          JOIN companies c ON u.company_id = c.id
-         WHERE u.phone = $1 AND u.country_code = $2`,
-        [phone, countryCode]
+         WHERE LOWER(u.email) = LOWER($1)`,
+        [email]
       );
 
       if (!user) {
         return { status: 400 as const, body: { message: 'Invalid verification request.' } };
       }
 
-      if (user.phone_verified) {
-        return { status: 400 as const, body: { message: 'Phone number is already verified.' } };
+      if (user.email_verified) {
+        return { status: 400 as const, body: { message: 'Email is already verified.' } };
       }
 
-      if (!user.phone_otp || user.phone_otp !== body.otp) {
+      if (!user.email_otp || user.email_otp !== body.otp) {
         return { status: 400 as const, body: { message: 'Invalid verification code.' } };
       }
 
-      if (!user.phone_otp_expires_at || new Date(user.phone_otp_expires_at) < new Date()) {
+      if (!user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
         return {
           status: 400 as const,
           body: { message: 'Verification code has expired. Please request a new one.' },
@@ -392,7 +386,7 @@ export const authRoutes = {
 
       await query(
         `UPDATE users
-         SET phone_verified = TRUE, phone_otp = NULL, phone_otp_expires_at = NULL,
+         SET email_verified = TRUE, email_otp = NULL, email_otp_expires_at = NULL,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [user.id]
@@ -417,44 +411,42 @@ export const authRoutes = {
         body: {
           accessToken,
           refreshToken,
-          user: buildSafeUser({ ...user, phone_verified: true }, branchIds),
+          user: buildSafeUser({ ...user, email_verified: true }, branchIds),
         },
       };
     } catch (error) {
-      console.error('Verify phone error:', error);
+      console.error('Verify email error:', error);
       return { status: 400 as const, body: { message: 'Verification failed. Please try again.' } };
     }
   },
 
-  resendOtp: async ({
+  resendEmailOtp: async ({
     body,
   }: {
-    body: { countryCode: string; phone: string };
+    body: { email: string };
   }) => {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
-      const countryCode = normalizeCountryCode(body.countryCode);
-      const phone = normalizeLocalPhone(body.phone);
-      // Per-phone cap so an attacker can't pump WhatsApp messages at a
+      const email = (body.email || '').trim().toLowerCase();
+      // Per-email cap so an attacker can't pump verification emails at a
       // target. Same bucket as register/login since it's account-scoped.
-      const phoneKey = countryCode && phone ? `${countryCode}:${phone}` : null;
-      enforce(RATE_LIMITS.AUTH_EMAIL, phoneKey);
+      enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
       const user = await queryOne<any>(
-        'SELECT * FROM users WHERE phone = $1 AND country_code = $2',
-        [phone, countryCode]
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
       );
 
       if (!user) {
         // Generic response to avoid enumeration
         return {
           status: 200 as const,
-          body: { message: 'If your phone is registered, a new verification code has been sent.' },
+          body: { message: 'If your email is registered, a new verification code has been sent.' },
         };
       }
 
-      if (user.phone_verified) {
-        return { status: 400 as const, body: { message: 'This phone number is already verified.' } };
+      if (user.email_verified) {
+        return { status: 400 as const, body: { message: 'This email is already verified.' } };
       }
 
       const otp = generateOtp();
@@ -462,23 +454,23 @@ export const authRoutes = {
 
       await query(
         `UPDATE users
-         SET phone_otp = $1, phone_otp_expires_at = $2, updated_at = CURRENT_TIMESTAMP
+         SET email_otp = $1, email_otp_expires_at = $2, updated_at = CURRENT_TIMESTAMP
          WHERE id = $3`,
         [otp, otpExpiresAt, user.id]
       );
 
       try {
-        await sendOtpWhatsApp(countryCode, phone, otp);
+        await sendOtpEmail(user.email, otp, user.first_name);
       } catch (otpError) {
-        console.error('Failed to send WhatsApp OTP on resend:', otpError);
+        console.error('Failed to send verification email on resend:', otpError);
       }
 
       return {
         status: 200 as const,
-        body: { message: 'A new verification code has been sent to your WhatsApp.' },
+        body: { message: 'A new verification code has been sent to your email.' },
       };
     } catch (error) {
-      console.error('Resend OTP error:', error);
+      console.error('Resend email OTP error:', error);
       return { status: 400 as const, body: { message: 'Failed to resend code. Please try again.' } };
     }
   },

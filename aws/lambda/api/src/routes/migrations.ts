@@ -958,7 +958,64 @@ async function runPhoneAuthMigration() {
   return { success: true, message: 'Phone auth columns added to users table' };
 }
 
+async function runEmailVerificationMigration() {
+  console.log('Starting migration: switch to email verification, drop company code/email & phone OTP');
+
+  // 1) Add email OTP columns. Repurpose them from the phone OTP slot.
+  await query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email_otp VARCHAR(6),
+      ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ
+  `);
+
+  // 2) Ensure email_verified column exists and is NOT NULL with default FALSE.
+  await query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email_verified BOOLEAN
+  `);
+  await query(`UPDATE users SET email_verified = FALSE WHERE email_verified IS NULL`);
+  await query(`ALTER TABLE users ALTER COLUMN email_verified SET NOT NULL`);
+  await query(`ALTER TABLE users ALTER COLUMN email_verified SET DEFAULT FALSE`);
+
+  // 3) Backfill existing users to verified=true so we don't lock anyone out
+  //    when login starts gating on email_verified.
+  await query(`UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE`);
+
+  // 4) Drop phone OTP columns — no longer used (WhatsApp OTP removed).
+  await query(`ALTER TABLE users DROP COLUMN IF EXISTS phone_otp`);
+  await query(`ALTER TABLE users DROP COLUMN IF EXISTS phone_otp_expires_at`);
+  await query(`ALTER TABLE users DROP COLUMN IF EXISTS phone_verified`);
+
+  // 5) Drop legacy email_verification_token / expires (replaced by email_otp).
+  await query(`ALTER TABLE users DROP COLUMN IF EXISTS email_verification_token`);
+  await query(`ALTER TABLE users DROP COLUMN IF EXISTS email_verification_expires`);
+
+  // 6) Drop companies.code & companies.email — no longer collected at registration.
+  await query(`DROP INDEX IF EXISTS idx_companies_code`);
+  await query(`DROP INDEX IF EXISTS idx_companies_email`);
+  await query(`ALTER TABLE companies DROP COLUMN IF EXISTS code`);
+  await query(`ALTER TABLE companies DROP COLUMN IF EXISTS email`);
+
+  console.log('✅ Email verification migration applied');
+  return { success: true, message: 'Switched to email verification; dropped phone OTP & company code/email' };
+}
+
 export const migrationsRoutes = {
+  runEmailVerificationMigration: async () => {
+    try {
+      const result = await runEmailVerificationMigration();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   runPhoneAuthMigration: async () => {
     try {
       const result = await runPhoneAuthMigration();

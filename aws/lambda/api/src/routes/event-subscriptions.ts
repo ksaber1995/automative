@@ -36,7 +36,7 @@ export const eventSubscriptionsRoutes = {
   listByEvent: async ({ params, headers }: { params: { eventId: string }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const event = await queryOne(
@@ -70,7 +70,7 @@ export const eventSubscriptionsRoutes = {
   create: async ({ params, body, headers }: { params: { eventId: string }; body: any; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'write')) {
+      if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const event = await queryOne(
@@ -134,7 +134,7 @@ export const eventSubscriptionsRoutes = {
   listExpenses: async ({ params, headers }: { params: { eventId: string }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const event = await queryOne(
@@ -184,7 +184,7 @@ export const eventSubscriptionsRoutes = {
   listRefunds: async ({ params, headers }: { params: { eventId: string }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const event = await queryOne(
@@ -236,7 +236,7 @@ export const eventSubscriptionsRoutes = {
   createRefund: async ({ params, body, headers }: { params: { eventId: string }; body: any; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'write')) {
+      if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const event = await queryOne(
@@ -323,7 +323,7 @@ export const eventSubscriptionsRoutes = {
   remove: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'events', 'write')) {
+      if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
       const existing = await queryOne(

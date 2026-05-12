@@ -10,12 +10,12 @@ import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
-  selector: 'app-verify-phone',
+  selector: 'app-verify-email',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, InputTextModule, TranslateModule],
-  templateUrl: './verify-phone.component.html',
+  templateUrl: './verify-email.component.html',
 })
-export class VerifyPhoneComponent implements OnInit, OnDestroy {
+export class VerifyEmailComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
@@ -28,8 +28,7 @@ export class VerifyPhoneComponent implements OnInit, OnDestroy {
   resending = signal(false);
   resendCooldown = signal(0);
 
-  private countryCode = '';
-  private phone = '';
+  private email = '';
   private cooldownTimer: any;
 
   constructor() {
@@ -47,13 +46,11 @@ export class VerifyPhoneComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.countryCode = this.route.snapshot.queryParamMap.get('countryCode') || '';
-    this.phone = this.route.snapshot.queryParamMap.get('phone') || '';
-    if (!this.phone || !this.countryCode) {
+    this.email = this.route.snapshot.queryParamMap.get('email') || '';
+    if (!this.email) {
       this.router.navigate(['/auth/login']);
       return;
     }
-    // Start initial cooldown so user waits before spamming resend
     this.startCooldown(60);
   }
 
@@ -61,11 +58,13 @@ export class VerifyPhoneComponent implements OnInit, OnDestroy {
     clearInterval(this.cooldownTimer);
   }
 
-  maskedPhone(): string {
-    if (!this.phone) return '';
-    const last = this.phone.slice(-4);
-    const masked = '*'.repeat(Math.max(this.phone.length - 4, 2));
-    return `+${this.countryCode} ${masked}${last}`;
+  maskedEmail(): string {
+    if (!this.email) return '';
+    const [local, domain] = this.email.split('@');
+    if (!domain) return this.email;
+    const visible = local.slice(0, 2);
+    const masked = '*'.repeat(Math.max(local.length - 2, 2));
+    return `${visible}${masked}@${domain}`;
   }
 
   onSubmit() {
@@ -77,15 +76,15 @@ export class VerifyPhoneComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     const { otp } = this.otpForm.value;
 
-    this.authService.verifyPhone(this.countryCode, this.phone, otp).subscribe({
+    this.authService.verifyEmail(this.email, otp).subscribe({
       next: () => {
-        this.notificationService.success(this.translate.instant('AUTH.VERIFY_PHONE.VERIFY_SUCCESS'));
+        this.notificationService.success(this.translate.instant('AUTH.VERIFY_EMAIL.VERIFY_SUCCESS'));
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.loading.set(false);
         this.notificationService.error(
-          error.error?.message || this.translate.instant('AUTH.VERIFY_PHONE.VERIFY_FAILED')
+          error.error?.message || this.translate.instant('AUTH.VERIFY_EMAIL.VERIFY_FAILED')
         );
       },
     });
@@ -93,16 +92,16 @@ export class VerifyPhoneComponent implements OnInit, OnDestroy {
 
   resendOtp() {
     this.resending.set(true);
-    this.authService.resendOtp(this.countryCode, this.phone).subscribe({
+    this.authService.resendEmailOtp(this.email).subscribe({
       next: (res: any) => {
         this.resending.set(false);
-        this.notificationService.success(res.message || this.translate.instant('AUTH.VERIFY_PHONE.RESEND_SUCCESS'));
+        this.notificationService.success(res.message || this.translate.instant('AUTH.VERIFY_EMAIL.RESEND_SUCCESS'));
         this.startCooldown(60);
       },
       error: (error) => {
         this.resending.set(false);
         this.notificationService.error(
-          error.error?.message || this.translate.instant('AUTH.VERIFY_PHONE.RESEND_FAILED')
+          error.error?.message || this.translate.instant('AUTH.VERIFY_EMAIL.RESEND_FAILED')
         );
       },
     });

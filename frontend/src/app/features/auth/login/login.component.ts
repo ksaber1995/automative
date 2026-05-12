@@ -64,12 +64,11 @@ export class LoginComponent {
       },
       error: (error) => {
         this.loading.set(false);
-        if (error.status === 403 && error.error?.code === 'PHONE_NOT_VERIFIED') {
-          this.notificationService.error(this.translate.instant('AUTH.LOGIN.PHONE_NOT_VERIFIED'));
-          this.router.navigate(['/auth/verify-phone'], {
+        if (error.status === 403 && error.error?.code === 'EMAIL_NOT_VERIFIED') {
+          this.notificationService.error(this.translate.instant('AUTH.LOGIN.EMAIL_NOT_VERIFIED'));
+          this.router.navigate(['/auth/verify-email'], {
             queryParams: {
-              countryCode: error.error.countryCode || '',
-              phone: error.error.phone || '',
+              email: error.error.email || '',
             },
           });
           return;

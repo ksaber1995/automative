@@ -210,6 +210,10 @@ export class CoreStack extends cdk.Stack {
         // SES sender — must be a verified identity in AWS SES (email or domain).
         // netrofit.com is verified via the SES EmailIdentity construct above.
         SENDER_EMAIL: 'noreply@netrofit.com',
+        // Google reCAPTCHA v3 secret for server-side verification. When unset
+        // (dev), verifyRecaptcha skips the check and allows requests through.
+        // TODO: move to Secrets Manager once we're past the first deploy.
+        RECAPTCHA_V3_SECRET_KEY: process.env.RECAPTCHA_V3_SECRET_KEY ?? '6LcwMOYsAAAAALzbgYLfn0a7YuW9-MNufQL9M9Kp',
       },
       vpc,
       vpcSubnets: {

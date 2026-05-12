@@ -9,7 +9,7 @@ export const attendanceRoutes = {
   getBySession: async ({ params, headers }: { params: { sessionId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -72,7 +72,7 @@ export const attendanceRoutes = {
   saveForSession: async ({ params, body, headers }: { params: { sessionId: string }; body: { presentStudentIds: string[] }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'write')) {
+      if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -128,7 +128,7 @@ export const attendanceRoutes = {
   getByStudent: async ({ params, headers }: { params: { studentId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -188,7 +188,7 @@ export const attendanceRoutes = {
   getByClass: async ({ params, headers }: { params: { classId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -264,7 +264,7 @@ export const attendanceRoutes = {
   getTeachersBySession: async ({ params, headers }: { params: { sessionId: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -328,7 +328,7 @@ export const attendanceRoutes = {
   saveTeachersForSession: async ({ params, body, headers }: { params: { sessionId: string }; body: { teachers: Array<{ employeeId: string; role: string; status: string; notes?: string | null }> }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'write')) {
+      if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
@@ -378,7 +378,7 @@ export const attendanceRoutes = {
   getTeachersHistory: async ({ query: queryParams, headers }: { query: { branchId?: string; employeeId?: string; classId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 

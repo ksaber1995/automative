@@ -132,34 +132,35 @@ const LoginRequestSchema = z.object({
 const RegisterRequestSchema = z.object({
   // Company details
   companyName: z.string().min(1),
-  companyEmail: z.string().email(),
-  companyCode: z.preprocess((val) => (val === '' || val === null) ? undefined : val, z.string().optional()),
+  // Industry is hidden in the registration UI but submitted with a default
+  // ("Tech Center") so the backend can store it. Optional so future clients
+  // that omit it still validate.
+  industry: z.string().optional(),
 
   // User details (becomes company owner/admin)
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  // Phone is now required — it's the channel we use to verify the account.
   countryCode: z.string().min(1),
   phone: z.string().min(4),
+
+  // reCAPTCHA v3 token captured by the client before submit.
+  recaptchaToken: z.string().optional(),
 });
 
 const RegisterResponseSchema = z.object({
-  phone: z.string(),
-  countryCode: z.string(),
+  email: z.string(),
   message: z.string(),
 });
 
-const VerifyPhoneRequestSchema = z.object({
-  countryCode: z.string().min(1),
-  phone: z.string().min(4),
+const VerifyEmailRequestSchema = z.object({
+  email: z.string().email(),
   otp: z.string().length(6),
 });
 
-const ResendOtpRequestSchema = z.object({
-  countryCode: z.string().min(1),
-  phone: z.string().min(4),
+const ResendEmailOtpRequestSchema = z.object({
+  email: z.string().email(),
 });
 
 const SafeUserSchema = z.object({
@@ -176,7 +177,7 @@ const SafeUserSchema = z.object({
   isActive: z.boolean(),
   countryCode: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
-  phoneVerified: z.boolean().optional(),
+  emailVerified: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -188,7 +189,6 @@ const AuthResponseSchema = z.object({
   company: z.object({
     id: UUIDSchema,
     name: z.string(),
-    code: z.string(),
     subscriptionTier: SubscriptionTierSchema,
     subscriptionStatus: SubscriptionStatusSchema,
   }).optional(),
@@ -963,8 +963,7 @@ export const contract = c.router({
         403: z.object({
           message: z.string(),
           code: z.string(),
-          countryCode: z.string().optional(),
-          phone: z.string().optional(),
+          email: z.string().optional(),
         }),
       },
     },
@@ -977,19 +976,19 @@ export const contract = c.router({
         400: z.object({ message: z.string() }),
       },
     },
-    verifyPhone: {
+    verifyEmail: {
       method: 'POST',
-      path: '/api/auth/verify-phone',
-      body: VerifyPhoneRequestSchema,
+      path: '/api/auth/verify-email',
+      body: VerifyEmailRequestSchema,
       responses: {
         200: AuthResponseSchema,
         400: z.object({ message: z.string() }),
       },
     },
-    resendOtp: {
+    resendEmailOtp: {
       method: 'POST',
-      path: '/api/auth/resend-otp',
-      body: ResendOtpRequestSchema,
+      path: '/api/auth/resend-email-otp',
+      body: ResendEmailOtpRequestSchema,
       responses: {
         200: z.object({ message: z.string() }),
         400: z.object({ message: z.string() }),
@@ -1331,6 +1330,7 @@ export const contract = c.router({
         branchCount: z.number().optional(),
         message: z.string().optional(),
         source: z.string().optional(),
+        recaptchaToken: z.string().optional(),
       }),
       responses: {
         201: z.object({ id: UUIDSchema, message: z.string() }),
@@ -3081,6 +3081,15 @@ export const contract = c.router({
     runPhoneAuthMigration: {
       method: 'POST',
       path: '/api/migrations/add-phone-auth',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    runEmailVerificationMigration: {
+      method: 'POST',
+      path: '/api/migrations/email-verification',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

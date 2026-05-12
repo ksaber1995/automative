@@ -11,8 +11,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255),
     phone VARCHAR(50),
     address TEXT,
     city VARCHAR(100),
@@ -41,8 +39,6 @@ CREATE TABLE companies (
     CONSTRAINT companies_name_not_empty CHECK (LENGTH(TRIM(name)) > 0)
 );
 
-CREATE INDEX idx_companies_code ON companies(code);
-CREATE INDEX idx_companies_email ON companies(email);
 CREATE INDEX idx_companies_subscription_status ON companies(subscription_status);
 
 -- =============================================
@@ -86,18 +82,15 @@ CREATE TABLE users (
     branch_id UUID,
     -- Optional link from a user account to an employee record (runtime).
     linked_employee_id UUID,
-    -- Email verification (migration 010).
-    email_verified BOOLEAN DEFAULT false,
-    email_verification_token VARCHAR(255),
-    email_verification_expires TIMESTAMP WITH TIME ZONE,
+    -- Email verification — 6-digit OTP delivered via SES at registration.
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    email_otp VARCHAR(6),
+    email_otp_expires_at TIMESTAMPTZ,
     password_reset_token VARCHAR(255),
     password_reset_expires TIMESTAMP WITH TIME ZONE,
-    -- Phone-based registration / WhatsApp OTP verification.
+    -- Phone is captured at registration (no verification step).
     country_code VARCHAR(8),
     phone VARCHAR(32),
-    phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    phone_otp VARCHAR(6),
-    phone_otp_expires_at TIMESTAMPTZ,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

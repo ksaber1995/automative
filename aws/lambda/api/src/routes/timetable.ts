@@ -80,7 +80,7 @@ export const timetableRoutes = {
   }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'courses', 'read')) {
+      if (!checkGranularPermission(context, 'academy', 'read')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 

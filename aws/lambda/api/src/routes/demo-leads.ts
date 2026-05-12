@@ -1,5 +1,7 @@
 import { insert, query } from '../db/connection';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
+import { verifyRecaptcha } from '../utils/recaptcha';
+import { getClientIp } from '../utils/request-context';
 
 type AuthHeaders = { authorization?: string };
 
@@ -37,6 +39,14 @@ export const demoLeadsRoutes = {
       }
       if (!email || !EMAIL_RE.test(email)) {
         return { status: 400 as const, body: { message: 'Valid email is required' } };
+      }
+
+      const captcha = await verifyRecaptcha(body?.recaptchaToken, {
+        expectedAction: 'demo_lead',
+        remoteIp: getClientIp(),
+      });
+      if (!captcha.ok) {
+        return { status: 400 as const, body: { message: captcha.reason } };
       }
 
       const row = await insert('demo_leads', {

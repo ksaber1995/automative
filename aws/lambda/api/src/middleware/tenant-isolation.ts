@@ -11,13 +11,15 @@ import { enforce, RATE_LIMITS } from './rate-limit';
 
 // ─── Permission types (inlined to avoid cross-rootDir imports) ──────────────
 
-// `courses` permission also covers Classes, Master Courses, Rooms, Sessions, Timetable.
+// `academy` permission covers Courses, Classes, Master Courses, Rooms,
+// Sessions, Timetable, Attendance, and Events. Granting `academy.read` also
+// grants read access to `students` and `employees` (see checkGranularPermission).
 // `cash` permission also covers Withdrawals.
 type PermissionResource =
-  | 'dashboard' | 'branches' | 'courses' | 'students'
+  | 'dashboard' | 'branches' | 'academy' | 'students'
   | 'enrollments' | 'employees' | 'revenues' | 'expenses'
   | 'refunds' | 'debts' | 'products' | 'product_sales' | 'reports' | 'users'
-  | 'events' | 'cash';
+  | 'cash';
 
 type PermissionAction = 'read' | 'write' | 'delete';
 
@@ -31,64 +33,64 @@ const NO_ACCESS: ResourcePermission = { read: false, write: false, delete: false
 
 const ROLE_DEFAULTS: Record<string, UserPermissions> = {
   GLOBAL_ADMIN: {
-    dashboard: FULL, branches: FULL, courses: FULL,
+    dashboard: FULL, branches: FULL, academy: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
-    events: FULL, cash: FULL,
+    cash: FULL,
   },
   ADMIN: {
-    dashboard: FULL, branches: FULL, courses: FULL,
+    dashboard: FULL, branches: FULL, academy: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: FULL, users: FULL,
-    events: FULL, cash: FULL,
+    cash: FULL,
   },
   BRANCH_ADMIN: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
-    events: FULL, cash: READ_ONLY,
+    cash: READ_ONLY,
   },
   BRANCH_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: FULL,
     students: FULL, enrollments: FULL, employees: FULL, revenues: FULL,
     expenses: FULL, refunds: FULL, debts: FULL,
     products: FULL, product_sales: FULL, reports: READ_ONLY, users: NO_ACCESS,
-    events: FULL, cash: READ_ONLY,
+    cash: READ_ONLY,
   },
   ACADEMIC_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: FULL,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: FULL,
     students: FULL, enrollments: READ_WRITE, employees: READ_ONLY,
     revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
-    events: FULL, cash: NO_ACCESS,
+    cash: NO_ACCESS,
   },
   SALES_MANAGER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: READ_ONLY,
     students: READ_WRITE, enrollments: READ_WRITE, employees: READ_ONLY,
     revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: FULL,
     product_sales: FULL, reports: NO_ACCESS, users: NO_ACCESS,
-    events: READ_ONLY, cash: NO_ACCESS,
+    cash: NO_ACCESS,
   },
   ACCOUNTANT: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: READ_ONLY,
     students: READ_ONLY, enrollments: READ_ONLY, employees: READ_ONLY,
     revenues: FULL, expenses: FULL, refunds: FULL,
     debts: FULL, products: READ_ONLY, product_sales: READ_ONLY,
     reports: FULL, users: NO_ACCESS,
-    events: READ_ONLY, cash: FULL,
+    cash: FULL,
   },
   VIEWER: {
-    dashboard: READ_ONLY, branches: READ_ONLY, courses: READ_ONLY,
+    dashboard: READ_ONLY, branches: READ_ONLY, academy: READ_ONLY,
     students: READ_ONLY, enrollments: READ_ONLY, employees: NO_ACCESS,
     revenues: NO_ACCESS, expenses: NO_ACCESS,
     refunds: NO_ACCESS, debts: NO_ACCESS, products: READ_ONLY,
     product_sales: NO_ACCESS, reports: NO_ACCESS, users: NO_ACCESS,
-    events: READ_ONLY, cash: NO_ACCESS,
+    cash: NO_ACCESS,
   },
 };
 
@@ -214,6 +216,20 @@ export function checkGranularPermission(
   context: TenantContext,
   resource: PermissionResource,
   action: PermissionAction
+): boolean {
+  if (resolveDirect(context, resource, action)) return true;
+  // Cascade: academy.read implies students.read + employees.read. Write/delete
+  // do not cascade — those resources need their own explicit permission.
+  if (action === 'read' && (resource === 'students' || resource === 'employees')) {
+    return resolveDirect(context, 'academy', 'read');
+  }
+  return false;
+}
+
+function resolveDirect(
+  context: TenantContext,
+  resource: PermissionResource,
+  action: PermissionAction,
 ): boolean {
   const custom = context.permissions?.[resource]?.[action];
   if (custom !== undefined) return custom as boolean;

@@ -18,8 +18,12 @@ export interface ResourcePermission {
 export interface UserPermissions {
   dashboard?: Partial<ResourcePermission>;
   branches?: Partial<ResourcePermission>;
-  /** Courses permission also covers Classes, Master Courses, Rooms, Sessions, and Timetable. */
-  courses?: Partial<ResourcePermission>;
+  /**
+   * Academy permission covers: Courses, Classes, Master Courses, Rooms,
+   * Sessions, Timetable, Attendance, and Events. Granting `academy.read`
+   * additionally grants read access to `students` and `employees`.
+   */
+  academy?: Partial<ResourcePermission>;
   students?: Partial<ResourcePermission>;
   enrollments?: Partial<ResourcePermission>;
   employees?: Partial<ResourcePermission>;
@@ -31,7 +35,6 @@ export interface UserPermissions {
   product_sales?: Partial<ResourcePermission>;
   reports?: Partial<ResourcePermission>;
   users?: Partial<ResourcePermission>;
-  events?: Partial<ResourcePermission>;
   /** Cash permission also covers Withdrawals. */
   cash?: Partial<ResourcePermission>;
 }
@@ -42,7 +45,7 @@ export type PermissionAction = keyof ResourcePermission;
 export const PERMISSION_RESOURCES: PermissionResource[] = [
   'dashboard',
   'branches',
-  'courses',
+  'academy',
   'students',
   'enrollments',
   'employees',
@@ -54,7 +57,6 @@ export const PERMISSION_RESOURCES: PermissionResource[] = [
   'product_sales',
   'reports',
   'users',
-  'events',
   'cash',
 ];
 
@@ -80,7 +82,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
   [UserRole.GLOBAL_ADMIN]: {
     dashboard:    FULL,
     branches:     FULL,
-    courses:      FULL,
+    academy:      FULL,
     students:     FULL,
     enrollments:  FULL,
     employees:    FULL,
@@ -92,13 +94,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      FULL,
     users:        FULL,
-    events: FULL,
     cash: FULL,
   },
   [UserRole.ADMIN]: {
     dashboard:    FULL,
     branches:     FULL,
-    courses:      FULL,
+    academy:      FULL,
     students:     FULL,
     enrollments:  FULL,
     employees:    FULL,
@@ -110,13 +111,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      FULL,
     users:        FULL,
-    events: FULL,
     cash: FULL,
   },
   [UserRole.BRANCH_ADMIN]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      FULL,
+    academy:      FULL,
     students:     FULL,
     enrollments:  FULL,
     employees:    FULL,
@@ -128,13 +128,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      READ_ONLY,
     users:        NO_ACCESS,
-    events: FULL,
     cash: READ_ONLY,
   },
   [UserRole.BRANCH_MANAGER]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      FULL,
+    academy:      FULL,
     students:     FULL,
     enrollments:  FULL,
     employees:    FULL,
@@ -146,13 +145,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      READ_ONLY,
     users:        NO_ACCESS,
-    events: FULL,
     cash: READ_ONLY,
   },
   [UserRole.ACADEMIC_MANAGER]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      FULL,
+    academy:      FULL,
     students:     FULL,
     enrollments:  READ_WRITE,
     employees:    READ_ONLY,
@@ -164,13 +162,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: NO_ACCESS,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
-    events: FULL,
     cash: NO_ACCESS,
   },
   [UserRole.SALES_MANAGER]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      READ_ONLY,
+    academy:      READ_ONLY,
     students:     READ_WRITE,
     enrollments:  READ_WRITE,
     employees:    READ_ONLY,
@@ -182,13 +179,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: FULL,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
-    events: READ_ONLY,
     cash: NO_ACCESS,
   },
   [UserRole.ACCOUNTANT]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      READ_ONLY,
+    academy:      READ_ONLY,
     students:     READ_ONLY,
     enrollments:  READ_ONLY,
     employees:    READ_ONLY,
@@ -200,13 +196,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: READ_ONLY,
     reports:      FULL,
     users:        NO_ACCESS,
-    events: READ_ONLY,
     cash: FULL,
   },
   [UserRole.VIEWER]: {
     dashboard:    READ_ONLY,
     branches:     READ_ONLY,
-    courses:      READ_ONLY,
+    academy:      READ_ONLY,
     students:     READ_ONLY,
     enrollments:  READ_ONLY,
     employees:    NO_ACCESS,
@@ -218,13 +213,18 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     product_sales: NO_ACCESS,
     reports:      NO_ACCESS,
     users:        NO_ACCESS,
-    events: READ_ONLY,
     cash: NO_ACCESS,
   },
 };
 
 /**
  * Resolve the effective permission for a user on a given resource and action.
+ *
+ * Cascade rule: `academy.read` additionally grants `students.read` and
+ * `employees.read` even when those are otherwise denied. Write/delete do
+ * NOT cascade — write access to students/employees requires its own
+ * explicit permission.
+ *
  * Custom permissions in `userPermissions` override role defaults.
  */
 export function resolvePermission(
@@ -233,10 +233,24 @@ export function resolvePermission(
   action: PermissionAction,
   userPermissions?: UserPermissions | null
 ): boolean {
-  // Custom permission override takes precedence
+  const direct = resolveDirect(role, resource, action, userPermissions);
+  if (direct) return true;
+
+  // Cascade: academy.read implies students.read + employees.read.
+  if (action === 'read' && (resource === 'students' || resource === 'employees')) {
+    return resolveDirect(role, 'academy', 'read', userPermissions);
+  }
+  return false;
+}
+
+function resolveDirect(
+  role: UserRole,
+  resource: PermissionResource,
+  action: PermissionAction,
+  userPermissions?: UserPermissions | null
+): boolean {
   if (userPermissions?.[resource]?.[action] !== undefined) {
     return userPermissions[resource]![action] as boolean;
   }
-  // Fall back to role default
   return ROLE_DEFAULT_PERMISSIONS[role]?.[resource]?.[action] ?? false;
 }

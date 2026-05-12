@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { LanguageService } from '../../../core/services/language.service';
+import { RecaptchaService } from '../../../core/services/recaptcha.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RegisterDto } from '@shared/interfaces/user.interface';
 
@@ -23,6 +24,7 @@ export class RegisterComponent {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private recaptcha = inject(RecaptchaService);
   languageService = inject(LanguageService);
 
   registerForm: FormGroup;
@@ -32,8 +34,9 @@ export class RegisterComponent {
     this.registerForm = this.fb.group({
       // Company Information
       companyName: ['', [Validators.required, Validators.minLength(2)]],
-      companyEmail: ['', [Validators.required, Validators.email]],
-      companyCode: [''],
+      // TODO: re-enable later. Hidden for now to simplify onboarding.
+      // companyEmail: ['', [Validators.required, Validators.email]],
+      // companyCode: [''],
 
       // User Information (Company Owner)
       firstName: ['', [Validators.required]],
@@ -60,7 +63,7 @@ export class RegisterComponent {
     return null;
   }
 
-  onSubmit() {
+  async onSubmit() {
     if (this.registerForm.invalid) {
       this.registerForm.markAllAsTouched();
       return;
@@ -69,21 +72,31 @@ export class RegisterComponent {
     this.loading.set(true);
     const { confirmPassword, ...registerData } = this.registerForm.value;
 
+    let recaptchaToken = '';
+    try {
+      recaptchaToken = await this.recaptcha.execute('register');
+    } catch (err) {
+      console.error('reCAPTCHA execute failed:', err);
+    }
+
     // Strip + and any non-digits client-side so the user can paste "+20"
     // and the trunk-zero on the local number.
     const dto: RegisterDto = {
       ...registerData,
+      // Industry is hidden in the UI for now but still required downstream —
+      // hard-coded here until we expose a picker.
+      industry: 'Tech Center',
       countryCode: String(registerData.countryCode || '').replace(/\D/g, ''),
       phone: String(registerData.phone || '').replace(/\D/g, '').replace(/^0+/, ''),
+      recaptchaToken,
     };
 
     this.authService.register(dto).subscribe({
       next: (response) => {
         this.notificationService.success(this.translate.instant('AUTH.REGISTER.SUCCESS'));
-        this.router.navigate(['/auth/verify-phone'], {
+        this.router.navigate(['/auth/verify-email'], {
           queryParams: {
-            countryCode: response.countryCode,
-            phone: response.phone,
+            email: response.email,
           },
         });
       },
@@ -98,8 +111,9 @@ export class RegisterComponent {
 
   // Form field getters
   get companyName() { return this.registerForm.get('companyName'); }
-  get companyEmail() { return this.registerForm.get('companyEmail'); }
-  get companyCode() { return this.registerForm.get('companyCode'); }
+  // TODO: re-enable later. Hidden for now to simplify onboarding.
+  // get companyEmail() { return this.registerForm.get('companyEmail'); }
+  // get companyCode() { return this.registerForm.get('companyCode'); }
   get firstName() { return this.registerForm.get('firstName'); }
   get lastName() { return this.registerForm.get('lastName'); }
   get email() { return this.registerForm.get('email'); }

@@ -12,6 +12,7 @@ export interface DemoLeadDto {
   branchCount?: number;
   message?: string;
   source?: string;
+  recaptchaToken?: string;
 }
 
 export interface DemoLeadResponse {

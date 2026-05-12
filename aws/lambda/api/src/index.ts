@@ -50,8 +50,8 @@ const router = {
   auth: {
     login: authRoutes.login,
     register: authRoutes.register,
-    verifyPhone: authRoutes.verifyPhone,
-    resendOtp: authRoutes.resendOtp,
+    verifyEmail: authRoutes.verifyEmail,
+    resendEmailOtp: authRoutes.resendEmailOtp,
     profile: authRoutes.profile,
   },
   students: studentsRoutes,

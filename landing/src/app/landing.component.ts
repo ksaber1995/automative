@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { DOCUMENT } from '@angular/common';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DemoLeadService } from './demo-lead.service';
+import { RecaptchaService } from './recaptcha.service';
 import { environment } from '../environments/environment';
 
 type Currency = 'EGP' | 'SAR';
@@ -33,7 +34,7 @@ interface RoadmapPhase {
     <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
       <div class="container-custom h-16 flex items-center justify-between">
         <a href="#top" class="flex items-center">
-          <img src="logo.png" alt="Netrofit" class="w-12 h-12 rounded-lg" />
+          <img src="logo-white.png" alt="Netrofit" class="w-12 h-12 rounded-lg" />
         </a>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
           <a href="#benefits" class="hover:text-brand-600">{{ 'NAV.BENEFITS' | translate }}</a>
@@ -428,7 +429,7 @@ interface RoadmapPhase {
       <div class="container-custom flex flex-col md:flex-row justify-between gap-6">
         <div>
           <div class="flex items-center mb-2">
-            <img src="logo.png" alt="Netrofit" class="w-10 h-10 rounded" />
+            <img src="logo-white.png" alt="Netrofit" class="w-10 h-10 rounded" />
           </div>
           <p>{{ 'FOOTER.COPY' | translate: { year: currentYear } }}</p>
         </div>
@@ -542,6 +543,7 @@ interface RoadmapPhase {
 })
 export class LandingComponent {
   private demoLeadService = inject(DemoLeadService);
+  private recaptcha = inject(RecaptchaService);
   private translate = inject(TranslateService);
   private doc = inject(DOCUMENT);
 
@@ -817,10 +819,17 @@ export class LandingComponent {
     }
   }
 
-  submit() {
+  async submit() {
     if (this.submitting()) return;
     this.submitting.set(true);
     this.error.set(null);
+
+    let recaptchaToken = '';
+    try {
+      recaptchaToken = await this.recaptcha.execute('demo_lead');
+    } catch (err) {
+      console.error('reCAPTCHA execute failed:', err);
+    }
 
     this.demoLeadService
       .submit({
@@ -832,6 +841,7 @@ export class LandingComponent {
         branchCount: this.form.branchCount ?? undefined,
         message: this.form.message.trim() || undefined,
         source: this.source,
+        recaptchaToken: recaptchaToken || undefined,
       })
       .subscribe({
         next: (res) => {

@@ -31,7 +31,7 @@ export interface SafeUser {
   isActive: boolean;
   countryCode?: string | null;
   phone?: string | null;
-  phoneVerified?: boolean;
+  emailVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,8 +78,6 @@ export interface LoginDto {
 export interface RegisterDto {
   // Company details
   companyName: string;
-  companyEmail: string;
-  companyCode?: string;
   industry?: string;
   timezone?: string;
 
@@ -90,12 +88,14 @@ export interface RegisterDto {
   password: string;
   countryCode: string;
   phone: string;
+
+  // Google reCAPTCHA v3 token captured on the client before submit.
+  recaptchaToken?: string;
 }
 
 export interface CompanySummary {
   id: string;
   name: string;
-  code: string;
   subscriptionTier: string;
   subscriptionStatus: string;
 }
@@ -108,7 +108,6 @@ export interface AuthResponse {
 }
 
 export interface RegisterResponse {
-  countryCode: string;
-  phone: string;
+  email: string;
   message: string;
 }
