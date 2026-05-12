@@ -570,10 +570,43 @@ psql -d automate_magic -c "
 8. ✅ **Test** every endpoint with multiple companies
 9. ✅ **Index** company_id on all tables
 10. ✅ **Document** any company-wide resources (is_global flag)
+11. ✅ **Parameterize every value** — see `aws/lambda/api/SECURITY.md`
+12. ✅ **Rate-limit public endpoints** — see rate-limit section in `aws/lambda/api/SECURITY.md`
+
+## SQL Injection + Rate Limiting — Read Before Adding an Endpoint
+
+Full rules live in **`aws/lambda/api/SECURITY.md`**. Highlights:
+
+- Use `$N` placeholders for every value that came from `body`, `params`,
+  `query`, or `headers` — including UUIDs, booleans, and numbers.
+- Identifiers (table / column / ORDER BY) cannot be parameterized — use
+  an allowlist (see `OWNERSHIP_TABLE_ALLOWLIST` and `SAFE_IDENT` in
+  `middleware/tenant-isolation.ts`).
+- `LIKE`/`ILIKE`: wrap `%…%` outside the SQL and pass as a parameter.
+- `INTERVAL`: use `make_interval(months => $N::int)`, not
+  `INTERVAL '${n} months'`.
+- Never pass raw `body`/`params`/`query` to the `insert` / `update`
+  helpers in `db/connection.ts` — keys become column names, so build an
+  allowlisted object first.
+- Use `appendBranchSqlFilter(context, params, alias)` for tenant branch
+  scoping. The legacy `getBranchSqlFilter` is `@deprecated` because it
+  interpolates IDs directly.
+
+**Rate limiting:**
+- Authenticated endpoints: no action needed — `extractTenantContext`
+  applies per-user + per-company limits automatically.
+- Public endpoints: call `enforceByIp(RATE_LIMITS.AUTH_IP)` (auth flows)
+  or `enforceByIp(RATE_LIMITS.PUBLIC_FORM_IP)` (contact / demo) at the
+  top of the route. If the endpoint takes an email/phone identifier, also
+  call `enforce(RATE_LIMITS.AUTH_EMAIL, normalizedIdentifier)`.
+- Counters are in-memory per Lambda container — fine for casual abuse,
+  not a defense against a distributed attacker. Layer API Gateway
+  throttling or WAF for that.
 
 ## Questions?
 
 Refer to:
+- `aws/lambda/api/SECURITY.md` - SQL injection rules + review checklist
 - `DEPLOYMENT_GUIDE.md` - Full deployment instructions
 - `MULTI_TENANT_TRANSFORMATION.md` - Implementation summary
 - `test-multi-tenant.sh` - Testing examples

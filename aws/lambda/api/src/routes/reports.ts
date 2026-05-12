@@ -311,8 +311,8 @@ export const reportsRoutes = {
       }
       const inactiveMonths = Math.min(Math.max(parseInt(q.inactiveMonths || '3', 10) || 3, 1), 24);
       const branchClause = q.branchId ? ' AND s.branch_id = $2' : '';
-      const params: any[] = [context.companyId];
-      if (q.branchId) params.push(q.branchId);
+      const totalsParams: any[] = [context.companyId];
+      if (q.branchId) totalsParams.push(q.branchId);
 
       const totals = await query(
         `SELECT
@@ -322,8 +322,12 @@ export const reportsRoutes = {
          FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
          WHERE b.company_id = $1 ${branchClause}`,
-        params
+        totalsParams
       );
+      const inactiveParams: any[] = [context.companyId];
+      if (q.branchId) inactiveParams.push(q.branchId);
+      inactiveParams.push(inactiveMonths);
+      const monthsParamIdx = inactiveParams.length;
       const inactive = await query(
         `SELECT COUNT(*) AS c FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
@@ -332,9 +336,9 @@ export const reportsRoutes = {
            AND NOT EXISTS (
              SELECT 1 FROM enrollments e
              WHERE e.student_id = s.id
-               AND e.enrollment_date >= (CURRENT_DATE - INTERVAL '${inactiveMonths} months')
+               AND e.enrollment_date >= (CURRENT_DATE - make_interval(months => $${monthsParamIdx}::int))
            )`,
-        params
+        inactiveParams
       );
 
       const total = parseInt(totals[0]?.total || '0', 10);

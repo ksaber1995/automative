@@ -6,7 +6,7 @@ import {
   checkGranularPermission,
   isAuthError,
   isSubscriptionError,
-  getBranchSqlFilter,
+  appendBranchSqlFilter,
 } from '../middleware/tenant-isolation';
 
 function mapEventFromDB(row: any) {
@@ -84,7 +84,7 @@ export const eventsRoutes = {
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
       } else if (!isGlobalAdmin(context)) {
-        const branchFilter = getBranchSqlFilter(context, 'branch_id');
+        const branchFilter = appendBranchSqlFilter(context, params, 'branch_id');
         if (branchFilter) sql += ` AND (${branchFilter} OR branch_id IS NULL)`;
       }
 

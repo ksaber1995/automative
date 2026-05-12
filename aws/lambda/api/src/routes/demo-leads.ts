@@ -1,4 +1,5 @@
 import { insert, query } from '../db/connection';
+import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 
 type AuthHeaders = { authorization?: string };
 
@@ -22,11 +23,15 @@ function mapRow(row: any) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const demoLeadsRoutes = {
-  // Public — no auth required. Rate-limited implicitly by API Gateway.
+  // Public — no auth required. Rate-limited by client IP and by submitted
+  // email so a spammer can't either flood from one IP or pivot through many
+  // IPs to keep hammering the same address.
   create: async ({ body, headers }: { body: any; headers: AuthHeaders }) => {
+    enforceByIp(RATE_LIMITS.PUBLIC_FORM_IP);
     try {
       const name = (body?.name || '').toString().trim();
       const email = (body?.email || '').toString().trim().toLowerCase();
+      enforce(RATE_LIMITS.PUBLIC_FORM_IP, email || null);
       if (!name || name.length < 2) {
         return { status: 400 as const, body: { message: 'Name is required' } };
       }

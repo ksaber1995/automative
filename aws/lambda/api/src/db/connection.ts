@@ -53,7 +53,10 @@ export async function getClient(): Promise<PoolClient> {
   return await pool.connect();
 }
 
-// Utility functions for common operations
+// Utility functions for common operations.
+// SECURITY: `table` and the keys of `data` are interpolated as SQL identifiers.
+// Callers MUST pass developer-controlled values — never `req.body` directly.
+// See aws/lambda/api/SECURITY.md.
 export async function insert<T = any>(
   table: string,
   data: Record<string, any>

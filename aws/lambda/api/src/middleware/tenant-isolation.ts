@@ -7,6 +7,7 @@
  */
 
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
+import { enforce, RATE_LIMITS } from './rate-limit';
 
 // ─── Permission types (inlined to avoid cross-rootDir imports) ──────────────
 
@@ -127,6 +128,13 @@ export async function extractTenantContext(authHeader?: string): Promise<TenantC
   const decoded = await verifyToken(token);
   if (!decoded.companyId) throw new Error('Invalid token: missing company context');
 
+  // Rate limit every authenticated request — per-user catches a runaway
+  // client; per-company caps a single tenant's share of the Lambda budget.
+  // Throws TsRestHttpError(429) which propagates to API Gateway directly,
+  // so individual routes don't need to declare 429 in their contracts.
+  enforce(RATE_LIMITS.AUTHED_USER, decoded.id);
+  enforce(RATE_LIMITS.AUTHED_COMPANY, decoded.companyId);
+
   const { queryOne, query } = await import('../db/connection');
 
   // Check subscription
@@ -169,11 +177,24 @@ export async function extractTenantContext(authHeader?: string): Promise<TenantC
   };
 }
 
+// `tableName` is an SQL identifier (cannot be parameterized) — restrict to an
+// explicit allowlist so this helper can never be turned into an injection sink.
+const OWNERSHIP_TABLE_ALLOWLIST = new Set([
+  'branches', 'courses', 'classes', 'master_courses', 'rooms', 'students',
+  'enrollments', 'master_enrollments', 'employees', 'expenses',
+  'expense_payments', 'product_sales', 'products', 'events',
+  'event_subscriptions', 'revenues', 'refunds', 'debts', 'withdrawals',
+  'installment_plans', 'sessions', 'attendance', 'demo_leads',
+]);
+
 export async function validateCompanyOwnership(
   companyId: string,
   tableName: string,
   resourceId: string
 ): Promise<boolean> {
+  if (!OWNERSHIP_TABLE_ALLOWLIST.has(tableName)) {
+    throw new Error(`validateCompanyOwnership: table "${tableName}" not in allowlist`);
+  }
   const { queryOne } = await import('../db/connection');
   return !!(await queryOne(
     `SELECT id FROM ${tableName} WHERE id = $1 AND company_id = $2`,
@@ -218,21 +239,70 @@ export function getBranchFilter(context: TenantContext, requestedBranchId?: stri
   return context.branchId || null;
 }
 
-export function getBranchSqlFilter(context: TenantContext, columnAlias = 'branch_id'): string | null {
+// Column alias is an SQL identifier (cannot be parameterized). Restrict to
+// safe identifier characters to make the helper non-injectable even if a
+// future caller passes an attacker-controlled value.
+const SAFE_IDENT = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+
+/**
+ * Appends a parameterized branch filter to `params` and returns the SQL
+ * fragment (or null if no branch filter applies). Caller is responsible for
+ * splicing the returned fragment into their query.
+ *
+ * Use this in place of the legacy `getBranchSqlFilter`, which returned a raw
+ * SQL string with values interpolated via template literals.
+ */
+export function appendBranchSqlFilter(
+  context: TenantContext,
+  params: any[],
+  columnAlias = 'branch_id'
+): string | null {
+  if (!SAFE_IDENT.test(columnAlias)) {
+    throw new Error(`appendBranchSqlFilter: unsafe column alias "${columnAlias}"`);
+  }
   if (isGlobalAdmin(context)) return null;
   if (
     (context.role === 'BRANCH_ADMIN' || context.role === 'BRANCH_MANAGER') &&
     context.branchIds && context.branchIds.length > 0
   ) {
-    if (context.branchIds.length === 1) return `${columnAlias} = '${context.branchIds[0]}'`;
-    return `${columnAlias} IN (${context.branchIds.map(id => `'${id}'`).join(', ')})`;
+    const placeholders = context.branchIds.map(id => {
+      params.push(id);
+      return `$${params.length}`;
+    }).join(', ');
+    return `${columnAlias} IN (${placeholders})`;
   }
-  if (context.branchId) return `${columnAlias} = '${context.branchId}'`;
+  if (context.branchId) {
+    params.push(context.branchId);
+    return `${columnAlias} = $${params.length}`;
+  }
   return null;
 }
 
-export function buildCompanyFilter(companyId: string, additionalConditions?: string): string {
-  let clause = `WHERE company_id = '${companyId}'`;
-  if (additionalConditions) clause += ` AND ${additionalConditions}`;
-  return clause;
+/** @deprecated Use `appendBranchSqlFilter` — this version interpolates IDs into SQL. */
+export function getBranchSqlFilter(context: TenantContext, columnAlias = 'branch_id'): string | null {
+  if (!SAFE_IDENT.test(columnAlias)) {
+    throw new Error(`getBranchSqlFilter: unsafe column alias "${columnAlias}"`);
+  }
+  if (isGlobalAdmin(context)) return null;
+  // Safe today because branchIds/branchId originate from a signed JWT and the
+  // DB-side `user_branches.branch_id` column is UUID (postgres rejects any
+  // value that doesn't parse as a UUID). Still — prefer appendBranchSqlFilter.
+  const isUuid = (v: string) => /^[0-9a-fA-F-]{36}$/.test(v);
+  if (
+    (context.role === 'BRANCH_ADMIN' || context.role === 'BRANCH_MANAGER') &&
+    context.branchIds && context.branchIds.length > 0
+  ) {
+    if (!context.branchIds.every(isUuid)) {
+      throw new Error('getBranchSqlFilter: branchIds contains non-UUID value');
+    }
+    if (context.branchIds.length === 1) return `${columnAlias} = '${context.branchIds[0]}'`;
+    return `${columnAlias} IN (${context.branchIds.map(id => `'${id}'`).join(', ')})`;
+  }
+  if (context.branchId) {
+    if (!isUuid(context.branchId)) {
+      throw new Error('getBranchSqlFilter: branchId is not a UUID');
+    }
+    return `${columnAlias} = '${context.branchId}'`;
+  }
+  return null;
 }

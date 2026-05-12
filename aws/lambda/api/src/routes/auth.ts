@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { query, queryOne, getClient } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { sendOtpWhatsApp, normalizeLocalPhone, normalizeCountryCode } from '../utils/whatsapp';
+import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -97,6 +98,8 @@ async function loadBranchIds(user: any): Promise<string[]> {
 
 export const authRoutes = {
   login: async ({ body }: { body: { identifier: string; password: string } }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
+    enforce(RATE_LIMITS.AUTH_EMAIL, (body.identifier || '').trim().toLowerCase() || null);
     try {
       const user = await findUserByIdentifier(body.identifier);
 
@@ -179,6 +182,9 @@ export const authRoutes = {
       timezone?: string;
     };
   }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
+    enforce(RATE_LIMITS.AUTH_EMAIL, (body.email || '').trim().toLowerCase() || null);
+
     const client = await getClient();
 
     const countryCode = normalizeCountryCode(body.countryCode);
@@ -347,9 +353,15 @@ export const authRoutes = {
   }: {
     body: { countryCode: string; phone: string; otp: string };
   }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
       const countryCode = normalizeCountryCode(body.countryCode);
       const phone = normalizeLocalPhone(body.phone);
+      // Per-phone cap on OTP attempts so an attacker can't brute-force a
+      // known target even from a fresh IP. Six-digit OTPs only give 10^6
+      // entropy, so this is essential.
+      const phoneKey = countryCode && phone ? `${countryCode}:${phone}` : null;
+      enforce(RATE_LIMITS.AUTH_EMAIL, phoneKey);
 
       const user = await queryOne<any>(
         `SELECT u.*, c.is_active as company_is_active, c.name as company_name
@@ -419,9 +431,14 @@ export const authRoutes = {
   }: {
     body: { countryCode: string; phone: string };
   }) => {
+    enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
       const countryCode = normalizeCountryCode(body.countryCode);
       const phone = normalizeLocalPhone(body.phone);
+      // Per-phone cap so an attacker can't pump WhatsApp messages at a
+      // target. Same bucket as register/login since it's account-scoped.
+      const phoneKey = countryCode && phone ? `${countryCode}:${phone}` : null;
+      enforce(RATE_LIMITS.AUTH_EMAIL, phoneKey);
 
       const user = await queryOne<any>(
         'SELECT * FROM users WHERE phone = $1 AND country_code = $2',

@@ -10,6 +10,7 @@ import { createLambdaHandler } from '@ts-rest/serverless/aws';
 type ApiGatewayEvent = APIGatewayProxyEvent | APIGatewayProxyEventV2;
 type ApiGatewayResponse = APIGatewayProxyResult | APIGatewayProxyResultV2;
 import { contract } from './contract';
+import { runWithRequestContext } from './utils/request-context';
 import { authRoutes } from './routes/auth';
 import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
@@ -138,6 +139,27 @@ const lambdaHandler = createLambdaHandler(contract, router, {
   ],
 });
 
+/**
+ * Best-effort client IP extraction. API Gateway forwards the original client
+ * IP either in `x-forwarded-for` (comma-separated; first hop is the client)
+ * or in `event.requestContext.identity.sourceIp` (REST v1) /
+ * `event.requestContext.http.sourceIp` (HTTP v2). Returns `null` only when
+ * none of those fields are populated, which should be vanishingly rare in
+ * practice but we tolerate it gracefully (the rate limiter no-ops on null).
+ */
+function extractClientIp(event: ApiGatewayEvent): string | null {
+  const headers = event.headers || {};
+  const xff = headers['x-forwarded-for'] ?? headers['X-Forwarded-For'];
+  if (typeof xff === 'string' && xff.length > 0) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  if ('rawPath' in event) {
+    return event.requestContext?.http?.sourceIp ?? null;
+  }
+  return (event as APIGatewayProxyEvent).requestContext?.identity?.sourceIp ?? null;
+}
+
 export const handler = async (
   event: ApiGatewayEvent,
   context: Context
@@ -150,9 +172,10 @@ export const handler = async (
     headers: event.headers,
   });
 
+  const ip = extractClientIp(event);
+
   try {
-    const result = await lambdaHandler(event, context);
-    return result;
+    return await runWithRequestContext({ ip }, () => lambdaHandler(event, context));
   } catch (error) {
     console.error('Handler error:', error);
     return {
