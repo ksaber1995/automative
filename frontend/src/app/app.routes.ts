@@ -31,32 +31,32 @@ export const routes: Routes = [
       },
       {
         path: 'courses',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadChildren: () => import('./features/courses/courses.routes').then(m => m.COURSES_ROUTES)
       },
       {
         path: 'master-courses',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadChildren: () => import('./features/master-courses/master-courses.routes').then(m => m.MASTER_COURSES_ROUTES)
       },
       {
         path: 'events',
-        canActivate: [permissionGuard('events')],
+        canActivate: [permissionGuard('academy')],
         loadChildren: () => import('./features/events/events.routes').then(m => m.EVENTS_ROUTES)
       },
       {
         path: 'classes',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/courses/class-list/class-list.component').then(m => m.ClassListComponent)
       },
       {
         path: 'classes/create',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/courses/class-form/class-form.component').then(m => m.ClassFormComponent)
       },
       {
         path: 'classes/:id',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/courses/class-detail/class-detail.component').then(m => m.ClassDetailComponent)
       },
       {
@@ -116,22 +116,22 @@ export const routes: Routes = [
       },
       {
         path: 'rooms',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/rooms/room-list/room-list.component').then(m => m.RoomListComponent)
       },
       {
         path: 'sessions',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
       },
       {
         path: 'timetable',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/timetable/timetable.component').then(m => m.TimetableComponent)
       },
       {
         path: 'attendance/teachers',
-        canActivate: [permissionGuard('courses')],
+        canActivate: [permissionGuard('academy')],
         loadComponent: () => import('./features/attendance/teacher-attendance-list/teacher-attendance-list.component').then(m => m.TeacherAttendanceListComponent)
       },
       {

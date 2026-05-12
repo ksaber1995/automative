@@ -396,10 +396,10 @@ export class ExpenseListComponent implements OnInit {
   getPaymentStatus(expense: Expense): { label: string; severity: 'success' | 'warn' | 'danger' | 'secondary' } {
     const totalPaid = expense.totalPaid ?? 0;
     if (totalPaid >= expense.amount) {
-      return { label: 'Paid', severity: 'success' };
+      return { label: 'EXPENSES.LIST.PAYMENT_STATUS_PAID', severity: 'success' };
     } else if (totalPaid > 0) {
-      return { label: 'Partial', severity: 'warn' };
+      return { label: 'EXPENSES.LIST.PAYMENT_STATUS_PARTIAL', severity: 'warn' };
     }
-    return { label: 'Unpaid', severity: 'danger' };
+    return { label: 'EXPENSES.LIST.PAYMENT_STATUS_UNPAID', severity: 'danger' };
   }
 }

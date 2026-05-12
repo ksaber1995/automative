@@ -15,7 +15,7 @@
         }
       </div>
     </div>
-    @if (event() && authService.canWrite('events')) {
+    @if (event() && authService.canWrite('academy')) {
       <p-button
         icon="pi pi-pencil"
         [label]="'EVENTS.DETAIL.EDIT' | translate"
@@ -137,7 +137,7 @@
           </h3>
           <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.SUBSCRIBERS_DESC' | translate }}</p>
         </div>
-        @if (authService.canWrite('events')) {
+        @if (authService.canWrite('academy')) {
           <p-button icon="pi pi-plus" [label]="'EVENTS.DETAIL.ADD_SUBSCRIBER' | translate" severity="success" (onClick)="openSubscriptionDialog()"></p-button>
         }
       </div>
@@ -187,7 +187,7 @@
           <td>{{ s.paymentDate | date: 'mediumDate' }}</td>
           <td class="text-sm text-gray-500">{{ s.paymentMethod || '—' }}</td>
           <td class="whitespace-nowrap">
-            @if (authService.canWrite('events')) {
+            @if (authService.canWrite('academy')) {
               <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
                 [pTooltip]="'EVENTS.DETAIL.TOOLTIP_REFUND' | translate"
                 [disabled]="refundRemaining(s) <= 0"
@@ -288,7 +288,7 @@
         <tr>
           <td>{{ r.refundDate | date: 'mediumDate' }}</td>
           <td>{{ r.studentName || '—' }}</td>
-          <td><p-tag [value]="r.type" severity="warn"></p-tag></td>
+          <td><p-tag [value]="('EVENTS.DETAIL.REFUND_TYPE_' + r.type) | translate" severity="warn"></p-tag></td>
           <td class="text-right font-semibold text-orange-600">-{{ r.amount.toFixed(2) }}</td>
           <td class="text-sm text-gray-600">{{ r.reason || '—' }}</td>
         </tr>

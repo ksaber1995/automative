@@ -1,0 +1,205 @@
+<div class="space-y-4">
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-800">{{ 'DUES.LIST.TITLE' | translate }}</h2>
+      <p class="text-gray-500 text-sm mt-1">{{ 'DUES.LIST.SUBTITLE' | translate }}</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="text-right">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">{{ 'DUES.LIST.TOTAL_REMAINING' | translate }}</p>
+        <p class="font-bold text-red-600 text-xl">{{ totalRemaining().toFixed(2) }} EGP</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <p-card>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
+        <p-select
+          [(ngModel)]="filterBranch"
+          [options]="branchOptions"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'DUES.LIST.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          (onChange)="load()"
+        ></p-select>
+      </div>
+      <div class="flex items-end">
+        <button pButton [label]="'DUES.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
+          class="p-button-outlined" (click)="clearFilters()"></button>
+      </div>
+    </div>
+  </p-card>
+
+  <!-- Table -->
+  <p-card>
+    <p-table
+      [value]="dues()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="15"
+      [rowsPerPageOptions]="[15, 30, 50]"
+      [globalFilterFields]="['studentName', 'courseName', 'branchName']"
+      responsiveLayout="scroll"
+      styleClass="p-datatable-sm"
+      sortField="remaining"
+      [sortOrder]="-1"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="studentName">{{ 'DUES.LIST.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
+          <th pSortableColumn="courseName">{{ 'DUES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+          <th pSortableColumn="branchName">{{ 'DUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+          <th pSortableColumn="enrollmentDate">{{ 'DUES.LIST.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+          <th class="text-right">{{ 'DUES.LIST.COL_TOTAL' | translate }}</th>
+          <th class="text-right">{{ 'DUES.LIST.COL_PAID' | translate }}</th>
+          <th pSortableColumn="remaining" class="text-right">{{ 'DUES.LIST.COL_REMAINING' | translate }} <p-sortIcon field="remaining"></p-sortIcon></th>
+          <th>{{ 'DUES.LIST.COL_PROGRESS' | translate }}</th>
+          <th>{{ 'DUES.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-due>
+        <tr>
+          <td>
+            <span class="font-medium cursor-pointer text-blue-600 hover:underline"
+              (click)="viewStudent(due)">{{ due.studentName }}</span>
+          </td>
+          <td class="text-sm text-gray-600">
+            {{ due.courseName }}
+            @if (due.type === 'MASTER_ENROLLMENT') {
+              <p-tag value="Master" severity="info" styleClass="ml-1 text-xs"></p-tag>
+            }
+          </td>
+          <td class="text-sm text-gray-500">{{ due.branchName }}</td>
+          <td class="text-sm">{{ formatDate(due.enrollmentDate) }}</td>
+          <td class="text-right font-medium">{{ due.finalPrice.toFixed(2) }}</td>
+          <td class="text-right text-green-600">{{ due.amountPaid.toFixed(2) }}</td>
+          <td class="text-right font-bold text-red-600">{{ due.remaining.toFixed(2) }}</td>
+          <td style="min-width: 120px">
+            <p-progressbar
+              [value]="getProgress(due)"
+              [showValue]="true"
+              styleClass="h-2"
+            ></p-progressbar>
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <p-button
+                icon="pi pi-plus-circle"
+                [rounded]="true"
+                [text]="true"
+                severity="success"
+                [pTooltip]="'DUES.LIST.ADD_PAYMENT' | translate"
+                (onClick)="openPaymentDialog(due)"
+              ></p-button>
+              <p-button
+                icon="pi pi-user"
+                [rounded]="true"
+                [text]="true"
+                severity="secondary"
+                [pTooltip]="'DUES.LIST.VIEW_STUDENT' | translate"
+                (onClick)="viewStudent(due)"
+              ></p-button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="9" class="text-center py-12">
+            <div class="text-gray-400">
+              <i class="pi pi-check-circle text-4xl mb-3 block text-green-400"></i>
+              <p class="text-lg text-green-600 font-medium">{{ 'DUES.LIST.ALL_CLEAR' | translate }}</p>
+              <p class="text-sm mt-1">{{ 'DUES.LIST.NO_DUES' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="footer">
+        @if (dues().length > 0) {
+          <tr>
+            <td colspan="4" class="text-right font-semibold text-gray-600">{{ 'DUES.LIST.TOTALS' | translate }}</td>
+            <td class="text-right font-bold">{{ totalFinal().toFixed(2) }}</td>
+            <td class="text-right font-bold text-green-600">{{ totalPaid().toFixed(2) }}</td>
+            <td class="text-right font-bold text-red-600">{{ totalRemaining().toFixed(2) }}</td>
+            <td colspan="2"></td>
+          </tr>
+        }
+      </ng-template>
+    </p-table>
+  </p-card>
+</div>
+
+<!-- Add Payment Dialog -->
+<p-dialog
+  [header]="'DUES.LIST.PAYMENT_DIALOG_TITLE' | translate"
+  [(visible)]="showPaymentDialog"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+  [closable]="true"
+>
+  @if (selectedDue()) {
+    <div class="space-y-4">
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="font-medium text-gray-800">{{ selectedDue()!.studentName }}</p>
+        <p class="text-sm text-gray-500">{{ selectedDue()!.courseName }}</p>
+        <div class="flex justify-between mt-2 text-sm">
+          <span class="text-gray-600">{{ 'DUES.LIST.REMAINING_BALANCE' | translate }}</span>
+          <span class="font-bold text-red-600">{{ selectedDue()!.remaining.toFixed(2) }} EGP</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.AMOUNT_LABEL' | translate }}</label>
+        <p-inputnumber
+          [(ngModel)]="paymentAmount"
+          [min]="0.01"
+          [max]="selectedDue()!.remaining"
+          [minFractionDigits]="2"
+          [maxFractionDigits]="2"
+          [style]="{ width: '100%' }"
+          [placeholder]="'DUES.LIST.AMOUNT_PLACEHOLDER' | translate"
+        ></p-inputnumber>
+        <p class="text-xs text-gray-400 mt-1">{{ 'DUES.LIST.MAX_LABEL' | translate }} {{ selectedDue()!.remaining.toFixed(2) }} EGP</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.DATE_LABEL' | translate }}</label>
+        <p-datepicker
+          [(ngModel)]="paymentDate"
+          [showIcon]="true"
+          dateFormat="yy-mm-dd"
+          [style]="{ width: '100%' }"
+        ></p-datepicker>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DUES.LIST.NOTES_LABEL' | translate }}</label>
+        <textarea
+          pTextarea
+          [(ngModel)]="paymentNotes"
+          [rows]="2"
+          style="width: 100%"
+          [placeholder]="'DUES.LIST.NOTES_PLACEHOLDER' | translate"
+        ></textarea>
+      </div>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <button pButton [label]="'DUES.LIST.CANCEL' | translate" class="p-button-text" (click)="showPaymentDialog = false"></button>
+    <button pButton [label]="'DUES.LIST.RECORD_PAYMENT' | translate" icon="pi pi-check"
+      [loading]="actionLoading()"
+      [disabled]="!paymentAmount || paymentAmount <= 0"
+      (click)="submitPayment()">
+    </button>
+  </ng-template>
+</p-dialog>

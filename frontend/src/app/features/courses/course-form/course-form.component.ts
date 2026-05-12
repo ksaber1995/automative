@@ -8,6 +8,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -28,203 +29,10 @@ import { Employee } from '@shared/interfaces/employee.interface';
     InputTextModule,
     TextareaModule,
     InputNumberModule,
-    SelectModule
+    SelectModule,
+    TranslateModule
   ],
-  template: `
-    <div class="container-custom py-8">
-      <div class="max-w-3xl mx-auto">
-        <div class="mb-6">
-          <h1 class="text-3xl font-bold text-gray-900">
-            {{ isEditMode() ? 'Edit Course' : 'Add New Course' }}
-          </h1>
-          <p class="text-gray-600 mt-2">
-            {{ isEditMode() ? 'Update course information' : 'Create a new course for your academy' }}
-          </p>
-        </div>
-
-        <p-card>
-          <form [formGroup]="courseForm" (ngSubmit)="onSubmit()">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <!-- Branch -->
-              <div class="col-span-2">
-                <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
-                  Branch <span class="text-red-500">*</span>
-                </label>
-                <p-select
-                  id="branchId"
-                  formControlName="branchId"
-                  [options]="branches()"
-                  optionLabel="name"
-                  optionValue="id"
-                  placeholder="Select a branch"
-                  [style]="{ width: '100%' }"
-                  [class.border-red-500]="branchId?.invalid && branchId?.touched"
-                ></p-select>
-                @if (branchId?.invalid && branchId?.touched) {
-                  <small class="text-red-500">Branch is required</small>
-                }
-              </div>
-
-              <!-- Course Name -->
-              <div class="col-span-2">
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
-                  Course Name <span class="text-red-500">*</span>
-                </label>
-                <input
-                  pInputText
-                  id="name"
-                  formControlName="name"
-                  placeholder="e.g., Introduction to Robotics"
-                  class="w-full"
-                  [class.border-red-500]="name?.invalid && name?.touched"
-                />
-                @if (name?.invalid && name?.touched) {
-                  <small class="text-red-500">Course name is required (min 3 characters)</small>
-                }
-              </div>
-
-              <!-- Course Code -->
-              <div>
-                <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
-                  Course Code <span class="text-red-500">*</span>
-                </label>
-                <input
-                  pInputText
-                  id="code"
-                  formControlName="code"
-                  placeholder="e.g., ROB101"
-                  class="w-full"
-                  [class.border-red-500]="code?.invalid && code?.touched"
-                />
-                @if (code?.invalid && code?.touched) {
-                  <small class="text-red-500">Course code is required (min 2 characters)</small>
-                }
-              </div>
-
-              <!-- Price -->
-              <div>
-                <label for="price" class="block text-sm font-medium text-gray-700 mb-2">
-                  Price <span class="text-red-500">*</span>
-                </label>
-                <p-inputnumber
-                  id="price"
-                  formControlName="price"
-                  mode="currency"
-                  currency="USD"
-                  [min]="0"
-                  placeholder="0.00"
-                  [style]="{ width: '100%' }"
-                  [class.border-red-500]="price?.invalid && price?.touched"
-                />
-                @if (price?.invalid && price?.touched) {
-                  <small class="text-red-500">Price is required and must be positive</small>
-                }
-              </div>
-
-              <!-- Duration (in weeks) -->
-              <div>
-                <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
-                  Duration (weeks) <span class="text-red-500">*</span>
-                </label>
-                <p-inputnumber
-                  id="duration"
-                  formControlName="duration"
-                  [min]="1"
-                  [max]="52"
-                  placeholder="8"
-                  [style]="{ width: '100%' }"
-                  [class.border-red-500]="duration?.invalid && duration?.touched"
-                />
-                @if (duration?.invalid && duration?.touched) {
-                  <small class="text-red-500">Duration is required (1-52 weeks)</small>
-                }
-              </div>
-
-              <!-- Max Students -->
-              <div>
-                <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
-                  Max Students (Optional)
-                </label>
-                <p-inputnumber
-                  id="maxStudents"
-                  formControlName="maxStudents"
-                  [min]="1"
-                  placeholder="20"
-                  [style]="{ width: '100%' }"
-                />
-              </div>
-
-              <!-- Instructor -->
-              <div class="col-span-2">
-                <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
-                  Instructor (Optional)
-                </label>
-                <p-select
-                  id="instructorId"
-                  formControlName="instructorId"
-                  [options]="employees()"
-                  optionLabel="fullName"
-                  optionValue="id"
-                  placeholder="Select an instructor"
-                  [style]="{ width: '100%' }"
-                  [showClear]="true"
-                ></p-select>
-              </div>
-
-              <!-- Default Room -->
-              <div class="col-span-2">
-                <label for="defaultRoomId" class="block text-sm font-medium text-gray-700 mb-2">
-                  Default Room (Optional)
-                </label>
-                <p-select
-                  id="defaultRoomId"
-                  formControlName="defaultRoomId"
-                  [options]="rooms()"
-                  optionLabel="code"
-                  optionValue="id"
-                  placeholder="Select a default room for this course"
-                  [style]="{ width: '100%' }"
-                  [showClear]="true"
-                ></p-select>
-                <small class="text-gray-400">When starting a session for this course's classes, this room will be pre-selected</small>
-              </div>
-
-              <!-- Description -->
-              <div class="col-span-2">
-                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  pTextarea
-                  id="description"
-                  formControlName="description"
-                  rows="4"
-                  placeholder="Course description..."
-                  class="w-full"
-                ></textarea>
-              </div>
-            </div>
-
-            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-              <p-button
-                label="Cancel"
-                severity="secondary"
-                [outlined]="true"
-                (onClick)="cancel()"
-                type="button"
-              ></p-button>
-              <p-button
-                [label]="isEditMode() ? 'Update Course' : 'Create Course'"
-                type="submit"
-                [loading]="loading()"
-                [disabled]="courseForm.invalid"
-              ></p-button>
-            </div>
-          </form>
-        </p-card>
-      </div>
-    </div>
-  `
+  templateUrl: './course-form.component.html'
 })
 export class CourseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
@@ -234,6 +42,7 @@ export class CourseFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   courseForm: FormGroup;
   loading = signal(false);
@@ -285,7 +94,7 @@ export class CourseFormComponent implements OnInit {
         this.branches.set(branches);
       },
       error: () => {
-        this.notificationService.error('Failed to load branches');
+        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_BRANCHES_ERROR'));
       }
     });
   }
@@ -301,7 +110,7 @@ export class CourseFormComponent implements OnInit {
         this.employees.set(mappedEmployees);
       },
       error: () => {
-        this.notificationService.error('Failed to load employees');
+        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_EMPLOYEES_ERROR'));
       }
     });
   }
@@ -326,7 +135,7 @@ export class CourseFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load course');
+        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_ERROR'));
         this.loading.set(false);
         this.router.navigate(['/courses']);
       }
@@ -353,12 +162,12 @@ export class CourseFormComponent implements OnInit {
     if (this.isEditMode() && this.courseId) {
       this.courseService.updateCourse(this.courseId, courseData).subscribe({
         next: () => {
-          this.notificationService.success('Course updated successfully');
+          this.notificationService.success(this.translate.instant('COURSES.FORM.UPDATE_SUCCESS'));
           this.router.navigate(['/courses']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error('Failed to update course');
+          this.notificationService.error(this.translate.instant('COURSES.FORM.UPDATE_ERROR'));
           console.error('Update error:', error);
         }
       });
@@ -366,12 +175,12 @@ export class CourseFormComponent implements OnInit {
       this.courseService.createCourse(courseData).subscribe({
         next: () => {
           this.loading.set(false);
-          this.notificationService.success('Course created successfully');
+          this.notificationService.success(this.translate.instant('COURSES.FORM.CREATE_SUCCESS'));
           this.router.navigate(['/courses']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error(error?.error?.message || 'Failed to create course');
+          this.notificationService.error(error?.error?.message || this.translate.instant('COURSES.FORM.CREATE_ERROR'));
           console.error('Create error:', error);
         }
       });

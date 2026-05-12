@@ -1,0 +1,188 @@
+<p-confirmDialog></p-confirmDialog>
+
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{ 'USERS.LIST.TITLE' | translate }}</h1>
+      <p class="text-gray-500 text-sm mt-1">{{ 'USERS.LIST.SUBTITLE' | translate }}</p>
+    </div>
+    <button pButton [label]="'USERS.LIST.ADD' | translate" icon="pi pi-user-plus"
+      class="p-button-primary"
+      (click)="router.navigate(['/users/create'])">
+    </button>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    @for (stat of stats(); track stat.label) {
+      <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center" [class]="stat.bg">
+          <i [class]="stat.icon + ' text-lg ' + stat.iconColor"></i>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-gray-900">{{ stat.value }}</div>
+          <div class="text-xs text-gray-500">{{ stat.label | translate }}</div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex-1 min-w-48">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.SEARCH_PLACEHOLDER' | translate }}</label>
+        <span class="p-input-icon-left w-full">
+          <i class="pi pi-search"></i>
+          <input pInputText type="text" [(ngModel)]="searchTerm"
+            [placeholder]="'USERS.LIST.SEARCH_PLACEHOLDER' | translate" class="w-full" />
+        </span>
+      </div>
+      <div class="min-w-44">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.ROLE_FILTER' | translate }}</label>
+        <p-select [options]="roleOptions" [(ngModel)]="selectedRole"
+          [placeholder]="'USERS.LIST.ALL_ROLES' | translate" [showClear]="true" styleClass="w-full"
+          (onChange)="applyFilters()">
+        </p-select>
+      </div>
+      <div class="min-w-44">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.BRANCH_FILTER' | translate }}</label>
+        <p-select [options]="branchOptions()" [(ngModel)]="selectedBranchId"
+          optionLabel="name" optionValue="id"
+          [placeholder]="'USERS.LIST.ALL_BRANCHES' | translate" [showClear]="true" styleClass="w-full"
+          (onChange)="applyFilters()">
+        </p-select>
+      </div>
+      <div class="min-w-44">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.STATUS_FILTER' | translate }}</label>
+        <p-select [options]="statusOptions" [(ngModel)]="selectedStatus"
+          [placeholder]="'USERS.LIST.ALL' | translate" [showClear]="true" styleClass="w-full"
+          (onChange)="applyFilters()">
+        </p-select>
+      </div>
+      <button pButton icon="pi pi-filter-slash" [label]="'USERS.LIST.CLEAR' | translate" severity="secondary"
+        class="p-button-outlined" (click)="clearFilters()">
+      </button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <p-table
+      [value]="filteredUsers()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="15"
+      [rowsPerPageOptions]="[15, 30, 50]"
+      styleClass="p-datatable-sm"
+      [globalFilterFields]="['email','firstName','lastName','role']">
+
+      <ng-template pTemplate="header">
+        <tr class="bg-gray-50">
+          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_USER' | translate }}</th>
+          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_ROLE' | translate }}</th>
+          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_BRANCHES' | translate }}</th>
+          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_LINKED' | translate }}</th>
+          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_STATUS' | translate }}</th>
+          <th class="font-semibold text-gray-600 text-center">{{ 'USERS.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-user>
+        <tr class="hover:bg-gray-50 transition-colors cursor-pointer"
+          (click)="openUser(user)">
+          <td>
+            <div class="flex items-center gap-3">
+              <p-avatar [label]="getInitials(user)" shape="circle"
+                [style]="{ background: getAvatarColor(user.role), color: 'white' }"
+                styleClass="font-semibold text-sm">
+              </p-avatar>
+              <div>
+                <div class="font-medium text-gray-900">
+                  {{ user.firstName }} {{ user.lastName }}
+                  @if (user.linkedEmployeeId) {
+                    <i class="pi pi-link text-blue-400 ml-1 text-xs" [pTooltip]="'USERS.LIST.LINKED_BADGE' | translate"></i>
+                  }
+                </div>
+                <div class="text-xs text-gray-400">{{ user.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+              [class]="getRoleBadgeClass(user.role)">
+              <i [class]="getRoleIcon(user.role) + ' text-xs'"></i>
+              {{ getRoleLabel(user.role) }}
+            </span>
+          </td>
+          <td>
+            <div class="flex flex-wrap gap-1">
+              @if (isGlobalRole(user.role)) {
+                <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-xs font-medium">{{ 'USERS.LIST.ALL_BRANCHES' | translate }}</span>
+              } @else if (user.branchIds?.length) {
+                @for (bId of user.branchIds.slice(0, 2); track bId) {
+                  <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs">{{ getBranchName(bId) }}</span>
+                }
+                @if (user.branchIds.length > 2) {
+                  <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">+{{ user.branchIds.length - 2 }}</span>
+                }
+              } @else {
+                <span class="text-gray-400 text-xs">—</span>
+              }
+            </div>
+          </td>
+          <td>
+            @if (user.linkedEmployeeId) {
+              <span class="inline-flex items-center gap-1 text-xs text-blue-600">
+                <i class="pi pi-user"></i> {{ 'USERS.LIST.LINKED_BADGE' | translate }}
+              </span>
+            } @else {
+              <span class="text-gray-400 text-xs">—</span>
+            }
+          </td>
+          <td>
+            <p-tag
+              [value]="user.isActive ? ('USERS.LIST.ACTIVE' | translate) : ('USERS.LIST.INACTIVE' | translate)"
+              [severity]="user.isActive ? 'success' : 'danger'"
+              [style]="{ fontSize: '0.7rem' }">
+            </p-tag>
+          </td>
+          <td (click)="$event.stopPropagation()">
+            <div class="flex items-center justify-center gap-1">
+              <button pButton icon="pi pi-pencil" class="p-button-text p-button-sm p-button-rounded"
+                [pTooltip]="'USERS.LIST.EDIT' | translate" (click)="editUser(user)">
+              </button>
+              <button pButton icon="pi pi-shield" class="p-button-text p-button-sm p-button-rounded p-button-info"
+                [pTooltip]="'USERS.LIST.PERMISSIONS' | translate" (click)="editPermissions(user)">
+              </button>
+              @if (user.id !== currentUserId()) {
+                @if (user.isActive) {
+                  <button pButton icon="pi pi-ban" class="p-button-text p-button-sm p-button-rounded p-button-danger"
+                    [pTooltip]="'USERS.LIST.DEACTIVATE' | translate" (click)="toggleActive(user)">
+                  </button>
+                } @else {
+                  <button pButton icon="pi pi-check-circle" class="p-button-text p-button-sm p-button-rounded p-button-success"
+                    [pTooltip]="'USERS.LIST.ACTIVATE' | translate" (click)="toggleActive(user)">
+                  </button>
+                }
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="6" class="text-center py-12">
+            <i class="pi pi-users text-4xl text-gray-300 mb-3 block"></i>
+            <p class="text-gray-400">{{ 'USERS.LIST.NO_DATA' | translate }}</p>
+            <button pButton [label]="'USERS.LIST.CREATE_FIRST' | translate" icon="pi pi-plus"
+              class="p-button-text mt-3" (click)="router.navigate(['/users/create'])">
+            </button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+</div>

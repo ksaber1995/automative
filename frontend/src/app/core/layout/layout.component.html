@@ -1,0 +1,181 @@
+<div class="min-h-screen bg-gray-100">
+  <!-- Top Header -->
+  <header class="bg-white shadow-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-10">
+    <div class="flex items-center justify-between px-6 py-4">
+      <div class="flex items-center gap-4">
+        <button pButton icon="pi pi-bars" class="p-button-text p-button-rounded"
+          (click)="toggleSidebar()">
+        </button>
+        <img src="assets/img/logo.png" alt="Automate Magic" class="h-9 w-auto">
+      </div>
+
+      <div class="flex items-center gap-4">
+        @if (currentUser(); as user) {
+          <!-- Company Badge -->
+          <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <i class="pi pi-building text-blue-600 text-sm"></i>
+            <span class="text-sm font-medium text-blue-700">{{ getCompanyName(user) }}</span>
+          </div>
+
+          <!-- User Info -->
+          <div class="flex items-center gap-3">
+            <div class="text-right hidden sm:block" [class.text-left]="languageService.isRtl()">
+              <p class="font-medium text-gray-900">{{ user.firstName }} {{ user.lastName }}</p>
+              <p class="text-xs text-gray-500">{{ formatRole(user.role) }}</p>
+            </div>
+            <div class="relative">
+              <p-avatar
+                [label]="getUserInitials(user)"
+                shape="circle"
+                [style]="{ background: getAvatarColor(user.role), color: 'white', fontWeight: '600' }">
+              </p-avatar>
+              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
+                [class]="getRoleDotClass(user.role)">
+              </span>
+            </div>
+          </div>
+        }
+
+        <!-- Language Toggle -->
+        <button pButton
+          [label]="'HEADER.TOGGLE_LANGUAGE' | translate"
+          class="p-button-outlined p-button-sm"
+          (click)="languageService.toggle()">
+        </button>
+
+        <button pButton
+          icon="pi pi-sign-out"
+          [label]="'HEADER.LOGOUT' | translate"
+          class="p-button-text"
+          (click)="logout()">
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside
+    class="fixed top-16 bottom-0 bg-white border-gray-200 transition-all duration-300 z-20 overflow-y-auto"
+    [class.left-0]="!languageService.isRtl()"
+    [class.right-0]="languageService.isRtl()"
+    [class.border-r]="!languageService.isRtl()"
+    [class.border-l]="languageService.isRtl()"
+    [class.w-64]="sidebarVisible()"
+    [class.w-0]="!sidebarVisible()">
+    @if (sidebarVisible()) {
+      <nav class="p-3">
+        <div class="space-y-0.5">
+          @for (entry of visibleMenuEntries(); track entryTrackBy($index, entry)) {
+            @if (entry.kind === 'leaf') {
+              <a
+                [routerLink]="entry.leaf.routerLink"
+                routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
+                [routerLinkActiveOptions]="{ exact: entry.leaf.routerLink.length === 1 }"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm"
+                [class.border-r-4]="languageService.isRtl()"
+                [class.border-l-4]="!languageService.isRtl()">
+                <i [class]="entry.leaf.icon + ' text-base'"></i>
+                <span class="font-medium">{{ entry.leaf.labelKey | translate }}</span>
+              </a>
+            } @else {
+              <button type="button"
+                (click)="toggleGroup(entry.group.groupKey)"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all text-sm">
+                <i [class]="entry.group.icon + ' text-base'"></i>
+                <span class="font-medium flex-1 text-start">{{ entry.group.labelKey | translate }}</span>
+                <i class="pi text-xs text-gray-400 transition-transform"
+                   [class.pi-chevron-down]="isGroupOpen(entry.group.groupKey)"
+                   [class.pi-chevron-right]="!isGroupOpen(entry.group.groupKey) && !languageService.isRtl()"
+                   [class.pi-chevron-left]="!isGroupOpen(entry.group.groupKey) && languageService.isRtl()"></i>
+              </button>
+              @if (isGroupOpen(entry.group.groupKey)) {
+                <div class="space-y-0.5 mb-1"
+                     [class.ms-4]="!languageService.isRtl()"
+                     [class.me-4]="languageService.isRtl()">
+                  @for (child of entry.group.children; track child.routerLink[0]) {
+                    <a
+                      [routerLink]="child.routerLink"
+                      routerLinkActive="bg-blue-50 text-blue-600 border-blue-500"
+                      [routerLinkActiveOptions]="{ exact: child.routerLink.length === 1 }"
+                      class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all border-l-4 border-transparent text-sm"
+                      [class.border-r-4]="languageService.isRtl()"
+                      [class.border-l-4]="!languageService.isRtl()">
+                      <i [class]="child.icon + ' text-sm'"></i>
+                      <span>{{ child.labelKey | translate }}</span>
+                    </a>
+                  }
+                </div>
+              }
+            }
+          }
+        </div>
+      </nav>
+    }
+  </aside>
+
+  <!-- Expiry Warning Banner -->
+  @if (subscriptionService.showExpiryWarning()) {
+    <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
+      [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
+      [class.mr-64]="sidebarVisible() && languageService.isRtl()">
+      <div class="flex items-center gap-2 text-amber-800">
+        <i class="pi pi-exclamation-triangle text-amber-600"></i>
+        <span class="text-sm font-medium">
+          {{ 'SUBSCRIPTION.EXPIRY_WARNING' | translate: { days: subscriptionService.daysUntilExpiry() } }}
+        </span>
+      </div>
+    </div>
+  }
+
+  <!-- Main Content -->
+  <main
+    class="transition-all duration-300"
+    [class.pt-16]="!subscriptionService.showExpiryWarning()"
+    [class.pt-24]="subscriptionService.showExpiryWarning()"
+    [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
+    [class.ml-0]="!sidebarVisible() && !languageService.isRtl()"
+    [class.mr-64]="sidebarVisible() && languageService.isRtl()"
+    [class.mr-0]="!sidebarVisible() && languageService.isRtl()">
+    <div class="p-6">
+      <router-outlet></router-outlet>
+    </div>
+  </main>
+</div>
+
+<!-- Trial Expired Dialog -->
+<p-dialog [visible]="subscriptionService.isTrialExpired()" [modal]="true"
+  [closable]="false" [style]="{ width: '480px' }"
+  [header]="'SUBSCRIPTION.TRIAL_EXPIRED_TITLE' | translate">
+  <div class="text-center py-6 px-4">
+    <i class="pi pi-clock text-6xl text-red-400 mb-4 block"></i>
+    <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'SUBSCRIPTION.TRIAL_EXPIRED_HEADING' | translate }}</h3>
+    <p class="text-gray-500 mb-4">{{ 'SUBSCRIPTION.TRIAL_EXPIRED_MESSAGE' | translate }}</p>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton
+      [label]="'SUBSCRIPTION.TRIAL_LOGOUT' | translate"
+      icon="pi pi-sign-out"
+      severity="secondary"
+      (click)="logout()">
+    </button>
+  </ng-template>
+</p-dialog>
+
+<!-- Subscription Expired Dialog -->
+<p-dialog [visible]="subscriptionService.isSubscriptionExpired()" [modal]="true"
+  [closable]="false" [style]="{ width: '480px' }"
+  [header]="'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_TITLE' | translate">
+  <div class="text-center py-6 px-4">
+    <i class="pi pi-ban text-6xl text-red-400 mb-4 block"></i>
+    <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_HEADING' | translate }}</h3>
+    <p class="text-gray-500 mb-4">{{ 'SUBSCRIPTION.SUBSCRIPTION_EXPIRED_MESSAGE' | translate }}</p>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton
+      [label]="'SUBSCRIPTION.SUBSCRIPTION_LOGOUT' | translate"
+      icon="pi pi-sign-out"
+      severity="secondary"
+      (click)="logout()">
+    </button>
+  </ng-template>
+</p-dialog>

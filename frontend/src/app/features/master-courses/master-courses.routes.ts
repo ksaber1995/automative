@@ -11,7 +11,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   },
   {
     path: 'create',
-    canActivate: [permissionGuard('courses', 'write')],
+    canActivate: [permissionGuard('academy', 'write')],
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent
@@ -19,7 +19,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   },
   {
     path: ':id/edit',
-    canActivate: [permissionGuard('courses', 'write')],
+    canActivate: [permissionGuard('academy', 'write')],
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent

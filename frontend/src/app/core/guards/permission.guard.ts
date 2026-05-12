@@ -7,7 +7,7 @@ import { PermissionResource, PermissionAction } from '@shared/interfaces/permiss
 const ROUTE_PERMISSION_MAP: Array<{ path: string; resource: PermissionResource }> = [
   { path: '/dashboard',   resource: 'dashboard' },
   { path: '/branches',    resource: 'branches' },
-  { path: '/courses',     resource: 'courses' },
+  { path: '/courses',     resource: 'academy' },
   { path: '/students',    resource: 'students' },
   { path: '/enrollments', resource: 'enrollments' },
   { path: '/employees',   resource: 'employees' },

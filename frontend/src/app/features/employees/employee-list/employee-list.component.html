@@ -24,16 +24,16 @@
         </select>
       </div>
       <div>
-        <label for="statusFilter" class="block text-sm font-medium mb-2">Status</label>
+        <label for="statusFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.STATUS_FILTER' | translate }}</label>
         <select
           id="statusFilter"
           [ngModel]="statusFilter()"
           (ngModelChange)="statusFilter.set($event)"
           class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="active">Active</option>
-          <option value="terminated">Terminated</option>
-          <option value="all">All</option>
+          <option value="active">{{ 'EMPLOYEES.LIST.STATUS_ACTIVE' | translate }}</option>
+          <option value="terminated">{{ 'EMPLOYEES.LIST.STATUS_TERMINATED' | translate }}</option>
+          <option value="all">{{ 'EMPLOYEES.LIST.STATUS_ALL' | translate }}</option>
         </select>
       </div>
     </div>

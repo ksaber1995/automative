@@ -25,24 +25,23 @@ import {
 import { Branch } from '@shared/interfaces/branch.interface';
 
 const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; hint?: string; financial?: boolean }> = {
-  dashboard:    { label: 'Dashboard',      icon: 'pi pi-home' },
-  branches:     { label: 'Branches',       icon: 'pi pi-building' },
-  courses:      { label: 'Courses',        icon: 'pi pi-book',
-    hint: 'Includes Classes, Master Courses, Rooms, Sessions, Timetable' },
-  events:       { label: 'Events',          icon: 'pi pi-flag' },
-  students:     { label: 'Students',       icon: 'pi pi-users' },
-  enrollments:  { label: 'Enrollments',    icon: 'pi pi-id-card' },
-  employees:    { label: 'Employees',      icon: 'pi pi-user' },
-  revenues:     { label: 'Revenues',       icon: 'pi pi-dollar',      financial: true },
-  expenses:     { label: 'Expenses',       icon: 'pi pi-money-bill',  financial: true },
-  refunds:      { label: 'Refunds',        icon: 'pi pi-replay',      financial: true },
-  debts:        { label: 'Debts',          icon: 'pi pi-credit-card', financial: true },
-  products:     { label: 'Products',       icon: 'pi pi-box' },
-  product_sales:{ label: 'Product Sales',  icon: 'pi pi-shopping-cart' },
-  reports:      { label: 'Reports',        icon: 'pi pi-chart-bar',   financial: true },
-  users:        { label: 'User Mgmt',      icon: 'pi pi-user-edit' },
-  cash:         { label: 'Current Cash',   icon: 'pi pi-wallet',      financial: true,
-    hint: 'Includes Withdrawals' },
+  dashboard:    { label: 'USERS.FORM.RESOURCE_DASHBOARD',     icon: 'pi pi-home' },
+  branches:     { label: 'USERS.FORM.RESOURCE_BRANCHES',      icon: 'pi pi-building' },
+  academy:      { label: 'USERS.FORM.RESOURCE_ACADEMY',       icon: 'pi pi-graduation-cap',
+    hint: 'USERS.FORM.RESOURCE_ACADEMY_HINT' },
+  students:     { label: 'USERS.FORM.RESOURCE_STUDENTS',      icon: 'pi pi-users' },
+  enrollments:  { label: 'USERS.FORM.RESOURCE_ENROLLMENTS',   icon: 'pi pi-id-card' },
+  employees:    { label: 'USERS.FORM.RESOURCE_EMPLOYEES',     icon: 'pi pi-user' },
+  revenues:     { label: 'USERS.FORM.RESOURCE_REVENUES',      icon: 'pi pi-dollar',      financial: true },
+  expenses:     { label: 'USERS.FORM.RESOURCE_EXPENSES',      icon: 'pi pi-money-bill',  financial: true },
+  refunds:      { label: 'USERS.FORM.RESOURCE_REFUNDS',       icon: 'pi pi-replay',      financial: true },
+  debts:        { label: 'USERS.FORM.RESOURCE_DEBTS',         icon: 'pi pi-credit-card', financial: true },
+  products:     { label: 'USERS.FORM.RESOURCE_PRODUCTS',      icon: 'pi pi-box' },
+  product_sales:{ label: 'USERS.FORM.RESOURCE_PRODUCT_SALES', icon: 'pi pi-shopping-cart' },
+  reports:      { label: 'USERS.FORM.RESOURCE_REPORTS',       icon: 'pi pi-chart-bar',   financial: true },
+  users:        { label: 'USERS.FORM.RESOURCE_USERS',         icon: 'pi pi-user-edit' },
+  cash:         { label: 'USERS.FORM.RESOURCE_CASH',          icon: 'pi pi-wallet',      financial: true,
+    hint: 'USERS.FORM.RESOURCE_CASH_HINT' },
 };
 
 @Component({
@@ -55,235 +54,7 @@ const RESOURCE_META: Record<PermissionResource, { label: string; icon: string; h
     TranslateModule,
   ],
   providers: [ConfirmationService],
-  template: `
-    <p-confirmDialog></p-confirmDialog>
-
-    @if (loading()) {
-      <div class="flex justify-center py-20">
-        <i class="pi pi-spin pi-spinner text-4xl text-gray-300"></i>
-      </div>
-    } @else if (user()) {
-      <div class="max-w-5xl mx-auto space-y-6">
-
-        <!-- Header -->
-        <div class="flex items-start justify-between">
-          <div class="flex items-center gap-4">
-            <button pButton icon="pi pi-arrow-left" class="p-button-text p-button-rounded p-button-secondary"
-              (click)="back()">
-            </button>
-            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold"
-              [style.background]="getAvatarColor(user()!.role)">
-              {{ getInitials(user()!) }}
-            </div>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-900">{{ user()!.firstName }} {{ user()!.lastName }}</h1>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                  [class]="getRoleBadgeClass(user()!.role)">
-                  <i [class]="getRoleIcon(user()!.role) + ' text-xs'"></i>
-                  {{ getRoleLabel(user()!.role) }}
-                </span>
-                <p-tag [value]="user()!.isActive ? ('USERS.DETAIL.ACTIVE' | translate) : ('USERS.DETAIL.INACTIVE' | translate)"
-                  [severity]="user()!.isActive ? 'success' : 'danger'"
-                  [style]="{ fontSize: '0.7rem' }">
-                </p-tag>
-                @if (user()!.linkedEmployeeId) {
-                  <span class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                    <i class="pi pi-link"></i> {{ 'USERS.LIST.LINKED_BADGE' | translate }}
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT' | translate" severity="warn"
-              (click)="edit()">
-            </button>
-            @if (!isSelf()) {
-              @if (user()!.isActive) {
-                <button pButton icon="pi pi-ban" [label]="'USERS.DETAIL.DEACTIVATE' | translate" severity="danger"
-                  class="p-button-outlined" (click)="toggleActive()">
-                </button>
-              } @else {
-                <button pButton icon="pi pi-check" [label]="'USERS.DETAIL.ACTIVATE' | translate" severity="success"
-                  class="p-button-outlined" (click)="toggleActive()">
-                </button>
-              }
-            }
-          </div>
-        </div>
-
-        <p-tabs value="0">
-          <p-tablist>
-            <p-tab value="0"><i class="pi pi-user mr-2"></i>{{ 'USERS.DETAIL.TAB_INFO' | translate }}</p-tab>
-            <p-tab value="1"><i class="pi pi-shield mr-2"></i>{{ 'USERS.DETAIL.TAB_PERMISSIONS' | translate }}</p-tab>
-          </p-tablist>
-          <p-tabpanels>
-          <!-- Info Tab -->
-          <p-tabpanel value="0">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-              <p-card>
-                <ng-template pTemplate="header">
-                  <div class="flex items-center gap-2 px-4 pt-4">
-                    <i class="pi pi-info-circle text-blue-500"></i>
-                    <span class="font-semibold text-gray-700">{{ 'USERS.DETAIL.ACCOUNT_DETAILS' | translate }}</span>
-                  </div>
-                </ng-template>
-                <div class="space-y-3">
-                  <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">{{ 'USERS.DETAIL.EMAIL' | translate }}</span>
-                    <span class="font-medium">{{ user()!.email }}</span>
-                  </div>
-                  <p-divider styleClass="my-2"></p-divider>
-                  <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">{{ 'USERS.DETAIL.ROLE' | translate }}</span>
-                    <span class="font-medium">{{ getRoleLabel(user()!.role) }}</span>
-                  </div>
-                  <p-divider styleClass="my-2"></p-divider>
-                  <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">{{ 'USERS.DETAIL.CREATED' | translate }}</span>
-                    <span class="font-medium">{{ user()!.createdAt | date:'mediumDate' }}</span>
-                  </div>
-                  <p-divider styleClass="my-2"></p-divider>
-                  <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">{{ 'USERS.DETAIL.STATUS' | translate }}</span>
-                    <p-tag [value]="user()!.isActive ? ('USERS.DETAIL.ACTIVE' | translate) : ('USERS.DETAIL.INACTIVE' | translate)"
-                      [severity]="user()!.isActive ? 'success' : 'danger'">
-                    </p-tag>
-                  </div>
-                </div>
-              </p-card>
-
-              <p-card>
-                <ng-template pTemplate="header">
-                  <div class="flex items-center gap-2 px-4 pt-4">
-                    <i class="pi pi-building text-green-500"></i>
-                    <span class="font-semibold text-gray-700">{{ 'USERS.DETAIL.BRANCH_ACCESS' | translate }}</span>
-                  </div>
-                </ng-template>
-                <div class="space-y-2">
-                  @if (user()!.role === UserRole.GLOBAL_ADMIN || user()!.role === UserRole.ADMIN) {
-                    <div class="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
-                      <i class="pi pi-crown text-purple-500"></i>
-                      <span class="text-sm font-medium text-purple-700">{{ 'USERS.DETAIL.ALL_BRANCHES' | translate }}</span>
-                    </div>
-                  } @else if (userBranches().length) {
-                    @for (branch of userBranches(); track branch.id) {
-                      <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <i class="pi pi-building text-gray-400"></i>
-                        <span class="text-sm font-medium">{{ branch.name }}</span>
-                        @if (branch.id === user()!.branchId) {
-                          <span class="ml-auto text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{{ 'USERS.DETAIL.PRIMARY' | translate }}</span>
-                        }
-                      </div>
-                    }
-                  } @else {
-                    <div class="text-gray-400 text-sm text-center py-4">{{ 'USERS.DETAIL.NO_BRANCHES' | translate }}</div>
-                  }
-                </div>
-              </p-card>
-            </div>
-
-            <!-- Reset Password -->
-            <div class="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-gray-700">{{ 'USERS.DETAIL.RESET_PASSWORD_LABEL' | translate }}</p>
-                  <p class="text-xs text-gray-400 mt-0.5">{{ 'USERS.DETAIL.RESET_PASSWORD_DESC' | translate }}</p>
-                </div>
-                <button pButton icon="pi pi-key" [label]="'USERS.DETAIL.RESET_PASSWORD_BTN' | translate" severity="secondary"
-                  class="p-button-outlined" (click)="showPasswordDialog = true">
-                </button>
-              </div>
-            </div>
-          </p-tabpanel>
-
-          <!-- Permissions Tab -->
-          <p-tabpanel value="1">
-            <div class="pt-4">
-              <div class="flex items-center justify-between mb-4">
-                <p class="text-sm text-gray-500">
-                  {{ 'USERS.DETAIL.EFFECTIVE_PERM' | translate }}
-                  <strong>{{ getRoleLabel(user()!.role) }}</strong>
-                  @if (user()!.permissions) {
-                    {{ 'USERS.DETAIL.CUSTOM_OVERRIDES' | translate }}
-                  }
-                </p>
-                <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT_PERMISSIONS' | translate"
-                  class="p-button-sm p-button-outlined"
-                  (click)="edit()">
-                </button>
-              </div>
-
-              <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <table class="w-full text-sm">
-                  <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th class="text-left px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_RESOURCE' | translate }}</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_READ' | translate }}</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_WRITE' | translate }}</th>
-                      <th class="text-center px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_DELETE' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (resource of allResources; track resource) {
-                      <tr class="border-b border-gray-100 hover:bg-gray-50"
-                        [class.bg-amber-50]="RESOURCE_META[resource].financial">
-                        <td class="px-4 py-2.5">
-                          <div class="flex items-center gap-2 flex-wrap">
-                            <i [class]="RESOURCE_META[resource].icon + ' text-gray-400 text-sm'"></i>
-                            <span class="text-gray-700">{{ RESOURCE_META[resource].label }}</span>
-                            @if (RESOURCE_META[resource].financial) {
-                              <span class="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{{ 'USERS.FORM.SECTION_FINANCIAL' | translate }}</span>
-                            }
-                            @if (RESOURCE_META[resource].hint) {
-                              <span class="text-xs text-gray-500 italic w-full">{{ RESOURCE_META[resource].hint }}</span>
-                            }
-                          </div>
-                        </td>
-                        @for (action of ['read', 'write', 'delete']; track action) {
-                          <td class="text-center px-4 py-2.5">
-                            @if (getEffectivePerm(resource, $any(action))) {
-                              <i class="pi pi-check-circle text-green-500 text-base"></i>
-                            } @else {
-                              <i class="pi pi-times-circle text-gray-300 text-base"></i>
-                            }
-                          </td>
-                        }
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </p-tabpanel>
-          </p-tabpanels>
-        </p-tabs>
-      </div>
-    }
-
-    <!-- Reset Password Dialog -->
-    <p-dialog [(visible)]="showPasswordDialog" [header]="'USERS.DETAIL.RESET_TITLE' | translate" [modal]="true"
-      [style]="{ width: '400px' }">
-      <div class="space-y-4 py-2">
-        <p class="text-sm text-gray-500">
-          {{ 'USERS.DETAIL.RESET_FOR' | translate }} <strong>{{ user()?.firstName }} {{ user()?.lastName }}</strong>
-        </p>
-        <p-password [(ngModel)]="newPassword" [toggleMask]="true" [feedback]="true"
-          [placeholder]="'USERS.DETAIL.NEW_PASSWORD' | translate"
-          styleClass="w-full" [inputStyleClass]="'w-full'">
-        </p-password>
-      </div>
-      <ng-template pTemplate="footer">
-        <button pButton [label]="'USERS.DETAIL.CANCEL' | translate" severity="secondary" class="p-button-outlined"
-          (click)="showPasswordDialog = false; newPassword = ''">
-        </button>
-        <button pButton [label]="'USERS.DETAIL.RESET' | translate" icon="pi pi-key" [loading]="savingPassword()"
-          (click)="resetPassword()">
-        </button>
-      </ng-template>
-    </p-dialog>
-  `,
+  templateUrl: './user-detail.component.html',
 })
 export class UserDetailComponent implements OnInit {
   private router = inject(Router);

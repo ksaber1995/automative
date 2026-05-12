@@ -50,361 +50,7 @@ interface SalaryAdjustment {
     TranslateModule,
   ],
   providers: [ConfirmationService],
-  template: `
-    <p-confirmDialog></p-confirmDialog>
-    <div class="container-custom py-8">
-      <!-- Header -->
-      <div class="flex items-center gap-4 mb-6">
-        <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()"></p-button>
-        <div class="flex-1">
-          <h1 class="text-3xl font-bold text-gray-900">{{ 'EXPENSES.SALARIES.TITLE' | translate }}</h1>
-          <p class="text-gray-500 mt-1">
-            @if (viewMode() === 'pending') {
-              {{ 'EXPENSES.SALARIES.SUBTITLE' | translate: { month: displayMonth() } }}
-            } @else {
-              Past salary payments — review or void recorded payments.
-            }
-          </p>
-        </div>
-      </div>
-
-      <!-- View tabs -->
-      <div class="flex border-b border-gray-200 mb-6">
-        <button type="button"
-          class="px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
-          [class]="viewMode() === 'pending'
-            ? 'border-blue-600 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'"
-          (click)="setViewMode('pending')">
-          <i class="pi pi-clock mr-2"></i>Pending Payments
-        </button>
-        <button type="button"
-          class="px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
-          [class]="viewMode() === 'history'
-            ? 'border-blue-600 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'"
-          (click)="setViewMode('history')">
-          <i class="pi pi-history mr-2"></i>Salary History
-        </button>
-      </div>
-
-      @if (viewMode() === 'pending') {
-      <!-- Controls -->
-      <p-card styleClass="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.MONTH_LABEL' | translate }}</label>
-            <p-datepicker
-              [(ngModel)]="selectedMonth"
-              view="month"
-              dateFormat="yy-mm"
-              [showIcon]="true"
-              [placeholder]="'EXPENSES.SALARIES.MONTH_PLACEHOLDER' | translate"
-              (onSelect)="onMonthChange()"
-              [style]="{ width: '100%' }"
-            ></p-datepicker>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.PAYMENT_DATE' | translate }}</label>
-            <p-datepicker
-              [(ngModel)]="paymentDate"
-              [showIcon]="true"
-              dateFormat="yy-mm-dd"
-              [placeholder]="'EXPENSES.SALARIES.DATE_PLACEHOLDER' | translate"
-              [style]="{ width: '100%' }"
-            ></p-datepicker>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.FILTER_BRANCH' | translate }}</label>
-            <p-select
-              [(ngModel)]="selectedBranchId"
-              [options]="branchOptions()"
-              optionLabel="label"
-              optionValue="value"
-              [placeholder]="'EXPENSES.SALARIES.ALL_BRANCHES' | translate"
-              [style]="{ width: '100%' }"
-              (onChange)="loadSalaries()"
-            ></p-select>
-          </div>
-        </div>
-      </p-card>
-
-      <!-- Summary cards -->
-      @if (!loading()) {
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.TOTAL_EMPLOYEES' | translate }}</p>
-            <p class="text-3xl font-bold text-gray-800">{{ filteredEmployees().length }}</p>
-          </div>
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.SELECTED' | translate }}</p>
-            <p class="text-3xl font-bold text-blue-700">{{ selectedIds().size }}</p>
-          </div>
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.SALARIES.TOTAL_DUE' | translate }}</p>
-            <p class="text-3xl font-bold text-green-700">{{ selectedTotal().toFixed(2) }}</p>
-          </div>
-        </div>
-      }
-
-      <!-- Table -->
-      <p-card>
-        <ng-template pTemplate="header">
-          <div class="flex items-center justify-between px-4 pt-4">
-            <div class="flex items-center gap-3">
-              <p-checkbox
-                [binary]="true"
-                [ngModel]="allSelected()"
-                (onChange)="toggleAll($event.checked)"
-                [indeterminate]="someSelected()"
-              ></p-checkbox>
-              <span class="text-sm text-gray-600">
-                {{ selectedIds().size > 0 ? ('EXPENSES.SALARIES.SELECTED_COUNT' | translate: {count: selectedIds().size}) : ('EXPENSES.SALARIES.SELECT_ALL' | translate) }}
-              </span>
-            </div>
-            <div class="flex gap-2">
-              <p-button
-                [label]="'EXPENSES.SALARIES.PAY_SELECTED' | translate"
-                icon="pi pi-check"
-                severity="success"
-                [outlined]="true"
-                [disabled]="selectedIds().size === 0 || paying()"
-                [loading]="paying()"
-                (onClick)="paySelected()"
-              ></p-button>
-              <p-button
-                [label]="'EXPENSES.SALARIES.PAY_ALL' | translate"
-                icon="pi pi-users"
-                severity="warn"
-                [disabled]="filteredEmployees().length === 0 || paying()"
-                [loading]="paying()"
-                (onClick)="payAll()"
-              ></p-button>
-            </div>
-          </div>
-        </ng-template>
-
-        <p-table
-          [value]="filteredEmployees()"
-          [loading]="loading()"
-          responsiveLayout="scroll"
-        >
-          <ng-template pTemplate="header">
-            <tr>
-              <th style="width: 48px"></th>
-              <th>{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }}</th>
-              <th>{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }}</th>
-              <th class="text-right">Base Salary</th>
-              <th style="width: 130px" class="text-right text-green-600">Bonus</th>
-              <th style="width: 130px" class="text-right text-red-600">Discount</th>
-              <th style="width: 200px">Reason</th>
-              <th class="text-right font-semibold">Total</th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-item>
-            <tr [class.bg-blue-50]="selectedIds().has(item.employeeId)">
-              <td>
-                <p-checkbox
-                  [binary]="true"
-                  [ngModel]="selectedIds().has(item.employeeId)"
-                  (onChange)="toggleOne(item.employeeId, $event.checked)"
-                ></p-checkbox>
-              </td>
-              <td>
-                <span class="font-medium">{{ item.label.replace('Salary: ', '') }}</span>
-              </td>
-              <td>{{ item.branchName || 'N/A' }}</td>
-              <td class="text-right text-gray-700">{{ item.amount.toFixed(2) }}</td>
-              <td class="text-right">
-                <p-inputNumber
-                  [(ngModel)]="adjustments[item.employeeId].bonusAmount"
-                  [min]="0"
-                  [maxFractionDigits]="2"
-                  mode="decimal"
-                  inputStyleClass="w-full text-right text-green-700 border-green-300"
-                  [style]="{ width: '110px' }"
-                  (onInput)="onAdjustmentChange()"
-                ></p-inputNumber>
-              </td>
-              <td class="text-right">
-                <p-inputNumber
-                  [(ngModel)]="adjustments[item.employeeId].discountAmount"
-                  [min]="0"
-                  [max]="item.amount + (adjustments[item.employeeId].bonusAmount || 0)"
-                  [maxFractionDigits]="2"
-                  mode="decimal"
-                  inputStyleClass="w-full text-right text-red-700 border-red-300"
-                  [style]="{ width: '110px' }"
-                  (onInput)="onAdjustmentChange()"
-                ></p-inputNumber>
-              </td>
-              <td>
-                <input
-                  pInputText
-                  [(ngModel)]="adjustments[item.employeeId].adjustmentReason"
-                  placeholder="Reason (optional)"
-                  class="w-full text-sm"
-                  style="width: 100%"
-                />
-              </td>
-              <td class="text-right font-semibold" [class.text-green-700]="getFinalAmount(item) >= item.amount" [class.text-red-700]="getFinalAmount(item) < item.amount">
-                {{ getFinalAmount(item).toFixed(2) }}
-              </td>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="emptymessage">
-            <tr>
-              <td colspan="8" class="text-center py-12">
-                <div class="text-gray-400">
-                  <i class="pi pi-check-circle text-4xl mb-3 text-green-400"></i>
-                  <p class="text-lg font-medium text-green-600">{{ 'EXPENSES.SALARIES.ALL_PAID' | translate: { month: displayMonth() } }}</p>
-                  <p class="text-sm mt-1">{{ 'EXPENSES.SALARIES.NO_PENDING' | translate }}</p>
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </p-card>
-      }
-
-      @if (viewMode() === 'history') {
-      <!-- History controls -->
-      <p-card styleClass="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">From</label>
-            <p-datepicker
-              [(ngModel)]="historyStartDate"
-              [showIcon]="true"
-              dateFormat="yy-mm-dd"
-              placeholder="Start date"
-              (onSelect)="loadHistory()"
-              [style]="{ width: '100%' }"
-            ></p-datepicker>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">To</label>
-            <p-datepicker
-              [(ngModel)]="historyEndDate"
-              [showIcon]="true"
-              dateFormat="yy-mm-dd"
-              placeholder="End date"
-              (onSelect)="loadHistory()"
-              [style]="{ width: '100%' }"
-            ></p-datepicker>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Branch</label>
-            <p-select
-              [(ngModel)]="historyBranchId"
-              [options]="branchOptions()"
-              optionLabel="label"
-              optionValue="value"
-              [placeholder]="'EXPENSES.SALARIES.ALL_BRANCHES' | translate"
-              [style]="{ width: '100%' }"
-              (onChange)="loadHistory()"
-            ></p-select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
-            <p-select
-              [(ngModel)]="historyEmployeeId"
-              [options]="employeeOptions()"
-              optionLabel="label"
-              optionValue="value"
-              placeholder="All employees"
-              [filter]="true"
-              [style]="{ width: '100%' }"
-            ></p-select>
-          </div>
-        </div>
-      </p-card>
-
-      <!-- History summary -->
-      @if (!historyLoading()) {
-        <div class="grid grid-cols-4 gap-4 mb-6">
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Payments</p>
-            <p class="text-3xl font-bold text-gray-800">{{ filteredHistory().length }}</p>
-          </div>
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">Employees Paid</p>
-            <p class="text-3xl font-bold text-blue-700">{{ historyEmployeeCount() }}</p>
-          </div>
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">Total Paid</p>
-            <p class="text-3xl font-bold text-green-700">{{ historyTotal().toFixed(2) }}</p>
-          </div>
-          <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-purple-600 uppercase tracking-wider mb-1">Avg / Payment</p>
-            <p class="text-3xl font-bold text-purple-700">{{ historyAverage().toFixed(2) }}</p>
-          </div>
-        </div>
-      }
-
-      <!-- History table -->
-      <p-card>
-        <p-table
-          [value]="filteredHistory()"
-          [loading]="historyLoading()"
-          [paginator]="true"
-          [rows]="20"
-          [rowsPerPageOptions]="[10, 20, 50, 100]"
-          responsiveLayout="scroll"
-          sortField="date"
-          [sortOrder]="-1"
-        >
-          <ng-template pTemplate="header">
-            <tr>
-              <th pSortableColumn="date">Date <p-sortIcon field="date"></p-sortIcon></th>
-              <th>Employee</th>
-              <th>Branch</th>
-              <th class="text-right">Base</th>
-              <th class="text-right text-green-600">Bonus</th>
-              <th class="text-right text-red-600">Discount</th>
-              <th>Reason</th>
-              <th class="text-right font-semibold">Net Paid</th>
-              <th style="width: 80px"></th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-p>
-            <tr>
-              <td class="whitespace-nowrap">{{ p.date }}</td>
-              <td class="font-medium">{{ getEmployeeName(p.employeeId) }}</td>
-              <td>{{ getBranchName(p.branchId) || 'N/A' }}</td>
-              <td class="text-right text-gray-700">{{ getBasePaid(p).toFixed(2) }}</td>
-              <td class="text-right text-green-700">{{ (p.bonusAmount || 0).toFixed(2) }}</td>
-              <td class="text-right text-red-700">{{ (p.discountAmount || 0).toFixed(2) }}</td>
-              <td class="text-sm text-gray-600">{{ p.adjustmentReason || '—' }}</td>
-              <td class="text-right font-semibold text-green-700">{{ p.amount.toFixed(2) }}</td>
-              <td>
-                <p-button
-                  icon="pi pi-trash"
-                  severity="danger"
-                  [text]="true"
-                  size="small"
-                  pTooltip="Void payment"
-                  (onClick)="confirmDeletePayment(p)"
-                ></p-button>
-              </td>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="emptymessage">
-            <tr>
-              <td colspan="9" class="text-center py-12">
-                <div class="text-gray-400">
-                  <i class="pi pi-inbox text-4xl mb-3"></i>
-                  <p class="text-lg font-medium">No salary payments found</p>
-                  <p class="text-sm mt-1">Adjust your filters or pay some salaries to see history.</p>
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </p-card>
-      }
-    </div>
-  `
+  templateUrl: './salaries.component.html'
 })
 export class SalariesComponent implements OnInit {
   private expenseService = inject(ExpenseService);
@@ -442,7 +88,7 @@ export class SalariesComponent implements OnInit {
   ]);
 
   employeeOptions = computed(() => [
-    { label: 'All employees', value: null },
+    { label: this.translate.instant('EXPENSES.SALARIES.HISTORY_ALL_EMPLOYEES'), value: null },
     ...this.employees().map(e => ({ label: `${e.firstName} ${e.lastName}`, value: e.id }))
   ]);
 
@@ -537,16 +183,16 @@ export class SalariesComponent implements OnInit {
         this.historyLoading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load salary history');
+        this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.LOAD_HISTORY_FAILED'));
         this.historyLoading.set(false);
       }
     });
   }
 
   getEmployeeName(employeeId?: string | null): string {
-    if (!employeeId) return 'Unknown';
+    if (!employeeId) return this.translate.instant('EXPENSES.SALARIES.UNKNOWN');
     const e = this.employees().find(x => x.id === employeeId);
-    return e ? `${e.firstName} ${e.lastName}` : 'Unknown';
+    return e ? `${e.firstName} ${e.lastName}` : this.translate.instant('EXPENSES.SALARIES.UNKNOWN');
   }
 
   getBranchName(branchId?: string | null): string {
@@ -560,19 +206,23 @@ export class SalariesComponent implements OnInit {
 
   confirmDeletePayment(p: ExpensePayment) {
     this.confirmationService.confirm({
-      message: `Void salary payment of ${p.amount.toFixed(2)} for ${this.getEmployeeName(p.employeeId)} on ${p.date}? This cannot be undone.`,
-      header: 'Void Payment',
+      message: this.translate.instant('EXPENSES.SALARIES.VOID_CONFIRM', {
+        amount: p.amount.toFixed(2),
+        name: this.getEmployeeName(p.employeeId),
+        date: p.date,
+      }),
+      header: this.translate.instant('EXPENSES.SALARIES.VOID_HEADER'),
       icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Void',
-      rejectLabel: 'Cancel',
+      acceptLabel: this.translate.instant('EXPENSES.SALARIES.VOID_BTN'),
+      rejectLabel: this.translate.instant('EXPENSES.SALARIES.CANCEL'),
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.expenseService.deletePayment(p.id).subscribe({
           next: () => {
-            this.notificationService.success('Payment voided');
+            this.notificationService.success(this.translate.instant('EXPENSES.SALARIES.VOIDED'));
             this.historyPayments.set(this.historyPayments().filter(x => x.id !== p.id));
           },
-          error: () => this.notificationService.error('Failed to void payment')
+          error: () => this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.VOID_FAILED'))
         });
       }
     });
@@ -595,7 +245,7 @@ export class SalariesComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load salary data');
+        this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.LOAD_FAILED'));
         this.loading.set(false);
       }
     });
@@ -644,9 +294,9 @@ export class SalariesComponent implements OnInit {
       if (completed + failed === employeeIds.length) {
         this.paying.set(false);
         if (failed > 0) {
-          this.notificationService.error(`Paid ${completed - failed}, failed ${failed}`);
+          this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.PAID_RESULT_PARTIAL', { paid: completed - failed, failed }));
         } else {
-          this.notificationService.success(`Successfully paid ${completed} salary payment(s)`);
+          this.notificationService.success(this.translate.instant('EXPENSES.SALARIES.PAID_RESULT', { count: completed }));
         }
         this.loadSalaries();
       }

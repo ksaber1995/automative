@@ -30,154 +30,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     SelectModule,
     TranslateModule,
   ],
-  template: `
-    <div class="container-custom py-8">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">{{ 'COURSES.LIST.TITLE' | translate }}</h1>
-        <p-button [label]="'COURSES.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="createCourse()"></p-button>
-      </div>
-
-      <p-card>
-        <!-- Filters -->
-        <div class="flex flex-wrap gap-3 mb-4">
-          <p-select
-            [options]="branchOptions()"
-            [ngModel]="selectedBranchId()"
-            (ngModelChange)="selectedBranchId.set($event)"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All Branches"
-            [showClear]="true"
-            [style]="{ minWidth: '200px' }"
-          ></p-select>
-
-          <p-select
-            [options]="statusOptions"
-            [ngModel]="selectedStatus()"
-            (ngModelChange)="selectedStatus.set($event)"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All Statuses"
-            [showClear]="true"
-            [style]="{ minWidth: '160px' }"
-          ></p-select>
-
-          @if (selectedBranchId() || selectedStatus() !== null) {
-            <p-button
-              label="Clear"
-              icon="pi pi-times"
-              severity="secondary"
-              [outlined]="true"
-              (onClick)="clearFilters()"
-            ></p-button>
-          }
-
-          @if (selectedBranchId() || selectedStatus() !== null) {
-            <span class="ml-auto text-sm text-gray-500 self-center">
-              {{ filteredCourses().length }} / {{ courses().length }} courses
-            </span>
-          }
-        </div>
-
-        <p-table
-          [value]="filteredCourses()"
-          [loading]="loading()"
-          [paginator]="true"
-          [rows]="10"
-          [showCurrentPageReport]="true"
-          [currentPageReportTemplate]="'COURSES.LIST.PAGE_REPORT' | translate"
-          responsiveLayout="scroll"
-        >
-          <ng-template pTemplate="header">
-            <tr>
-              <th pSortableColumn="code">{{ 'COURSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
-              <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-              <th>Branch</th>
-              <th pSortableColumn="duration">{{ 'COURSES.LIST.COL_DURATION' | translate }}</th>
-              <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
-              <th>{{ 'COURSES.LIST.COL_MAX_STUDENTS' | translate }}</th>
-              <th>Enrollments</th>
-              <th pSortableColumn="isActive">{{ 'COURSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
-              <th>{{ 'COURSES.LIST.COL_ACTIONS' | translate }}</th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-course>
-            <tr>
-              <td>{{ course.code }}</td>
-              <td>{{ course.name }}</td>
-              <td>{{ getBranchName(course.branchId) }}</td>
-              <td>{{ course.duration }} {{ 'COURSES.LIST.WEEKS' | translate }}</td>
-              <td>{{ course.price.toFixed(2) }}</td>
-              <td>{{ course.maxStudents || ('COURSES.LIST.UNLIMITED' | translate) }}</td>
-              <td>
-                <div class="flex flex-col gap-1">
-                  <span class="font-semibold text-sm">
-                    Total: {{ course.enrollmentCount || 0 }}
-                  </span>
-                  @if (course.directEnrollmentCount > 0 || course.masterEnrollmentCount > 0) {
-                    <div class="flex gap-1 flex-wrap">
-                      @if (course.directEnrollmentCount > 0) {
-                        <p-tag
-                          [value]="course.directEnrollmentCount + ' direct'"
-                          severity="info"
-                          [pTooltip]="'Direct course enrollments'"
-                        ></p-tag>
-                      }
-                      @if (course.masterEnrollmentCount > 0) {
-                        <p-tag
-                          [value]="course.masterEnrollmentCount + ' bundle'"
-                          severity="secondary"
-                          [pTooltip]="'From master course bundle enrollments'"
-                        ></p-tag>
-                      }
-                    </div>
-                  }
-                </div>
-              </td>
-              <td>
-                <p-tag
-                  [value]="course.isActive ? ('COURSES.LIST.ACTIVE' | translate) : ('COURSES.LIST.INACTIVE' | translate)"
-                  [severity]="course.isActive ? 'success' : 'danger'"
-                ></p-tag>
-              </td>
-              <td>
-                <div class="flex gap-2">
-                  <p-button
-                    icon="pi pi-eye"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="info"
-                    (onClick)="viewCourse(course)"
-                    [pTooltip]="'COURSES.LIST.VIEW' | translate"
-                  ></p-button>
-                  @if (authService.canWrite('courses')) {
-                    <p-button
-                      icon="pi pi-pencil"
-                      [rounded]="true"
-                      [text]="true"
-                      severity="warn"
-                      (onClick)="editCourse(course)"
-                      [pTooltip]="'COURSES.LIST.EDIT' | translate"
-                    ></p-button>
-                  }
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="emptymessage">
-            <tr>
-              <td colspan="9" class="text-center py-8">
-                <div class="text-gray-500">
-                  <i class="pi pi-inbox text-4xl mb-3"></i>
-                  <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </p-card>
-    </div>
-  `
+  templateUrl: './course-list.component.html'
 })
 export class CourseListComponent implements OnInit {
   private courseService = inject(CourseService);
@@ -193,13 +46,15 @@ export class CourseListComponent implements OnInit {
   selectedBranchId = signal<string | null>(null);
   selectedStatus = signal<boolean | null>(null);
 
-  statusOptions = [
-    { label: 'Active', value: true },
-    { label: 'Inactive', value: false },
-  ];
+  private translate = inject(TranslateService);
+
+  statusOptions = computed(() => [
+    { label: this.translate.instant('COURSES.LIST.ACTIVE'), value: true },
+    { label: this.translate.instant('COURSES.LIST.INACTIVE'), value: false },
+  ]);
 
   branchOptions = computed(() => [
-    { label: 'Global (No Branch)', value: '__global__' },
+    { label: this.translate.instant('COURSES.LIST.GLOBAL_NO_BRANCH'), value: '__global__' },
     ...this.branches().map(b => ({ label: b.name, value: b.id })),
   ]);
 
@@ -231,14 +86,14 @@ export class CourseListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load courses');
+        this.notificationService.error(this.translate.instant('COURSES.LIST.LOAD_ERROR'));
         this.loading.set(false);
       }
     });
   }
 
   getBranchName(branchId: string | null): string {
-    if (!branchId) return 'Global';
+    if (!branchId) return this.translate.instant('COURSES.LIST.GLOBAL');
     return this.branches().find(b => b.id === branchId)?.name ?? branchId;
   }
 

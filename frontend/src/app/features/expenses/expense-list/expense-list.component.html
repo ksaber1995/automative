@@ -8,7 +8,7 @@
         </div>
         <div class="flex gap-2">
           <p-button
-            label="Manage Recurring"
+            [label]="'EXPENSES.LIST.MANAGE_RECURRING' | translate"
             icon="pi pi-refresh"
             severity="secondary"
             [outlined]="true"
@@ -381,7 +381,7 @@
             {{ expense.description }}
           </span>
           @if (expense.eventId) {
-            <p-tag value="Event" severity="warn" styleClass="ml-2 text-xs"></p-tag>
+            <p-tag [value]="'EXPENSES.LIST.EVENT_TAG' | translate" severity="warn" styleClass="ml-2 text-xs"></p-tag>
           }
         </td>
         <td class="font-semibold">{{ expense.amount | number:'1.2-2' }}</td>
@@ -412,13 +412,13 @@
         </td>
         <td>
           <p-tag
-            [value]="getPaymentStatus(expense).label"
+            [value]="getPaymentStatus(expense).label | translate"
             [severity]="getPaymentStatus(expense).severity">
           </p-tag>
         </td>
         <td>
           @if (expense.isRecurring) {
-            <p-tag value="Recurring" severity="info" icon="pi pi-refresh"></p-tag>
+            <p-tag [value]="'EXPENSES.LIST.RECURRING_TAG' | translate" severity="info" icon="pi pi-refresh"></p-tag>
           } @else {
             <span class="text-gray-400 text-sm">-</span>
           }
@@ -431,7 +431,7 @@
                 [rounded]="true"
                 [text]="true"
                 severity="success"
-                pTooltip="Record Payment"
+                [pTooltip]="'EXPENSES.LIST.RECORD_PAYMENT_TOOLTIP' | translate"
                 (onClick)="openPaymentDialog(expense)">
               </p-button>
             }

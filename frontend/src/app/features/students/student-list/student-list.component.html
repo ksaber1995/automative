@@ -40,7 +40,7 @@
           <th>{{ 'STUDENTS.LIST.COL_PARENT' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_CONTACT' | translate }}</th>
           <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
-          <th class="text-center">Courses</th>
+          <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
           <th pSortableColumn="isActive">{{ 'STUDENTS.LIST.COL_STATUS' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
@@ -62,14 +62,14 @@
           <td>
             <div class="flex justify-center gap-2">
               <p-tag
-                [value]="getCounts(student.id).active + ' active'"
+                [value]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS' | translate: { count: getCounts(student.id).active }"
                 severity="info"
-                [pTooltip]="'Active enrollments'"
+                [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
               ></p-tag>
               <p-tag
-                [value]="getCounts(student.id).completed + ' done'"
+                [value]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS' | translate: { count: getCounts(student.id).completed }"
                 severity="success"
-                [pTooltip]="'Completed enrollments'"
+                [pTooltip]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS_TOOLTIP' | translate"
               ></p-tag>
             </div>
           </td>

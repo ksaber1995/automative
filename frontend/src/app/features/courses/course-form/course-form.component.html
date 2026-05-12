@@ -1,0 +1,193 @@
+<div class="container-custom py-8">
+  <div class="max-w-3xl mx-auto">
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold text-gray-900">
+        {{ (isEditMode() ? 'COURSES.FORM.EDIT_TITLE' : 'COURSES.FORM.CREATE_TITLE') | translate }}
+      </h1>
+      <p class="text-gray-600 mt-2">
+        {{ (isEditMode() ? 'COURSES.FORM.EDIT_SUBTITLE' : 'COURSES.FORM.CREATE_SUBTITLE') | translate }}
+      </p>
+    </div>
+
+    <p-card>
+      <form [formGroup]="courseForm" (ngSubmit)="onSubmit()">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Branch -->
+          <div class="col-span-2">
+            <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-select
+              id="branchId"
+              formControlName="branchId"
+              [options]="branches()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="'COURSES.FORM.BRANCH_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [class.border-red-500]="branchId?.invalid && branchId?.touched"
+            ></p-select>
+            @if (branchId?.invalid && branchId?.touched) {
+              <small class="text-red-500">{{ 'COURSES.FORM.BRANCH_REQUIRED' | translate }}</small>
+            }
+          </div>
+
+          <!-- Course Name -->
+          <div class="col-span-2">
+            <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <input
+              pInputText
+              id="name"
+              formControlName="name"
+              [placeholder]="'COURSES.FORM.NAME_PLACEHOLDER' | translate"
+              class="w-full"
+              [class.border-red-500]="name?.invalid && name?.touched"
+            />
+            @if (name?.invalid && name?.touched) {
+              <small class="text-red-500">{{ 'COURSES.FORM.NAME_REQUIRED' | translate }}</small>
+            }
+          </div>
+
+          <!-- Course Code -->
+          <div>
+            <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.CODE_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <input
+              pInputText
+              id="code"
+              formControlName="code"
+              [placeholder]="'COURSES.FORM.CODE_PLACEHOLDER' | translate"
+              class="w-full"
+              [class.border-red-500]="code?.invalid && code?.touched"
+            />
+            @if (code?.invalid && code?.touched) {
+              <small class="text-red-500">{{ 'COURSES.FORM.CODE_REQUIRED' | translate }}</small>
+            }
+          </div>
+
+          <!-- Price -->
+          <div>
+            <label for="price" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.PRICE_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-inputnumber
+              id="price"
+              formControlName="price"
+              mode="currency"
+              currency="USD"
+              [min]="0"
+              [placeholder]="'COURSES.FORM.PRICE_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [class.border-red-500]="price?.invalid && price?.touched"
+            />
+            @if (price?.invalid && price?.touched) {
+              <small class="text-red-500">{{ 'COURSES.FORM.PRICE_REQUIRED' | translate }}</small>
+            }
+          </div>
+
+          <!-- Duration (in weeks) -->
+          <div>
+            <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.DURATION_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-inputnumber
+              id="duration"
+              formControlName="duration"
+              [min]="1"
+              [max]="52"
+              [placeholder]="'COURSES.FORM.DURATION_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [class.border-red-500]="duration?.invalid && duration?.touched"
+            />
+            @if (duration?.invalid && duration?.touched) {
+              <small class="text-red-500">{{ 'COURSES.FORM.DURATION_REQUIRED' | translate }}</small>
+            }
+          </div>
+
+          <!-- Max Students -->
+          <div>
+            <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.MAX_STUDENTS_LABEL' | translate }}
+            </label>
+            <p-inputnumber
+              id="maxStudents"
+              formControlName="maxStudents"
+              [min]="1"
+              [placeholder]="'COURSES.FORM.MAX_STUDENTS_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+            />
+          </div>
+
+          <!-- Instructor -->
+          <div class="col-span-2">
+            <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.INSTRUCTOR_LABEL' | translate }}
+            </label>
+            <p-select
+              id="instructorId"
+              formControlName="instructorId"
+              [options]="employees()"
+              optionLabel="fullName"
+              optionValue="id"
+              [placeholder]="'COURSES.FORM.INSTRUCTOR_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+            ></p-select>
+          </div>
+
+          <!-- Default Room -->
+          <div class="col-span-2">
+            <label for="defaultRoomId" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.DEFAULT_ROOM_LABEL' | translate }}
+            </label>
+            <p-select
+              id="defaultRoomId"
+              formControlName="defaultRoomId"
+              [options]="rooms()"
+              optionLabel="code"
+              optionValue="id"
+              [placeholder]="'COURSES.FORM.DEFAULT_ROOM_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+            ></p-select>
+            <small class="text-gray-400">{{ 'COURSES.FORM.DEFAULT_ROOM_HINT' | translate }}</small>
+          </div>
+
+          <!-- Description -->
+          <div class="col-span-2">
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.DESCRIPTION_LABEL' | translate }}
+            </label>
+            <textarea
+              pTextarea
+              id="description"
+              formControlName="description"
+              rows="4"
+              [placeholder]="'COURSES.FORM.DESCRIPTION_PLACEHOLDER' | translate"
+              class="w-full"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+          <p-button
+            [label]="'COURSES.FORM.CANCEL' | translate"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="cancel()"
+            type="button"
+          ></p-button>
+          <p-button
+            [label]="(isEditMode() ? 'COURSES.FORM.UPDATE_COURSE' : 'COURSES.FORM.CREATE_COURSE') | translate"
+            type="submit"
+            [loading]="loading()"
+            [disabled]="courseForm.invalid"
+          ></p-button>
+        </div>
+      </form>
+    </p-card>
+  </div>
+</div>

@@ -199,7 +199,7 @@ export class AuthService {
   canAccessAcademics(): boolean {
     return (
       this.hasPermission('students', 'read') ||
-      this.hasPermission('courses', 'read')
+      this.hasPermission('academy', 'read')
     );
   }
 

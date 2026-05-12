@@ -7,12 +7,7 @@ import { LanguageService } from './core/services/language.service';
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, ToastModule],
-  template: `
-    <p-toast></p-toast>
-    <router-outlet></router-outlet>
-  `,
-  styles: []
-})
+  templateUrl: './app.component.html'})
 export class AppComponent {
   title = 'Netrofit';
   private languageService = inject(LanguageService);

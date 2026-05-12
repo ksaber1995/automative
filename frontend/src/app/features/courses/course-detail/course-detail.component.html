@@ -36,7 +36,7 @@
             }
             <div class="flex">
               <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.STATUS' | translate }}</span>
-              <p-tag [value]="c.isActive ? 'Active' : 'Inactive'" [severity]="c.isActive ? 'success' : 'danger'"></p-tag>
+              <p-tag [value]="(c.isActive ? 'COURSES.DETAIL.ACTIVE' : 'COURSES.DETAIL.INACTIVE') | translate" [severity]="c.isActive ? 'success' : 'danger'"></p-tag>
             </div>
           </div>
         </div>
@@ -54,10 +54,10 @@
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
           <div>
-            <h3 class="text-xl font-bold">Enrolled Students</h3>
-            <p class="text-sm text-gray-500 mt-0.5">All enrollments across classes for this course</p>
+            <h3 class="text-xl font-bold">{{ 'COURSES.DETAIL.ENROLLED_STUDENTS_TITLE' | translate }}</h3>
+            <p class="text-sm text-gray-500 mt-0.5">{{ 'COURSES.DETAIL.ENROLLED_STUDENTS_SUBTITLE' | translate }}</p>
           </div>
-          <p-tag [value]="enrollments().length + ' students'" severity="info" icon="pi pi-users"></p-tag>
+          <p-tag [value]="'COURSES.DETAIL.STUDENTS_COUNT' | translate: { count: enrollments().length }" severity="info" icon="pi pi-users"></p-tag>
         </div>
       </ng-template>
 
@@ -70,14 +70,14 @@
       >
         <ng-template pTemplate="header">
           <tr>
-            <th>Student</th>
-            <th>Class</th>
-            <th>Enrolled</th>
-            <th>Status</th>
-            <th>Payment Mode</th>
-            <th>Payment Progress</th>
-            <th>Payment Status</th>
-            <th>Actions</th>
+            <th>{{ 'COURSES.DETAIL.COL_STUDENT' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_CLASS' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_ENROLLED' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_STATUS' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_MODE' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_PROGRESS' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_STATUS' | translate }}</th>
+            <th>{{ 'COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
 
@@ -87,17 +87,17 @@
             <td class="text-sm text-gray-600">{{ row.className || '—' }}</td>
             <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
             <td>
-              <p-tag [value]="row.status" [severity]="getEnrollmentStatusSeverity(row.status)"></p-tag>
+              <p-tag [value]="enrollmentStatusLabel(row.status)" [severity]="getEnrollmentStatusSeverity(row.status)"></p-tag>
             </td>
             <td>
               <span class="text-sm">
                 @if (row.paymentMode === 'INSTALLMENTS') {
                   <span class="inline-flex items-center gap-1 text-blue-700">
-                    <i class="pi pi-credit-card text-xs"></i> Installments
+                    <i class="pi pi-credit-card text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_INSTALLMENTS' | translate }}
                   </span>
                 } @else {
                   <span class="inline-flex items-center gap-1 text-green-700">
-                    <i class="pi pi-check text-xs"></i> Full
+                    <i class="pi pi-check text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_FULL' | translate }}
                   </span>
                 }
               </span>
@@ -105,8 +105,8 @@
             <td>
               <div class="min-w-36">
                 <div class="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>{{ row.amountPaid.toFixed(0) }} paid</span>
-                  <span>{{ row.finalPrice.toFixed(0) }} total</span>
+                  <span>{{ 'COURSES.DETAIL.PAID_LABEL' | translate: { amount: row.amountPaid.toFixed(0) } }}</span>
+                  <span>{{ 'COURSES.DETAIL.TOTAL_LABEL' | translate: { amount: row.finalPrice.toFixed(0) } }}</span>
                 </div>
                 <p-progressbar
                   [value]="row.finalPrice > 0 ? (row.amountPaid / row.finalPrice) * 100 : 0"
@@ -114,7 +114,7 @@
                   [style]="{ height: '8px' }"
                 ></p-progressbar>
                 @if ((row.totalRefunded || 0) > 0) {
-                  <div class="text-xs text-orange-500 mt-0.5">Refunded: {{ row.totalRefunded.toFixed(0) }}</div>
+                  <div class="text-xs text-orange-500 mt-0.5">{{ 'COURSES.DETAIL.REFUNDED_LABEL' | translate: { amount: row.totalRefunded.toFixed(0) } }}</div>
                 }
               </div>
             </td>
@@ -130,7 +130,7 @@
                     [text]="true"
                     severity="success"
                     (onClick)="openPaymentDialog(row)"
-                    pTooltip="Add Payment"
+                    [pTooltip]="'COURSES.DETAIL.TOOLTIP_ADD_PAYMENT' | translate"
                   ></p-button>
                 }
                 @if (refundableAmount(row) > 0) {
@@ -140,7 +140,7 @@
                     [text]="true"
                     severity="warn"
                     (onClick)="openRefundDialog(row)"
-                    pTooltip="Process Refund"
+                    [pTooltip]="'COURSES.DETAIL.TOOLTIP_PROCESS_REFUND' | translate"
                   ></p-button>
                 }
                 <p-button
@@ -149,7 +149,7 @@
                   [text]="true"
                   severity="info"
                   (onClick)="viewStudent(row.studentId)"
-                  pTooltip="View Student"
+                  [pTooltip]="'COURSES.DETAIL.TOOLTIP_VIEW_STUDENT' | translate"
                 ></p-button>
               </div>
             </td>
@@ -161,7 +161,7 @@
             <td colspan="8" class="text-center py-8">
               <div class="text-gray-500">
                 <i class="pi pi-users text-4xl mb-3 block"></i>
-                <p>No students enrolled in this course yet</p>
+                <p>{{ 'COURSES.DETAIL.NO_ENROLLMENTS' | translate }}</p>
               </div>
             </td>
           </tr>
@@ -318,7 +318,7 @@
 <!-- Add Payment Dialog -->
 <p-dialog
   [(visible)]="showPaymentDialog"
-  [header]="'Add Payment — ' + (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '')"
+  [header]="'COURSES.DETAIL.PAYMENT_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '') }"
   [modal]="true"
   [style]="{ width: '450px' }"
   [closable]="true"
@@ -326,15 +326,15 @@
   @if (selectedEnrollment()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
       <div class="flex justify-between mb-1">
-        <span class="text-gray-600">Final Price:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.FINAL_PRICE' | translate }}</span>
         <span class="font-semibold">{{ selectedEnrollment()!.finalPrice.toFixed(2) }}</span>
       </div>
       <div class="flex justify-between mb-1">
-        <span class="text-gray-600">Paid so far:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.PAID_SO_FAR' | translate }}</span>
         <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid.toFixed(2) }}</span>
       </div>
       <div class="flex justify-between">
-        <span class="text-gray-600">Remaining:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.REMAINING' | translate }}</span>
         <span class="font-semibold text-red-600">{{ (selectedEnrollment()!.finalPrice - selectedEnrollment()!.amountPaid).toFixed(2) }}</span>
       </div>
     </div>
@@ -342,17 +342,17 @@
 
   <div class="grid gap-4">
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Amount <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.AMOUNT' | translate }} <span class="text-red-500">*</span></label>
       <p-inputnumber
         [(ngModel)]="paymentAmount"
         [min]="0.01"
         [max]="selectedEnrollment() ? selectedEnrollment()!.finalPrice - selectedEnrollment()!.amountPaid : 99999"
-        placeholder="Payment amount"
+        [placeholder]="'COURSES.DETAIL.PAYMENT_AMOUNT_PLACEHOLDER' | translate"
         [style]="{ width: '100%' }"
       />
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
       <p-datepicker
         [(ngModel)]="paymentDate"
         [showIcon]="true"
@@ -361,21 +361,21 @@
       ></p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.NOTES_FIELD' | translate }}</label>
       <textarea
         pTextarea
         [(ngModel)]="paymentNotes"
         rows="2"
-        placeholder="Optional notes..."
+        [placeholder]="'COURSES.DETAIL.NOTES_PLACEHOLDER' | translate"
         class="w-full"
       ></textarea>
     </div>
   </div>
 
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="closePaymentDialog()"></p-button>
+    <p-button [label]="'COURSES.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closePaymentDialog()"></p-button>
     <p-button
-      label="Record Payment"
+      [label]="'COURSES.DETAIL.RECORD_PAYMENT' | translate"
       icon="pi pi-check"
       [loading]="paymentLoading()"
       [disabled]="!paymentAmount || !paymentDate"
@@ -387,7 +387,7 @@
 <!-- Refund Dialog -->
 <p-dialog
   [(visible)]="showRefundDialog"
-  [header]="'Process Refund — ' + (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '')"
+  [header]="'COURSES.DETAIL.REFUND_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '') }"
   [modal]="true"
   [style]="{ width: '480px' }"
   [closable]="true"
@@ -395,15 +395,15 @@
   @if (selectedEnrollment()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
       <div class="flex justify-between mb-1">
-        <span class="text-gray-600">Amount Paid:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.AMOUNT_PAID' | translate }}</span>
         <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid.toFixed(2) }}</span>
       </div>
       <div class="flex justify-between mb-1">
-        <span class="text-gray-600">Already Refunded:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.ALREADY_REFUNDED' | translate }}</span>
         <span class="font-semibold text-orange-500">{{ (selectedEnrollment()!.totalRefunded || 0).toFixed(2) }}</span>
       </div>
       <div class="flex justify-between border-t pt-1 mt-1">
-        <span class="text-gray-600">Refundable:</span>
+        <span class="text-gray-600">{{ 'COURSES.DETAIL.REFUNDABLE' | translate }}</span>
         <span class="font-semibold text-blue-600">{{ refundableAmount(selectedEnrollment()!).toFixed(2) }}</span>
       </div>
     </div>
@@ -411,27 +411,27 @@
 
   <div class="grid gap-4">
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Refund Type</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.REFUND_TYPE' | translate }}</label>
       <p-selectbutton
         [(ngModel)]="refundType"
-        [options]="refundTypeOptions"
+        [options]="refundTypeOptions()"
         optionLabel="label"
         optionValue="value"
         [style]="{ width: '100%' }"
       ></p-selectbutton>
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Amount <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.AMOUNT' | translate }} <span class="text-red-500">*</span></label>
       <p-inputnumber
         [(ngModel)]="refundAmount"
         [min]="0.01"
         [max]="selectedEnrollment() ? refundableAmount(selectedEnrollment()!) : 99999"
-        placeholder="Refund amount"
+        [placeholder]="'COURSES.DETAIL.REFUND_AMOUNT_PLACEHOLDER' | translate"
         [style]="{ width: '100%' }"
       />
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Refund Date <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.REFUND_DATE' | translate }} <span class="text-red-500">*</span></label>
       <p-datepicker
         [(ngModel)]="refundDate"
         [showIcon]="true"
@@ -440,21 +440,21 @@
       ></p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Reason</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.DETAIL.REFUND_REASON' | translate }}</label>
       <textarea
         pTextarea
         [(ngModel)]="refundReason"
         rows="2"
-        placeholder="Reason for refund..."
+        [placeholder]="'COURSES.DETAIL.REFUND_REASON_PLACEHOLDER' | translate"
         class="w-full"
       ></textarea>
     </div>
   </div>
 
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="closeRefundDialog()"></p-button>
+    <p-button [label]="'COURSES.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeRefundDialog()"></p-button>
     <p-button
-      label="Process Refund"
+      [label]="'COURSES.DETAIL.PROCESS_REFUND_BTN' | translate"
       icon="pi pi-replay"
       severity="warn"
       [loading]="refundLoading()"

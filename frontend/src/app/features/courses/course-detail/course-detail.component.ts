@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -23,7 +23,7 @@ import { EnrollmentService } from '../../enrollments/services/enrollment.service
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-course-detail',
@@ -59,6 +59,7 @@ export class CourseDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
 
   course = signal<Course | null>(null);
   classes = signal<ClassWithDetails[]>([]);
@@ -83,10 +84,10 @@ export class CourseDetailComponent implements OnInit {
   refundReason = '';
   refundLoading = signal(false);
 
-  refundTypeOptions = [
-    { label: 'Partial', value: 'PARTIAL' },
-    { label: 'Full', value: 'FULL' },
-  ];
+  refundTypeOptions = computed(() => [
+    { label: this.translate.instant('COURSES.DETAIL.REFUND_TYPE_PARTIAL'), value: 'PARTIAL' },
+    { label: this.translate.instant('COURSES.DETAIL.REFUND_TYPE_FULL'), value: 'FULL' },
+  ]);
 
   classStatus(cls: ClassWithDetails): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
     if (cls.status) return cls.status;
@@ -99,9 +100,9 @@ export class CourseDetailComponent implements OnInit {
 
   classStatusLabel(cls: ClassWithDetails): string {
     switch (this.classStatus(cls)) {
-      case 'IN_PROGRESS': return 'In Progress';
-      case 'SCHEDULED': return 'Scheduled';
-      case 'DONE': return 'Done';
+      case 'IN_PROGRESS': return this.translate.instant('COURSES.DETAIL.STATUS_IN_PROGRESS');
+      case 'SCHEDULED': return this.translate.instant('COURSES.DETAIL.STATUS_SCHEDULED');
+      case 'DONE': return this.translate.instant('COURSES.DETAIL.STATUS_DONE');
     }
   }
 
@@ -130,7 +131,7 @@ export class CourseDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load course');
+        this.notificationService.error(this.translate.instant('COURSES.DETAIL.LOAD_COURSE_FAILED'));
         this.loading.set(false);
         this.router.navigate(['/courses']);
       }
@@ -148,7 +149,7 @@ export class CourseDetailComponent implements OnInit {
         this.classes.set(classesWithDetails.filter(c => c !== undefined) as ClassWithDetails[]);
       },
       error: () => {
-        this.notificationService.error('Failed to load classes');
+        this.notificationService.error(this.translate.instant('COURSES.DETAIL.LOAD_CLASSES_FAILED'));
       }
     });
   }
@@ -192,13 +193,13 @@ export class CourseDetailComponent implements OnInit {
       notes: this.paymentNotes || undefined
     }).subscribe({
       next: () => {
-        this.notificationService.success('Payment recorded successfully');
+        this.notificationService.success(this.translate.instant('COURSES.DETAIL.PAYMENT_RECORDED'));
         this.paymentLoading.set(false);
         this.closePaymentDialog();
         if (this.courseId) this.loadEnrollments(this.courseId);
       },
       error: () => {
-        this.notificationService.error('Failed to record payment');
+        this.notificationService.error(this.translate.instant('COURSES.DETAIL.PAYMENT_FAILED'));
         this.paymentLoading.set(false);
       }
     });
@@ -233,13 +234,13 @@ export class CourseDetailComponent implements OnInit {
       reason: this.refundReason || undefined
     }).subscribe({
       next: () => {
-        this.notificationService.success('Refund processed successfully');
+        this.notificationService.success(this.translate.instant('COURSES.DETAIL.REFUND_PROCESSED'));
         this.refundLoading.set(false);
         this.closeRefundDialog();
         if (this.courseId) this.loadEnrollments(this.courseId);
       },
       error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to process refund');
+        this.notificationService.error(err?.error?.message || this.translate.instant('COURSES.DETAIL.REFUND_FAILED'));
         this.refundLoading.set(false);
       }
     });
@@ -271,11 +272,21 @@ export class CourseDetailComponent implements OnInit {
 
   paymentLabel(status: string): string {
     switch (status?.toUpperCase()) {
-      case 'PAID': return 'Complete';
-      case 'PARTIAL': return 'Partial';
-      case 'PENDING': return 'Pending';
-      case 'REFUNDED': return 'Refunded';
-      default: return status || 'Unknown';
+      case 'PAID': return this.translate.instant('COURSES.DETAIL.PAYMENT_STATUS_PAID');
+      case 'PARTIAL': return this.translate.instant('COURSES.DETAIL.PAYMENT_STATUS_PARTIAL');
+      case 'PENDING': return this.translate.instant('COURSES.DETAIL.PAYMENT_STATUS_PENDING');
+      case 'REFUNDED': return this.translate.instant('COURSES.DETAIL.PAYMENT_STATUS_REFUNDED');
+      default: return status || '';
+    }
+  }
+
+  enrollmentStatusLabel(status: string): string {
+    switch (status?.toUpperCase()) {
+      case 'ACTIVE': return this.translate.instant('COURSES.DETAIL.ENROLLMENT_STATUS_ACTIVE');
+      case 'COMPLETED': return this.translate.instant('COURSES.DETAIL.ENROLLMENT_STATUS_COMPLETED');
+      case 'DROPPED': return this.translate.instant('COURSES.DETAIL.ENROLLMENT_STATUS_DROPPED');
+      case 'PENDING': return this.translate.instant('COURSES.DETAIL.ENROLLMENT_STATUS_PENDING');
+      default: return status || '';
     }
   }
 

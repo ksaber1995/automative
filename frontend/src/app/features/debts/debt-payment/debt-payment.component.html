@@ -1,0 +1,136 @@
+<div class="container mx-auto p-4 max-w-4xl">
+  @if (debt()) {
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="p-4">
+          <h2 class="text-2xl font-bold">Make Payment - {{ debt()!.creditorName }}</h2>
+          <div class="mt-2 text-sm text-gray-600">
+            <div>Current Balance: <span class="font-bold text-red-600">\${{ debt()!.currentBalance.toLocaleString() }}</span></div>
+            <div>Interest Rate: {{ debt()!.interestRate }}%</div>
+          </div>
+        </div>
+      </ng-template>
+
+      <form [formGroup]="paymentForm" (ngSubmit)="onSubmit()">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div class="field">
+            <label for="paymentDate" class="block text-sm font-medium mb-2">
+              Payment Date *
+            </label>
+            <input
+              type="date"
+              id="paymentDate"
+              formControlName="paymentDate"
+              class="w-full p-2 border rounded" />
+          </div>
+
+          <div class="field">
+            <label for="totalAmount" class="block text-sm font-medium mb-2">
+              Payment Amount *
+            </label>
+            <p-inputNumber
+              inputId="totalAmount"
+              formControlName="totalAmount"
+              mode="currency"
+              currency="USD"
+              [minFractionDigits]="2"
+              [min]="0.01"
+              class="w-full">
+            </p-inputNumber>
+            <small class="text-gray-500">Maximum: \${{ debt()!.currentBalance.toLocaleString() }}</small>
+          </div>
+
+          <div class="field">
+            <label for="paymentMethod" class="block text-sm font-medium mb-2">
+              Payment Method *
+            </label>
+            <select
+              id="paymentMethod"
+              formControlName="paymentMethod"
+              class="w-full p-2 border rounded">
+              <option value="">Select payment method</option>
+              @for (opt of paymentMethodOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="referenceNumber" class="block text-sm font-medium mb-2">
+              Reference Number
+            </label>
+            <input
+              pInputText
+              id="referenceNumber"
+              formControlName="referenceNumber"
+              class="w-full"
+              placeholder="Transaction reference" />
+          </div>
+
+          <div class="field">
+            <label for="lateFee" class="block text-sm font-medium mb-2">
+              Late Fee
+            </label>
+            <p-inputNumber
+              inputId="lateFee"
+              formControlName="lateFee"
+              mode="currency"
+              currency="USD"
+              [minFractionDigits]="2"
+              [min]="0"
+              class="w-full">
+            </p-inputNumber>
+          </div>
+
+          <div class="field md:col-span-2">
+            <label for="notes" class="block text-sm font-medium mb-2">
+              Notes
+            </label>
+            <textarea
+              id="notes"
+              formControlName="notes"
+              rows="3"
+              class="w-full p-2 border rounded"
+              placeholder="Payment notes...">
+            </textarea>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 p-4 rounded-lg mt-4">
+          <h3 class="font-semibold mb-2">Payment Breakdown (Estimated)</h3>
+          <div class="text-sm space-y-1">
+            <div class="flex justify-between">
+              <span>Total Payment:</span>
+              <span class="font-semibold">\${{ paymentForm.get('totalAmount')?.value || 0 }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Late Fee:</span>
+              <span>\${{ paymentForm.get('lateFee')?.value || 0 }}</span>
+            </div>
+            <div class="text-xs text-gray-600 mt-2">
+              * Interest and principal amounts will be calculated automatically based on the payment date
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+          <p-button
+            type="submit"
+            label="Submit Payment"
+            icon="pi pi-check"
+            [disabled]="paymentForm.invalid || submitting()">
+          </p-button>
+          <p-button
+            type="button"
+            label="Cancel"
+            icon="pi pi-times"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="cancel()">
+          </p-button>
+        </div>
+      </form>
+    </p-card>
+  }
+</div>
