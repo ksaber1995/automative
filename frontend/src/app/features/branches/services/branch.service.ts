@@ -14,6 +14,31 @@ export interface BranchStats {
   activeEnrollments: number;
 }
 
+export interface BranchDeletionCounts {
+  revenues: number;
+  expenses: number;
+  expensePayments: number;
+  students: number;
+  employees: number;
+  products: number;
+}
+
+export interface BranchDeletionImpact {
+  hasFinancials: boolean;
+  counts: BranchDeletionCounts;
+}
+
+export interface BranchDeleteResult {
+  message: string;
+  deactivated: boolean;
+  counts: BranchDeletionCounts;
+}
+
+export interface BranchDeleteOptions {
+  studentsHandling?: 'delete' | 'deactivate';
+  employeesHandling?: 'delete' | 'deactivate';
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -36,6 +61,10 @@ export class BranchService {
     return this.api.get<BranchStats>(`branches/${id}/stats`);
   }
 
+  getDeletionImpact(id: string): Observable<BranchDeletionImpact> {
+    return this.api.get<BranchDeletionImpact>(`branches/${id}/deletion-impact`);
+  }
+
   createBranch(branch: BranchCreateDto): Observable<Branch> {
     return this.api.post<Branch>('branches', branch);
   }
@@ -44,7 +73,7 @@ export class BranchService {
     return this.api.patch<Branch>(`branches/${id}`, branch);
   }
 
-  deleteBranch(id: string): Observable<Branch> {
-    return this.api.delete<Branch>(`branches/${id}`);
+  deleteBranch(id: string, options: BranchDeleteOptions = {}): Observable<BranchDeleteResult> {
+    return this.api.delete<BranchDeleteResult>(`branches/${id}`, options);
   }
 }

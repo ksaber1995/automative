@@ -20,6 +20,12 @@ export interface CoreStackProps extends cdk.StackProps {
    * Only one stack per account+region can own it — defaults to true; set false on duplicate stacks.
    */
   createSesIdentity?: boolean;
+  /**
+   * Absolute base URL of the deployed frontend for this stage. Used to build
+   * password-reset links in transactional emails. Required because the default
+   * (localhost) produces dead links once mail leaves the developer's laptop.
+   */
+  frontendBaseUrl?: string;
 }
 
 export class CoreStack extends cdk.Stack {
@@ -215,9 +221,10 @@ export class CoreStack extends cdk.Stack {
         // TODO: move to Secrets Manager once we're past the first deploy.
         RECAPTCHA_V3_SECRET_KEY: process.env.RECAPTCHA_V3_SECRET_KEY ?? '6LcwMOYsAAAAALzbgYLfn0a7YuW9-MNufQL9M9Kp',
         // Used to build absolute URLs in transactional emails (password reset).
-        // Override per stage. localhost:4200 keeps dev links functional when
-        // the developer is running `ng serve` locally.
-        FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200',
+        // Passed in per stage from bin/core.ts; falls back to localhost so a
+        // developer running `ng serve` against this Lambda still gets working
+        // links during local end-to-end testing.
+        FRONTEND_BASE_URL: props?.frontendBaseUrl ?? 'http://localhost:4200',
       },
       vpc,
       vpcSubnets: {

@@ -9,6 +9,7 @@ import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
+import { TabsModule } from 'primeng/tabs';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
@@ -31,6 +32,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     ConfirmDialogModule,
     DialogModule,
     TooltipModule,
+    TabsModule,
     TranslateModule
   ],
   providers: [ConfirmationService],
@@ -49,19 +51,21 @@ export class EmployeeListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string | null = null;
-  statusFilter = signal<'active' | 'terminated' | 'all'>('active');
+  statusFilter = signal<'active' | 'inactive'>('active');
 
   showAssignedClassesDialog = signal(false);
   blockedEmployee = signal<Employee | null>(null);
   blockingClasses = signal<{ id: string; name: string; code: string }[]>([]);
 
   filteredEmployees = computed(() => {
-    const status = this.statusFilter();
     const list = this.employees();
-    if (status === 'all') return list;
-    if (status === 'active') return list.filter(e => e.isActive);
-    return list.filter(e => !e.isActive);
+    return this.statusFilter() === 'active'
+      ? list.filter(e => e.isActive)
+      : list.filter(e => !e.isActive);
   });
+
+  activeCount = computed(() => this.employees().filter(e => e.isActive).length);
+  inactiveCount = computed(() => this.employees().filter(e => !e.isActive).length);
 
   ngOnInit() {
     this.loadBranches();

@@ -1149,13 +1149,46 @@ export const contract = c.router({
         404: z.object({ message: z.string() }),
       },
     },
+    getDeletionImpact: {
+      method: 'GET',
+      path: '/api/branches/:id/deletion-impact',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({
+          hasFinancials: z.boolean(),
+          counts: z.object({
+            revenues: z.number(),
+            expenses: z.number(),
+            expensePayments: z.number(),
+            students: z.number(),
+            employees: z.number(),
+            products: z.number(),
+          }),
+        }),
+        404: z.object({ message: z.string() }),
+      },
+    },
     delete: {
       method: 'DELETE',
       path: '/api/branches/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}).optional(),
+      body: z.object({
+        studentsHandling: z.enum(['delete', 'deactivate']).optional(),
+        employeesHandling: z.enum(['delete', 'deactivate']).optional(),
+      }).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
+        200: z.object({
+          message: z.string(),
+          deactivated: z.boolean(),
+          counts: z.object({
+            revenues: z.number(),
+            expenses: z.number(),
+            expensePayments: z.number(),
+            students: z.number(),
+            employees: z.number(),
+            products: z.number(),
+          }),
+        }),
         404: z.object({ message: z.string() }),
       },
     },
@@ -3055,6 +3088,15 @@ export const contract = c.router({
     addRefundSubscriptionLink: {
       method: 'POST',
       path: '/api/migrations/add-refund-subscription-link',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    fixEventSubscriptionStudentFk: {
+      method: 'POST',
+      path: '/api/migrations/fix-event-subscription-student-fk',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

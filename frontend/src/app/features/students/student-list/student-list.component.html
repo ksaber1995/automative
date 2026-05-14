@@ -16,16 +16,32 @@
         (change)="onBranchFilterChange()"
         class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        <option [value]="null">{{ 'STUDENTS.LIST.ALL_BRANCHES' | translate }}</option>
+        <option value="">{{ 'STUDENTS.LIST.ALL_BRANCHES' | translate }}</option>
         @for (branch of branches(); track branch.id) {
           <option [value]="branch.id">{{ branch.name }}</option>
         }
       </select>
     </div>
 
+    <!-- Active/Inactive Tabs -->
+    <p-tabs [value]="activeTab()" (valueChange)="onTabChange($any($event))">
+      <p-tablist>
+        <p-tab value="active">
+          <i class="pi pi-check-circle text-green-600 mr-2"></i>
+          {{ 'STUDENTS.LIST.ACTIVE' | translate }}
+          <span class="ml-2 bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ activeCount() }}</span>
+        </p-tab>
+        <p-tab value="inactive">
+          <i class="pi pi-times-circle text-gray-500 mr-2"></i>
+          {{ 'STUDENTS.LIST.INACTIVE' | translate }}
+          <span class="ml-2 bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ inactiveCount() }}</span>
+        </p-tab>
+      </p-tablist>
+    </p-tabs>
+
     <!-- Students Table -->
     <p-table
-      [value]="students()"
+      [value]="filteredStudents()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"
@@ -40,6 +56,7 @@
           <th>{{ 'STUDENTS.LIST.COL_PARENT' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_CONTACT' | translate }}</th>
           <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
+          <th>{{ 'STUDENTS.LIST.COL_BRANCH' | translate }}</th>
           <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
           <th pSortableColumn="isActive">{{ 'STUDENTS.LIST.COL_STATUS' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
@@ -59,6 +76,7 @@
             </div>
           </td>
           <td>{{ student.enrollmentDate | date: 'MMM d, y' }}</td>
+          <td>{{ getBranchName(student.branchId) }}</td>
           <td>
             <div class="flex justify-center gap-2">
               <p-tag
@@ -112,7 +130,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td colspan="9" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

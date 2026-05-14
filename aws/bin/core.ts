@@ -18,6 +18,7 @@ const netrofitZoneId = 'Z09915202RRKLGYSVZZTS';
 new CoreStack(app, `AutomateMagicStack-dev`, {
   stage: 'dev',
   dbName: 'automative',
+  frontendBaseUrl: 'https://dev.netrofit.com',
   env: { account, region: apiRegion },
   description: `Netrofit Application Stack (dev)`,
   tags: {
@@ -36,7 +37,7 @@ new LandingStack(app, `NetrofitLandingStack-dev`, {
   hostedZoneId: netrofitZoneId,
   // Apex stack owns the zone-wide TXTs so we don't get duplicate-record CFN errors.
   zoneApexTxtRecords: {
-    spf: 'v=spf1 -all',
+    spf: 'v=spf1 include:amazonses.com -all',
     dmarc: 'v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s',
   },
   env: { account, region: 'us-east-1' },
@@ -71,6 +72,7 @@ new CoreStack(app, `AutomateMagicStack-prod`, {
   dbName: 'automative_prod',
   apiCustomDomain: 'prod.api.netrofit.net',
   createSesIdentity: false,
+  frontendBaseUrl: 'https://app.netrofit.com',
   env: { account, region: apiRegion },
   description: `Netrofit Application Stack (prod)`,
   tags: {

@@ -116,10 +116,133 @@
     </p-table>
   </p-card>
 
-  <app-delete-confirm-dialog
-    [(visible)]="showDeleteDialog"
+  <p-dialog
+    [visible]="showDeleteDialog()"
+    (visibleChange)="$event ? null : closeDeleteDialog()"
     [header]="'BRANCHES.LIST.DELETE_TITLE' | translate"
-    [message]="'BRANCHES.LIST.DELETE_CONFIRM' | translate: { name: branchToDelete()?.name }"
-    (confirm)="deleteBranch()"
-  ></app-delete-confirm-dialog>
+    [modal]="true"
+    [style]="{ width: '560px' }"
+    [closable]="!deleteSubmitting()"
+  >
+    @if (impactLoading()) {
+      <div class="py-8 text-center text-gray-500">
+        <i class="pi pi-spinner pi-spin text-2xl"></i>
+        <p class="mt-2">{{ 'BRANCHES.LIST.DELETE_LOADING' | translate }}</p>
+      </div>
+    } @else if (deletionImpact(); as impact) {
+      <div class="space-y-4">
+        <p class="text-gray-700">
+          {{ 'BRANCHES.LIST.DELETE_CONFIRM' | translate: { name: branchToDelete()?.name } }}
+        </p>
+
+        @if (impact.hasFinancials) {
+          <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
+            <div class="flex items-start gap-2">
+              <i class="pi pi-exclamation-triangle text-amber-600 mt-0.5"></i>
+              <div class="text-sm text-amber-900">
+                <p class="font-semibold mb-1">{{ 'BRANCHES.LIST.DELETE_FINANCIALS_TITLE' | translate }}</p>
+                <p>{{ 'BRANCHES.LIST.DELETE_FINANCIALS_BODY' | translate }}</p>
+                <ul class="mt-2 ml-4 list-disc text-xs space-y-0.5">
+                  <li>{{ 'BRANCHES.LIST.IMPACT_REVENUES' | translate: { count: impact.counts.revenues } }}</li>
+                  <li>{{ 'BRANCHES.LIST.IMPACT_EXPENSES' | translate: { count: impact.counts.expenses } }}</li>
+                  <li>{{ 'BRANCHES.LIST.IMPACT_EXPENSE_PAYMENTS' | translate: { count: impact.counts.expensePayments } }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (impact.hasFinancials) {
+          @if (impact.counts.students > 0) {
+            <div>
+              <div class="text-sm font-medium text-gray-800 mb-2">
+                {{ 'BRANCHES.LIST.HANDLE_STUDENTS' | translate: { count: impact.counts.students } }}
+              </div>
+              <div class="flex gap-6 ml-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <p-radioButton name="studentsHandling" value="deactivate"
+                    [ngModel]="studentsHandling()" (ngModelChange)="studentsHandling.set($event)"></p-radioButton>
+                  <span class="text-sm">{{ 'BRANCHES.LIST.OPT_DEACTIVATE' | translate }}</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <p-radioButton name="studentsHandling" value="delete"
+                    [ngModel]="studentsHandling()" (ngModelChange)="studentsHandling.set($event)"></p-radioButton>
+                  <span class="text-sm">{{ 'BRANCHES.LIST.OPT_DELETE' | translate }}</span>
+                </label>
+              </div>
+            </div>
+          }
+
+          @if (impact.counts.employees > 0) {
+            <div>
+              <div class="text-sm font-medium text-gray-800 mb-2">
+                {{ 'BRANCHES.LIST.HANDLE_EMPLOYEES' | translate: { count: impact.counts.employees } }}
+              </div>
+              <div class="flex gap-6 ml-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <p-radioButton name="employeesHandling" value="deactivate"
+                    [ngModel]="employeesHandling()" (ngModelChange)="employeesHandling.set($event)"></p-radioButton>
+                  <span class="text-sm">{{ 'BRANCHES.LIST.OPT_DEACTIVATE' | translate }}</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <p-radioButton name="employeesHandling" value="delete"
+                    [ngModel]="employeesHandling()" (ngModelChange)="employeesHandling.set($event)"></p-radioButton>
+                  <span class="text-sm">{{ 'BRANCHES.LIST.OPT_DELETE' | translate }}</span>
+                </label>
+              </div>
+            </div>
+          }
+
+          @if (impact.counts.products > 0) {
+            <div class="bg-red-50 border-l-4 border-red-400 p-3 rounded">
+              <div class="flex items-start gap-2">
+                <i class="pi pi-info-circle text-red-600 mt-0.5"></i>
+                <p class="text-sm text-red-900">
+                  {{ 'BRANCHES.LIST.PRODUCTS_NOTICE' | translate: { count: impact.counts.products } }}
+                </p>
+              </div>
+            </div>
+          }
+        } @else if (impact.counts.students + impact.counts.employees + impact.counts.products > 0) {
+          <div class="bg-red-50 border-l-4 border-red-400 p-3 rounded">
+            <div class="flex items-start gap-2">
+              <i class="pi pi-exclamation-triangle text-red-600 mt-0.5"></i>
+              <div class="text-sm text-red-900">
+                <p class="font-semibold mb-1">{{ 'BRANCHES.LIST.HARD_DELETE_TITLE' | translate }}</p>
+                <ul class="ml-4 list-disc text-xs space-y-0.5">
+                  @if (impact.counts.students > 0) {
+                    <li>{{ 'BRANCHES.LIST.HARD_DELETE_STUDENTS' | translate: { count: impact.counts.students } }}</li>
+                  }
+                  @if (impact.counts.employees > 0) {
+                    <li>{{ 'BRANCHES.LIST.HARD_DELETE_EMPLOYEES' | translate: { count: impact.counts.employees } }}</li>
+                  }
+                  @if (impact.counts.products > 0) {
+                    <li>{{ 'BRANCHES.LIST.HARD_DELETE_PRODUCTS' | translate: { count: impact.counts.products } }}</li>
+                  }
+                </ul>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <ng-template pTemplate="footer">
+      <p-button
+        [label]="'BRANCHES.FORM.CANCEL' | translate"
+        severity="secondary"
+        [text]="true"
+        [disabled]="deleteSubmitting()"
+        (onClick)="closeDeleteDialog()"
+      ></p-button>
+      <p-button
+        [label]="(deletionImpact()?.hasFinancials ? 'BRANCHES.LIST.CONFIRM_DEACTIVATE' : 'BRANCHES.LIST.CONFIRM_DELETE') | translate"
+        severity="danger"
+        icon="pi pi-trash"
+        [loading]="deleteSubmitting()"
+        [disabled]="impactLoading() || !deletionImpact()"
+        (onClick)="deleteBranch()"
+      ></p-button>
+    </ng-template>
+  </p-dialog>
 </div>

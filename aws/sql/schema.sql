@@ -457,7 +457,11 @@ CREATE TABLE event_subscriptions (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
-    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+    -- CASCADE (not SET NULL) because the CHECK constraint below requires
+    -- student_id OR an external_first_name/last_name pair. SET NULL would
+    -- leave both empty for student-attached rows when the student is deleted
+    -- (e.g. as a side-effect of deleting their branch), violating the CHECK.
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
     external_first_name VARCHAR(100),
     external_last_name VARCHAR(100),
     external_age INTEGER,

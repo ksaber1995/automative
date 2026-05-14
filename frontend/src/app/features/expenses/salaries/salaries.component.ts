@@ -154,7 +154,7 @@ export class SalariesComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (b) => this.branches.set(b)
     });
     this.employeeService.getAllEmployees().subscribe({

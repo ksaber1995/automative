@@ -49,7 +49,7 @@ export class InstallmentListComponent implements OnInit {
   remainingTotal = computed(() => this.plans().reduce((s, p) => s + (p.financedAmount - (p.paidAmount ?? 0)), 0));
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({ next: bs => this.branches.set(bs) });
+    this.branchService.getAllBranches().subscribe({ next: bs => this.branches.set(bs) });
     this.load();
   }
 

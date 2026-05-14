@@ -90,7 +90,7 @@ export class ManageRecurringComponent implements OnInit {
   );
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
+    this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b) });
     this.loadData();
   }
 

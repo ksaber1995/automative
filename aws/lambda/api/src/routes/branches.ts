@@ -1,4 +1,4 @@
-import { insert, update, findById, query, queryOne, deleteById } from '../db/connection';
+import { insert, update, findById, query, queryOne, deleteById, getClient } from '../db/connection';
 import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
 function mapBranchFromDB(row: any) {
@@ -320,27 +320,79 @@ export const branchesRoutes = {
     }
   },
 
-  delete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+  getDeletionImpact: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'branches', 'read')) {
+        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+      }
+
+      const branch = await queryOne(
+        'SELECT id FROM branches WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!branch) {
+        return { status: 404 as const, body: { message: 'Branch not found' } };
+      }
+
+      const row = await queryOne<Record<string, string>>(`
+        SELECT
+          (SELECT COUNT(*) FROM revenues          WHERE branch_id = $1) AS revenues,
+          (SELECT COUNT(*) FROM expenses          WHERE branch_id = $1) AS expenses,
+          (SELECT COUNT(*) FROM expense_payments  WHERE branch_id = $1) AS expense_payments,
+          (SELECT COUNT(*) FROM students          WHERE branch_id = $1) AS students,
+          (SELECT COUNT(*) FROM employees         WHERE branch_id = $1) AS employees,
+          (SELECT COUNT(*) FROM products          WHERE branch_id = $1) AS products
+      `, [params.id]);
+
+      const n = (k: string) => parseInt(row?.[k] || '0');
+      const revenues = n('revenues');
+      const expenses = n('expenses');
+      const expensePayments = n('expense_payments');
+      const hasFinancials = revenues + expenses + expensePayments > 0;
+
+      return {
+        status: 200 as const,
+        body: {
+          hasFinancials,
+          counts: {
+            revenues,
+            expenses,
+            expensePayments,
+            students: n('students'),
+            employees: n('employees'),
+            products: n('products'),
+          },
+        },
+      };
+    } catch (error) {
+      console.error('Branch deletion impact error:', error);
+      return {
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
+        body: { message: error.message || 'Failed to compute branch deletion impact' },
+      };
+    }
+  },
+
+  delete: async ({ params, body, headers }: {
+    params: { id: string };
+    body?: { studentsHandling?: 'delete' | 'deactivate'; employeesHandling?: 'delete' | 'deactivate' };
+    headers: { authorization: string };
+  }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'delete')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      // Verify branch belongs to company
       const existing = await queryOne(
         'SELECT * FROM branches WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
+        return { status: 404 as const, body: { message: 'Branch not found' } };
       }
 
-      // Only ADMIN or GLOBAL_ADMIN can delete branches
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
         return {
           status: 403 as const,
@@ -348,16 +400,88 @@ export const branchesRoutes = {
         };
       }
 
-      await deleteById('branches', params.id);
+      const counts = await queryOne<Record<string, string>>(`
+        SELECT
+          (SELECT COUNT(*) FROM revenues          WHERE branch_id = $1) AS revenues,
+          (SELECT COUNT(*) FROM expenses          WHERE branch_id = $1) AS expenses,
+          (SELECT COUNT(*) FROM expense_payments  WHERE branch_id = $1) AS expense_payments,
+          (SELECT COUNT(*) FROM students          WHERE branch_id = $1) AS students,
+          (SELECT COUNT(*) FROM employees         WHERE branch_id = $1) AS employees,
+          (SELECT COUNT(*) FROM products          WHERE branch_id = $1) AS products
+      `, [params.id]);
+
+      const n = (k: string) => parseInt(counts?.[k] || '0');
+      const financialCount = n('revenues') + n('expenses') + n('expense_payments');
+      const hasFinancials = financialCount > 0;
+      const studentsHandling = body?.studentsHandling ?? 'delete';
+      const employeesHandling = body?.employeesHandling ?? 'delete';
+
+      // Both flavours share student/employee/product handling. The only
+      // difference is whether the branch row itself is dropped at the end.
+      // Products are always deleted (the user is informed of this in the UI;
+      // they're branch-scoped operational data with no financial value).
+      const client = await getClient();
+      try {
+        await client.query('BEGIN');
+
+        if (studentsHandling === 'deactivate') {
+          await client.query(
+            'UPDATE students SET is_active = false WHERE branch_id = $1',
+            [params.id]
+          );
+        } else {
+          await client.query('DELETE FROM students WHERE branch_id = $1', [params.id]);
+        }
+
+        if (employeesHandling === 'deactivate') {
+          await client.query(
+            'UPDATE employees SET is_active = false WHERE branch_id = $1',
+            [params.id]
+          );
+        } else {
+          await client.query('DELETE FROM employees WHERE branch_id = $1', [params.id]);
+        }
+
+        await client.query('DELETE FROM products WHERE branch_id = $1', [params.id]);
+
+        if (hasFinancials) {
+          await client.query(
+            'UPDATE branches SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+            [params.id]
+          );
+        } else {
+          await client.query('DELETE FROM branches WHERE id = $1', [params.id]);
+        }
+
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
 
       return {
         status: 200 as const,
-        body: { message: 'Branch deleted successfully' },
+        body: {
+          message: hasFinancials
+            ? 'Branch has financial records and cannot be deleted. It has been deactivated instead.'
+            : 'Branch deleted successfully',
+          deactivated: hasFinancials,
+          counts: {
+            revenues: n('revenues'),
+            expenses: n('expenses'),
+            expensePayments: n('expense_payments'),
+            students: n('students'),
+            employees: n('employees'),
+            products: n('products'),
+          },
+        },
       };
     } catch (error) {
       console.error('Delete branch error:', error);
       return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
+        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
         body: { message: error.message || 'Failed to delete branch' },
       };
     }

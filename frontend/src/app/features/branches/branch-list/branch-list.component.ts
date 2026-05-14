@@ -8,12 +8,13 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { DialogModule } from 'primeng/dialog';
+import { RadioButtonModule } from 'primeng/radiobutton';
 import { TranslateModule } from '@ngx-translate/core';
-import { BranchService } from '../services/branch.service';
+import { BranchService, BranchDeletionImpact } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
-import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
   selector: 'app-branch-list',
@@ -27,7 +28,8 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     SelectModule,
-    DeleteConfirmDialogComponent,
+    DialogModule,
+    RadioButtonModule,
     TranslateModule
   ],
   templateUrl: './branch-list.component.html',
@@ -41,8 +43,13 @@ export class BranchListComponent implements OnInit {
 
   allBranches = signal<Branch[]>([]);
   loading = signal(true);
-  showDeleteDialog = false;
+  showDeleteDialog = signal(false);
   branchToDelete = signal<Branch | null>(null);
+  deletionImpact = signal<BranchDeletionImpact | null>(null);
+  impactLoading = signal(false);
+  deleteSubmitting = signal(false);
+  studentsHandling = signal<'delete' | 'deactivate'>('deactivate');
+  employeesHandling = signal<'delete' | 'deactivate'>('deactivate');
 
   // Filter state
   private statusFilterSignal = signal<'all' | 'active' | 'inactive'>('all');
@@ -100,23 +107,59 @@ export class BranchListComponent implements OnInit {
 
   confirmDelete(branch: Branch) {
     this.branchToDelete.set(branch);
-    this.showDeleteDialog = true;
+    this.deletionImpact.set(null);
+    this.studentsHandling.set('deactivate');
+    this.employeesHandling.set('deactivate');
+    this.showDeleteDialog.set(true);
+    this.impactLoading.set(true);
+    this.branchService.getDeletionImpact(branch.id).subscribe({
+      next: (impact) => {
+        this.deletionImpact.set(impact);
+        this.impactLoading.set(false);
+        // No financials → hard delete path. CASCADE wipes everything anyway,
+        // so we don't ask the user about students/employees.
+        if (!impact.hasFinancials) {
+          this.studentsHandling.set('delete');
+          this.employeesHandling.set('delete');
+        }
+      },
+      error: () => {
+        this.impactLoading.set(false);
+        this.notificationService.error('Failed to compute deletion impact');
+        this.showDeleteDialog.set(false);
+      }
+    });
+  }
+
+  closeDeleteDialog() {
+    this.showDeleteDialog.set(false);
+    this.branchToDelete.set(null);
+    this.deletionImpact.set(null);
   }
 
   deleteBranch() {
     const branch = this.branchToDelete();
     if (!branch) return;
-
-    this.branchService.deleteBranch(branch.id).subscribe({
-      next: () => {
-        this.notificationService.success('Branch deleted successfully');
+    this.deleteSubmitting.set(true);
+    this.branchService.deleteBranch(branch.id, {
+      studentsHandling: this.studentsHandling(),
+      employeesHandling: this.employeesHandling(),
+    }).subscribe({
+      next: (result) => {
+        this.deleteSubmitting.set(false);
+        if (result.deactivated) {
+          this.notificationService.info(
+            `Branch "${branch.name}" was deactivated because it has financial records.`
+          );
+        } else {
+          this.notificationService.success(`Branch "${branch.name}" deleted successfully`);
+        }
         this.loadBranches();
-        this.showDeleteDialog = false;
-        this.branchToDelete.set(null);
+        this.closeDeleteDialog();
       },
       error: () => {
+        this.deleteSubmitting.set(false);
         this.notificationService.error('Failed to delete branch');
-        this.showDeleteDialog = false;
       }
     });
   }

@@ -34,7 +34,7 @@ interface RoadmapPhase {
     <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
       <div class="container-custom h-16 flex items-center justify-between">
         <a href="#top" class="flex items-center">
-          <img src="logo-white.png" alt="Netrofit" class="w-12 h-12 rounded-lg" />
+          <img src="logo-white.png" alt="Netrofit" style="height:60px" class="w-12" />
         </a>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
           <a href="#benefits" class="hover:text-brand-600">{{ 'NAV.BENEFITS' | translate }}</a>
@@ -429,7 +429,7 @@ interface RoadmapPhase {
       <div class="container-custom flex flex-col md:flex-row justify-between gap-6">
         <div>
           <div class="flex items-center mb-2">
-            <img src="logo-white.png" alt="Netrofit" class="w-10 h-10 rounded" />
+            <img src="logo-white.png" alt="Netrofit" style="height:60px" class="w-10" />
           </div>
           <p>{{ 'FOOTER.COPY' | translate: { year: currentYear } }}</p>
         </div>

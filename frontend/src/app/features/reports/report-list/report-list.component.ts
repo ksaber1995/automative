@@ -297,7 +297,7 @@ export class ReportListComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (rows) => this.branches.set(rows),
     });
     this.reload();

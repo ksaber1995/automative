@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
+import { TabsModule } from 'primeng/tabs';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule } from '@ngx-translate/core';
@@ -37,6 +38,7 @@ interface EnrollmentCounts {
     TagModule,
     ConfirmDialogModule,
     TooltipModule,
+    TabsModule,
     TranslateModule
   ],
   providers: [ConfirmationService],
@@ -54,10 +56,32 @@ export class StudentListComponent implements OnInit {
   authService = inject(AuthService);
 
   students = signal<Student[]>([]);
-  branches = signal<Branch[]>([]);
+  allBranches = signal<Branch[]>([]);
   loading = signal(true);
-  selectedBranchId: string | null = null;
+  selectedBranchId: string = '';
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
+  activeTab = signal<'active' | 'inactive'>('active');
+
+  branches = computed(() => {
+    const all = this.allBranches();
+    return this.activeTab() === 'inactive' ? all : all.filter(b => b.isActive);
+  });
+
+  branchNameById = computed(() => {
+    const map = new Map<string, string>();
+    for (const b of this.allBranches()) map.set(b.id, b.name);
+    return map;
+  });
+
+  filteredStudents = computed(() => {
+    const list = this.students();
+    return this.activeTab() === 'active'
+      ? list.filter(s => s.isActive)
+      : list.filter(s => !s.isActive);
+  });
+
+  activeCount = computed(() => this.students().filter(s => s.isActive).length);
+  inactiveCount = computed(() => this.students().filter(s => !s.isActive).length);
 
   ngOnInit() {
     this.loadBranches();
@@ -98,11 +122,16 @@ export class StudentListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (branches) => {
-        this.branches.set(branches);
+        this.allBranches.set(branches);
       }
     });
+  }
+
+  getBranchName(branchId: string | undefined | null): string {
+    if (!branchId) return '';
+    return this.branchNameById().get(branchId) || '';
   }
 
   loadStudents() {
@@ -132,6 +161,15 @@ export class StudentListComponent implements OnInit {
 
   onBranchFilterChange() {
     this.loadStudents();
+  }
+
+  onTabChange(tab: 'active' | 'inactive') {
+    if (this.activeTab() === tab) return;
+    this.activeTab.set(tab);
+    if (this.selectedBranchId) {
+      this.selectedBranchId = '';
+      this.loadStudents();
+    }
   }
 
   viewStudent(student: Student) {

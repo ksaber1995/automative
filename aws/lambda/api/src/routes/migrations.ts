@@ -754,7 +754,7 @@ async function createEventFeatureMigration() {
           company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
           event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
           branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
-          student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+          student_id UUID REFERENCES students(id) ON DELETE CASCADE,
           external_first_name VARCHAR(100),
           external_last_name VARCHAR(100),
           external_age INTEGER,
@@ -864,6 +864,45 @@ async function addRefundSubscriptionLink() {
   return {
     success: true,
     message: `refunds.subscription_id CASCADE applied; ${orphans.length} orphan(s) removed`,
+  };
+}
+
+async function fixEventSubscriptionStudentFk() {
+  console.log('Starting migration: event_subscriptions.student_id -> CASCADE');
+
+  // The original FK was ON DELETE SET NULL, which conflicts with the table's
+  // CHECK constraint (student_id NOT NULL OR external_first_name+last_name NOT
+  // NULL). Deleting a branch CASCADEs to students, which then tries to NULL
+  // student_id on student-attached subscription rows and the CHECK rejects it.
+  const fks = await query<{ conname: string; deltype: string }>(`
+    SELECT con.conname, con.confdeltype AS deltype
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    WHERE rel.relname = 'event_subscriptions'
+      AND con.contype = 'f'
+      AND con.conkey @> ARRAY[(
+        SELECT attnum FROM pg_attribute
+        WHERE attrelid = rel.oid AND attname = 'student_id'
+      )]::smallint[]
+  `);
+
+  let upgraded = 0;
+  for (const c of fks) {
+    if (c.deltype !== 'c') {
+      console.log(`Upgrading ${c.conname} from delete_rule=${c.deltype} to CASCADE`);
+      await query(`ALTER TABLE event_subscriptions DROP CONSTRAINT ${c.conname}`);
+      await query(`
+        ALTER TABLE event_subscriptions
+          ADD CONSTRAINT event_subscriptions_student_id_fkey
+          FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+      `);
+      upgraded++;
+    }
+  }
+
+  return {
+    success: true,
+    message: `event_subscriptions.student_id FK: ${upgraded} upgraded to CASCADE, ${fks.length - upgraded} already correct`,
   };
 }
 
@@ -1212,6 +1251,21 @@ export const migrationsRoutes = {
   addRefundSubscriptionLink: async () => {
     try {
       const result = await addRefundSubscriptionLink();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  fixEventSubscriptionStudentFk: async () => {
+    try {
+      const result = await fixEventSubscriptionStudentFk();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

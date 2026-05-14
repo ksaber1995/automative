@@ -23,20 +23,23 @@
           }
         </select>
       </div>
-      <div>
-        <label for="statusFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.STATUS_FILTER' | translate }}</label>
-        <select
-          id="statusFilter"
-          [ngModel]="statusFilter()"
-          (ngModelChange)="statusFilter.set($event)"
-          class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="active">{{ 'EMPLOYEES.LIST.STATUS_ACTIVE' | translate }}</option>
-          <option value="terminated">{{ 'EMPLOYEES.LIST.STATUS_TERMINATED' | translate }}</option>
-          <option value="all">{{ 'EMPLOYEES.LIST.STATUS_ALL' | translate }}</option>
-        </select>
-      </div>
     </div>
+
+    <!-- Active/Inactive Tabs -->
+    <p-tabs [value]="statusFilter()" (valueChange)="statusFilter.set($any($event))">
+      <p-tablist>
+        <p-tab value="active">
+          <i class="pi pi-check-circle text-green-600 mr-2"></i>
+          {{ 'EMPLOYEES.LIST.STATUS_ACTIVE' | translate }}
+          <span class="ml-2 bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ activeCount() }}</span>
+        </p-tab>
+        <p-tab value="inactive">
+          <i class="pi pi-times-circle text-gray-500 mr-2"></i>
+          {{ 'EMPLOYEES.LIST.STATUS_TERMINATED' | translate }}
+          <span class="ml-2 bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ inactiveCount() }}</span>
+        </p-tab>
+      </p-tablist>
+    </p-tabs>
 
     <!-- Employees Table -->
     <p-table

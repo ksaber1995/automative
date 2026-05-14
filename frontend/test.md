@@ -67,3 +67,95 @@
  
   Also worth noting: the code currently swallows this SES error (try { await sendOtpEmail(...) } catch (otpError) { console.error(...) } at auth.ts:322–326), so the API returns a happy 201 to the frontend even when no email actually goes
    out. That's why the frontend gave you no signal. You may want to surface it (return 502/warning) at least in dev, but that's a separate decision.
+
+
+
+
+
+
+
+
+    Step 1 — Pre-flight (do these first, they make approval near-automatic)
+
+  a) Verify your sender domain with DKIM (you already have netrofit.com as an identity — check DKIM is actually
+  verified):
+
+  aws ses get-identity-dkim-attributes --identities netrofit.com --profile personal --region eu-west-1
+
+  If DkimVerificationStatus is not Success, run:
+
+  aws ses verify-domain-dkim --domain netrofit.com --profile personal --region eu-west-1
+
+  It will return 3 CNAME tokens. Add all 3 as CNAMEs in Route 53 (zone Z09915202RRKLGYSVZZTS):
+  - Host: <token>._domainkey.netrofit.com
+  - Data: <token>.dkim.amazonses.com
+
+  b) Set up a bounce/complaint handler (AWS asks how you handle these). Easiest: subscribe an email to SNS topics for
+  bounces/complaints, or just commit to monitoring in the console — for <20/day you can answer "manual monitoring via
+  SES dashboard."
+
+  Step 2 — Submit the request
+
+  Console is easier than CLI for this. Open:
+
+  https://eu-west-1.console.aws.amazon.com/ses/home?region=eu-west-1#/account
+
+  → Click "Request production access" (top right banner).
+
+  Fill in the form:
+
+  ┌────────────────────────────┬──────────────────────┐
+  │           Field            │     What to put      │
+  ├────────────────────────────┼──────────────────────┤
+  │ Mail type                  │ Transactional        │
+  ├────────────────────────────┼──────────────────────┤
+  │ Website URL                │ https://netrofit.com │
+  ├────────────────────────────┼──────────────────────┤
+  │ Use case description       │ Copy the block below │
+  ├────────────────────────────┼──────────────────────┤
+  │ Additional contacts        │ leave blank          │
+  ├────────────────────────────┼──────────────────────┤
+  │ Preferred contact language │ English              │
+  ├────────────────────────────┼──────────────────────┤
+  │ Compliance with AWS AUP    │ tick yes             │
+  └────────────────────────────┴──────────────────────┘
+
+  Use case description (paste this, edit if you want):
+
+  Netrofit is a SaaS platform for multi-branch academy management. We send
+  transactional email only:
+  1. Account verification OTPs (6-digit code) sent immediately after a user
+     registers, to confirm ownership of their email address.
+  2. Password reset links, sent on-demand when a user clicks "forgot password".
+
+  Recipients are exclusively users who have just submitted our signup or
+  password-reset forms — we never email opt-out lists, marketing lists, or
+  purchased lists. Expected volume is under 20 emails per day.
+
+  Bounce/complaint handling: bounces and complaints are monitored via the
+  SES console. Hard-bounced addresses are flagged in our database and not
+  emailed again. Complaints trigger account review.
+
+  Unsubscribe: not applicable — all email is transactional and triggered
+  by an explicit user action on their own account.
+
+  Step 3 — While you wait
+
+  Approval is usually <24h. To unblock your testing today, verify your own inbox:
+
+  aws ses verify-email-identity --email-address karimali201094@gmail.com --profile personal --region eu-west-1
+
+  Then click the link AWS sends to that inbox — registration emails to it will start flowing immediately, even before
+  production access is granted.
+
+  Step 4 — After approval
+
+  Nothing to deploy. SES just flips the ProductionAccessEnabled flag and emails to any recipient start going through.
+  You can confirm with:
+
+  aws sesv2 get-account --profile personal --region eu-west-1 --query "ProductionAccessEnabled"
+
+  Want me to run step 1a (the DKIM check) now?
+
+
+  -- append to body

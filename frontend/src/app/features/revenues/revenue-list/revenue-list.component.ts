@@ -42,7 +42,7 @@ export class RevenueListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (branches) => this.branches.set(branches)
     });
   }
