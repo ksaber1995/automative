@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
@@ -26,6 +27,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
   standalone: true,
   imports: [
     CommonModule,
+    TranslateModule,
     CardModule,
     TableModule,
     ButtonModule,
@@ -51,6 +53,7 @@ export class ClassDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
 
   classId = '';
   classDetail = signal<ClassWithDetails | null>(null);
@@ -104,7 +107,7 @@ export class ClassDetailComponent implements OnInit {
     this.loadingClass.set(true);
     this.classService.getClassWithDetails(this.classId).subscribe({
       next: (cls) => { this.classDetail.set(cls); this.loadingClass.set(false); },
-      error: () => { this.notificationService.error('Failed to load class'); this.loadingClass.set(false); }
+      error: () => { this.notificationService.error(this.translate.instant('CLASSES.DETAIL.ERR_LOAD_CLASS')); this.loadingClass.set(false); }
     });
   }
 
@@ -163,12 +166,12 @@ export class ClassDetailComponent implements OnInit {
       next: () => {
         this.savingSession.set(false);
         this.showStartSessionDialog = false;
-        this.notificationService.success('Session started');
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.SESSION_STARTED'));
         this.loadSessions();
       },
       error: (err) => {
         this.savingSession.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to start session');
+        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_START_SESSION'));
       },
     });
   }
@@ -187,12 +190,12 @@ export class ClassDetailComponent implements OnInit {
       next: () => {
         this.savingSession.set(false);
         this.showEndSessionDialog = false;
-        this.notificationService.success('Session ended');
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.SESSION_ENDED_MSG'));
         this.loadSessions();
       },
       error: (err) => {
         this.savingSession.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to end session');
+        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_END_SESSION'));
       },
     });
   }
@@ -208,7 +211,7 @@ export class ClassDetailComponent implements OnInit {
       },
       error: () => {
         this.loadingAttendanceStudents.set(false);
-        this.notificationService.error('Failed to load students');
+        this.notificationService.error(this.translate.instant('CLASSES.DETAIL.ERR_LOAD_STUDENTS'));
       },
     });
   }
@@ -240,13 +243,13 @@ export class ClassDetailComponent implements OnInit {
       next: (res) => {
         this.savingAttendance.set(false);
         this.showAttendanceDialog = false;
-        this.notificationService.success(`Attendance saved — ${res.presentCount} present`);
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.ATTENDANCE_SAVED', { count: res.presentCount }));
         // Refresh attendance summary if on that tab
         if (this.activeTab === 'attendance') this.loadAttendanceSummary();
       },
       error: (err) => {
         this.savingAttendance.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to save attendance');
+        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_SAVE_ATTENDANCE'));
       },
     });
   }
@@ -276,11 +279,11 @@ export class ClassDetailComponent implements OnInit {
     const cls = this.classDetail();
     if (!cls) return;
     this.confirmationService.confirm({
-      header: 'Finish Class',
-      message: `Mark "${cls.name}" as finished? Once finished, no new enrollments and no sessions can be started for this class. This cannot be undone here.`,
+      header: this.translate.instant('CLASSES.DETAIL.FINISH_CLASS_TITLE'),
+      message: this.translate.instant('CLASSES.DETAIL.FINISH_CLASS_MSG', { name: cls.name }),
       icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Finish Class',
-      rejectLabel: 'Cancel',
+      acceptLabel: this.translate.instant('CLASSES.DETAIL.FINISH_CLASS'),
+      rejectLabel: this.translate.instant('CLASSES.DETAIL.CANCEL'),
       acceptButtonStyleClass: 'p-button-success',
       accept: () => this.finishCourse(),
     });
@@ -292,23 +295,23 @@ export class ClassDetailComponent implements OnInit {
     this.classService.finishClass(this.classId).subscribe({
       next: (updated) => {
         this.finishing.set(false);
-        this.notificationService.success('Course marked as finished');
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.COURSE_MARKED_FINISHED'));
         const current = this.classDetail();
         this.classDetail.set(current ? { ...current, ...updated } : null);
       },
       error: (err) => {
         this.finishing.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to finish class');
+        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_FINISH_CLASS'));
       },
     });
   }
 
   statusLabel(status?: string): string {
     switch (status) {
-      case 'IN_PROGRESS': return 'In Progress';
-      case 'SCHEDULED': return 'Scheduled';
-      case 'DONE': return 'Done';
-      default: return 'Unknown';
+      case 'IN_PROGRESS': return this.translate.instant('CLASSES.DETAIL.STATUS_IN_PROGRESS');
+      case 'SCHEDULED': return this.translate.instant('CLASSES.DETAIL.STATUS_SCHEDULED');
+      case 'DONE': return this.translate.instant('CLASSES.DETAIL.STATUS_DONE');
+      default: return this.translate.instant('CLASSES.DETAIL.STATUS_UNKNOWN');
     }
   }
 
@@ -336,7 +339,7 @@ export class ClassDetailComponent implements OnInit {
   }
 
   formatDate(dateString?: string): string {
-    if (!dateString) return 'N/A';
+    if (!dateString) return this.translate.instant('CLASSES.DETAIL.NOT_AVAILABLE');
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 

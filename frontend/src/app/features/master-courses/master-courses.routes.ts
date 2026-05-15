@@ -12,6 +12,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   {
     path: 'create',
     canActivate: [permissionGuard('academy', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.CREATE' },
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent
@@ -20,6 +21,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   {
     path: ':id/edit',
     canActivate: [permissionGuard('academy', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () =>
       import('./master-course-form/master-course-form.component').then(
         (m) => m.MasterCourseFormComponent
@@ -27,6 +29,7 @@ export const MASTER_COURSES_ROUTES: Routes = [
   },
   {
     path: ':id',
+    data: { breadcrumb: 'BREADCRUMBS.DETAIL' },
     loadComponent: () =>
       import('./master-course-detail/master-course-detail.component').then(
         (m) => m.MasterCourseDetailComponent

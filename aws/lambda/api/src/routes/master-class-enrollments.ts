@@ -53,9 +53,12 @@ export const masterClassEnrollmentsRoutes = {
         return { status: 400 as const, body: { message: 'Master enrollment is not active' } };
       }
 
-      // Verify the class belongs to the right branch and course
+      // Verify the class belongs to the right course (branch comes from the course)
       const cls = await queryOne(
-        `SELECT id, branch_id, is_finished FROM classes WHERE id = $1 AND course_id = $2`,
+        `SELECT c.id, co.branch_id, c.is_finished
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.id = $1 AND c.course_id = $2`,
         [body.classId, body.courseId]
       );
       if (!cls) return { status: 404 as const, body: { message: 'Class not found for this course' } };

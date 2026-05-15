@@ -9,15 +9,18 @@ export const BRANCHES_ROUTES: Routes = [
   {
     path: 'create',
     canActivate: [permissionGuard('branches', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.CREATE' },
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   },
   {
     path: ':id',
+    data: { breadcrumb: 'BREADCRUMBS.DETAIL' },
     loadComponent: () => import('./branch-detail/branch-detail.component').then(m => m.BranchDetailComponent)
   },
   {
     path: ':id/edit',
     canActivate: [permissionGuard('branches', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () => import('./branch-form/branch-form.component').then(m => m.BranchFormComponent)
   }
 ];

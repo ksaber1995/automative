@@ -9,15 +9,18 @@ export const USERS_ROUTES: Routes = [
   {
     path: 'create',
     canActivate: [permissionGuard('users', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.CREATE' },
     loadComponent: () => import('./user-form/user-form.component').then(m => m.UserFormComponent),
   },
   {
     path: ':id/edit',
     canActivate: [permissionGuard('users', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () => import('./user-form/user-form.component').then(m => m.UserFormComponent),
   },
   {
     path: ':id',
+    data: { breadcrumb: 'BREADCRUMBS.DETAIL' },
     loadComponent: () => import('./user-detail/user-detail.component').then(m => m.UserDetailComponent),
   },
 ];

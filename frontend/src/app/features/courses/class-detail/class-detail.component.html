@@ -1,10 +1,10 @@
 <div class="container-custom py-8">
   <!-- Header -->
   <div class="flex items-center gap-4 mb-6">
-    <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()" pTooltip="Back to Classes"></p-button>
+    <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()" [pTooltip]="'CLASSES.DETAIL.BACK_TO_CLASSES' | translate"></p-button>
     <div class="flex-1">
       <div class="flex items-center gap-3">
-        <h1 class="text-3xl font-bold text-gray-900">{{ classDetail()?.name || 'Class Details' }}</h1>
+        <h1 class="text-3xl font-bold text-gray-900">{{ classDetail()?.name || ('CLASSES.DETAIL.CLASS_DETAILS' | translate) }}</h1>
         @if (classDetail()) {
           <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
         }
@@ -12,12 +12,12 @@
       <p class="text-gray-500 mt-1">{{ classDetail()?.code }}</p>
     </div>
     @if (!isFinished()) {
-      <p-button label="Add Student" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
-      <p-button label="Finish Class" icon="pi pi-check-circle" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>
+      <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
+      <p-button [label]="'CLASSES.DETAIL.FINISH_CLASS' | translate" icon="pi pi-check-circle" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>
     } @else {
       <div class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
         <i class="pi pi-check-circle"></i>
-        <span class="font-medium">Course finished{{ classDetail()?.finishedAt ? ' on ' + formatDate(classDetail()!.finishedAt!) : '' }}</span>
+        <span class="font-medium">{{ classDetail()?.finishedAt ? ('CLASSES.DETAIL.COURSE_FINISHED_ON' | translate: { date: formatDate(classDetail()!.finishedAt!) }) : ('CLASSES.DETAIL.COURSE_FINISHED' | translate) }}</span>
       </div>
     }
   </div>
@@ -27,7 +27,7 @@
   @if (loadingClass()) {
     <div class="text-center py-16 text-gray-400">
       <i class="pi pi-spin pi-spinner text-4xl mb-3"></i>
-      <p>Loading...</p>
+      <p>{{ 'CLASSES.DETAIL.LOADING' | translate }}</p>
     </div>
   }
 
@@ -36,37 +36,37 @@
     <p-card styleClass="mb-6">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Course</p>
-          <p class="font-semibold">{{ classDetail()?.courseName || 'N/A' }}</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.COURSE' | translate }}</p>
+          <p class="font-semibold">{{ classDetail()?.courseName || ('CLASSES.DETAIL.NOT_AVAILABLE' | translate) }}</p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Branch</p>
-          <p class="font-semibold">{{ classDetail()?.branchName || 'N/A' }}</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.BRANCH' | translate }}</p>
+          <p class="font-semibold">{{ classDetail()?.branchName || ('CLASSES.DETAIL.NOT_AVAILABLE' | translate) }}</p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Instructor</p>
-          <p class="font-semibold">{{ classDetail()?.instructorName || 'Not assigned' }}</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.INSTRUCTOR' | translate }}</p>
+          <p class="font-semibold">{{ classDetail()?.instructorName || ('CLASSES.DETAIL.NOT_ASSIGNED' | translate) }}</p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Schedule</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.SCHEDULE' | translate }}</p>
           <p class="font-semibold text-sm">
             @if (classDetail()?.daysOfWeek) { {{ formatDays(classDetail()!.daysOfWeek!) }} }
             @if (classDetail()?.startTime) { <span class="text-gray-500">{{ classDetail()?.startTime }} - {{ classDetail()?.endTime }}</span> }
-            @if (!classDetail()?.daysOfWeek && !classDetail()?.startTime) { N/A }
+            @if (!classDetail()?.daysOfWeek && !classDetail()?.startTime) { {{ 'CLASSES.DETAIL.NOT_AVAILABLE' | translate }} }
           </p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Dates</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.DATES' | translate }}</p>
           <p class="font-semibold text-sm">{{ formatDate(classDetail()?.startDate) }} → {{ formatDate(classDetail()?.endDate) }}</p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Enrollment</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.ENROLLMENT' | translate }}</p>
           <p class="font-semibold">{{ classDetail()?.studentCount ?? classDetail()?.currentEnrollment ?? 0 }}
             @if (classDetail()?.maxStudents) { <span class="text-gray-400">/ {{ classDetail()?.maxStudents }}</span> }
           </p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.STATUS' | translate }}</p>
           @if (classDetail()) {
             <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
           }
@@ -78,16 +78,16 @@
     <p-tabs [value]="activeTab" (valueChange)="onTabChange($event)">
       <p-tablist>
         <p-tab value="students">
-          <i class="pi pi-users mr-2"></i>Students
+          <i class="pi pi-users mr-2"></i>{{ 'CLASSES.DETAIL.TAB_STUDENTS' | translate }}
         </p-tab>
         <p-tab value="sessions">
-          <i class="pi pi-clock mr-2"></i>Sessions
+          <i class="pi pi-clock mr-2"></i>{{ 'CLASSES.DETAIL.TAB_SESSIONS' | translate }}
           @if (activeSession()) {
             <span class="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
           }
         </p-tab>
         <p-tab value="attendance">
-          <i class="pi pi-check-square mr-2"></i>Attendance
+          <i class="pi pi-check-square mr-2"></i>{{ 'CLASSES.DETAIL.TAB_ATTENDANCE' | translate }}
         </p-tab>
       </p-tablist>
 
@@ -95,11 +95,11 @@
         <!-- Students Tab -->
         <p-tabpanel value="students">
           <div class="flex justify-end mb-3 mt-2">
-            <p-button label="Add Student" icon="pi pi-user-plus" severity="secondary" [outlined]="true" [disabled]="isFinished()" (onClick)="addStudent()"></p-button>
+            <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" [disabled]="isFinished()" (onClick)="addStudent()"></p-button>
           </div>
           @if (isFinished()) {
             <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 mb-3">
-              This class is finished — new enrollments are closed.
+              {{ 'CLASSES.DETAIL.CLASS_FINISHED_ENROLLMENTS_CLOSED' | translate }}
             </div>
           }
           <p-table
@@ -111,10 +111,10 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th>Student</th>
-                <th>Enrolled</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{{ 'CLASSES.DETAIL.COL_STUDENT' | translate }}</th>
+                <th>{{ 'CLASSES.DETAIL.COL_ENROLLED' | translate }}</th>
+                <th>{{ 'CLASSES.DETAIL.COL_STATUS' | translate }}</th>
+                <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-row>
@@ -122,7 +122,7 @@
                 <td class="font-medium">
                   <div>{{ row.studentFirstName }} {{ row.studentLastName }}</div>
                   @if (row.enrollmentType === 'MASTER') {
-                    <div class="text-xs text-purple-600 font-normal mt-0.5">Bundle: {{ row.masterCourseName }}</div>
+                    <div class="text-xs text-purple-600 font-normal mt-0.5">{{ 'CLASSES.DETAIL.BUNDLE_PREFIX' | translate }} {{ row.masterCourseName }}</div>
                   }
                 </td>
                 <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
@@ -131,7 +131,7 @@
                 </td>
                 <td>
                   <p-button icon="pi pi-external-link" [rounded]="true" [text]="true" severity="info"
-                    (onClick)="viewStudent(row.studentId)" pTooltip="View Student"></p-button>
+                    (onClick)="viewStudent(row.studentId)" [pTooltip]="'CLASSES.DETAIL.VIEW_STUDENT' | translate"></p-button>
                 </td>
               </tr>
             </ng-template>
@@ -139,7 +139,7 @@
               <tr>
                 <td colspan="4" class="text-center py-8 text-gray-500">
                   <i class="pi pi-users text-4xl mb-3 block"></i>
-                  No students enrolled
+                  {{ 'CLASSES.DETAIL.NO_STUDENTS_ENROLLED' | translate }}
                 </td>
               </tr>
             </ng-template>
@@ -155,14 +155,14 @@
                 <div class="flex items-center gap-3">
                   <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
                   <div>
-                    <p class="font-semibold text-orange-900">Active Session in Room {{ activeSession()?.roomCode }}</p>
-                    <p class="text-sm text-orange-700">Started {{ formatDateTime(activeSession()!.startDate) }}</p>
+                    <p class="font-semibold text-orange-900">{{ 'CLASSES.DETAIL.ACTIVE_SESSION_IN_ROOM' | translate: { room: activeSession()?.roomCode } }}</p>
+                    <p class="text-sm text-orange-700">{{ 'CLASSES.DETAIL.STARTED_AT' | translate: { time: formatDateTime(activeSession()!.startDate) } }}</p>
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <p-button label="Take Attendance" icon="pi pi-check-square" severity="info" [outlined]="true" size="small"
+                  <p-button [label]="'CLASSES.DETAIL.TAKE_ATTENDANCE' | translate" icon="pi pi-check-square" severity="info" [outlined]="true" size="small"
                     (onClick)="openAttendanceDialog(activeSession()!)"></p-button>
-                  <p-button label="End Session" icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
+                  <p-button [label]="'CLASSES.DETAIL.END_SESSION' | translate" icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
                     (onClick)="confirmEndSession(activeSession()!)"></p-button>
                 </div>
               </div>
@@ -171,12 +171,12 @@
             <!-- Start Session Button -->
             @if (!activeSession() && !isFinished()) {
               <div class="flex justify-end mb-3">
-                <p-button label="Start Session" icon="pi pi-play" size="small" (onClick)="openStartSessionDialog()"></p-button>
+                <p-button [label]="'CLASSES.DETAIL.START_SESSION' | translate" icon="pi pi-play" size="small" (onClick)="openStartSessionDialog()"></p-button>
               </div>
             }
             @if (isFinished()) {
               <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 mb-3">
-                This class is finished — sessions cannot be started.
+                {{ 'CLASSES.DETAIL.CLASS_FINISHED_SESSIONS_CLOSED' | translate }}
               </div>
             }
 
@@ -190,12 +190,12 @@
             >
               <ng-template pTemplate="header">
                 <tr>
-                  <th>Room</th>
-                  <th>Started</th>
-                  <th>Ended</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                  <th>Attendance</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_ROOM' | translate }}</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_STARTED' | translate }}</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_ENDED' | translate }}</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_DURATION' | translate }}</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_STATUS' | translate }}</th>
+                  <th>{{ 'CLASSES.DETAIL.COL_ATTENDANCE' | translate }}</th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-s>
@@ -209,17 +209,17 @@
                     @else { — }
                   </td>
                   <td>
-                    <p-tag [value]="s.endDate ? 'Ended' : 'Active'" [severity]="s.endDate ? 'secondary' : 'success'"></p-tag>
+                    <p-tag [value]="(s.endDate ? 'CLASSES.DETAIL.SESSION_ENDED' : 'CLASSES.DETAIL.SESSION_ACTIVE') | translate" [severity]="s.endDate ? 'secondary' : 'success'"></p-tag>
                   </td>
                   <td>
                     <p-button icon="pi pi-check-square" [rounded]="true" [text]="true" severity="info"
-                      (onClick)="openAttendanceDialog(s)" pTooltip="Manage Attendance"></p-button>
+                      (onClick)="openAttendanceDialog(s)" [pTooltip]="'CLASSES.DETAIL.MANAGE_ATTENDANCE' | translate"></p-button>
                   </td>
                 </tr>
               </ng-template>
               <ng-template pTemplate="emptymessage">
                 <tr>
-                  <td colspan="6" class="text-center py-8 text-gray-400">No sessions recorded for this class</td>
+                  <td colspan="6" class="text-center py-8 text-gray-400">{{ 'CLASSES.DETAIL.NO_SESSIONS' | translate }}</td>
                 </tr>
               </ng-template>
             </p-table>
@@ -232,39 +232,39 @@
             @if (loadingAttendance()) {
               <div class="text-center py-12 text-gray-400">
                 <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
-                <p>Loading attendance...</p>
+                <p>{{ 'CLASSES.DETAIL.LOADING_ATTENDANCE' | translate }}</p>
               </div>
             } @else if (attendanceSummary().length === 0) {
               <div class="text-center py-12 text-gray-400">
                 <i class="pi pi-check-square text-4xl mb-3 block"></i>
-                <p>No attendance records yet. Start a session and take attendance.</p>
+                <p>{{ 'CLASSES.DETAIL.NO_ATTENDANCE' | translate }}</p>
               </div>
             } @else {
               <!-- Overall Stats -->
               <div class="grid grid-cols-3 gap-4 mb-6">
                 <div class="bg-blue-50 rounded-xl p-4 text-center">
                   <p class="text-2xl font-bold text-blue-700">{{ attendanceSummary().length }}</p>
-                  <p class="text-sm text-blue-600 mt-1">Total Sessions</p>
+                  <p class="text-sm text-blue-600 mt-1">{{ 'CLASSES.DETAIL.TOTAL_SESSIONS' | translate }}</p>
                 </div>
                 <div class="bg-green-50 rounded-xl p-4 text-center">
                   <p class="text-2xl font-bold text-green-700">{{ avgAttendanceRate() }}%</p>
-                  <p class="text-sm text-green-600 mt-1">Avg Attendance Rate</p>
+                  <p class="text-sm text-green-600 mt-1">{{ 'CLASSES.DETAIL.AVG_ATTENDANCE_RATE' | translate }}</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
                   <p class="text-2xl font-bold text-gray-700">{{ attendanceSummary()[0]?.totalStudents ?? 0 }}</p>
-                  <p class="text-sm text-gray-600 mt-1">Enrolled Students</p>
+                  <p class="text-sm text-gray-600 mt-1">{{ 'CLASSES.DETAIL.ENROLLED_STUDENTS' | translate }}</p>
                 </div>
               </div>
 
               <p-table [value]="attendanceSummary()" responsiveLayout="scroll">
                 <ng-template pTemplate="header">
                   <tr>
-                    <th>Session Date</th>
-                    <th>Room</th>
-                    <th>Present</th>
-                    <th>Absent</th>
-                    <th>Rate</th>
-                    <th>Actions</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_SESSION_DATE' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_ROOM' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_PRESENT' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_ABSENT' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_RATE' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
                   </tr>
                 </ng-template>
                 <ng-template pTemplate="body" let-row>
@@ -294,7 +294,7 @@
                     </td>
                     <td>
                       <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
-                        (onClick)="openAttendanceDialogById(row.sessionId)" pTooltip="Edit Attendance"></p-button>
+                        (onClick)="openAttendanceDialogById(row.sessionId)" [pTooltip]="'CLASSES.DETAIL.EDIT_ATTENDANCE' | translate"></p-button>
                     </td>
                   </tr>
                 </ng-template>
@@ -308,47 +308,47 @@
 </div>
 
 <!-- Start Session Dialog -->
-<p-dialog [(visible)]="showStartSessionDialog" header="Start Session" [modal]="true" [style]="{ width: '420px' }">
+<p-dialog [(visible)]="showStartSessionDialog" [header]="'CLASSES.DETAIL.DIALOG_START_SESSION' | translate" [modal]="true" [style]="{ width: '420px' }">
   <div class="space-y-4 pt-2">
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Room <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CLASSES.DETAIL.ROOM_LABEL' | translate }} <span class="text-red-500">*</span></label>
       <p-select
         [(ngModel)]="selectedRoomId"
         [options]="freeRooms()"
         optionLabel="code"
         optionValue="id"
-        placeholder="Select a free room"
+        [placeholder]="'CLASSES.DETAIL.ROOM_PLACEHOLDER' | translate"
         [style]="{ width: '100%' }"
       ></p-select>
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-      <textarea pTextarea [(ngModel)]="sessionNotes" rows="2" placeholder="Optional notes" class="w-full"></textarea>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CLASSES.DETAIL.NOTES_LABEL' | translate }}</label>
+      <textarea pTextarea [(ngModel)]="sessionNotes" rows="2" [placeholder]="'CLASSES.DETAIL.NOTES_PLACEHOLDER' | translate" class="w-full"></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showStartSessionDialog = false"></p-button>
-    <p-button label="Start" icon="pi pi-play" [loading]="savingSession()" [disabled]="!selectedRoomId" (onClick)="startSession()"></p-button>
+    <p-button [label]="'CLASSES.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showStartSessionDialog = false"></p-button>
+    <p-button [label]="'CLASSES.DETAIL.START' | translate" icon="pi pi-play" [loading]="savingSession()" [disabled]="!selectedRoomId" (onClick)="startSession()"></p-button>
   </ng-template>
 </p-dialog>
 
 <!-- End Session Dialog -->
-<p-dialog [(visible)]="showEndSessionDialog" header="End Session" [modal]="true" [style]="{ width: '380px' }">
-  <p class="text-gray-600 mb-3">End the session in room <strong>{{ endingSession()?.roomCode }}</strong>?</p>
+<p-dialog [(visible)]="showEndSessionDialog" [header]="'CLASSES.DETAIL.DIALOG_END_SESSION' | translate" [modal]="true" [style]="{ width: '380px' }">
+  <p class="text-gray-600 mb-3" [innerHTML]="'CLASSES.DETAIL.END_SESSION_CONFIRM' | translate: { room: endingSession()?.roomCode }"></p>
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+    <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CLASSES.DETAIL.NOTES_OPTIONAL_LABEL' | translate }}</label>
     <textarea pTextarea [(ngModel)]="endSessionNotes" rows="2" class="w-full"></textarea>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showEndSessionDialog = false"></p-button>
-    <p-button label="End Session" severity="danger" [loading]="savingSession()" (onClick)="endSession()"></p-button>
+    <p-button [label]="'CLASSES.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showEndSessionDialog = false"></p-button>
+    <p-button [label]="'CLASSES.DETAIL.END_SESSION' | translate" severity="danger" [loading]="savingSession()" (onClick)="endSession()"></p-button>
   </ng-template>
 </p-dialog>
 
 <!-- Attendance Dialog -->
 <p-dialog
   [(visible)]="showAttendanceDialog"
-  [header]="'Attendance — ' + formatDateTime(attendanceSession()?.startDate || '')"
+  [header]="'CLASSES.DETAIL.ATTENDANCE_HEADER' | translate: { time: formatDateTime(attendanceSession()?.startDate || '') }"
   [modal]="true"
   [style]="{ width: '520px' }"
   [closable]="true"
@@ -356,14 +356,14 @@
   @if (loadingAttendanceStudents()) {
     <div class="text-center py-8 text-gray-400">
       <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
-      <p>Loading students...</p>
+      <p>{{ 'CLASSES.DETAIL.LOADING_STUDENTS' | translate }}</p>
     </div>
   } @else {
     <div class="mb-3 flex items-center justify-between">
-      <span class="text-sm text-gray-500">{{ attendanceStudents().length }} students enrolled</span>
+      <span class="text-sm text-gray-500">{{ 'CLASSES.DETAIL.STUDENTS_ENROLLED_COUNT' | translate: { count: attendanceStudents().length } }}</span>
       <div class="flex gap-2">
-        <p-button label="All Present" size="small" severity="success" [outlined]="true" (onClick)="markAll(true)"></p-button>
-        <p-button label="All Absent" size="small" severity="danger" [outlined]="true" (onClick)="markAll(false)"></p-button>
+        <p-button [label]="'CLASSES.DETAIL.ALL_PRESENT' | translate" size="small" severity="success" [outlined]="true" (onClick)="markAll(true)"></p-button>
+        <p-button [label]="'CLASSES.DETAIL.ALL_ABSENT' | translate" size="small" severity="danger" [outlined]="true" (onClick)="markAll(false)"></p-button>
       </div>
     </div>
     <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -388,22 +388,22 @@
             [class.text-green-700]="student.isPresent"
             [class.bg-gray-100]="!student.isPresent"
             [class.text-gray-500]="!student.isPresent">
-            {{ student.isPresent ? 'Present' : 'Absent' }}
+            {{ (student.isPresent ? 'CLASSES.DETAIL.PRESENT' : 'CLASSES.DETAIL.ABSENT') | translate }}
           </span>
         </div>
       }
     </div>
     <div class="mt-3 pt-3 border-t flex items-center justify-between text-sm text-gray-500">
       <span>
-        <span class="text-green-600 font-semibold">{{ presentCount() }} present</span>
+        <span class="text-green-600 font-semibold">{{ 'CLASSES.DETAIL.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
         &nbsp;·&nbsp;
-        <span class="text-red-500 font-semibold">{{ absentCount() }} absent</span>
+        <span class="text-red-500 font-semibold">{{ 'CLASSES.DETAIL.ABSENT_COUNT' | translate: { count: absentCount() } }}</span>
       </span>
     </div>
   }
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showAttendanceDialog = false"></p-button>
-    <p-button label="Save Attendance" icon="pi pi-check" [loading]="savingAttendance()"
+    <p-button [label]="'CLASSES.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showAttendanceDialog = false"></p-button>
+    <p-button [label]="'CLASSES.DETAIL.SAVE_ATTENDANCE' | translate" icon="pi pi-check" [loading]="savingAttendance()"
       [disabled]="loadingAttendanceStudents()" (onClick)="saveAttendance()"></p-button>
   </ng-template>
 </p-dialog>

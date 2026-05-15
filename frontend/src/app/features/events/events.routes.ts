@@ -10,17 +10,20 @@ export const EVENTS_ROUTES: Routes = [
   {
     path: 'create',
     canActivate: [permissionGuard('academy', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.CREATE' },
     loadComponent: () =>
       import('./event-form/event-form.component').then((m) => m.EventFormComponent),
   },
   {
     path: ':id/edit',
     canActivate: [permissionGuard('academy', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () =>
       import('./event-form/event-form.component').then((m) => m.EventFormComponent),
   },
   {
     path: ':id',
+    data: { breadcrumb: 'BREADCRUMBS.DETAIL' },
     loadComponent: () =>
       import('./event-detail/event-detail.component').then((m) => m.EventDetailComponent),
   },

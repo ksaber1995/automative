@@ -102,10 +102,10 @@
         <p-tabs value="active-master">
           <p-tablist>
             <p-tab value="active-master">
-              <i class="pi pi-bolt mr-2"></i>Active ({{ activeMasterEnrollments().length }})
+              <i class="pi pi-bolt mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_ACTIVE' | translate }} ({{ activeMasterEnrollments().length }})
             </p-tab>
             <p-tab value="finished-master">
-              <i class="pi pi-check-circle mr-2"></i>Finished ({{ finishedMasterEnrollments().length }})
+              <i class="pi pi-check-circle mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_FINISHED' | translate }} ({{ finishedMasterEnrollments().length }})
             </p-tab>
           </p-tablist>
           <p-tabpanels>
@@ -347,7 +347,7 @@
             </p-tabpanel>
             <p-tabpanel value="finished-master">
               @if (finishedMasterEnrollments().length === 0) {
-                <div class="text-center py-6 text-gray-500">No finished master enrollments yet.</div>
+                <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_FINISHED_MASTER' | translate }}</div>
               } @else {
                 <p-table [value]="finishedMasterEnrollments()" responsiveLayout="scroll" dataKey="id">
                   <ng-template pTemplate="header">
@@ -397,10 +397,10 @@
       <p-tabs value="active-courses">
         <p-tablist>
           <p-tab value="active-courses">
-            <i class="pi pi-bolt mr-2"></i>Active ({{ activeEnrollments().length }})
+            <i class="pi pi-bolt mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_ACTIVE' | translate }} ({{ activeEnrollments().length }})
           </p-tab>
           <p-tab value="finished-courses">
-            <i class="pi pi-check-circle mr-2"></i>Finished ({{ finishedEnrollments().length }})
+            <i class="pi pi-check-circle mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_FINISHED' | translate }} ({{ finishedEnrollments().length }})
           </p-tab>
         </p-tablist>
         <p-tabpanels>
@@ -628,14 +628,14 @@
           </p-tabpanel>
           <p-tabpanel value="finished-courses">
             @if (finishedEnrollments().length === 0) {
-              <div class="text-center py-6 text-gray-500">No finished courses yet.</div>
+              <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_FINISHED_COURSES' | translate }}</div>
             } @else {
               <p-table [value]="finishedEnrollments()" responsiveLayout="scroll" dataKey="id">
                 <ng-template pTemplate="header">
                   <tr>
                     <th>{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</th>
                     <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
-                    <th>Completion Date</th>
+                    <th>{{ 'STUDENTS.DETAIL.COL_COMPLETION_DATE' | translate }}</th>
                     <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
                     <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
                   </tr>

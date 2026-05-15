@@ -12,6 +12,7 @@ import { DividerModule } from 'primeng/divider';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { TextareaModule } from 'primeng/textarea';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -30,7 +31,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule,
     DialogModule, TooltipModule, DividerModule, DatePickerModule, InputNumberModule,
-    TextareaModule, DeleteConfirmDialogComponent,
+    TextareaModule, DeleteConfirmDialogComponent, TranslateModule,
   ],
   templateUrl: './installment-detail.component.html',
 })
@@ -40,6 +41,7 @@ export class InstallmentDetailComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   plan = signal<InstallmentPlan | null>(null);
@@ -62,7 +64,7 @@ export class InstallmentDetailComponent implements OnInit {
   });
   branchName = computed(() => {
     const p = this.plan();
-    if (!p?.branchId) return 'Global';
+    if (!p?.branchId) return this.translate.instant('INSTALLMENTS.DETAIL.GLOBAL');
     return this.branches().find(b => b.id === p.branchId)?.name || '—';
   });
 
@@ -95,7 +97,7 @@ export class InstallmentDetailComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.notificationService.error('Failed to load installment plan');
+        this.notificationService.error(this.translate.instant('INSTALLMENTS.DETAIL.MSG_LOAD_FAILED'));
       },
     });
   }
@@ -126,12 +128,12 @@ export class InstallmentDetailComponent implements OnInit {
       next: () => {
         this.paying.set(false);
         this.showPayDialog = false;
-        this.notificationService.success('Installment paid');
+        this.notificationService.success(this.translate.instant('INSTALLMENTS.DETAIL.MSG_PAID'));
         this.load();
       },
       error: (err) => {
         this.paying.set(false);
-        this.notificationService.error(err.error?.message || 'Failed to pay');
+        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_PAY_FAILED'));
       },
     });
   }
@@ -146,13 +148,13 @@ export class InstallmentDetailComponent implements OnInit {
     if (!t) return;
     this.installmentService.unpay(this.planId, t.id).subscribe({
       next: () => {
-        this.notificationService.success('Payment reversed');
+        this.notificationService.success(this.translate.instant('INSTALLMENTS.DETAIL.MSG_REVERSED'));
         this.showUnpayDialog = false;
         this.unpayTarget.set(null);
         this.load();
       },
       error: (err) => {
-        this.notificationService.error(err.error?.message || 'Failed to reverse');
+        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_REVERSE_FAILED'));
         this.showUnpayDialog = false;
       },
     });
@@ -163,11 +165,11 @@ export class InstallmentDetailComponent implements OnInit {
   doDelete() {
     this.installmentService.delete(this.planId).subscribe({
       next: () => {
-        this.notificationService.success('Installment plan deleted');
+        this.notificationService.success(this.translate.instant('INSTALLMENTS.DETAIL.MSG_DELETED'));
         this.router.navigate(['/expenses/installments']);
       },
       error: (err) => {
-        this.notificationService.error(err.error?.message || 'Failed to delete plan');
+        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_DELETE_FAILED'));
         this.showDeleteDialog = false;
       },
     });
@@ -194,5 +196,23 @@ export class InstallmentDetailComponent implements OnInit {
     if (item.status === 'SKIPPED') return 'secondary';
     if (this.isOverdue(item)) return 'danger';
     return 'warn';
+  }
+
+  planStatusLabel(status: string): string {
+    switch (status) {
+      case 'ACTIVE': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_ACTIVE');
+      case 'COMPLETED': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_COMPLETED');
+      case 'CANCELED': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_CANCELED');
+      default: return status;
+    }
+  }
+
+  schedStatusLabel(status: string): string {
+    switch (status) {
+      case 'PAID': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_PAID');
+      case 'PENDING': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_PENDING');
+      case 'SKIPPED': return this.translate.instant('INSTALLMENTS.DETAIL.STATUS_SKIPPED');
+      default: return status;
+    }
   }
 }

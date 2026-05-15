@@ -8,6 +8,7 @@ import { MenuModule } from 'primeng/menu';
 import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
+import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
 import { LanguageService } from '../services/language.service';
@@ -43,6 +44,7 @@ type NavEntry =
     DialogModule,
     TooltipModule,
     TranslateModule,
+    BreadcrumbsComponent,
   ],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss'})

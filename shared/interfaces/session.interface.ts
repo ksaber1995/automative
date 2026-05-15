@@ -2,7 +2,7 @@ export interface Session {
   id: string;
   companyId: string;
   branchId: string;
-  roomId: string;
+  roomId: string | null;
   classId: string;
   startDate: string;
   endDate?: string | null;
@@ -12,7 +12,7 @@ export interface Session {
 }
 
 export interface SessionWithDetails extends Session {
-  roomCode: string;
+  roomCode: string | null;
   roomDescription?: string | null;
   className: string;
   classCode: string;
@@ -22,7 +22,7 @@ export interface SessionWithDetails extends Session {
 }
 
 export interface SessionStartDto {
-  roomId: string;
+  roomId?: string;
   classId: string;
   branchId: string;
   notes?: string;

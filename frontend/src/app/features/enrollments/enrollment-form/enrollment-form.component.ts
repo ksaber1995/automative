@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, ActivatedRoute } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { switchMap, map } from 'rxjs/operators';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -36,6 +37,7 @@ type EnrollmentType = 'COURSE' | 'MASTER';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    TranslateModule,
     CardModule,
     ButtonModule,
     InputTextModule,
@@ -60,6 +62,7 @@ export class EnrollmentFormComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private masterCourseService = inject(MasterCourseService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
+  private translate = inject(TranslateService);
 
   enrollmentForm: FormGroup;
   loading = signal(false);
@@ -127,12 +130,14 @@ export class EnrollmentFormComponent implements OnInit {
     return !!this.selectedCourse() && !this.coverage()?.covered;
   });
 
-  enrollmentStatuses = [
-    { label: 'Active', value: EnrollmentStatus.ACTIVE },
-    { label: 'Pending', value: EnrollmentStatus.PENDING },
-    { label: 'Completed', value: EnrollmentStatus.COMPLETED },
-    { label: 'Dropped', value: EnrollmentStatus.DROPPED }
-  ];
+  get enrollmentStatuses() {
+    return [
+      { label: this.translate.instant('ENROLLMENT_FORM.STATUS_ACTIVE'), value: EnrollmentStatus.ACTIVE },
+      { label: this.translate.instant('ENROLLMENT_FORM.STATUS_PENDING'), value: EnrollmentStatus.PENDING },
+      { label: this.translate.instant('ENROLLMENT_FORM.STATUS_COMPLETED'), value: EnrollmentStatus.COMPLETED },
+      { label: this.translate.instant('ENROLLMENT_FORM.STATUS_DROPPED'), value: EnrollmentStatus.DROPPED }
+    ];
+  }
 
   constructor() {
     this.enrollmentForm = this.fb.group({
@@ -273,7 +278,7 @@ export class EnrollmentFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load enrollment');
+        this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_LOAD_ENROLLMENT'));
         this.loading.set(false);
         this.router.navigate(['/students']);
       }
@@ -474,7 +479,7 @@ export class EnrollmentFormComponent implements OnInit {
 
     if (!this.isEditMode() && this.enrollmentType() === 'MASTER') {
       if (this.duplicateMaster()) {
-        this.notificationService.error('Student already has an active enrollment in this master course');
+        this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_DUPLICATE_MASTER'));
         return;
       }
       this.loading.set(true);
@@ -496,12 +501,12 @@ export class EnrollmentFormComponent implements OnInit {
         notes: v.notes || undefined,
       }).subscribe({
         next: () => {
-          this.notificationService.success('Student enrolled in master course bundle');
+          this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_MASTER_ENROLLED'));
           this.router.navigate(['/students', v.studentId]);
         },
         error: (err) => {
           this.loading.set(false);
-          this.notificationService.error(err?.error?.message || 'Failed to enroll in master course');
+          this.notificationService.error(err?.error?.message || this.translate.instant('ENROLLMENT_FORM.ERR_MASTER_ENROLL'));
         },
       });
       return;
@@ -526,13 +531,13 @@ export class EnrollmentFormComponent implements OnInit {
 
     if (this.isEditMode() && this.enrollmentId) {
       this.enrollmentService.updateEnrollment(this.enrollmentId, { status: enrollmentData.status, notes: enrollmentData.notes }).subscribe({
-        next: () => { this.notificationService.success('Enrollment updated'); this.router.navigate(['/students']); },
-        error: () => { this.loading.set(false); this.notificationService.error('Failed to update enrollment'); }
+        next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_UPDATED')); this.router.navigate(['/students']); },
+        error: () => { this.loading.set(false); this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_ENROLLMENT_UPDATE')); }
       });
     } else {
       this.enrollmentService.createEnrollment(enrollmentData).subscribe({
-        next: () => { this.notificationService.success('Student enrolled successfully'); this.router.navigate(['/students']); },
-        error: () => { this.loading.set(false); this.notificationService.error('Failed to create enrollment'); }
+        next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_CREATED')); this.router.navigate(['/students']); },
+        error: () => { this.loading.set(false); this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_ENROLLMENT_CREATE')); }
       });
     }
   }

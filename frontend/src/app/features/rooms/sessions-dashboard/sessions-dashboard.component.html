@@ -449,15 +449,23 @@
       }
     </div>
 
-    <!-- Room (filtered by selected branch) -->
+    <!-- Room (filtered by selected branch) — optional when class is online -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_ROOM' | translate }} <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        {{ 'SESSIONS_DASHBOARD.FIELD_ROOM' | translate }}
+        @if (!isSelectedClassOnline()) {
+          <span class="text-red-500">*</span>
+        } @else {
+          <span class="text-xs text-gray-500 ml-1">({{ 'SESSIONS_DASHBOARD.ROOM_OPTIONAL_ONLINE' | translate }})</span>
+        }
+      </label>
       <p-select
         formControlName="roomId"
         [options]="dialogFreeRooms()"
         optionLabel="code"
         optionValue="id"
         appendTo="body"
+        [showClear]="true"
         [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_ROOM' | translate"
         [disabled]="!sessionForm.get('branchId')?.value"
         [style]="{ width: '100%' }"
@@ -468,7 +476,7 @@
       @if (sessionForm.get('roomId')?.invalid && sessionForm.get('roomId')?.touched) {
         <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_ROOM_REQUIRED' | translate }}</small>
       }
-      @if (sessionForm.get('branchId')?.value && dialogFreeRooms().length === 0) {
+      @if (sessionForm.get('branchId')?.value && dialogFreeRooms().length === 0 && !isSelectedClassOnline()) {
         <small class="text-orange-500">{{ 'SESSIONS_DASHBOARD.NO_FREE_ROOMS' | translate }}</small>
       }
     </div>

@@ -5,14 +5,50 @@
         <h2 class="text-2xl font-bold">
           {{ isEditMode() ? ('CLASSES.FORM.EDIT_TITLE' | translate) : ('CLASSES.FORM.CREATE_TITLE' | translate) }}
         </h2>
-        <p class="text-gray-500 mt-1">{{ courseName() }}</p>
+        @if (!isGlobalCreate() && courseName()) {
+          <!-- Course-scoped create: highlight the target course + branch -->
+          <div class="mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 flex items-center gap-3">
+            <i class="pi pi-book text-blue-600 text-xl"></i>
+            <div class="flex-1">
+              <div class="text-xs uppercase tracking-wider text-blue-600 font-semibold">{{ 'CLASSES.FORM.CONTEXT_LABEL' | translate }}</div>
+              <div class="text-base font-semibold text-blue-900">{{ courseName() }}</div>
+              @if (branchName()) {
+                <div class="text-sm text-blue-700">
+                  <i class="pi pi-building text-xs mr-1"></i>{{ branchName() }}
+                </div>
+              }
+            </div>
+          </div>
+        } @else if (courseName()) {
+          <p class="text-gray-500 mt-1">{{ courseName() }}</p>
+        }
       </div>
     </ng-template>
 
     <form [formGroup]="classForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Course Selection (only show when creating from global classes list) -->
+        <!-- Global-create only: Branch first, then Course (filtered by branch) -->
         @if (isGlobalCreate()) {
+          <div class="field md:col-span-2">
+            <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'CLASSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-select
+              id="branchId"
+              formControlName="branchId"
+              [options]="branches()"
+              optionLabel="label"
+              optionValue="value"
+              [placeholder]="'CLASSES.FORM.BRANCH_PLACEHOLDER' | translate"
+              styleClass="w-full"
+              [class.ng-invalid]="classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched"
+              [class.ng-dirty]="classForm.get('branchId')?.touched">
+            </p-select>
+            @if (classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched) {
+              <small class="text-red-500">{{ 'CLASSES.FORM.BRANCH_REQUIRED' | translate }}</small>
+            }
+          </div>
+
           <div class="field md:col-span-2">
             <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'CLASSES.FORM.COURSE_LABEL' | translate }} <span class="text-red-500">*</span>
@@ -20,14 +56,21 @@
             <p-select
               id="courseId"
               formControlName="courseId"
-              [options]="courses()"
+              [options]="filteredCourses()"
               optionLabel="label"
               optionValue="value"
               [placeholder]="'CLASSES.FORM.COURSE_PLACEHOLDER' | translate"
+              [disabled]="!classForm.get('branchId')?.value"
               styleClass="w-full"
               [class.ng-invalid]="classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched"
               [class.ng-dirty]="classForm.get('courseId')?.touched">
             </p-select>
+            @if (!classForm.get('branchId')?.value) {
+              <small class="text-gray-500">{{ 'CLASSES.FORM.PICK_BRANCH_FIRST' | translate }}</small>
+            }
+            @if (classForm.get('branchId')?.value && filteredCourses().length === 0) {
+              <small class="text-orange-500">{{ 'CLASSES.FORM.NO_COURSES_IN_BRANCH' | translate }}</small>
+            }
             @if (classForm.get('courseId')?.invalid && classForm.get('courseId')?.touched) {
               <small class="text-red-500">{{ 'CLASSES.FORM.COURSE_REQUIRED' | translate }}</small>
             }
@@ -72,25 +115,21 @@
           }
         </div>
 
-        <!-- Branch -->
+        <!-- Class Type (Online / Offline) -->
         <div class="field">
-          <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
-            {{ 'CLASSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
+          <label for="type" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'CLASSES.FORM.TYPE_LABEL' | translate }} <span class="text-red-500">*</span>
           </label>
           <p-select
-            id="branchId"
-            formControlName="branchId"
-            [options]="branches()"
+            id="type"
+            formControlName="type"
+            [options]="classTypes"
             optionLabel="label"
             optionValue="value"
-            [placeholder]="'CLASSES.FORM.BRANCH_PLACEHOLDER' | translate"
-            styleClass="w-full"
-            [class.ng-invalid]="classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched"
-            [class.ng-dirty]="classForm.get('branchId')?.touched">
+            [placeholder]="'CLASSES.FORM.TYPE_PLACEHOLDER' | translate"
+            styleClass="w-full">
           </p-select>
-          @if (classForm.get('branchId')?.invalid && classForm.get('branchId')?.touched) {
-            <small class="text-red-500">{{ 'CLASSES.FORM.BRANCH_REQUIRED' | translate }}</small>
-          }
+          <small class="text-gray-500">{{ 'CLASSES.FORM.TYPE_HINT' | translate }}</small>
         </div>
 
         <!-- Instructor -->

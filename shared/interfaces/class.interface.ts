@@ -1,4 +1,5 @@
 export type ClassStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'DONE';
+export type ClassType = 'ONLINE' | 'OFFLINE';
 
 export interface Class {
   id: string;
@@ -19,6 +20,7 @@ export interface Class {
   isActive: boolean;
   isFinished?: boolean;
   finishedAt?: string | null;
+  type?: ClassType;
   status?: ClassStatus;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +39,7 @@ export interface ClassCreateDto {
   daysOfWeek?: string;
   maxStudents?: number;
   notes?: string;
+  type?: ClassType;
 }
 
 export interface ClassUpdateDto {
@@ -52,6 +55,7 @@ export interface ClassUpdateDto {
   daysOfWeek?: string;
   maxStudents?: number;
   notes?: string;
+  type?: ClassType;
 }
 
 // Extended interface with populated data for frontend display

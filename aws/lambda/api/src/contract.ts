@@ -463,9 +463,13 @@ const CourseSchema = z.object({
 // =============================================
 // Class Schemas
 // =============================================
+const ClassTypeSchema = z.enum(['ONLINE', 'OFFLINE']);
+
 const CreateClassSchema = z.object({
   courseId: UUIDSchema,
-  branchId: UUIDSchema,
+  // Class branch/company are derived from the linked course. Keep `branchId` optional
+  // for backward compatibility with older clients; the server ignores it.
+  branchId: OptionalUUIDSchema,
   instructorId: OptionalUUIDSchema,
   name: z.string(),
   code: z.string(),
@@ -476,6 +480,7 @@ const CreateClassSchema = z.object({
   daysOfWeek: z.string().optional(),
   maxStudents: z.number().optional(),
   notes: z.string().optional(),
+  type: ClassTypeSchema.optional(),
 });
 
 const UpdateClassSchema = z.object({
@@ -490,6 +495,7 @@ const UpdateClassSchema = z.object({
   maxStudents: z.number().optional(),
   notes: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  type: ClassTypeSchema.optional(),
 });
 
 const ClassStatusSchema = z.enum(['SCHEDULED', 'IN_PROGRESS', 'DONE']);
@@ -513,6 +519,7 @@ const ClassSchema = z.object({
   isActive: z.boolean(),
   isFinished: z.boolean().optional(),
   finishedAt: z.string().nullable().optional(),
+  type: ClassTypeSchema.optional(),
   status: ClassStatusSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -3538,7 +3545,7 @@ export const contract = c.router({
       method: 'POST' as const,
       path: '/api/sessions/start',
       body: z.object({
-        roomId: UUIDSchema,
+        roomId: OptionalUUIDSchema,
         classId: UUIDSchema,
         branchId: UUIDSchema,
         notes: z.string().optional(),

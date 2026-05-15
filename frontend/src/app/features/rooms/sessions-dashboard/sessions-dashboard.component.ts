@@ -160,13 +160,35 @@ export class SessionsDashboardComponent implements OnInit {
   onDialogClassChange() {
     const classId = this.sessionForm.get('classId')?.value;
     if (!classId) return;
+
+    // Toggle room validator based on class type (online classes don't require a room)
+    const cls = this.dialogActiveClasses().find((c) => c.id === classId);
+    const isOnline = (cls?.type || '').toUpperCase() === 'ONLINE';
+    const roomCtrl = this.sessionForm.get('roomId');
+    if (roomCtrl) {
+      if (isOnline) {
+        roomCtrl.clearValidators();
+        roomCtrl.setValue('');
+      } else {
+        roomCtrl.setValidators([Validators.required]);
+      }
+      roomCtrl.updateValueAndValidity({ emitEvent: false });
+    }
+
     // If the user already added rows, don't overwrite — they're driving.
     if (this.dialogTeachers().length > 0) return;
-    const cls = this.dialogActiveClasses().find((c) => c.id === classId);
     const instructorId = cls?.instructorId || cls?.instructor_id;
     if (instructorId) {
       this.dialogTeachers.set([{ employeeId: instructorId, role: 'PRIMARY', status: 'PRESENT' }]);
     }
+  }
+
+  /** Computed: is the currently-selected class in the dialog an online class? */
+  isSelectedClassOnline(): boolean {
+    const classId = this.sessionForm?.get('classId')?.value;
+    if (!classId) return false;
+    const cls = this.dialogActiveClasses().find((c) => c.id === classId);
+    return (cls?.type || '').toUpperCase() === 'ONLINE';
   }
 
   activeSessions = signal<Session[]>([]);
@@ -394,7 +416,7 @@ export class SessionsDashboardComponent implements OnInit {
     }));
 
     this.sessionService.start({
-      roomId: val.roomId,
+      roomId: val.roomId || undefined,
       classId: val.classId,
       branchId: val.branchId,
       notes: val.notes || undefined,

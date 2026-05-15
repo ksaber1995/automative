@@ -50,7 +50,10 @@ export const enrollmentsRoutes = {
 
       if (body.classId) {
         const targetClass = await queryOne(
-          'SELECT id, is_finished FROM classes WHERE id = $1 AND company_id = $2',
+          `SELECT c.id, c.is_finished
+           FROM classes c
+           INNER JOIN courses co ON c.course_id = co.id
+           WHERE c.id = $1 AND co.company_id = $2`,
           [body.classId, context.companyId]
         );
         if (targetClass && targetClass.is_finished) {

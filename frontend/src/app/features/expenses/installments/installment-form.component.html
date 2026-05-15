@@ -2,110 +2,110 @@
   <div class="flex items-center gap-4 mb-6">
     <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="cancel()"></p-button>
     <div class="flex-1">
-      <h1 class="text-2xl font-bold text-gray-900">New Installment Plan</h1>
-      <p class="text-gray-500 mt-1">Set up a financed purchase paid over multiple months</p>
+      <h1 class="text-2xl font-bold text-gray-900">{{ 'INSTALLMENTS.FORM.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ 'INSTALLMENTS.FORM.SUBTITLE' | translate }}</p>
     </div>
   </div>
 
   <p-card>
     <form [formGroup]="form" (ngSubmit)="submit()" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="md:col-span-2">
-        <label class="block text-sm font-medium mb-1">Item / Asset Name *</label>
-        <input pInputText type="text" formControlName="name" placeholder="e.g. MacBook Pro 16'"
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_NAME' | translate }}</label>
+        <input pInputText type="text" formControlName="name" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_NAME' | translate"
           class="w-full" />
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Branch</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_BRANCH' | translate }}</label>
         <p-select formControlName="branchId" [options]="branchOptions()" optionLabel="label" optionValue="value"
-          placeholder="Global / All branches" [showClear]="true" styleClass="w-full">
+          [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_BRANCH' | translate" [showClear]="true" styleClass="w-full">
         </p-select>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Category *</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_CATEGORY' | translate }}</label>
         <p-select formControlName="category" [options]="categoryOptions" optionLabel="label" optionValue="value"
-          placeholder="Select category" styleClass="w-full">
+          [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_CATEGORY' | translate" styleClass="w-full">
         </p-select>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Total Amount *</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_TOTAL' | translate }}</label>
         <p-inputnumber formControlName="totalAmount" [min]="0.01" [minFractionDigits]="2"
-          [maxFractionDigits]="2" placeholder="2000.00" styleClass="w-full">
+          [maxFractionDigits]="2" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_TOTAL' | translate" styleClass="w-full">
         </p-inputnumber>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Downpayment</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_DOWNPAYMENT' | translate }}</label>
         <p-inputnumber formControlName="downpaymentAmount" [min]="0" [minFractionDigits]="2"
-          [maxFractionDigits]="2" placeholder="0.00" styleClass="w-full">
+          [maxFractionDigits]="2" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_DOWNPAYMENT' | translate" styleClass="w-full">
         </p-inputnumber>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Number of Months *</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_MONTHS' | translate }}</label>
         <p-inputnumber formControlName="monthsCount" [min]="1" [max]="120" [showButtons]="true"
           styleClass="w-full">
         </p-inputnumber>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Start Date *</label>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_START_DATE' | translate }}</label>
         <p-datepicker formControlName="startDate" dateFormat="yy-mm-dd" [showIcon]="true" styleClass="w-full">
         </p-datepicker>
-        <p class="text-xs text-gray-500 mt-1">Downpayment recorded here. First installment due 1 month after.</p>
+        <p class="text-xs text-gray-500 mt-1">{{ 'INSTALLMENTS.FORM.HINT_START_DATE' | translate }}</p>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Vendor</label>
-        <input pInputText type="text" formControlName="vendor" placeholder="Vendor / Store name" class="w-full" />
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_VENDOR' | translate }}</label>
+        <input pInputText type="text" formControlName="vendor" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_VENDOR' | translate" class="w-full" />
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1">Invoice #</label>
-        <input pInputText type="text" formControlName="invoiceNumber" placeholder="Invoice number" class="w-full" />
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_INVOICE' | translate }}</label>
+        <input pInputText type="text" formControlName="invoiceNumber" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_INVOICE' | translate" class="w-full" />
       </div>
 
       <div class="md:col-span-2">
-        <label class="block text-sm font-medium mb-1">Description</label>
-        <textarea pTextarea formControlName="description" rows="2" placeholder="Optional description"
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_DESCRIPTION' | translate }}</label>
+        <textarea pTextarea formControlName="description" rows="2" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_DESCRIPTION' | translate"
           class="w-full"></textarea>
       </div>
 
       <div class="md:col-span-2">
-        <label class="block text-sm font-medium mb-1">Notes</label>
-        <textarea pTextarea formControlName="notes" rows="2" placeholder="Optional notes" class="w-full"></textarea>
+        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_NOTES' | translate }}</label>
+        <textarea pTextarea formControlName="notes" rows="2" [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_NOTES' | translate" class="w-full"></textarea>
       </div>
 
       <!-- Live preview -->
       <div class="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 class="font-semibold text-blue-900 mb-3">Plan Preview</h3>
+        <h3 class="font-semibold text-blue-900 mb-3">{{ 'INSTALLMENTS.FORM.PREVIEW_TITLE' | translate }}</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div>
-            <p class="text-blue-700 text-xs uppercase">Total</p>
+            <p class="text-blue-700 text-xs uppercase">{{ 'INSTALLMENTS.FORM.PREVIEW_TOTAL' | translate }}</p>
             <p class="font-bold text-blue-900">{{ totalPreview() | number:'1.2-2' }}</p>
           </div>
           <div>
-            <p class="text-blue-700 text-xs uppercase">Downpayment</p>
+            <p class="text-blue-700 text-xs uppercase">{{ 'INSTALLMENTS.FORM.PREVIEW_DOWNPAYMENT' | translate }}</p>
             <p class="font-bold text-blue-900">{{ dpPreview() | number:'1.2-2' }}</p>
           </div>
           <div>
-            <p class="text-blue-700 text-xs uppercase">Financed</p>
+            <p class="text-blue-700 text-xs uppercase">{{ 'INSTALLMENTS.FORM.PREVIEW_FINANCED' | translate }}</p>
             <p class="font-bold text-blue-900">{{ financedPreview() | number:'1.2-2' }}</p>
           </div>
           <div>
-            <p class="text-blue-700 text-xs uppercase">Per Month × {{ form.value.monthsCount || 0 }}</p>
+            <p class="text-blue-700 text-xs uppercase">{{ 'INSTALLMENTS.FORM.PREVIEW_PER_MONTH' | translate: { count: form.value.monthsCount || 0 } }}</p>
             <p class="font-bold text-blue-900">{{ monthlyPreview() | number:'1.2-2' }}</p>
           </div>
         </div>
       </div>
 
       <div class="md:col-span-2 flex justify-end gap-2">
-        <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
+        <p-button [label]="'INSTALLMENTS.FORM.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="cancel()"></p-button>
         <p-button
           type="submit"
-          label="Create Plan"
+          [label]="'INSTALLMENTS.FORM.CREATE' | translate"
           icon="pi pi-check"
           [disabled]="!form.valid || submitting()"
           [loading]="submitting()">

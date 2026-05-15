@@ -147,7 +147,12 @@
             [binary]="true"
             inputId="isRecurring"
             class="mr-2"></p-checkbox>
-          <label for="isRecurring" class="text-sm font-medium">{{ 'EXPENSES.FORM.RECURRING_LABEL' | translate }}</label>
+          <label for="isRecurring" class="text-sm font-medium flex items-center gap-1">
+            {{ 'EXPENSES.FORM.RECURRING_LABEL' | translate }}
+            <i class="pi pi-info-circle text-gray-400 text-xs cursor-help"
+               [pTooltip]="'EXPENSES.FORM.RECURRING_TOOLTIP' | translate"
+               tooltipPosition="top"></i>
+          </label>
         </div>
 
         <!-- Pay Immediately (create mode only) -->
@@ -160,12 +165,19 @@
               inputId="payImmediately"
               class="mr-2"
               (ngModelChange)="payImmediately.set($event)"></p-checkbox>
-            <label for="payImmediately" class="text-sm font-medium">Pay immediately</label>
+            <label for="payImmediately" class="text-sm font-medium flex items-center gap-1">
+              {{ 'EXPENSES.FORM.PAY_IMMEDIATELY_LABEL' | translate }}
+              <i class="pi pi-info-circle text-gray-400 text-xs cursor-help"
+                 [pTooltip]="'EXPENSES.FORM.PAY_IMMEDIATELY_TOOLTIP' | translate"
+                 tooltipPosition="top"></i>
+            </label>
           </div>
 
           @if (payImmediately()) {
             <div>
-              <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium mb-2">
+                {{ 'EXPENSES.FORM.PAYMENT_DATE_LABEL' | translate }} <span class="text-red-500">*</span>
+              </label>
               <p-datepicker
                 [(ngModel)]="paymentDate"
                 [ngModelOptions]="{standalone: true}"

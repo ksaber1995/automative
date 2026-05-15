@@ -17,6 +17,7 @@ export const PRODUCTS_ROUTES: Routes = [
   {
     path: 'create',
     canActivate: [permissionGuard('products', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.CREATE' },
     loadComponent: () =>
       import('./product-form/product-form.component').then(
         (m) => m.ProductFormComponent,
@@ -25,6 +26,7 @@ export const PRODUCTS_ROUTES: Routes = [
   {
     path: ':id/edit',
     canActivate: [permissionGuard('products', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () =>
       import('./product-form/product-form.component').then(
         (m) => m.ProductFormComponent,
@@ -33,6 +35,7 @@ export const PRODUCTS_ROUTES: Routes = [
   {
     path: 'sell',
     canActivate: [permissionGuard('product_sales', 'write')],
+    data: { breadcrumb: 'BREADCRUMBS.PRODUCTS_SELL' },
     loadComponent: () =>
       import('./product-sale/product-sale.component').then(
         (m) => m.ProductSaleComponent,
@@ -41,6 +44,7 @@ export const PRODUCTS_ROUTES: Routes = [
   {
     path: 'sales',
     canActivate: [permissionGuard('product_sales')],
+    data: { breadcrumb: 'BREADCRUMBS.PRODUCTS_SALES' },
     loadComponent: () =>
       import('./sales-history/sales-history.component').then(
         (m) => m.SalesHistoryComponent,

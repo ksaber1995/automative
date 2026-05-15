@@ -9,6 +9,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -21,6 +22,7 @@ import { ExpenseCategory } from '@shared/enums/expense-type.enum';
   imports: [
     CommonModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule,
     InputTextModule, InputNumberModule, TextareaModule, SelectModule, DatePickerModule,
+    TranslateModule,
   ],
   templateUrl: './installment-form.component.html',
 })
@@ -30,6 +32,7 @@ export class InstallmentFormComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   form: FormGroup;
   branches = signal<Branch[]>([]);
@@ -80,12 +83,12 @@ export class InstallmentFormComponent implements OnInit {
 
   submit() {
     if (!this.form.valid) {
-      this.notificationService.error('Please fill all required fields');
+      this.notificationService.error(this.translate.instant('INSTALLMENTS.FORM.MSG_REQUIRED_FIELDS'));
       return;
     }
     const v = this.form.value;
     if (Number(v.downpaymentAmount || 0) >= Number(v.totalAmount)) {
-      this.notificationService.error('Downpayment must be less than total amount');
+      this.notificationService.error(this.translate.instant('INSTALLMENTS.FORM.MSG_DOWNPAYMENT_INVALID'));
       return;
     }
     const startStr = v.startDate instanceof Date ? v.startDate.toISOString().split('T')[0] : v.startDate;
@@ -106,12 +109,12 @@ export class InstallmentFormComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        this.notificationService.success('Installment plan created');
+        this.notificationService.success(this.translate.instant('INSTALLMENTS.FORM.MSG_CREATED'));
         this.router.navigate(['/expenses/installments', res.plan.id]);
       },
       error: (err) => {
         this.submitting.set(false);
-        this.notificationService.error(err.error?.message || 'Failed to create plan');
+        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.FORM.MSG_CREATE_FAILED'));
       },
     });
   }

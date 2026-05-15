@@ -246,12 +246,14 @@ export const employeesRoutes = {
       }
 
       // Block termination if the employee is still assigned as instructor on any non-finished class.
+      // (company_id is derived from the linked course.)
       const assignedClasses = await query(
-        `SELECT id, name, code
-         FROM classes
-         WHERE instructor_id = $1
-           AND company_id = $2
-           AND COALESCE(is_finished, FALSE) = FALSE`,
+        `SELECT c.id, c.name, c.code
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.instructor_id = $1
+           AND co.company_id = $2
+           AND COALESCE(c.is_finished, FALSE) = FALSE`,
         [params.id, context.companyId]
       );
 

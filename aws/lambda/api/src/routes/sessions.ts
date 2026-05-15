@@ -1,6 +1,21 @@
 import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
+let sessionSchemaInitPromise: Promise<void> | null = null;
+async function ensureSessionRoomNullable(): Promise<void> {
+  if (!sessionSchemaInitPromise) {
+    sessionSchemaInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE sessions ALTER COLUMN room_id DROP NOT NULL`);
+      } catch (e) {
+        sessionSchemaInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return sessionSchemaInitPromise;
+}
+
 function mapSessionFromDB(row: any) {
   return {
     id: row.id,
@@ -36,6 +51,7 @@ function mapSessionWithDetailsFromDB(row: any) {
 export const sessionsRoutes = {
   start: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      await ensureSessionRoomNullable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
@@ -45,18 +61,12 @@ export const sessionsRoutes = {
         return { status: 403 as const, body: { message: 'Access denied to this branch' } };
       }
 
-      // Verify room exists and belongs to company
-      const room = await queryOne(
-        'SELECT * FROM rooms WHERE id = $1 AND company_id = $2 AND is_active = true',
-        [body.roomId, context.companyId]
-      );
-      if (!room) {
-        return { status: 404 as const, body: { message: 'Room not found or inactive' } };
-      }
-
-      // Verify class exists and belongs to company
+      // Verify class exists and belongs to company (branch/company come from the linked course)
       const cls = await queryOne(
-        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
+        `SELECT c.*, co.company_id, co.branch_id
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.id = $1 AND co.company_id = $2`,
         [body.classId, context.companyId]
       );
       if (!cls) {
@@ -67,13 +77,29 @@ export const sessionsRoutes = {
         return { status: 400 as const, body: { message: 'This class is finished. Sessions cannot be started.' } };
       }
 
-      // Check if room is already occupied
-      const activeSession = await queryOne(
-        'SELECT id FROM sessions WHERE room_id = $1 AND end_date IS NULL',
-        [body.roomId]
-      );
-      if (activeSession) {
-        return { status: 400 as const, body: { message: 'Room is already occupied. End the current session first.' } };
+      const isOnlineClass = typeof cls.type === 'string' && cls.type.toUpperCase() === 'ONLINE';
+
+      // Verify room only if provided (online classes don't require a room)
+      let room: any = null;
+      if (body.roomId) {
+        room = await queryOne(
+          'SELECT * FROM rooms WHERE id = $1 AND company_id = $2 AND is_active = true',
+          [body.roomId, context.companyId]
+        );
+        if (!room) {
+          return { status: 404 as const, body: { message: 'Room not found or inactive' } };
+        }
+
+        // Check if room is already occupied
+        const activeSession = await queryOne(
+          'SELECT id FROM sessions WHERE room_id = $1 AND end_date IS NULL',
+          [body.roomId]
+        );
+        if (activeSession) {
+          return { status: 400 as const, body: { message: 'Room is already occupied. End the current session first.' } };
+        }
+      } else if (!isOnlineClass) {
+        return { status: 400 as const, body: { message: 'Room is required for offline classes.' } };
       }
 
       // Check if class already has an active session
@@ -87,8 +113,8 @@ export const sessionsRoutes = {
 
       const session = await insert('sessions', {
         company_id: context.companyId,
-        branch_id: body.branchId || room.branch_id,
-        room_id: body.roomId,
+        branch_id: body.branchId || room?.branch_id || cls.branch_id,
+        room_id: body.roomId || null,
         class_id: body.classId,
         start_date: new Date().toISOString(),
         end_date: null,

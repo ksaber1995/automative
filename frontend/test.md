@@ -159,3 +159,11 @@
 
 
   -- append to body
+
+
+
+   days of the week here are not translated to arabic if languate is arabic
+  http://localhost:4200/courses/fdfbbc71-c615-4917-85ee-7cfdf1306bc3/classes/create
+
+
+  pass lang to the backend and return errors with arabic if lang is arabic 

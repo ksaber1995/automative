@@ -11,6 +11,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { CheckboxModule } from 'primeng/checkbox';
+import { TooltipModule } from 'primeng/tooltip';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -34,6 +35,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
     SelectModule,
     DatePickerModule,
     CheckboxModule,
+    TooltipModule,
     TranslateModule
   ],
   templateUrl: './expense-form.component.html',

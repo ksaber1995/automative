@@ -8,6 +8,14 @@ async function ensureClassStatusColumns(): Promise<void> {
       try {
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`);
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`);
+        await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS type VARCHAR(16) NOT NULL DEFAULT 'OFFLINE'`);
+        // Drop redundant columns: branch_id and company_id are derivable from courses.
+        // Drop the unique constraint and indexes that depend on company_id first.
+        await query(`ALTER TABLE classes DROP CONSTRAINT IF EXISTS classes_company_id_code_key`);
+        await query(`DROP INDEX IF EXISTS idx_classes_branch_id`);
+        await query(`DROP INDEX IF EXISTS idx_classes_company_id`);
+        await query(`ALTER TABLE classes DROP COLUMN IF EXISTS branch_id`);
+        await query(`ALTER TABLE classes DROP COLUMN IF EXISTS company_id`);
       } catch (e) {
         classSchemaInitPromise = null;
         throw e;
@@ -15,6 +23,11 @@ async function ensureClassStatusColumns(): Promise<void> {
     })();
   }
   return classSchemaInitPromise;
+}
+
+function normalizeClassType(value: any): 'ONLINE' | 'OFFLINE' {
+  const upper = typeof value === 'string' ? value.toUpperCase() : '';
+  return upper === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
 }
 
 function timeToMinutes(time: string | null | undefined): number {
@@ -30,6 +43,21 @@ function deriveStatus(row: any): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
   const start = row.start_date ? new Date(row.start_date) : null;
   if (start && start.getTime() > today.getTime()) return 'SCHEDULED';
   return 'IN_PROGRESS';
+}
+
+/**
+ * Loads a class along with its derived branch/company (from the linked course).
+ * Replaces the legacy `SELECT * FROM classes WHERE id=$1 AND company_id=$2`
+ * pattern now that classes.branch_id and classes.company_id no longer exist.
+ */
+async function loadClassForTenant(classId: string, companyId: string): Promise<any | null> {
+  return queryOne(
+    `SELECT c.*, co.company_id, co.branch_id
+     FROM classes c
+     INNER JOIN courses co ON c.course_id = co.id
+     WHERE c.id = $1 AND co.company_id = $2`,
+    [classId, companyId]
+  );
 }
 
 function mapClassFromDB(row: any) {
@@ -52,6 +80,7 @@ function mapClassFromDB(row: any) {
     isActive: row.is_active,
     isFinished: !!row.is_finished,
     finishedAt: row.finished_at || null,
+    type: normalizeClassType(row.type),
     status: deriveStatus(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -78,19 +107,24 @@ export const classesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+      // Resolve course -> branch/company. The class is implicitly scoped to
+      // the course's branch and company; there is no separate branch_id field.
+      const course = await queryOne(
+        'SELECT id, company_id, branch_id FROM courses WHERE id = $1',
+        [body.courseId]
+      );
+      if (!course) {
+        return { status: 404 as const, body: { message: 'Course not found' } };
+      }
+      if (course.company_id !== context.companyId) {
+        return { status: 403 as const, body: { message: 'Access denied to this course' } };
+      }
+      if (!canAccessBranch(context, course.branch_id)) {
+        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
       }
 
-      console.log('Creating class with data:', JSON.stringify(body, null, 2));
-
       const insertData = {
-        company_id: context.companyId,
         course_id: body.courseId,
-        branch_id: body.branchId,
         instructor_id: body.instructorId || null,
         name: body.name,
         code: body.code,
@@ -103,17 +137,18 @@ export const classesRoutes = {
         current_enrollment: 0,
         notes: body.notes || null,
         is_active: true,
+        type: normalizeClassType(body.type),
       };
-
-      console.log('Insert data:', JSON.stringify(insertData, null, 2));
 
       const classRecord = await insert('classes', insertData);
 
-      console.log('Class created successfully:', classRecord.id);
-
       return {
         status: 201 as const,
-        body: mapClassFromDB(classRecord),
+        body: mapClassFromDB({
+          ...classRecord,
+          company_id: course.company_id,
+          branch_id: course.branch_id,
+        }),
       };
     } catch (error) {
       console.error('Create class error:', error);
@@ -140,6 +175,8 @@ export const classesRoutes = {
       let sql = `
         SELECT
           c.*,
+          co.company_id,
+          co.branch_id,
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
@@ -155,10 +192,10 @@ export const classesRoutes = {
             WHERE s.class_id = c.id AND s.end_date IS NULL
           ) AS has_active_session
         FROM classes c
-        LEFT JOIN courses co ON c.course_id = co.id
-        LEFT JOIN branches b ON c.branch_id = b.id
+        INNER JOIN courses co ON c.course_id = co.id
+        LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.company_id = $1
+        WHERE co.company_id = $1
       `;
       const params: any[] = [context.companyId];
 
@@ -170,10 +207,10 @@ export const classesRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       }
 
       if (queryParams.courseId) {
@@ -208,6 +245,8 @@ export const classesRoutes = {
       let sql = `
         SELECT
           c.*,
+          co.company_id,
+          co.branch_id,
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
@@ -223,10 +262,10 @@ export const classesRoutes = {
             WHERE s.class_id = c.id AND s.end_date IS NULL
           ) AS has_active_session
         FROM classes c
-        LEFT JOIN courses co ON c.course_id = co.id
-        LEFT JOIN branches b ON c.branch_id = b.id
+        INNER JOIN courses co ON c.course_id = co.id
+        LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.company_id = $1 AND c.is_active = true
+        WHERE co.company_id = $1 AND c.is_active = true
       `;
       const params: any[] = [context.companyId];
 
@@ -238,10 +277,10 @@ export const classesRoutes = {
           };
         }
         params.push(queryParams.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       }
 
       if (queryParams.courseId) {
@@ -286,21 +325,22 @@ export const classesRoutes = {
 
       const params: any[] = [context.companyId, instructorId, endDate, startDate];
       let sql = `
-        SELECT id, name, code, days_of_week, start_time, end_time, start_date, end_date
-        FROM classes
-        WHERE company_id = $1
-          AND instructor_id = $2
-          AND is_active = true
-          AND COALESCE(is_finished, false) = false
-          AND start_date <= $3
-          AND end_date >= $4
-          AND start_time IS NOT NULL
-          AND end_time IS NOT NULL
-          AND days_of_week IS NOT NULL
+        SELECT c.id, c.name, c.code, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date
+        FROM classes c
+        INNER JOIN courses co ON c.course_id = co.id
+        WHERE co.company_id = $1
+          AND c.instructor_id = $2
+          AND c.is_active = true
+          AND COALESCE(c.is_finished, false) = false
+          AND c.start_date <= $3
+          AND c.end_date >= $4
+          AND c.start_time IS NOT NULL
+          AND c.end_time IS NOT NULL
+          AND c.days_of_week IS NOT NULL
       `;
       if (excludeClassId) {
         params.push(excludeClassId);
-        sql += ` AND id != $${params.length}`;
+        sql += ` AND c.id != $${params.length}`;
       }
 
       const rows = await query(sql, params);
@@ -352,6 +392,8 @@ export const classesRoutes = {
       const sql = `
         SELECT
           c.*,
+          co.company_id,
+          co.branch_id,
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
@@ -363,10 +405,10 @@ export const classesRoutes = {
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
           ) AS student_count
         FROM classes c
-        LEFT JOIN courses co ON c.course_id = co.id
-        LEFT JOIN branches b ON c.branch_id = b.id
+        INNER JOIN courses co ON c.course_id = co.id
+        LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.id = $1 AND c.company_id = $2
+        WHERE c.id = $1 AND co.company_id = $2
       `;
 
       const result = await query(sql, [params.id, context.companyId]);
@@ -400,15 +442,13 @@ export const classesRoutes = {
 
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      const existing = await queryOne(
-        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
+      const existing = await loadClassForTenant(params.id, context.companyId);
 
       if (!existing) {
         return {
@@ -426,15 +466,19 @@ export const classesRoutes = {
 
       const updateData: any = {};
 
-      if (body.courseId !== undefined) updateData.course_id = body.courseId;
-      if (body.branchId !== undefined) {
-        if (!canAccessBranch(context, body.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to target branch' },
-          };
+      if (body.courseId !== undefined) {
+        // Switching course also implicitly switches branch/company. Re-validate.
+        const newCourse = await queryOne(
+          'SELECT id, company_id, branch_id FROM courses WHERE id = $1',
+          [body.courseId]
+        );
+        if (!newCourse || newCourse.company_id !== context.companyId) {
+          return { status: 404 as const, body: { message: 'Target course not found' } };
         }
-        updateData.branch_id = body.branchId;
+        if (!canAccessBranch(context, newCourse.branch_id)) {
+          return { status: 403 as const, body: { message: 'Access denied to target branch' } };
+        }
+        updateData.course_id = body.courseId;
       }
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.name !== undefined) updateData.name = body.name;
@@ -446,6 +490,7 @@ export const classesRoutes = {
       if (body.daysOfWeek !== undefined) updateData.days_of_week = body.daysOfWeek;
       if (body.maxStudents !== undefined) updateData.max_students = body.maxStudents;
       if (body.notes !== undefined) updateData.notes = body.notes;
+      if (body.type !== undefined) updateData.type = normalizeClassType(body.type);
 
       const classRecord = await update('classes', params.id, updateData);
 
@@ -456,9 +501,11 @@ export const classesRoutes = {
         };
       }
 
+      // Reload to include the (possibly-updated) joined branch/company.
+      const reloaded = await loadClassForTenant(params.id, context.companyId);
       return {
         status: 200 as const,
-        body: mapClassFromDB(classRecord),
+        body: mapClassFromDB(reloaded || classRecord),
       };
     } catch (error) {
       console.error('Update class error:', error);
@@ -476,10 +523,7 @@ export const classesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      const cls = await queryOne(
-        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
+      const cls = await loadClassForTenant(params.id, context.companyId);
 
       if (!cls) {
         return { status: 404 as const, body: { message: 'Class not found' } };
@@ -584,10 +628,7 @@ export const classesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      const existing = await queryOne(
-        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
+      const existing = await loadClassForTenant(params.id, context.companyId);
 
       if (!existing) {
         return {
@@ -640,10 +681,7 @@ export const classesRoutes = {
         return { status: 403 as const, body: { message: 'Insufficient permissions' } };
       }
 
-      const existing = await queryOne(
-        'SELECT * FROM classes WHERE id = $1 AND company_id = $2',
-        [params.id, context.companyId]
-      );
+      const existing = await loadClassForTenant(params.id, context.companyId);
 
       if (!existing) {
         return { status: 404 as const, body: { message: 'Class not found' } };
@@ -675,7 +713,14 @@ export const classesRoutes = {
         return { status: 404 as const, body: { message: 'Class not found' } };
       }
 
-      return { status: 200 as const, body: mapClassFromDB(updated) };
+      return {
+        status: 200 as const,
+        body: mapClassFromDB({
+          ...updated,
+          company_id: existing.company_id,
+          branch_id: existing.branch_id,
+        }),
+      };
     } catch (error) {
       console.error('Finish class error:', error);
       return {

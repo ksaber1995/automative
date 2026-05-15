@@ -18,7 +18,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import {
   EventService,
   EventSubscription,
@@ -68,6 +68,7 @@ export class EventDetailComponent implements OnInit {
   private router = inject(Router);
   private notifications = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   id!: string;
@@ -125,7 +126,13 @@ export class EventDetailComponent implements OnInit {
     { label: 'Check', value: 'CHECK' },
   ];
 
-  expenseCategoryOptions = Object.values(ExpenseCategory).map(c => ({ label: c, value: c }));
+  // Getter so labels re-evaluate when the active language changes.
+  get expenseCategoryOptions() {
+    return Object.values(ExpenseCategory).map(c => ({
+      label: this.translate.instant(`EXPENSES.CATEGORY_VALUES.${c}`),
+      value: c,
+    }));
+  }
 
   ngOnInit() {
     this.id = this.route.snapshot.paramMap.get('id')!;

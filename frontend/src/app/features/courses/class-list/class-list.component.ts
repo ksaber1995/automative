@@ -65,10 +65,10 @@ export class ClassListComponent implements OnInit {
 
   statusLabel(status?: ClassStatus | string): string {
     switch (status) {
-      case 'IN_PROGRESS': return 'In Progress';
-      case 'SCHEDULED': return 'Scheduled';
-      case 'DONE': return 'Done';
-      default: return 'Unknown';
+      case 'IN_PROGRESS': return this.translate.instant('CLASSES.LIST.STATUS_IN_PROGRESS');
+      case 'SCHEDULED': return this.translate.instant('CLASSES.LIST.STATUS_SCHEDULED');
+      case 'DONE': return this.translate.instant('CLASSES.LIST.STATUS_DONE');
+      default: return this.translate.instant('CLASSES.LIST.STATUS_UNKNOWN');
     }
   }
 

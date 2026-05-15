@@ -6,14 +6,14 @@ export interface Session {
   id: string;
   companyId: string;
   branchId: string;
-  roomId: string;
+  roomId: string | null;
   classId: string;
   startDate: string;
   endDate: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  roomCode?: string;
+  roomCode?: string | null;
   roomDescription?: string | null;
   className?: string;
   classCode?: string;
@@ -30,7 +30,7 @@ export interface StartSessionTeacher {
 }
 
 export interface StartSessionDto {
-  roomId: string;
+  roomId?: string;
   classId: string;
   branchId: string;
   notes?: string;

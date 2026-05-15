@@ -238,9 +238,12 @@ export const branchesRoutes = {
       );
       const courseCount = parseInt(courseResult?.count || '0');
 
-      // Get class count
+      // Get class count (derived via course join — classes no longer carry branch_id/company_id)
       const classResult = await queryOne(
-        'SELECT COUNT(*) as count FROM classes WHERE branch_id = $1 AND company_id = $2',
+        `SELECT COUNT(*) as count
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE co.branch_id = $1 AND co.company_id = $2`,
         [params.id, context.companyId]
       );
       const classCount = parseInt(classResult?.count || '0');

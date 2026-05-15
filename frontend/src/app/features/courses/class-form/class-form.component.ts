@@ -16,7 +16,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-class-form',
@@ -47,6 +47,7 @@ export class ClassFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   classForm: FormGroup;
   loading = signal(false);
@@ -55,8 +56,12 @@ export class ClassFormComponent implements OnInit {
   classId: string | null = null;
   instructors = signal<any[]>([]);
   branches = signal<any[]>([]);
+  // All active courses fetched once; the dropdown shown to the user is `filteredCourses`,
+  // which narrows them down to those belonging to the currently-selected branch.
+  allCourses = signal<Array<{ id: string; name: string; branchId: string | null }>>([]);
   courses = signal<any[]>([]);
   courseName = signal<string>('');
+  branchName = signal<string>('');
   courseDefaultInstructor = signal<string | null>(null);
   isGlobalCreate = signal(false);
   availabilityConflicts = signal<TeacherAvailabilityConflict[]>([]);
@@ -72,13 +77,23 @@ export class ClassFormComponent implements OnInit {
     { label: 'Saturday', value: 'SATURDAY' }
   ];
 
+  get classTypes() {
+    return [
+      { label: this.translate.instant('CLASSES.FORM.TYPE_OFFLINE'), value: 'OFFLINE' },
+      { label: this.translate.instant('CLASSES.FORM.TYPE_ONLINE'), value: 'ONLINE' }
+    ];
+  }
+
   constructor() {
     this.classForm = this.fb.group({
       courseId: [''],
       name: ['', [Validators.required, Validators.minLength(2)]],
       code: ['', [Validators.required, Validators.minLength(2)]],
-      branchId: ['', [Validators.required]],
+      // Branch is no longer stored on the class — it is derived from the course.
+      // The form control acts purely as a UI filter for the course dropdown in global-create mode.
+      branchId: [''],
       instructorId: [''],
+      type: ['OFFLINE', [Validators.required]],
       daysOfWeek: [[]],
       startTime: [''],
       endTime: [''],
@@ -90,6 +105,16 @@ export class ClassFormComponent implements OnInit {
     });
   }
 
+  /** Courses shown to the user in the dropdown — narrowed by the chosen branch. */
+  filteredCourses() {
+    const branchId = this.classForm?.get('branchId')?.value;
+    const all = this.allCourses();
+    if (!branchId) return [];
+    return all
+      .filter(c => c.branchId === branchId)
+      .map(c => ({ label: c.name, value: c.id }));
+  }
+
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('courseId');
     this.classId = this.route.snapshot.paramMap.get('id');
@@ -99,6 +124,9 @@ export class ClassFormComponent implements OnInit {
       this.isGlobalCreate.set(true);
       this.classForm.get('courseId')?.setValidators([Validators.required]);
       this.classForm.get('courseId')?.updateValueAndValidity();
+      // Branch is the entry-point filter in global-create mode.
+      this.classForm.get('branchId')?.setValidators([Validators.required]);
+      this.classForm.get('branchId')?.updateValueAndValidity();
       this.loadCourses();
     } else if (this.courseId) {
       this.loadCourse(this.courseId);
@@ -106,6 +134,14 @@ export class ClassFormComponent implements OnInit {
 
     this.loadInstructors();
     this.loadBranches();
+
+    // When the branch changes in global-create mode, clear the picked course
+    // (it may not belong to the new branch).
+    this.classForm.get('branchId')?.valueChanges.subscribe(() => {
+      if (this.isGlobalCreate() && !this.isEditMode()) {
+        this.classForm.patchValue({ courseId: '' }, { emitEvent: false });
+      }
+    });
 
     if (this.classId) {
       this.isEditMode.set(true);
@@ -199,10 +235,13 @@ export class ClassFormComponent implements OnInit {
   loadCourses() {
     this.courseService.getActiveCourses().subscribe({
       next: (courses) => {
-        this.courses.set(courses.map(c => ({
-          label: c.name,
-          value: c.id
+        this.allCourses.set(courses.map(c => ({
+          id: c.id,
+          name: c.name,
+          branchId: c.branchId,
         })));
+        // Legacy `courses` signal kept populated for any other code that reads it.
+        this.courses.set(courses.map(c => ({ label: c.name, value: c.id })));
       },
       error: () => {
         this.notificationService.error('Failed to load courses');
@@ -215,6 +254,12 @@ export class ClassFormComponent implements OnInit {
       next: (course) => {
         this.courseName.set(course.name);
         this.courseDefaultInstructor.set(course.instructorId || null);
+
+        // Look up the branch name to show alongside the course in the header.
+        if (course.branchId) {
+          const found = this.branches().find(b => b.value === course.branchId);
+          this.branchName.set(found?.label || '');
+        }
 
         // Auto-select course's branch and instructor if creating new class
         if (!this.isEditMode()) {
@@ -258,6 +303,12 @@ export class ClassFormComponent implements OnInit {
           label: branch.name,
           value: branch.id
         })));
+        // If a course was loaded before branches resolved, resolve the branch name now.
+        const branchId = this.classForm.get('branchId')?.value;
+        if (branchId && !this.branchName()) {
+          const found = this.branches().find(b => b.value === branchId);
+          if (found) this.branchName.set(found.label);
+        }
       },
       error: () => {
         this.notificationService.error('Failed to load branches');
@@ -284,6 +335,7 @@ export class ClassFormComponent implements OnInit {
           code: classData.code,
           branchId: classData.branchId,
           instructorId: classData.instructorId,
+          type: classData.type || 'OFFLINE',
           daysOfWeek: daysArray,
           startTime: classData.startTime,
           endTime: classData.endTime,
@@ -405,10 +457,11 @@ export class ClassFormComponent implements OnInit {
 
     const classData: any = {
       courseId: targetCourseId,
-      branchId: formValue.branchId,
+      // branchId no longer sent — backend derives it from the course.
       name: formValue.name,
       code: formValue.code,
       instructorId: formValue.instructorId || undefined,
+      type: formValue.type || 'OFFLINE',
       startDate,
       endDate,
       startTime: formValue.startTime || undefined,

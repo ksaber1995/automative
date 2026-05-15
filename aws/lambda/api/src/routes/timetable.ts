@@ -100,7 +100,7 @@ export const timetableRoutes = {
           c.name,
           c.code,
           c.course_id,
-          c.branch_id,
+          co.branch_id,
           c.instructor_id,
           c.start_time,
           c.end_time,
@@ -125,8 +125,8 @@ export const timetableRoutes = {
           s.room_id AS session_room_id,
           r.code AS session_room_code
         FROM classes c
-        LEFT JOIN courses co ON c.course_id = co.id
-        LEFT JOIN branches b ON c.branch_id = b.id
+        INNER JOIN courses co ON c.course_id = co.id
+        LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
         LEFT JOIN LATERAL (
           SELECT s2.id, s2.start_date, s2.end_date, s2.room_id
@@ -137,7 +137,7 @@ export const timetableRoutes = {
           LIMIT 1
         ) s ON TRUE
         LEFT JOIN rooms r ON s.room_id = r.id
-        WHERE c.company_id = $1
+        WHERE co.company_id = $1
           AND c.is_active = true
           AND c.start_time IS NOT NULL
           AND c.end_time IS NOT NULL
@@ -154,10 +154,10 @@ export const timetableRoutes = {
           return { status: 403 as const, body: { message: 'Access denied to this branch' } };
         }
         params.push(queryParams.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       } else if (!isGlobalAdmin(context) && context.branchId) {
         params.push(context.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+        sql += ` AND co.branch_id = $${params.length}`;
       }
 
       if (queryParams.teacherId) {

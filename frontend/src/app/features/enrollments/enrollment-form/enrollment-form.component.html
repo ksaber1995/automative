@@ -2,7 +2,7 @@
   <div class="max-w-4xl mx-auto">
     <div class="mb-6">
       <h1 class="text-3xl font-bold text-gray-900">
-        {{ isEditMode() ? 'Edit Enrollment' : 'Enroll Student in Course' }}
+        {{ (isEditMode() ? 'ENROLLMENT_FORM.EDIT_TITLE' : 'ENROLLMENT_FORM.CREATE_TITLE') | translate }}
       </h1>
     </div>
 
@@ -11,7 +11,7 @@
         <!-- Enrollment type toggle -->
         @if (!isEditMode()) {
           <div class="mb-6">
-            <div class="text-sm font-medium text-gray-700 mb-2">Enrollment Type</div>
+            <div class="text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.ENROLLMENT_TYPE' | translate }}</div>
             <div class="flex gap-3">
               <button type="button"
                 class="relative flex-1 p-4 pr-10 border-2 rounded-lg text-left transition-all focus:outline-none"
@@ -23,10 +23,10 @@
                   <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white text-blue-600 flex items-center justify-center text-sm font-bold shadow">✓</span>
                 }
                 <div class="font-semibold text-base flex items-center gap-2">
-                  <span class="text-xl">🎓</span> Single Course
+                  <span class="text-xl">🎓</span> {{ 'ENROLLMENT_FORM.SINGLE_COURSE' | translate }}
                 </div>
                 <div class="text-xs mt-1" [class]="enrollmentType() === 'COURSE' ? 'text-blue-100' : 'text-gray-500'">
-                  Enroll the student in one class of one course.
+                  {{ 'ENROLLMENT_FORM.SINGLE_COURSE_DESC' | translate }}
                 </div>
               </button>
               <button type="button"
@@ -39,10 +39,10 @@
                   <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white text-purple-600 flex items-center justify-center text-sm font-bold shadow">✓</span>
                 }
                 <div class="font-semibold text-base flex items-center gap-2">
-                  <span class="text-xl">🎁</span> Master Course Bundle
+                  <span class="text-xl">🎁</span> {{ 'ENROLLMENT_FORM.MASTER_COURSE_BUNDLE' | translate }}
                 </div>
                 <div class="text-xs mt-1" [class]="enrollmentType() === 'MASTER' ? 'text-purple-100' : 'text-gray-500'">
-                  One payment gives access to every course in the bundle.
+                  {{ 'ENROLLMENT_FORM.MASTER_COURSE_BUNDLE_DESC' | translate }}
                 </div>
               </button>
             </div>
@@ -51,9 +51,9 @@
 
         @if (studentLocked() && studentBranchName()) {
           <div class="mb-4 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm">
-            <span class="text-gray-500">Branch:</span>
+            <span class="text-gray-500">{{ 'ENROLLMENT_FORM.BRANCH_PREFIX' | translate }}</span>
             <span class="ml-2 font-semibold text-gray-900">{{ studentBranchName() }}</span>
-            <span class="ml-2 text-xs text-gray-400">(locked to the student's branch)</span>
+            <span class="ml-2 text-xs text-gray-400">{{ 'ENROLLMENT_FORM.BRANCH_LOCKED_SUFFIX' | translate }}</span>
           </div>
         }
 
@@ -62,11 +62,11 @@
           <!-- Branch (only shown when not locked to a student) -->
           @if (!studentLocked()) {
             <div class="col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Branch <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_BRANCH' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
-                placeholder="Select a branch" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
+                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_BRANCH' | translate" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
               @if (f['branchId'].invalid && f['branchId'].touched) {
-                <small class="text-red-500">Branch is required</small>
+                <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_BRANCH_REQUIRED' | translate }}</small>
               }
             </div>
           }
@@ -74,16 +74,16 @@
           <!-- Student (only shown when not locked to a single student) -->
           @if (!studentLocked()) {
             <div class="col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Student <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_STUDENT' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="studentId" [options]="filteredStudents()" optionLabel="fullName" optionValue="id"
-                placeholder="Select a student" [filter]="true" (onChange)="onStudentChange()" [style]="{ width: '100%' }"
+                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_STUDENT' | translate" [filter]="true" (onChange)="onStudentChange()" [style]="{ width: '100%' }"
                 [disabled]="!f['branchId'].value"></p-select>
-              @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+              @if (!f['branchId'].value) { <small class="text-gray-500">{{ 'ENROLLMENT_FORM.MSG_SELECT_BRANCH_FIRST' | translate }}</small> }
               @if (f['branchId'].value && filteredStudents().length === 0) {
-                <small class="text-orange-500">No active students for this branch</small>
+                <small class="text-orange-500">{{ 'ENROLLMENT_FORM.MSG_NO_ACTIVE_STUDENTS' | translate }}</small>
               }
               @if (f['studentId'].invalid && f['studentId'].touched) {
-                <small class="text-red-500">Student is required</small>
+                <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_STUDENT_REQUIRED' | translate }}</small>
               }
             </div>
           }
@@ -91,9 +91,9 @@
           <!-- Master Course (MASTER mode) -->
           @if (enrollmentType() === 'MASTER') {
             <div class="col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Master Course <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_MASTER_COURSE' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="masterCourseId" [options]="filteredMasters()" optionLabel="name" optionValue="id"
-                placeholder="Select a master course" (onChange)="onMasterCourseChange()" [style]="{ width: '100%' }"
+                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_MASTER_COURSE' | translate" (onChange)="onMasterCourseChange()" [style]="{ width: '100%' }"
                 [disabled]="!f['branchId'].value">
                 <ng-template let-m pTemplate="item">
                   <div class="flex justify-between items-center gap-3">
@@ -102,12 +102,12 @@
                   </div>
                 </ng-template>
               </p-select>
-              @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+              @if (!f['branchId'].value) { <small class="text-gray-500">{{ 'ENROLLMENT_FORM.MSG_SELECT_BRANCH_FIRST' | translate }}</small> }
               @if (f['branchId'].value && filteredMasters().length === 0) {
-                <small class="text-orange-500">No active master courses for this branch</small>
+                <small class="text-orange-500">{{ 'ENROLLMENT_FORM.MSG_NO_ACTIVE_MASTER_COURSES' | translate }}</small>
               }
               @if (f['masterCourseId'].invalid && f['masterCourseId'].touched) {
-                <small class="text-red-500">Master course is required</small>
+                <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_MASTER_COURSE_REQUIRED' | translate }}</small>
               }
             </div>
           }
@@ -115,47 +115,47 @@
           <!-- Course (COURSE mode) -->
           @if (enrollmentType() === 'COURSE') {
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Course <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_COURSE' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="courseId" [options]="filteredCourses()" optionLabel="name" optionValue="id"
-                optionDisabled="disabled" placeholder="Select a course" (onChange)="onCourseChange()"
+                optionDisabled="disabled" [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_COURSE' | translate" (onChange)="onCourseChange()"
                 [style]="{ width: '100%' }" [disabled]="!f['branchId'].value">
                 <ng-template let-c pTemplate="item">
                   <div class="flex justify-between items-center gap-3 w-full" [class.opacity-50]="c.disabled">
                     <span>{{ c.name }}</span>
                     @if (c.disabled) {
-                      <span class="text-xs text-gray-500 italic">already enrolled</span>
+                      <span class="text-xs text-gray-500 italic">{{ 'ENROLLMENT_FORM.ALREADY_ENROLLED' | translate }}</span>
                     }
                   </div>
                 </ng-template>
               </p-select>
-              @if (!f['branchId'].value) { <small class="text-gray-500">Select a branch first</small> }
+              @if (!f['branchId'].value) { <small class="text-gray-500">{{ 'ENROLLMENT_FORM.MSG_SELECT_BRANCH_FIRST' | translate }}</small> }
               @if (f['branchId'].value && filteredCourses().length === 0) {
-                <small class="text-orange-500">No active courses for this branch</small>
+                <small class="text-orange-500">{{ 'ENROLLMENT_FORM.MSG_NO_ACTIVE_COURSES' | translate }}</small>
               }
             </div>
 
             <!-- Class -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Class <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_CLASS' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="classId" [options]="filteredClasses()" optionLabel="name" optionValue="id"
-                placeholder="Select a class" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value"></p-select>
+                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_CLASS' | translate" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value"></p-select>
               @if (f['classId'].invalid && f['classId'].touched) {
-                <small class="text-red-500">Class is required</small>
+                <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_CLASS_REQUIRED' | translate }}</small>
               }
             </div>
           }
 
           <!-- Enrollment Date -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Enrollment Date <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_ENROLLMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
             <p-datepicker formControlName="enrollmentDate" [showIcon]="true" dateFormat="yy-mm-dd"
-              placeholder="Select date" [style]="{ width: '100%' }"></p-datepicker>
+              [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_DATE' | translate" [style]="{ width: '100%' }"></p-datepicker>
           </div>
 
           <!-- Status -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Status <span class="text-red-500">*</span></label>
-            <p-select formControlName="status" [options]="enrollmentStatuses" placeholder="Select status"
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_STATUS' | translate }} <span class="text-red-500">*</span></label>
+            <p-select formControlName="status" [options]="enrollmentStatuses" [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_STATUS' | translate"
               [style]="{ width: '100%' }"></p-select>
           </div>
         </div>
@@ -165,10 +165,9 @@
             <div class="flex items-start gap-3">
               <i class="pi pi-check-circle text-green-600 text-2xl mt-1"></i>
               <div>
-                <p class="font-semibold text-green-800">Covered by master course</p>
-                <p class="text-sm text-green-700 mt-1">
-                  This student is enrolled in <strong>{{ coverage()?.masterCourseName }}</strong>.
-                  This course is included — no payment required.
+                <p class="font-semibold text-green-800">{{ 'ENROLLMENT_FORM.COVERED_TITLE' | translate }}</p>
+                <p class="text-sm text-green-700 mt-1"
+                  [innerHTML]="'ENROLLMENT_FORM.COVERED_BODY' | translate: { name: coverage()?.masterCourseName }">
                 </p>
               </div>
             </div>
@@ -180,28 +179,28 @@
           <div class="p-4 rounded-lg bg-purple-50 border border-purple-200 mb-4">
             <div class="font-semibold text-purple-900">🎁 {{ m.name }}</div>
             <div class="text-sm text-purple-700 mt-1">
-              This bundle includes {{ linkedCourseCount() }} course(s). The student can enroll in any class inside those courses for free.
+              {{ 'ENROLLMENT_FORM.BUNDLE_BANNER' | translate: { count: linkedCourseCount() } }}
             </div>
           </div>
           @if (duplicateMaster()) {
             <div class="p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-              This student already has an active enrollment in this master course.
+              {{ 'ENROLLMENT_FORM.DUPLICATE_MASTER_WARNING' | translate }}
             </div>
           }
         }
 
         @if (showPricingBlock()) {
         <p-divider></p-divider>
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Pricing</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PRICING' | translate }}</h3>
 
         <!-- Pricing summary card -->
         <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Original Price</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'ENROLLMENT_FORM.ORIGINAL_PRICE' | translate }}</p>
             <p class="text-2xl font-bold text-gray-800">{{ originalPriceSig().toFixed(2) }}</p>
           </div>
           <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-orange-600 uppercase tracking-wider mb-1">Discount</p>
+            <p class="text-xs text-orange-600 uppercase tracking-wider mb-1">{{ 'ENROLLMENT_FORM.DISCOUNT' | translate }}</p>
             <p class="text-2xl font-bold text-orange-700">
               {{ discountAmountSig().toFixed(2) }}
               @if (discountPercentSig() > 0) {
@@ -210,7 +209,7 @@
             </p>
           </div>
           <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">Final Price</p>
+            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ 'ENROLLMENT_FORM.FINAL_PRICE' | translate }}</p>
             <p class="text-2xl font-bold text-green-700">{{ finalPriceSig().toFixed(2) }}</p>
           </div>
         </div>
@@ -218,23 +217,23 @@
         <!-- Discount controls -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Discount Type</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.DISCOUNT_TYPE' | translate }}</label>
             <div class="flex flex-wrap gap-6">
               <div class="flex items-center gap-2">
                 <p-radiobutton name="discountType" value="none" formControlName="discountType" (onClick)="setDiscountType('none')"></p-radiobutton>
-                <label>No Discount</label>
+                <label>{{ 'ENROLLMENT_FORM.DISCOUNT_NONE' | translate }}</label>
               </div>
               <div class="flex items-center gap-2">
                 <p-radiobutton name="discountType" value="percentage" formControlName="discountType" (onClick)="setDiscountType('percentage')"></p-radiobutton>
-                <label>By Percentage</label>
+                <label>{{ 'ENROLLMENT_FORM.DISCOUNT_PERCENTAGE' | translate }}</label>
               </div>
               <div class="flex items-center gap-2">
                 <p-radiobutton name="discountType" value="amount" formControlName="discountType" (onClick)="setDiscountType('amount')"></p-radiobutton>
-                <label>By Fixed Amount</label>
+                <label>{{ 'ENROLLMENT_FORM.DISCOUNT_AMOUNT' | translate }}</label>
               </div>
               <div class="flex items-center gap-2">
                 <p-radiobutton name="discountType" value="direct" formControlName="discountType" (onClick)="setDiscountType('direct')"></p-radiobutton>
-                <label>Set Final Price Directly</label>
+                <label>{{ 'ENROLLMENT_FORM.DISCOUNT_DIRECT' | translate }}</label>
               </div>
             </div>
           </div>
@@ -242,7 +241,7 @@
           <!-- Percentage input -->
           @if (discountTypeSig() === 'percentage') {
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Discount %</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_DISCOUNT_PERCENT' | translate }}</label>
               <p-inputnumber formControlName="discountPercent" suffix="%" [min]="0" [max]="100"
                 (onInput)="recalculate()" [style]="{ width: '100%' }" />
             </div>
@@ -251,7 +250,7 @@
           <!-- Fixed amount input -->
           @if (discountTypeSig() === 'amount') {
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Discount Amount</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_DISCOUNT_AMOUNT' | translate }}</label>
               <p-inputnumber formControlName="discountAmount" [min]="0"
                 (onInput)="recalculate()" [style]="{ width: '100%' }" />
             </div>
@@ -260,7 +259,7 @@
           <!-- Direct final price input -->
           @if (discountTypeSig() === 'direct') {
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Final Price</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_FINAL_PRICE' | translate }}</label>
               <p-inputnumber formControlName="finalPrice" [min]="0"
                 (onInput)="onFinalPriceInput()" [style]="{ width: '100%' }" />
             </div>
@@ -268,19 +267,19 @@
         </div>
 
         <p-divider></p-divider>
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Payment</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PAYMENT' | translate }}</h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.PAYMENT_METHOD' | translate }} <span class="text-red-500">*</span></label>
             <div class="flex gap-8">
               <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
                 [class.border-green-500]="paymentModeSig() === 'FULL'"
                 [class.bg-green-50]="paymentModeSig() === 'FULL'">
                 <p-radiobutton name="paymentMode" value="FULL" formControlName="paymentMode" (onClick)="paymentModeSig.set('FULL')"></p-radiobutton>
                 <div>
-                  <p class="font-medium">Pay in Full</p>
-                  <p class="text-sm text-gray-500">Full payment: {{ finalPriceSig().toFixed(2) }}</p>
+                  <p class="font-medium">{{ 'ENROLLMENT_FORM.PAY_IN_FULL' | translate }}</p>
+                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.FULL_PAYMENT' | translate: { amount: finalPriceSig().toFixed(2) } }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
@@ -288,8 +287,8 @@
                 [class.bg-blue-50]="paymentModeSig() === 'INSTALLMENTS'">
                 <p-radiobutton name="paymentMode" value="INSTALLMENTS" formControlName="paymentMode" (onClick)="paymentModeSig.set('INSTALLMENTS')"></p-radiobutton>
                 <div>
-                  <p class="font-medium">Installments</p>
-                  <p class="text-sm text-gray-500">Pay a down payment now, rest later</p>
+                  <p class="font-medium">{{ 'ENROLLMENT_FORM.INSTALLMENTS' | translate }}</p>
+                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.INSTALLMENTS_DESC' | translate }}</p>
                 </div>
               </div>
             </div>
@@ -297,17 +296,19 @@
 
           @if (paymentModeSig() === 'INSTALLMENTS') {
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Down Payment <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.DOWN_PAYMENT' | translate }} <span class="text-red-500">*</span></label>
               <p-inputnumber formControlName="downPayment" [min]="0" [max]="finalPriceSig()"
-                placeholder="First payment amount" (onInput)="downPaymentSig.set($event.value || 0)"
+                [placeholder]="'ENROLLMENT_FORM.DOWN_PAYMENT_PLACEHOLDER' | translate" (onInput)="downPaymentSig.set($event.value || 0)"
                 [style]="{ width: '100%' }" />
-              <small class="text-gray-500">
-                Remaining: <strong>{{ (finalPriceSig() - downPaymentSig()).toFixed(2) }}</strong>
+              <small class="text-gray-500"
+                [innerHTML]="'ENROLLMENT_FORM.REMAINING' | translate: { amount: (finalPriceSig() - downPaymentSig()).toFixed(2) }">
               </small>
             </div>
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
               <i class="pi pi-info-circle text-amber-500 mt-0.5"></i>
-              <p class="text-sm text-amber-700">Payment status will be <strong>Partial</strong> until the full amount of <strong>{{ finalPriceSig().toFixed(2) }}</strong> is paid.</p>
+              <p class="text-sm text-amber-700"
+                [innerHTML]="'ENROLLMENT_FORM.PARTIAL_INFO' | translate: { amount: finalPriceSig().toFixed(2) }">
+              </p>
             </div>
           }
         </div>
@@ -318,13 +319,13 @@
 
         <!-- Notes -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-          <textarea pTextarea formControlName="notes" rows="3" placeholder="Additional notes..." class="w-full"></textarea>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_NOTES' | translate }}</label>
+          <textarea pTextarea formControlName="notes" rows="3" [placeholder]="'ENROLLMENT_FORM.NOTES_PLACEHOLDER' | translate" class="w-full"></textarea>
         </div>
 
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-          <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="cancel()" type="button"></p-button>
-          <p-button [label]="isEditMode() ? 'Update Enrollment' : 'Create Enrollment'" type="submit"
+          <p-button [label]="'ENROLLMENT_FORM.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="cancel()" type="button"></p-button>
+          <p-button [label]="(isEditMode() ? 'ENROLLMENT_FORM.UPDATE' : 'ENROLLMENT_FORM.CREATE') | translate" type="submit"
             [loading]="loading()" [disabled]="enrollmentForm.invalid"></p-button>
         </div>
       </form>

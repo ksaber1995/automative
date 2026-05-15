@@ -6,12 +6,12 @@
         <h1 class="text-2xl font-bold text-gray-900">{{ plan()!.name }}</h1>
         <p class="text-gray-500 mt-1">
           {{ plan()!.category }} · {{ plan()!.type }} ·
-          <span class="font-medium">{{ plan()!.monthsCount }} months</span>
+          <span class="font-medium">{{ 'INSTALLMENTS.DETAIL.MONTHS_COUNT' | translate: { count: plan()!.monthsCount } }}</span>
         </p>
       }
     </div>
     @if (plan() && authService.canDelete('expenses')) {
-      <p-button icon="pi pi-trash" label="Delete Plan" severity="danger" [outlined]="true"
+      <p-button icon="pi pi-trash" [label]="'INSTALLMENTS.DETAIL.DELETE_PLAN' | translate" severity="danger" [outlined]="true"
         (onClick)="confirmDelete()">
       </p-button>
     }
@@ -25,28 +25,28 @@
     <!-- Summary cards -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
       <div class="bg-white border border-gray-200 rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase mb-1">Total</p>
+        <p class="text-xs text-gray-500 uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_TOTAL' | translate }}</p>
         <p class="text-xl font-bold text-gray-900">{{ plan()!.totalAmount | number:'1.2-2' }}</p>
       </div>
       <div class="bg-white border border-gray-200 rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase mb-1">Downpayment</p>
+        <p class="text-xs text-gray-500 uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_DOWNPAYMENT' | translate }}</p>
         <p class="text-xl font-bold text-gray-900">{{ plan()!.downpaymentAmount | number:'1.2-2' }}</p>
-        <p class="text-xs text-gray-500 mt-1">on {{ plan()!.startDate | date:'MMM d, y' }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_DOWNPAYMENT_ON' | translate: { date: (plan()!.startDate | date:'MMM d, y') } }}</p>
       </div>
       <div class="bg-white border border-gray-200 rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase mb-1">Financed</p>
+        <p class="text-xs text-gray-500 uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_FINANCED' | translate }}</p>
         <p class="text-xl font-bold text-gray-900">{{ plan()!.financedAmount | number:'1.2-2' }}</p>
       </div>
       <div class="bg-green-50 border border-green-200 rounded-xl p-4">
-        <p class="text-xs text-green-700 uppercase mb-1">Paid So Far</p>
+        <p class="text-xs text-green-700 uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_PAID_SO_FAR' | translate }}</p>
         <p class="text-xl font-bold text-green-900">{{ paidTotal() | number:'1.2-2' }}</p>
-        <p class="text-xs text-green-700 mt-1">{{ paidCount() }}/{{ plan()!.monthsCount }} installments</p>
+        <p class="text-xs text-green-700 mt-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_PAID_COUNT' | translate: { paid: paidCount(), total: plan()!.monthsCount } }}</p>
       </div>
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p class="text-xs text-amber-700 uppercase mb-1">Remaining</p>
+        <p class="text-xs text-amber-700 uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_REMAINING' | translate }}</p>
         <p class="text-xl font-bold text-amber-900">{{ remaining() | number:'1.2-2' }}</p>
         @if (plan()!.nextDueDate) {
-          <p class="text-xs text-amber-700 mt-1">Next: {{ plan()!.nextDueDate | date:'MMM d' }}</p>
+          <p class="text-xs text-amber-700 mt-1">{{ 'INSTALLMENTS.DETAIL.SUMMARY_NEXT' | translate: { date: (plan()!.nextDueDate | date:'MMM d') } }}</p>
         }
       </div>
     </div>
@@ -55,24 +55,24 @@
     <p-card styleClass="mb-6">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
-          <p class="text-gray-500 text-xs uppercase mb-1">Status</p>
-          <p-tag [value]="plan()!.status" [severity]="statusSeverity(plan()!.status)"></p-tag>
+          <p class="text-gray-500 text-xs uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.INFO_STATUS' | translate }}</p>
+          <p-tag [value]="planStatusLabel(plan()!.status)" [severity]="statusSeverity(plan()!.status)"></p-tag>
         </div>
         <div>
-          <p class="text-gray-500 text-xs uppercase mb-1">Branch</p>
+          <p class="text-gray-500 text-xs uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.INFO_BRANCH' | translate }}</p>
           <p class="font-medium">{{ branchName() }}</p>
         </div>
         <div>
-          <p class="text-gray-500 text-xs uppercase mb-1">Vendor</p>
+          <p class="text-gray-500 text-xs uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.INFO_VENDOR' | translate }}</p>
           <p class="font-medium">{{ plan()!.vendor || '—' }}</p>
         </div>
         <div>
-          <p class="text-gray-500 text-xs uppercase mb-1">Invoice</p>
+          <p class="text-gray-500 text-xs uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.INFO_INVOICE' | translate }}</p>
           <p class="font-medium">{{ plan()!.invoiceNumber || '—' }}</p>
         </div>
         @if (plan()!.notes) {
           <div class="md:col-span-4">
-            <p class="text-gray-500 text-xs uppercase mb-1">Notes</p>
+            <p class="text-gray-500 text-xs uppercase mb-1">{{ 'INSTALLMENTS.DETAIL.INFO_NOTES' | translate }}</p>
             <p>{{ plan()!.notes }}</p>
           </div>
         }
@@ -84,8 +84,8 @@
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
           <div>
-            <h3 class="text-lg font-bold">Payment Schedule</h3>
-            <p class="text-sm text-gray-600">Pay each installment as due. Each paid installment becomes an expense.</p>
+            <h3 class="text-lg font-bold">{{ 'INSTALLMENTS.DETAIL.SCHEDULE_TITLE' | translate }}</h3>
+            <p class="text-sm text-gray-600">{{ 'INSTALLMENTS.DETAIL.SCHEDULE_SUBTITLE' | translate }}</p>
           </div>
         </div>
       </ng-template>
@@ -93,13 +93,13 @@
       <p-table [value]="schedule()" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th class="w-16">#</th>
-            <th>Due Date</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Paid Date</th>
-            <th>Paid Amount</th>
-            <th class="w-48">Actions</th>
+            <th class="w-16">{{ 'INSTALLMENTS.DETAIL.COL_NUMBER' | translate }}</th>
+            <th>{{ 'INSTALLMENTS.DETAIL.COL_DUE_DATE' | translate }}</th>
+            <th>{{ 'INSTALLMENTS.DETAIL.COL_AMOUNT' | translate }}</th>
+            <th>{{ 'INSTALLMENTS.DETAIL.COL_STATUS' | translate }}</th>
+            <th>{{ 'INSTALLMENTS.DETAIL.COL_PAID_DATE' | translate }}</th>
+            <th>{{ 'INSTALLMENTS.DETAIL.COL_PAID_AMOUNT' | translate }}</th>
+            <th class="w-48">{{ 'INSTALLMENTS.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-item>
@@ -108,9 +108,9 @@
             <td>{{ item.dueDate | date:'MMM d, y' }}</td>
             <td class="font-semibold">{{ item.amount | number:'1.2-2' }}</td>
             <td>
-              <p-tag [value]="item.status" [severity]="schedSeverity(item)"></p-tag>
+              <p-tag [value]="schedStatusLabel(item.status)" [severity]="schedSeverity(item)"></p-tag>
               @if (isOverdue(item)) {
-                <span class="ml-2 text-xs text-amber-700">Overdue</span>
+                <span class="ml-2 text-xs text-amber-700">{{ 'INSTALLMENTS.DETAIL.OVERDUE' | translate }}</span>
               }
             </td>
             <td>
@@ -130,13 +130,13 @@
             <td>
               @if (item.status === 'PENDING') {
                 @if (authService.canWrite('expenses')) {
-                  <p-button label="Pay" icon="pi pi-dollar" severity="success" size="small"
+                  <p-button [label]="'INSTALLMENTS.DETAIL.PAY' | translate" icon="pi pi-dollar" severity="success" size="small"
                     (onClick)="openPay(item)">
                   </p-button>
                 }
               } @else if (item.status === 'PAID') {
                 @if (authService.canWrite('expenses')) {
-                  <p-button label="Reverse" icon="pi pi-undo" severity="warn" [outlined]="true" size="small"
+                  <p-button [label]="'INSTALLMENTS.DETAIL.REVERSE' | translate" icon="pi pi-undo" severity="warn" [outlined]="true" size="small"
                     (onClick)="confirmUnpay(item)">
                   </p-button>
                 }
@@ -150,40 +150,39 @@
 </div>
 
 <!-- Pay dialog -->
-<p-dialog header="Record Installment Payment" [(visible)]="showPayDialog" [modal]="true"
+<p-dialog [header]="'INSTALLMENTS.DETAIL.PAY_DIALOG_HEADER' | translate" [(visible)]="showPayDialog" [modal]="true"
   [style]="{ width: '460px' }" [draggable]="false">
   @if (payTarget()) {
     <div class="flex flex-col gap-4 py-2">
       <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p class="text-sm text-blue-700 font-medium">
-          Installment {{ payTarget()!.installmentNumber }} / {{ plan()?.monthsCount }}
+          {{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_INSTALLMENT' | translate: { number: payTarget()!.installmentNumber, total: plan()?.monthsCount } }}
         </p>
-        <p class="text-xs text-blue-500 mt-1">Due {{ payTarget()!.dueDate | date:'MMM d, y' }} · Expected
-          {{ payTarget()!.amount | number:'1.2-2' }}</p>
+        <p class="text-xs text-blue-500 mt-1">{{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_DUE_EXPECTED' | translate: { date: (payTarget()!.dueDate | date:'MMM d, y'), amount: (payTarget()!.amount | number:'1.2-2') } }}</p>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Amount *</label>
+        <label class="block text-sm font-medium mb-2">{{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_AMOUNT' | translate }}</label>
         <p-inputnumber [(ngModel)]="payAmount" [min]="0.01" [minFractionDigits]="2"
           [maxFractionDigits]="2" styleClass="w-full">
         </p-inputnumber>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Payment Date *</label>
+        <label class="block text-sm font-medium mb-2">{{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_DATE' | translate }}</label>
         <p-datepicker [(ngModel)]="payDate" dateFormat="yy-mm-dd" [showIcon]="true"
           styleClass="w-full">
         </p-datepicker>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2">Notes</label>
-        <textarea pTextarea [(ngModel)]="payNotes" placeholder="Optional notes" rows="2"
+        <label class="block text-sm font-medium mb-2">{{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_NOTES' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="payNotes" [placeholder]="'INSTALLMENTS.DETAIL.PAY_DIALOG_NOTES_PLACEHOLDER' | translate" rows="2"
           class="w-full"></textarea>
       </div>
     </div>
   }
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true"
+    <p-button [label]="'INSTALLMENTS.DETAIL.PAY_DIALOG_CANCEL' | translate" severity="secondary" [outlined]="true"
       (onClick)="showPayDialog = false"></p-button>
-    <p-button label="Record Payment" severity="success" icon="pi pi-check"
+    <p-button [label]="'INSTALLMENTS.DETAIL.PAY_DIALOG_CONFIRM' | translate" severity="success" icon="pi pi-check"
       [disabled]="paying()" [loading]="paying()" (onClick)="confirmPay()">
     </p-button>
   </ng-template>
@@ -193,8 +192,8 @@
 <app-delete-confirm-dialog
   [visible]="showUnpayDialog"
   (visibleChange)="showUnpayDialog = $event"
-  header="Reverse Installment Payment"
-  [message]="'This will delete the linked expense payment and mark this installment as PENDING again. Continue?'"
+  [header]="'INSTALLMENTS.DETAIL.UNPAY_DIALOG_HEADER' | translate"
+  [message]="'INSTALLMENTS.DETAIL.UNPAY_DIALOG_MESSAGE' | translate"
   (confirm)="doUnpay()"
   (cancel)="showUnpayDialog = false">
 </app-delete-confirm-dialog>
@@ -203,8 +202,8 @@
 <app-delete-confirm-dialog
   [visible]="showDeleteDialog"
   (visibleChange)="showDeleteDialog = $event"
-  header="Delete Installment Plan"
-  [message]="'Permanently delete this plan and ALL its payments (including downpayment)? This cannot be undone.'"
+  [header]="'INSTALLMENTS.DETAIL.DELETE_DIALOG_HEADER' | translate"
+  [message]="'INSTALLMENTS.DETAIL.DELETE_DIALOG_MESSAGE' | translate"
   (confirm)="doDelete()"
   (cancel)="showDeleteDialog = false">
 </app-delete-confirm-dialog>

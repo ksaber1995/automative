@@ -294,8 +294,7 @@ CREATE INDEX idx_mcc_course ON master_course_courses(course_id);
 CREATE TABLE classes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     course_id UUID NOT NULL,
-    branch_id UUID NOT NULL,
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    -- branch_id / company_id were removed: both are derivable from courses.
     instructor_id UUID,
     name VARCHAR(255) NOT NULL,
     code VARCHAR(50) NOT NULL,
@@ -311,17 +310,15 @@ CREATE TABLE classes (
     -- Lifecycle: marks a class as finished (runtime: ensureClassStatusColumns).
     is_finished BOOLEAN NOT NULL DEFAULT false,
     finished_at TIMESTAMP WITH TIME ZONE,
+    -- Class delivery mode: OFFLINE (default, in-person) or ONLINE (no room required).
+    type VARCHAR(16) NOT NULL DEFAULT 'OFFLINE',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
-    CONSTRAINT classes_company_id_code_key UNIQUE(company_id, code)
+    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_classes_course_id ON classes(course_id);
-CREATE INDEX idx_classes_branch_id ON classes(branch_id);
-CREATE INDEX idx_classes_company_id ON classes(company_id);
 CREATE INDEX idx_classes_instructor_id ON classes(instructor_id);
 
 -- =============================================
@@ -948,7 +945,7 @@ CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date TIMESTAMP WITH TIME ZONE,
