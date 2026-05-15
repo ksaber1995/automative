@@ -6,6 +6,7 @@ import { sendOtpEmail, sendPasswordResetEmail } from '../utils/email';
 import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
+import { apiError } from '../utils/api-error';
 
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -119,24 +120,24 @@ export const authRoutes = {
       const user = await findUserByIdentifier(body.identifier);
 
       if (!user) {
-        return { status: 401 as const, body: { message: 'Invalid credentials' } };
+        return apiError(401, 'ERRORS.AUTH.INVALID_CREDENTIALS', 'Invalid credentials');
       }
 
       const isValidPassword = await bcrypt.compare(body.password, user.password);
       if (!isValidPassword) {
-        return { status: 401 as const, body: { message: 'Invalid credentials' } };
+        return apiError(401, 'ERRORS.AUTH.INVALID_CREDENTIALS', 'Invalid credentials');
       }
 
       if (!user.company_is_active) {
-        return { status: 401 as const, body: { message: 'Company account is inactive. Please contact support.' } };
+        return apiError(401, 'ERRORS.AUTH.COMPANY_INACTIVE', 'Company account is inactive. Please contact support.');
       }
 
       if (user.subscription_status === 'SUSPENDED' || user.subscription_status === 'CANCELLED') {
-        return { status: 401 as const, body: { message: 'Company subscription is not active. Please contact support.' } };
+        return apiError(401, 'ERRORS.AUTH.SUBSCRIPTION_INACTIVE', 'Company subscription is not active. Please contact support.');
       }
 
       if (!user.is_active) {
-        return { status: 401 as const, body: { message: 'User account is inactive' } };
+        return apiError(401, 'ERRORS.AUTH.USER_INACTIVE', 'User account is inactive');
       }
 
       // Block unverified emails — users must finish the OTP flow first.
@@ -145,7 +146,7 @@ export const authRoutes = {
           status: 403 as const,
           body: {
             message: 'Please verify your email address before logging in.',
-            code: 'EMAIL_NOT_VERIFIED',
+            code: 'ERRORS.AUTH.EMAIL_NOT_VERIFIED',
             email: user.email,
           },
         };
@@ -175,7 +176,7 @@ export const authRoutes = {
       };
     } catch (error) {
       console.error('Login error:', error);
-      return { status: 401 as const, body: { message: 'Authentication failed' } };
+      return apiError(401, 'ERRORS.AUTH.LOGIN_FAILED', 'Authentication failed');
     }
   },
 
@@ -203,7 +204,7 @@ export const authRoutes = {
       remoteIp: getClientIp(),
     });
     if (!captcha.ok) {
-      return { status: 400 as const, body: { message: captcha.reason } };
+      return apiError(400, 'ERRORS.RECAPTCHA_FAILED', captcha.reason || 'Captcha verification failed');
     }
 
     const countryCode = normalizeCountryCode(body.countryCode);
@@ -211,13 +212,13 @@ export const authRoutes = {
     const email = (body.email || '').trim().toLowerCase();
 
     if (!countryCode) {
-      return { status: 400 as const, body: { message: 'Country code is required.' } };
+      return apiError(400, 'ERRORS.AUTH.COUNTRY_CODE_REQUIRED', 'Country code is required.');
     }
     if (!phone) {
-      return { status: 400 as const, body: { message: 'Phone number is required.' } };
+      return apiError(400, 'ERRORS.AUTH.PHONE_REQUIRED', 'Phone number is required.');
     }
     if (!email) {
-      return { status: 400 as const, body: { message: 'Email is required.' } };
+      return apiError(400, 'ERRORS.AUTH.EMAIL_REQUIRED', 'Email is required.');
     }
 
     const client = await getClient();
@@ -231,7 +232,7 @@ export const authRoutes = {
       );
       if (existingUser) {
         await client.query('ROLLBACK');
-        return { status: 400 as const, body: { message: 'An account with this email already exists.' } };
+        return apiError(400, 'ERRORS.AUTH.EMAIL_TAKEN', 'An account with this email already exists.');
       }
 
       const existingPhone = await queryOne(
@@ -240,7 +241,7 @@ export const authRoutes = {
       );
       if (existingPhone) {
         await client.query('ROLLBACK');
-        return { status: 400 as const, body: { message: 'A user with this phone number already exists.' } };
+        return apiError(400, 'ERRORS.AUTH.PHONE_TAKEN', 'A user with this phone number already exists.');
       }
 
       const companyRes = await client.query(
@@ -330,6 +331,7 @@ export const authRoutes = {
         body: {
           email,
           message: 'Registration successful. Please check your email for the 6-digit verification code.',
+          code: 'AUTH.REGISTRATION_OTP_SENT',
         },
       };
     } catch (error: any) {
@@ -341,15 +343,18 @@ export const authRoutes = {
         const table: string = error?.table || '';
         const detail: string = error?.detail || '';
         let message = 'Registration failed due to a conflict.';
+        let conflictCode = 'ERRORS.AUTH.REGISTRATION_CONFLICT';
         if (constraint.includes('phone') || detail.includes('phone')) {
           message = 'A user with this phone number already exists.';
+          conflictCode = 'ERRORS.AUTH.PHONE_TAKEN';
         } else if (table === 'users' || constraint.includes('users')) {
           message = 'An account with this email already exists.';
+          conflictCode = 'ERRORS.AUTH.EMAIL_TAKEN';
         }
-        return { status: 400 as const, body: { message } };
+        return apiError(400, conflictCode, message);
       }
 
-      return { status: 400 as const, body: { message: 'Registration failed. Please try again.' } };
+      return apiError(400, 'ERRORS.AUTH.REGISTRATION_FAILED', 'Registration failed. Please try again.');
     } finally {
       client.release();
     }
@@ -377,22 +382,19 @@ export const authRoutes = {
       );
 
       if (!user) {
-        return { status: 400 as const, body: { message: 'Invalid verification request.' } };
+        return apiError(400, 'ERRORS.AUTH.INVALID_VERIFICATION_REQUEST', 'Invalid verification request.');
       }
 
       if (user.email_verified) {
-        return { status: 400 as const, body: { message: 'Email is already verified.' } };
+        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'Email is already verified.');
       }
 
       if (!user.email_otp || user.email_otp !== body.otp) {
-        return { status: 400 as const, body: { message: 'Invalid verification code.' } };
+        return apiError(400, 'ERRORS.AUTH.OTP_INVALID', 'Invalid verification code.');
       }
 
       if (!user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
-        return {
-          status: 400 as const,
-          body: { message: 'Verification code has expired. Please request a new one.' },
-        };
+        return apiError(400, 'ERRORS.AUTH.OTP_EXPIRED', 'Verification code has expired. Please request a new one.');
       }
 
       await query(
@@ -427,7 +429,7 @@ export const authRoutes = {
       };
     } catch (error) {
       console.error('Verify email error:', error);
-      return { status: 400 as const, body: { message: 'Verification failed. Please try again.' } };
+      return apiError(400, 'ERRORS.AUTH.VERIFICATION_FAILED', 'Verification failed. Please try again.');
     }
   },
 
@@ -452,12 +454,12 @@ export const authRoutes = {
         // Generic response to avoid enumeration
         return {
           status: 200 as const,
-          body: { message: 'If your email is registered, a new verification code has been sent.' },
+          body: { message: 'If your email is registered, a new verification code has been sent.', code: 'AUTH.OTP_RESEND_OK_GENERIC' },
         };
       }
 
       if (user.email_verified) {
-        return { status: 400 as const, body: { message: 'This email is already verified.' } };
+        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'This email is already verified.');
       }
 
       const otp = generateOtp();
@@ -478,11 +480,11 @@ export const authRoutes = {
 
       return {
         status: 200 as const,
-        body: { message: 'A new verification code has been sent to your email.' },
+        body: { message: 'A new verification code has been sent to your email.', code: 'AUTH.OTP_RESENT' },
       };
     } catch (error) {
       console.error('Resend email OTP error:', error);
-      return { status: 400 as const, body: { message: 'Failed to resend code. Please try again.' } };
+      return apiError(400, 'ERRORS.AUTH.OTP_RESEND_FAILED', 'Failed to resend code. Please try again.');
     }
   },
 
@@ -500,13 +502,13 @@ export const authRoutes = {
       remoteIp: getClientIp(),
     });
     if (!captcha.ok) {
-      return { status: 400 as const, body: { message: captcha.reason } };
+      return apiError(400, 'ERRORS.RECAPTCHA_FAILED', captcha.reason || 'Captcha verification failed');
     }
 
     // Always respond 200 to avoid leaking which addresses are registered.
     const genericResponse = {
       status: 200 as const,
-      body: { message: 'If an account exists for that email, a reset link has been sent.' },
+      body: { message: 'If an account exists for that email, a reset link has been sent.', code: 'AUTH.PASSWORD_RESET_LINK_SENT_GENERIC' },
     };
 
     if (!email) return genericResponse;
@@ -553,10 +555,10 @@ export const authRoutes = {
     try {
       const token = (body.token || '').trim();
       if (!token) {
-        return { status: 400 as const, body: { message: 'Reset token is required.' } };
+        return apiError(400, 'ERRORS.AUTH.RESET_TOKEN_REQUIRED', 'Reset token is required.');
       }
       if (!body.password || body.password.length < 6) {
-        return { status: 400 as const, body: { message: 'Password must be at least 6 characters.' } };
+        return apiError(400, 'ERRORS.AUTH.PASSWORD_TOO_SHORT', 'Password must be at least 6 characters.');
       }
 
       const user = await queryOne<any>(
@@ -567,17 +569,11 @@ export const authRoutes = {
       );
 
       if (!user) {
-        return {
-          status: 400 as const,
-          body: { message: 'Invalid or expired reset link. Please request a new one.' },
-        };
+        return apiError(400, 'ERRORS.AUTH.RESET_LINK_INVALID', 'Invalid or expired reset link. Please request a new one.');
       }
 
       if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
-        return {
-          status: 400 as const,
-          body: { message: 'This reset link has expired. Please request a new one.' },
-        };
+        return apiError(400, 'ERRORS.AUTH.RESET_LINK_EXPIRED', 'This reset link has expired. Please request a new one.');
       }
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
@@ -594,11 +590,11 @@ export const authRoutes = {
 
       return {
         status: 200 as const,
-        body: { message: 'Password updated. You can now sign in with your new password.' },
+        body: { message: 'Password updated. You can now sign in with your new password.', code: 'AUTH.PASSWORD_UPDATED' },
       };
     } catch (error) {
       console.error('Reset password error:', error);
-      return { status: 400 as const, body: { message: 'Could not reset password. Please try again.' } };
+      return apiError(400, 'ERRORS.AUTH.PASSWORD_RESET_FAILED', 'Could not reset password. Please try again.');
     }
   },
 
@@ -606,7 +602,7 @@ export const authRoutes = {
     try {
       const token = extractTokenFromHeader(headers.authorization);
       if (!token) {
-        return { status: 401 as const, body: { message: 'No token provided' } };
+        return apiError(401, 'ERRORS.AUTH.NO_TOKEN', 'No token provided');
       }
 
       const decoded = await verifyToken(token);
@@ -621,7 +617,7 @@ export const authRoutes = {
       );
 
       if (!user) {
-        return { status: 401 as const, body: { message: 'User not found' } };
+        return apiError(401, 'ERRORS.AUTH.USER_NOT_FOUND', 'User not found');
       }
 
       const branchIds: string[] = user.branch_ids ?? (user.branch_id ? [user.branch_id] : []);
@@ -632,7 +628,7 @@ export const authRoutes = {
       };
     } catch (error) {
       console.error('Profile error:', error);
-      return { status: 401 as const, body: { message: 'Unauthorized' } };
+      return apiError(401, 'ERRORS.UNAUTHORIZED', 'Unauthorized');
     }
   },
 };

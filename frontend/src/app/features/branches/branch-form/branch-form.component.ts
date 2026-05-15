@@ -6,7 +6,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -32,6 +32,7 @@ export class BranchFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   branchForm: FormGroup;
   loading = signal(false);
@@ -71,7 +72,7 @@ export class BranchFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load branch');
+        // Error toast comes from the interceptor (translated). We just unwind.
         this.loading.set(false);
         this.router.navigate(['/branches']);
       }
@@ -99,24 +100,23 @@ export class BranchFormComponent implements OnInit {
     if (this.isEditMode() && this.branchId) {
       this.branchService.updateBranch(this.branchId, branchData).subscribe({
         next: () => {
-          this.notificationService.success('Branch updated successfully');
+          this.notificationService.success(this.translate.instant('BRANCHES.UPDATED'));
           this.router.navigate(['/branches']);
         },
         error: (error) => {
+          // Server-side error is already translated and toasted by the interceptor.
           this.loading.set(false);
-          this.notificationService.error('Failed to update branch');
           console.error('Update error:', error);
         }
       });
     } else {
       this.branchService.createBranch(branchData).subscribe({
         next: () => {
-          this.notificationService.success('Branch created successfully');
+          this.notificationService.success(this.translate.instant('BRANCHES.CREATED'));
           this.router.navigate(['/branches']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error('Failed to create branch');
           console.error('Create error:', error);
         }
       });

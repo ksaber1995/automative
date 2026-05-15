@@ -122,13 +122,13 @@ export class ProductListComponent implements OnInit {
 
     this.productService.deleteProduct(product.id).subscribe({
       next: () => {
-        this.notificationService.success('Product deleted successfully');
+        this.notificationService.success(this.translate.instant('PRODUCTS.DELETED'));
         this.loadProducts();
         this.showDeleteDialog = false;
         this.productToDelete.set(null);
       },
       error: () => {
-        this.notificationService.error('Failed to delete product');
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       },
     });
@@ -158,29 +158,29 @@ export class ProductListComponent implements OnInit {
 
     if (this.activeTab === 'adjust') {
       if (!this.adjustForm.quantity || this.adjustForm.quantity < 1) {
-        this.notificationService.error('Please enter a valid quantity');
+        this.notificationService.error(this.translate.instant('PRODUCTS.INVALID_QUANTITY'));
         return;
       }
       this.stockSubmitting.set(true);
       this.productService.adjustStock(product.id, this.adjustForm.quantity, this.adjustForm.operation).subscribe({
         next: () => {
-          this.notificationService.success('Stock adjusted successfully');
+          this.notificationService.success(this.translate.instant('PRODUCTS.STOCK_ADJUSTED'));
           this.stockSubmitting.set(false);
           this.closeStockDialog();
           this.loadProducts();
         },
-        error: (err) => {
-          this.notificationService.error(err.error?.message || 'Failed to adjust stock');
+        error: () => {
+          // Interceptor toasted the translated error.
           this.stockSubmitting.set(false);
         },
       });
     } else {
       if (!this.restockForm.quantity || this.restockForm.quantity < 1) {
-        this.notificationService.error('Please enter a valid quantity');
+        this.notificationService.error(this.translate.instant('PRODUCTS.INVALID_QUANTITY'));
         return;
       }
       if (!this.restockForm.costPerUnit || this.restockForm.costPerUnit < 0) {
-        this.notificationService.error('Please enter a valid cost per unit');
+        this.notificationService.error(this.translate.instant('PRODUCTS.INVALID_COST'));
         return;
       }
       this.stockSubmitting.set(true);
@@ -195,13 +195,13 @@ export class ProductListComponent implements OnInit {
         notes: this.restockForm.notes || undefined,
       }).subscribe({
         next: () => {
-          this.notificationService.success('Stock purchased and recorded successfully');
+          this.notificationService.success(this.translate.instant('PRODUCTS.STOCK_PURCHASED'));
           this.stockSubmitting.set(false);
           this.closeStockDialog();
           this.loadProducts();
         },
-        error: (err) => {
-          this.notificationService.error(err.error?.message || 'Failed to restock product');
+        error: () => {
+          // Interceptor toasted the translated error.
           this.stockSubmitting.set(false);
         },
       });

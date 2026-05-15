@@ -278,7 +278,7 @@ export class EnrollmentFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_LOAD_ENROLLMENT'));
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/students']);
       }
@@ -504,9 +504,9 @@ export class EnrollmentFormComponent implements OnInit {
           this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_MASTER_ENROLLED'));
           this.router.navigate(['/students', v.studentId]);
         },
-        error: (err) => {
+        error: () => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error(err?.error?.message || this.translate.instant('ENROLLMENT_FORM.ERR_MASTER_ENROLL'));
         },
       });
       return;
@@ -532,12 +532,18 @@ export class EnrollmentFormComponent implements OnInit {
     if (this.isEditMode() && this.enrollmentId) {
       this.enrollmentService.updateEnrollment(this.enrollmentId, { status: enrollmentData.status, notes: enrollmentData.notes }).subscribe({
         next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_UPDATED')); this.router.navigate(['/students']); },
-        error: () => { this.loading.set(false); this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_ENROLLMENT_UPDATE')); }
+        error: () => {
+          // Interceptor toasted the translated error.
+          this.loading.set(false);
+        }
       });
     } else {
       this.enrollmentService.createEnrollment(enrollmentData).subscribe({
         next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_CREATED')); this.router.navigate(['/students']); },
-        error: () => { this.loading.set(false); this.notificationService.error(this.translate.instant('ENROLLMENT_FORM.ERR_ENROLLMENT_CREATE')); }
+        error: () => {
+          // Interceptor toasted the translated error.
+          this.loading.set(false);
+        }
       });
     }
   }

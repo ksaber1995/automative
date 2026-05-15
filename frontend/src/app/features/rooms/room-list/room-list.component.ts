@@ -42,6 +42,7 @@ export class RoomListComponent implements OnInit {
   private roomService = inject(RoomService);
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   private fb = inject(FormBuilder);
 
   rooms = signal<Room[]>([]);
@@ -91,7 +92,10 @@ export class RoomListComponent implements OnInit {
     this.loading.set(true);
     this.roomService.list().subscribe({
       next: (rooms) => { this.rooms.set(rooms); this.loading.set(false); },
-      error: () => { this.notificationService.error('Failed to load rooms'); this.loading.set(false); },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.loading.set(false);
+      },
     });
   }
 
@@ -143,11 +147,11 @@ export class RoomListComponent implements OnInit {
           this.saving.set(false);
           this.closeDialog();
           this.loadRooms();
-          this.notificationService.success('Room updated successfully');
+          this.notificationService.success(this.translate.instant('ROOMS.UPDATED'));
         },
-        error: (err) => {
+        error: () => {
+          // Interceptor toasted the translated error.
           this.saving.set(false);
-          this.notificationService.error(err?.error?.message || 'Failed to update room');
         },
       });
     } else {
@@ -158,11 +162,11 @@ export class RoomListComponent implements OnInit {
           this.saving.set(false);
           this.closeDialog();
           this.loadRooms();
-          this.notificationService.success('Room created successfully');
+          this.notificationService.success(this.translate.instant('ROOMS.CREATED'));
         },
-        error: (err) => {
+        error: () => {
+          // Interceptor toasted the translated error.
           this.saving.set(false);
-          this.notificationService.error(err?.error?.message || 'Failed to create room');
         },
       });
     }
@@ -183,11 +187,11 @@ export class RoomListComponent implements OnInit {
         this.showDeleteDialog = false;
         this.deletingRoom.set(null);
         this.loadRooms();
-        this.notificationService.success('Room deleted successfully');
+        this.notificationService.success(this.translate.instant('ROOMS.DELETED'));
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to delete room');
       },
     });
   }

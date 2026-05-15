@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -38,14 +39,11 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       if (body.classId) {
@@ -57,7 +55,7 @@ export const enrollmentsRoutes = {
           [body.classId, context.companyId]
         );
         if (targetClass && targetClass.is_finished) {
-          return { status: 400 as const, body: { message: 'This class is finished. Enrollment is closed.' } };
+          return apiError(400, 'ERRORS.ENROLLMENTS.CLASS_FINISHED', 'This class is finished. Enrollment is closed.');
         }
       }
 
@@ -109,10 +107,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Create enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_FAILED', 'Failed to create enrollment', 400);
     }
   },
 
@@ -120,7 +115,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM enrollments WHERE company_id = $1';
@@ -138,10 +133,7 @@ export const enrollmentsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -164,10 +156,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('List enrollments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.LIST_FAILED', 'Failed to list enrollments');
     }
   },
 
@@ -175,7 +164,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const enrollment = await queryOne(
@@ -184,17 +173,11 @@ export const enrollmentsRoutes = {
       );
 
       if (!enrollment) {
-        return {
-          status: 404 as const,
-          body: { message: 'Enrollment not found' },
-        };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       if (!canAccessBranch(context, enrollment.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this enrollment' },
-        };
+        return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED', 'Access denied to this enrollment');
       }
 
       return {
@@ -203,10 +186,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Get enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Enrollment not found' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found', 404);
     }
   },
 
@@ -214,7 +194,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const enrollments = await query(
@@ -228,10 +208,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Get student enrollments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get student enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.STUDENT_LIST_FAILED', 'Failed to get student enrollments');
     }
   },
 
@@ -239,7 +216,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -248,17 +225,11 @@ export const enrollmentsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Enrollment not found' },
-        };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to update this enrollment' },
-        };
+        return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED_UPDATE', 'Access denied to update this enrollment');
       }
 
       const updateData: any = {};
@@ -271,10 +242,7 @@ export const enrollmentsRoutes = {
       const enrollment = await update('enrollments', params.id, updateData);
 
       if (!enrollment) {
-        return {
-          status: 404 as const,
-          body: { message: 'Enrollment not found' },
-        };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       return {
@@ -283,10 +251,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Update enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.UPDATE_FAILED', 'Failed to update enrollment', 404);
     }
   },
 
@@ -294,11 +259,11 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (q.branchId && !canAccessBranch(context, q.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
       const branchFilter = q.branchId || (!isGlobalAdmin(context) && context.branchId ? context.branchId : null);
 
@@ -365,7 +330,7 @@ export const enrollmentsRoutes = {
 
       return { status: 200 as const, body: combined };
     } catch (error) {
-      return { status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list dues' } };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.DUES_FAILED', 'Failed to list dues');
     }
   },
 
@@ -373,7 +338,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const conditions: string[] = ['r.company_id = $1'];
@@ -459,7 +424,7 @@ export const enrollmentsRoutes = {
         })),
       };
     } catch (error) {
-      return { status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to list refunds' } };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.LIST_REFUNDS_FAILED', 'Failed to list refunds');
     }
   },
 
@@ -467,7 +432,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const refunds = await query(
         'SELECT * FROM refunds WHERE enrollment_id = $1 AND company_id = $2 ORDER BY refund_date ASC',
@@ -482,7 +447,7 @@ export const enrollmentsRoutes = {
         })),
       };
     } catch (error) {
-      return { status: 500 as const, body: { message: error.message || 'Failed to get refunds' } };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.GET_REFUNDS_FAILED', 'Failed to get refunds');
     }
   },
 
@@ -490,14 +455,14 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const enrollment = await queryOne(
         'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!enrollment) return { status: 404 as const, body: { message: 'Enrollment not found' } };
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
 
       const refundAmount = parseFloat(body.amount);
       const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
@@ -505,7 +470,7 @@ export const enrollmentsRoutes = {
       const refundableAmount = currentAmountPaid - currentTotalRefunded;
 
       if (refundAmount > refundableAmount) {
-        return { status: 400 as const, body: { message: `Cannot refund more than refundable amount (${refundableAmount.toFixed(2)})` } };
+        return apiError(400, 'ERRORS.ENROLLMENTS.REFUND_EXCEEDS_REFUNDABLE', `Cannot refund more than refundable amount (${refundableAmount.toFixed(2)})`);
       }
 
       const refund = await insert('refunds', {
@@ -536,7 +501,7 @@ export const enrollmentsRoutes = {
         },
       };
     } catch (error) {
-      return { status: 400 as const, body: { message: error.message || 'Failed to create refund' } };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_REFUND_FAILED', 'Failed to create refund', 400);
     }
   },
 
@@ -544,7 +509,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const enrollment = await queryOne(
@@ -553,7 +518,7 @@ export const enrollmentsRoutes = {
       );
 
       if (!enrollment) {
-        return { status: 404 as const, body: { message: 'Enrollment not found' } };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       const payments = await query(
@@ -575,10 +540,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Get payments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get payments' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.GET_PAYMENTS_FAILED', 'Failed to get payments');
     }
   },
 
@@ -586,7 +548,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const enrollment = await queryOne(
@@ -595,7 +557,7 @@ export const enrollmentsRoutes = {
       );
 
       if (!enrollment) {
-        return { status: 404 as const, body: { message: 'Enrollment not found' } };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
@@ -603,7 +565,7 @@ export const enrollmentsRoutes = {
       const remaining = finalPrice - currentAmountPaid;
 
       if (parseFloat(body.amount) > remaining) {
-        return { status: 400 as const, body: { message: `Payment exceeds remaining balance (${remaining.toFixed(2)})` } };
+        return apiError(400, 'ERRORS.ENROLLMENTS.PAYMENT_EXCEEDS_BALANCE', `Payment exceeds remaining balance (${remaining.toFixed(2)})`);
       }
 
       const payment = await insert('enrollment_payments', {
@@ -637,10 +599,7 @@ export const enrollmentsRoutes = {
       };
     } catch (error) {
       console.error('Add payment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to add payment' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.ADD_PAYMENT_FAILED', 'Failed to add payment', 400);
     }
   },
 
@@ -648,7 +607,7 @@ export const enrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -657,39 +616,27 @@ export const enrollmentsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Enrollment not found' },
-        };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to delete this enrollment' },
-        };
+        return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED_DELETE', 'Access denied to delete this enrollment');
       }
 
       // Soft delete by setting status to DROPPED
       const enrollment = await update('enrollments', params.id, { status: 'DROPPED' });
 
       if (!enrollment) {
-        return {
-          status: 404 as const,
-          body: { message: 'Enrollment not found' },
-        };
+        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
       }
 
       return {
         status: 200 as const,
-        body: { message: 'Enrollment deleted successfully' },
+        body: { message: 'Enrollment deleted successfully', code: 'ENROLLMENTS.DELETED' },
       };
     } catch (error) {
       console.error('Delete enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.DELETE_FAILED', 'Failed to delete enrollment', 404);
     }
   },
 };

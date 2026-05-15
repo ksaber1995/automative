@@ -3,9 +3,8 @@ import {
   extractTenantContext,
   canAccessBranch,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 type AuthHeaders = { authorization: string };
 
@@ -37,13 +36,13 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
         'SELECT id, branch_id FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       const rows = await query(
         `SELECT es.*,
@@ -60,10 +59,7 @@ export const eventSubscriptionsRoutes = {
       return { status: 200 as const, body: rows.map(mapRow) };
     } catch (error: any) {
       console.error('List event subscriptions error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list subscriptions' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list subscriptions');
     }
   },
 
@@ -71,21 +67,21 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
         'SELECT id, branch_id, name FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
       if (event.branch_id && !canAccessBranch(context, event.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const isStudent = !!body.studentId;
       if (!isStudent) {
         if (!body.externalFirstName || !body.externalLastName) {
-          return { status: 400 as const, body: { message: 'External subscriber requires first and last name' } };
+          return apiError(400, 'ERRORS.EVENT_SUBSCRIPTIONS.EXTERNAL_NAME_REQUIRED', 'External subscriber requires first and last name');
         }
       }
 
@@ -123,10 +119,7 @@ export const eventSubscriptionsRoutes = {
       return { status: 201 as const, body: mapRow(row || sub) };
     } catch (error: any) {
       console.error('Create event subscription error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create subscription' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.CREATE_FAILED', 'Failed to create subscription', 400);
     }
   },
 
@@ -135,13 +128,13 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
         'SELECT id FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       const rows = await query(
         `SELECT e.*,
@@ -173,10 +166,7 @@ export const eventSubscriptionsRoutes = {
       };
     } catch (error: any) {
       console.error('List event expenses error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list expenses' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.LIST_EXPENSES_FAILED', 'Failed to list expenses');
     }
   },
 
@@ -185,13 +175,13 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
         'SELECT id FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       const rows = await query(
         `SELECT r.*,
@@ -226,10 +216,7 @@ export const eventSubscriptionsRoutes = {
       };
     } catch (error: any) {
       console.error('List event refunds error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list refunds' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.LIST_REFUNDS_FAILED', 'Failed to list refunds');
     }
   },
 
@@ -237,16 +224,16 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
         'SELECT id, branch_id FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       if (!body.subscriptionId) {
-        return { status: 400 as const, body: { message: 'subscriptionId is required' } };
+        return apiError(400, 'ERRORS.EVENT_SUBSCRIPTIONS.SUBSCRIPTION_ID_REQUIRED', 'subscriptionId is required');
       }
       const sub = await queryOne(
         `SELECT id, amount, student_id
@@ -254,11 +241,11 @@ export const eventSubscriptionsRoutes = {
          WHERE id = $1 AND event_id = $2 AND company_id = $3`,
         [body.subscriptionId, params.eventId, context.companyId]
       );
-      if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this event' } };
+      if (!sub) return apiError(404, 'ERRORS.EVENT_SUBSCRIPTIONS.SUBSCRIPTION_NOT_FOUND', 'Subscription not found for this event');
 
       const amount = typeof body.amount === 'number' ? body.amount : parseFloat(body.amount);
       if (!Number.isFinite(amount) || amount <= 0) {
-        return { status: 400 as const, body: { message: 'Refund amount must be a positive number' } };
+        return apiError(400, 'ERRORS.EVENT_SUBSCRIPTIONS.REFUND_NON_POSITIVE', 'Refund amount must be a positive number');
       }
 
       const subAmount = parseFloat(sub.amount || '0');
@@ -271,12 +258,7 @@ export const eventSubscriptionsRoutes = {
 
       // Allow a tiny tolerance for floating-point drift across decimal columns.
       if (amount > remaining + 0.005) {
-        return {
-          status: 400 as const,
-          body: {
-            message: `Refund exceeds remaining refundable amount (${remaining.toFixed(2)})`,
-          },
-        };
+        return apiError(400, 'ERRORS.EVENT_SUBSCRIPTIONS.REFUND_EXCEEDS_REFUNDABLE', `Refund exceeds remaining refundable amount (${remaining.toFixed(2)})`);
       }
 
       const type = body.type === 'PARTIAL' ? 'PARTIAL'
@@ -313,10 +295,7 @@ export const eventSubscriptionsRoutes = {
       };
     } catch (error: any) {
       console.error('Create event refund error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create refund' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.CREATE_REFUND_FAILED', 'Failed to create refund', 400);
     }
   },
 
@@ -324,25 +303,22 @@ export const eventSubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const existing = await queryOne(
         'SELECT id, revenue_id FROM event_subscriptions WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'Subscription not found' } };
+      if (!existing) return apiError(404, 'ERRORS.EVENT_SUBSCRIPTIONS.SUBSCRIPTION_NOT_FOUND', 'Subscription not found');
 
       if (existing.revenue_id) {
         await query('DELETE FROM revenues WHERE id = $1', [existing.revenue_id]);
       }
       await query('DELETE FROM event_subscriptions WHERE id = $1', [params.id]);
-      return { status: 200 as const, body: { message: 'Subscription deleted' } };
+      return { status: 200 as const, body: { message: 'Subscription deleted', code: 'EVENT_SUBSCRIPTIONS.DELETED' } };
     } catch (error: any) {
       console.error('Delete event subscription error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to delete subscription' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENT_SUBSCRIPTIONS.DELETE_FAILED', 'Failed to delete subscription', 400);
     }
   },
 };

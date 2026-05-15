@@ -169,7 +169,8 @@
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'INSTALLMENTS.DETAIL.PAY_DIALOG_DATE' | translate }}</label>
         <p-datepicker [(ngModel)]="payDate" dateFormat="yy-mm-dd" [showIcon]="true"
-          styleClass="w-full">
+          styleClass="w-full"
+          appendTo="body">
         </p-datepicker>
       </div>
       <div>

@@ -4,10 +4,9 @@ import {
   canAccessBranch,
   isGlobalAdmin,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
   appendBranchSqlFilter,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapEventFromDB(row: any) {
   return {
@@ -36,10 +35,10 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const row = await insert('events', {
@@ -60,10 +59,7 @@ export const eventsRoutes = {
       return { status: 201 as const, body: mapEventFromDB(row) };
     } catch (error: any) {
       console.error('Create event error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create event' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.CREATE_FAILED', 'Failed to create event', 400);
     }
   },
 
@@ -71,7 +67,7 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM events WHERE company_id = $1';
@@ -79,7 +75,7 @@ export const eventsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -99,10 +95,7 @@ export const eventsRoutes = {
       return { status: 200 as const, body: rows.map(mapEventFromDB) };
     } catch (error: any) {
       console.error('List events error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list events' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.LIST_FAILED', 'Failed to list events');
     }
   },
 
@@ -110,25 +103,22 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const row = await queryOne(
         'SELECT * FROM events WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!row) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!row) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
       if (row.branch_id && !canAccessBranch(context, row.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this event' } };
+        return apiError(403, 'ERRORS.EVENTS.ACCESS_DENIED', 'Access denied to this event');
       }
 
       return { status: 200 as const, body: mapEventFromDB(row) };
     } catch (error: any) {
       console.error('Get event error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Event not found' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found', 404);
     }
   },
 
@@ -136,21 +126,21 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const existing = await queryOne(
         'SELECT * FROM events WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!existing) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to update this event' } };
+        return apiError(403, 'ERRORS.EVENTS.ACCESS_DENIED_UPDATE', 'Access denied to update this event');
       }
 
       const updateData: any = {};
       if (body.branchId !== undefined) {
         if (body.branchId && !canAccessBranch(context, body.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to target branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS_TARGET', 'Access denied to target branch');
         }
         updateData.branch_id = body.branchId || null;
       }
@@ -168,14 +158,11 @@ export const eventsRoutes = {
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
       const row = await update('events', params.id, updateData);
-      if (!row) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!row) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
       return { status: 200 as const, body: mapEventFromDB(row) };
     } catch (error: any) {
       console.error('Update event error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update event' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.UPDATE_FAILED', 'Failed to update event', 404);
     }
   },
 
@@ -183,22 +170,19 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const existing = await queryOne(
         'SELECT * FROM events WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!existing) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       await update('events', params.id, { is_active: false, status: 'CANCELLED' });
-      return { status: 200 as const, body: { message: 'Event deleted successfully' } };
+      return { status: 200 as const, body: { message: 'Event deleted successfully', code: 'EVENTS.DELETED' } };
     } catch (error: any) {
       console.error('Delete event error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete event' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.DELETE_FAILED', 'Failed to delete event', 404);
     }
   },
 
@@ -207,14 +191,14 @@ export const eventsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const event = await queryOne(
         'SELECT id FROM events WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!event) return { status: 404 as const, body: { message: 'Event not found' } };
+      if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
 
       // Revenue: use event_subscriptions as the source of truth.
       // The auto-mirrored revenues row only exists when the event has a branch_id
@@ -278,10 +262,7 @@ export const eventsRoutes = {
       };
     } catch (error: any) {
       console.error('Event P&L error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to compute P&L' },
-      };
+      return mapThrownError(error, 'ERRORS.EVENTS.PL_FAILED', 'Failed to compute P&L');
     }
   },
 };

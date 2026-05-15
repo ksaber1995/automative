@@ -1,4 +1,403 @@
 {
+  "ERRORS": {
+    "GENERIC": "حدث خطأ",
+    "UNAUTHORIZED": "غير مصرح. يرجى تسجيل الدخول مرة أخرى.",
+    "FORBIDDEN": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+    "NOT_FOUND": "العنصر غير موجود.",
+    "SERVER": "خطأ في الخادم. يرجى المحاولة لاحقاً.",
+    "SUBSCRIPTION": {
+      "REQUIRED": "يلزم اشتراك فعّال لتنفيذ هذا الإجراء."
+    },
+    "PERMISSION": {
+      "INSUFFICIENT": "صلاحيات غير كافية",
+      "BRANCH_ACCESS": "الوصول إلى هذا الفرع غير مسموح",
+      "BRANCH_ACCESS_TARGET": "الوصول إلى الفرع المستهدف غير مسموح"
+    },
+    "BRANCHES": {
+      "NOT_FOUND": "الفرع غير موجود",
+      "ADMIN_ONLY_CREATE": "يمكن للمسؤولين فقط إنشاء الفروع",
+      "ADMIN_ONLY_UPDATE": "يمكن للمسؤولين فقط تعديل الفروع",
+      "ADMIN_ONLY_DELETE": "يمكن للمسؤولين فقط حذف الفروع",
+      "CREATE_FAILED": "فشل إنشاء الفرع",
+      "LIST_FAILED": "فشل تحميل الفروع",
+      "UPDATE_FAILED": "فشل تعديل الفرع",
+      "DELETE_FAILED": "فشل حذف الفرع",
+      "STATS_FAILED": "فشل تحميل إحصائيات الفرع",
+      "DELETION_IMPACT_FAILED": "فشل حساب أثر الحذف"
+    },
+    "STUDENTS": {
+      "NOT_FOUND": "الطالب غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا الطالب غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا الطالب غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذا الطالب غير مسموح",
+      "ACCESS_DENIED_TARGET_BRANCH": "الوصول إلى الفرع المستهدف غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الطالب",
+      "LIST_FAILED": "فشل تحميل الطلاب",
+      "UPDATE_FAILED": "فشل تعديل الطالب",
+      "DELETE_FAILED": "فشل حذف الطالب"
+    },
+    "NO_FIELDS": "لا توجد حقول صالحة للتحديث",
+    "RECAPTCHA_FAILED": "فشل التحقق من اختبار الإنسان",
+    "AUTH": {
+      "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+      "COMPANY_INACTIVE": "حساب شركتك غير نشط",
+      "SUBSCRIPTION_INACTIVE": "اشتراكك لم يعد ساريًا",
+      "USER_INACTIVE": "حسابك غير نشط. يرجى التواصل مع الدعم.",
+      "EMAIL_NOT_VERIFIED": "يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول",
+      "LOGIN_FAILED": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+      "COUNTRY_CODE_REQUIRED": "رمز الدولة مطلوب",
+      "PHONE_REQUIRED": "رقم الهاتف مطلوب",
+      "EMAIL_REQUIRED": "البريد الإلكتروني مطلوب",
+      "EMAIL_TAKEN": "هذا البريد الإلكتروني مسجل بالفعل",
+      "PHONE_TAKEN": "رقم الهاتف هذا مسجل بالفعل",
+      "REGISTRATION_CONFLICT": "يوجد حساب مسجل بهذه البيانات بالفعل",
+      "REGISTRATION_FAILED": "فشل التسجيل. يرجى المحاولة مرة أخرى.",
+      "INVALID_VERIFICATION_REQUEST": "طلب التحقق غير صالح",
+      "EMAIL_ALREADY_VERIFIED": "البريد الإلكتروني مؤكد بالفعل",
+      "OTP_INVALID": "رمز التحقق غير صحيح",
+      "OTP_EXPIRED": "انتهت صلاحية رمز التحقق",
+      "OTP_RESEND_FAILED": "تعذر إعادة إرسال رمز التحقق",
+      "VERIFICATION_FAILED": "فشل التحقق. يرجى المحاولة مرة أخرى.",
+      "RESET_TOKEN_REQUIRED": "رمز إعادة التعيين مطلوب",
+      "PASSWORD_TOO_SHORT": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+      "RESET_LINK_INVALID": "رابط إعادة التعيين غير صالح",
+      "RESET_LINK_EXPIRED": "انتهت صلاحية رابط إعادة التعيين",
+      "PASSWORD_RESET_FAILED": "تعذر إعادة تعيين كلمة المرور",
+      "NO_TOKEN": "رمز المصادقة مفقود",
+      "INVALID_TOKEN": "رمز المصادقة غير صالح",
+      "USER_NOT_FOUND": "المستخدم غير موجود"
+    },
+    "ANALYTICS": {
+      "DASHBOARD_FAILED": "فشل تحميل بيانات لوحة المعلومات"
+    },
+    "ATTENDANCE": {
+      "GET_FAILED": "فشل تحميل سجل الحضور",
+      "SAVE_FAILED": "فشل حفظ الحضور",
+      "STUDENT_FAILED": "فشل تحميل حضور الطالب",
+      "CLASS_FAILED": "فشل تحميل حضور الفصل",
+      "TEACHER_GET_FAILED": "فشل تحميل حضور المعلم",
+      "TEACHER_SAVE_FAILED": "فشل حفظ حضور المعلم",
+      "TEACHER_HISTORY_FAILED": "فشل تحميل سجل حضور المعلم"
+    },
+    "CASH": {
+      "CURRENT_FAILED": "فشل تحميل الرصيد النقدي الحالي",
+      "INVALID_TYPE": "نوع التسوية غير صالح",
+      "OBSERVED_AMOUNT_REQUIRED": "المبلغ المرصود مطلوب",
+      "OBSERVED_AMOUNT_INVALID": "المبلغ المرصود غير صالح",
+      "SYSTEM_CASH_FAILED": "فشل تحميل النقد في النظام",
+      "AMOUNT_INVALID": "المبلغ غير صالح",
+      "ADJUST_FAILED": "فشل تسجيل التسوية",
+      "LIST_ADJUSTMENTS_FAILED": "فشل تحميل التسويات",
+      "ADJUSTMENT_NOT_FOUND": "التسوية غير موجودة",
+      "DELETE_ADJUSTMENT_FAILED": "فشل حذف التسوية",
+      "FLOW_FAILED": "فشل تحميل التدفق النقدي"
+    },
+    "CLASSES": {
+      "NOT_FOUND": "الفصل غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا الفصل غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا الفصل غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذا الفصل غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الفصل",
+      "UPDATE_FAILED": "فشل تحديث الفصل",
+      "DELETE_FAILED": "فشل حذف الفصل",
+      "LIST_FAILED": "فشل تحميل الفصول",
+      "ENROLLMENTS_FAILED": "فشل تحميل التسجيلات",
+      "CHECK_AVAILABILITY_FAILED": "فشل التحقق من توفر المعلم",
+      "CANNOT_DEACTIVATE_FINISHED": "لا يمكن تعطيل الفصول المنتهية",
+      "ALREADY_FINISHED": "الفصل منتهٍ بالفعل",
+      "HAS_ACTIVE_SESSION": "الفصل لديه جلسة نشطة ولا يمكن إنهاؤه",
+      "FINISH_FAILED": "فشل إنهاء الفصل"
+    },
+    "COMPANIES": {
+      "NOT_FOUND": "الشركة غير موجودة",
+      "ADMIN_ONLY": "يمكن للمسؤولين فقط إدارة إعدادات الشركة",
+      "UPDATE_FAILED": "فشل تحديث الشركة",
+      "SETTINGS_FAILED": "فشل تحميل إعدادات الشركة"
+    },
+    "COURSES": {
+      "NOT_FOUND": "الدورة غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه الدورة غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذه الدورة غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذه الدورة غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الدورة",
+      "UPDATE_FAILED": "فشل تحديث الدورة",
+      "DELETE_FAILED": "فشل حذف الدورة",
+      "LIST_FAILED": "فشل تحميل الدورات",
+      "ENROLLMENTS_FAILED": "فشل تحميل تسجيلات الدورة"
+    },
+    "DEBTS": {
+      "NOT_FOUND": "الدين غير موجود",
+      "CREATE_FAILED": "فشل إنشاء الدين",
+      "LIST_FAILED": "فشل تحميل الديون",
+      "SUMMARY_FAILED": "فشل تحميل ملخص الديون",
+      "UPDATE_FAILED": "فشل تحديث الدين",
+      "DELETE_FAILED": "فشل حذف الدين"
+    },
+    "DEMO_LEADS": {
+      "NAME_REQUIRED": "الاسم مطلوب",
+      "EMAIL_INVALID": "يرجى إدخال بريد إلكتروني صحيح",
+      "CREATE_FAILED": "فشل إرسال طلبك",
+      "LIST_FAILED": "فشل تحميل الطلبات"
+    },
+    "EMPLOYEES": {
+      "NOT_FOUND": "الموظف غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا الموظف غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا الموظف غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذا الموظف غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الموظف",
+      "UPDATE_FAILED": "فشل تحديث الموظف",
+      "DELETE_FAILED": "فشل حذف الموظف",
+      "LIST_FAILED": "فشل تحميل الموظفين",
+      "ASSIGNED_TO_ACTIVE_CLASSES": "الموظف معيّن في فصول نشطة"
+    },
+    "ENROLLMENTS": {
+      "NOT_FOUND": "التسجيل غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا التسجيل غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا التسجيل غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذا التسجيل غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء التسجيل",
+      "UPDATE_FAILED": "فشل تحديث التسجيل",
+      "DELETE_FAILED": "فشل حذف التسجيل",
+      "LIST_FAILED": "فشل تحميل التسجيلات",
+      "CLASS_FINISHED": "هذا الفصل منتهٍ — لا تُقبل تسجيلات جديدة",
+      "STUDENT_LIST_FAILED": "فشل تحميل تسجيلات الطالب",
+      "DUES_FAILED": "فشل تحميل المستحقات",
+      "LIST_REFUNDS_FAILED": "فشل تحميل المستردات",
+      "GET_REFUNDS_FAILED": "فشل تحميل المستردات لهذا التسجيل",
+      "CREATE_REFUND_FAILED": "فشل إصدار الاسترداد",
+      "GET_PAYMENTS_FAILED": "فشل تحميل الدفعات",
+      "ADD_PAYMENT_FAILED": "فشل تسجيل الدفعة",
+      "PAYMENT_EXCEEDS_BALANCE": "الدفعة تتجاوز الرصيد المتبقي",
+      "REFUND_EXCEEDS_REFUNDABLE": "الاسترداد يتجاوز المبلغ القابل للاسترداد"
+    },
+    "EVENTS": {
+      "NOT_FOUND": "الفعالية غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه الفعالية غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذه الفعالية غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الفعالية",
+      "UPDATE_FAILED": "فشل تحديث الفعالية",
+      "DELETE_FAILED": "فشل حذف الفعالية",
+      "LIST_FAILED": "فشل تحميل الفعاليات",
+      "PL_FAILED": "فشل تحميل أرباح وخسائر الفعالية"
+    },
+    "EVENT_SUBSCRIPTIONS": {
+      "LIST_FAILED": "فشل تحميل المشتركين",
+      "CREATE_FAILED": "فشل إضافة المشترك",
+      "DELETE_FAILED": "فشل إزالة المشترك",
+      "EXTERNAL_NAME_REQUIRED": "اسم المشترك مطلوب",
+      "SUBSCRIPTION_ID_REQUIRED": "الاشتراك مطلوب",
+      "SUBSCRIPTION_NOT_FOUND": "الاشتراك غير موجود",
+      "REFUND_NON_POSITIVE": "يجب أن يكون مبلغ الاسترداد أكبر من صفر",
+      "REFUND_EXCEEDS_REFUNDABLE": "الاسترداد يتجاوز المبلغ القابل للاسترداد",
+      "LIST_EXPENSES_FAILED": "فشل تحميل مصروفات الفعالية",
+      "LIST_REFUNDS_FAILED": "فشل تحميل مستردات الفعالية",
+      "CREATE_REFUND_FAILED": "فشل إصدار الاسترداد"
+    },
+    "EXPENSES": {
+      "NOT_FOUND": "المصروف غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا المصروف غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا المصروف غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء المصروف",
+      "UPDATE_FAILED": "فشل تحديث المصروف",
+      "DELETE_FAILED": "فشل حذف المصروف",
+      "LIST_FAILED": "فشل تحميل المصروفات",
+      "DUE_FAILED": "فشل تحميل المصروفات المستحقة",
+      "GET_PAYMENTS_FAILED": "فشل تحميل دفعات المصروف",
+      "RECURRING_NOT_FOUND": "المصروف المتكرر غير موجود",
+      "PAY_RECURRING_FAILED": "فشل تسجيل الدفعة المتكررة",
+      "NO_SALARY_EMPLOYEES": "لا يوجد موظفون برواتب للدفع",
+      "NO_SALARY_CONFIGURED": "لا يوجد راتب مُكوّن لهذا الموظف",
+      "SALARY_ALREADY_PAID": "تم دفع الراتب لهذه الفترة بالفعل",
+      "SALARY_NON_POSITIVE": "يجب أن يكون مبلغ الراتب أكبر من صفر",
+      "PAY_SALARIES_FAILED": "فشل دفع الرواتب",
+      "PAY_SALARY_FAILED": "فشل دفع الراتب",
+      "SALARY_HISTORY_FAILED": "فشل تحميل سجل الرواتب"
+    },
+    "EXPENSE_PAYMENTS": {
+      "NOT_FOUND": "دفعة المصروف غير موجودة",
+      "CREATE_FAILED": "فشل إنشاء دفعة المصروف",
+      "DELETE_FAILED": "فشل حذف دفعة المصروف",
+      "LIST_FAILED": "فشل تحميل دفعات المصروف",
+      "ALREADY_PAID_THIS_MONTH": "تم تسجيل دفعة لهذا المصروف هذا الشهر بالفعل"
+    },
+    "INSTALLMENTS": {
+      "PLAN_NOT_FOUND": "خطة التقسيط غير موجودة",
+      "PLAN_ACCESS_DENIED": "الوصول إلى خطة التقسيط هذه غير مسموح",
+      "SCHEDULE_NOT_FOUND": "قسط التقسيط غير موجود",
+      "CREATE_FAILED": "فشل إنشاء خطة التقسيط",
+      "LIST_FAILED": "فشل تحميل خطط التقسيط",
+      "DELETE_FAILED": "فشل حذف خطة التقسيط",
+      "TOTAL_NON_POSITIVE": "يجب أن يكون الإجمالي أكبر من صفر",
+      "DOWNPAYMENT_INVALID": "الدفعة المقدمة غير صالحة",
+      "MONTHS_INVALID": "عدد الأشهر غير صالح",
+      "START_DATE_REQUIRED": "تاريخ البدء مطلوب",
+      "ALREADY_PAID": "القسط مدفوع بالفعل",
+      "NOT_PAID": "القسط غير مدفوع بعد",
+      "PAY_AMOUNT_NON_POSITIVE": "يجب أن يكون مبلغ الدفعة أكبر من صفر",
+      "PAY_FAILED": "فشل دفع القسط",
+      "UNPAY_FAILED": "فشل التراجع عن دفع القسط"
+    },
+    "MASTER_CLASS_ENROLLMENTS": {
+      "NOT_FOUND": "تسجيل الفصل غير موجود",
+      "CLASS_NOT_FOUND_FOR_COURSE": "الفصل غير موجود لهذه الدورة",
+      "CLASS_FINISHED": "هذا الفصل منتهٍ",
+      "MASTER_NOT_ACTIVE": "التسجيل الرئيسي غير نشط",
+      "ALREADY_ENROLLED": "الطالب مسجل بالفعل في هذا الفصل",
+      "CREATE_FAILED": "فشل تسجيل الطالب",
+      "LIST_FAILED": "فشل تحميل تسجيلات الفصل",
+      "UPDATE_FAILED": "فشل تحديث تسجيل الفصل"
+    },
+    "MASTER_COURSES": {
+      "NOT_FOUND": "الدورة الرئيسية غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه الدورة الرئيسية غير مسموح",
+      "INVALID_BRANCH": "الفرع المختار غير صالح",
+      "COURSE_BRANCH_MISMATCH": "فرع الدورة لا يطابق فرع الدورة الرئيسية",
+      "CREATE_FAILED": "فشل إنشاء الدورة الرئيسية",
+      "UPDATE_FAILED": "فشل تحديث الدورة الرئيسية",
+      "DELETE_FAILED": "فشل حذف الدورة الرئيسية",
+      "LIST_FAILED": "فشل تحميل الدورات الرئيسية",
+      "LINKED_COURSES_FAILED": "فشل تحميل الدورات المرتبطة",
+      "AVAILABLE_COURSES_FAILED": "فشل تحميل الدورات المتاحة",
+      "ADD_COURSE_FAILED": "فشل إضافة الدورة",
+      "REMOVE_COURSE_FAILED": "فشل إزالة الدورة",
+      "INSUFFICIENT_COURSES_PERMISSION": "ليس لديك صلاحية لإدارة الدورات"
+    },
+    "MASTER_ENROLLMENTS": {
+      "NOT_FOUND": "التسجيل الرئيسي غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا التسجيل الرئيسي غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء التسجيل الرئيسي",
+      "LIST_FAILED": "فشل تحميل التسجيلات الرئيسية",
+      "CANCEL_FAILED": "فشل إلغاء التسجيل الرئيسي",
+      "STUDENT_BRANCH_MISMATCH": "فرع الطالب لا يطابق فرع التسجيل",
+      "ALREADY_ACTIVE": "للطالب تسجيل رئيسي نشط بالفعل لهذه الدورة",
+      "LIST_REFUNDS_FAILED": "فشل تحميل المستردات",
+      "CREATE_REFUND_FAILED": "فشل إصدار الاسترداد",
+      "REFUND_NON_POSITIVE": "يجب أن يكون مبلغ الاسترداد أكبر من صفر",
+      "REFUND_EXCEEDS_REFUNDABLE": "الاسترداد يتجاوز المبلغ القابل للاسترداد",
+      "GET_PAYMENTS_FAILED": "فشل تحميل الدفعات",
+      "ADD_PAYMENT_FAILED": "فشل تسجيل الدفعة",
+      "PAYMENT_EXCEEDS_BALANCE": "الدفعة تتجاوز الرصيد المتبقي",
+      "COVERAGE_CHECK_FAILED": "فشل التحقق من التغطية"
+    },
+    "PRODUCTS": {
+      "NOT_FOUND": "المنتج غير موجود",
+      "ACCESS_DENIED": "الوصول إلى هذا المنتج غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذا المنتج غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذا المنتج غير مسموح",
+      "ACCESS_DENIED_ADJUST": "تعديل المخزون غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء المنتج",
+      "UPDATE_FAILED": "فشل تحديث المنتج",
+      "DELETE_FAILED": "فشل حذف المنتج",
+      "LIST_FAILED": "فشل تحميل المنتجات",
+      "AVAILABLE_FAILED": "فشل تحميل المنتجات المتاحة",
+      "LOW_STOCK_FAILED": "فشل تحميل المنتجات منخفضة المخزون",
+      "CODE_TAKEN": "رمز المنتج هذا مستخدم بالفعل",
+      "INVALID_OPERATION": "عملية غير صالحة",
+      "STOCK_UPDATE_FAILED": "فشل تحديث المخزون",
+      "STOCK_ADJUST_FAILED": "فشل تعديل المخزون",
+      "RESTOCK_FAILED": "فشل تجديد المخزون"
+    },
+    "PRODUCT_SALES": {
+      "NOT_FOUND": "البيعة غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه البيعة غير مسموح",
+      "CREATE_FAILED": "فشل تسجيل البيعة",
+      "LIST_FAILED": "فشل تحميل المبيعات",
+      "SUMMARY_FAILED": "فشل تحميل ملخص المبيعات",
+      "TOP_PRODUCTS_FAILED": "فشل تحميل أعلى المنتجات مبيعًا",
+      "LIST_REFUNDS_FAILED": "فشل تحميل المستردات",
+      "CREATE_REFUND_FAILED": "فشل إصدار الاسترداد",
+      "REFUND_NON_POSITIVE": "يجب أن يكون مبلغ الاسترداد أكبر من صفر",
+      "REFUND_EXCEEDS_REMAINING": "الاسترداد يتجاوز المبلغ المتبقي"
+    },
+    "REPORTS": {
+      "MONTHLY_PL_FAILED": "فشل تحميل أرباح وخسائر الأشهر",
+      "SALARY_GROWTH_FAILED": "فشل تحميل نمو الرواتب",
+      "TOP_COURSES_FAILED": "فشل تحميل أعلى الدورات",
+      "STUDENTS_OVER_TIME_FAILED": "فشل تحميل تطور أعداد الطلاب",
+      "CHURN_FAILED": "فشل تحميل بيانات الانسحاب",
+      "PROFIT_BY_COURSE_FAILED": "فشل تحميل الأرباح حسب الدورة",
+      "PROFIT_BY_BRANCH_FAILED": "فشل تحميل الأرباح حسب الفرع",
+      "PROFIT_BY_PRODUCT_FAILED": "فشل تحميل الأرباح حسب المنتج",
+      "PROFIT_BY_EVENT_FAILED": "فشل تحميل الأرباح حسب الفعالية",
+      "EXPENSES_BY_CATEGORY_FAILED": "فشل تحميل المصروفات حسب الفئة"
+    },
+    "REVENUES": {
+      "LIST_FAILED": "فشل تحميل الإيرادات",
+      "SUMMARY_FAILED": "فشل تحميل ملخص الإيرادات",
+      "GLOBAL_ADMIN_ONLY_COMPANY_LEVEL": "يمكن للمسؤول العام فقط عرض إيرادات على مستوى الشركة"
+    },
+    "ROOMS": {
+      "NOT_FOUND": "الغرفة غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه الغرفة غير مسموح",
+      "ACCESS_DENIED_UPDATE": "تعديل هذه الغرفة غير مسموح",
+      "ACCESS_DENIED_DELETE": "حذف هذه الغرفة غير مسموح",
+      "CREATE_FAILED": "فشل إنشاء الغرفة",
+      "UPDATE_FAILED": "فشل تحديث الغرفة",
+      "DELETE_FAILED": "فشل حذف الغرفة",
+      "LIST_FAILED": "فشل تحميل الغرف",
+      "HAS_ACTIVE_SESSION": "الغرفة لديها جلسة نشطة"
+    },
+    "SESSIONS": {
+      "NOT_FOUND": "الجلسة غير موجودة",
+      "ACCESS_DENIED": "الوصول إلى هذه الجلسة غير مسموح",
+      "START_FAILED": "فشل بدء الجلسة",
+      "END_FAILED": "فشل إنهاء الجلسة",
+      "LIST_FAILED": "فشل تحميل الجلسات",
+      "CLASS_FINISHED": "لا يمكن بدء جلسة لفصل منتهٍ",
+      "CLASS_HAS_ACTIVE": "هذا الفصل لديه جلسة نشطة بالفعل",
+      "ROOM_NOT_FOUND": "الغرفة غير موجودة",
+      "ROOM_OCCUPIED": "الغرفة مشغولة حاليًا",
+      "ROOM_REQUIRED": "الغرفة مطلوبة",
+      "ALREADY_ENDED": "الجلسة منتهية بالفعل",
+      "INVALID_END_DATE": "تاريخ النهاية غير صالح",
+      "END_BEFORE_START": "يجب أن يكون تاريخ النهاية بعد تاريخ البدء"
+    },
+    "SUBSCRIPTIONS": {
+      "NOT_FOUND": "الاشتراك غير موجود",
+      "ADMIN_ONLY": "يمكن للمسؤولين فقط إدارة الاشتراكات",
+      "GET_FAILED": "فشل تحميل الاشتراك",
+      "UPDATE_FAILED": "فشل تحديث الاشتراك"
+    },
+    "TIMETABLE": {
+      "INVALID_DATE": "التاريخ غير صالح",
+      "LOAD_FAILED": "فشل تحميل الجدول"
+    },
+    "USERS": {
+      "NOT_FOUND": "المستخدم غير موجود",
+      "EMAIL_TAKEN": "هذا البريد الإلكتروني مستخدم بالفعل",
+      "LIST_FAILED": "فشل تحميل المستخدمين",
+      "GET_FAILED": "فشل تحميل المستخدم",
+      "CREATE_FAILED": "فشل إنشاء المستخدم",
+      "UPDATE_FAILED": "فشل تحديث المستخدم",
+      "GLOBAL_ADMIN_ONLY_MANAGE": "يمكن للمسؤول العام فقط إدارة المستخدمين",
+      "GLOBAL_ADMIN_ONLY_VIEW": "يمكن للمسؤول العام فقط عرض المستخدمين",
+      "GLOBAL_ADMIN_ONLY_CREATE": "يمكن للمسؤول العام فقط إنشاء المستخدمين",
+      "GLOBAL_ADMIN_ONLY_UPDATE": "يمكن للمسؤول العام فقط تحديث المستخدمين",
+      "GLOBAL_ADMIN_ONLY_PERMISSIONS": "يمكن للمسؤول العام فقط تعديل الصلاحيات",
+      "GLOBAL_ADMIN_ONLY_RESET_PW": "يمكن للمسؤول العام فقط إعادة تعيين كلمات المرور",
+      "GLOBAL_ADMIN_ONLY_DEACTIVATE": "يمكن للمسؤول العام فقط تعطيل المستخدمين",
+      "GLOBAL_ADMIN_ONLY_ACTIVATE": "يمكن للمسؤول العام فقط تفعيل المستخدمين",
+      "GLOBAL_ADMIN_ONLY_CONVERT": "يمكن للمسؤول العام فقط تحويل الموظفين إلى مستخدمين",
+      "SELF_DEACTIVATE": "لا يمكنك تعطيل حسابك",
+      "SELF_ROLE_CHANGE": "لا يمكنك تغيير دورك",
+      "SELF_PERMISSIONS_CHANGE": "لا يمكنك تغيير صلاحياتك",
+      "ADMIN_PERMISSIONS_FIXED": "لا يمكن تغيير صلاحيات المسؤول",
+      "PERMISSIONS_UPDATE_FAILED": "فشل تحديث الصلاحيات",
+      "PASSWORD_RESET_FAILED": "فشل إعادة تعيين كلمة المرور",
+      "DEACTIVATE_FAILED": "فشل تعطيل المستخدم",
+      "ACTIVATE_FAILED": "فشل تفعيل المستخدم",
+      "EMPLOYEE_ALREADY_USER": "هذا الموظف لديه حساب مستخدم بالفعل",
+      "CONVERT_EMPLOYEE_FAILED": "فشل تحويل الموظف إلى مستخدم"
+    },
+    "WITHDRAWALS": {
+      "NOT_FOUND": "السحب غير موجود",
+      "CREATE_FAILED": "فشل تسجيل السحب",
+      "LIST_FAILED": "فشل تحميل السحوبات",
+      "SUMMARY_FAILED": "فشل تحميل ملخص السحوبات",
+      "UPDATE_FAILED": "فشل تحديث السحب",
+      "DELETE_FAILED": "فشل حذف السحب"
+    }
+  },
   "BREADCRUMBS": {
     "CREATE": "إنشاء",
     "EDIT": "تعديل",
@@ -225,7 +624,12 @@
       "VERIFY_FAILED": "فشل التحقق. يرجى التحقق من الرمز والمحاولة مجدداً.",
       "RESEND_SUCCESS": "تم إرسال رمز جديد إلى بريدك الإلكتروني.",
       "RESEND_FAILED": "فشل إعادة إرسال الرمز. يرجى المحاولة مرة أخرى."
-    }
+    },
+    "OTP_RESENT": "تم إعادة إرسال رمز التحقق",
+    "OTP_RESEND_OK_GENERIC": "إذا كان البريد الإلكتروني مسجلًا، فقد تم إرسال رمز التحقق",
+    "PASSWORD_UPDATED": "تم تحديث كلمة المرور بنجاح",
+    "PASSWORD_RESET_LINK_SENT_GENERIC": "إذا كان البريد الإلكتروني مسجلًا، فقد تم إرسال رابط إعادة تعيين كلمة المرور",
+    "REGISTRATION_OTP_SENT": "اكتمل التسجيل — تحقق من بريدك الإلكتروني للحصول على رمز التحقق"
   },
   "BRANCHES": {
     "LIST": {
@@ -326,7 +730,17 @@
       "SYSTEM_INFO": "معلومات النظام",
       "CREATED": "تاريخ الإنشاء",
       "LAST_UPDATED": "آخر تحديث"
-    }
+    },
+    "CREATED": "تم إنشاء الفرع بنجاح",
+    "UPDATED": "تم تحديث الفرع بنجاح",
+    "DELETED_NAMED": "تم حذف الفرع \"{{name}}\" بنجاح",
+    "DEACTIVATED_WITH_FINANCIALS": "تم تعطيل الفرع \"{{name}}\" لاحتوائه على سجلات مالية.",
+    "ACTIVATED": "تم تفعيل الفرع بنجاح",
+    "DEACTIVATED": "تم تعطيل الفرع بنجاح",
+    "ACTIVATE_HEADER": "تفعيل الفرع",
+    "DEACTIVATE_HEADER": "تعطيل الفرع",
+    "ACTIVATE_CONFIRM": "هل أنت متأكد من تفعيل هذا الفرع؟",
+    "DEACTIVATE_CONFIRM": "هل أنت متأكد من تعطيل هذا الفرع؟ لن يتمكن المستخدمون من الوصول إليه."
   },
   "EVENTS": {
     "LIST": {
@@ -467,7 +881,8 @@
       "ACTIVE": "جارية",
       "COMPLETED": "مكتملة",
       "CANCELLED": "ملغاة"
-    }
+    },
+    "DELETED": "تم حذف الفعالية"
   },
   "MASTER_COURSES": {
     "WEEKS": "أسابيع",
@@ -544,7 +959,10 @@
       "NONE": "لا توجد كورسات مؤهلة.",
       "CANCEL": "إلغاء",
       "CONFIRM": "إضافة"
-    }
+    },
+    "DELETED": "تم حذف الدورة الرئيسية",
+    "COURSE_ADDED": "تم إضافة الدورة",
+    "COURSE_REMOVED": "تم إزالة الدورة"
   },
   "COURSES": {
     "DETAIL": {
@@ -712,7 +1130,8 @@
       "CREATE_ERROR": "فشل إنشاء الكورس",
       "LOAD_BRANCHES_ERROR": "فشل تحميل الفروع",
       "LOAD_EMPLOYEES_ERROR": "فشل تحميل الموظفين"
-    }
+    },
+    "DELETED": "تم حذف الدورة بنجاح"
   },
   "CLASSES": {
     "FORM": {
@@ -838,6 +1257,10 @@
       "BUNDLE_PREFIX": "الباقة:",
       "VIEW_STUDENT": "عرض الطالب",
       "NO_STUDENTS_ENROLLED": "لا يوجد طلاب مسجلون",
+      "ENR_STATUS_ACTIVE": "نشط",
+      "ENR_STATUS_COMPLETED": "مكتمل",
+      "ENR_STATUS_DROPPED": "ملغى",
+      "ENR_STATUS_PENDING": "قيد الانتظار",
       "ACTIVE_SESSION_IN_ROOM": "جلسة نشطة في الغرفة {{room}}",
       "STARTED_AT": "بدأت في {{time}}",
       "TAKE_ATTENDANCE": "تسجيل الحضور",
@@ -898,7 +1321,22 @@
       "ERR_FINISH_CLASS": "فشل إنهاء الفصل",
       "FINISH_CLASS_TITLE": "إنهاء الفصل",
       "FINISH_CLASS_MSG": "هل تريد تعليم \"{{name}}\" كمنتهٍ؟ بمجرد الإنهاء لن يُسمح بتسجيلات جديدة ولا ببدء جلسات لهذا الفصل. لا يمكن التراجع عن ذلك من هنا."
-    }
+    },
+    "CREATED": "تم إنشاء الفصل بنجاح",
+    "UPDATED": "تم تحديث الفصل بنجاح",
+    "DELETED": "تم حذف الفصل بنجاح",
+    "COURSE_REQUIRED": "يرجى اختيار دورة",
+    "END_DATE_OR_SESSIONS_REQUIRED": "يرجى تحديد تاريخ نهاية أو عدد جلسات"
+  },
+  "ENROLLMENTS": {
+    "DELETED": "تم حذف التسجيل بنجاح"
+  },
+  "DEBTS": {
+    "PAYMENT_SUBMITTED": "تم إرسال الدفعة بنجاح",
+    "PAYMENT_EXCEEDS_BALANCE": "الدفعة تتجاوز الرصيد المتبقي"
+  },
+  "SALARIES": {
+    "PAID": "تم تسجيل دفعات الرواتب"
   },
   "ENROLLMENT_FORM": {
     "EDIT_TITLE": "تعديل التسجيل",
@@ -1022,7 +1460,8 @@
     "TOTAL_DUE": "إجمالي المستحق",
     "ALL_CAUGHT_UP": "ممتاز! لا توجد مصروفات مستحقة هذا الشهر.",
     "PAY_NOW": "ادفع الآن",
-    "TOP_BRANCHES": "أفضل الفروع أداءً"
+    "TOP_BRANCHES": "أفضل الفروع أداءً",
+    "ITEM_PAID": "تم دفع {{label}} بنجاح"
   },
   "EMPLOYEES": {
     "LIST": {
@@ -1151,7 +1590,13 @@
       "STATUS_PRESENT": "حاضر",
       "STATUS_ABSENT": "غائب",
       "NO_ATTENDANCE": "لا توجد سجلات حضور بعد."
-    }
+    },
+    "CREATED": "تم إنشاء الموظف بنجاح",
+    "UPDATED": "تم تحديث الموظف بنجاح",
+    "TERMINATED": "تم إنهاء عمل الموظف بنجاح",
+    "TERMINATE_HEADER": "تأكيد إنهاء العمل",
+    "TERMINATE_CONFIRM": "هل أنت متأكد من إنهاء عمل {{name}}؟",
+    "DELETED": "تم حذف الموظف"
   },
   "EXPENSES": {
     "LIST": {
@@ -1424,101 +1869,55 @@
       "MSG_PAYMENT_RECORD_FAILED": "فشل تسجيل الدفعة",
       "MSG_PAYMENT_DELETED": "تم حذف الدفعة",
       "MSG_PAYMENT_DELETE_FAILED": "فشل حذف الدفعة"
-    }
+    },
+    "CREATED": "تم إنشاء المصروف بنجاح",
+    "UPDATED": "تم تحديث المصروف بنجاح",
+    "DELETED": "تم حذف المصروف",
+    "CREATED_AND_PAID": "تم إنشاء المصروف وتسجيل الدفعة",
+    "PAYMENT_RECORDED": "تم تسجيل الدفعة بنجاح",
+    "RECURRING_RECORDED": "تم تسجيل {{count}} دفعة بنجاح",
+    "RECURRING_PAID_PARTIAL": "تم تسجيل {{paid}} دفعة؛ فشلت {{failed}}",
+    "SALARIES_PAID": "تم دفع الرواتب"
   },
   "INSTALLMENTS": {
-    "FORM": {
-      "TITLE": "خطة أقساط جديدة",
-      "SUBTITLE": "إعداد عملية شراء بالتقسيط تُدفَع على عدة أشهر",
-      "LABEL_NAME": "اسم العنصر / الأصل *",
-      "PLACEHOLDER_NAME": "مثال: MacBook Pro 16'",
-      "LABEL_BRANCH": "الفرع",
-      "PLACEHOLDER_BRANCH": "عام / جميع الفروع",
-      "LABEL_CATEGORY": "الفئة *",
-      "PLACEHOLDER_CATEGORY": "اختر الفئة",
-      "LABEL_TOTAL": "المبلغ الإجمالي *",
-      "PLACEHOLDER_TOTAL": "2000.00",
-      "LABEL_DOWNPAYMENT": "الدفعة المقدمة",
-      "PLACEHOLDER_DOWNPAYMENT": "0.00",
-      "LABEL_MONTHS": "عدد الأشهر *",
-      "LABEL_START_DATE": "تاريخ البدء *",
-      "HINT_START_DATE": "تُسجَّل الدفعة المقدمة هنا. أول قسط يستحق بعد شهر واحد.",
-      "LABEL_VENDOR": "المورد",
-      "PLACEHOLDER_VENDOR": "اسم المورد / المتجر",
-      "LABEL_INVOICE": "رقم الفاتورة",
-      "PLACEHOLDER_INVOICE": "رقم الفاتورة",
-      "LABEL_DESCRIPTION": "الوصف",
-      "PLACEHOLDER_DESCRIPTION": "وصف اختياري",
-      "LABEL_NOTES": "ملاحظات",
-      "PLACEHOLDER_NOTES": "ملاحظات اختيارية",
-      "PREVIEW_TITLE": "معاينة الخطة",
-      "PREVIEW_TOTAL": "الإجمالي",
-      "PREVIEW_DOWNPAYMENT": "الدفعة المقدمة",
-      "PREVIEW_FINANCED": "المُموَّل",
-      "PREVIEW_PER_MONTH": "شهرياً × {{count}}",
-      "CANCEL": "إلغاء",
-      "CREATE": "إنشاء الخطة",
-      "MSG_REQUIRED_FIELDS": "يرجى تعبئة جميع الحقول المطلوبة",
-      "MSG_DOWNPAYMENT_INVALID": "يجب أن تكون الدفعة المقدمة أقل من المبلغ الإجمالي",
-      "MSG_CREATED": "تم إنشاء خطة الأقساط",
-      "MSG_CREATE_FAILED": "فشل إنشاء الخطة"
-    },
-    "DETAIL": {
-      "MONTHS_COUNT": "{{count}} شهراً",
-      "DELETE_PLAN": "حذف الخطة",
-      "SUMMARY_TOTAL": "الإجمالي",
-      "SUMMARY_DOWNPAYMENT": "الدفعة المقدمة",
-      "SUMMARY_DOWNPAYMENT_ON": "بتاريخ {{date}}",
-      "SUMMARY_FINANCED": "المُموَّل",
-      "SUMMARY_PAID_SO_FAR": "المدفوع حتى الآن",
-      "SUMMARY_PAID_COUNT": "{{paid}}/{{total}} أقساط",
-      "SUMMARY_REMAINING": "المتبقي",
-      "SUMMARY_NEXT": "التالي: {{date}}",
-      "INFO_STATUS": "الحالة",
-      "INFO_BRANCH": "الفرع",
-      "INFO_VENDOR": "المورد",
-      "INFO_INVOICE": "الفاتورة",
-      "INFO_NOTES": "ملاحظات",
-      "GLOBAL": "عام",
-      "SCHEDULE_TITLE": "جدول الدفعات",
-      "SCHEDULE_SUBTITLE": "ادفع كل قسط عند استحقاقه. كل قسط مدفوع يصبح مصروفاً.",
-      "COL_NUMBER": "#",
-      "COL_DUE_DATE": "تاريخ الاستحقاق",
-      "COL_AMOUNT": "المبلغ",
-      "COL_STATUS": "الحالة",
-      "COL_PAID_DATE": "تاريخ الدفع",
-      "COL_PAID_AMOUNT": "المبلغ المدفوع",
-      "COL_ACTIONS": "الإجراءات",
-      "OVERDUE": "متأخر",
-      "PAY": "دفع",
-      "REVERSE": "تراجع",
-      "STATUS_PAID": "مدفوع",
-      "STATUS_PENDING": "معلَّق",
-      "STATUS_SKIPPED": "مُتخطَّى",
+    "LIST": {
+      "TITLE": "خطط الأقساط",
+      "SUBTITLE": "تتبع المشتريات الممولة المدفوعة على دفعات",
+      "BACK_TO_EXPENSES": "العودة إلى المصاريف",
+      "NEW": "قسط جديد",
+      "STAT_ACTIVE": "الخطط النشطة",
+      "STAT_COMPLETED": "المكتملة",
+      "STAT_TOTAL_FINANCED": "إجمالي التمويل",
+      "STAT_REMAINING": "المتبقي",
+      "BRANCH": "الفرع",
+      "ALL_BRANCHES": "جميع الفروع",
+      "STATUS": "الحالة",
+      "ALL": "الكل",
       "STATUS_ACTIVE": "نشط",
       "STATUS_COMPLETED": "مكتمل",
       "STATUS_CANCELED": "ملغى",
-      "PAY_DIALOG_HEADER": "تسجيل دفعة قسط",
-      "PAY_DIALOG_INSTALLMENT": "القسط {{number}} / {{total}}",
-      "PAY_DIALOG_DUE_EXPECTED": "مستحق بتاريخ {{date}} · المتوقع {{amount}}",
-      "PAY_DIALOG_AMOUNT": "المبلغ *",
-      "PAY_DIALOG_DATE": "تاريخ الدفع *",
-      "PAY_DIALOG_NOTES": "ملاحظات",
-      "PAY_DIALOG_NOTES_PLACEHOLDER": "ملاحظات اختيارية",
-      "PAY_DIALOG_CANCEL": "إلغاء",
-      "PAY_DIALOG_CONFIRM": "تسجيل الدفعة",
-      "UNPAY_DIALOG_HEADER": "التراجع عن دفعة القسط",
-      "UNPAY_DIALOG_MESSAGE": "سيؤدي ذلك إلى حذف الدفعة المرتبطة وإعادة هذا القسط إلى حالة معلَّق. هل تريد المتابعة؟",
-      "DELETE_DIALOG_HEADER": "حذف خطة الأقساط",
-      "DELETE_DIALOG_MESSAGE": "حذف هذه الخطة وجميع دفعاتها (بما في ذلك الدفعة المقدمة) نهائياً؟ لا يمكن التراجع عن هذا الإجراء.",
-      "MSG_LOAD_FAILED": "فشل تحميل خطة الأقساط",
-      "MSG_PAID": "تم دفع القسط",
-      "MSG_PAY_FAILED": "فشل الدفع",
-      "MSG_REVERSED": "تم التراجع عن الدفعة",
-      "MSG_REVERSE_FAILED": "فشل التراجع",
+      "COL_NAME": "الاسم",
+      "COL_BRANCH": "الفرع",
+      "COL_CATEGORY": "الفئة",
+      "COL_TOTAL": "الإجمالي",
+      "COL_DOWN": "مقدم",
+      "COL_MONTHLY": "الشهري",
+      "COL_MONTHS": "الأشهر",
+      "COL_PROGRESS": "التقدم",
+      "COL_NEXT_DUE": "القسط القادم",
+      "COL_STATUS": "الحالة",
+      "COL_ACTIONS": "الإجراءات",
+      "VIEW": "عرض",
+      "DELETE": "حذف",
+      "GLOBAL": "عام",
+      "NO_DATA": "لا توجد خطط أقساط بعد. اضغط \"قسط جديد\" لإنشاء واحدة.",
+      "DELETE_TITLE": "حذف خطة الأقساط",
+      "DELETE_CONFIRM": "سيؤدي هذا إلى الإزالة الدائمة للخطة وجدولها وجميع الدفعات المرتبطة (بما في ذلك الدفعة المقدمة). هل تريد المتابعة؟",
       "MSG_DELETED": "تم حذف خطة الأقساط",
       "MSG_DELETE_FAILED": "فشل حذف الخطة"
-    }
+    },
+    "PLAN_DELETED": "تم حذف خطة التقسيط",
+    "UNPAID": "تم التراجع عن دفع القسط"
   },
   "REVENUES": {
     "LIST": {
@@ -1582,7 +1981,9 @@
       "CANCEL": "إلغاء",
       "UPDATE": "تحديث",
       "CREATE": "إنشاء"
-    }
+    },
+    "CREATED": "تم إنشاء الإيراد بنجاح",
+    "UPDATED": "تم تحديث الإيراد بنجاح"
   },
   "STUDENTS": {
     "LIST": {
@@ -1695,7 +2096,6 @@
       "COL_ENROLLMENT_DATE": "تاريخ التسجيل",
       "COL_AMOUNT_PAID": "المدفوع",
       "COL_PROGRESS": "التقدم",
-      "ACTIVE": "نشط",
       "COL_COURSE": "الكورس",
       "COL_DATE": "التاريخ",
       "COL_PRICING": "التسعير",
@@ -1727,7 +2127,6 @@
       "AMOUNT": "المبلغ",
       "PAYMENT_DATE": "تاريخ الدفع",
       "NOTES_LABEL": "ملاحظات",
-      "CANCEL": "إلغاء",
       "RECORD_PAYMENT": "تسجيل الدفعة",
       "REFUND_TITLE": "إصدار استرداد",
       "REFUND_TYPE": "نوع الاسترداد",
@@ -1754,7 +2153,19 @@
       "ATTENDANCE_PRESENT_LABEL": "حاضر",
       "ATTENDANCE_ABSENT_LABEL": "غائب",
       "NOTES_PLACEHOLDER": "ملاحظات اختيارية..."
-    }
+    },
+    "CREATED": "تم إنشاء الطالب بنجاح",
+    "UPDATED": "تم تحديث الطالب بنجاح",
+    "DEACTIVATED": "تم تعطيل الطالب بنجاح",
+    "DEACTIVATE_HEADER": "تأكيد التعطيل",
+    "DEACTIVATE_CONFIRM": "هل أنت متأكد من تعطيل {{name}}؟",
+    "PAYMENT_RECORDED": "تم تسجيل الدفعة بنجاح",
+    "REFUND_ISSUED": "تم إصدار الاسترداد بنجاح",
+    "BUNDLE_REFUND_ISSUED": "تم إصدار استرداد الباقة",
+    "NOTHING_TO_REFUND": "لا يوجد مبلغ متبقٍ لاسترداده في هذا التسجيل",
+    "ENROLLED_IN_CLASS": "تم تسجيل الطالب في الفصل",
+    "MASTER_ENROLLMENT_CANCELLED": "تم إلغاء التسجيل الرئيسي",
+    "MASTER_ENROLLMENT_CANCEL_CONFIRM": "هل تريد إلغاء هذا التسجيل الرئيسي؟ سيفقد الطالب التغطية للدورات المرتبطة."
   },
   "USERS": {
     "LIST": {
@@ -1899,7 +2310,18 @@
       "NEW_PASSWORD": "كلمة المرور الجديدة (6 أحرف على الأقل)",
       "CANCEL": "إلغاء",
       "RESET": "إعادة تعيين"
-    }
+    },
+    "CREATED": "تم إنشاء المستخدم بنجاح",
+    "UPDATED": "تم تحديث المستخدم بنجاح",
+    "ACTIVATED": "تم تفعيل المستخدم بنجاح",
+    "DEACTIVATED": "تم تعطيل المستخدم بنجاح",
+    "ACTIVATE_HEADER": "تفعيل المستخدم",
+    "DEACTIVATE_HEADER": "تعطيل المستخدم",
+    "ACTIVATE_CONFIRM": "هل أنت متأكد من تفعيل {{name}}؟",
+    "DEACTIVATE_CONFIRM": "هل أنت متأكد من تعطيل {{name}}؟ لن يتمكن من تسجيل الدخول.",
+    "PASSWORD_RESET": "تم إعادة تعيين كلمة المرور بنجاح",
+    "PASSWORD_TOO_SHORT": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+    "PERMISSIONS_UPDATED": "تم تحديث الصلاحيات"
   },
   "SETTINGS": {
     "TITLE": "إعدادات الشركة",
@@ -1925,7 +2347,8 @@
     "OVERHEAD_EXAMPLE": "يُظهر كل فرع \"مساهمته\" (الإيرادات ناقص التكاليف المباشرة). صافي ربح الشركة = إجمالي المساهمات ناقص المصروفات العامة.",
     "OVERHEAD_BEST": "الأفضل للأدوار التنفيذية (المدير العام، المالك، المحاسب) الذين يخدمون الشركة كاملاً لا فرعاً واحداً.",
     "OVERHEAD_WARNING": "سيبدو \"صافي ربح\" الفرع مرتفعاً بشكل مصطنع لأنه لا يعكس التكلفة الحقيقية لطبقة الإدارة.",
-    "SAVE": "حفظ الإعدادات"
+    "SAVE": "حفظ الإعدادات",
+    "SAVED": "تم حفظ الإعدادات بنجاح"
   },
   "REPORTS": {
     "TITLE": "التقارير والتحليلات",
@@ -2079,7 +2502,8 @@
       "NOTES_PLACEHOLDER": "أضف أي ملاحظات...",
       "CANCEL": "إلغاء",
       "RECORD_PAYMENT": "تسجيل الدفعة"
-    }
+    },
+    "PAYMENT_RECORDED": "تم تسجيل الدفعة بنجاح"
   },
   "PRODUCTS": {
     "LIST": {
@@ -2240,7 +2664,13 @@
       "CONFIRM_REFUND": "تنفيذ الاسترداد",
       "REFUND_SUCCESS": "تم تسجيل الاسترداد بنجاح",
       "REFUND_FAILED": "فشل تسجيل الاسترداد"
-    }
+    },
+    "DELETED": "تم حذف المنتج بنجاح",
+    "STOCK_ADJUSTED": "تم تعديل المخزون بنجاح",
+    "STOCK_PURCHASED": "تم شراء المخزون وتسجيله بنجاح",
+    "SALE_COMPLETED": "تمت البيعة! المجموع: {{total}}",
+    "INVALID_QUANTITY": "يرجى إدخال كمية صحيحة",
+    "INVALID_COST": "يرجى إدخال تكلفة صحيحة"
   },
   "SHARED": {
     "DELETE_DIALOG": {
@@ -2314,7 +2744,8 @@
     "DELETE_MSG": "هل أنت متأكد من حذف هذا التعديل؟ سيُعاد احتساب الرصيد الحالي للكاش.",
     "NO_HISTORY": "لا توجد تعديلات للكاش بعد.",
     "SAVED": "تم حفظ تعديل الكاش.",
-    "DELETED": "تم حذف تعديل الكاش."
+    "DELETED": "تم حذف تعديل الكاش.",
+    "ADJUSTMENT_DELETED": "تم حذف التسوية"
   },
   "ROOMS": {
     "TITLE": "الغرف",
@@ -2360,7 +2791,10 @@
     "MSG_CREATED": "تم إنشاء الغرفة بنجاح",
     "MSG_CREATE_FAILED": "فشل إنشاء الغرفة",
     "MSG_DELETED": "تم حذف الغرفة بنجاح",
-    "MSG_DELETE_FAILED": "فشل حذف الغرفة"
+    "MSG_DELETE_FAILED": "فشل حذف الغرفة",
+    "CREATED": "تم إنشاء الغرفة بنجاح",
+    "UPDATED": "تم تحديث الغرفة بنجاح",
+    "DELETED": "تم حذف الغرفة بنجاح"
   },
   "TIMETABLE": {
     "TITLE": "الجدول الزمني",
@@ -2384,44 +2818,6 @@
     "CLASS_COUNT": "— {{count}} حصة",
     "LIVE": "مباشر",
     "ROOM_PREFIX": "غرفة {{code}}"
-  },
-  "INSTALLMENTS": {
-    "LIST": {
-      "TITLE": "خطط الأقساط",
-      "SUBTITLE": "تتبع المشتريات الممولة المدفوعة على دفعات",
-      "BACK_TO_EXPENSES": "العودة إلى المصاريف",
-      "NEW": "قسط جديد",
-      "STAT_ACTIVE": "الخطط النشطة",
-      "STAT_COMPLETED": "المكتملة",
-      "STAT_TOTAL_FINANCED": "إجمالي التمويل",
-      "STAT_REMAINING": "المتبقي",
-      "BRANCH": "الفرع",
-      "ALL_BRANCHES": "جميع الفروع",
-      "STATUS": "الحالة",
-      "ALL": "الكل",
-      "STATUS_ACTIVE": "نشط",
-      "STATUS_COMPLETED": "مكتمل",
-      "STATUS_CANCELED": "ملغى",
-      "COL_NAME": "الاسم",
-      "COL_BRANCH": "الفرع",
-      "COL_CATEGORY": "الفئة",
-      "COL_TOTAL": "الإجمالي",
-      "COL_DOWN": "مقدم",
-      "COL_MONTHLY": "الشهري",
-      "COL_MONTHS": "الأشهر",
-      "COL_PROGRESS": "التقدم",
-      "COL_NEXT_DUE": "القسط القادم",
-      "COL_STATUS": "الحالة",
-      "COL_ACTIONS": "الإجراءات",
-      "VIEW": "عرض",
-      "DELETE": "حذف",
-      "GLOBAL": "عام",
-      "NO_DATA": "لا توجد خطط أقساط بعد. اضغط \"قسط جديد\" لإنشاء واحدة.",
-      "DELETE_TITLE": "حذف خطة الأقساط",
-      "DELETE_CONFIRM": "سيؤدي هذا إلى الإزالة الدائمة للخطة وجدولها وجميع الدفعات المرتبطة (بما في ذلك الدفعة المقدمة). هل تريد المتابعة؟",
-      "MSG_DELETED": "تم حذف خطة الأقساط",
-      "MSG_DELETE_FAILED": "فشل حذف الخطة"
-    }
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الجلسات",
@@ -2554,5 +2950,24 @@
     "STATUS_ABSENT": "غائب",
     "NO_DATA": "لا توجد سجلات حضور للمعلمين",
     "NO_DATA_HINT": "يتم إنشاء السجلات عند بدء الجلسات مع قائمة المعلمين."
+  },
+  "ATTENDANCE": {
+    "SAVED": "تم حفظ الحضور",
+    "TEACHER_SAVED": "تم حفظ حضور المعلم"
+  },
+  "DEMO_LEADS": {
+    "CREATED": "شكرًا! سنتواصل معك قريبًا."
+  },
+  "EVENT_SUBSCRIPTIONS": {
+    "DELETED": "تم إزالة المشترك"
+  },
+  "EXPENSE_PAYMENTS": {
+    "DELETED": "تم حذف الدفعة"
+  },
+  "MASTER_ENROLLMENTS": {
+    "CANCELLED": "تم إلغاء التسجيل الرئيسي"
+  },
+  "WITHDRAWALS": {
+    "DELETED": "تم حذف السحب"
   }
 }

@@ -6,7 +6,7 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
 import { ProductSaleService } from '../services/product-sale.service';
 import { EventService } from '../../events/services/event.service';
@@ -45,6 +45,7 @@ export class ProductSaleComponent implements OnInit {
   private eventService = inject(EventService);
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -174,13 +175,15 @@ export class ProductSaleComponent implements OnInit {
     this.productSaleService.createSale(formValue).subscribe({
       next: (sale: any) => {
         this.submitting.set(false);
-        this.notificationService.success(`Sale completed! Total: ${sale.totalAmount.toFixed(2)}`);
+        this.notificationService.success(
+          this.translate.instant('PRODUCTS.SALE_COMPLETED', { total: sale.totalAmount.toFixed(2) })
+        );
         this.router.navigate(['/products/sales']);
       },
       error: (err) => {
+        // Interceptor toasted the translated error.
         this.submitting.set(false);
         console.error('Error creating sale:', err);
-        this.notificationService.error(err.error?.message || 'Failed to complete sale');
       },
     });
   }

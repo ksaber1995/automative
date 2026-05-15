@@ -4,7 +4,7 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { FormsModule } from '@angular/forms';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CompanyService, GlobalExpenseAllocation } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 
@@ -30,6 +30,7 @@ interface AllocationOption {
 export class SettingsComponent implements OnInit {
   private companyService = inject(CompanyService);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   loading = signal(true);
   saving = signal(false);
@@ -96,11 +97,11 @@ export class SettingsComponent implements OnInit {
     this.saving.set(true);
     this.companyService.updateSettings({ globalExpenseAllocation: this.selectedMethod() }).subscribe({
       next: () => {
-        this.notificationService.success('Settings saved successfully');
+        this.notificationService.success(this.translate.instant('SETTINGS.SAVED'));
         this.saving.set(false);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to save settings');
+      error: () => {
+        // Interceptor toasted the translated error.
         this.saving.set(false);
       }
     });

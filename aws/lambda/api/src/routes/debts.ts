@@ -1,5 +1,6 @@
 import { query } from '../db/connection';
-import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export const debtsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
@@ -7,7 +8,7 @@ export const debtsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'debts', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement debts table and insert logic with company_id
@@ -28,10 +29,7 @@ export const debtsRoutes = {
       };
     } catch (error) {
       console.error('Create debt error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create debt' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.CREATE_FAILED', 'Failed to create debt', 400);
     }
   },
 
@@ -40,7 +38,7 @@ export const debtsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'debts', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement when debts table is created
@@ -51,10 +49,7 @@ export const debtsRoutes = {
       };
     } catch (error) {
       console.error('List debts error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list debts' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.LIST_FAILED', 'Failed to list debts');
     }
   },
 
@@ -63,7 +58,7 @@ export const debtsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'debts', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement when debts table is created
@@ -80,10 +75,7 @@ export const debtsRoutes = {
       };
     } catch (error) {
       console.error('Debts summary error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to generate debts summary' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.SUMMARY_FAILED', 'Failed to generate debts summary');
     }
   },
 
@@ -91,21 +83,15 @@ export const debtsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'debts', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement when debts table is created
       // When implemented, verify: WHERE id = $1 AND company_id = $2
-      return {
-        status: 404 as const,
-        body: { message: 'Debt not found' },
-      };
+      return apiError(404, 'ERRORS.DEBTS.NOT_FOUND', 'Debt not found');
     } catch (error) {
       console.error('Get debt error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Debt not found' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.NOT_FOUND', 'Debt not found', 404);
     }
   },
 
@@ -113,21 +99,15 @@ export const debtsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'debts', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement when debts table is created
       // When implemented, verify ownership: WHERE id = $1 AND company_id = $2
-      return {
-        status: 404 as const,
-        body: { message: 'Debt not found' },
-      };
+      return apiError(404, 'ERRORS.DEBTS.NOT_FOUND', 'Debt not found');
     } catch (error) {
       console.error('Update debt error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update debt' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.UPDATE_FAILED', 'Failed to update debt', 404);
     }
   },
 
@@ -135,21 +115,15 @@ export const debtsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'debts', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // TODO: Implement when debts table is created
       // When implemented, verify ownership: WHERE id = $1 AND company_id = $2
-      return {
-        status: 404 as const,
-        body: { message: 'Debt not found' },
-      };
+      return apiError(404, 'ERRORS.DEBTS.NOT_FOUND', 'Debt not found');
     } catch (error) {
       console.error('Delete debt error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete debt' },
-      };
+      return mapThrownError(error, 'ERRORS.DEBTS.DELETE_FAILED', 'Failed to delete debt', 404);
     }
   },
 };

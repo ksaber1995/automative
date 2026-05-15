@@ -244,7 +244,7 @@ export class ClassFormComponent implements OnInit {
         this.courses.set(courses.map(c => ({ label: c.name, value: c.id })));
       },
       error: () => {
-        this.notificationService.error('Failed to load courses');
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -270,7 +270,7 @@ export class ClassFormComponent implements OnInit {
         }
       },
       error: () => {
-        this.notificationService.error('Failed to load course');
+        // Interceptor toasted the translated error.
         if (this.isGlobalCreate()) {
           this.router.navigate(['/classes']);
         } else {
@@ -291,7 +291,7 @@ export class ClassFormComponent implements OnInit {
         })));
       },
       error: () => {
-        this.notificationService.error('Failed to load instructors');
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -311,7 +311,7 @@ export class ClassFormComponent implements OnInit {
         }
       },
       error: () => {
-        this.notificationService.error('Failed to load branches');
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -347,7 +347,7 @@ export class ClassFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load class');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/courses', this.courseId]);
       }
@@ -421,7 +421,7 @@ export class ClassFormComponent implements OnInit {
     // Determine courseId (from route or from form)
     const targetCourseId = this.courseId || formValue.courseId;
     if (!targetCourseId) {
-      this.notificationService.error('Course is required');
+      this.notificationService.error(this.translate.instant('CLASSES.COURSE_REQUIRED'));
       this.loading.set(false);
       return;
     }
@@ -445,7 +445,7 @@ export class ClassFormComponent implements OnInit {
         ? formValue.endDate.toISOString().split('T')[0]
         : formValue.endDate;
     } else {
-      this.notificationService.error('Please provide either an end date or number of sessions with days of week');
+      this.notificationService.error(this.translate.instant('CLASSES.END_DATE_OR_SESSIONS_REQUIRED'));
       this.loading.set(false);
       return;
     }
@@ -474,7 +474,7 @@ export class ClassFormComponent implements OnInit {
     if (this.isEditMode() && this.classId) {
       this.classService.updateClass(this.classId, classData).subscribe({
         next: () => {
-          this.notificationService.success('Class updated successfully');
+          this.notificationService.success(this.translate.instant('CLASSES.UPDATED'));
           if (this.isGlobalCreate()) {
             this.router.navigate(['/classes']);
           } else {
@@ -482,15 +482,15 @@ export class ClassFormComponent implements OnInit {
           }
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to update class');
           console.error('Update error:', error);
         }
       });
     } else {
       this.classService.createClass(classData).subscribe({
         next: () => {
-          this.notificationService.success('Class created successfully');
+          this.notificationService.success(this.translate.instant('CLASSES.CREATED'));
           if (this.isGlobalCreate()) {
             this.router.navigate(['/classes']);
           } else {
@@ -498,8 +498,8 @@ export class ClassFormComponent implements OnInit {
           }
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to create class');
           console.error('Create error:', error);
         }
       });

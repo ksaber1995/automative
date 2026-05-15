@@ -1,6 +1,7 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission } from '../middleware/tenant-isolation';
 import { mapPaymentFromDB } from './expense-payments';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapPlanFromDB(row: any) {
   return {
@@ -82,11 +83,11 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const totalAmount = Number(body.totalAmount);
@@ -94,13 +95,13 @@ export const installmentsRoutes = {
       const monthsCount = Number(body.monthsCount);
 
       if (!(totalAmount > 0)) {
-        return { status: 400 as const, body: { message: 'Total amount must be greater than zero' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.TOTAL_NON_POSITIVE', 'Total amount must be greater than zero');
       }
       if (downpaymentAmount < 0 || downpaymentAmount >= totalAmount) {
-        return { status: 400 as const, body: { message: 'Downpayment must be between 0 and less than total amount' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.DOWNPAYMENT_INVALID', 'Downpayment must be between 0 and less than total amount');
       }
       if (!Number.isInteger(monthsCount) || monthsCount < 1) {
-        return { status: 400 as const, body: { message: 'Months count must be a positive integer' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.MONTHS_INVALID', 'Months count must be a positive integer');
       }
 
       const financedAmount = parseFloat((totalAmount - downpaymentAmount).toFixed(2));
@@ -108,7 +109,7 @@ export const installmentsRoutes = {
 
       const startDate: string = body.startDate;
       if (!startDate) {
-        return { status: 400 as const, body: { message: 'Start date is required' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.START_DATE_REQUIRED', 'Start date is required');
       }
 
       // 1. Create downpayment expense_payment first if needed (so we can FK link it)
@@ -179,10 +180,7 @@ export const installmentsRoutes = {
       };
     } catch (error) {
       console.error('Create installment plan error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create installment plan' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.CREATE_FAILED', 'Failed to create installment plan', 400);
     }
   },
 
@@ -190,7 +188,7 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -205,7 +203,7 @@ export const installmentsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND p.branch_id = $${params.length}`;
@@ -220,10 +218,7 @@ export const installmentsRoutes = {
       return { status: 200 as const, body: plans.map(mapPlanFromDB) };
     } catch (error) {
       console.error('List installment plans error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list installment plans' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.LIST_FAILED', 'Failed to list installment plans');
     }
   },
 
@@ -231,7 +226,7 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const plan = await queryOne(
@@ -245,11 +240,11 @@ export const installmentsRoutes = {
       );
 
       if (!plan) {
-        return { status: 404 as const, body: { message: 'Installment plan not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.PLAN_NOT_FOUND', 'Installment plan not found');
       }
 
       if (plan.branch_id && !canAccessBranch(context, plan.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this plan' } };
+        return apiError(403, 'ERRORS.INSTALLMENTS.PLAN_ACCESS_DENIED', 'Access denied to this plan');
       }
 
       const schedule = await query(
@@ -276,10 +271,7 @@ export const installmentsRoutes = {
       };
     } catch (error) {
       console.error('Get installment plan error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Installment plan not found' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.PLAN_NOT_FOUND', 'Installment plan not found', 404);
     }
   },
 
@@ -287,7 +279,7 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const plan = await queryOne(
@@ -295,10 +287,10 @@ export const installmentsRoutes = {
         [params.id, context.companyId]
       );
       if (!plan) {
-        return { status: 404 as const, body: { message: 'Installment plan not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.PLAN_NOT_FOUND', 'Installment plan not found');
       }
       if (plan.branch_id && !canAccessBranch(context, plan.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this plan' } };
+        return apiError(403, 'ERRORS.INSTALLMENTS.PLAN_ACCESS_DENIED', 'Access denied to this plan');
       }
 
       // Delete linked expense_payments (downpayment + paid installments)
@@ -315,13 +307,10 @@ export const installmentsRoutes = {
 
       await query(`DELETE FROM installment_plans WHERE id = $1 AND company_id = $2`, [params.id, context.companyId]);
 
-      return { status: 200 as const, body: { message: 'Installment plan deleted successfully' } };
+      return { status: 200 as const, body: { message: 'Installment plan deleted successfully', code: 'INSTALLMENTS.PLAN_DELETED' } };
     } catch (error) {
       console.error('Delete installment plan error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to delete installment plan' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.DELETE_FAILED', 'Failed to delete installment plan');
     }
   },
 
@@ -329,7 +318,7 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const plan = await queryOne(
@@ -337,10 +326,10 @@ export const installmentsRoutes = {
         [params.id, context.companyId]
       );
       if (!plan) {
-        return { status: 404 as const, body: { message: 'Installment plan not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.PLAN_NOT_FOUND', 'Installment plan not found');
       }
       if (plan.branch_id && !canAccessBranch(context, plan.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this plan' } };
+        return apiError(403, 'ERRORS.INSTALLMENTS.PLAN_ACCESS_DENIED', 'Access denied to this plan');
       }
 
       const sched = await queryOne(
@@ -348,16 +337,16 @@ export const installmentsRoutes = {
         [params.scheduleId, params.id, context.companyId]
       );
       if (!sched) {
-        return { status: 404 as const, body: { message: 'Installment not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.SCHEDULE_NOT_FOUND', 'Installment not found');
       }
       if (sched.status === 'PAID') {
-        return { status: 400 as const, body: { message: 'This installment is already paid' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.ALREADY_PAID', 'This installment is already paid');
       }
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
       const payAmount = body.amount !== undefined && body.amount !== null ? Number(body.amount) : parseFloat(sched.amount);
       if (!(payAmount > 0)) {
-        return { status: 400 as const, body: { message: 'Payment amount must be greater than zero' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.PAY_AMOUNT_NON_POSITIVE', 'Payment amount must be greater than zero');
       }
 
       const payment = await insert('expense_payments', {
@@ -398,10 +387,7 @@ export const installmentsRoutes = {
       };
     } catch (error) {
       console.error('Pay installment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to pay installment' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.PAY_FAILED', 'Failed to pay installment');
     }
   },
 
@@ -409,7 +395,7 @@ export const installmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const plan = await queryOne(
@@ -417,10 +403,10 @@ export const installmentsRoutes = {
         [params.id, context.companyId]
       );
       if (!plan) {
-        return { status: 404 as const, body: { message: 'Installment plan not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.PLAN_NOT_FOUND', 'Installment plan not found');
       }
       if (plan.branch_id && !canAccessBranch(context, plan.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this plan' } };
+        return apiError(403, 'ERRORS.INSTALLMENTS.PLAN_ACCESS_DENIED', 'Access denied to this plan');
       }
 
       const sched = await queryOne(
@@ -428,10 +414,10 @@ export const installmentsRoutes = {
         [params.scheduleId, params.id, context.companyId]
       );
       if (!sched) {
-        return { status: 404 as const, body: { message: 'Installment not found' } };
+        return apiError(404, 'ERRORS.INSTALLMENTS.SCHEDULE_NOT_FOUND', 'Installment not found');
       }
       if (sched.status !== 'PAID') {
-        return { status: 400 as const, body: { message: 'This installment is not paid' } };
+        return apiError(400, 'ERRORS.INSTALLMENTS.NOT_PAID', 'This installment is not paid');
       }
 
       if (sched.payment_id) {
@@ -447,13 +433,10 @@ export const installmentsRoutes = {
 
       await recalcPlanStatus(params.id);
 
-      return { status: 200 as const, body: { message: 'Installment payment reversed' } };
+      return { status: 200 as const, body: { message: 'Installment payment reversed', code: 'INSTALLMENTS.UNPAID' } };
     } catch (error) {
       console.error('Unpay installment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to reverse installment payment' },
-      };
+      return mapThrownError(error, 'ERRORS.INSTALLMENTS.UNPAY_FAILED', 'Failed to reverse installment payment');
     }
   },
 };

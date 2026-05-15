@@ -197,9 +197,9 @@ export class CashManagementComponent implements OnInit {
         this.notificationService.success(this.translate.instant('CASH.SAVED'));
         this.loadAll();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to save');
       },
     });
   }
@@ -219,8 +219,8 @@ export class CashManagementComponent implements OnInit {
         this.toDelete.set(null);
         this.loadAll();
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to delete');
+      error: () => {
+        // Interceptor toasted the translated error.
       },
     });
   }

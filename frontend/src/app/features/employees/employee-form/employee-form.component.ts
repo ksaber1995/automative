@@ -8,7 +8,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -38,6 +38,7 @@ export class EmployeeFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   employeeForm: FormGroup;
   loading = signal(false);
@@ -102,7 +103,7 @@ export class EmployeeFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load employee');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/employees']);
       }
@@ -124,23 +125,23 @@ export class EmployeeFormComponent implements OnInit {
     if (this.isEditMode() && this.employeeId) {
       this.employeeService.updateEmployee(this.employeeId, employeeData).subscribe({
         next: () => {
-          this.notificationService.success('Employee updated successfully');
+          this.notificationService.success(this.translate.instant('EMPLOYEES.UPDATED'));
           this.router.navigate(['/employees']);
         },
-        error: (error) => {
+        error: () => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to update employee');
         }
       });
     } else {
       this.employeeService.createEmployee(employeeData).subscribe({
         next: () => {
-          this.notificationService.success('Employee created successfully');
+          this.notificationService.success(this.translate.instant('EMPLOYEES.CREATED'));
           this.router.navigate(['/employees']);
         },
-        error: (error) => {
+        error: () => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to create employee');
         }
       });
     }

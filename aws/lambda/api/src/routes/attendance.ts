@@ -1,5 +1,6 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export const attendanceRoutes = {
   /**
@@ -10,7 +11,7 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Verify session belongs to company
@@ -19,10 +20,10 @@ export const attendanceRoutes = {
         [params.sessionId, context.companyId]
       );
       if (!session) {
-        return { status: 404 as const, body: { message: 'Session not found' } };
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       }
       if (!canAccessBranch(context, session.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       // Get all enrolled students for this class (both direct and bundle enrollments)
@@ -57,10 +58,7 @@ export const attendanceRoutes = {
       };
     } catch (error) {
       console.error('Get session attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.GET_FAILED', 'Failed to get attendance');
     }
   },
 
@@ -73,7 +71,7 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const session = await queryOne(
@@ -81,10 +79,10 @@ export const attendanceRoutes = {
         [params.sessionId, context.companyId]
       );
       if (!session) {
-        return { status: 404 as const, body: { message: 'Session not found' } };
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       }
       if (!canAccessBranch(context, session.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       const presentIds: string[] = body.presentStudentIds || [];
@@ -109,15 +107,13 @@ export const attendanceRoutes = {
         status: 200 as const,
         body: {
           message: 'Attendance saved successfully',
+          code: 'ATTENDANCE.SAVED',
           presentCount: presentIds.length,
         },
       };
     } catch (error) {
       console.error('Save session attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to save attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.SAVE_FAILED', 'Failed to save attendance');
     }
   },
 
@@ -129,7 +125,7 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Get all sessions for classes the student is enrolled in
@@ -174,10 +170,7 @@ export const attendanceRoutes = {
       };
     } catch (error) {
       console.error('Get student attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get student attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.STUDENT_FAILED', 'Failed to get student attendance');
     }
   },
 
@@ -189,7 +182,7 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const cls = await queryOne(
@@ -200,10 +193,10 @@ export const attendanceRoutes = {
         [params.classId, context.companyId]
       );
       if (!cls) {
-        return { status: 404 as const, body: { message: 'Class not found' } };
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
       }
       if (!canAccessBranch(context, cls.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this class' } };
+        return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED', 'Access denied to this class');
       }
 
       // Total enrolled students for this class
@@ -249,10 +242,7 @@ export const attendanceRoutes = {
       };
     } catch (error) {
       console.error('Get class attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get class attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.CLASS_FAILED', 'Failed to get class attendance');
     }
   },
 
@@ -268,16 +258,16 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const session = await queryOne(
         'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
         [params.sessionId, context.companyId]
       );
-      if (!session) return { status: 404 as const, body: { message: 'Session not found' } };
+      if (!session) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       if (!canAccessBranch(context, session.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       const rows = await query(
@@ -316,10 +306,7 @@ export const attendanceRoutes = {
       };
     } catch (error) {
       console.error('Get session teacher attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get teacher attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.TEACHER_GET_FAILED', 'Failed to get teacher attendance');
     }
   },
 
@@ -332,16 +319,16 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const session = await queryOne(
         'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
         [params.sessionId, context.companyId]
       );
-      if (!session) return { status: 404 as const, body: { message: 'Session not found' } };
+      if (!session) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       if (!canAccessBranch(context, session.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       const teachers = Array.isArray(body?.teachers) ? body.teachers : [];
@@ -364,13 +351,10 @@ export const attendanceRoutes = {
         );
       }
 
-      return { status: 200 as const, body: { message: 'Teacher attendance saved', count: teachers.length } };
+      return { status: 200 as const, body: { message: 'Teacher attendance saved', code: 'ATTENDANCE.TEACHER_SAVED', count: teachers.length } };
     } catch (error) {
       console.error('Save teacher attendance error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to save teacher attendance' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.TEACHER_SAVE_FAILED', 'Failed to save teacher attendance');
     }
   },
 
@@ -382,7 +366,7 @@ export const attendanceRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const params: any[] = [context.companyId];
@@ -419,7 +403,7 @@ export const attendanceRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND s.branch_id = $${params.length}`;
@@ -482,10 +466,7 @@ export const attendanceRoutes = {
       };
     } catch (error) {
       console.error('Get teacher attendance history error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get teacher attendance history' },
-      };
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.TEACHER_HISTORY_FAILED', 'Failed to get teacher attendance history');
     }
   },
 };

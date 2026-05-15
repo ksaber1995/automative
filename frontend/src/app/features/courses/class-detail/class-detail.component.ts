@@ -107,7 +107,10 @@ export class ClassDetailComponent implements OnInit {
     this.loadingClass.set(true);
     this.classService.getClassWithDetails(this.classId).subscribe({
       next: (cls) => { this.classDetail.set(cls); this.loadingClass.set(false); },
-      error: () => { this.notificationService.error(this.translate.instant('CLASSES.DETAIL.ERR_LOAD_CLASS')); this.loadingClass.set(false); }
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.loadingClass.set(false);
+      }
     });
   }
 
@@ -169,9 +172,9 @@ export class ClassDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('CLASSES.DETAIL.SESSION_STARTED'));
         this.loadSessions();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingSession.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_START_SESSION'));
       },
     });
   }
@@ -193,9 +196,9 @@ export class ClassDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('CLASSES.DETAIL.SESSION_ENDED_MSG'));
         this.loadSessions();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingSession.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_END_SESSION'));
       },
     });
   }
@@ -210,8 +213,8 @@ export class ClassDetailComponent implements OnInit {
         this.loadingAttendanceStudents.set(false);
       },
       error: () => {
+        // Interceptor toasted the translated error.
         this.loadingAttendanceStudents.set(false);
-        this.notificationService.error(this.translate.instant('CLASSES.DETAIL.ERR_LOAD_STUDENTS'));
       },
     });
   }
@@ -247,9 +250,9 @@ export class ClassDetailComponent implements OnInit {
         // Refresh attendance summary if on that tab
         if (this.activeTab === 'attendance') this.loadAttendanceSummary();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingAttendance.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_SAVE_ATTENDANCE'));
       },
     });
   }
@@ -299,9 +302,9 @@ export class ClassDetailComponent implements OnInit {
         const current = this.classDetail();
         this.classDetail.set(current ? { ...current, ...updated } : null);
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.finishing.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('CLASSES.DETAIL.ERR_FINISH_CLASS'));
       },
     });
   }
@@ -331,6 +334,16 @@ export class ClassDetailComponent implements OnInit {
       case 'DROPPED': return 'danger';
       case 'PENDING': return 'warn';
       default: return 'secondary';
+    }
+  }
+
+  enrollmentStatusLabel(status?: string): string {
+    switch (status?.toUpperCase()) {
+      case 'ACTIVE': return this.translate.instant('CLASSES.DETAIL.ENR_STATUS_ACTIVE');
+      case 'COMPLETED': return this.translate.instant('CLASSES.DETAIL.ENR_STATUS_COMPLETED');
+      case 'DROPPED': return this.translate.instant('CLASSES.DETAIL.ENR_STATUS_DROPPED');
+      case 'PENDING': return this.translate.instant('CLASSES.DETAIL.ENR_STATUS_PENDING');
+      default: return status || '';
     }
   }
 

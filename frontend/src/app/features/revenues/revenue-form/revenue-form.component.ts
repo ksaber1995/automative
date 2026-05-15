@@ -19,7 +19,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Student } from '@shared/interfaces/student.interface';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-revenue-form',
@@ -48,6 +48,7 @@ export class RevenueFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   revenueForm: FormGroup;
   loading = signal(false);
@@ -114,7 +115,7 @@ export class RevenueFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load revenue');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/revenues']);
       }
@@ -139,24 +140,24 @@ export class RevenueFormComponent implements OnInit {
     if (this.isEditMode() && this.revenueId) {
       this.revenueService.updateRevenue(this.revenueId, revenueData).subscribe({
         next: () => {
-          this.notificationService.success('Revenue updated successfully');
+          this.notificationService.success(this.translate.instant('REVENUES.UPDATED'));
           this.router.navigate(['/revenues']);
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to update revenue');
           console.error('Update error:', error);
         }
       });
     } else {
       this.revenueService.createRevenue(revenueData).subscribe({
         next: () => {
-          this.notificationService.success('Revenue created successfully');
+          this.notificationService.success(this.translate.instant('REVENUES.CREATED'));
           this.router.navigate(['/revenues']);
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to create revenue');
           console.error('Create error:', error);
         }
       });

@@ -193,13 +193,13 @@ export class ClassListComponent implements OnInit {
 
     this.classService.deleteClass(classItem.id).subscribe({
       next: () => {
-        this.notificationService.success('Class deleted successfully');
+        this.notificationService.success(this.translate.instant('CLASSES.DELETED'));
         this.loadClasses();
         this.showDeleteDialog = false;
         this.classToDelete.set(null);
       },
       error: () => {
-        this.notificationService.error('Failed to delete class');
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       }
     });

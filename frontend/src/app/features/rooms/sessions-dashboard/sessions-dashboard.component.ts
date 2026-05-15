@@ -428,9 +428,9 @@ export class SessionsDashboardComponent implements OnInit {
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
         this.loadAll();
       },
-      error: (err: any) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_START_FAILED'));
       },
     });
   }
@@ -487,9 +487,9 @@ export class SessionsDashboardComponent implements OnInit {
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_ENDED'));
         this.loadAll();
       },
-      error: (err: any) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.saving.set(false);
-        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_END_FAILED'));
       },
     });
   }
@@ -539,8 +539,8 @@ export class SessionsDashboardComponent implements OnInit {
         this.loadingAttendanceFor.set(null);
       },
       error: () => {
+        // Interceptor toasted the translated error.
         this.loadingAttendanceFor.set(null);
-        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_LOAD_STUDENTS_FAILED'));
       },
     });
   }
@@ -597,11 +597,9 @@ export class SessionsDashboardComponent implements OnInit {
           delete this.attendanceSavedClearTimers[sessionId];
         }, 2000);
       },
-      error: (err: any) => {
+      error: () => {
+        // Interceptor toasted the translated error; also flip the per-row indicator.
         this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'error' });
-        this.notificationService.error(
-          err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_ATTENDANCE_SAVE_FAILED'),
-        );
       },
     });
   }
@@ -634,8 +632,8 @@ export class SessionsDashboardComponent implements OnInit {
         this.loadingTeachersFor.set(null);
       },
       error: () => {
+        // Interceptor toasted the translated error.
         this.loadingTeachersFor.set(null);
-        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_LOAD_TEACHERS_FAILED'));
       },
     });
   }
@@ -700,9 +698,9 @@ export class SessionsDashboardComponent implements OnInit {
         this.savingTeachersFor.set(null);
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVED', { count: res.count }));
       },
-      error: (err: any) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingTeachersFor.set(null);
-        this.notificationService.error(err?.error?.message || this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVE_FAILED'));
       },
     });
   }

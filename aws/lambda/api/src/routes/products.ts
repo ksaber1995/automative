@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapProductFromDB(row: any) {
   return {
@@ -28,15 +29,12 @@ export const productsRoutes = {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'write')) {
         client.release();
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (!body.branchId || !canAccessBranch(context, body.branchId)) {
         client.release();
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       await client.query('BEGIN');
@@ -79,15 +77,9 @@ export const productsRoutes = {
       await client.query('ROLLBACK');
       console.error('Create product error:', error);
       if (error?.code === '23505') {
-        return {
-          status: 400 as const,
-          body: { message: 'A product with this code already exists in this branch.' },
-        };
+        return apiError(400, 'ERRORS.PRODUCTS.CODE_TAKEN', 'A product with this code already exists in this branch.');
       }
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create product' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.CREATE_FAILED', 'Failed to create product', 400);
     } finally {
       client.release();
     }
@@ -97,7 +89,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM products WHERE company_id = $1 AND is_active = true';
@@ -105,10 +97,7 @@ export const productsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -126,10 +115,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('List products error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list products' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.LIST_FAILED', 'Failed to list products');
     }
   },
 
@@ -137,14 +123,11 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (!canAccessBranch(context, params.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const sql = `
@@ -163,10 +146,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('Get available products error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get available products' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.AVAILABLE_FAILED', 'Failed to get available products');
     }
   },
 
@@ -174,7 +154,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -187,10 +167,7 @@ export const productsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -208,10 +185,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('Get low stock products error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get low stock products' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.LOW_STOCK_FAILED', 'Failed to get low stock products');
     }
   },
 
@@ -219,7 +193,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const product = await queryOne(
@@ -228,17 +202,11 @@ export const productsRoutes = {
       );
 
       if (!product) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this product' },
-        };
+        return apiError(403, 'ERRORS.PRODUCTS.ACCESS_DENIED', 'Access denied to this product');
       }
 
       return {
@@ -247,10 +215,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('Get product error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Product not found' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found', 404);
     }
   },
 
@@ -258,7 +223,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -267,17 +232,11 @@ export const productsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to update this product' },
-        };
+        return apiError(403, 'ERRORS.PRODUCTS.ACCESS_DENIED_UPDATE', 'Access denied to update this product');
       }
 
       const updateData: any = {};
@@ -296,10 +255,7 @@ export const productsRoutes = {
       const product = await update('products', params.id, updateData);
 
       if (!product) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       return {
@@ -308,10 +264,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('Update product error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update product' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.UPDATE_FAILED', 'Failed to update product', 404);
     }
   },
 
@@ -319,7 +272,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const product = await queryOne(
@@ -328,17 +281,11 @@ export const productsRoutes = {
       );
 
       if (!product) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to adjust this product stock' },
-        };
+        return apiError(403, 'ERRORS.PRODUCTS.ACCESS_DENIED_ADJUST', 'Access denied to adjust this product stock');
       }
 
       const currentStock = parseInt(product.stock) || 0;
@@ -349,19 +296,13 @@ export const productsRoutes = {
       } else if (body.operation === 'subtract') {
         newStock = Math.max(0, currentStock - body.quantity);
       } else {
-        return {
-          status: 400 as const,
-          body: { message: 'Invalid operation. Must be "add" or "subtract"' },
-        };
+        return apiError(400, 'ERRORS.PRODUCTS.INVALID_OPERATION', 'Invalid operation. Must be "add" or "subtract"');
       }
 
       const updatedProduct = await update('products', params.id, { stock: newStock });
 
       if (!updatedProduct) {
-        return {
-          status: 404 as const,
-          body: { message: 'Failed to update product stock' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.STOCK_UPDATE_FAILED', 'Failed to update product stock');
       }
 
       return {
@@ -370,10 +311,7 @@ export const productsRoutes = {
       };
     } catch (error) {
       console.error('Adjust product stock error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to adjust product stock' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.STOCK_ADJUST_FAILED', 'Failed to adjust product stock', 404);
     }
   },
 
@@ -383,7 +321,7 @@ export const productsRoutes = {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'write')) {
         client.release();
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const product = await queryOne(
@@ -392,11 +330,11 @@ export const productsRoutes = {
       );
       if (!product) {
         client.release();
-        return { status: 404 as const, body: { message: 'Product not found' } };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
       if (product.branch_id && !canAccessBranch(context, product.branch_id)) {
         client.release();
-        return { status: 403 as const, body: { message: 'Access denied to this product' } };
+        return apiError(403, 'ERRORS.PRODUCTS.ACCESS_DENIED', 'Access denied to this product');
       }
 
       const quantity = body.quantity;
@@ -447,10 +385,7 @@ export const productsRoutes = {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Restock product error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to restock product' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.RESTOCK_FAILED', 'Failed to restock product', 400);
     } finally {
       client.release();
     }
@@ -460,7 +395,7 @@ export const productsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'products', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -469,38 +404,26 @@ export const productsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to delete this product' },
-        };
+        return apiError(403, 'ERRORS.PRODUCTS.ACCESS_DENIED_DELETE', 'Access denied to delete this product');
       }
 
       const product = await update('products', params.id, { is_active: false });
 
       if (!product) {
-        return {
-          status: 404 as const,
-          body: { message: 'Product not found' },
-        };
+        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
       }
 
       return {
         status: 200 as const,
-        body: { message: 'Product deleted successfully' },
+        body: { message: 'Product deleted successfully', code: 'PRODUCTS.DELETED' },
       };
     } catch (error) {
       console.error('Delete product error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete product' },
-      };
+      return mapThrownError(error, 'ERRORS.PRODUCTS.DELETE_FAILED', 'Failed to delete product', 404);
     }
   },
 };

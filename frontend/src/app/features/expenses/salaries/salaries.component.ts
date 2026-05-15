@@ -183,7 +183,7 @@ export class SalariesComponent implements OnInit {
         this.historyLoading.set(false);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.LOAD_HISTORY_FAILED'));
+        // Interceptor toasted the translated error.
         this.historyLoading.set(false);
       }
     });
@@ -222,7 +222,9 @@ export class SalariesComponent implements OnInit {
             this.notificationService.success(this.translate.instant('EXPENSES.SALARIES.VOIDED'));
             this.historyPayments.set(this.historyPayments().filter(x => x.id !== p.id));
           },
-          error: () => this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.VOID_FAILED'))
+          error: () => {
+            // Interceptor toasted the translated error.
+          }
         });
       }
     });
@@ -245,7 +247,7 @@ export class SalariesComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('EXPENSES.SALARIES.LOAD_FAILED'));
+        // Interceptor toasted the translated error.
         this.loading.set(false);
       }
     });

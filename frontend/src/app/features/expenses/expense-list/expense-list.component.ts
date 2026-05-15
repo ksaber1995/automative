@@ -24,7 +24,7 @@ import { Employee } from '@shared/interfaces/employee.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { InstallmentPlan } from '@shared/interfaces/installment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 type ExpenseTab = 'all' | 'due' | 'direct' | 'salaries' | 'installments' | 'events';
 
@@ -46,6 +46,7 @@ export class ExpenseListComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   expenses = signal<Expense[]>([]);
@@ -280,13 +281,13 @@ export class ExpenseListComponent implements OnInit {
     if (!expense) return;
     this.expenseService.deleteExpense(expense.id).subscribe({
       next: () => {
-        this.notificationService.success('Expense deleted');
+        this.notificationService.success(this.translate.instant('EXPENSES.DELETED'));
         this.showDeleteDialog = false;
         this.expenseToDelete.set(null);
         this.loadExpenses();
       },
       error: () => {
-        this.notificationService.error('Failed to delete expense');
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       }
     });
@@ -324,13 +325,13 @@ export class ExpenseListComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.recordingPayment.set(false);
-        this.notificationService.success('Payment recorded successfully');
+        this.notificationService.success(this.translate.instant('EXPENSES.PAYMENT_RECORDED'));
         this.showPaymentDialog = false;
         this.loadExpenses();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.recordingPayment.set(false);
-        this.notificationService.error(err.error?.message || 'Failed to record payment');
       }
     });
   }
@@ -364,15 +365,15 @@ export class ExpenseListComponent implements OnInit {
       : this.salariesDate;
 
     this.expenseService.paySalaries(dateStr, this.salariesBranchId || undefined).subscribe({
-      next: (result) => {
+      next: () => {
         this.payingSalaries.set(false);
         this.showSalariesDialog = false;
-        this.notificationService.success(result.message);
+        this.notificationService.success(this.translate.instant('SALARIES.PAID'));
         this.loadExpenses();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.payingSalaries.set(false);
-        this.notificationService.error(err.error?.message || 'Failed to pay salaries');
         this.showSalariesDialog = false;
       }
     });

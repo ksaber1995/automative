@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapCourseFromDB(row: any) {
   return {
@@ -35,14 +36,11 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const course = await insert('courses', {
@@ -64,10 +62,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('Create course error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create course' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.CREATE_FAILED', 'Failed to create course', 400);
     }
   },
 
@@ -75,7 +70,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -92,10 +87,7 @@ export const coursesRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
@@ -113,10 +105,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('List courses error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list courses' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.LIST_FAILED', 'Failed to list courses');
     }
   },
 
@@ -124,7 +113,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM courses WHERE company_id = $1 AND is_active = true';
@@ -132,10 +121,7 @@ export const coursesRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -153,10 +139,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('List active courses error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list active courses' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.LIST_FAILED', 'Failed to list active courses');
     }
   },
 
@@ -164,7 +147,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const course = await queryOne(
@@ -173,17 +156,11 @@ export const coursesRoutes = {
       );
 
       if (!course) {
-        return {
-          status: 404 as const,
-          body: { message: 'Course not found' },
-        };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       if (!canAccessBranch(context, course.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this course' },
-        };
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED', 'Access denied to this course');
       }
 
       return {
@@ -192,10 +169,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('Get course error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Course not found' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.NOT_FOUND', 'Course not found', 404);
     }
   },
 
@@ -203,7 +177,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -212,27 +186,18 @@ export const coursesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Course not found' },
-        };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to update this course' },
-        };
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_UPDATE', 'Access denied to update this course');
       }
 
       const updateData: any = {};
 
       if (body.branchId !== undefined) {
         if (!canAccessBranch(context, body.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to target branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS_TARGET', 'Access denied to target branch');
         }
         updateData.branch_id = body.branchId;
       }
@@ -247,10 +212,7 @@ export const coursesRoutes = {
       const course = await update('courses', params.id, updateData);
 
       if (!course) {
-        return {
-          status: 404 as const,
-          body: { message: 'Course not found' },
-        };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       return {
@@ -259,10 +221,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('Update course error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update course' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.UPDATE_FAILED', 'Failed to update course', 404);
     }
   },
 
@@ -270,7 +229,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const course = await queryOne(
@@ -279,11 +238,11 @@ export const coursesRoutes = {
       );
 
       if (!course) {
-        return { status: 404 as const, body: { message: 'Course not found' } };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       if (!canAccessBranch(context, course.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this course' } };
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED', 'Access denied to this course');
       }
 
       const enrollments = await query(
@@ -341,10 +300,7 @@ export const coursesRoutes = {
       };
     } catch (error) {
       console.error('Get course enrollments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get course enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.ENROLLMENTS_FAILED', 'Failed to get course enrollments');
     }
   },
 
@@ -352,7 +308,7 @@ export const coursesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -361,38 +317,26 @@ export const coursesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Course not found' },
-        };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to delete this course' },
-        };
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_DELETE', 'Access denied to delete this course');
       }
 
       const course = await update('courses', params.id, { is_active: false });
 
       if (!course) {
-        return {
-          status: 404 as const,
-          body: { message: 'Course not found' },
-        };
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
       return {
         status: 200 as const,
-        body: { message: 'Course deleted successfully' },
+        body: { message: 'Course deleted successfully', code: 'COURSES.DELETED' },
       };
     } catch (error) {
       console.error('Delete course error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete course' },
-      };
+      return mapThrownError(error, 'ERRORS.COURSES.DELETE_FAILED', 'Failed to delete course', 404);
     }
   },
 };

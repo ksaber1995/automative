@@ -112,9 +112,9 @@ export class InstallmentFormComponent implements OnInit {
         this.notificationService.success(this.translate.instant('INSTALLMENTS.FORM.MSG_CREATED'));
         this.router.navigate(['/expenses/installments', res.plan.id]);
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.submitting.set(false);
-        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.FORM.MSG_CREATE_FAILED'));
       },
     });
   }

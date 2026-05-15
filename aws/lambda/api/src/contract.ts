@@ -13,6 +13,13 @@ const OptionalUUIDSchema = z.preprocess(
 );
 const DateStringSchema = z.string().datetime();
 
+// Standard error envelope. `code` is an i18n key (e.g. `ERRORS.BRANCHES.NOT_FOUND`)
+// the frontend translates via ngx-translate. `message` is the English fallback.
+const ApiErrorSchema = z.object({
+  message: z.string(),
+  code: z.string().optional(),
+});
+
 // User Roles (extended RBAC)
 const UserRoleSchema = z.enum([
   'GLOBAL_ADMIN', 'BRANCH_ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER', 'VIEWER',
@@ -976,7 +983,7 @@ export const contract = c.router({
       body: LoginRequestSchema,
       responses: {
         200: AuthResponseSchema,
-        401: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
         403: z.object({
           message: z.string(),
           code: z.string(),
@@ -990,7 +997,7 @@ export const contract = c.router({
       body: RegisterRequestSchema,
       responses: {
         201: RegisterResponseSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     verifyEmail: {
@@ -999,7 +1006,7 @@ export const contract = c.router({
       body: VerifyEmailRequestSchema,
       responses: {
         200: AuthResponseSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     resendEmailOtp: {
@@ -1007,8 +1014,8 @@ export const contract = c.router({
       path: '/api/auth/resend-email-otp',
       body: ResendEmailOtpRequestSchema,
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
       },
     },
     forgotPassword: {
@@ -1016,8 +1023,8 @@ export const contract = c.router({
       path: '/api/auth/forgot-password',
       body: ForgotPasswordRequestSchema,
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
       },
     },
     resetPassword: {
@@ -1025,8 +1032,8 @@ export const contract = c.router({
       path: '/api/auth/reset-password',
       body: ResetPasswordRequestSchema,
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
       },
     },
     profile: {
@@ -1034,7 +1041,7 @@ export const contract = c.router({
       path: '/api/auth/profile',
       responses: {
         200: SafeUserSchema,
-        401: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
       },
       headers: z.object({
         authorization: z.string(),
@@ -1050,7 +1057,7 @@ export const contract = c.router({
       body: CreateStudentSchema,
       responses: {
         201: StudentSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1069,7 +1076,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: StudentSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -1079,7 +1086,7 @@ export const contract = c.router({
       body: UpdateStudentSchema,
       responses: {
         200: StudentSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1088,8 +1095,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1102,7 +1109,7 @@ export const contract = c.router({
       body: CreateBranchSchema,
       responses: {
         201: BranchSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1125,7 +1132,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: BranchSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getStats: {
@@ -1143,7 +1150,7 @@ export const contract = c.router({
           netProfit: z.number(),
           activeEnrollments: z.number(),
         }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -1153,7 +1160,7 @@ export const contract = c.router({
       body: UpdateBranchSchema,
       responses: {
         200: BranchSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getDeletionImpact: {
@@ -1172,7 +1179,7 @@ export const contract = c.router({
             products: z.number(),
           }),
         }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1186,6 +1193,7 @@ export const contract = c.router({
       responses: {
         200: z.object({
           message: z.string(),
+          code: z.string().optional(),
           deactivated: z.boolean(),
           counts: z.object({
             revenues: z.number(),
@@ -1196,7 +1204,7 @@ export const contract = c.router({
             products: z.number(),
           }),
         }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1209,7 +1217,7 @@ export const contract = c.router({
       body: CreateCourseSchema,
       responses: {
         201: CourseSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1238,8 +1246,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getById: {
@@ -1248,7 +1256,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: CourseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -1258,7 +1266,7 @@ export const contract = c.router({
       body: UpdateCourseSchema,
       responses: {
         200: CourseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1267,8 +1275,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1279,7 +1287,7 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/events',
       body: CreateEventSchema,
-      responses: { 201: EventSchema, 400: z.object({ message: z.string() }) },
+      responses: { 201: EventSchema, 400: ApiErrorSchema },
     },
     list: {
       method: 'GET',
@@ -1294,33 +1302,33 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/events/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      responses: { 200: EventSchema, 404: z.object({ message: z.string() }) },
+      responses: { 200: EventSchema, 404: ApiErrorSchema },
     },
     update: {
       method: 'PATCH',
       path: '/api/events/:id',
       pathParams: z.object({ id: UUIDSchema }),
       body: UpdateEventSchema,
-      responses: { 200: EventSchema, 404: z.object({ message: z.string() }) },
+      responses: { 200: EventSchema, 404: ApiErrorSchema },
     },
     delete: {
       method: 'DELETE',
       path: '/api/events/:id',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
-      responses: { 200: z.object({ message: z.string() }), 404: z.object({ message: z.string() }) },
+      responses: { 200: ApiErrorSchema, 404: ApiErrorSchema },
     },
     getPL: {
       method: 'GET',
       path: '/api/events/:id/pl',
       pathParams: z.object({ id: UUIDSchema }),
-      responses: { 200: EventPLSchema, 404: z.object({ message: z.string() }) },
+      responses: { 200: EventPLSchema, 404: ApiErrorSchema },
     },
     listSubscriptions: {
       method: 'GET',
       path: '/api/events/:eventId/subscriptions',
       pathParams: z.object({ eventId: UUIDSchema }),
-      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.array(z.any()), 404: ApiErrorSchema },
     },
     createSubscription: {
       method: 'POST',
@@ -1339,8 +1347,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     deleteSubscription: {
@@ -1349,21 +1357,21 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     listExpenses: {
       method: 'GET',
       path: '/api/events/:eventId/expenses',
       pathParams: z.object({ eventId: UUIDSchema }),
-      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.array(z.any()), 404: ApiErrorSchema },
     },
     listRefunds: {
       method: 'GET',
       path: '/api/events/:eventId/refunds',
       pathParams: z.object({ eventId: UUIDSchema }),
-      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.array(z.any()), 404: ApiErrorSchema },
     },
     createRefund: {
       method: 'POST',
@@ -1378,8 +1386,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1402,8 +1410,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.object({ id: UUIDSchema, message: z.string() }),
-        400: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     list: {
@@ -1411,7 +1419,7 @@ export const contract = c.router({
       path: '/api/demo-leads',
       responses: {
         200: z.array(z.any()),
-        401: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
       },
     },
   },
@@ -1424,7 +1432,7 @@ export const contract = c.router({
       body: CreateMasterCourseSchema,
       responses: {
         201: MasterCourseSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1440,7 +1448,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: MasterCourseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getLinkedCourses: {
@@ -1449,7 +1457,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(LinkedCourseSummarySchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -1459,7 +1467,7 @@ export const contract = c.router({
       body: UpdateMasterCourseSchema,
       responses: {
         200: MasterCourseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1468,8 +1476,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     addCourse: {
@@ -1478,9 +1486,9 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ courseId: UUIDSchema }),
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     removeCourse: {
@@ -1489,8 +1497,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema, courseId: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     availableCourses: {
@@ -1499,7 +1507,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(z.any()),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     listEnrollments: {
@@ -1554,8 +1562,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     cancel: {
@@ -1564,15 +1572,15 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getPayments: {
       method: 'GET',
       path: '/api/master-enrollments/:id/payments',
       pathParams: z.object({ id: UUIDSchema }),
-      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.array(z.any()), 404: ApiErrorSchema },
     },
     addPayment: {
       method: 'POST',
@@ -1585,8 +1593,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     createRefund: {
@@ -1601,21 +1609,21 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     listRefunds: {
       method: 'GET',
       path: '/api/master-enrollments/:id/refunds',
       pathParams: z.object({ id: UUIDSchema }),
-      responses: { 200: z.array(z.any()), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.array(z.any()), 404: ApiErrorSchema },
     },
     getById: {
       method: 'GET',
       path: '/api/master-enrollments/:id',
       pathParams: z.object({ id: UUIDSchema }),
-      responses: { 200: z.any(), 404: z.object({ message: z.string() }) },
+      responses: { 200: z.any(), 404: ApiErrorSchema },
     },
   },
 
@@ -1627,7 +1635,7 @@ export const contract = c.router({
       body: CreateClassSchema,
       responses: {
         201: ClassSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1679,7 +1687,7 @@ export const contract = c.router({
             endDate: z.string(),
           })),
         }),
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     getEnrollments: {
@@ -1705,7 +1713,7 @@ export const contract = c.router({
           notes: z.string().nullable(),
           createdAt: z.string(),
         })),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getById: {
@@ -1714,7 +1722,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ClassSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -1724,7 +1732,7 @@ export const contract = c.router({
       body: UpdateClassSchema,
       responses: {
         200: ClassSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1733,8 +1741,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     finish: {
@@ -1744,8 +1752,8 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: ClassSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1765,9 +1773,9 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     listByMasterEnrollment: {
@@ -1776,7 +1784,7 @@ export const contract = c.router({
       query: z.object({ masterEnrollmentId: UUIDSchema }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     updateStatus: {
@@ -1789,8 +1797,8 @@ export const contract = c.router({
       }),
       responses: {
         200: z.any(),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1803,7 +1811,7 @@ export const contract = c.router({
       body: CreateEnrollmentSchema,
       responses: {
         201: EnrollmentSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -1850,7 +1858,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(RefundSchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     createRefund: {
@@ -1860,8 +1868,8 @@ export const contract = c.router({
       body: CreateRefundSchema,
       responses: {
         201: RefundSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getPayments: {
@@ -1870,7 +1878,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(EnrollmentPaymentSchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     addPayment: {
@@ -1880,8 +1888,8 @@ export const contract = c.router({
       body: CreateEnrollmentPaymentSchema,
       responses: {
         201: EnrollmentPaymentSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getById: {
@@ -1890,7 +1898,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: EnrollmentSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getByStudent: {
@@ -1908,7 +1916,7 @@ export const contract = c.router({
       body: UpdateEnrollmentSchema,
       responses: {
         200: EnrollmentSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -1917,8 +1925,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1960,7 +1968,7 @@ export const contract = c.router({
       body: CreateExpenseSchema,
       responses: {
         201: ExpenseSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2012,7 +2020,7 @@ export const contract = c.router({
           payments: z.array(z.any()),
           message: z.string(),
         }),
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     payEmployeeSalary: {
@@ -2027,8 +2035,8 @@ export const contract = c.router({
       }),
       responses: {
         201: ExpensePaymentSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getEmployeeSalaryHistory: {
@@ -2037,7 +2045,7 @@ export const contract = c.router({
       pathParams: z.object({ employeeId: UUIDSchema }),
       responses: {
         200: z.array(ExpensePaymentSchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     getById: {
@@ -2046,7 +2054,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ExpenseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -2056,7 +2064,7 @@ export const contract = c.router({
       body: UpdateExpenseSchema,
       responses: {
         200: ExpenseSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2065,8 +2073,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     payRecurring: {
@@ -2076,8 +2084,8 @@ export const contract = c.router({
       body: z.object({ date: z.string().optional() }),
       responses: {
         201: ExpensePaymentSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getPayments: {
@@ -2086,7 +2094,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(ExpensePaymentSchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2116,8 +2124,8 @@ export const contract = c.router({
           schedule: z.array(z.any()),
           downpaymentPayment: z.any().nullable(),
         }),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     list: {
@@ -2141,7 +2149,7 @@ export const contract = c.router({
           schedule: z.array(z.any()),
           downpaymentPayment: z.any().nullable(),
         }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2150,8 +2158,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     pay: {
@@ -2165,8 +2173,8 @@ export const contract = c.router({
       }),
       responses: {
         201: z.object({ payment: z.any(), schedule: z.any() }),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     unpay: {
@@ -2175,9 +2183,9 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema, scheduleId: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2190,9 +2198,9 @@ export const contract = c.router({
       body: CreateExpensePaymentSchema,
       responses: {
         201: ExpensePaymentSchema,
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     list: {
@@ -2215,7 +2223,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ExpensePaymentSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2224,8 +2232,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2266,7 +2274,7 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
         }),
-        401: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
       },
     },
     updateSettings: {
@@ -2281,8 +2289,8 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
         }),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
   },
@@ -2295,7 +2303,7 @@ export const contract = c.router({
       body: CreateEmployeeSchema,
       responses: {
         201: EmployeeSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2315,7 +2323,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: EmployeeSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -2325,7 +2333,7 @@ export const contract = c.router({
       body: UpdateEmployeeSchema,
       responses: {
         200: EmployeeSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2334,7 +2342,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
         400: z.object({
           message: z.string(),
           assignedClasses: z.array(z.object({
@@ -2343,7 +2351,7 @@ export const contract = c.router({
             code: z.string(),
           })).optional(),
         }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2356,7 +2364,7 @@ export const contract = c.router({
       body: CreateWithdrawalSchema,
       responses: {
         201: WithdrawalSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2395,7 +2403,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: WithdrawalSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -2405,7 +2413,7 @@ export const contract = c.router({
       body: UpdateWithdrawalSchema,
       responses: {
         200: WithdrawalSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2414,8 +2422,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2428,7 +2436,7 @@ export const contract = c.router({
       body: CreateProductSchema,
       responses: {
         201: ProductSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2465,7 +2473,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ProductSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     adjustStock: {
@@ -2478,7 +2486,7 @@ export const contract = c.router({
       }),
       responses: {
         200: ProductSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     restock: {
@@ -2488,8 +2496,8 @@ export const contract = c.router({
       body: RestockProductSchema,
       responses: {
         200: ProductSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -2499,7 +2507,7 @@ export const contract = c.router({
       body: UpdateProductSchema,
       responses: {
         200: ProductSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2508,8 +2516,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2522,7 +2530,7 @@ export const contract = c.router({
       body: CreateProductSaleSchema,
       responses: {
         201: ProductSaleSchema,
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2582,7 +2590,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ProductSaleSchema,
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     listRefunds: {
@@ -2591,7 +2599,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(RefundSchema),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     createRefund: {
@@ -2601,8 +2609,8 @@ export const contract = c.router({
       body: CreateRefundSchema,
       responses: {
         201: RefundSchema,
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2624,7 +2632,7 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     list: {
@@ -2656,7 +2664,7 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.any(),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     update: {
@@ -2666,7 +2674,7 @@ export const contract = c.router({
       body: z.any(),
       responses: {
         200: z.any(),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -2676,7 +2684,7 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.any(),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2750,7 +2758,7 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
       },
     },
     deleteAdjustment: {
@@ -2760,7 +2768,7 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ message: z.string(), id: UUIDSchema }),
-        404: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
       },
     },
     flow: {
@@ -2915,8 +2923,8 @@ export const contract = c.router({
           createdAt: z.string(),
           updatedAt: z.string(),
         }),
-        401: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     updateSubscription: {
@@ -2946,8 +2954,8 @@ export const contract = c.router({
           createdAt: z.string(),
           updatedAt: z.string(),
         }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -3192,7 +3200,7 @@ export const contract = c.router({
       }),
       responses: {
         200: z.object({ users: z.array(SafeUserSchema) }),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     get: {
@@ -3201,8 +3209,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: SafeUserSchema,
-        404: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     create: {
@@ -3211,8 +3219,8 @@ export const contract = c.router({
       body: CreateUserSchema,
       responses: {
         201: SafeUserSchema,
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     update: {
@@ -3222,9 +3230,9 @@ export const contract = c.router({
       body: UpdateUserSchema,
       responses: {
         200: SafeUserSchema,
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     updatePermissions: {
@@ -3234,8 +3242,8 @@ export const contract = c.router({
       body: z.object({ permissions: UserPermissionsSchema }),
       responses: {
         200: z.object({ message: z.string(), permissions: UserPermissionsSchema }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     resetPassword: {
@@ -3244,9 +3252,9 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ password: z.string().min(6) }),
       responses: {
-        200: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     deactivate: {
@@ -3255,9 +3263,9 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     activate: {
@@ -3266,9 +3274,9 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     convertEmployee: {
@@ -3277,9 +3285,9 @@ export const contract = c.router({
       body: ConvertEmployeeToUserSchema,
       responses: {
         201: SafeUserSchema,
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -3307,8 +3315,8 @@ export const contract = c.router({
           createdAt: z.string(),
           updatedAt: z.string(),
         }),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     list: {
@@ -3319,7 +3327,7 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     listActive: {
@@ -3330,7 +3338,7 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     getById: {
@@ -3339,8 +3347,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.any(),
-        404: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     update: {
@@ -3354,9 +3362,9 @@ export const contract = c.router({
       }),
       responses: {
         200: z.any(),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     delete: {
@@ -3365,10 +3373,10 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
-        200: z.object({ message: z.string() }),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -3389,11 +3397,11 @@ export const contract = c.router({
           isPresent: z.boolean(),
           attendanceId: UUIDSchema.nullable().optional(),
         })),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     saveForSession: {
@@ -3403,11 +3411,11 @@ export const contract = c.router({
       body: z.object({ presentStudentIds: z.array(UUIDSchema) }),
       responses: {
         200: z.object({ message: z.string(), presentCount: z.number() }),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     getByStudent: {
@@ -3425,10 +3433,10 @@ export const contract = c.router({
           roomCode: z.string().nullable(),
           isPresent: z.boolean(),
         })),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     getByClass: {
@@ -3445,11 +3453,11 @@ export const contract = c.router({
           presentCount: z.number(),
           absentCount: z.number(),
         })),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     getTeachersBySession: {
@@ -3469,11 +3477,11 @@ export const contract = c.router({
           notes: z.string().nullable(),
           createdAt: z.string(),
         })),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     saveTeachersForSession: {
@@ -3490,11 +3498,11 @@ export const contract = c.router({
       }),
       responses: {
         200: z.object({ message: z.string(), count: z.number() }),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
     getTeachersHistory: {
@@ -3529,10 +3537,10 @@ export const contract = c.router({
           courseName: z.string().nullable(),
           roomCode: z.string().nullable(),
         })),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
   },
@@ -3558,9 +3566,9 @@ export const contract = c.router({
       }),
       responses: {
         201: z.any(),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     end: {
@@ -3572,9 +3580,9 @@ export const contract = c.router({
       }),
       responses: {
         200: z.any(),
-        400: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     list: {
@@ -3587,7 +3595,7 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     listActive: {
@@ -3598,7 +3606,7 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(z.any()),
-        403: z.object({ message: z.string() }),
+        403: ApiErrorSchema,
       },
     },
     getById: {
@@ -3607,8 +3615,8 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.any(),
-        404: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
+        404: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
   },
@@ -3632,11 +3640,11 @@ export const contract = c.router({
           dayOfWeek: z.string(),
           entries: z.array(z.any()),
         }),
-        400: z.object({ message: z.string() }),
-        401: z.object({ message: z.string() }),
-        402: z.object({ message: z.string() }),
-        403: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
   },

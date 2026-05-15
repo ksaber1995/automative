@@ -14,7 +14,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -71,6 +71,7 @@ export class StudentDetailComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   student = signal<Student | null>(null);
   enrollments = signal<Enrollment[]>([]);
@@ -214,14 +215,14 @@ export class StudentDetailComponent implements OnInit {
   }
 
   cancelMasterEnrollment(me: MasterEnrollmentProgress) {
-    if (!confirm('Cancel this master enrollment? The student will lose coverage for linked courses.')) return;
+    if (!confirm(this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCEL_CONFIRM'))) return;
     this.masterEnrollmentService.cancel(me.id).subscribe({
       next: () => {
-        this.notificationService.success('Master enrollment cancelled');
+        this.notificationService.success(this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCELLED'));
         if (this.studentId) this.loadMasterEnrollments(this.studentId);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to cancel');
+      error: () => {
+        // Interceptor toasted the translated error.
       },
     });
   }
@@ -244,7 +245,7 @@ export class StudentDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load student');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/students']);
       }
@@ -262,7 +263,7 @@ export class StudentDetailComponent implements OnInit {
         });
       },
       error: () => {
-        this.notificationService.error('Failed to load enrollments');
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -334,13 +335,13 @@ export class StudentDetailComponent implements OnInit {
       notes: this.dialogPaymentNotes || undefined,
     }).subscribe({
       next: () => {
-        this.notificationService.success('Payment recorded successfully');
+        this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to record payment');
+      error: () => {
+        // Interceptor toasted the translated error.
         this.actionLoading.set(false);
       }
     });
@@ -380,7 +381,7 @@ export class StudentDetailComponent implements OnInit {
       reason: this.refundReason || undefined,
     }).subscribe({
       next: () => {
-        this.notificationService.success('Refund issued successfully');
+        this.notificationService.success(this.translate.instant('STUDENTS.REFUND_ISSUED'));
         this.showRefundDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
@@ -389,8 +390,7 @@ export class StudentDetailComponent implements OnInit {
           this.loadPaymentHistory(enrollment.id);
         }
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to issue refund');
+      error: () => {
         this.actionLoading.set(false);
       }
     });
@@ -401,7 +401,7 @@ export class StudentDetailComponent implements OnInit {
   openMasterRefundDialog(me: MasterEnrollmentProgress) {
     const refundable = Math.max(0, (me.amountPaid || 0) - (me.totalRefunded || 0));
     if (refundable <= 0) {
-      this.notificationService.error('Nothing left to refund on this enrollment');
+      this.notificationService.error(this.translate.instant('STUDENTS.NOTHING_TO_REFUND'));
       return;
     }
     this.masterEnrollmentForAction.set(me);
@@ -434,14 +434,13 @@ export class StudentDetailComponent implements OnInit {
       reason: this.masterRefundReason || undefined,
     }).subscribe({
       next: () => {
-        this.notificationService.success('Bundle refund issued');
+        this.notificationService.success(this.translate.instant('STUDENTS.BUNDLE_REFUND_ISSUED'));
         this.showMasterRefundDialog = false;
         this.actionLoading.set(false);
         if (this.studentId) this.loadMasterEnrollments(this.studentId);
       },
-      error: (err) => {
+      error: () => {
         this.actionLoading.set(false);
-        this.notificationService.error(err?.error?.message || 'Failed to issue refund');
       }
     });
   }
@@ -502,7 +501,6 @@ export class StudentDetailComponent implements OnInit {
         this.joinBundleCourseLoading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load classes');
         this.joinBundleCourseLoading.set(false);
       },
     });
@@ -519,14 +517,13 @@ export class StudentDetailComponent implements OnInit {
       branchId: cls.branchId,
     }).subscribe({
       next: () => {
-        this.notificationService.success('Student enrolled in class');
+        this.notificationService.success(this.translate.instant('STUDENTS.ENROLLED_IN_CLASS'));
         this.showJoinBundleCourseDialog = false;
         this.actionLoading.set(false);
         this.loadMasterClassEnrollments(this.joinBundleMasterEnrollmentId!);
         if (this.studentId) this.loadMasterEnrollments(this.studentId);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to enroll');
+      error: () => {
         this.actionLoading.set(false);
       },
     });
@@ -565,14 +562,13 @@ export class StudentDetailComponent implements OnInit {
       notes: this.masterDialogPaymentNotes || undefined,
     }).subscribe({
       next: () => {
-        this.notificationService.success('Payment recorded successfully');
+        this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
         this.showMasterPaymentDialog = false;
         this.actionLoading.set(false);
         if (this.studentId) this.loadMasterEnrollments(this.studentId);
         this.loadMasterPaymentHistory(me.id);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to record payment');
+      error: () => {
         this.actionLoading.set(false);
       },
     });

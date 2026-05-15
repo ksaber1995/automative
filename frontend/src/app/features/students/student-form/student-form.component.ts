@@ -8,7 +8,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -38,6 +38,7 @@ export class StudentFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   studentForm: FormGroup;
   loading = signal(false);
@@ -78,7 +79,7 @@ export class StudentFormComponent implements OnInit {
         this.branches.set(branches);
       },
       error: () => {
-        this.notificationService.error('Failed to load branches');
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -95,7 +96,6 @@ export class StudentFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load student');
         this.loading.set(false);
         this.router.navigate(['/students']);
       }
@@ -119,24 +119,22 @@ export class StudentFormComponent implements OnInit {
     if (this.isEditMode() && this.studentId) {
       this.studentService.updateStudent(this.studentId, studentData).subscribe({
         next: () => {
-          this.notificationService.success('Student updated successfully');
+          this.notificationService.success(this.translate.instant('STUDENTS.UPDATED'));
           this.router.navigate(['/students']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error('Failed to update student');
           console.error('Update error:', error);
         }
       });
     } else {
       this.studentService.createStudent(studentData).subscribe({
         next: () => {
-          this.notificationService.success('Student created successfully');
+          this.notificationService.success(this.translate.instant('STUDENTS.CREATED'));
           this.router.navigate(['/students']);
         },
         error: (error) => {
           this.loading.set(false);
-          this.notificationService.error('Failed to create student');
           console.error('Create error:', error);
         }
       });

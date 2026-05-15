@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 import { TableModule } from 'primeng/table';
@@ -28,6 +28,7 @@ export class OverviewComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private cashService = inject(CashService);
   private router = inject(Router);
+  private translate = inject(TranslateService);
 
   dashboardData = signal<DashboardMetrics | null>(null);
   loading = signal(true);
@@ -97,12 +98,12 @@ export class OverviewComponent implements OnInit {
 
     obs.subscribe({
       next: () => {
-        this.notificationService.success(`${item.label} paid successfully`);
+        this.notificationService.success(this.translate.instant('DASHBOARD.ITEM_PAID', { label: item.label }));
         this.payingId.set(null);
         this.loadDueExpenses();
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to pay');
+      error: () => {
+        // Interceptor toasted the translated error.
         this.payingId.set(null);
       }
     });

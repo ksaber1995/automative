@@ -10,7 +10,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -53,6 +53,7 @@ export class StudentListComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   students = signal<Student[]>([]);
@@ -182,13 +183,15 @@ export class StudentListComponent implements OnInit {
 
   deleteStudent(student: Student) {
     this.confirmationService.confirm({
-      message: `Are you sure you want to deactivate ${student.firstName} ${student.lastName}?`,
-      header: 'Confirm Deactivation',
+      message: this.translate.instant('STUDENTS.DEACTIVATE_CONFIRM', {
+        name: `${student.firstName} ${student.lastName}`,
+      }),
+      header: this.translate.instant('STUDENTS.DEACTIVATE_HEADER'),
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
         this.studentService.deleteStudent(student.id).subscribe({
           next: () => {
-            this.notificationService.success('Student deactivated successfully');
+            this.notificationService.success(this.translate.instant('STUDENTS.DEACTIVATED'));
             this.loadStudents();
           }
         });

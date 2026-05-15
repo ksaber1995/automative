@@ -127,7 +127,7 @@
                 </td>
                 <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
                 <td>
-                  <p-tag [value]="row.status" [severity]="statusSeverity(row.status)"></p-tag>
+                  <p-tag [value]="enrollmentStatusLabel(row.status)" [severity]="statusSeverity(row.status)"></p-tag>
                 </td>
                 <td>
                   <p-button icon="pi pi-external-link" [rounded]="true" [text]="true" severity="info"
@@ -319,6 +319,7 @@
         optionValue="id"
         [placeholder]="'CLASSES.DETAIL.ROOM_PLACEHOLDER' | translate"
         [style]="{ width: '100%' }"
+        appendTo="body"
       ></p-select>
     </div>
     <div>

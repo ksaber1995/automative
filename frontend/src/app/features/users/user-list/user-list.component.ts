@@ -12,7 +12,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { AvatarModule } from 'primeng/avatar';
 import { BadgeModule } from 'primeng/badge';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -40,6 +40,7 @@ export class UserListComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
   private authService = inject(AuthService);
+  private translate = inject(TranslateService);
 
   currentUserId = computed(() => this.authService.currentUser()?.id);
 
@@ -143,21 +144,31 @@ export class UserListComponent implements OnInit {
   }
 
   toggleActive(user: SafeUser) {
-    const action = user.isActive ? 'deactivate' : 'activate';
+    const isDeactivating = user.isActive;
+    const name = `${user.firstName} ${user.lastName}`;
     this.confirmationService.confirm({
-      message: `Are you sure you want to ${action} ${user.firstName} ${user.lastName}?`,
-      header: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
-      icon: user.isActive ? 'pi pi-ban' : 'pi pi-check',
+      message: this.translate.instant(
+        isDeactivating ? 'USERS.DEACTIVATE_CONFIRM' : 'USERS.ACTIVATE_CONFIRM',
+        { name }
+      ),
+      header: this.translate.instant(
+        isDeactivating ? 'USERS.DEACTIVATE_HEADER' : 'USERS.ACTIVATE_HEADER'
+      ),
+      icon: isDeactivating ? 'pi pi-ban' : 'pi pi-check',
       accept: () => {
-        const call = user.isActive
+        const call = isDeactivating
           ? this.userService.deactivate(user.id)
           : this.userService.activate(user.id);
         call.subscribe({
           next: () => {
-            this.notificationService.success(`User ${action}d successfully`);
+            this.notificationService.success(
+              this.translate.instant(isDeactivating ? 'USERS.DEACTIVATED' : 'USERS.ACTIVATED')
+            );
             this.loadUsers();
           },
-          error: (e) => this.notificationService.error(e.error?.message || `Failed to ${action} user`),
+          error: () => {
+            // Interceptor toasted the translated error.
+          },
         });
       }
     });

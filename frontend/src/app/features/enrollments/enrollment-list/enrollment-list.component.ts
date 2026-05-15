@@ -6,6 +6,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslateService } from '@ngx-translate/core';
 import { EnrollmentService } from '../services/enrollment.service';
 import { StudentService } from '../../students/services/student.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -41,6 +42,7 @@ export class EnrollmentListComponent implements OnInit {
   private courseService = inject(CourseService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   enrollments = signal<Enrollment[]>([]);
   enrollmentsDisplay = signal<EnrollmentDisplay[]>([]);
@@ -72,8 +74,8 @@ export class EnrollmentListComponent implements OnInit {
       // Load enrollments
       this.loadEnrollments();
     } catch (error) {
+      // Interceptor toasted the translated error.
       this.loading.set(false);
-      this.notificationService.error('Failed to load data');
     }
   }
 
@@ -99,8 +101,8 @@ export class EnrollmentListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
+        // Interceptor toasted the translated error.
         this.loading.set(false);
-        this.notificationService.error('Failed to load enrollments');
       }
     });
   }
@@ -152,13 +154,13 @@ export class EnrollmentListComponent implements OnInit {
 
     this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
       next: () => {
-        this.notificationService.success('Enrollment deleted successfully');
+        this.notificationService.success(this.translate.instant('ENROLLMENTS.DELETED'));
         this.loadEnrollments();
         this.showDeleteDialog = false;
         this.enrollmentToDelete.set(null);
       },
       error: () => {
-        this.notificationService.error('Failed to delete enrollment');
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       }
     });

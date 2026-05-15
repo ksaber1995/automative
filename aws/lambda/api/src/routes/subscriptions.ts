@@ -1,6 +1,7 @@
 import { query, queryOne, update, insert } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext } from '../middleware/tenant-isolation';
 import { extractTokenFromHeader, verifyToken } from '../utils/jwt';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapSubscription(row: any) {
   return {
@@ -23,9 +24,9 @@ export const subscriptionsRoutes = {
   getMySubscription: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const token = extractTokenFromHeader(headers.authorization);
-      if (!token) return { status: 401 as const, body: { message: 'No authentication token provided' } };
+      if (!token) return apiError(401, 'ERRORS.AUTH.NO_TOKEN', 'No authentication token provided');
       const decoded = await verifyToken(token);
-      if (!decoded.companyId) return { status: 401 as const, body: { message: 'Invalid token' } };
+      if (!decoded.companyId) return apiError(401, 'ERRORS.AUTH.INVALID_TOKEN', 'Invalid token');
 
       const subscription = await queryOne<any>(
         'SELECT * FROM subscriptions WHERE company_id = $1',
@@ -33,12 +34,12 @@ export const subscriptionsRoutes = {
       );
 
       if (!subscription) {
-        return { status: 404 as const, body: { message: 'Subscription not found' } };
+        return apiError(404, 'ERRORS.SUBSCRIPTIONS.NOT_FOUND', 'Subscription not found');
       }
 
       return { status: 200 as const, body: mapSubscription(subscription) };
     } catch (error: any) {
-      return { status: isAuthError(error) ? 401 : 500, body: { message: error.message || 'Failed to get subscription' } };
+      return mapThrownError(error, 'ERRORS.SUBSCRIPTIONS.GET_FAILED', 'Failed to get subscription');
     }
   },
 
@@ -48,7 +49,7 @@ export const subscriptionsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
-        return { status: 403 as const, body: { message: 'Only admins can update subscription' } };
+        return apiError(403, 'ERRORS.SUBSCRIPTIONS.ADMIN_ONLY', 'Only admins can update subscription');
       }
 
       const existing = await queryOne<any>(
@@ -57,7 +58,7 @@ export const subscriptionsRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Subscription not found' } };
+        return apiError(404, 'ERRORS.SUBSCRIPTIONS.NOT_FOUND', 'Subscription not found');
       }
 
       const updates: any = { updated_at: new Date() };
@@ -80,10 +81,7 @@ export const subscriptionsRoutes = {
       const updated = await queryOne<any>('SELECT * FROM subscriptions WHERE id = $1', [existing.id]);
       return { status: 200 as const, body: mapSubscription(updated) };
     } catch (error: any) {
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to update subscription' },
-      };
+      return mapThrownError(error, 'ERRORS.SUBSCRIPTIONS.UPDATE_FAILED', 'Failed to update subscription');
     }
   },
 };

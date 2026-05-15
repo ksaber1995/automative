@@ -11,7 +11,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { DividerModule } from 'primeng/divider';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -75,6 +75,7 @@ export class UserFormComponent implements OnInit {
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private authService = inject(AuthService);
+  private translate = inject(TranslateService);
 
   UserRole = UserRole;
   isEdit = false;
@@ -147,7 +148,7 @@ export class UserFormComponent implements OnInit {
           this.loading.set(false);
         },
         error: () => {
-          this.notificationService.error('Failed to load user');
+          // Interceptor toasted the translated error.
           this.loading.set(false);
         }
       });
@@ -292,12 +293,12 @@ export class UserFormComponent implements OnInit {
 
       this.userService.update(this.userId!, dto).subscribe({
         next: () => {
-          this.notificationService.success('User updated successfully');
+          this.notificationService.success(this.translate.instant('USERS.UPDATED'));
           this.saving.set(false);
           this.router.navigate(['/users']);
         },
-        error: (e) => {
-          this.notificationService.error(e.error?.message || 'Failed to update user');
+        error: () => {
+          // Interceptor toasted the translated error.
           this.saving.set(false);
         }
       });
@@ -314,12 +315,12 @@ export class UserFormComponent implements OnInit {
         permissions,
       }).subscribe({
         next: () => {
-          this.notificationService.success('User created successfully');
+          this.notificationService.success(this.translate.instant('USERS.CREATED'));
           this.saving.set(false);
           this.router.navigate(['/users']);
         },
-        error: (e) => {
-          this.notificationService.error(e.error?.message || 'Failed to create user');
+        error: () => {
+          // Interceptor toasted the translated error.
           this.saving.set(false);
         }
       });

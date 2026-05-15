@@ -213,7 +213,8 @@
           [options]="branchPickerOptions()"
           optionLabel="label"
           optionValue="value"
-          styleClass="w-full"></p-select>
+          styleClass="w-full"
+          appendTo="body"></p-select>
         <small class="text-gray-500">
           @if (dialogBranchId) {
             {{ 'CASH.SCOPE_BRANCH_HINT' | translate }}
@@ -275,7 +276,7 @@
         <label class="block text-sm font-medium text-gray-700 mb-2">
           {{ 'CASH.DATE' | translate }}
         </label>
-        <p-datepicker [(ngModel)]="date" [showIcon]="true" styleClass="w-full"></p-datepicker>
+        <p-datepicker [(ngModel)]="date" [showIcon]="true" styleClass="w-full" appendTo="body"></p-datepicker>
       </div>
 
       <div>

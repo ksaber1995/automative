@@ -6,6 +6,7 @@ import { CardModule } from 'primeng/card';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { ButtonModule } from 'primeng/button';
+import { TranslateService } from '@ngx-translate/core';
 import { DebtService, CreatePaymentDto } from '../../../core/services/debt.service';
 import { Debt } from '@shared/interfaces/debt.interface';
 import { PaymentMethod } from '@shared/interfaces/withdrawal.interface';
@@ -30,6 +31,7 @@ export class DebtPaymentComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   paymentForm!: FormGroup;
   debt = signal<Debt | null>(null);
@@ -70,8 +72,8 @@ export class DebtPaymentComponent implements OnInit {
         this.debt.set(debt);
       },
       error: (err) => {
+        // Interceptor toasted the translated error.
         console.error('Error loading debt:', err);
-        this.notificationService.error('Failed to load debt');
         this.cancel();
       }
     });
@@ -89,7 +91,7 @@ export class DebtPaymentComponent implements OnInit {
 
     // Validate payment amount doesn't exceed balance
     if (formValue.totalAmount > this.debt()!.currentBalance) {
-      this.notificationService.error('Payment amount cannot exceed current balance');
+      this.notificationService.error(this.translate.instant('DEBTS.PAYMENT_EXCEEDS_BALANCE'));
       return;
     }
 
@@ -107,13 +109,13 @@ export class DebtPaymentComponent implements OnInit {
     this.debtService.createPayment(this.debt()!.id, paymentDto).subscribe({
       next: () => {
         this.submitting.set(false);
-        this.notificationService.success('Payment submitted successfully');
+        this.notificationService.success(this.translate.instant('DEBTS.PAYMENT_SUBMITTED'));
         this.router.navigate(['/debts', this.debt()!.id]);
       },
       error: (err) => {
+        // Interceptor toasted the translated error.
         this.submitting.set(false);
         console.error('Error submitting payment:', err);
-        this.notificationService.error(err.error?.message || 'Failed to submit payment');
       }
     });
   }

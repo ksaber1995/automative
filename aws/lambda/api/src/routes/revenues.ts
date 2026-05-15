@@ -1,5 +1,6 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
@@ -15,7 +16,7 @@ export const revenuesRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const params: any[] = [context.companyId];
@@ -34,11 +35,11 @@ export const revenuesRoutes = {
       let branchIdx: number | null = null;
       if (companyLevelOnly) {
         if (!isGlobalAdmin(context)) {
-          return { status: 403 as const, body: { message: 'Only Global Admins can view company-level revenue' } };
+          return apiError(403, 'ERRORS.REVENUES.GLOBAL_ADMIN_ONLY_COMPANY_LEVEL', 'Only Global Admins can view company-level revenue');
         }
       } else if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         branchIdx = params.length;
@@ -221,10 +222,7 @@ export const revenuesRoutes = {
       };
     } catch (error) {
       console.error('List revenues error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list revenues' },
-      };
+      return mapThrownError(error, 'ERRORS.REVENUES.LIST_FAILED', 'Failed to list revenues');
     }
   },
 
@@ -240,7 +238,7 @@ export const revenuesRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const params: any[] = [context.companyId];
@@ -253,10 +251,7 @@ export const revenuesRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         enrollmentConditions += ` AND e.branch_id = $${params.length}`;
@@ -428,10 +423,7 @@ export const revenuesRoutes = {
       };
     } catch (error) {
       console.error('Revenue summary error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to generate revenue summary' },
-      };
+      return mapThrownError(error, 'ERRORS.REVENUES.SUMMARY_FAILED', 'Failed to generate revenue summary');
     }
   },
 };

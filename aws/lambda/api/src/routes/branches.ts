@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne, deleteById, getClient } from '../db/connection';
-import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapBranchFromDB(row: any) {
   return {
@@ -24,15 +25,12 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Only ADMIN or GLOBAL_ADMIN can create branches
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
-        return {
-          status: 403 as const,
-          body: { message: 'Only administrators can create branches' },
-        };
+        return apiError(403, 'ERRORS.BRANCHES.ADMIN_ONLY_CREATE', 'Only administrators can create branches');
       }
 
       const branch = await insert('branches', {
@@ -54,10 +52,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Create branch error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create branch' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.CREATE_FAILED', 'Failed to create branch', 400);
     }
   },
 
@@ -65,7 +60,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const branches = await query(
@@ -78,10 +73,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('List branches error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list branches' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.LIST_FAILED', 'Failed to list branches');
     }
   },
 
@@ -89,7 +81,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const branches = await query(
@@ -102,10 +94,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('List active branches error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list active branches' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.LIST_FAILED', 'Failed to list active branches');
     }
   },
 
@@ -113,7 +102,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const branch = await queryOne(
@@ -122,10 +111,7 @@ export const branchesRoutes = {
       );
 
       if (!branch) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       return {
@@ -134,10 +120,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Get branch error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Branch not found' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found', 404);
     }
   },
 
@@ -145,7 +128,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Verify branch belongs to company
@@ -155,18 +138,12 @@ export const branchesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       // Only ADMIN or GLOBAL_ADMIN can update branches
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
-        return {
-          status: 403 as const,
-          body: { message: 'Only administrators can update branches' },
-        };
+        return apiError(403, 'ERRORS.BRANCHES.ADMIN_ONLY_UPDATE', 'Only administrators can update branches');
       }
 
       const updateData: any = {};
@@ -183,19 +160,13 @@ export const branchesRoutes = {
 
       // Check if there's anything to update
       if (Object.keys(updateData).length === 0) {
-        return {
-          status: 400 as const,
-          body: { message: 'No valid fields to update' },
-        };
+        return apiError(400, 'ERRORS.NO_FIELDS', 'No valid fields to update');
       }
 
       const branch = await update('branches', params.id, updateData);
 
       if (!branch) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       return {
@@ -204,10 +175,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Update branch error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update branch' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.UPDATE_FAILED', 'Failed to update branch', 404);
     }
   },
 
@@ -215,7 +183,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Verify branch belongs to company
@@ -225,10 +193,7 @@ export const branchesRoutes = {
       );
 
       if (!branch) {
-        return {
-          status: 404 as const,
-          body: { message: 'Branch not found' },
-        };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       // Get course count
@@ -316,10 +281,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Get branch stats error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get branch statistics' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.STATS_FAILED', 'Failed to get branch statistics');
     }
   },
 
@@ -327,7 +289,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const branch = await queryOne(
@@ -335,7 +297,7 @@ export const branchesRoutes = {
         [params.id, context.companyId]
       );
       if (!branch) {
-        return { status: 404 as const, body: { message: 'Branch not found' } };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       const row = await queryOne<Record<string, string>>(`
@@ -370,10 +332,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Branch deletion impact error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to compute branch deletion impact' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.DELETION_IMPACT_FAILED', 'Failed to compute branch deletion impact');
     }
   },
 
@@ -385,7 +344,7 @@ export const branchesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -393,14 +352,11 @@ export const branchesRoutes = {
         [params.id, context.companyId]
       );
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Branch not found' } };
+        return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
-        return {
-          status: 403 as const,
-          body: { message: 'Only administrators can delete branches' },
-        };
+        return apiError(403, 'ERRORS.BRANCHES.ADMIN_ONLY_DELETE', 'Only administrators can delete branches');
       }
 
       const counts = await queryOne<Record<string, string>>(`
@@ -470,6 +426,9 @@ export const branchesRoutes = {
           message: hasFinancials
             ? 'Branch has financial records and cannot be deleted. It has been deactivated instead.'
             : 'Branch deleted successfully',
+          code: hasFinancials
+            ? 'BRANCHES.DEACTIVATED_WITH_FINANCIALS'
+            : 'BRANCHES.DELETED',
           deactivated: hasFinancials,
           counts: {
             revenues: n('revenues'),
@@ -483,10 +442,7 @@ export const branchesRoutes = {
       };
     } catch (error) {
       console.error('Delete branch error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to delete branch' },
-      };
+      return mapThrownError(error, 'ERRORS.BRANCHES.DELETE_FAILED', 'Failed to delete branch');
     }
   },
 };

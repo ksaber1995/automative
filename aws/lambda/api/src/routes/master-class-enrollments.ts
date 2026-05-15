@@ -3,9 +3,8 @@ import {
   extractTenantContext,
   canAccessBranch,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 type AuthHeaders = { authorization: string };
 
@@ -39,7 +38,7 @@ export const masterClassEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       // Verify master enrollment belongs to this company and is active
@@ -48,9 +47,9 @@ export const masterClassEnrollmentsRoutes = {
          WHERE id = $1 AND company_id = $2`,
         [body.masterEnrollmentId, context.companyId]
       );
-      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!me) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (me.status !== 'ACTIVE') {
-        return { status: 400 as const, body: { message: 'Master enrollment is not active' } };
+        return apiError(400, 'ERRORS.MASTER_CLASS_ENROLLMENTS.MASTER_NOT_ACTIVE', 'Master enrollment is not active');
       }
 
       // Verify the class belongs to the right course (branch comes from the course)
@@ -61,13 +60,13 @@ export const masterClassEnrollmentsRoutes = {
          WHERE c.id = $1 AND c.course_id = $2`,
         [body.classId, body.courseId]
       );
-      if (!cls) return { status: 404 as const, body: { message: 'Class not found for this course' } };
+      if (!cls) return apiError(404, 'ERRORS.MASTER_CLASS_ENROLLMENTS.CLASS_NOT_FOUND_FOR_COURSE', 'Class not found for this course');
       if (cls.is_finished) {
-        return { status: 400 as const, body: { message: 'This class is finished. Enrollment is closed.' } };
+        return apiError(400, 'ERRORS.MASTER_CLASS_ENROLLMENTS.CLASS_FINISHED', 'This class is finished. Enrollment is closed.');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       // Check for duplicate
@@ -77,7 +76,7 @@ export const masterClassEnrollmentsRoutes = {
         [body.masterEnrollmentId, body.courseId]
       );
       if (existing) {
-        return { status: 400 as const, body: { message: 'Student is already enrolled in this course via this bundle' } };
+        return apiError(400, 'ERRORS.MASTER_CLASS_ENROLLMENTS.ALREADY_ENROLLED', 'Student is already enrolled in this course via this bundle');
       }
 
       const row = await insert('master_class_enrollments', {
@@ -101,10 +100,7 @@ export const masterClassEnrollmentsRoutes = {
       return { status: 201 as const, body: mapRow(row) };
     } catch (error: any) {
       console.error('Create master class enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create master class enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_CLASS_ENROLLMENTS.CREATE_FAILED', 'Failed to create master class enrollment', 400);
     }
   },
 
@@ -112,7 +108,7 @@ export const masterClassEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const rows = await query(
@@ -131,10 +127,7 @@ export const masterClassEnrollmentsRoutes = {
       return { status: 200 as const, body: rows.map(mapRow) };
     } catch (error: any) {
       console.error('List master class enrollments error:', error);
-      return {
-        status: isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list master class enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_CLASS_ENROLLMENTS.LIST_FAILED', 'Failed to list master class enrollments');
     }
   },
 
@@ -142,14 +135,14 @@ export const masterClassEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
         `SELECT id, class_id, status FROM master_class_enrollments WHERE id = $1 AND company_id = $2`,
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'Not found' } };
+      if (!existing) return apiError(404, 'ERRORS.MASTER_CLASS_ENROLLMENTS.NOT_FOUND', 'Not found');
 
       const updated = await update('master_class_enrollments', params.id, {
         status: body.status,
@@ -167,10 +160,7 @@ export const masterClassEnrollmentsRoutes = {
       return { status: 200 as const, body: mapRow(updated) };
     } catch (error: any) {
       console.error('Update master class enrollment error:', error);
-      return {
-        status: isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to update' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_CLASS_ENROLLMENTS.UPDATE_FAILED', 'Failed to update', 400);
     }
   },
 };

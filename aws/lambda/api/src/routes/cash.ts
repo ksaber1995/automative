@@ -1,5 +1,6 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 let cashSchemaInitPromise: Promise<void> | null = null;
 async function ensureCashAdjustmentsTable(): Promise<void> {
@@ -128,7 +129,7 @@ export const cashRoutes = {
         !checkGranularPermission(context, 'cash', 'read') &&
         !checkGranularPermission(context, 'dashboard', 'read')
       ) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const aggs = await fetchCashAggregates(context.companyId);
@@ -242,10 +243,7 @@ export const cashRoutes = {
       };
     } catch (error) {
       console.error('Get current cash error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error instanceof Error ? error.message : 'Failed to get current cash' },
-      };
+      return mapThrownError(error, 'ERRORS.CASH.CURRENT_FAILED', 'Failed to get current cash');
     }
   },
 
@@ -258,17 +256,17 @@ export const cashRoutes = {
       await ensureCashAdjustmentsTable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'cash', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const type = String(body.type || '').toUpperCase();
       if (!['DEPOSIT', 'WITHDRAWAL', 'ADJUSTMENT'].includes(type)) {
-        return { status: 400 as const, body: { message: 'Invalid type. Must be DEPOSIT, WITHDRAWAL, or ADJUSTMENT.' } };
+        return apiError(400, 'ERRORS.CASH.INVALID_TYPE', 'Invalid type. Must be DEPOSIT, WITHDRAWAL, or ADJUSTMENT.');
       }
 
       const branchId: string | null = body.branchId || null;
       if (branchId && !canAccessBranch(context, branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const date = body.date || new Date().toISOString().split('T')[0];
@@ -280,16 +278,16 @@ export const cashRoutes = {
 
       if (type === 'ADJUSTMENT') {
         if (body.observedAmount === undefined || body.observedAmount === null) {
-          return { status: 400 as const, body: { message: 'observedAmount is required for ADJUSTMENT' } };
+          return apiError(400, 'ERRORS.CASH.OBSERVED_AMOUNT_REQUIRED', 'observedAmount is required for ADJUSTMENT');
         }
         observedAmount = Number(body.observedAmount);
         if (!isFinite(observedAmount) || observedAmount < 0) {
-          return { status: 400 as const, body: { message: 'observedAmount must be a non-negative number' } };
+          return apiError(400, 'ERRORS.CASH.OBSERVED_AMOUNT_INVALID', 'observedAmount must be a non-negative number');
         }
         // Compute system cash for the chosen scope (branch or company-wide)
         const currentResp = await cashRoutes.current({ headers });
         if (currentResp.status !== 200) {
-          return { status: 400 as const, body: { message: 'Could not compute system cash' } };
+          return apiError(400, 'ERRORS.CASH.SYSTEM_CASH_FAILED', 'Could not compute system cash');
         }
         const cur = currentResp.body as any;
         if (branchId) {
@@ -302,7 +300,7 @@ export const cashRoutes = {
       } else {
         const raw = Number(body.amount);
         if (!isFinite(raw) || raw <= 0) {
-          return { status: 400 as const, body: { message: 'amount must be a positive number' } };
+          return apiError(400, 'ERRORS.CASH.AMOUNT_INVALID', 'amount must be a positive number');
         }
         amount = type === 'WITHDRAWAL' ? -raw : raw;
       }
@@ -321,10 +319,7 @@ export const cashRoutes = {
       };
     } catch (error) {
       console.error('Adjust cash error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error instanceof Error ? error.message : 'Failed to adjust cash' },
-      };
+      return mapThrownError(error, 'ERRORS.CASH.ADJUST_FAILED', 'Failed to adjust cash', 400);
     }
   },
 
@@ -333,7 +328,7 @@ export const cashRoutes = {
       await ensureCashAdjustmentsTable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const params: any[] = [context.companyId];
@@ -343,7 +338,7 @@ export const cashRoutes = {
         where += ` AND ca.branch_id IS NULL`;
       } else if (filterBranch) {
         if (!canAccessBranch(context, filterBranch)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(filterBranch);
         where += ` AND ca.branch_id = $${params.length}`;
@@ -364,10 +359,7 @@ export const cashRoutes = {
       };
     } catch (error) {
       console.error('List cash adjustments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error instanceof Error ? error.message : 'Failed to list cash adjustments' },
-      };
+      return mapThrownError(error, 'ERRORS.CASH.LIST_ADJUSTMENTS_FAILED', 'Failed to list cash adjustments');
     }
   },
 
@@ -376,7 +368,7 @@ export const cashRoutes = {
       await ensureCashAdjustmentsTable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'cash', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const result = await query(
@@ -385,16 +377,13 @@ export const cashRoutes = {
       );
 
       if (!result || result.length === 0) {
-        return { status: 404 as const, body: { message: 'Cash adjustment not found' } };
+        return apiError(404, 'ERRORS.CASH.ADJUSTMENT_NOT_FOUND', 'Cash adjustment not found');
       }
 
-      return { status: 200 as const, body: { message: 'Cash adjustment deleted', id: result[0].id } };
+      return { status: 200 as const, body: { message: 'Cash adjustment deleted', code: 'CASH.ADJUSTMENT_DELETED', id: result[0].id } };
     } catch (error) {
       console.error('Delete cash adjustment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error instanceof Error ? error.message : 'Failed to delete cash adjustment' },
-      };
+      return mapThrownError(error, 'ERRORS.CASH.DELETE_ADJUSTMENT_FAILED', 'Failed to delete cash adjustment', 400);
     }
   },
 
@@ -402,15 +391,12 @@ export const cashRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       return { status: 200 as const, body: [] };
     } catch (error) {
       console.error('Get cash flow error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error instanceof Error ? error.message : 'Failed to get cash flow' },
-      };
+      return mapThrownError(error, 'ERRORS.CASH.FLOW_FAILED', 'Failed to get cash flow');
     }
   },
 };

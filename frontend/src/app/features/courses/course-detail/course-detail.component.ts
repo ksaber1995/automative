@@ -131,7 +131,7 @@ export class CourseDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.DETAIL.LOAD_COURSE_FAILED'));
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/courses']);
       }
@@ -149,7 +149,7 @@ export class CourseDetailComponent implements OnInit {
         this.classes.set(classesWithDetails.filter(c => c !== undefined) as ClassWithDetails[]);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.DETAIL.LOAD_CLASSES_FAILED'));
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -199,7 +199,7 @@ export class CourseDetailComponent implements OnInit {
         if (this.courseId) this.loadEnrollments(this.courseId);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.DETAIL.PAYMENT_FAILED'));
+        // Interceptor toasted the translated error.
         this.paymentLoading.set(false);
       }
     });
@@ -239,8 +239,8 @@ export class CourseDetailComponent implements OnInit {
         this.closeRefundDialog();
         if (this.courseId) this.loadEnrollments(this.courseId);
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || this.translate.instant('COURSES.DETAIL.REFUND_FAILED'));
+      error: () => {
+        // Interceptor toasted the translated error.
         this.refundLoading.set(false);
       }
     });

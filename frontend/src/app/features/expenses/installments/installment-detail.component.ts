@@ -96,8 +96,8 @@ export class InstallmentDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
+        // Interceptor toasted the translated error.
         this.loading.set(false);
-        this.notificationService.error(this.translate.instant('INSTALLMENTS.DETAIL.MSG_LOAD_FAILED'));
       },
     });
   }
@@ -131,9 +131,9 @@ export class InstallmentDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('INSTALLMENTS.DETAIL.MSG_PAID'));
         this.load();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.paying.set(false);
-        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_PAY_FAILED'));
       },
     });
   }
@@ -153,8 +153,8 @@ export class InstallmentDetailComponent implements OnInit {
         this.unpayTarget.set(null);
         this.load();
       },
-      error: (err) => {
-        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_REVERSE_FAILED'));
+      error: () => {
+        // Interceptor toasted the translated error.
         this.showUnpayDialog = false;
       },
     });
@@ -168,8 +168,8 @@ export class InstallmentDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('INSTALLMENTS.DETAIL.MSG_DELETED'));
         this.router.navigate(['/expenses/installments']);
       },
-      error: (err) => {
-        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.DETAIL.MSG_DELETE_FAILED'));
+      error: () => {
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       },
     });

@@ -3,20 +3,36 @@ import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
+import { LanguageService } from '../services/language.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const authService = inject(AuthService);
-  const subscriptionService = inject(SubscriptionService);
-  const token = authService.getToken();
-
-  // Skip auth for login/register requests
-  if (req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
+  // Static-asset fetches (e.g. ngx-translate loading ./assets/i18n/*.json) must
+  // bypass this interceptor entirely. Injecting LanguageService here while it's
+  // mid-construction creates a circular DI — LanguageService's constructor is
+  // what triggers the asset fetch in the first place — and Arabic silently
+  // fails to load on bootstrap.
+  if (req.url.includes('/assets/') || req.url.startsWith('assets/')) {
     return next(req);
   }
 
-  const authReq = token
-    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
-    : req;
+  const authService = inject(AuthService);
+  const subscriptionService = inject(SubscriptionService);
+  const languageService = inject(LanguageService);
+  const token = authService.getToken();
+
+  // Attach current UI language so the backend can localize anything it owns
+  // (emails, scheduled jobs) and so the frontend's error interceptor can fall
+  // back to the same locale when the server emits a translation code.
+  const lang = languageService.currentLang();
+
+  // Skip auth for login/register requests, but still send the language.
+  if (req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
+    return next(req.clone({ setHeaders: { 'Accept-Language': lang } }));
+  }
+
+  const headers: Record<string, string> = { 'Accept-Language': lang };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const authReq = req.clone({ setHeaders: headers });
 
   return next(authReq).pipe(
     catchError((error: HttpErrorResponse) => {

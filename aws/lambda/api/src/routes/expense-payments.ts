@@ -1,5 +1,6 @@
 import { insert, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export function mapPaymentFromDB(row: any) {
   return {
@@ -29,7 +30,7 @@ export const expensePaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.expenseId) {
@@ -38,7 +39,7 @@ export const expensePaymentsRoutes = {
           [body.expenseId, context.companyId]
         );
         if (!expense) {
-          return { status: 404 as const, body: { message: 'Expense not found' } };
+          return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
         }
         if (expense.is_recurring) {
           const payDate: string = body.date || new Date().toISOString().split('T')[0];
@@ -49,13 +50,13 @@ export const expensePaymentsRoutes = {
             [context.companyId, body.expenseId, monthStart, monthEnd]
           );
           if (existing) {
-            return { status: 400 as const, body: { message: 'This expense has already been paid for this month' } };
+            return apiError(400, 'ERRORS.EXPENSE_PAYMENTS.ALREADY_PAID_THIS_MONTH', 'This expense has already been paid for this month');
           }
         }
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const payment = await insert('expense_payments', {
@@ -79,10 +80,7 @@ export const expensePaymentsRoutes = {
       return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
       console.error('Create expense payment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create payment' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSE_PAYMENTS.CREATE_FAILED', 'Failed to create payment', 400);
     }
   },
 
@@ -90,7 +88,7 @@ export const expensePaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM expense_payments WHERE company_id = $1';
@@ -127,10 +125,7 @@ export const expensePaymentsRoutes = {
       return { status: 200 as const, body: payments.map(mapPaymentFromDB) };
     } catch (error) {
       console.error('List expense payments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list payments' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSE_PAYMENTS.LIST_FAILED', 'Failed to list payments');
     }
   },
 
@@ -138,7 +133,7 @@ export const expensePaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const payment = await queryOne(
@@ -147,15 +142,12 @@ export const expensePaymentsRoutes = {
       );
 
       if (!payment) {
-        return { status: 404 as const, body: { message: 'Payment not found' } };
+        return apiError(404, 'ERRORS.EXPENSE_PAYMENTS.NOT_FOUND', 'Payment not found');
       }
 
       return { status: 200 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Payment not found' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSE_PAYMENTS.NOT_FOUND', 'Payment not found', 404);
     }
   },
 
@@ -163,7 +155,7 @@ export const expensePaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -172,18 +164,15 @@ export const expensePaymentsRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Payment not found' } };
+        return apiError(404, 'ERRORS.EXPENSE_PAYMENTS.NOT_FOUND', 'Payment not found');
       }
 
       await query('DELETE FROM expense_payments WHERE id = $1', [params.id]);
 
-      return { status: 200 as const, body: { message: 'Payment deleted successfully' } };
+      return { status: 200 as const, body: { message: 'Payment deleted successfully', code: 'EXPENSE_PAYMENTS.DELETED' } };
     } catch (error) {
       console.error('Delete expense payment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to delete payment' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSE_PAYMENTS.DELETE_FAILED', 'Failed to delete payment');
     }
   },
 };

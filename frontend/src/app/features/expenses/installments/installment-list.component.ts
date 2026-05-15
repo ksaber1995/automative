@@ -83,8 +83,8 @@ export class InstallmentListComponent implements OnInit {
         this.planToDelete.set(null);
         this.load();
       },
-      error: (err) => {
-        this.notificationService.error(err.error?.message || this.translate.instant('INSTALLMENTS.LIST.MSG_DELETE_FAILED'));
+      error: () => {
+        // Interceptor toasted the translated error.
         this.showDeleteDialog = false;
       },
     });

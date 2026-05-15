@@ -1,5 +1,6 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
@@ -7,7 +8,7 @@ export const analyticsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'dashboard', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const startDate = queryParams.startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
@@ -362,10 +363,7 @@ export const analyticsRoutes = {
       };
     } catch (error) {
       console.error('Dashboard error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to load dashboard' },
-      };
+      return mapThrownError(error, 'ERRORS.ANALYTICS.DASHBOARD_FAILED', 'Failed to load dashboard');
     }
   },
 };

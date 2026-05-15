@@ -1,5 +1,6 @@
 import { query, queryOne, update } from '../db/connection';
-import { extractTenantContext, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 export const companiesRoutes = {
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
@@ -10,7 +11,7 @@ export const companiesRoutes = {
         [context.companyId]
       );
       if (!company) {
-        return { status: 404 as const, body: { message: 'Company not found' } };
+        return apiError(404, 'ERRORS.COMPANIES.NOT_FOUND', 'Company not found');
       }
       return {
         status: 200 as const,
@@ -22,10 +23,7 @@ export const companiesRoutes = {
       };
     } catch (error) {
       console.error('Get company settings error:', error);
-      return {
-        status: 401 as const,
-        body: { message: error.message || 'Unauthorized' },
-      };
+      return mapThrownError(error, 'ERRORS.COMPANIES.SETTINGS_FAILED', 'Unauthorized', 401);
     }
   },
 
@@ -34,7 +32,7 @@ export const companiesRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
-        return { status: 403 as const, body: { message: 'Only admins can update company settings' } };
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can update company settings');
       }
 
       const updateData: any = {};
@@ -44,7 +42,7 @@ export const companiesRoutes = {
 
       const company = await update('companies', context.companyId, updateData);
       if (!company) {
-        return { status: 400 as const, body: { message: 'Failed to update settings' } };
+        return apiError(400, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update settings');
       }
 
       return {
@@ -57,10 +55,7 @@ export const companiesRoutes = {
       };
     } catch (error) {
       console.error('Update company settings error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to update settings' },
-      };
+      return mapThrownError(error, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update settings', 400);
     }
   },
 };

@@ -1,5 +1,6 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -54,11 +55,11 @@ export const sessionsRoutes = {
       await ensureSessionRoomNullable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       // Verify class exists and belongs to company (branch/company come from the linked course)
@@ -70,11 +71,11 @@ export const sessionsRoutes = {
         [body.classId, context.companyId]
       );
       if (!cls) {
-        return { status: 404 as const, body: { message: 'Class not found' } };
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
       }
 
       if (cls.is_finished) {
-        return { status: 400 as const, body: { message: 'This class is finished. Sessions cannot be started.' } };
+        return apiError(400, 'ERRORS.SESSIONS.CLASS_FINISHED', 'This class is finished. Sessions cannot be started.');
       }
 
       const isOnlineClass = typeof cls.type === 'string' && cls.type.toUpperCase() === 'ONLINE';
@@ -87,7 +88,7 @@ export const sessionsRoutes = {
           [body.roomId, context.companyId]
         );
         if (!room) {
-          return { status: 404 as const, body: { message: 'Room not found or inactive' } };
+          return apiError(404, 'ERRORS.SESSIONS.ROOM_NOT_FOUND', 'Room not found or inactive');
         }
 
         // Check if room is already occupied
@@ -96,10 +97,10 @@ export const sessionsRoutes = {
           [body.roomId]
         );
         if (activeSession) {
-          return { status: 400 as const, body: { message: 'Room is already occupied. End the current session first.' } };
+          return apiError(400, 'ERRORS.SESSIONS.ROOM_OCCUPIED', 'Room is already occupied. End the current session first.');
         }
       } else if (!isOnlineClass) {
-        return { status: 400 as const, body: { message: 'Room is required for offline classes.' } };
+        return apiError(400, 'ERRORS.SESSIONS.ROOM_REQUIRED', 'Room is required for offline classes.');
       }
 
       // Check if class already has an active session
@@ -108,7 +109,7 @@ export const sessionsRoutes = {
         [body.classId]
       );
       if (classActiveSession) {
-        return { status: 400 as const, body: { message: 'This class already has an active session running.' } };
+        return apiError(400, 'ERRORS.SESSIONS.CLASS_HAS_ACTIVE', 'This class already has an active session running.');
       }
 
       const session = await insert('sessions', {
@@ -150,10 +151,7 @@ export const sessionsRoutes = {
       return { status: 201 as const, body: mapSessionFromDB(session) };
     } catch (error) {
       console.error('Start session error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to start session' },
-      };
+      return mapThrownError(error, 'ERRORS.SESSIONS.START_FAILED', 'Failed to start session', 400);
     }
   },
 
@@ -161,7 +159,7 @@ export const sessionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -170,15 +168,15 @@ export const sessionsRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Session not found' } };
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       }
 
       if (existing.end_date) {
-        return { status: 400 as const, body: { message: 'Session has already ended' } };
+        return apiError(400, 'ERRORS.SESSIONS.ALREADY_ENDED', 'Session has already ended');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       // Allow caller to supply a custom end date (e.g. forgot to end session yesterday)
@@ -186,12 +184,12 @@ export const sessionsRoutes = {
       if (body?.endDate) {
         endDate = new Date(body.endDate);
         if (isNaN(endDate.getTime())) {
-          return { status: 400 as const, body: { message: 'Invalid endDate provided' } };
+          return apiError(400, 'ERRORS.SESSIONS.INVALID_END_DATE', 'Invalid endDate provided');
         }
         // Validate: endDate must not be before startDate
         const startDate = new Date(existing.start_date);
         if (endDate < startDate) {
-          return { status: 400 as const, body: { message: 'End date cannot be before start date' } };
+          return apiError(400, 'ERRORS.SESSIONS.END_BEFORE_START', 'End date cannot be before start date');
         }
       } else {
         endDate = new Date();
@@ -207,10 +205,7 @@ export const sessionsRoutes = {
       return { status: 200 as const, body: mapSessionFromDB(session) };
     } catch (error) {
       console.error('End session error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to end session' },
-      };
+      return mapThrownError(error, 'ERRORS.SESSIONS.END_FAILED', 'Failed to end session', 400);
     }
   },
 
@@ -218,7 +213,7 @@ export const sessionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -241,7 +236,7 @@ export const sessionsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND s.branch_id = $${params.length}`;
@@ -266,10 +261,7 @@ export const sessionsRoutes = {
       return { status: 200 as const, body: sessions.map(mapSessionWithDetailsFromDB) };
     } catch (error) {
       console.error('List sessions error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list sessions' },
-      };
+      return mapThrownError(error, 'ERRORS.SESSIONS.LIST_FAILED', 'Failed to list sessions');
     }
   },
 
@@ -277,7 +269,7 @@ export const sessionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -300,7 +292,7 @@ export const sessionsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND s.branch_id = $${params.length}`;
@@ -315,10 +307,7 @@ export const sessionsRoutes = {
       return { status: 200 as const, body: sessions.map(mapSessionWithDetailsFromDB) };
     } catch (error) {
       console.error('List active sessions error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list active sessions' },
-      };
+      return mapThrownError(error, 'ERRORS.SESSIONS.LIST_FAILED', 'Failed to list active sessions');
     }
   },
 
@@ -326,7 +315,7 @@ export const sessionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const sql = `
@@ -349,20 +338,17 @@ export const sessionsRoutes = {
       const result = await query(sql, [params.id, context.companyId]);
 
       if (!result || result.length === 0) {
-        return { status: 404 as const, body: { message: 'Session not found' } };
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
       }
 
       if (!canAccessBranch(context, result[0].branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this session' } };
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
       return { status: 200 as const, body: mapSessionWithDetailsFromDB(result[0]) };
     } catch (error) {
       console.error('Get session error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Session not found' },
-      };
+      return mapThrownError(error, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found', 404);
     }
   },
 };

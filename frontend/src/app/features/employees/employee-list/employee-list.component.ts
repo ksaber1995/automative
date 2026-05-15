@@ -11,7 +11,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -45,6 +45,7 @@ export class EmployeeListComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   employees = signal<Employee[]>([]);
@@ -119,24 +120,26 @@ export class EmployeeListComponent implements OnInit {
 
   terminateEmployee(employee: Employee) {
     this.confirmationService.confirm({
-      message: `Are you sure you want to terminate ${employee.firstName} ${employee.lastName}?`,
-      header: 'Confirm Termination',
+      message: this.translate.instant('EMPLOYEES.TERMINATE_CONFIRM', {
+        name: `${employee.firstName} ${employee.lastName}`,
+      }),
+      header: this.translate.instant('EMPLOYEES.TERMINATE_HEADER'),
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
         this.employeeService.deleteEmployee(employee.id).subscribe({
           next: () => {
-            this.notificationService.success('Employee terminated successfully');
+            this.notificationService.success(this.translate.instant('EMPLOYEES.TERMINATED'));
             this.loadEmployees();
           },
           error: (err) => {
             const assigned = err?.error?.assignedClasses;
             if (err?.status === 400 && Array.isArray(assigned) && assigned.length > 0) {
+              // Show the specialized "assigned to classes" dialog instead of relying on the interceptor toast.
               this.blockedEmployee.set(employee);
               this.blockingClasses.set(assigned);
               this.showAssignedClassesDialog.set(true);
-            } else {
-              this.notificationService.error(err?.error?.message || 'Failed to terminate employee');
             }
+            // Otherwise the interceptor toasted the translated error.
           }
         });
       }

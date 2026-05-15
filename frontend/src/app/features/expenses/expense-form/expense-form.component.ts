@@ -170,7 +170,7 @@ export class ExpenseFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load expense');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/expenses']);
       }
@@ -196,12 +196,12 @@ export class ExpenseFormComponent implements OnInit {
     if (this.isEditMode() && this.expenseId) {
       this.expenseService.updateExpense(this.expenseId, expenseData).subscribe({
         next: () => {
-          this.notificationService.success('Expense updated successfully');
+          this.notificationService.success(this.translate.instant('EXPENSES.UPDATED'));
           this.router.navigate(['/expenses']);
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error('Failed to update expense');
           console.error('Update error:', error);
         }
       });
@@ -229,24 +229,24 @@ export class ExpenseFormComponent implements OnInit {
           )
         ).subscribe({
           next: () => {
-            this.notificationService.success('Expense created and payment recorded');
+            this.notificationService.success(this.translate.instant('EXPENSES.CREATED_AND_PAID'));
             this.router.navigate(['/expenses']);
           },
           error: (error) => {
+            // Interceptor toasted the translated error.
             this.loading.set(false);
-            this.notificationService.error('Expense created but payment failed');
             console.error('Payment error:', error);
           }
         });
       } else {
         create$.subscribe({
           next: () => {
-            this.notificationService.success('Expense created successfully');
+            this.notificationService.success(this.translate.instant('EXPENSES.CREATED'));
             this.router.navigate(['/expenses']);
           },
           error: (error) => {
+            // Interceptor toasted the translated error.
             this.loading.set(false);
-            this.notificationService.error('Failed to create expense');
             console.error('Create error:', error);
           }
         });

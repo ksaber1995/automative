@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapEmployeeFromDB(row: any) {
   return {
@@ -26,14 +27,11 @@ export const employeesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const employee = await insert('employees', {
@@ -57,10 +55,7 @@ export const employeesRoutes = {
       };
     } catch (error) {
       console.error('Create employee error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create employee' },
-      };
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.CREATE_FAILED', 'Failed to create employee', 400);
     }
   },
 
@@ -68,7 +63,7 @@ export const employeesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM employees WHERE company_id = $1';
@@ -76,10 +71,7 @@ export const employeesRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
@@ -104,10 +96,7 @@ export const employeesRoutes = {
       };
     } catch (error) {
       console.error('List employees error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list employees' },
-      };
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.LIST_FAILED', 'Failed to list employees');
     }
   },
 
@@ -115,7 +104,7 @@ export const employeesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const employee = await queryOne(
@@ -124,17 +113,11 @@ export const employeesRoutes = {
       );
 
       if (!employee) {
-        return {
-          status: 404 as const,
-          body: { message: 'Employee not found' },
-        };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       if (employee.branch_id && !canAccessBranch(context, employee.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this employee' },
-        };
+        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED', 'Access denied to this employee');
       }
 
       return {
@@ -143,10 +126,7 @@ export const employeesRoutes = {
       };
     } catch (error) {
       console.error('Get employee error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Employee not found' },
-      };
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found', 404);
     }
   },
 
@@ -154,7 +134,7 @@ export const employeesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -163,17 +143,11 @@ export const employeesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Employee not found' },
-        };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to update this employee' },
-        };
+        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_UPDATE', 'Access denied to update this employee');
       }
 
       const updateData: any = {};
@@ -188,10 +162,7 @@ export const employeesRoutes = {
       if (body.hireDate !== undefined) updateData.hire_date = body.hireDate;
       if (body.branchId !== undefined) {
         if (body.branchId && !canAccessBranch(context, body.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to target branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS_TARGET', 'Access denied to target branch');
         }
         updateData.branch_id = body.branchId;
       }
@@ -200,10 +171,7 @@ export const employeesRoutes = {
       const employee = await update('employees', params.id, updateData);
 
       if (!employee) {
-        return {
-          status: 404 as const,
-          body: { message: 'Employee not found' },
-        };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       return {
@@ -212,10 +180,7 @@ export const employeesRoutes = {
       };
     } catch (error) {
       console.error('Update employee error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update employee' },
-      };
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.UPDATE_FAILED', 'Failed to update employee', 404);
     }
   },
 
@@ -223,7 +188,7 @@ export const employeesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -232,17 +197,11 @@ export const employeesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Employee not found' },
-        };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to delete this employee' },
-        };
+        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_DELETE', 'Access denied to delete this employee');
       }
 
       // Block termination if the employee is still assigned as instructor on any non-finished class.
@@ -262,6 +221,7 @@ export const employeesRoutes = {
           status: 400 as const,
           body: {
             message: 'Cannot terminate this employee while they are assigned to active classes. Please unassign them from these classes first.',
+            code: 'ERRORS.EMPLOYEES.ASSIGNED_TO_ACTIVE_CLASSES',
             assignedClasses: assignedClasses.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
           },
         };
@@ -271,22 +231,16 @@ export const employeesRoutes = {
       const employee = await update('employees', params.id, { is_active: false });
 
       if (!employee) {
-        return {
-          status: 404 as const,
-          body: { message: 'Employee not found' },
-        };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       return {
         status: 200 as const,
-        body: { message: 'Employee deleted successfully' },
+        body: { message: 'Employee deleted successfully', code: 'EMPLOYEES.DELETED' },
       };
     } catch (error) {
       console.error('Delete employee error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete employee' },
-      };
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.DELETE_FAILED', 'Failed to delete employee', 404);
     }
   },
 };

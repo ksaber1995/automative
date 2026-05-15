@@ -78,6 +78,7 @@ export class BreadcrumbsComponent {
 
     const walk = (node: ActivatedRoute) => {
       const snapshot = node.snapshot;
+      if (!snapshot) return;
       // Append URL segments of this route to the cumulative path.
       const segs = snapshot.url.map(u => u.path).filter(Boolean);
       if (segs.length) urlSegments.push(...segs);

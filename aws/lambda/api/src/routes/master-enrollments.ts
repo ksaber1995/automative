@@ -3,9 +3,8 @@ import {
   extractTenantContext,
   canAccessBranch,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 type AuthHeaders = { authorization: string };
 
@@ -106,7 +105,7 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const conditions: string[] = ['me.company_id = $1'];
@@ -122,7 +121,7 @@ export const masterEnrollmentsRoutes = {
       }
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         conditions.push(`me.branch_id = $${params.length}`);
@@ -136,10 +135,7 @@ export const masterEnrollmentsRoutes = {
       return { status: 200 as const, body: filtered.map(mapWithProgress) };
     } catch (error: any) {
       console.error('List master enrollments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list master enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.LIST_FAILED', 'Failed to list master enrollments');
     }
   },
 
@@ -147,25 +143,25 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const master = await queryOne(
         'SELECT id, branch_id FROM master_courses WHERE id = $1 AND company_id = $2',
         [body.masterCourseId, context.companyId]
       );
-      if (!master) return { status: 404 as const, body: { message: 'Master course not found' } };
+      if (!master) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
       if (!canAccessBranch(context, master.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const student = await queryOne(
         'SELECT id, branch_id FROM students WHERE id = $1',
         [body.studentId]
       );
-      if (!student) return { status: 404 as const, body: { message: 'Student not found' } };
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
       if (student.branch_id !== master.branch_id) {
-        return { status: 400 as const, body: { message: 'Student must belong to the same branch as the master course' } };
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.STUDENT_BRANCH_MISMATCH', 'Student must belong to the same branch as the master course');
       }
 
       const existing = await queryOne(
@@ -174,7 +170,7 @@ export const masterEnrollmentsRoutes = {
         [body.studentId, body.masterCourseId]
       );
       if (existing) {
-        return { status: 400 as const, body: { message: 'Student already has an active enrollment in this master course' } };
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.ALREADY_ACTIVE', 'Student already has an active enrollment in this master course');
       }
 
       const masterFull = await queryOne(
@@ -217,10 +213,7 @@ export const masterEnrollmentsRoutes = {
       return { status: 201 as const, body: mapWithProgress(full || row) };
     } catch (error: any) {
       console.error('Create master enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create master enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.CREATE_FAILED', 'Failed to create master enrollment', 400);
     }
   },
 
@@ -228,7 +221,7 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const rows = await query(
@@ -241,10 +234,7 @@ export const masterEnrollmentsRoutes = {
       return { status: 200 as const, body: filtered.map(mapWithProgress) };
     } catch (error: any) {
       console.error('List master enrollments by student error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list master enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.LIST_FAILED', 'Failed to list master enrollments');
     }
   },
 
@@ -252,7 +242,7 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const rows = await query(
         `${SELECT_WITH_PROGRESS}
@@ -264,10 +254,7 @@ export const masterEnrollmentsRoutes = {
       return { status: 200 as const, body: filtered.map(mapWithProgress) };
     } catch (error: any) {
       console.error('List master enrollments by master error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list master enrollments' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.LIST_FAILED', 'Failed to list master enrollments');
     }
   },
 
@@ -275,23 +262,20 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const row = await queryOne(
         `${SELECT_WITH_PROGRESS} WHERE me.id = $1 AND me.company_id = $2`,
         [params.id, context.companyId]
       );
-      if (!row) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!row) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, row.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
       return { status: 200 as const, body: mapWithProgress(row) };
     } catch (error: any) {
       console.error('Get master enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Master enrollment not found' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found', 404);
     }
   },
 
@@ -299,24 +283,21 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const existing = await queryOne(
         'SELECT id, branch_id, status FROM master_enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!existing) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, existing.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
       await update('master_enrollments', params.id, { status: 'CANCELLED' });
-      return { status: 200 as const, body: { message: 'Master enrollment cancelled' } };
+      return { status: 200 as const, body: { message: 'Master enrollment cancelled', code: 'MASTER_ENROLLMENTS.CANCELLED' } };
     } catch (error: any) {
       console.error('Cancel master enrollment error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to cancel master enrollment' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.CANCEL_FAILED', 'Failed to cancel master enrollment', 400);
     }
   },
 
@@ -325,15 +306,15 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const me = await queryOne(
         'SELECT branch_id FROM master_enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!me) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, me.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
       const rows = await query(
         `SELECT * FROM refunds
@@ -358,10 +339,7 @@ export const masterEnrollmentsRoutes = {
       };
     } catch (error: any) {
       console.error('List master enrollment refunds error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list refunds' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.LIST_REFUNDS_FAILED', 'Failed to list refunds');
     }
   },
 
@@ -371,21 +349,21 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const me = await queryOne(
         'SELECT * FROM master_enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!me) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, me.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
 
       const amount = parseFloat(body.amount);
       if (!Number.isFinite(amount) || amount <= 0) {
-        return { status: 400 as const, body: { message: 'Refund amount must be a positive number' } };
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.REFUND_NON_POSITIVE', 'Refund amount must be a positive number');
       }
       const type = body.type === 'FULL' ? 'FULL' : 'PARTIAL';
 
@@ -393,10 +371,7 @@ export const masterEnrollmentsRoutes = {
       const alreadyRefunded = parseFloat(me.total_refunded || '0');
       const refundable = amountPaid - alreadyRefunded;
       if (amount > refundable + 0.001) {
-        return {
-          status: 400 as const,
-          body: { message: `Cannot refund more than refundable amount (${refundable.toFixed(2)})` },
-        };
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.REFUND_EXCEEDS_REFUNDABLE', `Cannot refund more than refundable amount (${refundable.toFixed(2)})`);
       }
 
       const refund = await insert('refunds', {
@@ -441,10 +416,7 @@ export const masterEnrollmentsRoutes = {
       };
     } catch (error: any) {
       console.error('Create master enrollment refund error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create refund' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.CREATE_REFUND_FAILED', 'Failed to create refund', 400);
     }
   },
 
@@ -453,15 +425,15 @@ export const masterEnrollmentsRoutes = {
       await ensurePaymentsTable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const me = await queryOne(
         'SELECT branch_id FROM master_enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!me) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, me.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
       const rows = await query(
         `SELECT * FROM master_enrollment_payments
@@ -483,7 +455,7 @@ export const masterEnrollmentsRoutes = {
         })),
       };
     } catch (error: any) {
-      return { status: 500 as const, body: { message: error.message || 'Failed to get payments' } };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.GET_PAYMENTS_FAILED', 'Failed to get payments');
     }
   },
 
@@ -492,15 +464,15 @@ export const masterEnrollmentsRoutes = {
       await ensurePaymentsTable();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const me = await queryOne(
         'SELECT * FROM master_enrollments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!me) return { status: 404 as const, body: { message: 'Master enrollment not found' } };
+      if (!me) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
       if (!canAccessBranch(context, me.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied' } };
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
       }
 
       const currentAmountPaid = parseFloat(me.amount_paid || '0');
@@ -508,7 +480,7 @@ export const masterEnrollmentsRoutes = {
       const remaining = finalPrice - currentAmountPaid;
       const amount = parseFloat(body.amount);
       if (amount > remaining + 0.001) {
-        return { status: 400 as const, body: { message: `Payment exceeds remaining balance (${remaining.toFixed(2)})` } };
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.PAYMENT_EXCEEDS_BALANCE', `Payment exceeds remaining balance (${remaining.toFixed(2)})`);
       }
 
       const payment = await insert('master_enrollment_payments', {
@@ -540,10 +512,7 @@ export const masterEnrollmentsRoutes = {
         },
       };
     } catch (error: any) {
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to add payment' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.ADD_PAYMENT_FAILED', 'Failed to add payment', 400);
     }
   },
 
@@ -554,7 +523,7 @@ export const masterEnrollmentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const row = await queryOne(
         `SELECT me.id AS master_enrollment_id, mc.id AS master_course_id, mc.name AS master_course_name
@@ -582,10 +551,7 @@ export const masterEnrollmentsRoutes = {
       };
     } catch (error: any) {
       console.error('Coverage check error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to check coverage' },
-      };
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.COVERAGE_CHECK_FAILED', 'Failed to check coverage');
     }
   },
 };

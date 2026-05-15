@@ -63,7 +63,7 @@ interface RoadmapPhase {
     <section id="top" class="pt-28 pb-20 bg-gradient-to-br from-brand-50 via-white to-white relative overflow-hidden">
       <div class="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]"></div>
       <div class="container-custom relative">
-        <div class="max-w-3xl">
+        <div class="max-w-4xl">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold mb-6">
             <span class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
             {{ 'HERO.BADGE' | translate }}
@@ -309,7 +309,7 @@ interface RoadmapPhase {
           <p class="mt-4 text-lg text-gray-400">{{ 'ROADMAP.SUB' | translate }}</p>
         </div>
 
-        <div class="relative max-w-3xl mx-auto">
+        <div class="relative max-w-4xl mx-auto">
           <div class="absolute start-[27px] top-8 bottom-8 w-0.5 bg-gradient-to-b from-brand-500 via-brand-700 to-gray-700 opacity-60"></div>
 
           <div class="space-y-6">
@@ -393,7 +393,7 @@ interface RoadmapPhase {
 
     <!-- FAQ -->
     <section id="faq" class="py-20 bg-white">
-      <div class="container-custom max-w-3xl">
+      <div class="container-custom max-w-4xl">
         <div class="text-center mb-10">
           <p class="text-sm font-semibold text-brand-600 uppercase tracking-wider">{{ 'FAQ.KICKER' | translate }}</p>
           <h2 class="mt-2 text-3xl font-bold text-gray-900">{{ 'FAQ.HEADING' | translate }}</h2>

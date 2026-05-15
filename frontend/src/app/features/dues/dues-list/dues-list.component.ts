@@ -82,7 +82,7 @@ export class DuesListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load dues');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
       }
     });
@@ -120,13 +120,13 @@ export class DuesListComponent implements OnInit {
 
     request$.subscribe({
       next: () => {
-        this.notificationService.success('Payment recorded successfully');
+        this.notificationService.success(this.translate.instant('DUES.PAYMENT_RECORDED'));
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.load();
       },
-      error: (err) => {
-        this.notificationService.error(err?.error?.message || 'Failed to record payment');
+      error: () => {
+        // Interceptor toasted the translated error.
         this.actionLoading.set(false);
       }
     });

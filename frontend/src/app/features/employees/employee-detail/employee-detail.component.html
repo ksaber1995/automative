@@ -357,14 +357,16 @@
       <div class="col-span-2 field">
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.ROLE' | translate }} <span class="text-red-500">*</span></label>
         <p-select [(ngModel)]="convertForm.role" [options]="roleOptions"
-          [placeholder]="'EMPLOYEES.DETAIL.SELECT_ROLE' | translate" styleClass="w-full">
+          [placeholder]="'EMPLOYEES.DETAIL.SELECT_ROLE' | translate" styleClass="w-full"
+          appendTo="body">
         </p-select>
       </div>
       <div class="col-span-2 field">
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EMPLOYEES.DETAIL.BRANCH_ACCESS' | translate }}</label>
         <p-multiSelect [(ngModel)]="convertForm.branchIds" [options]="branches()"
           optionLabel="name" optionValue="id" [placeholder]="'EMPLOYEES.DETAIL.SELECT_BRANCHES' | translate"
-          styleClass="w-full">
+          styleClass="w-full"
+          appendTo="body">
         </p-multiSelect>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { forkJoin } from 'rxjs';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -32,7 +33,7 @@ interface RecurringRow {
   imports: [
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DatePickerModule, CheckboxModule, TooltipModule, InputNumberModule,
-    InputTextModule, SelectModule,
+    InputTextModule, SelectModule, TranslateModule,
   ],
   templateUrl: './manage-recurring.component.html'
 })
@@ -40,6 +41,7 @@ export class ManageRecurringComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   private router = inject(Router);
 
   loading = signal(false);
@@ -129,7 +131,7 @@ export class ManageRecurringComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load data');
+        // Interceptor toasted the translated error.
         this.loading.set(false);
       }
     });
@@ -171,9 +173,13 @@ export class ManageRecurringComponent implements OnInit {
       if (done + failed === rows.length) {
         this.paying.set(false);
         if (failed > 0) {
-          this.notificationService.error(`Paid ${done - failed}, failed ${failed}`);
+          this.notificationService.error(
+            this.translate.instant('EXPENSES.RECURRING_PAID_PARTIAL', { paid: done - failed, failed })
+          );
         } else {
-          this.notificationService.success(`Recorded ${done} payment(s) successfully`);
+          this.notificationService.success(
+            this.translate.instant('EXPENSES.RECURRING_RECORDED', { count: done })
+          );
         }
         this.selectedIds.set(new Set());
         this.loadData();

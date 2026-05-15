@@ -2,9 +2,8 @@ import { query } from '../db/connection';
 import {
   extractTenantContext,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 type AuthHeaders = { authorization: string };
 type RangeQuery = { startDate?: string; endDate?: string; branchId?: string };
@@ -19,10 +18,9 @@ function defaultRange(q: RangeQuery) {
   return { startDate, endDate: end };
 }
 
-function handleError(error: any, fallback: string) {
-  console.error(`${fallback}:`, error);
-  const status = isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500;
-  return { status: status as 402 | 401 | 500, body: { message: error?.message || fallback } };
+function handleError(error: any, fallbackCode: string, fallbackMessage: string) {
+  console.error(`${fallbackMessage}:`, error);
+  return mapThrownError(error, fallbackCode, fallbackMessage);
 }
 
 export const reportsRoutes = {
@@ -31,7 +29,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND branch_id = $4' : '';
@@ -115,7 +113,7 @@ export const reportsRoutes = {
       });
       return { status: 200 as const, body: data };
     } catch (error) {
-      return handleError(error, 'Failed to compute monthly P&L');
+      return handleError(error, 'ERRORS.REPORTS.MONTHLY_PL_FAILED', 'Failed to compute monthly P&L');
     }
   },
 
@@ -124,7 +122,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND branch_id = $4' : '';
@@ -162,7 +160,7 @@ export const reportsRoutes = {
         })),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute salary growth');
+      return handleError(error, 'ERRORS.REPORTS.SALARY_GROWTH_FAILED', 'Failed to compute salary growth');
     }
   },
 
@@ -172,7 +170,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const courseBranchClause = q.branchId ? ' AND e.branch_id = $4' : '';
@@ -234,7 +232,7 @@ export const reportsRoutes = {
         })),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute top courses');
+      return handleError(error, 'ERRORS.REPORTS.TOP_COURSES_FAILED', 'Failed to compute top courses');
     }
   },
 
@@ -243,7 +241,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND s.branch_id = $4' : '';
@@ -298,7 +296,7 @@ export const reportsRoutes = {
         }),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute students over time');
+      return handleError(error, 'ERRORS.REPORTS.STUDENTS_OVER_TIME_FAILED', 'Failed to compute students over time');
     }
   },
 
@@ -307,7 +305,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const inactiveMonths = Math.min(Math.max(parseInt(q.inactiveMonths || '3', 10) || 3, 1), 24);
       const branchClause = q.branchId ? ' AND s.branch_id = $2' : '';
@@ -361,7 +359,7 @@ export const reportsRoutes = {
         },
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute churn');
+      return handleError(error, 'ERRORS.REPORTS.CHURN_FAILED', 'Failed to compute churn');
     }
   },
 
@@ -371,7 +369,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const courseBranchClause = q.branchId ? ' AND c.branch_id = $4' : '';
@@ -437,7 +435,7 @@ export const reportsRoutes = {
         })),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute profit by course');
+      return handleError(error, 'ERRORS.REPORTS.PROFIT_BY_COURSE_FAILED', 'Failed to compute profit by course');
     }
   },
 
@@ -446,7 +444,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
 
@@ -513,7 +511,7 @@ export const reportsRoutes = {
         }),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute profit by branch');
+      return handleError(error, 'ERRORS.REPORTS.PROFIT_BY_BRANCH_FAILED', 'Failed to compute profit by branch');
     }
   },
 
@@ -522,7 +520,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND p.branch_id = $4' : '';
@@ -569,7 +567,7 @@ export const reportsRoutes = {
         }),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute profit by product');
+      return handleError(error, 'ERRORS.REPORTS.PROFIT_BY_PRODUCT_FAILED', 'Failed to compute profit by product');
     }
   },
 
@@ -578,7 +576,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND branch_id = $4' : '';
@@ -602,7 +600,7 @@ export const reportsRoutes = {
         })),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute expenses by category');
+      return handleError(error, 'ERRORS.REPORTS.EXPENSES_BY_CATEGORY_FAILED', 'Failed to compute expenses by category');
     }
   },
 
@@ -614,7 +612,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
       const branchClause = q.branchId ? ' AND e.branch_id = $4' : '';
@@ -714,7 +712,7 @@ export const reportsRoutes = {
         }),
       };
     } catch (error) {
-      return handleError(error, 'Failed to compute profit by event');
+      return handleError(error, 'ERRORS.REPORTS.PROFIT_BY_EVENT_FAILED', 'Failed to compute profit by event');
     }
   },
 };

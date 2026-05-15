@@ -12,7 +12,7 @@ import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -64,6 +64,7 @@ export class UserDetailComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
   private authService = inject(AuthService);
+  private translate = inject(TranslateService);
 
   UserRole = UserRole;
   RESOURCE_META = RESOURCE_META;
@@ -89,7 +90,10 @@ export class UserDetailComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
     this.userService.get(id).subscribe({
       next: (user) => { this.user.set(user); this.loading.set(false); },
-      error: () => { this.notificationService.error('User not found'); this.loading.set(false); }
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.loading.set(false);
+      }
     });
   }
 
@@ -98,18 +102,28 @@ export class UserDetailComponent implements OnInit {
 
   toggleActive() {
     const u = this.user()!;
-    const action = u.isActive ? 'deactivate' : 'activate';
+    const isDeactivating = u.isActive;
+    const name = `${u.firstName} ${u.lastName}`;
     this.confirmationService.confirm({
-      message: `${action.charAt(0).toUpperCase() + action.slice(1)} ${u.firstName} ${u.lastName}?`,
-      header: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
+      message: this.translate.instant(
+        isDeactivating ? 'USERS.DEACTIVATE_CONFIRM' : 'USERS.ACTIVATE_CONFIRM',
+        { name }
+      ),
+      header: this.translate.instant(
+        isDeactivating ? 'USERS.DEACTIVATE_HEADER' : 'USERS.ACTIVATE_HEADER'
+      ),
       accept: () => {
-        const call = u.isActive ? this.userService.deactivate(u.id) : this.userService.activate(u.id);
+        const call = isDeactivating ? this.userService.deactivate(u.id) : this.userService.activate(u.id);
         call.subscribe({
           next: () => {
-            this.notificationService.success(`User ${action}d`);
+            this.notificationService.success(
+              this.translate.instant(isDeactivating ? 'USERS.DEACTIVATED' : 'USERS.ACTIVATED')
+            );
             this.user.update(prev => prev ? { ...prev, isActive: !prev.isActive } : prev);
           },
-          error: (e) => this.notificationService.error(e.error?.message || `Failed`),
+          error: () => {
+            // Interceptor toasted the translated error.
+          },
         });
       }
     });
@@ -117,19 +131,19 @@ export class UserDetailComponent implements OnInit {
 
   resetPassword() {
     if (!this.newPassword || this.newPassword.length < 6) {
-      this.notificationService.error('Password must be at least 6 characters');
+      this.notificationService.error(this.translate.instant('USERS.PASSWORD_TOO_SHORT'));
       return;
     }
     this.savingPassword.set(true);
     this.userService.resetPassword(this.user()!.id, this.newPassword).subscribe({
       next: () => {
-        this.notificationService.success('Password reset successfully');
+        this.notificationService.success(this.translate.instant('USERS.PASSWORD_RESET'));
         this.showPasswordDialog = false;
         this.newPassword = '';
         this.savingPassword.set(false);
       },
-      error: (e) => {
-        this.notificationService.error(e.error?.message || 'Failed to reset password');
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingPassword.set(false);
       }
     });

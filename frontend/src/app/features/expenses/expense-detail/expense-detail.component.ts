@@ -108,9 +108,9 @@ export class ExpenseDetailComponent implements OnInit {
         this.loadExpense(e.id);
         this.loadPayments(e.id);
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.savingPayment.set(false);
-        this.notificationService.error(err.error?.message || this.translate.instant('EXPENSES.DETAIL.MSG_PAYMENT_RECORD_FAILED'));
       }
     });
   }
@@ -131,7 +131,9 @@ export class ExpenseDetailComponent implements OnInit {
         this.loadExpense(id);
         this.loadPayments(id);
       },
-      error: () => this.notificationService.error(this.translate.instant('EXPENSES.DETAIL.MSG_PAYMENT_DELETE_FAILED'))
+      error: () => {
+        // Interceptor toasted the translated error.
+      }
     });
   }
 

@@ -8,7 +8,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -48,6 +48,7 @@ export class BranchDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   branch = signal<Branch | null>(null);
@@ -72,7 +73,7 @@ export class BranchDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error('Failed to load branch details');
+        // Interceptor toasted the translated error already.
         this.loading.set(false);
         this.router.navigate(['/branches']);
       }
@@ -117,14 +118,15 @@ export class BranchDetailComponent implements OnInit {
     const branch = this.branch();
     if (!branch || !this.branchId) return;
 
-    const action = branch.isActive ? 'deactivate' : 'activate';
-    const message = branch.isActive
-      ? 'Are you sure you want to deactivate this branch? Users will not be able to access it.'
-      : 'Are you sure you want to activate this branch?';
+    const willDeactivate = branch.isActive;
 
     this.confirmationService.confirm({
-      message: message,
-      header: `${action.charAt(0).toUpperCase() + action.slice(1)} Branch`,
+      message: this.translate.instant(
+        willDeactivate ? 'BRANCHES.DEACTIVATE_CONFIRM' : 'BRANCHES.ACTIVATE_CONFIRM'
+      ),
+      header: this.translate.instant(
+        willDeactivate ? 'BRANCHES.DEACTIVATE_HEADER' : 'BRANCHES.ACTIVATE_HEADER'
+      ),
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
         this.branchService.updateBranch(this.branchId!, {
@@ -133,13 +135,11 @@ export class BranchDetailComponent implements OnInit {
           next: (updatedBranch) => {
             this.branch.set(updatedBranch);
             this.notificationService.success(
-              `Branch ${action}d successfully`
+              this.translate.instant(willDeactivate ? 'BRANCHES.DEACTIVATED' : 'BRANCHES.ACTIVATED')
             );
           },
           error: () => {
-            this.notificationService.error(
-              `Failed to ${action} branch`
-            );
+            // Interceptor toasted the translated error.
           }
         });
       }

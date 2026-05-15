@@ -2,10 +2,9 @@ import bcrypt from 'bcryptjs';
 import { query, queryOne, insert } from '../db/connection';
 import {
   extractTenantContext,
-  isAuthError,
-  isSubscriptionError,
   isGlobalAdmin,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 /** Convenience: build a parameterised UPDATE returning the updated row */
 async function updateUser(
@@ -83,7 +82,7 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can manage users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_MANAGE', 'Only Global Admins can manage users');
       }
 
       let sql = `
@@ -114,10 +113,8 @@ export const usersRoutes = {
       return { status: 200 as const, body: { users: rows.map(mapUserRow) } };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
-      if (isSubscriptionError(error)) return { status: 402 as const, body: { message: (error as Error).message } };
       console.error('List users error:', error);
-      return { status: 500 as const, body: { message: 'Failed to list users' } };
+      return mapThrownError(error, 'ERRORS.USERS.LIST_FAILED', 'Failed to list users');
     }
   },
 
@@ -126,18 +123,17 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can view user details' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_VIEW', 'Only Global Admins can view user details');
       }
 
       const user = await getUserWithBranches(params.id, context.companyId);
-      if (!user) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!user) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       return { status: 200 as const, body: mapUserRow(user) };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Get user error:', error);
-      return { status: 500 as const, body: { message: 'Failed to get user' } };
+      return mapThrownError(error, 'ERRORS.USERS.GET_FAILED', 'Failed to get user');
     }
   },
 
@@ -146,13 +142,13 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can create users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_CREATE', 'Only Global Admins can create users');
       }
 
       // Check email uniqueness
       const existing = await queryOne<any>('SELECT id FROM users WHERE email = $1', [body.email]);
       if (existing) {
-        return { status: 400 as const, body: { message: 'A user with this email already exists' } };
+        return apiError(400, 'ERRORS.USERS.EMAIL_TAKEN', 'A user with this email already exists');
       }
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
@@ -185,9 +181,8 @@ export const usersRoutes = {
       return { status: 201 as const, body: mapUserRow(fullUser) };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Create user error:', error);
-      return { status: 500 as const, body: { message: 'Failed to create user' } };
+      return mapThrownError(error, 'ERRORS.USERS.CREATE_FAILED', 'Failed to create user');
     }
   },
 
@@ -196,24 +191,24 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can update users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_UPDATE', 'Only Global Admins can update users');
       }
 
       const existing = await getUserWithBranches(params.id, context.companyId);
-      if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       // Prevent self-deactivation via update
       if (body.isActive === false && params.id === context.userId) {
-        return { status: 400 as const, body: { message: 'You cannot deactivate your own account' } };
+        return apiError(400, 'ERRORS.USERS.SELF_DEACTIVATE', 'You cannot deactivate your own account');
       }
 
       // Block self-elevation: a user cannot change their own role or permissions.
       const isSelf = params.id === context.userId;
       if (isSelf && body.role !== undefined && body.role !== existing.role) {
-        return { status: 400 as const, body: { message: 'You cannot change your own role' } };
+        return apiError(400, 'ERRORS.USERS.SELF_ROLE_CHANGE', 'You cannot change your own role');
       }
       if (isSelf && 'permissions' in body) {
-        return { status: 400 as const, body: { message: 'You cannot change your own permissions' } };
+        return apiError(400, 'ERRORS.USERS.SELF_PERMISSIONS_CHANGE', 'You cannot change your own permissions');
       }
 
       // Build update fields
@@ -262,9 +257,8 @@ export const usersRoutes = {
       return { status: 200 as const, body: mapUserRow(updated) };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Update user error:', error);
-      return { status: 500 as const, body: { message: 'Failed to update user' } };
+      return mapThrownError(error, 'ERRORS.USERS.UPDATE_FAILED', 'Failed to update user');
     }
   },
 
@@ -273,21 +267,21 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can update permissions' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_PERMISSIONS', 'Only Global Admins can update permissions');
       }
 
       if (params.id === context.userId) {
-        return { status: 400 as const, body: { message: 'You cannot change your own permissions' } };
+        return apiError(400, 'ERRORS.USERS.SELF_PERMISSIONS_CHANGE', 'You cannot change your own permissions');
       }
 
       const existing = await queryOne<any>(
         'SELECT id, role FROM users WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       if (existing.role === 'GLOBAL_ADMIN' || existing.role === 'ADMIN') {
-        return { status: 400 as const, body: { message: 'GLOBAL_ADMIN/ADMIN always have full permissions and cannot be customised' } };
+        return apiError(400, 'ERRORS.USERS.ADMIN_PERMISSIONS_FIXED', 'GLOBAL_ADMIN/ADMIN always have full permissions and cannot be customised');
       }
 
       await updateUser(
@@ -298,13 +292,12 @@ export const usersRoutes = {
 
       return {
         status: 200 as const,
-        body: { message: 'Permissions updated successfully', permissions: body.permissions },
+        body: { message: 'Permissions updated successfully', code: 'USERS.PERMISSIONS_UPDATED', permissions: body.permissions },
       };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Update permissions error:', error);
-      return { status: 500 as const, body: { message: 'Failed to update permissions' } };
+      return mapThrownError(error, 'ERRORS.USERS.PERMISSIONS_UPDATE_FAILED', 'Failed to update permissions');
     }
   },
 
@@ -313,23 +306,22 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can reset passwords' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_RESET_PW', 'Only Global Admins can reset passwords');
       }
 
       const existing = await queryOne<any>(
         'SELECT id FROM users WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
       await updateUser(params.id, context.companyId, { password: hashedPassword });
-      return { status: 200 as const, body: { message: 'Password reset successfully' } };
+      return { status: 200 as const, body: { message: 'Password reset successfully', code: 'USERS.PASSWORD_RESET' } };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Reset password error:', error);
-      return { status: 500 as const, body: { message: 'Failed to reset password' } };
+      return mapThrownError(error, 'ERRORS.USERS.PASSWORD_RESET_FAILED', 'Failed to reset password');
     }
   },
 
@@ -338,27 +330,26 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can deactivate users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_DEACTIVATE', 'Only Global Admins can deactivate users');
       }
 
       // Prevent deactivating yourself
       if (params.id === context.userId) {
-        return { status: 400 as const, body: { message: 'You cannot deactivate your own account' } };
+        return apiError(400, 'ERRORS.USERS.SELF_DEACTIVATE', 'You cannot deactivate your own account');
       }
 
       const existing = await queryOne<any>(
         'SELECT id FROM users WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       await updateUser(params.id, context.companyId, { is_active: false });
-      return { status: 200 as const, body: { message: 'User deactivated successfully' } };
+      return { status: 200 as const, body: { message: 'User deactivated successfully', code: 'USERS.DEACTIVATED' } };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Deactivate user error:', error);
-      return { status: 500 as const, body: { message: 'Failed to deactivate user' } };
+      return mapThrownError(error, 'ERRORS.USERS.DEACTIVATE_FAILED', 'Failed to deactivate user');
     }
   },
 
@@ -367,22 +358,21 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can activate users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_ACTIVATE', 'Only Global Admins can activate users');
       }
 
       const existing = await queryOne<any>(
         'SELECT id FROM users WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
-      if (!existing) return { status: 404 as const, body: { message: 'User not found' } };
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
 
       await updateUser(params.id, context.companyId, { is_active: true });
-      return { status: 200 as const, body: { message: 'User activated successfully' } };
+      return { status: 200 as const, body: { message: 'User activated successfully', code: 'USERS.ACTIVATED' } };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Activate user error:', error);
-      return { status: 500 as const, body: { message: 'Failed to activate user' } };
+      return mapThrownError(error, 'ERRORS.USERS.ACTIVATE_FAILED', 'Failed to activate user');
     }
   },
 
@@ -391,7 +381,7 @@ export const usersRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
-        return { status: 403 as const, body: { message: 'Only Global Admins can convert employees to users' } };
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_CONVERT', 'Only Global Admins can convert employees to users');
       }
 
       // Verify employee exists and belongs to this company
@@ -400,7 +390,7 @@ export const usersRoutes = {
         [body.employeeId, context.companyId]
       );
       if (!employee) {
-        return { status: 404 as const, body: { message: 'Employee not found' } };
+        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
       // Check if employee is already a user
@@ -409,13 +399,13 @@ export const usersRoutes = {
         [body.employeeId]
       );
       if (alreadyUser) {
-        return { status: 400 as const, body: { message: 'This employee already has a user account' } };
+        return apiError(400, 'ERRORS.USERS.EMPLOYEE_ALREADY_USER', 'This employee already has a user account');
       }
 
       // Check email uniqueness
       const emailExists = await queryOne<any>('SELECT id FROM users WHERE email = $1', [body.email]);
       if (emailExists) {
-        return { status: 400 as const, body: { message: 'A user with this email already exists' } };
+        return apiError(400, 'ERRORS.USERS.EMAIL_TAKEN', 'A user with this email already exists');
       }
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
@@ -442,9 +432,8 @@ export const usersRoutes = {
       return { status: 201 as const, body: mapUserRow(fullUser) };
 
     } catch (error) {
-      if (isAuthError(error)) return { status: 401 as const, body: { message: (error as Error).message } };
       console.error('Convert employee error:', error);
-      return { status: 500 as const, body: { message: 'Failed to convert employee to user' } };
+      return mapThrownError(error, 'ERRORS.USERS.CONVERT_EMPLOYEE_FAILED', 'Failed to convert employee to user');
     }
   },
 };

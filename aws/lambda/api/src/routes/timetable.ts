@@ -4,9 +4,8 @@ import {
   canAccessBranch,
   isGlobalAdmin,
   checkGranularPermission,
-  isAuthError,
-  isSubscriptionError,
 } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 const DAY_NAMES = [
   'SUNDAY',
@@ -81,15 +80,12 @@ export const timetableRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const date = queryParams.date;
       if (!date || !isValidDate(date)) {
-        return {
-          status: 400 as const,
-          body: { message: 'A valid date (YYYY-MM-DD) is required' },
-        };
+        return apiError(400, 'ERRORS.TIMETABLE.INVALID_DATE', 'A valid date (YYYY-MM-DD) is required');
       }
 
       const dayName = dayNameForDate(date);
@@ -151,7 +147,7 @@ export const timetableRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND co.branch_id = $${params.length}`;
@@ -185,10 +181,7 @@ export const timetableRoutes = {
       };
     } catch (error) {
       console.error('Timetable getDay error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to load timetable' },
-      };
+      return mapThrownError(error, 'ERRORS.TIMETABLE.LOAD_FAILED', 'Failed to load timetable');
     }
   },
 };

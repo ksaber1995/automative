@@ -108,7 +108,7 @@ export class EmployeeDetailComponent implements OnInit {
         this.loadAttendanceHistory(id);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('EMPLOYEES.DETAIL.ERR_NOT_FOUND'));
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/employees']);
       }
@@ -182,8 +182,8 @@ export class EmployeeDetailComponent implements OnInit {
         this.showConvertDialog = false;
         this.converting.set(false);
       },
-      error: (e) => {
-        this.notificationService.error(e.error?.message || this.translate.instant('EMPLOYEES.DETAIL.ERR_CREATE_USER'));
+      error: () => {
+        // Interceptor toasted the translated error.
         this.converting.set(false);
       }
     });

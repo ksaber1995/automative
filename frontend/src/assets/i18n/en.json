@@ -1,4 +1,403 @@
 {
+  "ERRORS": {
+    "GENERIC": "An error occurred",
+    "UNAUTHORIZED": "Unauthorized. Please login again.",
+    "FORBIDDEN": "You do not have permission to perform this action.",
+    "NOT_FOUND": "Resource not found.",
+    "SERVER": "Internal server error. Please try again later.",
+    "SUBSCRIPTION": {
+      "REQUIRED": "An active subscription is required to perform this action."
+    },
+    "PERMISSION": {
+      "INSUFFICIENT": "Insufficient permissions",
+      "BRANCH_ACCESS": "Access denied to this branch",
+      "BRANCH_ACCESS_TARGET": "Access denied to the target branch"
+    },
+    "BRANCHES": {
+      "NOT_FOUND": "Branch not found",
+      "ADMIN_ONLY_CREATE": "Only administrators can create branches",
+      "ADMIN_ONLY_UPDATE": "Only administrators can update branches",
+      "ADMIN_ONLY_DELETE": "Only administrators can delete branches",
+      "CREATE_FAILED": "Failed to create branch",
+      "LIST_FAILED": "Failed to load branches",
+      "UPDATE_FAILED": "Failed to update branch",
+      "DELETE_FAILED": "Failed to delete branch",
+      "STATS_FAILED": "Failed to load branch statistics",
+      "DELETION_IMPACT_FAILED": "Failed to compute deletion impact"
+    },
+    "STUDENTS": {
+      "NOT_FOUND": "Student not found",
+      "ACCESS_DENIED": "Access denied to this student",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this student",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this student",
+      "ACCESS_DENIED_TARGET_BRANCH": "Access denied to target branch",
+      "CREATE_FAILED": "Failed to create student",
+      "LIST_FAILED": "Failed to load students",
+      "UPDATE_FAILED": "Failed to update student",
+      "DELETE_FAILED": "Failed to delete student"
+    },
+    "NO_FIELDS": "No valid fields to update",
+    "RECAPTCHA_FAILED": "Captcha verification failed",
+    "AUTH": {
+      "INVALID_CREDENTIALS": "Invalid email or password",
+      "COMPANY_INACTIVE": "Your company account is inactive",
+      "SUBSCRIPTION_INACTIVE": "Your subscription is no longer active",
+      "USER_INACTIVE": "Your account is inactive. Please contact support.",
+      "EMAIL_NOT_VERIFIED": "Please verify your email before logging in",
+      "LOGIN_FAILED": "Login failed. Please try again.",
+      "COUNTRY_CODE_REQUIRED": "Country code is required",
+      "PHONE_REQUIRED": "Phone number is required",
+      "EMAIL_REQUIRED": "Email is required",
+      "EMAIL_TAKEN": "This email is already registered",
+      "PHONE_TAKEN": "This phone number is already registered",
+      "REGISTRATION_CONFLICT": "An account with these details already exists",
+      "REGISTRATION_FAILED": "Registration failed. Please try again.",
+      "INVALID_VERIFICATION_REQUEST": "Invalid verification request",
+      "EMAIL_ALREADY_VERIFIED": "Email is already verified",
+      "OTP_INVALID": "Invalid verification code",
+      "OTP_EXPIRED": "Verification code has expired",
+      "OTP_RESEND_FAILED": "Could not resend the verification code",
+      "VERIFICATION_FAILED": "Verification failed. Please try again.",
+      "RESET_TOKEN_REQUIRED": "Reset token is required",
+      "PASSWORD_TOO_SHORT": "Password must be at least 6 characters",
+      "RESET_LINK_INVALID": "Reset link is invalid",
+      "RESET_LINK_EXPIRED": "Reset link has expired",
+      "PASSWORD_RESET_FAILED": "Could not reset the password",
+      "NO_TOKEN": "Authentication token missing",
+      "INVALID_TOKEN": "Invalid authentication token",
+      "USER_NOT_FOUND": "User not found"
+    },
+    "ANALYTICS": {
+      "DASHBOARD_FAILED": "Failed to load dashboard data"
+    },
+    "ATTENDANCE": {
+      "GET_FAILED": "Failed to load attendance",
+      "SAVE_FAILED": "Failed to save attendance",
+      "STUDENT_FAILED": "Failed to load student attendance",
+      "CLASS_FAILED": "Failed to load class attendance",
+      "TEACHER_GET_FAILED": "Failed to load teacher attendance",
+      "TEACHER_SAVE_FAILED": "Failed to save teacher attendance",
+      "TEACHER_HISTORY_FAILED": "Failed to load teacher attendance history"
+    },
+    "CASH": {
+      "CURRENT_FAILED": "Failed to load current cash balance",
+      "INVALID_TYPE": "Invalid adjustment type",
+      "OBSERVED_AMOUNT_REQUIRED": "Observed amount is required",
+      "OBSERVED_AMOUNT_INVALID": "Observed amount is invalid",
+      "SYSTEM_CASH_FAILED": "Failed to load system cash",
+      "AMOUNT_INVALID": "Amount is invalid",
+      "ADJUST_FAILED": "Failed to record adjustment",
+      "LIST_ADJUSTMENTS_FAILED": "Failed to load adjustments",
+      "ADJUSTMENT_NOT_FOUND": "Adjustment not found",
+      "DELETE_ADJUSTMENT_FAILED": "Failed to delete adjustment",
+      "FLOW_FAILED": "Failed to load cash flow"
+    },
+    "CLASSES": {
+      "NOT_FOUND": "Class not found",
+      "ACCESS_DENIED": "Access denied to this class",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this class",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this class",
+      "CREATE_FAILED": "Failed to create class",
+      "UPDATE_FAILED": "Failed to update class",
+      "DELETE_FAILED": "Failed to delete class",
+      "LIST_FAILED": "Failed to load classes",
+      "ENROLLMENTS_FAILED": "Failed to load enrollments",
+      "CHECK_AVAILABILITY_FAILED": "Failed to check teacher availability",
+      "CANNOT_DEACTIVATE_FINISHED": "Finished classes cannot be deactivated",
+      "ALREADY_FINISHED": "Class is already finished",
+      "HAS_ACTIVE_SESSION": "Class has an active session and cannot be finished",
+      "FINISH_FAILED": "Failed to finish class"
+    },
+    "COMPANIES": {
+      "NOT_FOUND": "Company not found",
+      "ADMIN_ONLY": "Only administrators can manage company settings",
+      "UPDATE_FAILED": "Failed to update company",
+      "SETTINGS_FAILED": "Failed to load company settings"
+    },
+    "COURSES": {
+      "NOT_FOUND": "Course not found",
+      "ACCESS_DENIED": "Access denied to this course",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this course",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this course",
+      "CREATE_FAILED": "Failed to create course",
+      "UPDATE_FAILED": "Failed to update course",
+      "DELETE_FAILED": "Failed to delete course",
+      "LIST_FAILED": "Failed to load courses",
+      "ENROLLMENTS_FAILED": "Failed to load course enrollments"
+    },
+    "DEBTS": {
+      "NOT_FOUND": "Debt not found",
+      "CREATE_FAILED": "Failed to create debt",
+      "LIST_FAILED": "Failed to load debts",
+      "SUMMARY_FAILED": "Failed to load debt summary",
+      "UPDATE_FAILED": "Failed to update debt",
+      "DELETE_FAILED": "Failed to delete debt"
+    },
+    "DEMO_LEADS": {
+      "NAME_REQUIRED": "Name is required",
+      "EMAIL_INVALID": "Please enter a valid email",
+      "CREATE_FAILED": "Failed to submit your request",
+      "LIST_FAILED": "Failed to load leads"
+    },
+    "EMPLOYEES": {
+      "NOT_FOUND": "Employee not found",
+      "ACCESS_DENIED": "Access denied to this employee",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this employee",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this employee",
+      "CREATE_FAILED": "Failed to create employee",
+      "UPDATE_FAILED": "Failed to update employee",
+      "DELETE_FAILED": "Failed to delete employee",
+      "LIST_FAILED": "Failed to load employees",
+      "ASSIGNED_TO_ACTIVE_CLASSES": "Employee is assigned to active classes"
+    },
+    "ENROLLMENTS": {
+      "NOT_FOUND": "Enrollment not found",
+      "ACCESS_DENIED": "Access denied to this enrollment",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this enrollment",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this enrollment",
+      "CREATE_FAILED": "Failed to create enrollment",
+      "UPDATE_FAILED": "Failed to update enrollment",
+      "DELETE_FAILED": "Failed to delete enrollment",
+      "LIST_FAILED": "Failed to load enrollments",
+      "CLASS_FINISHED": "This class is finished — no new enrollments accepted",
+      "STUDENT_LIST_FAILED": "Failed to load student enrollments",
+      "DUES_FAILED": "Failed to load dues",
+      "LIST_REFUNDS_FAILED": "Failed to load refunds",
+      "GET_REFUNDS_FAILED": "Failed to load refunds for this enrollment",
+      "CREATE_REFUND_FAILED": "Failed to issue refund",
+      "GET_PAYMENTS_FAILED": "Failed to load payments",
+      "ADD_PAYMENT_FAILED": "Failed to record payment",
+      "PAYMENT_EXCEEDS_BALANCE": "Payment exceeds remaining balance",
+      "REFUND_EXCEEDS_REFUNDABLE": "Refund exceeds the refundable amount"
+    },
+    "EVENTS": {
+      "NOT_FOUND": "Event not found",
+      "ACCESS_DENIED": "Access denied to this event",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this event",
+      "CREATE_FAILED": "Failed to create event",
+      "UPDATE_FAILED": "Failed to update event",
+      "DELETE_FAILED": "Failed to delete event",
+      "LIST_FAILED": "Failed to load events",
+      "PL_FAILED": "Failed to load event P&L"
+    },
+    "EVENT_SUBSCRIPTIONS": {
+      "LIST_FAILED": "Failed to load subscribers",
+      "CREATE_FAILED": "Failed to add subscriber",
+      "DELETE_FAILED": "Failed to remove subscriber",
+      "EXTERNAL_NAME_REQUIRED": "Subscriber name is required",
+      "SUBSCRIPTION_ID_REQUIRED": "Subscription is required",
+      "SUBSCRIPTION_NOT_FOUND": "Subscription not found",
+      "REFUND_NON_POSITIVE": "Refund amount must be greater than zero",
+      "REFUND_EXCEEDS_REFUNDABLE": "Refund exceeds the refundable amount",
+      "LIST_EXPENSES_FAILED": "Failed to load event expenses",
+      "LIST_REFUNDS_FAILED": "Failed to load event refunds",
+      "CREATE_REFUND_FAILED": "Failed to issue refund"
+    },
+    "EXPENSES": {
+      "NOT_FOUND": "Expense not found",
+      "ACCESS_DENIED": "Access denied to this expense",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this expense",
+      "CREATE_FAILED": "Failed to create expense",
+      "UPDATE_FAILED": "Failed to update expense",
+      "DELETE_FAILED": "Failed to delete expense",
+      "LIST_FAILED": "Failed to load expenses",
+      "DUE_FAILED": "Failed to load due expenses",
+      "GET_PAYMENTS_FAILED": "Failed to load expense payments",
+      "RECURRING_NOT_FOUND": "Recurring expense not found",
+      "PAY_RECURRING_FAILED": "Failed to record recurring payment",
+      "NO_SALARY_EMPLOYEES": "No salaried employees to pay",
+      "NO_SALARY_CONFIGURED": "This employee has no salary configured",
+      "SALARY_ALREADY_PAID": "Salary for this period was already paid",
+      "SALARY_NON_POSITIVE": "Salary amount must be greater than zero",
+      "PAY_SALARIES_FAILED": "Failed to pay salaries",
+      "PAY_SALARY_FAILED": "Failed to pay salary",
+      "SALARY_HISTORY_FAILED": "Failed to load salary history"
+    },
+    "EXPENSE_PAYMENTS": {
+      "NOT_FOUND": "Expense payment not found",
+      "CREATE_FAILED": "Failed to create expense payment",
+      "DELETE_FAILED": "Failed to delete expense payment",
+      "LIST_FAILED": "Failed to load expense payments",
+      "ALREADY_PAID_THIS_MONTH": "A payment for this expense has already been recorded this month"
+    },
+    "INSTALLMENTS": {
+      "PLAN_NOT_FOUND": "Installment plan not found",
+      "PLAN_ACCESS_DENIED": "Access denied to this installment plan",
+      "SCHEDULE_NOT_FOUND": "Installment entry not found",
+      "CREATE_FAILED": "Failed to create installment plan",
+      "LIST_FAILED": "Failed to load installment plans",
+      "DELETE_FAILED": "Failed to delete installment plan",
+      "TOTAL_NON_POSITIVE": "Total must be greater than zero",
+      "DOWNPAYMENT_INVALID": "Down payment is invalid",
+      "MONTHS_INVALID": "Number of months is invalid",
+      "START_DATE_REQUIRED": "Start date is required",
+      "ALREADY_PAID": "Installment is already paid",
+      "NOT_PAID": "Installment is not paid yet",
+      "PAY_AMOUNT_NON_POSITIVE": "Payment amount must be greater than zero",
+      "PAY_FAILED": "Failed to pay installment",
+      "UNPAY_FAILED": "Failed to undo installment payment"
+    },
+    "MASTER_CLASS_ENROLLMENTS": {
+      "NOT_FOUND": "Class enrollment not found",
+      "CLASS_NOT_FOUND_FOR_COURSE": "Class not found for this course",
+      "CLASS_FINISHED": "This class is finished",
+      "MASTER_NOT_ACTIVE": "Master enrollment is not active",
+      "ALREADY_ENROLLED": "Student is already enrolled in this class",
+      "CREATE_FAILED": "Failed to enroll student",
+      "LIST_FAILED": "Failed to load class enrollments",
+      "UPDATE_FAILED": "Failed to update class enrollment"
+    },
+    "MASTER_COURSES": {
+      "NOT_FOUND": "Master course not found",
+      "ACCESS_DENIED": "Access denied to this master course",
+      "INVALID_BRANCH": "Invalid branch selected",
+      "COURSE_BRANCH_MISMATCH": "Course branch does not match master course branch",
+      "CREATE_FAILED": "Failed to create master course",
+      "UPDATE_FAILED": "Failed to update master course",
+      "DELETE_FAILED": "Failed to delete master course",
+      "LIST_FAILED": "Failed to load master courses",
+      "LINKED_COURSES_FAILED": "Failed to load linked courses",
+      "AVAILABLE_COURSES_FAILED": "Failed to load available courses",
+      "ADD_COURSE_FAILED": "Failed to add course",
+      "REMOVE_COURSE_FAILED": "Failed to remove course",
+      "INSUFFICIENT_COURSES_PERMISSION": "You do not have permission to manage courses"
+    },
+    "MASTER_ENROLLMENTS": {
+      "NOT_FOUND": "Master enrollment not found",
+      "ACCESS_DENIED": "Access denied to this master enrollment",
+      "CREATE_FAILED": "Failed to create master enrollment",
+      "LIST_FAILED": "Failed to load master enrollments",
+      "CANCEL_FAILED": "Failed to cancel master enrollment",
+      "STUDENT_BRANCH_MISMATCH": "Student branch does not match enrollment branch",
+      "ALREADY_ACTIVE": "Student already has an active master enrollment for this course",
+      "LIST_REFUNDS_FAILED": "Failed to load refunds",
+      "CREATE_REFUND_FAILED": "Failed to issue refund",
+      "REFUND_NON_POSITIVE": "Refund amount must be greater than zero",
+      "REFUND_EXCEEDS_REFUNDABLE": "Refund exceeds the refundable amount",
+      "GET_PAYMENTS_FAILED": "Failed to load payments",
+      "ADD_PAYMENT_FAILED": "Failed to record payment",
+      "PAYMENT_EXCEEDS_BALANCE": "Payment exceeds remaining balance",
+      "COVERAGE_CHECK_FAILED": "Failed to check coverage"
+    },
+    "PRODUCTS": {
+      "NOT_FOUND": "Product not found",
+      "ACCESS_DENIED": "Access denied to this product",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this product",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this product",
+      "ACCESS_DENIED_ADJUST": "Access denied to adjust stock",
+      "CREATE_FAILED": "Failed to create product",
+      "UPDATE_FAILED": "Failed to update product",
+      "DELETE_FAILED": "Failed to delete product",
+      "LIST_FAILED": "Failed to load products",
+      "AVAILABLE_FAILED": "Failed to load available products",
+      "LOW_STOCK_FAILED": "Failed to load low-stock products",
+      "CODE_TAKEN": "This product code is already in use",
+      "INVALID_OPERATION": "Invalid operation",
+      "STOCK_UPDATE_FAILED": "Failed to update stock",
+      "STOCK_ADJUST_FAILED": "Failed to adjust stock",
+      "RESTOCK_FAILED": "Failed to restock"
+    },
+    "PRODUCT_SALES": {
+      "NOT_FOUND": "Sale not found",
+      "ACCESS_DENIED": "Access denied to this sale",
+      "CREATE_FAILED": "Failed to record sale",
+      "LIST_FAILED": "Failed to load sales",
+      "SUMMARY_FAILED": "Failed to load sales summary",
+      "TOP_PRODUCTS_FAILED": "Failed to load top products",
+      "LIST_REFUNDS_FAILED": "Failed to load refunds",
+      "CREATE_REFUND_FAILED": "Failed to issue refund",
+      "REFUND_NON_POSITIVE": "Refund amount must be greater than zero",
+      "REFUND_EXCEEDS_REMAINING": "Refund exceeds the remaining amount"
+    },
+    "REPORTS": {
+      "MONTHLY_PL_FAILED": "Failed to load monthly P&L",
+      "SALARY_GROWTH_FAILED": "Failed to load salary growth",
+      "TOP_COURSES_FAILED": "Failed to load top courses",
+      "STUDENTS_OVER_TIME_FAILED": "Failed to load students over time",
+      "CHURN_FAILED": "Failed to load churn data",
+      "PROFIT_BY_COURSE_FAILED": "Failed to load profit by course",
+      "PROFIT_BY_BRANCH_FAILED": "Failed to load profit by branch",
+      "PROFIT_BY_PRODUCT_FAILED": "Failed to load profit by product",
+      "PROFIT_BY_EVENT_FAILED": "Failed to load profit by event",
+      "EXPENSES_BY_CATEGORY_FAILED": "Failed to load expenses by category"
+    },
+    "REVENUES": {
+      "LIST_FAILED": "Failed to load revenues",
+      "SUMMARY_FAILED": "Failed to load revenue summary",
+      "GLOBAL_ADMIN_ONLY_COMPANY_LEVEL": "Only Global Admins can view company-level revenue"
+    },
+    "ROOMS": {
+      "NOT_FOUND": "Room not found",
+      "ACCESS_DENIED": "Access denied to this room",
+      "ACCESS_DENIED_UPDATE": "Access denied to update this room",
+      "ACCESS_DENIED_DELETE": "Access denied to delete this room",
+      "CREATE_FAILED": "Failed to create room",
+      "UPDATE_FAILED": "Failed to update room",
+      "DELETE_FAILED": "Failed to delete room",
+      "LIST_FAILED": "Failed to load rooms",
+      "HAS_ACTIVE_SESSION": "Room has an active session"
+    },
+    "SESSIONS": {
+      "NOT_FOUND": "Session not found",
+      "ACCESS_DENIED": "Access denied to this session",
+      "START_FAILED": "Failed to start session",
+      "END_FAILED": "Failed to end session",
+      "LIST_FAILED": "Failed to load sessions",
+      "CLASS_FINISHED": "Cannot start a session for a finished class",
+      "CLASS_HAS_ACTIVE": "This class already has an active session",
+      "ROOM_NOT_FOUND": "Room not found",
+      "ROOM_OCCUPIED": "Room is currently occupied",
+      "ROOM_REQUIRED": "Room is required",
+      "ALREADY_ENDED": "Session has already ended",
+      "INVALID_END_DATE": "End date is invalid",
+      "END_BEFORE_START": "End date must be after the start date"
+    },
+    "SUBSCRIPTIONS": {
+      "NOT_FOUND": "Subscription not found",
+      "ADMIN_ONLY": "Only administrators can manage subscriptions",
+      "GET_FAILED": "Failed to load subscription",
+      "UPDATE_FAILED": "Failed to update subscription"
+    },
+    "TIMETABLE": {
+      "INVALID_DATE": "Invalid date",
+      "LOAD_FAILED": "Failed to load timetable"
+    },
+    "USERS": {
+      "NOT_FOUND": "User not found",
+      "EMAIL_TAKEN": "This email is already in use",
+      "LIST_FAILED": "Failed to load users",
+      "GET_FAILED": "Failed to load user",
+      "CREATE_FAILED": "Failed to create user",
+      "UPDATE_FAILED": "Failed to update user",
+      "GLOBAL_ADMIN_ONLY_MANAGE": "Only Global Admins can manage users",
+      "GLOBAL_ADMIN_ONLY_VIEW": "Only Global Admins can view users",
+      "GLOBAL_ADMIN_ONLY_CREATE": "Only Global Admins can create users",
+      "GLOBAL_ADMIN_ONLY_UPDATE": "Only Global Admins can update users",
+      "GLOBAL_ADMIN_ONLY_PERMISSIONS": "Only Global Admins can change permissions",
+      "GLOBAL_ADMIN_ONLY_RESET_PW": "Only Global Admins can reset passwords",
+      "GLOBAL_ADMIN_ONLY_DEACTIVATE": "Only Global Admins can deactivate users",
+      "GLOBAL_ADMIN_ONLY_ACTIVATE": "Only Global Admins can activate users",
+      "GLOBAL_ADMIN_ONLY_CONVERT": "Only Global Admins can convert employees to users",
+      "SELF_DEACTIVATE": "You cannot deactivate your own account",
+      "SELF_ROLE_CHANGE": "You cannot change your own role",
+      "SELF_PERMISSIONS_CHANGE": "You cannot change your own permissions",
+      "ADMIN_PERMISSIONS_FIXED": "Admin permissions cannot be changed",
+      "PERMISSIONS_UPDATE_FAILED": "Failed to update permissions",
+      "PASSWORD_RESET_FAILED": "Failed to reset password",
+      "DEACTIVATE_FAILED": "Failed to deactivate user",
+      "ACTIVATE_FAILED": "Failed to activate user",
+      "EMPLOYEE_ALREADY_USER": "This employee already has a user account",
+      "CONVERT_EMPLOYEE_FAILED": "Failed to convert employee to user"
+    },
+    "WITHDRAWALS": {
+      "NOT_FOUND": "Withdrawal not found",
+      "CREATE_FAILED": "Failed to record withdrawal",
+      "LIST_FAILED": "Failed to load withdrawals",
+      "SUMMARY_FAILED": "Failed to load withdrawal summary",
+      "UPDATE_FAILED": "Failed to update withdrawal",
+      "DELETE_FAILED": "Failed to delete withdrawal"
+    }
+  },
   "BREADCRUMBS": {
     "CREATE": "Create",
     "EDIT": "Edit",
@@ -225,7 +624,12 @@
       "VERIFY_FAILED": "Verification failed. Please check the code and try again.",
       "RESEND_SUCCESS": "A new code has been sent to your email.",
       "RESEND_FAILED": "Failed to resend code. Please try again."
-    }
+    },
+    "OTP_RESENT": "Verification code resent",
+    "OTP_RESEND_OK_GENERIC": "If the email exists, a verification code has been sent",
+    "PASSWORD_UPDATED": "Password updated successfully",
+    "PASSWORD_RESET_LINK_SENT_GENERIC": "If the email exists, a password reset link has been sent",
+    "REGISTRATION_OTP_SENT": "Registration complete — check your email for the verification code"
   },
   "BRANCHES": {
     "LIST": {
@@ -326,7 +730,17 @@
       "SYSTEM_INFO": "System Information",
       "CREATED": "Created",
       "LAST_UPDATED": "Last Updated"
-    }
+    },
+    "CREATED": "Branch created successfully",
+    "UPDATED": "Branch updated successfully",
+    "DELETED_NAMED": "Branch \"{{name}}\" deleted successfully",
+    "DEACTIVATED_WITH_FINANCIALS": "Branch \"{{name}}\" was deactivated because it has financial records.",
+    "ACTIVATED": "Branch activated successfully",
+    "DEACTIVATED": "Branch deactivated successfully",
+    "ACTIVATE_HEADER": "Activate Branch",
+    "DEACTIVATE_HEADER": "Deactivate Branch",
+    "ACTIVATE_CONFIRM": "Are you sure you want to activate this branch?",
+    "DEACTIVATE_CONFIRM": "Are you sure you want to deactivate this branch? Users will not be able to access it."
   },
   "EVENTS": {
     "LIST": {
@@ -467,7 +881,8 @@
       "ACTIVE": "Active",
       "COMPLETED": "Completed",
       "CANCELLED": "Cancelled"
-    }
+    },
+    "DELETED": "Event deleted"
   },
   "MASTER_COURSES": {
     "WEEKS": "weeks",
@@ -544,7 +959,10 @@
       "NONE": "No eligible courses available.",
       "CANCEL": "Cancel",
       "CONFIRM": "Add"
-    }
+    },
+    "DELETED": "Master course deleted",
+    "COURSE_ADDED": "Course added",
+    "COURSE_REMOVED": "Course removed"
   },
   "COURSES": {
     "DETAIL": {
@@ -712,7 +1130,8 @@
       "CREATE_ERROR": "Failed to create course",
       "LOAD_BRANCHES_ERROR": "Failed to load branches",
       "LOAD_EMPLOYEES_ERROR": "Failed to load employees"
-    }
+    },
+    "DELETED": "Course deleted successfully"
   },
   "CLASSES": {
     "FORM": {
@@ -838,6 +1257,10 @@
       "BUNDLE_PREFIX": "Bundle:",
       "VIEW_STUDENT": "View Student",
       "NO_STUDENTS_ENROLLED": "No students enrolled",
+      "ENR_STATUS_ACTIVE": "Active",
+      "ENR_STATUS_COMPLETED": "Completed",
+      "ENR_STATUS_DROPPED": "Dropped",
+      "ENR_STATUS_PENDING": "Pending",
       "ACTIVE_SESSION_IN_ROOM": "Active Session in Room {{room}}",
       "STARTED_AT": "Started {{time}}",
       "TAKE_ATTENDANCE": "Take Attendance",
@@ -898,7 +1321,22 @@
       "ERR_FINISH_CLASS": "Failed to finish class",
       "FINISH_CLASS_TITLE": "Finish Class",
       "FINISH_CLASS_MSG": "Mark \"{{name}}\" as finished? Once finished, no new enrollments and no sessions can be started for this class. This cannot be undone here."
-    }
+    },
+    "CREATED": "Class created successfully",
+    "UPDATED": "Class updated successfully",
+    "DELETED": "Class deleted successfully",
+    "COURSE_REQUIRED": "Please select a course",
+    "END_DATE_OR_SESSIONS_REQUIRED": "Please provide either an end date or a session count"
+  },
+  "ENROLLMENTS": {
+    "DELETED": "Enrollment deleted successfully"
+  },
+  "DEBTS": {
+    "PAYMENT_SUBMITTED": "Payment submitted successfully",
+    "PAYMENT_EXCEEDS_BALANCE": "Payment exceeds remaining balance"
+  },
+  "SALARIES": {
+    "PAID": "Salary payments recorded"
   },
   "ENROLLMENT_FORM": {
     "EDIT_TITLE": "Edit Enrollment",
@@ -1022,7 +1460,8 @@
     "TOTAL_DUE": "Total Due",
     "ALL_CAUGHT_UP": "All caught up! No due expenses for this month.",
     "PAY_NOW": "Pay Now",
-    "TOP_BRANCHES": "Top Performing Branches"
+    "TOP_BRANCHES": "Top Performing Branches",
+    "ITEM_PAID": "{{label}} paid successfully"
   },
   "EMPLOYEES": {
     "LIST": {
@@ -1151,7 +1590,13 @@
       "STATUS_PRESENT": "Present",
       "STATUS_ABSENT": "Absent",
       "NO_ATTENDANCE": "No attendance records yet."
-    }
+    },
+    "CREATED": "Employee created successfully",
+    "UPDATED": "Employee updated successfully",
+    "TERMINATED": "Employee terminated successfully",
+    "TERMINATE_HEADER": "Confirm Termination",
+    "TERMINATE_CONFIRM": "Are you sure you want to terminate {{name}}?",
+    "DELETED": "Employee deleted"
   },
   "EXPENSES": {
     "LIST": {
@@ -1424,101 +1869,55 @@
       "MSG_PAYMENT_RECORD_FAILED": "Failed to record payment",
       "MSG_PAYMENT_DELETED": "Payment deleted",
       "MSG_PAYMENT_DELETE_FAILED": "Failed to delete payment"
-    }
+    },
+    "CREATED": "Expense created successfully",
+    "UPDATED": "Expense updated successfully",
+    "DELETED": "Expense deleted",
+    "CREATED_AND_PAID": "Expense created and payment recorded",
+    "PAYMENT_RECORDED": "Payment recorded successfully",
+    "RECURRING_RECORDED": "Recorded {{count}} payment(s) successfully",
+    "RECURRING_PAID_PARTIAL": "Recorded {{paid}} payment(s); {{failed}} failed",
+    "SALARIES_PAID": "Salaries paid"
   },
   "INSTALLMENTS": {
-    "FORM": {
-      "TITLE": "New Installment Plan",
-      "SUBTITLE": "Set up a financed purchase paid over multiple months",
-      "LABEL_NAME": "Item / Asset Name *",
-      "PLACEHOLDER_NAME": "e.g. MacBook Pro 16'",
-      "LABEL_BRANCH": "Branch",
-      "PLACEHOLDER_BRANCH": "Global / All branches",
-      "LABEL_CATEGORY": "Category *",
-      "PLACEHOLDER_CATEGORY": "Select category",
-      "LABEL_TOTAL": "Total Amount *",
-      "PLACEHOLDER_TOTAL": "2000.00",
-      "LABEL_DOWNPAYMENT": "Downpayment",
-      "PLACEHOLDER_DOWNPAYMENT": "0.00",
-      "LABEL_MONTHS": "Number of Months *",
-      "LABEL_START_DATE": "Start Date *",
-      "HINT_START_DATE": "Downpayment recorded here. First installment due 1 month after.",
-      "LABEL_VENDOR": "Vendor",
-      "PLACEHOLDER_VENDOR": "Vendor / Store name",
-      "LABEL_INVOICE": "Invoice #",
-      "PLACEHOLDER_INVOICE": "Invoice number",
-      "LABEL_DESCRIPTION": "Description",
-      "PLACEHOLDER_DESCRIPTION": "Optional description",
-      "LABEL_NOTES": "Notes",
-      "PLACEHOLDER_NOTES": "Optional notes",
-      "PREVIEW_TITLE": "Plan Preview",
-      "PREVIEW_TOTAL": "Total",
-      "PREVIEW_DOWNPAYMENT": "Downpayment",
-      "PREVIEW_FINANCED": "Financed",
-      "PREVIEW_PER_MONTH": "Per Month × {{count}}",
-      "CANCEL": "Cancel",
-      "CREATE": "Create Plan",
-      "MSG_REQUIRED_FIELDS": "Please fill all required fields",
-      "MSG_DOWNPAYMENT_INVALID": "Downpayment must be less than total amount",
-      "MSG_CREATED": "Installment plan created",
-      "MSG_CREATE_FAILED": "Failed to create plan"
-    },
-    "DETAIL": {
-      "MONTHS_COUNT": "{{count}} months",
-      "DELETE_PLAN": "Delete Plan",
-      "SUMMARY_TOTAL": "Total",
-      "SUMMARY_DOWNPAYMENT": "Downpayment",
-      "SUMMARY_DOWNPAYMENT_ON": "on {{date}}",
-      "SUMMARY_FINANCED": "Financed",
-      "SUMMARY_PAID_SO_FAR": "Paid So Far",
-      "SUMMARY_PAID_COUNT": "{{paid}}/{{total}} installments",
-      "SUMMARY_REMAINING": "Remaining",
-      "SUMMARY_NEXT": "Next: {{date}}",
-      "INFO_STATUS": "Status",
-      "INFO_BRANCH": "Branch",
-      "INFO_VENDOR": "Vendor",
-      "INFO_INVOICE": "Invoice",
-      "INFO_NOTES": "Notes",
-      "GLOBAL": "Global",
-      "SCHEDULE_TITLE": "Payment Schedule",
-      "SCHEDULE_SUBTITLE": "Pay each installment as due. Each paid installment becomes an expense.",
-      "COL_NUMBER": "#",
-      "COL_DUE_DATE": "Due Date",
-      "COL_AMOUNT": "Amount",
-      "COL_STATUS": "Status",
-      "COL_PAID_DATE": "Paid Date",
-      "COL_PAID_AMOUNT": "Paid Amount",
-      "COL_ACTIONS": "Actions",
-      "OVERDUE": "Overdue",
-      "PAY": "Pay",
-      "REVERSE": "Reverse",
-      "STATUS_PAID": "Paid",
-      "STATUS_PENDING": "Pending",
-      "STATUS_SKIPPED": "Skipped",
+    "LIST": {
+      "TITLE": "Installment Plans",
+      "SUBTITLE": "Track financed purchases paid over time",
+      "BACK_TO_EXPENSES": "Back to Expenses",
+      "NEW": "New Installment",
+      "STAT_ACTIVE": "Active Plans",
+      "STAT_COMPLETED": "Completed",
+      "STAT_TOTAL_FINANCED": "Total Financed",
+      "STAT_REMAINING": "Remaining",
+      "BRANCH": "Branch",
+      "ALL_BRANCHES": "All branches",
+      "STATUS": "Status",
+      "ALL": "All",
       "STATUS_ACTIVE": "Active",
       "STATUS_COMPLETED": "Completed",
       "STATUS_CANCELED": "Canceled",
-      "PAY_DIALOG_HEADER": "Record Installment Payment",
-      "PAY_DIALOG_INSTALLMENT": "Installment {{number}} / {{total}}",
-      "PAY_DIALOG_DUE_EXPECTED": "Due {{date}} · Expected {{amount}}",
-      "PAY_DIALOG_AMOUNT": "Amount *",
-      "PAY_DIALOG_DATE": "Payment Date *",
-      "PAY_DIALOG_NOTES": "Notes",
-      "PAY_DIALOG_NOTES_PLACEHOLDER": "Optional notes",
-      "PAY_DIALOG_CANCEL": "Cancel",
-      "PAY_DIALOG_CONFIRM": "Record Payment",
-      "UNPAY_DIALOG_HEADER": "Reverse Installment Payment",
-      "UNPAY_DIALOG_MESSAGE": "This will delete the linked expense payment and mark this installment as PENDING again. Continue?",
-      "DELETE_DIALOG_HEADER": "Delete Installment Plan",
-      "DELETE_DIALOG_MESSAGE": "Permanently delete this plan and ALL its payments (including downpayment)? This cannot be undone.",
-      "MSG_LOAD_FAILED": "Failed to load installment plan",
-      "MSG_PAID": "Installment paid",
-      "MSG_PAY_FAILED": "Failed to pay",
-      "MSG_REVERSED": "Payment reversed",
-      "MSG_REVERSE_FAILED": "Failed to reverse",
+      "COL_NAME": "Name",
+      "COL_BRANCH": "Branch",
+      "COL_CATEGORY": "Category",
+      "COL_TOTAL": "Total",
+      "COL_DOWN": "Down",
+      "COL_MONTHLY": "Monthly",
+      "COL_MONTHS": "Months",
+      "COL_PROGRESS": "Progress",
+      "COL_NEXT_DUE": "Next Due",
+      "COL_STATUS": "Status",
+      "COL_ACTIONS": "Actions",
+      "VIEW": "View",
+      "DELETE": "Delete",
+      "GLOBAL": "Global",
+      "NO_DATA": "No installment plans yet. Click \"New Installment\" to create one.",
+      "DELETE_TITLE": "Delete Installment Plan",
+      "DELETE_CONFIRM": "This will permanently remove the plan, its schedule, and all linked payments (including the downpayment). Continue?",
       "MSG_DELETED": "Installment plan deleted",
       "MSG_DELETE_FAILED": "Failed to delete plan"
-    }
+    },
+    "PLAN_DELETED": "Installment plan deleted",
+    "UNPAID": "Installment payment undone"
   },
   "REVENUES": {
     "LIST": {
@@ -1582,7 +1981,9 @@
       "CANCEL": "Cancel",
       "UPDATE": "Update",
       "CREATE": "Create"
-    }
+    },
+    "CREATED": "Revenue created successfully",
+    "UPDATED": "Revenue updated successfully"
   },
   "STUDENTS": {
     "LIST": {
@@ -1695,7 +2096,6 @@
       "COL_ENROLLMENT_DATE": "Enrolled",
       "COL_AMOUNT_PAID": "Paid",
       "COL_PROGRESS": "Progress",
-      "ACTIVE": "Active",
       "COL_COURSE": "Course",
       "COL_DATE": "Date",
       "COL_PRICING": "Pricing",
@@ -1727,7 +2127,6 @@
       "AMOUNT": "Amount",
       "PAYMENT_DATE": "Payment Date",
       "NOTES_LABEL": "Notes",
-      "CANCEL": "Cancel",
       "RECORD_PAYMENT": "Record Payment",
       "REFUND_TITLE": "Issue Refund",
       "REFUND_TYPE": "Refund Type",
@@ -1754,7 +2153,19 @@
       "ATTENDANCE_PRESENT_LABEL": "Present",
       "ATTENDANCE_ABSENT_LABEL": "Absent",
       "NOTES_PLACEHOLDER": "Optional notes..."
-    }
+    },
+    "CREATED": "Student created successfully",
+    "UPDATED": "Student updated successfully",
+    "DEACTIVATED": "Student deactivated successfully",
+    "DEACTIVATE_HEADER": "Confirm Deactivation",
+    "DEACTIVATE_CONFIRM": "Are you sure you want to deactivate {{name}}?",
+    "PAYMENT_RECORDED": "Payment recorded successfully",
+    "REFUND_ISSUED": "Refund issued successfully",
+    "BUNDLE_REFUND_ISSUED": "Bundle refund issued",
+    "NOTHING_TO_REFUND": "Nothing left to refund on this enrollment",
+    "ENROLLED_IN_CLASS": "Student enrolled in class",
+    "MASTER_ENROLLMENT_CANCELLED": "Master enrollment cancelled",
+    "MASTER_ENROLLMENT_CANCEL_CONFIRM": "Cancel this master enrollment? The student will lose coverage for linked courses."
   },
   "USERS": {
     "LIST": {
@@ -1899,7 +2310,18 @@
       "NEW_PASSWORD": "New password (min. 6 chars)",
       "CANCEL": "Cancel",
       "RESET": "Reset"
-    }
+    },
+    "CREATED": "User created successfully",
+    "UPDATED": "User updated successfully",
+    "ACTIVATED": "User activated successfully",
+    "DEACTIVATED": "User deactivated successfully",
+    "ACTIVATE_HEADER": "Activate User",
+    "DEACTIVATE_HEADER": "Deactivate User",
+    "ACTIVATE_CONFIRM": "Are you sure you want to activate {{name}}?",
+    "DEACTIVATE_CONFIRM": "Are you sure you want to deactivate {{name}}? They will not be able to log in.",
+    "PASSWORD_RESET": "Password reset successfully",
+    "PASSWORD_TOO_SHORT": "Password must be at least 6 characters",
+    "PERMISSIONS_UPDATED": "Permissions updated"
   },
   "SETTINGS": {
     "TITLE": "Company Settings",
@@ -1925,7 +2347,8 @@
     "OVERHEAD_EXAMPLE": "Each branch shows its \"contribution\" (revenue minus direct costs). Company net profit = total contribution minus global overhead.",
     "OVERHEAD_BEST": "Best for executive roles (CEO, owner, accountant) whose work grows the whole company, not just one branch.",
     "OVERHEAD_WARNING": "Branch-level \"Net Profit\" will look artificially high because it doesn't reflect the true cost of the management layer.",
-    "SAVE": "Save Settings"
+    "SAVE": "Save Settings",
+    "SAVED": "Settings saved successfully"
   },
   "REPORTS": {
     "TITLE": "Reports & Analytics",
@@ -2079,7 +2502,8 @@
       "NOTES_PLACEHOLDER": "Add any notes...",
       "CANCEL": "Cancel",
       "RECORD_PAYMENT": "Record Payment"
-    }
+    },
+    "PAYMENT_RECORDED": "Payment recorded successfully"
   },
   "PRODUCTS": {
     "LIST": {
@@ -2240,7 +2664,13 @@
       "CONFIRM_REFUND": "Process Refund",
       "REFUND_SUCCESS": "Refund recorded successfully",
       "REFUND_FAILED": "Failed to record refund"
-    }
+    },
+    "DELETED": "Product deleted successfully",
+    "STOCK_ADJUSTED": "Stock adjusted successfully",
+    "STOCK_PURCHASED": "Stock purchased and recorded successfully",
+    "SALE_COMPLETED": "Sale completed! Total: {{total}}",
+    "INVALID_QUANTITY": "Please enter a valid quantity",
+    "INVALID_COST": "Please enter a valid cost amount"
   },
   "SHARED": {
     "DELETE_DIALOG": {
@@ -2314,7 +2744,8 @@
     "DELETE_MSG": "Are you sure you want to delete this adjustment? The current cash balance will be recalculated.",
     "NO_HISTORY": "No cash adjustments recorded yet.",
     "SAVED": "Cash adjustment saved.",
-    "DELETED": "Cash adjustment deleted."
+    "DELETED": "Cash adjustment deleted.",
+    "ADJUSTMENT_DELETED": "Adjustment deleted"
   },
   "ROOMS": {
     "TITLE": "Rooms",
@@ -2360,7 +2791,10 @@
     "MSG_CREATED": "Room created successfully",
     "MSG_CREATE_FAILED": "Failed to create room",
     "MSG_DELETED": "Room deleted successfully",
-    "MSG_DELETE_FAILED": "Failed to delete room"
+    "MSG_DELETE_FAILED": "Failed to delete room",
+    "CREATED": "Room created successfully",
+    "UPDATED": "Room updated successfully",
+    "DELETED": "Room deleted successfully"
   },
   "TIMETABLE": {
     "TITLE": "Time Table",
@@ -2384,44 +2818,6 @@
     "CLASS_COUNT": "— {{count}} class(es)",
     "LIVE": "LIVE",
     "ROOM_PREFIX": "Room {{code}}"
-  },
-  "INSTALLMENTS": {
-    "LIST": {
-      "TITLE": "Installment Plans",
-      "SUBTITLE": "Track financed purchases paid over time",
-      "BACK_TO_EXPENSES": "Back to Expenses",
-      "NEW": "New Installment",
-      "STAT_ACTIVE": "Active Plans",
-      "STAT_COMPLETED": "Completed",
-      "STAT_TOTAL_FINANCED": "Total Financed",
-      "STAT_REMAINING": "Remaining",
-      "BRANCH": "Branch",
-      "ALL_BRANCHES": "All branches",
-      "STATUS": "Status",
-      "ALL": "All",
-      "STATUS_ACTIVE": "Active",
-      "STATUS_COMPLETED": "Completed",
-      "STATUS_CANCELED": "Canceled",
-      "COL_NAME": "Name",
-      "COL_BRANCH": "Branch",
-      "COL_CATEGORY": "Category",
-      "COL_TOTAL": "Total",
-      "COL_DOWN": "Down",
-      "COL_MONTHLY": "Monthly",
-      "COL_MONTHS": "Months",
-      "COL_PROGRESS": "Progress",
-      "COL_NEXT_DUE": "Next Due",
-      "COL_STATUS": "Status",
-      "COL_ACTIONS": "Actions",
-      "VIEW": "View",
-      "DELETE": "Delete",
-      "GLOBAL": "Global",
-      "NO_DATA": "No installment plans yet. Click \"New Installment\" to create one.",
-      "DELETE_TITLE": "Delete Installment Plan",
-      "DELETE_CONFIRM": "This will permanently remove the plan, its schedule, and all linked payments (including the downpayment). Continue?",
-      "MSG_DELETED": "Installment plan deleted",
-      "MSG_DELETE_FAILED": "Failed to delete plan"
-    }
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",
@@ -2554,5 +2950,24 @@
     "STATUS_ABSENT": "Absent",
     "NO_DATA": "No teacher attendance records found",
     "NO_DATA_HINT": "Records are created when sessions are started with a teacher roster."
+  },
+  "ATTENDANCE": {
+    "SAVED": "Attendance saved",
+    "TEACHER_SAVED": "Teacher attendance saved"
+  },
+  "DEMO_LEADS": {
+    "CREATED": "Thanks! We'll be in touch shortly."
+  },
+  "EVENT_SUBSCRIPTIONS": {
+    "DELETED": "Subscriber removed"
+  },
+  "EXPENSE_PAYMENTS": {
+    "DELETED": "Payment deleted"
+  },
+  "MASTER_ENROLLMENTS": {
+    "CANCELLED": "Master enrollment cancelled"
+  },
+  "WITHDRAWALS": {
+    "DELETED": "Withdrawal deleted"
   }
 }

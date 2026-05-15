@@ -1,6 +1,7 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isAuthError, isSubscriptionError, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
 import { mapPaymentFromDB } from './expense-payments';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapExpenseFromDB(row: any) {
   const amount = parseFloat(row.amount);
@@ -39,14 +40,11 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this branch' },
-        };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       // If linked to an event, derive branch from the event automatically.
@@ -86,10 +84,7 @@ export const expensesRoutes = {
       };
     } catch (error) {
       console.error('Create expense error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create expense' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.CREATE_FAILED', 'Failed to create expense', 400);
     }
   },
 
@@ -97,7 +92,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `SELECT e.*,
@@ -109,10 +104,7 @@ export const expensesRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to this branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND e.branch_id = $${params.length}`;
@@ -155,10 +147,7 @@ export const expensesRoutes = {
       };
     } catch (error) {
       console.error('List expenses error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list expenses' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.LIST_FAILED', 'Failed to list expenses');
     }
   },
 
@@ -166,7 +155,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const targetMonth = queryParams.month || new Date().toISOString().substring(0, 7);
@@ -234,10 +223,7 @@ export const expensesRoutes = {
       };
     } catch (error) {
       console.error('Get due expenses error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get due expenses' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.DUE_FAILED', 'Failed to get due expenses');
     }
   },
 
@@ -245,7 +231,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const expense = await queryOne(
@@ -258,17 +244,11 @@ export const expensesRoutes = {
       );
 
       if (!expense) {
-        return {
-          status: 404 as const,
-          body: { message: 'Expense not found' },
-        };
+        return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
       }
 
       if (expense.branch_id && !canAccessBranch(context, expense.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to this expense' },
-        };
+        return apiError(403, 'ERRORS.EXPENSES.ACCESS_DENIED', 'Access denied to this expense');
       }
 
       return {
@@ -277,10 +257,7 @@ export const expensesRoutes = {
       };
     } catch (error) {
       console.error('Get expense error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Expense not found' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found', 404);
     }
   },
 
@@ -288,7 +265,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -297,27 +274,18 @@ export const expensesRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Expense not found' },
-        };
+        return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
       }
 
       if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return {
-          status: 403 as const,
-          body: { message: 'Access denied to update this expense' },
-        };
+        return apiError(403, 'ERRORS.EXPENSES.ACCESS_DENIED_UPDATE', 'Access denied to update this expense');
       }
 
       const updateData: any = {};
 
       if (body.branchId !== undefined) {
         if (body.branchId && !canAccessBranch(context, body.branchId)) {
-          return {
-            status: 403 as const,
-            body: { message: 'Access denied to target branch' },
-          };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS_TARGET', 'Access denied to target branch');
         }
         updateData.branch_id = body.branchId;
       }
@@ -338,10 +306,7 @@ export const expensesRoutes = {
       const expense = await update('expenses', params.id, updateData);
 
       if (!expense) {
-        return {
-          status: 404 as const,
-          body: { message: 'Expense not found' },
-        };
+        return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
       }
 
       return {
@@ -350,10 +315,7 @@ export const expensesRoutes = {
       };
     } catch (error) {
       console.error('Update expense error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update expense' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.UPDATE_FAILED', 'Failed to update expense', 404);
     }
   },
 
@@ -361,7 +323,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -370,19 +332,16 @@ export const expensesRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Expense not found' } };
+        return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
       }
 
       await query('DELETE FROM expense_payments WHERE expense_id = $1 AND company_id = $2', [params.id, context.companyId]);
       await query('DELETE FROM expenses WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
 
-      return { status: 200 as const, body: { message: 'Expense deleted successfully' } };
+      return { status: 200 as const, body: { message: 'Expense deleted successfully', code: 'EXPENSES.DELETED' } };
     } catch (error) {
       console.error('Delete expense error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to delete expense' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.DELETE_FAILED', 'Failed to delete expense');
     }
   },
 
@@ -390,7 +349,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const expense = await queryOne(
@@ -399,7 +358,7 @@ export const expensesRoutes = {
       );
 
       if (!expense) {
-        return { status: 404 as const, body: { message: 'Expense not found' } };
+        return apiError(404, 'ERRORS.EXPENSES.NOT_FOUND', 'Expense not found');
       }
 
       const payments = await query(
@@ -410,10 +369,7 @@ export const expensesRoutes = {
       return { status: 200 as const, body: payments.map(mapPaymentFromDB) };
     } catch (error) {
       console.error('Get expense payments error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get payments' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.GET_PAYMENTS_FAILED', 'Failed to get payments');
     }
   },
 
@@ -421,7 +377,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const template = await queryOne(
@@ -430,7 +386,7 @@ export const expensesRoutes = {
       );
 
       if (!template) {
-        return { status: 404 as const, body: { message: 'Recurring expense not found' } };
+        return apiError(404, 'ERRORS.EXPENSES.RECURRING_NOT_FOUND', 'Recurring expense not found');
       }
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
@@ -444,7 +400,7 @@ export const expensesRoutes = {
       );
 
       if (existing) {
-        return { status: 400 as const, body: { message: 'This expense has already been paid for this month' } };
+        return apiError(400, 'ERRORS.EXPENSE_PAYMENTS.ALREADY_PAID_THIS_MONTH', 'This expense has already been paid for this month');
       }
 
       const payment = await insert('expense_payments', {
@@ -466,10 +422,7 @@ export const expensesRoutes = {
       return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
       console.error('Pay recurring error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to pay recurring expense' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.PAY_RECURRING_FAILED', 'Failed to pay recurring expense');
     }
   },
 
@@ -477,7 +430,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
@@ -496,7 +449,7 @@ export const expensesRoutes = {
       const employees = await query(empSql, empParams);
 
       if (employees.length === 0) {
-        return { status: 400 as const, body: { message: 'No active employees with salary found' } };
+        return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_EMPLOYEES', 'No active employees with salary found');
       }
 
       const created: any[] = [];
@@ -537,14 +490,12 @@ export const expensesRoutes = {
           skippedNames: skipped,
           payments: created,
           message: `Created ${created.length} salary payment(s)${skipped.length ? `, skipped ${skipped.length} already paid` : ''}.`,
+          code: 'EXPENSES.SALARIES_PAID',
         },
       };
     } catch (error) {
       console.error('Pay salaries error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to pay salaries' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.PAY_SALARIES_FAILED', 'Failed to pay salaries');
     }
   },
 
@@ -552,7 +503,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const emp = await queryOne(
@@ -560,9 +511,9 @@ export const expensesRoutes = {
         [params.employeeId, context.companyId]
       );
 
-      if (!emp) return { status: 404 as const, body: { message: 'Employee not found' } };
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       if (!emp.salary || parseFloat(emp.salary) <= 0) {
-        return { status: 400 as const, body: { message: 'Employee has no salary configured' } };
+        return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
       }
 
       const payDate = body.date || new Date().toISOString().split('T')[0];
@@ -576,7 +527,7 @@ export const expensesRoutes = {
       );
 
       if (existing) {
-        return { status: 400 as const, body: { message: `Salary already paid for ${monthLabel}` } };
+        return apiError(400, 'ERRORS.EXPENSES.SALARY_ALREADY_PAID', `Salary already paid for ${monthLabel}`);
       }
 
       const baseSalary = parseFloat(emp.salary);
@@ -585,7 +536,7 @@ export const expensesRoutes = {
       const finalAmount = baseSalary + bonus - discount;
 
       if (finalAmount <= 0) {
-        return { status: 400 as const, body: { message: 'Final salary amount must be greater than zero' } };
+        return apiError(400, 'ERRORS.EXPENSES.SALARY_NON_POSITIVE', 'Final salary amount must be greater than zero');
       }
 
       const payment = await insert('expense_payments', {
@@ -605,10 +556,7 @@ export const expensesRoutes = {
       return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
       console.error('Pay employee salary error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to pay salary' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.PAY_SALARY_FAILED', 'Failed to pay salary');
     }
   },
 
@@ -616,7 +564,7 @@ export const expensesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'expenses', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const emp = await queryOne(
@@ -624,7 +572,7 @@ export const expensesRoutes = {
         [params.employeeId, context.companyId]
       );
 
-      if (!emp) return { status: 404 as const, body: { message: 'Employee not found' } };
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
       const rows = await query(
         `SELECT * FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' ORDER BY date DESC`,
@@ -634,10 +582,7 @@ export const expensesRoutes = {
       return { status: 200 as const, body: rows.map(mapPaymentFromDB) };
     } catch (error) {
       console.error('Get employee salary history error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get salary history' },
-      };
+      return mapThrownError(error, 'ERRORS.EXPENSES.SALARY_HISTORY_FAILED', 'Failed to get salary history');
     }
   },
 

@@ -332,6 +332,7 @@
           [filter]="true"
           filterBy="label"
           [style]="{ width: '100%' }"
+          appendTo="body"
         ></p-select>
       </div>
     } @else {
@@ -362,13 +363,13 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
-        <p-datepicker [(ngModel)]="subPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+        <p-datepicker [(ngModel)]="subPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
       </div>
     </div>
 
     <div>
       <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_PAYMENT_METHOD' | translate }}</label>
-      <p-select [(ngModel)]="subPaymentMethod" [options]="paymentMethodOptions" optionLabel="label" optionValue="value" [placeholder]="'EVENTS.DETAIL.PLACEHOLDER_OPTIONAL' | translate" [showClear]="true" [style]="{ width: '100%' }"></p-select>
+      <p-select [(ngModel)]="subPaymentMethod" [options]="paymentMethodOptions" optionLabel="label" optionValue="value" [placeholder]="'EVENTS.DETAIL.PLACEHOLDER_OPTIONAL' | translate" [showClear]="true" [style]="{ width: '100%' }" appendTo="body"></p-select>
     </div>
 
     <div>
@@ -390,7 +391,7 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_CATEGORY' | translate }} <span class="text-red-500">*</span></label>
-        <p-select [(ngModel)]="expCategory" [options]="expenseCategoryOptions" optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
+        <p-select [(ngModel)]="expCategory" [options]="expenseCategoryOptions" optionLabel="label" optionValue="value" [style]="{ width: '100%' }" appendTo="body"></p-select>
       </div>
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_AMOUNT' | translate }} <span class="text-red-500">*</span></label>
@@ -404,7 +405,7 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DATE' | translate }} <span class="text-red-500">*</span></label>
-        <p-datepicker [(ngModel)]="expDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+        <p-datepicker [(ngModel)]="expDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
       </div>
       <div>
         <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_VENDOR' | translate }}</label>
@@ -472,7 +473,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DATE' | translate }} <span class="text-red-500">*</span></label>
-          <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+          <p-datepicker [(ngModel)]="refDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
         </div>
       </div>
 

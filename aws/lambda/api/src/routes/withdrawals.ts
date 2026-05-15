@@ -1,5 +1,6 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapWithdrawalFromDB(row: any) {
   return {
@@ -26,7 +27,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const withdrawal = await insert('withdrawals', {
@@ -52,10 +53,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('Create withdrawal error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create withdrawal' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.CREATE_FAILED', 'Failed to create withdrawal', 400);
     }
   },
 
@@ -64,7 +62,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
@@ -94,10 +92,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('List withdrawals error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list withdrawals' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.LIST_FAILED', 'Failed to list withdrawals');
     }
   },
 
@@ -106,7 +101,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = 'SELECT * FROM withdrawals WHERE company_id = $1';
@@ -173,10 +168,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('Withdrawal summary error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to generate withdrawal summary' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.SUMMARY_FAILED', 'Failed to generate withdrawal summary');
     }
   },
 
@@ -185,7 +177,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const stakeholderName = decodeURIComponent(params.stakeholderName);
@@ -218,10 +210,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('Get withdrawals by stakeholder error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to get withdrawals by stakeholder' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.LIST_FAILED', 'Failed to get withdrawals by stakeholder');
     }
   },
 
@@ -230,7 +219,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const withdrawal = await queryOne(
@@ -239,10 +228,7 @@ export const withdrawalsRoutes = {
       );
 
       if (!withdrawal) {
-        return {
-          status: 404 as const,
-          body: { message: 'Withdrawal not found' },
-        };
+        return apiError(404, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found');
       }
 
       return {
@@ -256,10 +242,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('Get withdrawal error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Withdrawal not found' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found', 404);
     }
   },
 
@@ -268,7 +251,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -277,10 +260,7 @@ export const withdrawalsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Withdrawal not found' },
-        };
+        return apiError(404, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found');
       }
 
       const updateData: any = {};
@@ -294,10 +274,7 @@ export const withdrawalsRoutes = {
       const withdrawal = await update('withdrawals', params.id, updateData);
 
       if (!withdrawal) {
-        return {
-          status: 404 as const,
-          body: { message: 'Withdrawal not found' },
-        };
+        return apiError(404, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found');
       }
 
       return {
@@ -311,10 +288,7 @@ export const withdrawalsRoutes = {
       };
     } catch (error) {
       console.error('Update withdrawal error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to update withdrawal' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.UPDATE_FAILED', 'Failed to update withdrawal', 404);
     }
   },
 
@@ -323,7 +297,7 @@ export const withdrawalsRoutes = {
       const context = await extractTenantContext(headers.authorization);
 
       if (!checkGranularPermission(context, 'cash', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -332,32 +306,23 @@ export const withdrawalsRoutes = {
       );
 
       if (!existing) {
-        return {
-          status: 404 as const,
-          body: { message: 'Withdrawal not found' },
-        };
+        return apiError(404, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found');
       }
 
       // Soft delete by setting is_active to false
       const withdrawal = await update('withdrawals', params.id, { is_active: false });
 
       if (!withdrawal) {
-        return {
-          status: 404 as const,
-          body: { message: 'Withdrawal not found' },
-        };
+        return apiError(404, 'ERRORS.WITHDRAWALS.NOT_FOUND', 'Withdrawal not found');
       }
 
       return {
         status: 200 as const,
-        body: { message: 'Withdrawal deleted successfully' },
+        body: { message: 'Withdrawal deleted successfully', code: 'WITHDRAWALS.DELETED' },
       };
     } catch (error) {
       console.error('Delete withdrawal error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Failed to delete withdrawal' },
-      };
+      return mapThrownError(error, 'ERRORS.WITHDRAWALS.DELETE_FAILED', 'Failed to delete withdrawal', 404);
     }
   },
 };

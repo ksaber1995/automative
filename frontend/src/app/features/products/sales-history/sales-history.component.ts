@@ -180,11 +180,9 @@ export class SalesHistoryComponent implements OnInit {
         this.notificationService.success(this.translate.instant('PRODUCTS.SALES.REFUND_SUCCESS'));
         this.loadSales();
       },
-      error: (err) => {
+      error: () => {
+        // Interceptor toasted the translated error.
         this.processingRefund.set(false);
-        this.notificationService.error(
-          err?.error?.message || this.translate.instant('PRODUCTS.SALES.REFUND_FAILED')
-        );
       },
     });
   }

@@ -10,7 +10,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { DialogModule } from 'primeng/dialog';
 import { RadioButtonModule } from 'primeng/radiobutton';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BranchService, BranchDeletionImpact } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -39,6 +39,7 @@ export class BranchListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   allBranches = signal<Branch[]>([]);
@@ -124,8 +125,8 @@ export class BranchListComponent implements OnInit {
         }
       },
       error: () => {
+        // Interceptor toasted the translated error already.
         this.impactLoading.set(false);
-        this.notificationService.error('Failed to compute deletion impact');
         this.showDeleteDialog.set(false);
       }
     });
@@ -149,17 +150,18 @@ export class BranchListComponent implements OnInit {
         this.deleteSubmitting.set(false);
         if (result.deactivated) {
           this.notificationService.info(
-            `Branch "${branch.name}" was deactivated because it has financial records.`
+            this.translate.instant('BRANCHES.DEACTIVATED_WITH_FINANCIALS', { name: branch.name })
           );
         } else {
-          this.notificationService.success(`Branch "${branch.name}" deleted successfully`);
+          this.notificationService.success(
+            this.translate.instant('BRANCHES.DELETED_NAMED', { name: branch.name })
+          );
         }
         this.loadBranches();
         this.closeDeleteDialog();
       },
       error: () => {
         this.deleteSubmitting.set(false);
-        this.notificationService.error('Failed to delete branch');
       }
     });
   }

@@ -94,7 +94,7 @@ export class CourseFormComponent implements OnInit {
         this.branches.set(branches);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_BRANCHES_ERROR'));
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -110,7 +110,7 @@ export class CourseFormComponent implements OnInit {
         this.employees.set(mappedEmployees);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_EMPLOYEES_ERROR'));
+        // Interceptor toasted the translated error.
       }
     });
   }
@@ -135,7 +135,7 @@ export class CourseFormComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.notificationService.error(this.translate.instant('COURSES.FORM.LOAD_ERROR'));
+        // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/courses']);
       }
@@ -166,8 +166,8 @@ export class CourseFormComponent implements OnInit {
           this.router.navigate(['/courses']);
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error(this.translate.instant('COURSES.FORM.UPDATE_ERROR'));
           console.error('Update error:', error);
         }
       });
@@ -179,8 +179,8 @@ export class CourseFormComponent implements OnInit {
           this.router.navigate(['/courses']);
         },
         error: (error) => {
+          // Interceptor toasted the translated error.
           this.loading.set(false);
-          this.notificationService.error(error?.error?.message || this.translate.instant('COURSES.FORM.CREATE_ERROR'));
           console.error('Create error:', error);
         }
       });

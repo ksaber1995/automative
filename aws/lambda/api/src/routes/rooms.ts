@@ -1,5 +1,6 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapRoomFromDB(row: any) {
   return {
@@ -33,11 +34,11 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
-        return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const room = await insert('rooms', {
@@ -51,10 +52,7 @@ export const roomsRoutes = {
       return { status: 201 as const, body: mapRoomFromDB(room) };
     } catch (error) {
       console.error('Create room error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to create room' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.CREATE_FAILED', 'Failed to create room', 400);
     }
   },
 
@@ -62,7 +60,7 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -84,7 +82,7 @@ export const roomsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND r.branch_id = $${params.length}`;
@@ -99,10 +97,7 @@ export const roomsRoutes = {
       return { status: 200 as const, body: rooms.map(mapRoomWithStatusFromDB) };
     } catch (error) {
       console.error('List rooms error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list rooms' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.LIST_FAILED', 'Failed to list rooms');
     }
   },
 
@@ -110,7 +105,7 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       let sql = `
@@ -132,7 +127,7 @@ export const roomsRoutes = {
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
-          return { status: 403 as const, body: { message: 'Access denied to this branch' } };
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND r.branch_id = $${params.length}`;
@@ -147,10 +142,7 @@ export const roomsRoutes = {
       return { status: 200 as const, body: rooms.map(mapRoomWithStatusFromDB) };
     } catch (error) {
       console.error('List active rooms error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 500,
-        body: { message: error.message || 'Failed to list active rooms' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.LIST_FAILED', 'Failed to list active rooms');
     }
   },
 
@@ -158,7 +150,7 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const sql = `
@@ -180,20 +172,17 @@ export const roomsRoutes = {
       const result = await query(sql, [params.id, context.companyId]);
 
       if (!result || result.length === 0) {
-        return { status: 404 as const, body: { message: 'Room not found' } };
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
       if (!canAccessBranch(context, result[0].branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to this room' } };
+        return apiError(403, 'ERRORS.ROOMS.ACCESS_DENIED', 'Access denied to this room');
       }
 
       return { status: 200 as const, body: mapRoomWithStatusFromDB(result[0]) };
     } catch (error) {
       console.error('Get room error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 404,
-        body: { message: error.message || 'Room not found' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found', 404);
     }
   },
 
@@ -201,7 +190,7 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -210,11 +199,11 @@ export const roomsRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Room not found' } };
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to update this room' } };
+        return apiError(403, 'ERRORS.ROOMS.ACCESS_DENIED_UPDATE', 'Access denied to update this room');
       }
 
       const updateData: any = {};
@@ -225,16 +214,13 @@ export const roomsRoutes = {
       const room = await update('rooms', params.id, updateData);
 
       if (!room) {
-        return { status: 404 as const, body: { message: 'Room not found' } };
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
       return { status: 200 as const, body: mapRoomFromDB(room) };
     } catch (error) {
       console.error('Update room error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to update room' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.UPDATE_FAILED', 'Failed to update room', 400);
     }
   },
 
@@ -242,7 +228,7 @@ export const roomsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'delete')) {
-        return { status: 403 as const, body: { message: 'Insufficient permissions' } };
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
       const existing = await queryOne(
@@ -251,11 +237,11 @@ export const roomsRoutes = {
       );
 
       if (!existing) {
-        return { status: 404 as const, body: { message: 'Room not found' } };
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
       if (!canAccessBranch(context, existing.branch_id)) {
-        return { status: 403 as const, body: { message: 'Access denied to delete this room' } };
+        return apiError(403, 'ERRORS.ROOMS.ACCESS_DENIED_DELETE', 'Access denied to delete this room');
       }
 
       // Check for active sessions
@@ -265,18 +251,15 @@ export const roomsRoutes = {
       );
 
       if (activeSession) {
-        return { status: 400 as const, body: { message: 'Cannot delete room with an active session. End the session first.' } };
+        return apiError(400, 'ERRORS.ROOMS.HAS_ACTIVE_SESSION', 'Cannot delete room with an active session. End the session first.');
       }
 
       await update('rooms', params.id, { is_active: false });
 
-      return { status: 200 as const, body: { message: 'Room deleted successfully' } };
+      return { status: 200 as const, body: { message: 'Room deleted successfully', code: 'ROOMS.DELETED' } };
     } catch (error) {
       console.error('Delete room error:', error);
-      return {
-        status: isSubscriptionError(error) ? 402 : isAuthError(error) ? 401 : 400,
-        body: { message: error.message || 'Failed to delete room' },
-      };
+      return mapThrownError(error, 'ERRORS.ROOMS.DELETE_FAILED', 'Failed to delete room', 400);
     }
   },
 };
