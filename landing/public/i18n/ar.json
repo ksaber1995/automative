@@ -49,6 +49,19 @@
   "FEATURES": {
     "KICKER": "كل ما تحتاجه",
     "HEADING": "منصة واحدة. كل عملياتك.",
+    "MATCH_COUNT": "عرض {{count}} من {{total}} ميزة",
+    "SEARCH_PLACEHOLDER": "ابحث عن ميزة…",
+    "CLEAR_SEARCH": "مسح البحث",
+    "EMPTY": "لا توجد ميزات تطابق بحثك.",
+    "RESET": "إعادة تعيين الفلاتر",
+    "CATEGORIES": {
+      "ALL": "الكل",
+      "OPERATIONS": "العمليات",
+      "ACADEMICS": "الأكاديمي",
+      "FINANCE": "المالية",
+      "COMMERCE": "المبيعات",
+      "INSIGHTS": "التحليلات"
+    },
     "ITEMS": {
       "MULTIBRANCH_TITLE": "متعدد الفروع ومتعدد المؤسسات",
       "MULTIBRANCH_TEXT": "أدر العدد الذي تريده من الفروع. بيانات كل مؤسسة معزولة تماماً، وتقارير ربح وخسارة لكل فرع وللشركة ككل.",

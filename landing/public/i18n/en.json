@@ -49,6 +49,19 @@
   "FEATURES": {
     "KICKER": "Everything you need",
     "HEADING": "One platform. All your operations.",
+    "MATCH_COUNT": "Showing {{count}} of {{total}} features",
+    "SEARCH_PLACEHOLDER": "Search features…",
+    "CLEAR_SEARCH": "Clear search",
+    "EMPTY": "No features match your search.",
+    "RESET": "Reset filters",
+    "CATEGORIES": {
+      "ALL": "All",
+      "OPERATIONS": "Operations",
+      "ACADEMICS": "Academics",
+      "FINANCE": "Finance",
+      "COMMERCE": "Commerce",
+      "INSIGHTS": "Insights"
+    },
     "ITEMS": {
       "MULTIBRANCH_TITLE": "Multi-branch & multi-tenant",
       "MULTIBRANCH_TEXT": "Run as many branches as you need. Each tenant's data is isolated — full P&L per branch and consolidated at the company.",

@@ -13,7 +13,9 @@ type Lang = 'en' | 'ar';
 const LANG_STORAGE_KEY = 'netrofit.lang';
 
 interface Benefit { icon: string; titleKey: string; textKey: string; }
-interface Feature { icon: string; titleKey: string; textKey: string; }
+type FeatureCategory = 'operations' | 'academics' | 'finance' | 'commerce' | 'insights';
+interface Feature { icon: string; titleKey: string; textKey: string; category: FeatureCategory; }
+interface FeatureCategoryMeta { id: FeatureCategory | 'all'; labelKey: string; icon: string; }
 interface Faq { qKey: string; aKey: string; }
 interface RoadmapPhase {
   phase: string;
@@ -34,7 +36,7 @@ interface RoadmapPhase {
     <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
       <div class="container-custom h-16 flex items-center justify-between">
         <a href="#top" class="flex items-center">
-          <img src="logo-white.png" alt="Netrofit" style="height:60px" class="w-12" />
+          <img src="logo-white.png" alt="Netrofit" style="height:60px"  />
         </a>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
           <a href="#benefits" class="hover:text-brand-600">{{ 'NAV.BENEFITS' | translate }}</a>
@@ -133,21 +135,82 @@ interface RoadmapPhase {
     </section>
 
     <!-- FEATURES -->
-    <section id="features" class="py-20 bg-gray-50">
-      <div class="container-custom">
-        <div class="text-center max-w-2xl mx-auto mb-14">
+    <section id="features" class="py-20 bg-gradient-to-b from-gray-50 via-white to-gray-50 relative overflow-hidden">
+      <div class="pointer-events-none absolute -top-32 -end-32 w-96 h-96 rounded-full bg-brand-200/30 blur-3xl animate-pulse"></div>
+      <div class="pointer-events-none absolute -bottom-32 -start-32 w-96 h-96 rounded-full bg-brand-100/40 blur-3xl animate-pulse" style="animation-delay:1.5s"></div>
+
+      <div class="container-custom relative">
+        <div class="text-center max-w-2xl mx-auto mb-10">
           <p class="text-sm font-semibold text-brand-600 uppercase tracking-wider">{{ 'FEATURES.KICKER' | translate }}</p>
           <h2 class="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">{{ 'FEATURES.HEADING' | translate }}</h2>
+          <p class="mt-3 text-gray-500 text-sm">{{ 'FEATURES.MATCH_COUNT' | translate:{ count: visibleFeatures().length, total: features.length } }}</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          @for (f of features; track f.titleKey) {
-            <div class="flex gap-4 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
-              <div class="w-12 h-12 rounded-xl bg-brand-600 text-white flex items-center justify-center text-xl flex-shrink-0">{{ f.icon }}</div>
-              <div>
-                <h3 class="font-bold text-gray-900 mb-1">{{ f.titleKey | translate }}</h3>
-                <p class="text-gray-600 text-sm">{{ f.textKey | translate }}</p>
+        <!-- Category pills -->
+        <div class="flex flex-wrap justify-center gap-2 mb-6">
+          @for (c of featureCategories; track c.id) {
+            <button
+              type="button"
+              (click)="activeFeatureCategory.set(c.id)"
+              class="group/pill px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 inline-flex items-center gap-1.5"
+              [class]="activeFeatureCategory() === c.id
+                ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30 scale-105'
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-400 hover:text-brand-600 hover:-translate-y-0.5'">
+              <span>{{ c.icon }}</span>
+              <span>{{ c.labelKey | translate }}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded-full"
+                [class]="activeFeatureCategory() === c.id ? 'bg-white/20' : 'bg-gray-100 group-hover/pill:bg-brand-50'">
+                {{ featureCountFor(c.id) }}
+              </span>
+            </button>
+          }
+        </div>
+
+        <!-- Search -->
+        <div class="max-w-md mx-auto mb-10">
+          <div class="relative">
+            <span class="absolute inset-y-0 start-4 flex items-center text-gray-400 pointer-events-none">🔍</span>
+            <input
+              type="text"
+              [ngModel]="featureSearch()"
+              (ngModelChange)="featureSearch.set($event)"
+              [placeholder]="'FEATURES.SEARCH_PLACEHOLDER' | translate"
+              class="w-full ps-11 pe-10 py-3 rounded-full border border-gray-200 bg-white/90 backdrop-blur shadow-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all" />
+            @if (featureSearch()) {
+              <button
+                type="button"
+                (click)="featureSearch.set('')"
+                [attr.aria-label]="'FEATURES.CLEAR_SEARCH' | translate"
+                class="absolute inset-y-0 end-3 flex items-center text-gray-400 hover:text-brand-600 transition-colors">
+                ✕
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          @for (f of visibleFeatures(); track f.titleKey) {
+            <div class="group relative p-6 rounded-2xl bg-white border border-gray-100 hover:border-brand-300 shadow-sm hover:shadow-xl hover:shadow-brand-600/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-br from-brand-50/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute -top-10 -end-10 w-24 h-24 rounded-full bg-brand-100/50 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div class="relative flex gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-xl flex-shrink-0 shadow-md group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">{{ f.icon }}</div>
+                <div class="min-w-0">
+                  <h3 class="font-bold text-gray-900 mb-1 group-hover:text-brand-700 transition-colors">{{ f.titleKey | translate }}</h3>
+                  <p class="text-gray-600 text-sm leading-relaxed">{{ f.textKey | translate }}</p>
+                </div>
               </div>
+            </div>
+          } @empty {
+            <div class="col-span-full text-center py-16">
+              <div class="text-5xl mb-3">🔎</div>
+              <p class="text-gray-500 mb-4">{{ 'FEATURES.EMPTY' | translate }}</p>
+              <button
+                type="button"
+                (click)="resetFeatureFilters()"
+                class="text-sm font-medium text-brand-600 hover:text-brand-700 underline">
+                {{ 'FEATURES.RESET' | translate }}
+              </button>
             </div>
           }
         </div>
@@ -588,35 +651,69 @@ export class LandingComponent {
   ];
 
   features: Feature[] = [
-    { icon: '🏢', titleKey: 'FEATURES.ITEMS.MULTIBRANCH_TITLE',    textKey: 'FEATURES.ITEMS.MULTIBRANCH_TEXT' },
-    { icon: '📊', titleKey: 'FEATURES.ITEMS.DASHBOARD_TITLE',      textKey: 'FEATURES.ITEMS.DASHBOARD_TEXT' },
-    { icon: '🎓', titleKey: 'FEATURES.ITEMS.STUDENTS_TITLE',       textKey: 'FEATURES.ITEMS.STUDENTS_TEXT' },
-    { icon: '📚', titleKey: 'FEATURES.ITEMS.COURSES_TITLE',        textKey: 'FEATURES.ITEMS.COURSES_TEXT' },
-    { icon: '🎁', titleKey: 'FEATURES.ITEMS.BUNDLES_TITLE',        textKey: 'FEATURES.ITEMS.BUNDLES_TEXT' },
-    { icon: '📅', titleKey: 'FEATURES.ITEMS.CLASSES_TITLE',        textKey: 'FEATURES.ITEMS.CLASSES_TEXT' },
-    { icon: '🕘', titleKey: 'FEATURES.ITEMS.SESSIONS_TITLE',       textKey: 'FEATURES.ITEMS.SESSIONS_TEXT' },
-    { icon: '🗓️', titleKey: 'FEATURES.ITEMS.TIMETABLE_TITLE',      textKey: 'FEATURES.ITEMS.TIMETABLE_TEXT' },
-    { icon: '🚪', titleKey: 'FEATURES.ITEMS.ROOMS_TITLE',          textKey: 'FEATURES.ITEMS.ROOMS_TEXT' },
-    { icon: '✅', titleKey: 'FEATURES.ITEMS.ATTENDANCE_TITLE',     textKey: 'FEATURES.ITEMS.ATTENDANCE_TEXT' },
-    { icon: '👨‍🏫', titleKey: 'FEATURES.ITEMS.EMPLOYEES_TITLE',    textKey: 'FEATURES.ITEMS.EMPLOYEES_TEXT' },
-    { icon: '💵', titleKey: 'FEATURES.ITEMS.PAYROLL_TITLE',        textKey: 'FEATURES.ITEMS.PAYROLL_TEXT' },
-    { icon: '📝', titleKey: 'FEATURES.ITEMS.ENROLLMENTS_TITLE',    textKey: 'FEATURES.ITEMS.ENROLLMENTS_TEXT' },
-    { icon: '💳', titleKey: 'FEATURES.ITEMS.INSTALLMENTS_TITLE',   textKey: 'FEATURES.ITEMS.INSTALLMENTS_TEXT' },
-    { icon: '💰', titleKey: 'FEATURES.ITEMS.REVENUES_TITLE',       textKey: 'FEATURES.ITEMS.REVENUES_TEXT' },
-    { icon: '🧾', titleKey: 'FEATURES.ITEMS.EXPENSES_TITLE',       textKey: 'FEATURES.ITEMS.EXPENSES_TEXT' },
-    { icon: '🔁', titleKey: 'FEATURES.ITEMS.RECURRING_TITLE',      textKey: 'FEATURES.ITEMS.RECURRING_TEXT' },
-    { icon: '↩️', titleKey: 'FEATURES.ITEMS.REFUNDS_TITLE',        textKey: 'FEATURES.ITEMS.REFUNDS_TEXT' },
-    { icon: '🏧', titleKey: 'FEATURES.ITEMS.WITHDRAWALS_TITLE',    textKey: 'FEATURES.ITEMS.WITHDRAWALS_TEXT' },
-    { icon: '📉', titleKey: 'FEATURES.ITEMS.DEBTS_TITLE',          textKey: 'FEATURES.ITEMS.DEBTS_TEXT' },
-    { icon: '👛', titleKey: 'FEATURES.ITEMS.CASH_TITLE',           textKey: 'FEATURES.ITEMS.CASH_TEXT' },
-    { icon: '📦', titleKey: 'FEATURES.ITEMS.INVENTORY_TITLE',      textKey: 'FEATURES.ITEMS.INVENTORY_TEXT' },
-    { icon: '🛒', titleKey: 'FEATURES.ITEMS.SALES_TITLE',          textKey: 'FEATURES.ITEMS.SALES_TEXT' },
-    { icon: '🚩', titleKey: 'FEATURES.ITEMS.EVENTS_TITLE',         textKey: 'FEATURES.ITEMS.EVENTS_TEXT' },
-    { icon: '📈', titleKey: 'FEATURES.ITEMS.ANALYTICS_TITLE',      textKey: 'FEATURES.ITEMS.ANALYTICS_TEXT' },
-    { icon: '📑', titleKey: 'FEATURES.ITEMS.REPORTS_TITLE',        textKey: 'FEATURES.ITEMS.REPORTS_TEXT' },
-    { icon: '🔒', titleKey: 'FEATURES.ITEMS.RBAC_TITLE',           textKey: 'FEATURES.ITEMS.RBAC_TEXT' },
-    { icon: '🌍', titleKey: 'FEATURES.ITEMS.BILINGUAL_TITLE',      textKey: 'FEATURES.ITEMS.BILINGUAL_TEXT' },
+    { icon: '🏢', titleKey: 'FEATURES.ITEMS.MULTIBRANCH_TITLE',    textKey: 'FEATURES.ITEMS.MULTIBRANCH_TEXT',    category: 'operations' },
+    { icon: '📊', titleKey: 'FEATURES.ITEMS.DASHBOARD_TITLE',      textKey: 'FEATURES.ITEMS.DASHBOARD_TEXT',      category: 'finance' },
+    { icon: '🎓', titleKey: 'FEATURES.ITEMS.STUDENTS_TITLE',       textKey: 'FEATURES.ITEMS.STUDENTS_TEXT',       category: 'academics' },
+    { icon: '📚', titleKey: 'FEATURES.ITEMS.COURSES_TITLE',        textKey: 'FEATURES.ITEMS.COURSES_TEXT',        category: 'academics' },
+    { icon: '🎁', titleKey: 'FEATURES.ITEMS.BUNDLES_TITLE',        textKey: 'FEATURES.ITEMS.BUNDLES_TEXT',        category: 'academics' },
+    { icon: '📅', titleKey: 'FEATURES.ITEMS.CLASSES_TITLE',        textKey: 'FEATURES.ITEMS.CLASSES_TEXT',        category: 'academics' },
+    { icon: '🕘', titleKey: 'FEATURES.ITEMS.SESSIONS_TITLE',       textKey: 'FEATURES.ITEMS.SESSIONS_TEXT',       category: 'academics' },
+    { icon: '🗓️', titleKey: 'FEATURES.ITEMS.TIMETABLE_TITLE',      textKey: 'FEATURES.ITEMS.TIMETABLE_TEXT',      category: 'academics' },
+    { icon: '🚪', titleKey: 'FEATURES.ITEMS.ROOMS_TITLE',          textKey: 'FEATURES.ITEMS.ROOMS_TEXT',          category: 'academics' },
+    { icon: '✅', titleKey: 'FEATURES.ITEMS.ATTENDANCE_TITLE',     textKey: 'FEATURES.ITEMS.ATTENDANCE_TEXT',     category: 'academics' },
+    { icon: '👨‍🏫', titleKey: 'FEATURES.ITEMS.EMPLOYEES_TITLE',    textKey: 'FEATURES.ITEMS.EMPLOYEES_TEXT',      category: 'operations' },
+    { icon: '💵', titleKey: 'FEATURES.ITEMS.PAYROLL_TITLE',        textKey: 'FEATURES.ITEMS.PAYROLL_TEXT',        category: 'operations' },
+    { icon: '📝', titleKey: 'FEATURES.ITEMS.ENROLLMENTS_TITLE',    textKey: 'FEATURES.ITEMS.ENROLLMENTS_TEXT',    category: 'academics' },
+    { icon: '💳', titleKey: 'FEATURES.ITEMS.INSTALLMENTS_TITLE',   textKey: 'FEATURES.ITEMS.INSTALLMENTS_TEXT',   category: 'finance' },
+    { icon: '💰', titleKey: 'FEATURES.ITEMS.REVENUES_TITLE',       textKey: 'FEATURES.ITEMS.REVENUES_TEXT',       category: 'finance' },
+    { icon: '🧾', titleKey: 'FEATURES.ITEMS.EXPENSES_TITLE',       textKey: 'FEATURES.ITEMS.EXPENSES_TEXT',       category: 'finance' },
+    { icon: '🔁', titleKey: 'FEATURES.ITEMS.RECURRING_TITLE',      textKey: 'FEATURES.ITEMS.RECURRING_TEXT',      category: 'finance' },
+    { icon: '↩️', titleKey: 'FEATURES.ITEMS.REFUNDS_TITLE',        textKey: 'FEATURES.ITEMS.REFUNDS_TEXT',        category: 'finance' },
+    { icon: '🏧', titleKey: 'FEATURES.ITEMS.WITHDRAWALS_TITLE',    textKey: 'FEATURES.ITEMS.WITHDRAWALS_TEXT',    category: 'finance' },
+    { icon: '📉', titleKey: 'FEATURES.ITEMS.DEBTS_TITLE',          textKey: 'FEATURES.ITEMS.DEBTS_TEXT',          category: 'finance' },
+    { icon: '👛', titleKey: 'FEATURES.ITEMS.CASH_TITLE',           textKey: 'FEATURES.ITEMS.CASH_TEXT',           category: 'finance' },
+    { icon: '📦', titleKey: 'FEATURES.ITEMS.INVENTORY_TITLE',      textKey: 'FEATURES.ITEMS.INVENTORY_TEXT',      category: 'commerce' },
+    { icon: '🛒', titleKey: 'FEATURES.ITEMS.SALES_TITLE',          textKey: 'FEATURES.ITEMS.SALES_TEXT',          category: 'commerce' },
+    { icon: '🚩', titleKey: 'FEATURES.ITEMS.EVENTS_TITLE',         textKey: 'FEATURES.ITEMS.EVENTS_TEXT',         category: 'commerce' },
+    { icon: '📈', titleKey: 'FEATURES.ITEMS.ANALYTICS_TITLE',      textKey: 'FEATURES.ITEMS.ANALYTICS_TEXT',      category: 'insights' },
+    { icon: '📑', titleKey: 'FEATURES.ITEMS.REPORTS_TITLE',        textKey: 'FEATURES.ITEMS.REPORTS_TEXT',        category: 'insights' },
+    { icon: '🔒', titleKey: 'FEATURES.ITEMS.RBAC_TITLE',           textKey: 'FEATURES.ITEMS.RBAC_TEXT',           category: 'operations' },
+    { icon: '🌍', titleKey: 'FEATURES.ITEMS.BILINGUAL_TITLE',      textKey: 'FEATURES.ITEMS.BILINGUAL_TEXT',      category: 'operations' },
   ];
+
+  featureCategories: FeatureCategoryMeta[] = [
+    { id: 'all',        labelKey: 'FEATURES.CATEGORIES.ALL',        icon: '✨' },
+    { id: 'operations', labelKey: 'FEATURES.CATEGORIES.OPERATIONS', icon: '🏢' },
+    { id: 'academics',  labelKey: 'FEATURES.CATEGORIES.ACADEMICS',  icon: '🎓' },
+    { id: 'finance',    labelKey: 'FEATURES.CATEGORIES.FINANCE',    icon: '💰' },
+    { id: 'commerce',   labelKey: 'FEATURES.CATEGORIES.COMMERCE',   icon: '🛒' },
+    { id: 'insights',   labelKey: 'FEATURES.CATEGORIES.INSIGHTS',   icon: '📈' },
+  ];
+
+  activeFeatureCategory = signal<FeatureCategory | 'all'>('all');
+  featureSearch = signal('');
+
+  visibleFeatures = computed<Feature[]>(() => {
+    const cat = this.activeFeatureCategory();
+    const q = this.featureSearch().trim().toLowerCase();
+    return this.features.filter(f => {
+      if (cat !== 'all' && f.category !== cat) return false;
+      if (!q) return true;
+      const title = this.translate.instant(f.titleKey)?.toLowerCase() ?? '';
+      const text = this.translate.instant(f.textKey)?.toLowerCase() ?? '';
+      return title.includes(q) || text.includes(q);
+    });
+  });
+
+  featureCountFor(id: FeatureCategory | 'all'): number {
+    if (id === 'all') return this.features.length;
+    return this.features.filter(f => f.category === id).length;
+  }
+
+  resetFeatureFilters(): void {
+    this.activeFeatureCategory.set('all');
+    this.featureSearch.set('');
+  }
 
   roadmapPhases: RoadmapPhase[] = [
     {
