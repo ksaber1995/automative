@@ -85,6 +85,18 @@ export class UserFormComponent implements OnInit {
   saving = signal(false);
 
   branches = signal<Branch[]>([]);
+  branchOptions = computed(() => {
+    const inactiveSuffix = ` (${this.translate.instant('BRANCHES.LIST.INACTIVE')})`;
+    return [...this.branches()]
+      .sort((a, b) => {
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      })
+      .map(b => ({
+        ...b,
+        displayName: b.isActive ? b.name : `${b.name}${inactiveSuffix}`,
+      }));
+  });
   existingUser = signal<SafeUser | null>(null);
   selectedRole: UserRole = UserRole.ACADEMIC_MANAGER;
 
@@ -122,7 +134,9 @@ export class UserFormComponent implements OnInit {
       this.form.get('password')!.setValidators([Validators.required, Validators.minLength(6)]);
     }
 
-    this.branchService.getActiveBranches().subscribe({
+    // Load all branches (active + inactive) so admins can still manage
+    // assignments on deactivated branches.
+    this.branchService.getAllBranches().subscribe({
       next: (branches) => this.branches.set(branches),
     });
 

@@ -409,6 +409,17 @@ export const branchesRoutes = {
             [params.id]
           );
         } else {
+          // Cascade user access for hard deletes. user_branches has ON DELETE
+          // CASCADE so the FK handles it, but users.branch_id has no FK — clear
+          // it manually so we don't leave dangling references.
+          await client.query(
+            'DELETE FROM user_branches WHERE branch_id = $1 AND company_id = $2',
+            [params.id, context.companyId]
+          );
+          await client.query(
+            'UPDATE users SET branch_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE branch_id = $1 AND company_id = $2',
+            [params.id, context.companyId]
+          );
           await client.query('DELETE FROM branches WHERE id = $1', [params.id]);
         }
 

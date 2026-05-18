@@ -103,7 +103,9 @@ export class UserListComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({
+    // Include deactivated branches so users still assigned to one render with
+    // the correct branch name in the list/filter.
+    this.branchService.getAllBranches().subscribe({
       next: (branches) => this.branches.set(branches),
     });
     this.loadUsers();

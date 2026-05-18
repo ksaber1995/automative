@@ -118,8 +118,8 @@
               </label>
               <p-multiSelect
                 formControlName="branchIds"
-                [options]="branches()"
-                optionLabel="name"
+                [options]="branchOptions()"
+                optionLabel="displayName"
                 optionValue="id"
                 [placeholder]="'USERS.FORM.BRANCH_PLACEHOLDER' | translate"
                 [showToggleAll]="true"

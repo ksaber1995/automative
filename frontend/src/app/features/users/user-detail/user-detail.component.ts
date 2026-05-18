@@ -87,7 +87,9 @@ export class UserDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
-    this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
+    // Include deactivated branches so the user's assigned branches still
+    // resolve to a name when a branch has been deactivated.
+    this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b) });
     this.userService.get(id).subscribe({
       next: (user) => { this.user.set(user); this.loading.set(false); },
       error: () => {
