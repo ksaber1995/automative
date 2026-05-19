@@ -7,11 +7,13 @@ import { ChartModule } from 'primeng/chart';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 import {
   ReportService,
   MonthlyPLRow,
@@ -41,6 +43,7 @@ import { NotificationService } from '../../../core/services/notification.service
     TableModule,
     TagModule,
     SelectModule,
+    MultiSelectModule,
     DatePickerModule,
     InputNumberModule,
     TabsModule,
@@ -61,11 +64,19 @@ export class ReportListComponent implements OnInit {
   // Filters
   startDate: Date;
   endDate: Date;
-  branchId: string | null = null;
+  /**
+   * Empty array = all branches (no filter, aggregated).
+   * One id   = filter to that branch.
+   * 2+ ids   = "compare mode" — time-series endpoints are fanned out per branch and
+   *            tables/aggregates filter to the selected set.
+   */
+  branchIds: string[] = [];
   inactiveMonths = 3;
   branches = signal<Branch[]>([]);
+  // Mirror of branchIds usable from reactive computeds.
+  branchIdsSignal = signal<string[]>([]);
 
-  // Data
+  // Single-branch / aggregate data (mode: branchIds.length <= 1).
   loading = signal(false);
   monthlyPL = signal<MonthlyPLRow[]>([]);
   salary = signal<SalaryMonthRow[]>([]);
@@ -78,9 +89,43 @@ export class ReportListComponent implements OnInit {
   expenseCats = signal<ExpenseCategoryRow[]>([]);
   profitEvents = signal<ProfitByEventRow[]>([]);
 
-  // KPIs
-  totalRevenue = computed(() => this.monthlyPL().reduce((s, r) => s + r.revenue, 0));
-  totalExpenses = computed(() => this.monthlyPL().reduce((s, r) => s + r.expenses, 0));
+  // Compare mode (branchIds.length >= 2). Time-series broken out per branch.
+  compareSeries = signal<Array<{
+    branchId: string;
+    branchName: string;
+    color: string;
+    monthlyPL: MonthlyPLRow[];
+    salary: SalaryMonthRow[];
+    studentsOT: StudentMonthRow[];
+    churn: ChurnSummary | null;
+    expenseCats: ExpenseCategoryRow[];
+  }>>([]);
+
+  compareMode = computed(() => this.branchIdsSignal().length >= 2);
+
+  // Stable color palette for branch series (cycles if > 12 branches).
+  private readonly branchPalette = [
+    '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4',
+    '#ec4899', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7',
+  ];
+
+  // KPIs — aggregate selected branches in compare mode, else use monthlyPL.
+  totalRevenue = computed(() => {
+    if (this.compareMode()) {
+      return this.compareSeries().reduce(
+        (s, b) => s + b.monthlyPL.reduce((ss, r) => ss + r.revenue, 0), 0,
+      );
+    }
+    return this.monthlyPL().reduce((s, r) => s + r.revenue, 0);
+  });
+  totalExpenses = computed(() => {
+    if (this.compareMode()) {
+      return this.compareSeries().reduce(
+        (s, b) => s + b.monthlyPL.reduce((ss, r) => ss + r.expenses, 0), 0,
+      );
+    }
+    return this.monthlyPL().reduce((s, r) => s + r.expenses, 0);
+  });
   totalNetProfit = computed(() => this.totalRevenue() - this.totalExpenses());
   margin = computed(() => {
     const rev = this.totalRevenue();
@@ -125,6 +170,43 @@ export class ReportListComponent implements OnInit {
   };
 
   monthlyPLChart = computed(() => {
+    // Compare mode: 3 series (revenue/expenses/profit) per branch, color-coded by branch.
+    if (this.compareMode()) {
+      const series = this.compareSeries();
+      if (!series.length) return null;
+      const labels = series[0].monthlyPL.map((r) => r.month);
+      const datasets: any[] = [];
+      const revLabel = this.translate.instant('REPORTS.CHART_REVENUE');
+      const expLabel = this.translate.instant('REPORTS.CHART_EXPENSES');
+      const npLabel = this.translate.instant('REPORTS.CHART_NET_PROFIT');
+      for (const b of series) {
+        datasets.push({
+          label: `${b.branchName} · ${revLabel}`,
+          data: b.monthlyPL.map((r) => r.revenue),
+          borderColor: b.color,
+          backgroundColor: 'transparent',
+          tension: 0.3,
+        });
+        datasets.push({
+          label: `${b.branchName} · ${expLabel}`,
+          data: b.monthlyPL.map((r) => r.expenses),
+          borderColor: b.color,
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderDash: [6, 4],
+        });
+        datasets.push({
+          label: `${b.branchName} · ${npLabel}`,
+          data: b.monthlyPL.map((r) => r.netProfit),
+          borderColor: b.color,
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderDash: [2, 2],
+        });
+      }
+      return { labels, datasets };
+    }
+
     const data = this.monthlyPL();
     if (!data.length) return null;
     return {
@@ -157,6 +239,19 @@ export class ReportListComponent implements OnInit {
   });
 
   salaryChart = computed(() => {
+    if (this.compareMode()) {
+      const series = this.compareSeries();
+      if (!series.length) return null;
+      const labels = series[0].salary.map((r) => r.month);
+      return {
+        labels,
+        datasets: series.map((b) => ({
+          label: b.branchName,
+          data: b.salary.map((r) => r.total),
+          backgroundColor: b.color,
+        })),
+      };
+    }
     const data = this.salary();
     if (!data.length) return null;
     return {
@@ -172,6 +267,27 @@ export class ReportListComponent implements OnInit {
   });
 
   studentsChart = computed(() => {
+    if (this.compareMode()) {
+      const series = this.compareSeries();
+      if (!series.length) return null;
+      const labels = series[0].studentsOT.map((r) => r.month);
+      const newLabel = this.translate.instant('REPORTS.CHART_NEW_STUDENTS');
+      const churnedLabel = this.translate.instant('REPORTS.CHART_CHURNED');
+      const datasets: any[] = [];
+      for (const b of series) {
+        datasets.push({
+          label: `${b.branchName} · ${newLabel}`,
+          data: b.studentsOT.map((r) => r.newStudents),
+          backgroundColor: b.color,
+        });
+        datasets.push({
+          label: `${b.branchName} · ${churnedLabel}`,
+          data: b.studentsOT.map((r) => r.churned),
+          backgroundColor: b.color + '99', // semi-transparent for churned variant
+        });
+      }
+      return { labels, datasets };
+    }
     const data = this.studentsOT();
     if (!data.length) return null;
     return {
@@ -192,7 +308,7 @@ export class ReportListComponent implements OnInit {
   });
 
   topCoursesChart = computed(() => {
-    const data = this.topCourses();
+    const data = this.visibleTopCourses();
     if (!data.length) return null;
     // Color master bundles purple to distinguish from single-course rows.
     const colors = data.map((r) => (r.type === 'MASTER' ? '#8b5cf6' : '#3b82f6'));
@@ -209,7 +325,7 @@ export class ReportListComponent implements OnInit {
   });
 
   branchChart = computed(() => {
-    const data = this.profitBranches();
+    const data = this.visibleProfitBranches();
     if (!data.length) return null;
     return {
       labels: data.map((b) => b.branchName),
@@ -272,8 +388,27 @@ export class ReportListComponent implements OnInit {
     }
   }
 
+  // Aggregated expenseCats narrowed to selected branches. In compare mode we
+  // sum the per-branch expenseCats; otherwise the single aggregate call is the
+  // authoritative answer.
+  visibleExpenseCats = computed<ExpenseCategoryRow[]>(() => {
+    if (this.compareMode()) {
+      const byCat = new Map<string, { total: number; count: number }>();
+      for (const b of this.compareSeries()) {
+        for (const r of b.expenseCats) {
+          const prev = byCat.get(r.category) || { total: 0, count: 0 };
+          byCat.set(r.category, { total: prev.total + r.total, count: prev.count + r.count });
+        }
+      }
+      return Array.from(byCat.entries())
+        .map(([category, { total, count }]) => ({ category, total, count }))
+        .sort((a, b) => b.total - a.total);
+    }
+    return this.expenseCats();
+  });
+
   expenseCatChart = computed(() => {
-    const data = this.expenseCats();
+    const data = this.visibleExpenseCats();
     if (!data.length) return null;
     const palette = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'];
     return {
@@ -310,40 +445,91 @@ export class ReportListComponent implements OnInit {
     return `${y}-${m}-${day}`;
   }
 
-  private filters() {
+  private rangeFilters() {
     return {
       startDate: this.toIso(this.startDate),
       endDate: this.toIso(this.endDate),
-      branchId: this.branchId || undefined,
     };
   }
 
+  /** Resolve a branch's display name from the loaded branch list (fallback: id). */
+  private branchNameFor(id: string): string {
+    return this.branches().find((b) => b.id === id)?.name || id;
+  }
+
   reload() {
-    const f = this.filters();
+    // Keep the signal mirror in sync so compareMode/computeds react.
+    this.branchIdsSignal.set([...this.branchIds]);
+    const range = this.rangeFilters();
+    const ids = this.branchIdsSignal();
     this.loading.set(true);
-    forkJoin({
-      monthlyPL: this.reportService.monthlyPL(f),
-      salary: this.reportService.salaryGrowth(f),
-      topCourses: this.reportService.topCourses(f),
-      studentsOT: this.reportService.studentsOverTime(f),
-      churn: this.reportService.studentChurn(f.branchId, this.inactiveMonths),
-      profitCourses: this.reportService.profitByCourse(f),
-      profitBranches: this.reportService.profitByBranch(f),
-      profitProducts: this.reportService.profitByProduct(f),
-      expenseCats: this.reportService.expensesByCategory(f),
-      profitEvents: this.reportService.profitByEvent(f),
-    }).subscribe({
-      next: (res) => {
-        this.monthlyPL.set(res.monthlyPL);
-        this.salary.set(res.salary);
-        this.topCourses.set(res.topCourses);
-        this.studentsOT.set(res.studentsOT);
-        this.churn.set(res.churn);
-        this.profitCourses.set(res.profitCourses);
-        this.profitBranches.set(res.profitBranches);
-        this.profitProducts.set(res.profitProducts);
-        this.expenseCats.set(res.expenseCats);
-        this.profitEvents.set(res.profitEvents);
+
+    // Aggregates / table data — single call. For tables we always fetch the
+    // company-wide rows (no branch filter) and let computed signals narrow them
+    // to the selected branches; this keeps the SQL simple and means switching
+    // branches is instant after the first load.
+    const aggregateBranchId = ids.length === 1 ? ids[0] : undefined;
+    const churnBranchId = ids.length === 1 ? ids[0] : undefined;
+    const aggregate$ = forkJoin({
+      monthlyPL: this.reportService.monthlyPL({ ...range, branchId: aggregateBranchId }),
+      salary: this.reportService.salaryGrowth({ ...range, branchId: aggregateBranchId }),
+      topCourses: this.reportService.topCourses({ ...range }),
+      studentsOT: this.reportService.studentsOverTime({ ...range, branchId: aggregateBranchId }),
+      churn: this.reportService.studentChurn(churnBranchId, this.inactiveMonths),
+      profitCourses: this.reportService.profitByCourse({ ...range }),
+      profitBranches: this.reportService.profitByBranch({ ...range }),
+      profitProducts: this.reportService.profitByProduct({ ...range }),
+      expenseCats: this.reportService.expensesByCategory({ ...range, branchId: aggregateBranchId }),
+      profitEvents: this.reportService.profitByEvent({ ...range }),
+    });
+
+    // Compare-mode fan-out: one parallel set of time-series calls per selected
+    // branch. Skipped (empty observable) when ≤1 branch is selected.
+    const compare$ = ids.length >= 2
+      ? forkJoin(
+          ids.map((id, i) =>
+            forkJoin({
+              monthlyPL: this.reportService.monthlyPL({ ...range, branchId: id }),
+              salary: this.reportService.salaryGrowth({ ...range, branchId: id }),
+              studentsOT: this.reportService.studentsOverTime({ ...range, branchId: id }),
+              churn: this.reportService.studentChurn(id, this.inactiveMonths),
+              expenseCats: this.reportService.expensesByCategory({ ...range, branchId: id }),
+            }).pipe(map((v) => ({ branchId: id, idx: i, ...v }))),
+          ),
+        )
+      : of([] as Array<{ branchId: string; idx: number; monthlyPL: MonthlyPLRow[]; salary: SalaryMonthRow[]; studentsOT: StudentMonthRow[]; churn: ChurnSummary; expenseCats: ExpenseCategoryRow[] }>);
+
+    forkJoin({ agg: aggregate$, cmp: compare$ }).subscribe({
+      next: ({ agg, cmp }) => {
+        this.monthlyPL.set(agg.monthlyPL);
+        this.salary.set(agg.salary);
+        this.topCourses.set(agg.topCourses);
+        this.studentsOT.set(agg.studentsOT);
+        this.churn.set(agg.churn);
+        this.profitCourses.set(agg.profitCourses);
+        this.profitBranches.set(agg.profitBranches);
+        this.profitProducts.set(agg.profitProducts);
+        this.expenseCats.set(agg.expenseCats);
+        this.profitEvents.set(agg.profitEvents);
+
+        // Stitch compare-mode per-branch data.
+        if (Array.isArray(cmp) && cmp.length > 0) {
+          this.compareSeries.set(
+            cmp.map((b: any, i: number) => ({
+              branchId: b.branchId,
+              branchName: this.branchNameFor(b.branchId),
+              color: this.branchPalette[i % this.branchPalette.length],
+              monthlyPL: b.monthlyPL,
+              salary: b.salary,
+              studentsOT: b.studentsOT,
+              churn: b.churn,
+              expenseCats: b.expenseCats,
+            })),
+          );
+        } else {
+          this.compareSeries.set([]);
+        }
+
         this.loading.set(false);
       },
       error: (err) => {
@@ -354,9 +540,22 @@ export class ReportListComponent implements OnInit {
   }
 
   onChurnWindowChange() {
-    this.reportService
-      .studentChurn(this.branchId || undefined, this.inactiveMonths)
-      .subscribe({ next: (c) => this.churn.set(c) });
+    const ids = this.branchIdsSignal();
+    if (ids.length >= 2) {
+      forkJoin(
+        ids.map((id) => this.reportService.studentChurn(id, this.inactiveMonths)),
+      ).subscribe({
+        next: (results) => {
+          this.compareSeries.update((curr) =>
+            curr.map((b, i) => ({ ...b, churn: results[i] })),
+          );
+        },
+      });
+    } else {
+      this.reportService
+        .studentChurn(ids[0] || undefined, this.inactiveMonths)
+        .subscribe({ next: (c) => this.churn.set(c) });
+    }
   }
 
   resetFilters() {
@@ -366,8 +565,54 @@ export class ReportListComponent implements OnInit {
     start.setDate(1);
     this.startDate = start;
     this.endDate = end;
-    this.branchId = null;
+    this.branchIds = [];
+    this.branchIdsSignal.set([]);
     this.inactiveMonths = 3;
     this.reload();
   }
+
+  // ── Branch-filter-aware views over single-call data ─────────────────────────
+  // Tables/aggregates always fetch company-wide; these computeds narrow them
+  // by the selected branches without round-tripping.
+
+  private isBranchSelected(branchId: string | null | undefined): boolean {
+    const ids = this.branchIdsSignal();
+    if (ids.length === 0) return true; // no filter
+    if (branchId == null) return false;
+    return ids.includes(branchId);
+  }
+
+  visibleProfitBranches = computed(() =>
+    this.profitBranches().filter((r) => this.isBranchSelected(r.branchId)),
+  );
+  visibleProfitCourses = computed(() => {
+    const ids = this.branchIdsSignal();
+    if (ids.length === 0) return this.profitCourses();
+    const allowed = new Set(ids.map((id) => this.branchNameFor(id)));
+    return this.profitCourses().filter((r) => allowed.has(r.branchName));
+  });
+  visibleProfitProducts = computed(() => {
+    const ids = this.branchIdsSignal();
+    if (ids.length === 0) return this.profitProducts();
+    const allowed = new Set(ids.map((id) => this.branchNameFor(id)));
+    return this.profitProducts().filter((r) => allowed.has(r.branchName));
+  });
+  visibleProfitEvents = computed(() =>
+    this.profitEvents().filter((r) =>
+      r.branchId == null
+        ? this.branchIdsSignal().length === 0
+        : this.isBranchSelected(r.branchId),
+    ),
+  );
+  visibleTopCourses = computed(() => {
+    const ids = this.branchIdsSignal();
+    if (ids.length === 0) return this.topCourses();
+    const allowed = new Set(ids.map((id) => this.branchNameFor(id)));
+    return this.topCourses().filter((r) => allowed.has(r.branchName));
+  });
+
+  // Per-branch churn rows for the Students tab in compare mode.
+  compareChurnRows = computed(() =>
+    this.compareSeries().map((b) => ({ branchName: b.branchName, color: b.color, churn: b.churn })),
+  );
 }

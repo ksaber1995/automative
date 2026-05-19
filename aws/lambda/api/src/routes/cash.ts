@@ -1,6 +1,34 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission } from '../middleware/tenant-isolation';
+import {
+  extractTenantContext,
+  canAccessBranch,
+  checkGranularPermission,
+  isGlobalAdmin,
+  type TenantContext,
+} from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+
+/**
+ * For non-admins, return the IDs of branches they may see; for admins return
+ * null (meaning "no scoping — see everything"). Returns [] when a non-admin
+ * has no branch access so callers can short-circuit to zero data.
+ */
+function scopedBranchIdsFor(context: TenantContext): string[] | null {
+  if (isGlobalAdmin(context)) return null;
+  if (context.branchIds && context.branchIds.length > 0) return context.branchIds;
+  if (context.branchId) return [context.branchId];
+  return [];
+}
+
+/** Build " AND alias IN ($N, $N+1, ...)" and push UUIDs onto params. */
+function buildBranchInClause(alias: string, params: any[], ids: string[]): string {
+  if (ids.length === 0) return ' AND FALSE';
+  const placeholders = ids.map((id) => {
+    params.push(id);
+    return `$${params.length}`;
+  }).join(', ');
+  return ` AND ${alias} IN (${placeholders})`;
+}
 
 let cashSchemaInitPromise: Promise<void> | null = null;
 async function ensureCashAdjustmentsTable(): Promise<void> {
@@ -34,37 +62,52 @@ async function ensureCashAdjustmentsTable(): Promise<void> {
 }
 
 // ─── Base cash math (mirrors analytics math: amount_paid, refunds subtracted) ──
-async function fetchCashAggregates(companyId: string) {
+// `scoped` is null for global admins (no branch filter) or a list of branch UUIDs
+// for branch-scoped users. When scoped, branch_id IS NULL rows (unallocated
+// revenue/expenses) are excluded — those are company-level and not visible.
+async function fetchCashAggregates(companyId: string, scoped: string[] | null) {
+  const bp = (alias: string) => {
+    if (scoped === null) return { clause: '', params: [companyId] };
+    const p: any[] = [companyId];
+    const c = buildBranchInClause(alias, p, scoped);
+    return { clause: c, params: p };
+  };
+  const a1 = bp('branch_id');
+  const a2 = bp('branch_id');
+  const a3 = bp('branch_id');
+  const a4 = bp('branch_id');
+  const a5 = bp('branch_id');
+  const a6 = bp('branch_id');
   const [enrollPaid, productSales, masterPaid, expenses, refunds, withdrawals] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(amount_paid), 0) as total
-       FROM enrollments WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')`,
-      [companyId]
+       FROM enrollments WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')${a1.clause}`,
+      a1.params
     ),
     query(
       `SELECT COALESCE(SUM(total_amount), 0) as total
-       FROM product_sales WHERE company_id = $1`,
-      [companyId]
+       FROM product_sales WHERE company_id = $1${a2.clause}`,
+      a2.params
     ),
     query(
       `SELECT COALESCE(SUM(amount_paid), 0) as total
-       FROM master_enrollments WHERE company_id = $1 AND amount_paid > 0`,
-      [companyId]
+       FROM master_enrollments WHERE company_id = $1 AND amount_paid > 0${a3.clause}`,
+      a3.params
     ),
     query(
       `SELECT COALESCE(SUM(amount), 0) as total
-       FROM expense_payments WHERE company_id = $1`,
-      [companyId]
+       FROM expense_payments WHERE company_id = $1${a4.clause}`,
+      a4.params
     ),
     query(
       `SELECT COALESCE(SUM(amount), 0) as total
-       FROM refunds WHERE company_id = $1`,
-      [companyId]
+       FROM refunds WHERE company_id = $1${a5.clause}`,
+      a5.params
     ),
     query(
       `SELECT COALESCE(SUM(amount), 0) as total
-       FROM withdrawals WHERE company_id = $1 AND is_active = true`,
-      [companyId]
+       FROM withdrawals WHERE company_id = $1 AND is_active = true${a6.clause}`,
+      a6.params
     ),
   ]);
 
@@ -78,16 +121,20 @@ async function fetchCashAggregates(companyId: string) {
   };
 }
 
-async function fetchAdjustmentTotals(companyId: string) {
+async function fetchAdjustmentTotals(companyId: string, scoped: string[] | null) {
+  const overallParams: any[] = [companyId];
+  const overallClause = scoped === null ? '' : buildBranchInClause('branch_id', overallParams, scoped);
+  const byBranchParams: any[] = [companyId];
+  const byBranchClause = scoped === null ? '' : buildBranchInClause('branch_id', byBranchParams, scoped);
   const overall = await query(
-    `SELECT COALESCE(SUM(amount), 0) as total FROM cash_adjustments WHERE company_id = $1`,
-    [companyId]
+    `SELECT COALESCE(SUM(amount), 0) as total FROM cash_adjustments WHERE company_id = $1${overallClause}`,
+    overallParams
   );
   const byBranch = await query(
     `SELECT branch_id, COALESCE(SUM(amount), 0) as total
-     FROM cash_adjustments WHERE company_id = $1
+     FROM cash_adjustments WHERE company_id = $1${byBranchClause}
      GROUP BY branch_id`,
-    [companyId]
+    byBranchParams
   );
   const branchMap = new Map<string | null, number>();
   let unallocated = 0;
@@ -132,31 +179,39 @@ export const cashRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const aggs = await fetchCashAggregates(context.companyId);
+      const scoped = scopedBranchIdsFor(context);
+      const aggs = await fetchCashAggregates(context.companyId, scoped);
       const baseCash = aggs.totalEnrollPaid + aggs.totalProductSales + aggs.totalMasterPaid
         - aggs.totalExpenses - aggs.totalRefunds - aggs.totalWithdrawals;
 
       // Surface activity that isn't tagged to any branch — product_sales with no
       // branch_id and expense_payments with no branch_id. These are part of the
       // company total but never roll up into a branch row, so callers need to
-      // know about them to reconcile sum(byBranch) with totalCash.
-      const unallocActivity = await query(
-        `SELECT
-           COALESCE((SELECT SUM(total_amount) FROM product_sales
-                     WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_revenue,
-           COALESCE((SELECT SUM(amount) FROM expense_payments
-                     WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_expenses`,
-        [context.companyId]
-      );
-      const unallocatedRevenue = parseFloat(unallocActivity[0]?.unalloc_revenue || '0');
-      const unallocatedExpenses = parseFloat(unallocActivity[0]?.unalloc_expenses || '0');
+      // know about them to reconcile sum(byBranch) with totalCash. Scoped users
+      // don't see unallocated activity (it's company-level overhead).
+      let unallocatedRevenue = 0;
+      let unallocatedExpenses = 0;
+      if (scoped === null) {
+        const unallocActivity = await query(
+          `SELECT
+             COALESCE((SELECT SUM(total_amount) FROM product_sales
+                       WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_revenue,
+             COALESCE((SELECT SUM(amount) FROM expense_payments
+                       WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_expenses`,
+          [context.companyId]
+        );
+        unallocatedRevenue = parseFloat(unallocActivity[0]?.unalloc_revenue || '0');
+        unallocatedExpenses = parseFloat(unallocActivity[0]?.unalloc_expenses || '0');
+      }
       const unallocatedNet = unallocatedRevenue - unallocatedExpenses;
 
-      const adj = await fetchAdjustmentTotals(context.companyId);
+      const adj = await fetchAdjustmentTotals(context.companyId, scoped);
       const totalCash = baseCash + adj.overall;
 
       // Per-branch breakdown — mirrors the same formula scoped to one branch.
       // Cash adjustments with branch_id IS NULL are distributed equally across active branches.
+      const branchAggParams: any[] = [context.companyId];
+      const branchAggClause = scoped === null ? '' : buildBranchInClause('b.id', branchAggParams, scoped);
       const branchAggs = await query(
         `
         SELECT
@@ -201,10 +256,10 @@ export const cashRoutes = {
           WHERE company_id = $1 AND is_active = true
           GROUP BY branch_id
         ) w ON w.branch_id = b.id
-        WHERE b.company_id = $1 AND b.is_active = true
+        WHERE b.company_id = $1 AND b.is_active = true ${branchAggClause}
         ORDER BY b.name ASC
         `,
-        [context.companyId]
+        branchAggParams
       );
 
       const branchCount = branchAggs.length;
@@ -334,7 +389,12 @@ export const cashRoutes = {
       const params: any[] = [context.companyId];
       let where = `ca.company_id = $1`;
       const filterBranch = queryParams.branchId;
+      const scoped = scopedBranchIdsFor(context);
       if (filterBranch === 'NULL') {
+        // Scoped users have no visibility into unallocated (company-level) adjustments.
+        if (scoped !== null) {
+          return { status: 200 as const, body: [] };
+        }
         where += ` AND ca.branch_id IS NULL`;
       } else if (filterBranch) {
         if (!canAccessBranch(context, filterBranch)) {
@@ -342,6 +402,9 @@ export const cashRoutes = {
         }
         params.push(filterBranch);
         where += ` AND ca.branch_id = $${params.length}`;
+      } else if (scoped !== null) {
+        // No explicit branch filter and user is scoped → restrict to their branches.
+        where += buildBranchInClause('ca.branch_id', params, scoped);
       }
 
       const rows = await query(

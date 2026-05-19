@@ -33,6 +33,13 @@ export const employeesRoutes = {
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
+      // Only global admins may create global (company-wide) employees. Branch
+      // admins must scope every employee they create to a branch they own.
+      if (!isGlobalAdmin(context)) {
+        if (body.isGlobal || !body.branchId) {
+          return apiError(403, 'ERRORS.EMPLOYEES.GLOBAL_ADMIN_ONLY_GLOBAL', 'Only Global Admins can create global employees');
+        }
+      }
 
       const employee = await insert('employees', {
         company_id: context.companyId,
@@ -45,7 +52,7 @@ export const employeesRoutes = {
         salary: body.salary || null,
         hire_date: body.hireDate || null,
         branch_id: body.branchId || null,
-        is_global: body.isGlobal || false,
+        is_global: isGlobalAdmin(context) ? (body.isGlobal || false) : false,
         is_active: true,
       });
 
@@ -69,22 +76,40 @@ export const employeesRoutes = {
       let sql = 'SELECT * FROM employees WHERE company_id = $1';
       const params: any[] = [context.companyId];
 
+      const admin = isGlobalAdmin(context);
+
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId && !queryParams.isGlobal) {
-        // Non-admins see only their branch employees (unless requesting global)
-        params.push(context.branchId);
-        sql += ` AND (branch_id = $${params.length} OR is_global = true)`;
+      } else if (!admin) {
+        // Non-admins see only employees in branches they're assigned to.
+        // Global employees (is_global = true, branch_id NULL) are hidden — those
+        // are company-level and only visible to global admins.
+        const accessible = (context.branchIds && context.branchIds.length > 0)
+          ? context.branchIds
+          : (context.branchId ? [context.branchId] : []);
+        if (accessible.length === 0) {
+          sql += ' AND FALSE';
+        } else {
+          const placeholders = accessible.map((id) => {
+            params.push(id);
+            return `$${params.length}`;
+          }).join(', ');
+          sql += ` AND branch_id IN (${placeholders}) AND COALESCE(is_global, false) = false`;
+        }
       }
 
       if (queryParams.isGlobal !== undefined) {
-        const isGlobalBool = queryParams.isGlobal === 'true';
-        params.push(isGlobalBool);
-        sql += ` AND is_global = $${params.length}`;
+        // Only global admins may filter explicitly by is_global. Non-admins
+        // never see global employees regardless of the query string.
+        if (admin) {
+          const isGlobalBool = queryParams.isGlobal === 'true';
+          params.push(isGlobalBool);
+          sql += ` AND is_global = $${params.length}`;
+        }
       }
 
       sql += ' ORDER BY created_at DESC';
@@ -116,8 +141,14 @@ export const employeesRoutes = {
         return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
-      if (employee.branch_id && !canAccessBranch(context, employee.branch_id)) {
-        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED', 'Access denied to this employee');
+      // Non-admins cannot see global employees (is_global / no branch).
+      if (!isGlobalAdmin(context)) {
+        if (employee.is_global || !employee.branch_id) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED', 'Access denied to this employee');
+        }
+        if (!canAccessBranch(context, employee.branch_id)) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED', 'Access denied to this employee');
+        }
       }
 
       return {
@@ -146,8 +177,13 @@ export const employeesRoutes = {
         return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
-      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_UPDATE', 'Access denied to update this employee');
+      if (!isGlobalAdmin(context)) {
+        if (existing.is_global || !existing.branch_id) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_UPDATE', 'Access denied to update this employee');
+        }
+        if (!canAccessBranch(context, existing.branch_id)) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_UPDATE', 'Access denied to update this employee');
+        }
       }
 
       const updateData: any = {};
@@ -200,8 +236,13 @@ export const employeesRoutes = {
         return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
-      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
-        return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_DELETE', 'Access denied to delete this employee');
+      if (!isGlobalAdmin(context)) {
+        if (existing.is_global || !existing.branch_id) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_DELETE', 'Access denied to delete this employee');
+        }
+        if (!canAccessBranch(context, existing.branch_id)) {
+          return apiError(403, 'ERRORS.EMPLOYEES.ACCESS_DENIED_DELETE', 'Access denied to delete this employee');
+        }
       }
 
       // Block termination if the employee is still assigned as instructor on any non-finished class.

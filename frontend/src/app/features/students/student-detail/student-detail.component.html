@@ -72,6 +72,12 @@
               <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ENROLLED_DATE' | translate }}</span>
               <span>{{ s.enrollmentDate | date: 'MMM d, y' }}</span>
             </div>
+            @if (s.acquisitionChannel) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.CHANNEL' | translate }}</span>
+                <span>{{ 'STUDENTS.FORM.CHANNEL_' + s.acquisitionChannel | translate }}</span>
+              </div>
+            }
           </div>
         </div>
       </div>

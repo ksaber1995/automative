@@ -3,6 +3,68 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { mapPaymentFromDB } from './expense-payments';
 import { apiError, mapThrownError } from '../utils/api-error';
 
+// Parse a YYYY-MM-DD string into a calendar-only date with no timezone drift.
+function parseDateOnly(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+
+function fmtDate(year: number, month0: number, day: number): string {
+  const m = String(month0 + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${m}-${d}`;
+}
+
+interface BackPayPeriod {
+  monthKey: string;       // 'YYYY-MM'
+  monthLabel: string;     // 'January 2026'
+  startDate: string;      // 'YYYY-MM-DD'
+  endDate: string;        // 'YYYY-MM-DD'
+  daysInMonth: number;
+  daysWorked: number;
+  proRated: boolean;
+  amount: number;
+}
+
+// Build list of owed monthly periods strictly before upTo's month.
+// First month is pro-rated from hireDate.day; remaining months are full.
+function buildBackPayPeriods(hireDateStr: string, upToStr: string, monthlySalary: number): BackPayPeriod[] {
+  const hire = parseDateOnly(hireDateStr);
+  const upTo = parseDateOnly(upToStr);
+  const stopYear = upTo.getUTCFullYear();
+  const stopMonth = upTo.getUTCMonth();   // exclude this month — paid normally end-of-month
+
+  const periods: BackPayPeriod[] = [];
+  let year = hire.getUTCFullYear();
+  let month = hire.getUTCMonth();
+
+  while (year < stopYear || (year === stopYear && month < stopMonth)) {
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const isHireMonth = year === hire.getUTCFullYear() && month === hire.getUTCMonth();
+    const startDay = isHireMonth ? hire.getUTCDate() : 1;
+    const daysWorked = daysInMonth - startDay + 1;
+    const proRated = daysWorked < daysInMonth;
+    const amount = proRated
+      ? Math.round((monthlySalary * daysWorked / daysInMonth) * 100) / 100
+      : monthlySalary;
+
+    periods.push({
+      monthKey: `${year}-${String(month + 1).padStart(2, '0')}`,
+      monthLabel: new Date(Date.UTC(year, month, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+      startDate: fmtDate(year, month, startDay),
+      endDate: fmtDate(year, month, daysInMonth),
+      daysInMonth,
+      daysWorked,
+      proRated,
+      amount,
+    });
+
+    month += 1;
+    if (month > 11) { month = 0; year += 1; }
+  }
+  return periods;
+}
+
 function mapExpenseFromDB(row: any) {
   const amount = parseFloat(row.amount);
   const amortizationMonths = row.amortization_months || null;
@@ -583,6 +645,161 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get employee salary history error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.SALARY_HISTORY_FAILED', 'Failed to get salary history');
+    }
+  },
+
+  previewEmployeeBackPay: async ({ params, query: q, headers }: {
+    params: { employeeId: string };
+    query: { upTo?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const emp = await queryOne<any>(
+        'SELECT id, first_name, last_name, salary, hire_date, branch_id, is_active FROM employees WHERE id = $1 AND company_id = $2',
+        [params.employeeId, context.companyId]
+      );
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+      if (emp.branch_id && !canAccessBranch(context, emp.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this employee');
+      }
+      if (!emp.hire_date) return apiError(400, 'ERRORS.EXPENSES.NO_HIRE_DATE', 'Employee has no hire date');
+      const salary = emp.salary ? parseFloat(emp.salary) : 0;
+      if (salary <= 0) return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
+
+      const hireStr = typeof emp.hire_date === 'string' ? emp.hire_date.substring(0, 10) : emp.hire_date.toISOString().substring(0, 10);
+      const upToStr = (q?.upTo || new Date().toISOString().substring(0, 10));
+
+      const periods = buildBackPayPeriods(hireStr, upToStr, salary);
+
+      // Detect already-paid months so the user knows what will be skipped.
+      const paidRows = periods.length === 0 ? [] : await query<any>(
+        `SELECT date FROM expense_payments
+         WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES'
+           AND date >= $3 AND date <= $4`,
+        [context.companyId, params.employeeId, periods[0].startDate, periods[periods.length - 1].endDate]
+      );
+      const paidMonths = new Set(
+        paidRows.map(r => {
+          const d = typeof r.date === 'string' ? r.date : r.date.toISOString().substring(0, 10);
+          return d.substring(0, 7);
+        })
+      );
+
+      const enriched = periods.map(p => ({ ...p, alreadyPaid: paidMonths.has(p.monthKey) }));
+      const toCreate = enriched.filter(p => !p.alreadyPaid);
+
+      return {
+        status: 200 as const,
+        body: {
+          employee: {
+            id: emp.id,
+            firstName: emp.first_name,
+            lastName: emp.last_name,
+            hireDate: hireStr,
+            salary,
+            branchId: emp.branch_id,
+          },
+          upTo: upToStr,
+          periods: enriched,
+          totalToCreate: Math.round(toCreate.reduce((s, p) => s + p.amount, 0) * 100) / 100,
+          totalAlreadyPaid: Math.round(enriched.filter(p => p.alreadyPaid).reduce((s, p) => s + p.amount, 0) * 100) / 100,
+        },
+      };
+    } catch (error) {
+      console.error('Preview back-pay error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.BACK_PAY_PREVIEW_FAILED', 'Failed to preview back pay');
+    }
+  },
+
+  createEmployeeBackPay: async ({ params, body, headers }: {
+    params: { employeeId: string };
+    body: { upTo?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const emp = await queryOne<any>(
+        'SELECT id, first_name, last_name, salary, hire_date, branch_id FROM employees WHERE id = $1 AND company_id = $2',
+        [params.employeeId, context.companyId]
+      );
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+      if (emp.branch_id && !canAccessBranch(context, emp.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this employee');
+      }
+      if (!emp.hire_date) return apiError(400, 'ERRORS.EXPENSES.NO_HIRE_DATE', 'Employee has no hire date');
+      const salary = emp.salary ? parseFloat(emp.salary) : 0;
+      if (salary <= 0) return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
+
+      const hireStr = typeof emp.hire_date === 'string' ? emp.hire_date.substring(0, 10) : emp.hire_date.toISOString().substring(0, 10);
+      const upToStr = (body?.upTo || new Date().toISOString().substring(0, 10));
+
+      const periods = buildBackPayPeriods(hireStr, upToStr, salary);
+      if (periods.length === 0) {
+        return {
+          status: 200 as const,
+          body: { created: 0, skipped: 0, totalAmount: 0, payments: [], message: 'No back-pay periods to create.', code: 'EXPENSES.BACK_PAY_NONE' },
+        };
+      }
+
+      const paidRows = await query<any>(
+        `SELECT date FROM expense_payments
+         WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES'
+           AND date >= $3 AND date <= $4`,
+        [context.companyId, params.employeeId, periods[0].startDate, periods[periods.length - 1].endDate]
+      );
+      const paidMonths = new Set(
+        paidRows.map(r => {
+          const d = typeof r.date === 'string' ? r.date : r.date.toISOString().substring(0, 10);
+          return d.substring(0, 7);
+        })
+      );
+
+      const created: any[] = [];
+      let skipped = 0;
+      for (const p of periods) {
+        if (paidMonths.has(p.monthKey)) { skipped += 1; continue; }
+        const notes = p.proRated
+          ? `Back pay: ${emp.first_name} ${emp.last_name} — ${p.monthLabel} (pro-rated ${p.daysWorked}/${p.daysInMonth} days)`
+          : `Back pay: ${emp.first_name} ${emp.last_name} — ${p.monthLabel}`;
+        const payment = await insert('expense_payments', {
+          company_id: context.companyId,
+          branch_id: emp.branch_id,
+          employee_id: emp.id,
+          type: 'FIXED',
+          category: 'SALARIES',
+          amount: p.amount,
+          date: p.endDate,
+          notes,
+          bonus_amount: 0,
+          discount_amount: 0,
+        });
+        created.push(mapPaymentFromDB(payment));
+      }
+
+      const totalAmount = Math.round(created.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+      return {
+        status: 201 as const,
+        body: {
+          created: created.length,
+          skipped,
+          totalAmount,
+          payments: created,
+          message: `Created ${created.length} back-pay entr${created.length === 1 ? 'y' : 'ies'}${skipped ? `, skipped ${skipped} already-paid month${skipped === 1 ? '' : 's'}` : ''}.`,
+          code: 'EXPENSES.BACK_PAY_CREATED',
+        },
+      };
+    } catch (error) {
+      console.error('Create back-pay error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.BACK_PAY_FAILED', 'Failed to create back pay');
     }
   },
 

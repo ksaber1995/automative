@@ -3,6 +3,42 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { Expense, ExpenseCreateDto, ExpenseUpdateDto, ExpensePayment, ExpensePaymentCreateDto } from '@shared/interfaces/expense.interface';
 
+export interface BackPayPeriod {
+  monthKey: string;
+  monthLabel: string;
+  startDate: string;
+  endDate: string;
+  daysInMonth: number;
+  daysWorked: number;
+  proRated: boolean;
+  amount: number;
+  alreadyPaid: boolean;
+}
+
+export interface BackPayPreview {
+  employee: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    hireDate: string;
+    salary: number;
+    branchId: string | null;
+  };
+  upTo: string;
+  periods: BackPayPeriod[];
+  totalToCreate: number;
+  totalAlreadyPaid: number;
+}
+
+export interface BackPayResult {
+  created: number;
+  skipped: number;
+  totalAmount: number;
+  payments: ExpensePayment[];
+  message: string;
+  code: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -67,6 +103,17 @@ export class ExpenseService {
 
   getEmployeeSalaryHistory(employeeId: string): Observable<ExpensePayment[]> {
     return this.api.get<ExpensePayment[]>(`expenses/employee/${employeeId}/salary-history`);
+  }
+
+  previewEmployeeBackPay(employeeId: string, upTo?: string): Observable<BackPayPreview> {
+    const params = upTo ? { upTo } : undefined;
+    return this.api.get<BackPayPreview>(`expenses/employee/${employeeId}/back-pay-preview`, params);
+  }
+
+  createEmployeeBackPay(employeeId: string, upTo?: string): Observable<BackPayResult> {
+    const body: any = {};
+    if (upTo) body.upTo = upTo;
+    return this.api.post<BackPayResult>(`expenses/employee/${employeeId}/back-pay`, body);
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {

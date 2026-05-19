@@ -342,6 +342,7 @@ CREATE TABLE students (
     churn_date DATE,
     churn_reason TEXT,
     notes TEXT,
+    acquisition_channel VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE

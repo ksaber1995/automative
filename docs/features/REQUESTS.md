@@ -25,22 +25,27 @@
 
 ---
 
-## 🕐 Pending
-
 ### Student Acquisition Channel (Source)
 **Request:** Add a dropdown on the Add New Student form for "channel" — how the student heard about us.
-**Options:** Facebook, Instagram, Twitter, other client referral, walk-in, etc.
-**Status:** To be implemented (backend + frontend + DB column `acquisition_channel`)
+**Solution:** Added `acquisition_channel` column on `students` (VARCHAR(50), nullable).
+- Options: FACEBOOK, INSTAGRAM, TWITTER, TIKTOK, REFERRAL, WALK_IN, OTHER.
+- API contract: `acquisitionChannel` on create/update/return payloads, validated via Zod enum.
+- Migration: `POST /api/migrations/add-acquisition-channel-to-students` (idempotent — `ADD COLUMN IF NOT EXISTS`).
+- Frontend: dropdown on Add/Edit Student form (Student Information section, optional). Detail page shows "Heard via:" when set. EN + AR labels.
 
 ---
 
 ### Backdated Employee Salary Calculation
-**Request:** When registering an employee whose actual hire date is in the past (e.g. hired 20/1/2026 but registered 15/3/2026), automatically calculate and add back-salary expenses:
-- Rest of January salary (pro-rated from hire date)
-- Full February salary
-- March salary gets discounted at month-end
-**Decision:** Best approach is to add a "Calculate Back Pay" action on the employee detail page. When triggered:
-1. Compute months between `hireDate` and registration date
-2. Create expense entries (type: FIXED, category: SALARIES) for each owed period, pro-rated for partial months
-3. Show a preview/confirmation before creating the expenses
-**Status:** To be implemented
+**Request:** When registering an employee whose actual hire date is in the past (e.g. hired 20/1/2026 but registered 15/3/2026), automatically calculate and add back-salary expenses.
+**Solution:** "Calculate Back Pay" button on the employee detail page (shown only when employee has both `hireDate` and `salary`).
+- Generates monthly periods from hire month through the month *before* the registration/current month — the registration month itself is excluded since it's paid normally at month-end.
+- First month is pro-rated if hire day > 1 (`salary × daysWorked ÷ daysInMonth`).
+- Idempotent: months that already have a SALARIES `expense_payments` row are flagged `alreadyPaid` and skipped on commit.
+- Preview (`GET /api/expenses/employee/:id/back-pay-preview?upTo=YYYY-MM-DD`) lists every period (month, dates, days, amount, status) before commit.
+- Commit (`POST /api/expenses/employee/:id/back-pay`) writes `expense_payments` rows: `type=FIXED`, `category=SALARIES`, `employee_id=set`, `expense_id=null`, `date=end-of-month`, with pro-rated note when applicable.
+
+---
+
+## 🕐 Pending
+
+_None right now — add new requests below._

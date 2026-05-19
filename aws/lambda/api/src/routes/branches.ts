@@ -1,5 +1,11 @@
 import { insert, update, findById, query, queryOne, deleteById, getClient } from '../db/connection';
-import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import {
+  extractTenantContext,
+  checkGranularPermission,
+  appendBranchSqlFilter,
+  canAccessBranch,
+  isGlobalAdmin,
+} from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapBranchFromDB(row: any) {
@@ -63,10 +69,13 @@ export const branchesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const branches = await query(
-        'SELECT * FROM branches WHERE company_id = $1 ORDER BY created_at DESC',
-        [context.companyId]
-      );
+      const params: any[] = [context.companyId];
+      let sql = 'SELECT * FROM branches WHERE company_id = $1';
+      const branchClause = appendBranchSqlFilter(context, params, 'id');
+      if (branchClause) sql += ` AND ${branchClause}`;
+      sql += ' ORDER BY created_at DESC';
+
+      const branches = await query(sql, params);
       return {
         status: 200 as const,
         body: branches.map(mapBranchFromDB),
@@ -84,10 +93,13 @@ export const branchesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const branches = await query(
-        'SELECT * FROM branches WHERE company_id = $1 AND is_active = true ORDER BY created_at DESC',
-        [context.companyId]
-      );
+      const params: any[] = [context.companyId];
+      let sql = 'SELECT * FROM branches WHERE company_id = $1 AND is_active = true';
+      const branchClause = appendBranchSqlFilter(context, params, 'id');
+      if (branchClause) sql += ` AND ${branchClause}`;
+      sql += ' ORDER BY created_at DESC';
+
+      const branches = await query(sql, params);
       return {
         status: 200 as const,
         body: branches.map(mapBranchFromDB),
@@ -103,6 +115,9 @@ export const branchesRoutes = {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      if (!canAccessBranch(context, params.id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       const branch = await queryOne(
@@ -184,6 +199,9 @@ export const branchesRoutes = {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'branches', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      if (!canAccessBranch(context, params.id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
       // Verify branch belongs to company

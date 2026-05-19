@@ -7,7 +7,7 @@ import { DemoLeadService } from './demo-lead.service';
 import { RecaptchaService } from './recaptcha.service';
 import { environment } from '../environments/environment';
 
-type Currency = 'EGP' | 'SAR';
+type Currency = 'EGP' | 'SAR' | 'JOD';
 type Lang = 'en' | 'ar';
 
 const LANG_STORAGE_KEY = 'netrofit.lang';
@@ -225,7 +225,7 @@ interface RoadmapPhase {
           <h2 class="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">{{ 'PRICING.HEADING' | translate }}</h2>
           <p class="mt-4 text-lg text-gray-600">{{ 'PRICING.SUB' | translate }}</p>
 
-          <div class="mt-8 inline-flex items-stretch gap-1 p-1.5 rounded-full bg-gray-100 shadow-inner">
+          <div class="mt-8 flex items-stretch justify-center gap-1 p-1.5 rounded-full bg-gray-100 shadow-inner w-fit mx-auto">
             <button
               (click)="billing.set('annual')"
               [class.bg-white]="billing() === 'annual'"
@@ -258,7 +258,7 @@ interface RoadmapPhase {
             </div>
           }
 
-          <div class="mt-4 inline-flex items-center gap-2 p-1 rounded-full bg-gray-100">
+          <div class="mt-4 flex items-center justify-center gap-2 p-1 rounded-full bg-gray-100 w-fit mx-auto">
             <button
               (click)="currency.set('EGP')"
               [class.bg-white]="currency() === 'EGP'"
@@ -272,6 +272,13 @@ interface RoadmapPhase {
               [class.shadow]="currency() === 'SAR'"
               class="px-4 py-2 rounded-full font-medium text-sm">
               🇸🇦 SAR
+            </button>
+            <button
+              (click)="currency.set('JOD')"
+              [class.bg-white]="currency() === 'JOD'"
+              [class.shadow]="currency() === 'JOD'"
+              class="px-4 py-2 rounded-full font-medium text-sm">
+              🇯🇴 JOD
             </button>
           </div>
         </div>
@@ -492,7 +499,7 @@ interface RoadmapPhase {
       <div class="container-custom flex flex-col md:flex-row justify-between gap-6">
         <div>
           <div class="flex items-center mb-2">
-            <img src="logo-white.png" alt="Netrofit" style="height:60px" class="w-10" />
+            <img src="logo-white.png" alt="Netrofit" style="height:60px" />
           </div>
           <p>{{ 'FOOTER.COPY' | translate: { year: currentYear } }}</p>
         </div>
@@ -567,6 +574,7 @@ interface RoadmapPhase {
                     <option value="">{{ 'MODAL.COUNTRY_PLACEHOLDER' | translate }}</option>
                     <option value="EG">{{ 'MODAL.COUNTRY_EGYPT' | translate }}</option>
                     <option value="SA">{{ 'MODAL.COUNTRY_SAUDI' | translate }}</option>
+                    <option value="JO">{{ 'MODAL.COUNTRY_JORDAN' | translate }}</option>
                     <option value="AE">{{ 'MODAL.COUNTRY_UAE' | translate }}</option>
                     <option value="OTHER">{{ 'MODAL.COUNTRY_OTHER' | translate }}</option>
                   </select>
@@ -777,7 +785,13 @@ export class LandingComponent {
       growth: { monthly: 1120, annual: 840 },
       pro: { monthly: 1800, annual: 1350 },
     };
-    const p = cur === 'EGP' ? egp : sar;
+    // Jordan pricing: 2x Egypt across the board (per business decision).
+    const jod = {
+      starter: { monthly: 4000, annual: 3000 },
+      growth: { monthly: 8000, annual: 6000 },
+      pro: { monthly: 13600, annual: 10200 },
+    };
+    const p = cur === 'EGP' ? egp : cur === 'SAR' ? sar : jod;
 
     const buildPlan = (
       tierKey: string,

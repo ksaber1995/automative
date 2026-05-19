@@ -242,8 +242,14 @@
                           </label>
                         </td>
                         <td class="text-center px-4 py-3">
-                          <label class="relative inline-flex items-center cursor-pointer">
+                          <label class="relative inline-flex items-center"
+                            [class.cursor-pointer]="!isActionDisabled(row, 'write')"
+                            [class.cursor-not-allowed]="isActionDisabled(row, 'write')"
+                            [class.opacity-50]="isActionDisabled(row, 'write')"
+                            [pTooltip]="row.resource === 'branches' && !isAdminRoleSelected() ? ('USERS.FORM.BRANCHES_ADMIN_ONLY' | translate) : ''"
+                            tooltipPosition="top">
                             <input type="checkbox" [(ngModel)]="row.write" [ngModelOptions]="{standalone: true}"
+                              [disabled]="isActionDisabled(row, 'write')"
                               class="sr-only peer" (change)="onPermissionChange(row)" />
                             <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer
                               peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5
@@ -252,8 +258,14 @@
                           </label>
                         </td>
                         <td class="text-center px-4 py-3">
-                          <label class="relative inline-flex items-center cursor-pointer">
+                          <label class="relative inline-flex items-center"
+                            [class.cursor-pointer]="!isActionDisabled(row, 'delete')"
+                            [class.cursor-not-allowed]="isActionDisabled(row, 'delete')"
+                            [class.opacity-50]="isActionDisabled(row, 'delete')"
+                            [pTooltip]="row.resource === 'branches' && !isAdminRoleSelected() ? ('USERS.FORM.BRANCHES_ADMIN_ONLY' | translate) : ''"
+                            tooltipPosition="top">
                             <input type="checkbox" [(ngModel)]="row.delete" [ngModelOptions]="{standalone: true}"
+                              [disabled]="isActionDisabled(row, 'delete')"
                               class="sr-only peer" (change)="onPermissionChange(row)" />
                             <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-red-300 rounded-full peer
                               peer-checked:bg-red-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5

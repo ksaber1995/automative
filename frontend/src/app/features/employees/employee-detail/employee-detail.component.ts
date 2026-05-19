@@ -19,7 +19,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { ExpenseService } from '../../expenses/services/expense.service';
+import { ExpenseService, BackPayPreview } from '../../expenses/services/expense.service';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../attendance/services/teacher-attendance.service';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
@@ -68,6 +68,11 @@ export class EmployeeDetailComponent implements OnInit {
     role: UserRole.ACADEMIC_MANAGER,
     branchIds: [] as string[],
   };
+
+  showBackPayDialog = false;
+  backPayLoading = signal(false);
+  backPayCreating = signal(false);
+  backPayPreview = signal<BackPayPreview | null>(null);
 
   roleOptions = [
     { label: this.translate.instant('EMPLOYEES.DETAIL.ROLE_BRANCH_ADMIN'), value: UserRole.BRANCH_ADMIN },
@@ -161,6 +166,48 @@ export class EmployeeDetailComponent implements OnInit {
 
   back() {
     this.router.navigate(['/employees']);
+  }
+
+  openBackPayDialog() {
+    const emp = this.employee();
+    if (!emp) return;
+    this.showBackPayDialog = true;
+    this.backPayPreview.set(null);
+    this.backPayLoading.set(true);
+    this.expenseService.previewEmployeeBackPay(emp.id).subscribe({
+      next: (preview) => {
+        this.backPayPreview.set(preview);
+        this.backPayLoading.set(false);
+      },
+      error: () => {
+        this.backPayLoading.set(false);
+        this.showBackPayDialog = false;
+      }
+    });
+  }
+
+  confirmBackPay() {
+    const emp = this.employee();
+    const preview = this.backPayPreview();
+    if (!emp || !preview) return;
+    this.backPayCreating.set(true);
+    this.expenseService.createEmployeeBackPay(emp.id, preview.upTo).subscribe({
+      next: (res) => {
+        this.notificationService.success(res.message);
+        this.backPayCreating.set(false);
+        this.showBackPayDialog = false;
+        this.loadSalaryHistory(emp.id);
+      },
+      error: () => {
+        this.backPayCreating.set(false);
+      }
+    });
+  }
+
+  canCreateBackPay(): boolean {
+    const p = this.backPayPreview();
+    if (!p) return false;
+    return p.periods.some(period => !period.alreadyPaid);
   }
 
   convertToUser() {

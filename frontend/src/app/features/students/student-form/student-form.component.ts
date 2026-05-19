@@ -13,6 +13,7 @@ import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 
 @Component({
   selector: 'app-student-form',
@@ -46,6 +47,11 @@ export class StudentFormComponent implements OnInit {
   studentId: string | null = null;
   branches = signal<Branch[]>([]);
 
+  acquisitionChannelOptions = ACQUISITION_CHANNELS.map(value => ({
+    value,
+    label: `STUDENTS.FORM.CHANNEL_${value}`,
+  }));
+
   constructor() {
     const today = new Date();
     this.studentForm = this.fb.group({
@@ -60,7 +66,8 @@ export class StudentFormComponent implements OnInit {
       address: [''],
       branchId: ['', [Validators.required]],
       enrollmentDate: [today, [Validators.required]],
-      notes: ['']
+      notes: [''],
+      acquisitionChannel: [null]
     });
   }
 

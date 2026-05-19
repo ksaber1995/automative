@@ -21,6 +21,7 @@ function mapStudentFromDB(row: any) {
     churnDate: row.churn_date,
     churnReason: row.churn_reason,
     notes: row.notes,
+    acquisitionChannel: row.acquisition_channel,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -53,6 +54,7 @@ export const studentsRoutes = {
         branch_id: body.branchId,
         enrollment_date: body.enrollmentDate,
         notes: body.notes || null,
+        acquisition_channel: body.acquisitionChannel || null,
         is_active: true,
       });
 
@@ -169,6 +171,7 @@ export const studentsRoutes = {
       }
       if (body.enrollmentDate !== undefined) updateData.enrollment_date = body.enrollmentDate;
       if (body.notes !== undefined) updateData.notes = body.notes;
+      if (body.acquisitionChannel !== undefined) updateData.acquisition_channel = body.acquisitionChannel;
 
       const student = await update('students', params.id, updateData);
 

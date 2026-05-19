@@ -29,16 +29,29 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'REPORTS.BRANCH' | translate }}</label>
-        <p-select
-          [(ngModel)]="branchId"
+        <p-multiSelect
+          [(ngModel)]="branchIds"
           [options]="branchOptions()"
           optionLabel="label"
           optionValue="value"
           [placeholder]="'REPORTS.ALL_BRANCHES' | translate"
           [showClear]="true"
+          [showToggleAll]="true"
           [style]="{ width: '100%' }"
+          [filter]="true"
           appendTo="body"
-        ></p-select>
+        ></p-multiSelect>
+        <small class="text-xs text-gray-500 mt-1 block">
+          @if (compareMode()) {
+            <span class="text-purple-600 font-medium">
+              <i class="pi pi-clone mr-1"></i>{{ 'REPORTS.COMPARE_MODE_HINT' | translate: { count: branchIds.length } }}
+            </span>
+          } @else if (branchIds.length === 1) {
+            {{ 'REPORTS.SINGLE_BRANCH_HINT' | translate }}
+          } @else {
+            {{ 'REPORTS.MULTI_HINT' | translate }}
+          }
+        </small>
       </div>
       <div class="flex items-end gap-2">
         <p-button
@@ -159,7 +172,33 @@
                 </div>
               </div>
             </ng-template>
-            @if (churn(); as c) {
+            @if (compareMode()) {
+              <p-table [value]="compareChurnRows()" responsiveLayout="scroll" styleClass="p-2">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.CHURN_TOTAL' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.CHURN_ACTIVE' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.CHURN_CHURNED' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.CHURN_INACTIVE' | translate }}</th>
+                    <th class="text-right">{{ 'REPORTS.CHURN_RATE' | translate }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-row>
+                  <tr>
+                    <td class="font-medium">
+                      <span class="inline-block w-3 h-3 rounded-full mr-2 align-middle" [style.background]="row.color"></span>
+                      {{ row.branchName }}
+                    </td>
+                    <td class="text-right">{{ row.churn?.totalStudents ?? 0 }}</td>
+                    <td class="text-right text-green-700">{{ row.churn?.activeStudents ?? 0 }}</td>
+                    <td class="text-right text-red-700">{{ row.churn?.churnedStudents ?? 0 }}</td>
+                    <td class="text-right text-orange-700">{{ row.churn?.inactiveStudents ?? 0 }}</td>
+                    <td class="text-right font-bold text-red-700">{{ row.churn?.churnRate ?? 0 }}%</td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            } @else if (churn(); as c) {
               <div class="grid grid-cols-2 gap-3 p-4">
                 <div class="p-3 bg-blue-50 rounded">
                   <div class="text-xs text-gray-600">{{ 'REPORTS.CHURN_TOTAL' | translate }}</div>
@@ -214,7 +253,7 @@
                 <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_COURSE_TITLE' | translate }}</h3>
               </div>
             </ng-template>
-            <p-table [value]="profitCourses()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
+            <p-table [value]="visibleProfitCourses()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
                   <th>{{ 'REPORTS.COL_TYPE' | translate }}</th>
@@ -263,7 +302,7 @@
           </p-card>
 
           <p-card>
-            <p-table [value]="profitBranches()" responsiveLayout="scroll">
+            <p-table [value]="visibleProfitBranches()" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
                   <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
@@ -302,7 +341,7 @@
                 <p class="text-sm text-gray-500">{{ 'REPORTS.PROFIT_PRODUCT_DESC' | translate }}</p>
               </div>
             </ng-template>
-            <p-table [value]="profitProducts()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
+            <p-table [value]="visibleProfitProducts()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
                   <th>{{ 'REPORTS.COL_PRODUCT' | translate }}</th>
@@ -379,7 +418,7 @@
               <p class="text-sm text-gray-500">{{ 'REPORTS.EVENT_TABLE_DESC' | translate }}</p>
             </div>
           </ng-template>
-          <p-table [value]="profitEvents()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
+          <p-table [value]="visibleProfitEvents()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
             <ng-template pTemplate="header">
               <tr>
                 <th>{{ 'REPORTS.COL_EVENT' | translate }}</th>

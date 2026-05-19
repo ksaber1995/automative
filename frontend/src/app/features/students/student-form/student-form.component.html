@@ -121,6 +121,31 @@
               [placeholder]="'STUDENTS.FORM.STUDENT_PHONE_PLACEHOLDER' | translate"
             />
           </div>
+
+          <!-- Acquisition Channel (Optional) -->
+          <div class="field">
+            <label for="acquisitionChannel" class="block text-sm font-medium mb-2">
+              {{ 'STUDENTS.FORM.CHANNEL' | translate }}
+            </label>
+            <p-select
+              inputId="acquisitionChannel"
+              formControlName="acquisitionChannel"
+              [options]="acquisitionChannelOptions"
+              optionLabel="label"
+              optionValue="value"
+              [showClear]="true"
+              [placeholder]="'STUDENTS.FORM.CHANNEL_PLACEHOLDER' | translate"
+              [style]="{'width': '100%'}"
+            >
+              <ng-template let-option pTemplate="item">
+                {{ option.label | translate }}
+              </ng-template>
+              <ng-template let-selected pTemplate="selectedItem">
+                @if (selected) { {{ selected.label | translate }} }
+              </ng-template>
+            </p-select>
+            <small class="text-gray-400 text-xs">{{ 'STUDENTS.FORM.CHANNEL_HINT' | translate }}</small>
+          </div>
         </div>
       </div>
 

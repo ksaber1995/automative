@@ -1039,7 +1039,32 @@ async function runEmailVerificationMigration() {
   return { success: true, message: 'Switched to email verification; dropped phone OTP & company code/email' };
 }
 
+async function addAcquisitionChannelToStudents() {
+  console.log('Starting migration: add acquisition_channel to students');
+  await query(`
+    ALTER TABLE students
+      ADD COLUMN IF NOT EXISTS acquisition_channel VARCHAR(50)
+  `);
+  console.log('✅ acquisition_channel column ensured on students');
+  return { success: true, message: 'acquisition_channel column ensured on students' };
+}
+
 export const migrationsRoutes = {
+  addAcquisitionChannelToStudents: async () => {
+    try {
+      const result = await addAcquisitionChannelToStudents();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   runEmailVerificationMigration: async () => {
     try {
       const result = await runEmailVerificationMigration();

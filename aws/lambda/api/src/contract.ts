@@ -131,7 +131,7 @@ const CompanySchema = z.object({
 const LoginRequestSchema = z.object({
   // Identifier can be either an email address or a phone number.
   // Phone is normalized server-side, so users can enter either local
-  // ("01097628565") or international ("201097628565" / "+201097628565") format.
+  // ("01000000000") or international ("201000000000" / "+201000000000") format.
   identifier: z.string().min(3),
   password: z.string().min(6),
 });
@@ -250,6 +250,17 @@ const ConvertEmployeeToUserSchema = z.object({
 // =============================================
 // Student Schemas
 // =============================================
+export const ACQUISITION_CHANNELS = [
+  'FACEBOOK',
+  'INSTAGRAM',
+  'TWITTER',
+  'TIKTOK',
+  'REFERRAL',
+  'WALK_IN',
+  'OTHER',
+] as const;
+const AcquisitionChannelSchema = z.enum(ACQUISITION_CHANNELS);
+
 const CreateStudentSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
@@ -263,6 +274,7 @@ const CreateStudentSchema = z.object({
   branchId: UUIDSchema,
   enrollmentDate: z.string(),
   notes: z.string().optional(),
+  acquisitionChannel: AcquisitionChannelSchema.optional(),
 });
 
 const UpdateStudentSchema = CreateStudentSchema.partial();
@@ -285,6 +297,7 @@ const StudentSchema = z.object({
   churnDate: z.string().nullable(),
   churnReason: z.string().nullable(),
   notes: z.string().nullable(),
+  acquisitionChannel: AcquisitionChannelSchema.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -2048,6 +2061,66 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    previewEmployeeBackPay: {
+      method: 'GET',
+      path: '/api/expenses/employee/:employeeId/back-pay-preview',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      query: z.object({ upTo: z.string().optional() }),
+      responses: {
+        200: z.object({
+          employee: z.object({
+            id: UUIDSchema,
+            firstName: z.string(),
+            lastName: z.string(),
+            hireDate: z.string(),
+            salary: z.number(),
+            branchId: UUIDSchema.nullable(),
+          }),
+          upTo: z.string(),
+          periods: z.array(z.object({
+            monthKey: z.string(),
+            monthLabel: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+            daysInMonth: z.number(),
+            daysWorked: z.number(),
+            proRated: z.boolean(),
+            amount: z.number(),
+            alreadyPaid: z.boolean(),
+          })),
+          totalToCreate: z.number(),
+          totalAlreadyPaid: z.number(),
+        }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    createEmployeeBackPay: {
+      method: 'POST',
+      path: '/api/expenses/employee/:employeeId/back-pay',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      body: z.object({ upTo: z.string().optional() }),
+      responses: {
+        200: z.object({
+          created: z.number(),
+          skipped: z.number(),
+          totalAmount: z.number(),
+          payments: z.array(ExpensePaymentSchema),
+          message: z.string(),
+          code: z.string(),
+        }),
+        201: z.object({
+          created: z.number(),
+          skipped: z.number(),
+          totalAmount: z.number(),
+          payments: z.array(ExpensePaymentSchema),
+          message: z.string(),
+          code: z.string(),
+        }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     getById: {
       method: 'GET',
       path: '/api/expenses/:id',
@@ -3175,6 +3248,15 @@ export const contract = c.router({
     runEmailVerificationMigration: {
       method: 'POST',
       path: '/api/migrations/email-verification',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addAcquisitionChannelToStudents: {
+      method: 'POST',
+      path: '/api/migrations/add-acquisition-channel-to-students',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

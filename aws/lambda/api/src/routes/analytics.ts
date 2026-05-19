@@ -1,5 +1,9 @@
 import { query, queryOne } from '../db/connection';
-import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
+import {
+  extractTenantContext,
+  checkGranularPermission,
+  isGlobalAdmin,
+} from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 export const analyticsRoutes = {
@@ -14,6 +18,31 @@ export const analyticsRoutes = {
       const startDate = queryParams.startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
       const endDate = queryParams.endDate || new Date().toISOString().split('T')[0];
 
+      // Branch admins see only their accessible branches. Global admins see all.
+      // When scoped, ALL aggregates (company-wide, branch P&L, monthly, unallocated)
+      // must be narrowed to the same branch set so the numbers add up.
+      const scopedBranchIds: string[] | null =
+        isGlobalAdmin(context)
+          ? null
+          : (context.branchIds && context.branchIds.length > 0
+              ? context.branchIds
+              : (context.branchId ? [context.branchId] : []));
+
+      // Build a reusable "branch_id IN (...)" filter fragment with shared params.
+      // Returns { sql, params } that get appended to each query.
+      const buildBranchClause = (alias: string, baseParams: any[]) => {
+        if (!scopedBranchIds) return '';
+        if (scopedBranchIds.length === 0) {
+          // Scoped user with no branches → return zero data via impossible filter.
+          return ` AND FALSE`;
+        }
+        const placeholders = scopedBranchIds.map((id) => {
+          baseParams.push(id);
+          return `$${baseParams.length}`;
+        }).join(', ');
+        return ` AND ${alias} IN (${placeholders})`;
+      };
+
       // --- Company allocation method ---
       const company = await queryOne(
         'SELECT global_expense_allocation FROM companies WHERE id = $1',
@@ -22,26 +51,34 @@ export const analyticsRoutes = {
       const allocationMethod: 'PROPORTIONAL' | 'EQUAL' | 'OVERHEAD' = company?.global_expense_allocation || 'OVERHEAD';
 
       // --- Company-wide revenue ---
+      // For scoped (non-admin) users, append IN (branchIds...) to every
+      // aggregate so the company-wide summary becomes a scoped-branches summary.
+      const erParams: any[] = [context.companyId, startDate, endDate];
       const enrollmentRevenueData = await query(
         `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM enrollments
          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
-           AND enrollment_date >= $2 AND enrollment_date <= $3`,
-        [context.companyId, startDate, endDate]
+           AND enrollment_date >= $2 AND enrollment_date <= $3
+           ${buildBranchClause('branch_id', erParams)}`,
+        erParams
       );
+      const prParams: any[] = [context.companyId, startDate, endDate];
       const productRevenueData = await query(
         `SELECT COALESCE(SUM(total_amount), 0) as total_revenue
          FROM product_sales
-         WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3`,
-        [context.companyId, startDate, endDate]
+         WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
+           ${buildBranchClause('branch_id', prParams)}`,
+        prParams
       );
       // Master course bundle payments are revenue too.
+      const mrParams: any[] = [context.companyId, startDate, endDate];
       const masterRevenueData = await query(
         `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM master_enrollments
          WHERE company_id = $1 AND amount_paid > 0
-           AND enrollment_date >= $2 AND enrollment_date <= $3`,
-        [context.companyId, startDate, endDate]
+           AND enrollment_date >= $2 AND enrollment_date <= $3
+           ${buildBranchClause('branch_id', mrParams)}`,
+        mrParams
       );
 
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
@@ -50,21 +87,25 @@ export const analyticsRoutes = {
 
       // Subtract refunds from revenue (includes master-bundle refunds via the
       // polymorphic refunds table).
+      const rfParams: any[] = [context.companyId, startDate, endDate];
       const refundData = await query(
         `SELECT COALESCE(SUM(amount), 0) as total_refunds FROM refunds
-         WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3`,
-        [context.companyId, startDate, endDate]
+         WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3
+           ${buildBranchClause('branch_id', rfParams)}`,
+        rfParams
       );
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
       const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue - totalRefunds;
 
       // --- Company-wide expenses (actual payments only) ---
+      const exParams: any[] = [context.companyId, startDate, endDate];
       const expenseData = await query(
         `SELECT type, category, COALESCE(SUM(amount), 0) as total_amount
          FROM expense_payments
          WHERE company_id = $1 AND date >= $2 AND date <= $3
+           ${buildBranchClause('branch_id', exParams)}
          GROUP BY type, category`,
-        [context.companyId, startDate, endDate]
+        exParams
       );
 
       // Display buckets — non-overlapping. Each row contributes to exactly ONE
@@ -78,68 +119,109 @@ export const analyticsRoutes = {
       const salaries = expenseData.filter((e: any) => e.category === 'SALARIES').reduce((s: number, e: any) => s + parseFloat(e.total_amount), 0);
       // Authoritative total — single SUM, not derived from buckets, so a
       // miscategorised row can never silently drop or double-count.
+      const teParams: any[] = [context.companyId, startDate, endDate];
       const totalExpensesRow = await query(
         `SELECT COALESCE(SUM(amount), 0) as total
          FROM expense_payments
-         WHERE company_id = $1 AND date >= $2 AND date <= $3`,
-        [context.companyId, startDate, endDate]
+         WHERE company_id = $1 AND date >= $2 AND date <= $3
+           ${buildBranchClause('branch_id', teParams)}`,
+        teParams
       );
       const totalExpenses = parseFloat(totalExpensesRow[0]?.total || '0');
       const grossProfit = totalRevenue - cogsExpenses;
       const netProfit = totalRevenue - totalExpenses;
 
       // --- Inventory value ---
+      const invParams: any[] = [context.companyId];
       const inventoryData = await query(
-        `SELECT COALESCE(SUM(stock * cost_price), 0) as inventory_value FROM products WHERE company_id = $1 AND is_active = true`,
-        [context.companyId]
+        `SELECT COALESCE(SUM(stock * cost_price), 0) as inventory_value
+         FROM products WHERE company_id = $1 AND is_active = true
+           ${buildBranchClause('branch_id', invParams)}`,
+        invParams
       );
       const inventoryValue = parseFloat(inventoryData[0]?.inventory_value || '0');
 
       // --- Cash & debts ---
-      const cashState = await query('SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1', [context.companyId]);
-      const currentCash = parseFloat(cashState[0]?.current_balance || '0');
+      // Global admins see the canonical company cash_state. Scoped users see
+      // base cash computed from their accessible branches only (mirrors the
+      // formula in cash.ts: enrollments + products + master − expenses
+      // − refunds − withdrawals).
+      let currentCash = 0;
+      if (!scopedBranchIds) {
+        const cashState = await query('SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1', [context.companyId]);
+        currentCash = parseFloat(cashState[0]?.current_balance || '0');
+      } else if (scopedBranchIds.length > 0) {
+        const cashParams: any[] = [context.companyId];
+        const cashBc = buildBranchClause('branch_id', cashParams);
+        const [enrollAll, prodAll, mastAll, expAll, refAll, wAll] = await Promise.all([
+          query(`SELECT COALESCE(SUM(amount_paid), 0) as t FROM enrollments WHERE company_id = $1 AND payment_status IN ('PAID','PARTIAL','REFUNDED') ${cashBc}`, [...cashParams]),
+          query(`SELECT COALESCE(SUM(total_amount), 0) as t FROM product_sales WHERE company_id = $1 ${cashBc}`, [...cashParams]),
+          query(`SELECT COALESCE(SUM(amount_paid), 0) as t FROM master_enrollments WHERE company_id = $1 AND amount_paid > 0 ${cashBc}`, [...cashParams]),
+          query(`SELECT COALESCE(SUM(amount), 0) as t FROM expense_payments WHERE company_id = $1 ${cashBc}`, [...cashParams]),
+          query(`SELECT COALESCE(SUM(amount), 0) as t FROM refunds WHERE company_id = $1 ${cashBc}`, [...cashParams]),
+          query(`SELECT COALESCE(SUM(amount), 0) as t FROM withdrawals WHERE company_id = $1 AND is_active = true ${cashBc}`, [...cashParams]),
+        ]);
+        currentCash =
+          parseFloat(enrollAll[0]?.t || '0') +
+          parseFloat(prodAll[0]?.t || '0') +
+          parseFloat(mastAll[0]?.t || '0') -
+          parseFloat(expAll[0]?.t || '0') -
+          parseFloat(refAll[0]?.t || '0') -
+          parseFloat(wAll[0]?.t || '0');
+      }
+      const debtParams: any[] = [context.companyId];
       const debtsData = await query(
-        `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts FROM debts WHERE company_id = $1 AND status = 'ACTIVE'`,
-        [context.companyId]
+        `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts
+         FROM debts WHERE company_id = $1 AND status = 'ACTIVE'
+           ${buildBranchClause('branch_id', debtParams)}`,
+        debtParams
       ).catch(() => [{ total_debts: 0 }]);
       const totalOutstandingDebts = parseFloat(debtsData[0]?.total_debts || '0');
 
       // --- Global overhead (branch_id IS NULL, excluding product-cost categories) ---
-      const globalOverheadData = await query(
-        `SELECT COALESCE(SUM(amount), 0) as total
-         FROM expense_payments
-         WHERE company_id = $1 AND branch_id IS NULL
-           AND date >= $2 AND date <= $3
-           AND category NOT IN ('COGS', 'INVENTORY')`,
-        [context.companyId, startDate, endDate]
-      );
-      const totalGlobalOverhead = parseFloat(globalOverheadData[0]?.total || '0');
+      // Scoped users see no global overhead — it's not attributable to their branches.
+      let totalGlobalOverhead = 0;
+      let unallocatedRevenue = 0;
+      let unallocatedExpenses = 0;
+      if (!scopedBranchIds) {
+        const globalOverheadData = await query(
+          `SELECT COALESCE(SUM(amount), 0) as total
+           FROM expense_payments
+           WHERE company_id = $1 AND branch_id IS NULL
+             AND date >= $2 AND date <= $3
+             AND category NOT IN ('COGS', 'INVENTORY')`,
+          [context.companyId, startDate, endDate]
+        );
+        totalGlobalOverhead = parseFloat(globalOverheadData[0]?.total || '0');
 
-      // --- Company-level (unallocated) revenue & expenses ---
-      // Captures product_sales with no branch + every expense_payment with no branch
-      // (overhead AND COGS). These are not attributable to any specific branch and
-      // must reconcile against the company-wide total so branch sums add up.
-      // enrollments and master_enrollments require a branch_id (NOT NULL), so
-      // unallocated revenue can only come from product_sales.
-      const unallocRevData = await query(
-        `SELECT COALESCE(SUM(total_amount), 0) as total
-         FROM product_sales
-         WHERE company_id = $1 AND branch_id IS NULL
-           AND sale_date >= $2 AND sale_date <= $3`,
-        [context.companyId, startDate, endDate]
-      );
-      const unallocExpData = await query(
-        `SELECT COALESCE(SUM(amount), 0) as total
-         FROM expense_payments
-         WHERE company_id = $1 AND branch_id IS NULL
-           AND date >= $2 AND date <= $3`,
-        [context.companyId, startDate, endDate]
-      );
-      const unallocatedRevenue = parseFloat(unallocRevData[0]?.total || '0');
-      const unallocatedExpenses = parseFloat(unallocExpData[0]?.total || '0');
+        // --- Company-level (unallocated) revenue & expenses ---
+        // Captures product_sales with no branch + every expense_payment with no branch
+        // (overhead AND COGS). These are not attributable to any specific branch and
+        // must reconcile against the company-wide total so branch sums add up.
+        // enrollments and master_enrollments require a branch_id (NOT NULL), so
+        // unallocated revenue can only come from product_sales.
+        const unallocRevData = await query(
+          `SELECT COALESCE(SUM(total_amount), 0) as total
+           FROM product_sales
+           WHERE company_id = $1 AND branch_id IS NULL
+             AND sale_date >= $2 AND sale_date <= $3`,
+          [context.companyId, startDate, endDate]
+        );
+        const unallocExpData = await query(
+          `SELECT COALESCE(SUM(amount), 0) as total
+           FROM expense_payments
+           WHERE company_id = $1 AND branch_id IS NULL
+             AND date >= $2 AND date <= $3`,
+          [context.companyId, startDate, endDate]
+        );
+        unallocatedRevenue = parseFloat(unallocRevData[0]?.total || '0');
+        unallocatedExpenses = parseFloat(unallocExpData[0]?.total || '0');
+      }
       const unallocatedNetProfit = unallocatedRevenue - unallocatedExpenses;
 
       // --- Branch P&L ---
+      const brParams: any[] = [context.companyId, startDate, endDate];
+      const branchScopeClause = buildBranchClause('b.id', brParams);
       const branchRawData = await query(
         `SELECT
            b.id,
@@ -204,9 +286,9 @@ export const analyticsRoutes = {
            (SELECT COUNT(*) FROM employees em
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
          FROM branches b
-         WHERE b.company_id = $1
+         WHERE b.company_id = $1 ${branchScopeClause}
          ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0)) DESC`,
-        [context.companyId, startDate, endDate]
+        brParams
       );
 
       // Net branch revenue (after subtracting per-branch refunds) drives proportional allocation.
@@ -263,6 +345,14 @@ export const analyticsRoutes = {
       });
 
       // --- Revenue by month ---
+      // Each branch_id IN (...) clause needs its own placeholders, so build the
+      // params array as we go and snapshot the clause text per UNION arm.
+      const mParams: any[] = [context.companyId, startDate, endDate];
+      const enrollBc   = buildBranchClause('branch_id', mParams);
+      const prodBc     = buildBranchClause('branch_id', mParams);
+      const masterBc   = buildBranchClause('branch_id', mParams);
+      const expBc      = buildBranchClause('branch_id', mParams);
+      const refundBc   = buildBranchClause('branch_id', mParams);
       const monthlyRevenue = await query(
         `SELECT TO_CHAR(date, 'YYYY-MM') as month,
                 SUM(revenue) as revenue,
@@ -273,28 +363,28 @@ export const analyticsRoutes = {
            SELECT enrollment_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
            FROM enrollments
            WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
-             AND enrollment_date >= $2 AND enrollment_date <= $3
+             AND enrollment_date >= $2 AND enrollment_date <= $3 ${enrollBc}
            UNION ALL
            SELECT sale_date as date, total_amount as revenue, 0 as expenses, 0 as refunds
            FROM product_sales
-           WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3
+           WHERE company_id = $1 AND sale_date >= $2 AND sale_date <= $3 ${prodBc}
            UNION ALL
            SELECT enrollment_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
            FROM master_enrollments
            WHERE company_id = $1 AND amount_paid > 0
-             AND enrollment_date >= $2 AND enrollment_date <= $3
+             AND enrollment_date >= $2 AND enrollment_date <= $3 ${masterBc}
            UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expense_payments
-           WHERE company_id = $1 AND date >= $2 AND date <= $3
+           WHERE company_id = $1 AND date >= $2 AND date <= $3 ${expBc}
            UNION ALL
            SELECT refund_date as date, 0 as revenue, 0 as expenses, amount as refunds
            FROM refunds
-           WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3
+           WHERE company_id = $1 AND refund_date >= $2 AND refund_date <= $3 ${refundBc}
          ) combined
          GROUP BY TO_CHAR(date, 'YYYY-MM')
          ORDER BY month`,
-        [context.companyId, startDate, endDate]
+        mParams
       );
 
       const sumBranchNetProfit = branchSummaries.reduce((s: number, b: any) => s + b.netProfit, 0);

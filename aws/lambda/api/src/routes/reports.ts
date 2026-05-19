@@ -2,6 +2,9 @@ import { query } from '../db/connection';
 import {
   extractTenantContext,
   checkGranularPermission,
+  isGlobalAdmin,
+  canAccessBranch,
+  type TenantContext,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
@@ -23,6 +26,53 @@ function handleError(error: any, fallbackCode: string, fallbackMessage: string) 
   return mapThrownError(error, fallbackCode, fallbackMessage);
 }
 
+/**
+ * Returns a list of branch UUIDs to filter by for the current user, or null
+ * if no branch filter applies (global admin with no branchId selected).
+ * Throws an apiError result on access violation when the user requested a
+ * branchId outside their scope.
+ *
+ * The result is wrapped in `{ ok: true, ids } | { ok: false, error }` so
+ * callers can early-return on permission failure.
+ */
+function resolveBranchScope(
+  context: TenantContext,
+  requested?: string
+): { ok: true; ids: string[] | null } | { ok: false; error: ReturnType<typeof apiError> } {
+  if (isGlobalAdmin(context)) {
+    return { ok: true, ids: requested ? [requested] : null };
+  }
+  const accessible = (context.branchIds && context.branchIds.length > 0)
+    ? context.branchIds
+    : (context.branchId ? [context.branchId] : []);
+  if (requested) {
+    if (!canAccessBranch(context, requested)) {
+      return {
+        ok: false,
+        error: apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch'),
+      };
+    }
+    return { ok: true, ids: [requested] };
+  }
+  return { ok: true, ids: accessible };
+}
+
+/**
+ * Builds " AND <alias> IN ($N, $N+1, ...)" and appends UUID placeholders.
+ * Returns '' when `ids` is null (no filter — global admin with no requested
+ * branch). Returns ' AND FALSE' when `ids` is [] so scoped users with no
+ * branches see empty result sets.
+ */
+function reportBranchClause(alias: string, params: any[], ids: string[] | null): string {
+  if (ids === null) return '';
+  if (ids.length === 0) return ' AND FALSE';
+  const placeholders = ids.map((id) => {
+    params.push(id);
+    return `$${params.length}`;
+  }).join(', ');
+  return ` AND ${alias} IN (${placeholders})`;
+}
+
 export const reportsRoutes = {
   // Monthly P&L: revenue (enrollments + product_sales - refunds) and expenses per month.
   monthlyPL: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
@@ -32,9 +82,11 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      // Push branch UUIDs once and reuse the same placeholders across CTEs.
+      const branchClause = reportBranchClause('branch_id', params, scope.ids);
 
       const rows = await query(
         `WITH months AS (
@@ -125,9 +177,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const branchClause = reportBranchClause('branch_id', params, scope.ids);
 
       const rows = await query(
         `WITH months AS (
@@ -173,10 +226,11 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const courseBranchClause = q.branchId ? ' AND e.branch_id = $4' : '';
-      const masterBranchClause = q.branchId ? ' AND me.branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const courseBranchClause = reportBranchClause('e.branch_id', params, scope.ids);
+      const masterBranchClause = reportBranchClause('me.branch_id', params, scope.ids);
 
       const rows = await query(
         `SELECT * FROM (
@@ -244,9 +298,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND s.branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const branchClause = reportBranchClause('s.branch_id', params, scope.ids);
 
       const rows = await query(
         `WITH months AS (
@@ -308,9 +363,11 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const inactiveMonths = Math.min(Math.max(parseInt(q.inactiveMonths || '3', 10) || 3, 1), 24);
-      const branchClause = q.branchId ? ' AND s.branch_id = $2' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
+
       const totalsParams: any[] = [context.companyId];
-      if (q.branchId) totalsParams.push(q.branchId);
+      const totalsBranchClause = reportBranchClause('s.branch_id', totalsParams, scope.ids);
 
       const totals = await query(
         `SELECT
@@ -319,17 +376,18 @@ export const reportsRoutes = {
            COUNT(*) AS total
          FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
-         WHERE b.company_id = $1 ${branchClause}`,
+         WHERE b.company_id = $1 ${totalsBranchClause}`,
         totalsParams
       );
+
       const inactiveParams: any[] = [context.companyId];
-      if (q.branchId) inactiveParams.push(q.branchId);
+      const inactiveBranchClause = reportBranchClause('s.branch_id', inactiveParams, scope.ids);
       inactiveParams.push(inactiveMonths);
       const monthsParamIdx = inactiveParams.length;
       const inactive = await query(
         `SELECT COUNT(*) AS c FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
-         WHERE b.company_id = $1 ${branchClause}
+         WHERE b.company_id = $1 ${inactiveBranchClause}
            AND s.is_active = true
            AND NOT EXISTS (
              SELECT 1 FROM enrollments e
@@ -372,10 +430,11 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const courseBranchClause = q.branchId ? ' AND c.branch_id = $4' : '';
-      const masterBranchClause = q.branchId ? ' AND mc.branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const courseBranchClause = reportBranchClause('c.branch_id', params, scope.ids);
+      const masterBranchClause = reportBranchClause('mc.branch_id', params, scope.ids);
 
       const rows = await query(
         `SELECT * FROM (
@@ -447,6 +506,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
+      const params: any[] = [context.companyId, startDate, endDate];
+      const branchScopeClause = reportBranchClause('b.id', params, scope.ids);
 
       const rows = await query(
         `SELECT
@@ -482,9 +545,9 @@ export const reportsRoutes = {
            ), 0) AS expenses,
            (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id AND s.is_active = true) AS active_students
          FROM branches b
-         WHERE b.company_id = $1
+         WHERE b.company_id = $1 ${branchScopeClause}
          ORDER BY enrollment_revenue DESC`,
-        [context.companyId, startDate, endDate]
+        params
       );
       return {
         status: 200 as const,
@@ -523,9 +586,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND p.branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const branchClause = reportBranchClause('p.branch_id', params, scope.ids);
 
       const rows = await query(
         `SELECT
@@ -579,9 +643,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const branchClause = reportBranchClause('branch_id', params, scope.ids);
 
       const rows = await query(
         `SELECT category, SUM(amount) AS total, COUNT(*) AS count
@@ -615,9 +680,10 @@ export const reportsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const { startDate, endDate } = defaultRange(q);
-      const branchClause = q.branchId ? ' AND e.branch_id = $4' : '';
+      const scope = resolveBranchScope(context, q.branchId);
+      if (!scope.ok) return scope.error;
       const params: any[] = [context.companyId, startDate, endDate];
-      if (q.branchId) params.push(q.branchId);
+      const branchClause = reportBranchClause('e.branch_id', params, scope.ids);
 
       const rows = await query(
         `SELECT

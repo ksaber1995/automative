@@ -159,6 +159,7 @@ export class UserFormComponent implements OnInit {
           if (this.selectedRole === UserRole.GLOBAL_ADMIN || this.selectedRole === UserRole.ADMIN) {
             this.grantAll();
           }
+          this.enforceBranchAdminOnlyActions();
           this.loading.set(false);
         },
         error: () => {
@@ -229,6 +230,21 @@ export class UserFormComponent implements OnInit {
     if (role === UserRole.GLOBAL_ADMIN || role === UserRole.ADMIN) {
       this.grantAll();
     }
+    // Branches write/delete is admin-only: stripping when downgrading from
+    // admin to any other role ensures the saved permissions never carry over
+    // privileges the backend would reject anyway.
+    this.enforceBranchAdminOnlyActions();
+  }
+
+  /** Force-clear branches.write/delete when role isn't admin. */
+  private enforceBranchAdminOnlyActions() {
+    if (this.isAdminRoleSelected()) return;
+    for (const row of this.permissionRows) {
+      if (row.resource === 'branches') {
+        row.write = false;
+        row.delete = false;
+      }
+    }
   }
 
   isAdminRoleSelected(): boolean {
@@ -239,8 +255,23 @@ export class UserFormComponent implements OnInit {
     return this.isSelf || this.isAdminRoleSelected();
   }
 
-  onPermissionChange(_row: PermissionRow) {
-    // Angular's ngModel updates the row object directly; nothing extra needed
+  onPermissionChange(row: PermissionRow) {
+    // Keep branches.write/delete tied to admin-only access — even if the
+    // checkbox was somehow toggled, force it back off for non-admin roles.
+    // Mirrors the backend enforcement in branches.ts.
+    if (row.resource === 'branches' && !this.isAdminRoleSelected()) {
+      row.write = false;
+      row.delete = false;
+    }
+  }
+
+  /** Branches write/delete is reserved for GLOBAL_ADMIN/ADMIN. */
+  isActionDisabled(row: PermissionRow, action: 'read' | 'write' | 'delete'): boolean {
+    if (this.isPermissionsLocked()) return true;
+    if (row.resource === 'branches' && (action === 'write' || action === 'delete')) {
+      return !this.isAdminRoleSelected();
+    }
+    return false;
   }
 
   loadRoleDefaults() {

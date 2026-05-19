@@ -58,6 +58,23 @@ async function getUserWithBranches(userId: string, companyId: string) {
   return user;
 }
 
+/**
+ * Strip branches.write / branches.delete from a permissions object when the
+ * effective role is not GLOBAL_ADMIN/ADMIN. Mirrors the role check in
+ * branches.ts so the stored permissions can never claim privileges the
+ * branches endpoints would reject anyway.
+ */
+function sanitizePermissionsForRole(permissions: any, role: string | undefined): any {
+  if (!permissions || typeof permissions !== 'object') return permissions;
+  if (role === 'GLOBAL_ADMIN' || role === 'ADMIN') return permissions;
+  const branches = permissions.branches;
+  if (!branches || typeof branches !== 'object') return permissions;
+  return {
+    ...permissions,
+    branches: { ...branches, write: false, delete: false },
+  };
+}
+
 async function syncUserBranches(userId: string, companyId: string, branchIds: string[]) {
   // Remove old branch assignments
   await query('DELETE FROM user_branches WHERE user_id = $1', [userId]);
@@ -160,6 +177,7 @@ export const usersRoutes = {
       // permissions on these roles are forbidden so admins can never be locked
       // out of their own account.
       const isAdminRole = body.role === 'GLOBAL_ADMIN' || body.role === 'ADMIN';
+      const sanitized = sanitizePermissionsForRole(body.permissions, body.role);
       const newUser = await insert<any>('users', {
         company_id: context.companyId,
         email: body.email,
@@ -169,7 +187,7 @@ export const usersRoutes = {
         role: body.role,
         branch_id: primaryBranchId,
         linked_employee_id: body.linkedEmployeeId || null,
-        permissions: isAdminRole ? null : (body.permissions ? JSON.stringify(body.permissions) : null),
+        permissions: isAdminRole ? null : (sanitized ? JSON.stringify(sanitized) : null),
         is_active: true,
       });
 
@@ -220,7 +238,11 @@ export const usersRoutes = {
       if (body.isActive !== undefined) updates.is_active = body.isActive;
       if ('linkedEmployeeId' in body) updates.linked_employee_id = body.linkedEmployeeId;
       if ('permissions' in body && !isSelf) {
-        updates.permissions = body.permissions ? JSON.stringify(body.permissions) : null;
+        const sanitized = sanitizePermissionsForRole(
+          body.permissions,
+          (body.role as string | undefined) ?? existing.role,
+        );
+        updates.permissions = sanitized ? JSON.stringify(sanitized) : null;
       }
       // GLOBAL_ADMIN/ADMIN always run with role defaults — strip any custom
       // permissions so the matrix can never lock them out.
@@ -284,15 +306,16 @@ export const usersRoutes = {
         return apiError(400, 'ERRORS.USERS.ADMIN_PERMISSIONS_FIXED', 'GLOBAL_ADMIN/ADMIN always have full permissions and cannot be customised');
       }
 
+      const sanitized = sanitizePermissionsForRole(body.permissions, existing.role);
       await updateUser(
         params.id,
         context.companyId,
-        { permissions: body.permissions ? JSON.stringify(body.permissions) : null }
+        { permissions: sanitized ? JSON.stringify(sanitized) : null }
       );
 
       return {
         status: 200 as const,
-        body: { message: 'Permissions updated successfully', code: 'USERS.PERMISSIONS_UPDATED', permissions: body.permissions },
+        body: { message: 'Permissions updated successfully', code: 'USERS.PERMISSIONS_UPDATED', permissions: sanitized },
       };
 
     } catch (error) {
@@ -411,6 +434,7 @@ export const usersRoutes = {
       const hashedPassword = await bcrypt.hash(body.password, 10);
       const primaryBranchId = body.branchIds?.[0] || employee.branch_id || null;
 
+      const sanitized = sanitizePermissionsForRole(body.permissions, body.role);
       const newUser = await insert<any>('users', {
         company_id: context.companyId,
         email: body.email,
@@ -420,7 +444,7 @@ export const usersRoutes = {
         role: body.role,
         branch_id: primaryBranchId,
         linked_employee_id: body.employeeId,
-        permissions: body.permissions ? JSON.stringify(body.permissions) : null,
+        permissions: sanitized ? JSON.stringify(sanitized) : null,
         is_active: true,
       });
 

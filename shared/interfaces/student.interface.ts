@@ -1,3 +1,22 @@
+export type AcquisitionChannel =
+  | 'FACEBOOK'
+  | 'INSTAGRAM'
+  | 'TWITTER'
+  | 'TIKTOK'
+  | 'REFERRAL'
+  | 'WALK_IN'
+  | 'OTHER';
+
+export const ACQUISITION_CHANNELS: AcquisitionChannel[] = [
+  'FACEBOOK',
+  'INSTAGRAM',
+  'TWITTER',
+  'TIKTOK',
+  'REFERRAL',
+  'WALK_IN',
+  'OTHER',
+];
+
 export interface Student {
   id: string;
   companyId: string;
@@ -16,6 +35,7 @@ export interface Student {
   churnDate?: string;
   churnReason?: string;
   notes?: string;
+  acquisitionChannel?: AcquisitionChannel | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +53,7 @@ export interface StudentCreateDto {
   branchId: string;
   enrollmentDate: string;
   notes?: string;
+  acquisitionChannel?: AcquisitionChannel;
 }
 
 export interface StudentUpdateDto {
@@ -48,4 +69,5 @@ export interface StudentUpdateDto {
   branchId?: string;
   isActive?: boolean;
   notes?: string;
+  acquisitionChannel?: AcquisitionChannel | null;
 }
