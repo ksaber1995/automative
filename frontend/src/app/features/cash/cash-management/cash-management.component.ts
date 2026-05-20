@@ -87,10 +87,15 @@ export class CashManagementComponent implements OnInit {
   }
 
   filterOptions = computed(() => {
+    const isAdmin = this.authService.isGlobalAdmin();
     const opts: { label: string; value: string }[] = [
       { label: this.translate.instant('CASH.FILTER_ALL'), value: ALL },
-      { label: this.translate.instant('CASH.FILTER_COMPANY'), value: COMPANY },
     ];
+    // Only global admins can see/filter the "Global" (unallocated) slice —
+    // branch admins never own company-wide cash.
+    if (isAdmin) {
+      opts.push({ label: this.translate.instant('CASH.FILTER_COMPANY'), value: COMPANY });
+    }
     for (const b of this.branches()) {
       opts.push({ label: b.name, value: b.id });
     }
@@ -98,9 +103,13 @@ export class CashManagementComponent implements OnInit {
   });
 
   branchPickerOptions = computed(() => {
-    const opts: { label: string; value: string | null }[] = [
-      { label: this.translate.instant('CASH.SCOPE_COMPANY'), value: null },
-    ];
+    const isAdmin = this.authService.isGlobalAdmin();
+    const opts: { label: string; value: string | null }[] = [];
+    // "Company-wide" deposits/withdrawals (branch_id NULL) are only meaningful
+    // for global admins. Branch admins must post to a specific branch they own.
+    if (isAdmin) {
+      opts.push({ label: this.translate.instant('CASH.SCOPE_COMPANY'), value: null });
+    }
     for (const b of this.branches()) {
       opts.push({ label: b.name, value: b.id });
     }
@@ -144,8 +153,16 @@ export class CashManagementComponent implements OnInit {
 
   openDialog(type: CashAdjustmentType) {
     this.dialogType = type;
-    // Pre-fill branch from current filter when applicable
-    this.dialogBranchId = this.filterIsBranch() ? this.filterValue : null;
+    // Pre-fill branch from current filter when applicable. For non-global
+    // admins, a null (company-wide) target isn't allowed — fall back to the
+    // first branch they have access to so the picker isn't empty.
+    if (this.filterIsBranch()) {
+      this.dialogBranchId = this.filterValue;
+    } else if (!this.authService.isGlobalAdmin()) {
+      this.dialogBranchId = this.branches()[0]?.id ?? null;
+    } else {
+      this.dialogBranchId = null;
+    }
     this.amount = null;
     this.observedAmount = null;
     this.date = new Date();

@@ -9,14 +9,17 @@ import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { ProductService } from '../services/product.service';
+import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
+import { Branch } from '@shared/interfaces/branch.interface';
 import { ProductCategory } from '@shared/enums/product.enum';
 
 @Component({
@@ -32,6 +35,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
     InputNumberModule,
     DatePickerModule,
     InputTextModule,
+    SelectModule,
     FormsModule,
     DeleteConfirmDialogComponent,
     TranslateModule,
@@ -41,6 +45,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 })
 export class ProductListComponent implements OnInit {
   private productService = inject(ProductService);
+  private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
@@ -49,8 +54,20 @@ export class ProductListComponent implements OnInit {
   readonly Math = Math;
 
   products = signal<Product[]>([]);
+  branches = signal<Branch[]>([]);
   loading = signal(false);
   selectedCategory = '';
+  selectedBranchId = signal<string | null>(null);
+
+  branchOptions = computed(() =>
+    this.branches().map(b => ({ label: b.name, value: b.id })),
+  );
+
+  filteredProducts = computed(() => {
+    const branch = this.selectedBranchId();
+    if (!branch) return this.products();
+    return this.products().filter(p => p.branchId === branch);
+  });
   showDeleteDialog = false;
   productToDelete = signal<Product | null>(null);
 
@@ -85,7 +102,17 @@ export class ProductListComponent implements OnInit {
       { value: ProductCategory.OTHER, label: this.translate.instant('PRODUCTS.LIST.CAT_OTHER') },
     ];
     this.loadProducts();
+    this.branchService.getAllBranches().subscribe({
+      next: (b) => this.branches.set(b),
+    });
   }
+
+  getBranchName(branchId: string | null | undefined): string {
+    if (!branchId) return '—';
+    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+  }
+
+  clearBranchFilter() { this.selectedBranchId.set(null); }
 
   loadProducts() {
     this.loading.set(true);

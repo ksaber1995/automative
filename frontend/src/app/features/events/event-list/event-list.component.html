@@ -14,8 +14,31 @@
   </div>
 
   <p-card>
+    <div class="flex flex-wrap gap-3 mb-4">
+      <p-select
+        [options]="branchOptions()"
+        [ngModel]="selectedBranchId()"
+        (ngModelChange)="selectedBranchId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'EVENTS.LIST.ALL_BRANCHES' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      @if (selectedBranchId()) {
+        <p-button
+          [label]="'EVENTS.LIST.CLEAR' | translate"
+          icon="pi pi-times"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="clearFilters()"
+        ></p-button>
+      }
+    </div>
+
     <p-table
-      [value]="items()"
+      [value]="filteredItems()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"
@@ -28,6 +51,7 @@
             <p-sortIcon field="name"></p-sortIcon>
           </th>
           <th>{{ 'EVENTS.LIST.COL_TYPE' | translate }}</th>
+          <th>{{ 'EVENTS.LIST.COL_BRANCH' | translate }}</th>
           <th>{{ 'EVENTS.LIST.COL_LOCATION' | translate }}</th>
           <th pSortableColumn="startDate">
             {{ 'EVENTS.LIST.COL_START_DATE' | translate }}
@@ -46,6 +70,13 @@
           </td>
           <td>
             <p-tag [value]="('EVENTS.TYPE.' + item.eventType) | translate" severity="info"></p-tag>
+          </td>
+          <td>
+            @if (item.branchId) {
+              {{ getBranchName(item.branchId) }}
+            } @else {
+              <span class="text-gray-400 italic">{{ 'EVENTS.LIST.GLOBAL' | translate }}</span>
+            }
           </td>
           <td>{{ item.location || '—' }}</td>
           <td>{{ item.startDate | date: 'mediumDate' }}</td>
@@ -89,7 +120,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-8">
+          <td colspan="8" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-calendar text-4xl mb-3"></i>
               <p>{{ 'EVENTS.LIST.EMPTY' | translate }}</p>

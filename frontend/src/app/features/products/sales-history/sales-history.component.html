@@ -13,8 +13,8 @@
     </ng-template>
 
     <!-- Filter Section -->
-    <div class="mb-4 flex gap-4">
-      <div class="flex-1">
+    <div class="mb-4 flex gap-4 flex-wrap">
+      <div class="flex-1 min-w-[160px]">
         <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.SALES.START_DATE' | translate }}</label>
         <input
           type="date"
@@ -23,7 +23,7 @@
           class="w-full p-2 border rounded"
         />
       </div>
-      <div class="flex-1">
+      <div class="flex-1 min-w-[160px]">
         <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.SALES.END_DATE' | translate }}</label>
         <input
           type="date"
@@ -32,12 +32,25 @@
           class="w-full p-2 border rounded"
         />
       </div>
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.SALES.FILTER_BRANCH' | translate }}</label>
+        <p-select
+          [options]="branchOptions()"
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="onBranchFilterChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'PRODUCTS.SALES.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
       <div class="flex items-end">
         <p-button
           [label]="'PRODUCTS.SALES.CLEAR_FILTERS' | translate"
           icon="pi pi-filter-slash"
           [outlined]="true"
-          (onClick)="clearFilters()">
+          (onClick)="clearFilters(); clearBranchFilter()">
         </p-button>
       </div>
     </div>
@@ -62,7 +75,7 @@
 
     <!-- Sales Table -->
     <p-table
-      [value]="sales()"
+      [value]="filteredSales()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"
@@ -73,6 +86,7 @@
         <tr>
           <th>{{ 'PRODUCTS.SALES.COL_DATE' | translate }}</th>
           <th>{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }}</th>
+          <th>{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }}</th>
           <th>{{ 'PRODUCTS.SALES.COL_QTY' | translate }}</th>
           <th>{{ 'PRODUCTS.SALES.COL_UNIT_PRICE' | translate }}</th>
           <th>{{ 'PRODUCTS.SALES.COL_DISCOUNT' | translate }}</th>
@@ -93,6 +107,7 @@
               <div class="text-sm text-gray-500">{{ 'PRODUCTS.SALES.RECEIPT' | translate }} {{ sale.receiptNumber }}</div>
             }
           </td>
+          <td>{{ getBranchName(sale.branchId) }}</td>
           <td>{{ sale.quantity }}</td>
           <td>{{ sale.unitPrice.toFixed(2) }}</td>
           <td>
@@ -149,7 +164,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="10" class="text-center py-8 text-gray-500">
+          <td colspan="11" class="text-center py-8 text-gray-500">
             {{ 'PRODUCTS.SALES.NO_SALES' | translate }}
           </td>
         </tr>

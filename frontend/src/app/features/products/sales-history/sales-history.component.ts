@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { TableModule } from 'primeng/table';
@@ -14,9 +14,11 @@ import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductSaleService, SalesSummary } from '../services/product-sale.service';
+import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProductSale } from '@shared/interfaces/product-sale.interface';
+import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-sales-history',
@@ -30,16 +32,34 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
 })
 export class SalesHistoryComponent implements OnInit {
   private productSaleService = inject(ProductSaleService);
+  private branchService = inject(BranchService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   sales = signal<ProductSale[]>([]);
+  branches = signal<Branch[]>([]);
   summary = signal<SalesSummary | null>(null);
   loading = signal(false);
   startDate = '';
   endDate = '';
+  selectedBranchId = signal<string | null>(null);
+
+  branchOptions = computed(() =>
+    this.branches().map(b => ({ label: b.name, value: b.id })),
+  );
+
+  filteredSales = computed(() => {
+    const branch = this.selectedBranchId();
+    if (!branch) return this.sales();
+    return this.sales().filter(s => s.branchId === branch);
+  });
+
+  getBranchName(branchId: string | null | undefined): string {
+    if (!branchId) return '—';
+    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+  }
 
   // Refund dialog state
   showRefundDialog = false;
@@ -57,6 +77,23 @@ export class SalesHistoryComponent implements OnInit {
 
   ngOnInit() {
     this.loadSales();
+    this.loadSummary();
+    this.branchService.getAllBranches().subscribe({
+      next: (b) => this.branches.set(b),
+    });
+  }
+
+  // Reload the summary when the branch filter changes. The list itself is
+  // filtered client-side from the already-loaded sales so the dropdown feels
+  // instant; the summary, however, is server-aggregated and needs a refetch
+  // with the branchId param so totals match what's on screen.
+  onBranchFilterChange(value: string | null) {
+    this.selectedBranchId.set(value);
+    this.loadSummary();
+  }
+
+  clearBranchFilter() {
+    this.selectedBranchId.set(null);
     this.loadSummary();
   }
 
@@ -82,6 +119,8 @@ export class SalesHistoryComponent implements OnInit {
     const params: any = {};
     if (this.startDate) params.startDate = this.startDate;
     if (this.endDate) params.endDate = this.endDate;
+    const branch = this.selectedBranchId();
+    if (branch) params.branchId = branch;
 
     this.productSaleService.getSalesSummary(params).subscribe({
       next: (data) => {
