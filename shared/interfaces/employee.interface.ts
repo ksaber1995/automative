@@ -13,6 +13,7 @@ export interface Employee {
   hireDate: string;
   terminationDate?: string | null;
   isActive: boolean;
+  linkedUserId?: string | null;
   notes?: string;
   createdAt: string;
   updatedAt: string;

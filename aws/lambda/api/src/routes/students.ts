@@ -1,5 +1,5 @@
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapStudentFromDB(row: any) {
@@ -84,9 +84,9 @@ export const studentsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' ORDER BY created_at DESC';

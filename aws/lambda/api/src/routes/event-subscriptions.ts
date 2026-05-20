@@ -70,12 +70,15 @@ export const eventSubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
-        'SELECT id, branch_id, name FROM events WHERE id = $1 AND company_id = $2',
+        'SELECT id, branch_id, name, status FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
       if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
       if (event.branch_id && !canAccessBranch(context, event.branch_id)) {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      if (event.status === 'CANCELLED') {
+        return apiError(409, 'ERRORS.EVENTS.CANCELLED_NO_SUBSCRIPTIONS', 'Event is cancelled; no new subscriptions can be added');
       }
 
       const isStudent = !!body.studentId;
@@ -227,10 +230,13 @@ export const eventSubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(
-        'SELECT id, branch_id FROM events WHERE id = $1 AND company_id = $2',
+        'SELECT id, branch_id, status FROM events WHERE id = $1 AND company_id = $2',
         [params.eventId, context.companyId]
       );
       if (!event) return apiError(404, 'ERRORS.EVENTS.NOT_FOUND', 'Event not found');
+      if (event.status === 'CANCELLED') {
+        return apiError(409, 'ERRORS.EVENTS.CANCELLED_NO_REFUNDS', 'Event is cancelled; no new refunds can be issued');
+      }
 
       if (!body.subscriptionId) {
         return apiError(400, 'ERRORS.EVENT_SUBSCRIPTIONS.SUBSCRIPTION_ID_REQUIRED', 'subscriptionId is required');

@@ -18,8 +18,25 @@
   </div>
 
   <p-card>
+    <p-tabs [value]="selectedTab()" (valueChange)="selectedTab.set($any($event))">
+      <p-tablist>
+        <p-tab value="active">
+          <i class="pi pi-check-circle mr-2"></i>
+          {{ 'MASTER_COURSES.LIST.TAB_ACTIVE' | translate }} ({{ activeCount() }})
+        </p-tab>
+        <p-tab value="inactive">
+          <i class="pi pi-ban mr-2"></i>
+          {{ 'MASTER_COURSES.LIST.TAB_INACTIVE' | translate }} ({{ inactiveCount() }})
+        </p-tab>
+      </p-tablist>
+      <p-tabpanels>
+        <p-tabpanel value="active"></p-tabpanel>
+        <p-tabpanel value="inactive"></p-tabpanel>
+      </p-tabpanels>
+    </p-tabs>
+
     <p-table
-      [value]="items()"
+      [value]="filteredItems()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"
@@ -42,8 +59,7 @@
           <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_PRICE' | translate }}</th>
           <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_DURATION' | translate }}</th>
           <th>{{ 'MASTER_COURSES.LIST.COL_LINKED' | translate }}</th>
-          <th>Students</th>
-          <th>{{ 'MASTER_COURSES.LIST.COL_STATUS' | translate }}</th>
+          <th>{{ 'MASTER_COURSES.LIST.COL_STUDENTS' | translate }}</th>
           <th>{{ 'MASTER_COURSES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -76,12 +92,6 @@
             </div>
           </td>
           <td>
-            <p-tag
-              [value]="item.isActive ? ('MASTER_COURSES.ACTIVE' | translate) : ('MASTER_COURSES.INACTIVE' | translate)"
-              [severity]="item.isActive ? 'success' : 'danger'"
-            ></p-tag>
-          </td>
-          <td>
             <div class="flex gap-2">
               <p-button
                 icon="pi pi-eye"
@@ -108,7 +118,7 @@
                     [rounded]="true"
                     [text]="true"
                     severity="secondary"
-                    (onClick)="toggleActive(item)"
+                    (onClick)="deactivate(item)"
                     [pTooltip]="'MASTER_COURSES.LIST.DEACTIVATE' | translate"
                   ></p-button>
                 } @else {
@@ -117,12 +127,21 @@
                     [rounded]="true"
                     [text]="true"
                     severity="success"
-                    (onClick)="toggleActive(item)"
+                    (onClick)="activate(item)"
                     [pTooltip]="'MASTER_COURSES.LIST.ACTIVATE' | translate"
                   ></p-button>
                 }
               }
-         
+              @if (authService.canDelete('academy') && canDelete(item)) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="deleteItem(item)"
+                  [pTooltip]="'MASTER_COURSES.LIST.DELETE' | translate"
+                ></p-button>
+              }
             </div>
           </td>
         </tr>
@@ -140,5 +159,42 @@
     </p-table>
   </p-card>
 
-  
+  <p-confirmDialog></p-confirmDialog>
+
+  <p-dialog
+    [visible]="showBlockerDialog()"
+    (visibleChange)="showBlockerDialog.set($event)"
+    [modal]="true"
+    [style]="{ width: '520px' }"
+    [header]="'MASTER_COURSES.LIST.BLOCKER_TITLE' | translate"
+  >
+    <p class="mb-3 text-sm text-gray-700">
+      {{ 'MASTER_COURSES.LIST.BLOCKER_DESC' | translate: { name: blockerName() } }}
+    </p>
+    <ul class="divide-y rounded border">
+      @for (c of blockerCourses(); track c.id) {
+        <li class="flex items-center justify-between px-3 py-2">
+          <div>
+            <div class="font-medium text-sm">{{ c.name }}</div>
+            <div class="text-xs text-gray-500 font-mono">{{ c.code }}</div>
+          </div>
+          <p-button
+            icon="pi pi-external-link"
+            [label]="'MASTER_COURSES.LIST.BLOCKER_OPEN' | translate"
+            severity="secondary"
+            size="small"
+            (onClick)="openBlockingCourse(c)"
+          ></p-button>
+        </li>
+      }
+    </ul>
+    <ng-template pTemplate="footer">
+      <p-button
+        [label]="'MASTER_COURSES.LIST.BLOCKER_CLOSE' | translate"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="showBlockerDialog.set(false)"
+      ></p-button>
+    </ng-template>
+  </p-dialog>
 </div>

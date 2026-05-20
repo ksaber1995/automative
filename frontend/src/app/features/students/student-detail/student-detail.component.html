@@ -172,20 +172,20 @@
               </td>
               <td>
                 <p-tag
-                  [value]="me.status"
+                  [value]="statusLabel(me.status)"
                   [severity]="me.status === 'ACTIVE' ? 'success' : me.status === 'COMPLETED' ? 'info' : 'danger'"
                 ></p-tag>
               </td>
               <td>
                 <div class="flex gap-1 flex-wrap">
-                  @if (me.status === 'ACTIVE' && me.paymentMode === 'INSTALLMENTS' && me.paymentStatus !== 'PAID') {
+                  @if (me.status !== 'CANCELLED' && (me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                     <p-button
                       icon="pi pi-wallet"
                       [rounded]="true"
                       [text]="true"
                       severity="success"
                       (onClick)="openMasterPaymentDialog(me)"
-                      pTooltip="Record installment payment"
+                      pTooltip="Record payment"
                     ></p-button>
                   }
                   @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
@@ -312,11 +312,11 @@
                           <!-- Status + action -->
                           <div class="flex items-center gap-2 flex-shrink-0">
                             @if (status === 'ACTIVE') {
-                              <p-tag value="Active" severity="success" styleClass="text-xs"></p-tag>
+                              <p-tag [value]="'STUDENTS.DETAIL.STATUS_ACTIVE' | translate" severity="success" styleClass="text-xs"></p-tag>
                             } @else if (status === 'COMPLETED') {
-                              <p-tag value="Completed" severity="info" styleClass="text-xs"></p-tag>
+                              <p-tag [value]="'STUDENTS.DETAIL.STATUS_COMPLETED' | translate" severity="info" styleClass="text-xs"></p-tag>
                             } @else if (status === 'DROPPED') {
-                              <p-tag value="Dropped" severity="danger" styleClass="text-xs"></p-tag>
+                              <p-tag [value]="'STUDENTS.DETAIL.STATUS_DROPPED' | translate" severity="danger" styleClass="text-xs"></p-tag>
                               @if (me.status === 'ACTIVE') {
                                 <p-button
                                   icon="pi pi-user-plus"
@@ -363,6 +363,7 @@
                       <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
                       <th class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }}</th>
                       <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+                      <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="body" let-me>
@@ -374,12 +375,29 @@
                       <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
                       <td class="text-right">
                         <div class="font-semibold">{{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }}</div>
+                        @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
+                          <div class="text-xs text-red-600 font-medium">
+                            -{{ (me.finalPrice - me.amountPaid).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
+                          </div>
+                        }
                       </td>
                       <td class="text-center">
                         <p-tag [value]="me.completedCourses + ' / ' + me.totalCourses" severity="success"></p-tag>
                       </td>
                       <td>
-                        <p-tag [value]="me.status" severity="info"></p-tag>
+                        <p-tag [value]="statusLabel(me.status)" severity="info"></p-tag>
+                      </td>
+                      <td>
+                        @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
+                          <p-button
+                            icon="pi pi-wallet"
+                            [rounded]="true"
+                            [text]="true"
+                            severity="success"
+                            (onClick)="openMasterPaymentDialog(me)"
+                            pTooltip="Record payment"
+                          ></p-button>
+                        }
                       </td>
                     </tr>
                   </ng-template>
@@ -500,7 +518,7 @@
               }
             </td>
             <td>
-              <p-tag [value]="enrollment.status" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
+              <p-tag [value]="statusLabel(enrollment.status)" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
             <td>
               <div class="flex flex-col gap-1">
@@ -517,8 +535,8 @@
             </td>
             <td>
               <div class="flex gap-1">
-                <!-- Pay installment button -->
-                @if (enrollment.paymentMode === 'INSTALLMENTS' && enrollment.paymentStatus !== 'PAID' && enrollment.paymentStatus !== 'REFUNDED') {
+                <!-- Pay button (any enrollment with remaining balance and no refund) -->
+                @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
                   <p-button
                     icon="pi pi-wallet"
                     [rounded]="true"
@@ -643,7 +661,9 @@
                     <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
                     <th>{{ 'STUDENTS.DETAIL.COL_COMPLETION_DATE' | translate }}</th>
                     <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
+                    <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PAID' | translate }}</th>
                     <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
+                    <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
                   </tr>
                 </ng-template>
                 <ng-template pTemplate="body" let-enrollment>
@@ -661,8 +681,28 @@
                       }
                     </td>
                     <td class="text-right font-semibold text-green-600">{{ enrollment.finalPrice.toFixed(2) }}</td>
+                    <td class="text-right">
+                      <span class="font-semibold">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
+                      @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
+                        <div class="text-xs text-red-600 font-medium">
+                          -{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
+                        </div>
+                      }
+                    </td>
                     <td>
                       <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+                    </td>
+                    <td>
+                      @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
+                        <p-button
+                          icon="pi pi-wallet"
+                          [rounded]="true"
+                          [text]="true"
+                          severity="success"
+                          (onClick)="openPaymentDialog(enrollment)"
+                          [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
+                        ></p-button>
+                      }
                     </td>
                   </tr>
                 </ng-template>

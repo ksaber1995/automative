@@ -117,7 +117,10 @@ export class ClassListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    // Filter dropdowns: show every branch the user can access (active and
+    // inactive). Hiding inactive branches here would prevent admins from
+    // filtering existing data in a branch they've since deactivated.
+    this.branchService.getAllBranches().subscribe({
       next: (branches) => {
         this.branches.set([
           { label: this.translate.instant('CLASSES.LIST.ALL_BRANCHES'), value: null },

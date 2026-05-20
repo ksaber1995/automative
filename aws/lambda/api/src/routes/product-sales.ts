@@ -1,5 +1,5 @@
 import { insert, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { getClient } from '../db/connection';
 import { apiError, mapThrownError } from '../utils/api-error';
 
@@ -139,9 +139,9 @@ export const productSalesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND ps.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'ps.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       if (queryParams.productId) {
@@ -179,42 +179,49 @@ export const productSalesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = `
-        SELECT
-          COUNT(*) as total_sales,
-          SUM(quantity) as total_quantity,
-          SUM(total_amount) as total_revenue
-        FROM product_sales
-        WHERE company_id = $1
-      `;
+      // Build a single branch+date filter fragment and shared params, then
+      // splice it into both queries. The previous version reused params by
+      // indexOf() lookups which only works for single-branch scopes.
       const params: any[] = [context.companyId];
+      let filters = '';
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        filters += ` AND branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        if (branchClause) filters += ` AND ${branchClause}`;
       }
 
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
-        sql += ` AND sale_date >= $${params.length}`;
+        filters += ` AND sale_date >= $${params.length}`;
       }
 
       if (queryParams.endDate) {
         params.push(queryParams.endDate);
-        sql += ` AND sale_date <= $${params.length}`;
+        filters += ` AND sale_date <= $${params.length}`;
       }
 
+      const sql = `
+        SELECT
+          COUNT(*) as total_sales,
+          SUM(quantity) as total_quantity,
+          SUM(total_amount) as total_revenue
+        FROM product_sales
+        WHERE company_id = $1${filters}
+      `;
       const summaryResult = await query(sql, params);
       const summary = summaryResult[0];
 
-      // Get by product breakdown
-      let productSql = `
+      // The product breakdown uses the same filter but qualified with `ps.`
+      const productFilters = filters
+        .replace(/\bbranch_id\b/g, 'ps.branch_id')
+        .replace(/\bsale_date\b/g, 'ps.sale_date');
+      const productSql = `
         SELECT
           ps.product_id,
           p.name as product_name,
@@ -222,29 +229,9 @@ export const productSalesRoutes = {
           SUM(ps.total_amount) as revenue
         FROM product_sales ps
         LEFT JOIN products p ON ps.product_id = p.id
-        WHERE ps.company_id = $1
+        WHERE ps.company_id = $1${productFilters}
+        GROUP BY ps.product_id, p.name ORDER BY revenue DESC
       `;
-
-      if (queryParams.branchId) {
-        const branchIdx = params.indexOf(queryParams.branchId);
-        productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        const branchIdx = params.indexOf(context.branchId);
-        productSql += ` AND ps.branch_id = $${branchIdx + 1}`;
-      }
-
-      if (queryParams.startDate) {
-        const dateIdx = params.indexOf(queryParams.startDate);
-        productSql += ` AND ps.sale_date >= $${dateIdx + 1}`;
-      }
-
-      if (queryParams.endDate) {
-        const dateIdx = params.indexOf(queryParams.endDate);
-        productSql += ` AND ps.sale_date <= $${dateIdx + 1}`;
-      }
-
-      productSql += ' GROUP BY ps.product_id, p.name ORDER BY revenue DESC';
-
       const byProduct = await query(productSql, params);
 
       return {
@@ -292,9 +279,9 @@ export const productSalesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND ps.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND ps.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'ps.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' GROUP BY ps.product_id, p.name, p.code ORDER BY quantity DESC';

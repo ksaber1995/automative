@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
@@ -6,11 +6,24 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
-import { TranslateModule } from '@ngx-translate/core';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
+import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
+import { ConfirmationService } from 'primeng/api';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MasterCourseService } from '../services/master-course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { MasterCourse } from '@shared/interfaces/master-course.interface';
+
+type MasterCourseRow = MasterCourse & {
+  linkedCourseCount?: number;
+  branchCount?: number;
+  studentCount?: number;
+  paidCount?: number;
+  partialCount?: number;
+  pendingCount?: number;
+};
 
 @Component({
   selector: 'app-master-course-list',
@@ -22,25 +35,48 @@ import { MasterCourse } from '@shared/interfaces/master-course.interface';
     ButtonModule,
     TagModule,
     TooltipModule,
+    ConfirmDialogModule,
+    DialogModule,
+    TabsModule,
+    Tab,
+    TabList,
+    TabPanel,
+    TabPanels,
     TranslateModule,
   ],
+  providers: [ConfirmationService],
   templateUrl: './master-course-list.component.html',
 })
 export class MasterCourseListComponent implements OnInit {
   private service = inject(MasterCourseService);
   private router = inject(Router);
   private notifications = inject(NotificationService);
+  private confirmationService = inject(ConfirmationService);
+  private translate = inject(TranslateService);
   authService = inject(AuthService);
 
-  items = signal<MasterCourse[]>([]);
+  items = signal<MasterCourseRow[]>([]);
   loading = signal(true);
+  selectedTab = signal<'active' | 'inactive'>('active');
+
+  // Blocker dialog: server returns 409 with `courses` (linked courses still active).
+  showBlockerDialog = signal(false);
+  blockerName = signal('');
+  blockerCourses = signal<{ id: string; name: string; code: string }[]>([]);
+
+  activeCount = computed(() => this.items().filter(i => i.isActive).length);
+  inactiveCount = computed(() => this.items().filter(i => !i.isActive).length);
+  filteredItems = computed(() => {
+    const wantActive = this.selectedTab() === 'active';
+    return this.items().filter(i => i.isActive === wantActive);
+  });
 
   ngOnInit() { this.load(); }
 
   load() {
     this.loading.set(true);
     this.service.getAll().subscribe({
-      next: (rows) => { this.items.set(rows); this.loading.set(false); },
+      next: (rows) => { this.items.set(rows as MasterCourseRow[]); this.loading.set(false); },
       error: () => { this.notifications.error('Failed to load master courses'); this.loading.set(false); },
     });
   }
@@ -49,16 +85,61 @@ export class MasterCourseListComponent implements OnInit {
   view(item: MasterCourse) { this.router.navigate(['/master-courses', item.id]); }
   edit(item: MasterCourse) { this.router.navigate(['/master-courses', item.id, 'edit']); }
 
+  canDelete(item: MasterCourseRow): boolean {
+    return (item.studentCount || 0) === 0;
+  }
 
-  toggleActive(item: MasterCourse) {
-    const next = !item.isActive;
-    this.service.update(item.id, { isActive: next }).subscribe({
-      next: () => {
-        this.notifications.success(next ? 'Master course activated' : 'Master course deactivated');
-        this.load();
+  deleteItem(item: MasterCourseRow) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('MASTER_COURSES.LIST.DELETE_TITLE'),
+      message: this.translate.instant('MASTER_COURSES.LIST.DELETE_MSG', { name: item.name }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.service.delete(item.id).subscribe({
+          next: () => {
+            this.notifications.success(this.translate.instant('MASTER_COURSES.DELETED'));
+            this.load();
+          },
+        });
       },
-      error: () => {
-        this.notifications.error('Failed to update status');
+    });
+  }
+
+  deactivate(item: MasterCourseRow) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('MASTER_COURSES.LIST.DEACTIVATE_TITLE'),
+      message: this.translate.instant('MASTER_COURSES.LIST.DEACTIVATE_MSG', { name: item.name }),
+      icon: 'pi pi-ban',
+      accept: () => {
+        this.service.deactivate(item.id).subscribe({
+          next: () => {
+            this.notifications.success(this.translate.instant('MASTER_COURSES.LIST.DEACTIVATED'));
+            this.load();
+          },
+          error: (err) => {
+            const body = err?.error;
+            if (err?.status === 409 && Array.isArray(body?.courses)) {
+              this.blockerName.set(item.name);
+              this.blockerCourses.set(body.courses);
+              this.showBlockerDialog.set(true);
+            }
+          },
+        });
+      },
+    });
+  }
+
+  openBlockingCourse(c: { id: string }) {
+    this.showBlockerDialog.set(false);
+    this.router.navigate(['/courses', c.id]);
+  }
+
+  activate(item: MasterCourseRow) {
+    this.service.activate(item.id).subscribe({
+      next: () => {
+        this.notifications.success(this.translate.instant('MASTER_COURSES.LIST.ACTIVATED'));
+        this.load();
       },
     });
   }

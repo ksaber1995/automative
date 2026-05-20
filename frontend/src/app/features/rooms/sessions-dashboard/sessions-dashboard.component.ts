@@ -287,7 +287,7 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (b: Branch[]) => this.branches.set(b),
     });
   }

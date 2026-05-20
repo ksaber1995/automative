@@ -137,7 +137,7 @@
           </h3>
           <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.SUBSCRIBERS_DESC' | translate }}</p>
         </div>
-        @if (authService.canWrite('academy')) {
+        @if (authService.canWrite('academy') && !isCancelled()) {
           <p-button icon="pi pi-plus" [label]="'EVENTS.DETAIL.ADD_SUBSCRIBER' | translate" severity="success" (onClick)="openSubscriptionDialog()"></p-button>
         }
       </div>
@@ -189,8 +189,8 @@
           <td class="whitespace-nowrap">
             @if (authService.canWrite('academy')) {
               <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
-                [pTooltip]="'EVENTS.DETAIL.TOOLTIP_REFUND' | translate"
-                [disabled]="refundRemaining(s) <= 0"
+                [pTooltip]="isCancelled() ? ('EVENTS.DETAIL.CANCELLED_LOCKED' | translate) : ('EVENTS.DETAIL.TOOLTIP_REFUND' | translate)"
+                [disabled]="refundRemaining(s) <= 0 || isCancelled()"
                 (onClick)="openRefundDialog(s)"></p-button>
               <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
                 [pTooltip]="'EVENTS.DETAIL.TOOLTIP_DELETE' | translate" (onClick)="deleteSubscription(s)"></p-button>
@@ -218,7 +218,7 @@
           </h3>
           <p class="text-sm text-gray-500 mt-1">{{ 'EVENTS.DETAIL.EXPENSES_DESC' | translate }}</p>
         </div>
-        @if (authService.canWrite('expenses')) {
+        @if (authService.canWrite('expenses') && !isCancelled()) {
           <p-button icon="pi pi-plus" [label]="'EVENTS.DETAIL.ADD_EXPENSE' | translate" severity="danger" (onClick)="openExpenseDialog()"></p-button>
         }
       </div>

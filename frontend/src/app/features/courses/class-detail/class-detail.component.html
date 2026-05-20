@@ -11,6 +11,7 @@
       </div>
       <p class="text-gray-500 mt-1">{{ classDetail()?.code }}</p>
     </div>
+    <p-button [label]="'CLASSES.DETAIL.EDIT' | translate" icon="pi pi-pencil" severity="info" [outlined]="true" (onClick)="editClass()"></p-button>
     @if (!isFinished()) {
       <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
       <p-button [label]="'CLASSES.DETAIL.FINISH_CLASS' | translate" icon="pi pi-check-circle" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>

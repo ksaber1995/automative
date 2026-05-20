@@ -21,14 +21,17 @@
           </p-button>
         }
         <p-button [label]="'EMPLOYEES.DETAIL.EDIT' | translate" icon="pi pi-pencil" severity="warn" (onClick)="edit()"></p-button>
-        @if (canManageUsers() && true) {
-          <p-button [label]="'EMPLOYEES.DETAIL.CONVERT_TO_USER' | translate" icon="pi pi-user-plus" severity="info"
-            (onClick)="showConvertDialog = true">
-          </p-button>
-        } @else if (false) {
-          <span class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-            <i class="pi pi-link"></i> {{ 'EMPLOYEES.DETAIL.HAS_USER_ACCOUNT' | translate }}
-          </span>
+        @if (canManageUsers()) {
+          @if (hasLinkedUser()) {
+            <p-button [label]="'EMPLOYEES.DETAIL.REMOVE_USER' | translate" icon="pi pi-user-minus" severity="danger"
+              [loading]="removingUser()"
+              (onClick)="confirmRemoveUser()">
+            </p-button>
+          } @else {
+            <p-button [label]="'EMPLOYEES.DETAIL.CONVERT_TO_USER' | translate" icon="pi pi-user-plus" severity="info"
+              (onClick)="showConvertDialog = true">
+            </p-button>
+          }
         }
       </div>
     </div>
@@ -337,6 +340,8 @@
     </div>
   }
 </div>
+
+<p-confirmDialog></p-confirmDialog>
 
 <!-- Convert to User Dialog -->
 <p-dialog [(visible)]="showConvertDialog" [header]="'EMPLOYEES.DETAIL.CONVERT_DIALOG_TITLE' | translate"

@@ -244,7 +244,7 @@ export class TimetableComponent implements OnInit {
   }
 
   loadFilters() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (b) => this.branches.set(b),
     });
     this.courseService.getActiveCourses().subscribe({

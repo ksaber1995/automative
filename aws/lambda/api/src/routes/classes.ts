@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 let classSchemaInitPromise: Promise<void> | null = null;
@@ -199,9 +199,9 @@ export const classesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND co.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND co.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       if (queryParams.courseId) {
@@ -263,9 +263,9 @@ export const classesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND co.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND co.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       if (queryParams.courseId) {

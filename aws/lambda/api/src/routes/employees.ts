@@ -17,10 +17,17 @@ function mapEmployeeFromDB(row: any) {
     branchId: row.branch_id,
     isGlobal: row.is_global,
     isActive: row.is_active,
+    linkedUserId: row.linked_user_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+const EMPLOYEE_BASE_SELECT = `
+  SELECT e.*, u.id AS linked_user_id
+  FROM employees e
+  LEFT JOIN users u ON u.linked_employee_id = e.id
+`;
 
 export const employeesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
@@ -73,7 +80,7 @@ export const employeesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = 'SELECT * FROM employees WHERE company_id = $1';
+      let sql = `${EMPLOYEE_BASE_SELECT} WHERE e.company_id = $1`;
       const params: any[] = [context.companyId];
 
       const admin = isGlobalAdmin(context);
@@ -83,7 +90,7 @@ export const employeesRoutes = {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND e.branch_id = $${params.length}`;
       } else if (!admin) {
         // Non-admins see only employees in branches they're assigned to.
         // Global employees (is_global = true, branch_id NULL) are hidden — those
@@ -98,7 +105,7 @@ export const employeesRoutes = {
             params.push(id);
             return `$${params.length}`;
           }).join(', ');
-          sql += ` AND branch_id IN (${placeholders}) AND COALESCE(is_global, false) = false`;
+          sql += ` AND e.branch_id IN (${placeholders}) AND COALESCE(e.is_global, false) = false`;
         }
       }
 
@@ -108,11 +115,11 @@ export const employeesRoutes = {
         if (admin) {
           const isGlobalBool = queryParams.isGlobal === 'true';
           params.push(isGlobalBool);
-          sql += ` AND is_global = $${params.length}`;
+          sql += ` AND e.is_global = $${params.length}`;
         }
       }
 
-      sql += ' ORDER BY created_at DESC';
+      sql += ' ORDER BY e.created_at DESC';
 
       const employees = await query(sql, params);
       return {
@@ -133,7 +140,7 @@ export const employeesRoutes = {
       }
 
       const employee = await queryOne(
-        'SELECT * FROM employees WHERE id = $1 AND company_id = $2',
+        `${EMPLOYEE_BASE_SELECT} WHERE e.id = $1 AND e.company_id = $2`,
         [params.id, context.companyId]
       );
 

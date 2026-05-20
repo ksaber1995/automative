@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -74,6 +74,9 @@ export class EventDetailComponent implements OnInit {
   id!: string;
   event = signal<EventModel | null>(null);
   pl = signal<EventPL | null>(null);
+
+  // Cancelled events are read-only: no new subscriptions, refunds, or expenses.
+  isCancelled = computed(() => this.event()?.status === 'CANCELLED');
 
   subscriptions = signal<EventSubscription[]>([]);
   expenses = signal<EventExpense[]>([]);

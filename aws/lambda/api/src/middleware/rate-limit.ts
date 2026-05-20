@@ -41,13 +41,16 @@ export const RATE_LIMITS = {
   // unauthenticated and there is no legitimate burst.
   PUBLIC_FORM_IP: { name: 'public-form:ip', limit: 10, windowMs: 60 * 60_000 },
 
-  // Per-authenticated-user cap across all endpoints. High enough not to
-  // affect normal UI usage; low enough to flag a runaway client.
-  AUTHED_USER: { name: 'authed:user', limit: 600, windowMs: 15 * 60_000 },
+  // Per-authenticated-user cap across all endpoints. The reports/analytics
+  // pages fan out 25–35 parallel calls per reload (one per chart × compare-
+  // mode branches), and a power user re-filtering a few times in a minute
+  // can burn through a low limit fast. Sized to comfortably cover that
+  // workload while still flagging a runaway client.
+  AUTHED_USER: { name: 'authed:user', limit: 3000, windowMs: 15 * 60_000 },
 
   // Per-company cap so one tenant can't monopolize the Lambda's burst
   // budget. Scales with team size — bump if a real company hits it.
-  AUTHED_COMPANY: { name: 'authed:company', limit: 3000, windowMs: 15 * 60_000 },
+  AUTHED_COMPANY: { name: 'authed:company', limit: 15000, windowMs: 15 * 60_000 },
 } as const satisfies Record<string, RateLimitBucket>;
 
 interface Counter {

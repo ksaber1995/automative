@@ -643,13 +643,15 @@ export class StudentDetailComponent implements OnInit {
   }
 
   paymentLabel(status: string): string {
-    switch (status) {
-      case 'PAID': return 'Paid';
-      case 'PARTIAL': return 'Partial';
-      case 'REFUNDED': return 'Refunded';
-      case 'PENDING': return 'Pending';
-      default: return status;
-    }
+    const key = `STUDENTS.DETAIL.PAYMENT_${status}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? status : translated;
+  }
+
+  statusLabel(status: string): string {
+    const key = `STUDENTS.DETAIL.STATUS_${status}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? status : translated;
   }
 
   hasRefund(enrollment: any): boolean {

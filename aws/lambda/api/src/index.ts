@@ -129,14 +129,20 @@ const router = {
 
 // Create the Lambda handler
 // @ts-expect-error - Type mismatch with ts-rest router implementation
+// Echo the request Origin back rather than using '*'. The previous '*' +
+// 'Allow-Credentials: true' combo is invalid per CORS spec — browsers reject
+// the response whenever the request runs in credentials mode 'include'.
 const lambdaHandler = createLambdaHandler(contract, router, {
   responseHandlers: [
     (response, request, args) => {
-      // Add CORS headers to all responses
-      response.headers.set('Access-Control-Allow-Origin', '*');
+      const origin = request.headers.get('origin');
+      if (origin) {
+        response.headers.set('Access-Control-Allow-Origin', origin);
+        response.headers.set('Vary', 'Origin');
+      } else {
+        response.headers.set('Access-Control-Allow-Origin', '*');
+      }
       response.headers.set('Access-Control-Allow-Credentials', 'true');
-      response.headers.set('Access-Control-Allow-Headers', 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token');
-      response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     },
   ],
 });
@@ -180,12 +186,15 @@ export const handler = async (
     return await runWithRequestContext({ ip }, () => lambdaHandler(event, context));
   } catch (error) {
     console.error('Handler error:', error);
+    const reqOrigin =
+      (event.headers?.['origin'] ?? event.headers?.['Origin']) as string | undefined;
     return {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': reqOrigin || '*',
         'Access-Control-Allow-Credentials': 'true',
+        ...(reqOrigin ? { Vary: 'Origin' } : {}),
       },
       body: JSON.stringify({
         message: 'Internal server error',

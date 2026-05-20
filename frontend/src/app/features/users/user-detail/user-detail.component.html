@@ -52,6 +52,11 @@
             </button>
           }
         }
+        @if (canDelete()) {
+          <button pButton icon="pi pi-trash" [label]="'USERS.DETAIL.DELETE' | translate" severity="danger"
+            (click)="deleteUser()">
+          </button>
+        }
       </div>
     </div>
 

@@ -22,6 +22,16 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       const serverCode: string | undefined = error.error?.code;
       const serverMessage: string | undefined = error.error?.message;
 
+      // Structured 409 responses (course/master-course deactivation blockers) carry
+      // a list of blockers under `classes` or `courses`. The calling component will
+      // render a richer dialog with links, so we skip the generic toast here.
+      const hasStructuredBlockers =
+        error.status === 409 &&
+        (Array.isArray(error.error?.classes) || Array.isArray(error.error?.courses));
+      if (hasStructuredBlockers) {
+        return throwError(() => error);
+      }
+
       let errorMessage: string;
 
       if (error.error instanceof ErrorEvent) {

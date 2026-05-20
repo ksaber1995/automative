@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { mapPaymentFromDB } from './expense-payments';
 import { apiError, mapThrownError } from '../utils/api-error';
 
@@ -114,10 +114,13 @@ export const expensesRoutes = {
       let resolvedBranchId: string | null = body.branchId || null;
       if (body.eventId) {
         const event = await queryOne(
-          'SELECT branch_id FROM events WHERE id = $1 AND company_id = $2',
+          'SELECT branch_id, status FROM events WHERE id = $1 AND company_id = $2',
           [body.eventId, context.companyId]
         );
         if (event) {
+          if (event.status === 'CANCELLED') {
+            return apiError(409, 'ERRORS.EVENTS.CANCELLED_NO_EXPENSES', 'Event is cancelled; no new expenses can be added');
+          }
           resolvedBranchId = event.branch_id || null;
         }
       }
@@ -170,9 +173,9 @@ export const expensesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND e.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND (e.branch_id = $${params.length} OR e.branch_id IS NULL)`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'e.branch_id');
+        if (branchClause) sql += ` AND (${branchClause} OR e.branch_id IS NULL)`;
       }
 
       if (queryParams.startDate) {
@@ -224,32 +227,41 @@ export const expensesRoutes = {
       const monthStart = targetMonth + '-01';
       const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
 
-      // Unpaid recurring expense templates for this month (check expense_payments)
+      // Branch admins (etc.) see dues only for their assigned branches plus
+      // the global (NULL branch_id) expenses that apply company-wide.
+      const recurringParams: any[] = [context.companyId, monthStart, monthEnd];
+      const recurringBranchClause = appendBranchSqlFilter(context, recurringParams, 'e.branch_id');
+      const recurringScope = recurringBranchClause ? ` AND (${recurringBranchClause} OR e.branch_id IS NULL)` : '';
       const recurringTemplates = await query(
         `SELECT e.*, b.name as branch_name
          FROM expenses e
          LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE e.company_id = $1 AND e.is_recurring = true
+         WHERE e.company_id = $1 AND e.is_recurring = true${recurringScope}
            AND NOT EXISTS (
              SELECT 1 FROM expense_payments ep
              WHERE ep.expense_id = e.id
                AND ep.date >= $2 AND ep.date <= $3
            )`,
-        [context.companyId, monthStart, monthEnd]
+        recurringParams
       );
 
-      // Employees with unpaid salary for this month (check expense_payments)
+      // Employees with unpaid salary for this month (check expense_payments).
+      // Employees can have NULL branch_id (cross-branch staff); include those
+      // for branch admins so company-wide hires aren't silently dropped.
+      const employeeParams: any[] = [context.companyId, monthStart, monthEnd];
+      const employeeBranchClause = appendBranchSqlFilter(context, employeeParams, 'e.branch_id');
+      const employeeScope = employeeBranchClause ? ` AND (${employeeBranchClause} OR e.branch_id IS NULL)` : '';
       const unpaidEmployees = await query(
         `SELECT e.*, b.name as branch_name
          FROM employees e
          LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0
+         WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0${employeeScope}
            AND NOT EXISTS (
              SELECT 1 FROM expense_payments ep
              WHERE ep.employee_id = e.id AND ep.category = 'SALARIES'
                AND ep.date >= $2 AND ep.date <= $3
            )`,
-        [context.companyId, monthStart, monthEnd]
+        employeeParams
       );
 
       const items: any[] = [

@@ -475,11 +475,7 @@ export class ClassFormComponent implements OnInit {
       this.classService.updateClass(this.classId, classData).subscribe({
         next: () => {
           this.notificationService.success(this.translate.instant('CLASSES.UPDATED'));
-          if (this.isGlobalCreate()) {
-            this.router.navigate(['/classes']);
-          } else {
-            this.router.navigate(['/courses', targetCourseId]);
-          }
+          this.router.navigate(['/classes', this.classId]);
         },
         error: (error) => {
           // Interceptor toasted the translated error.

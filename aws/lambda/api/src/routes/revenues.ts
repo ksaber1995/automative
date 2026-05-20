@@ -1,5 +1,5 @@
 import { query } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 export const revenuesRoutes = {
@@ -32,7 +32,11 @@ export const revenuesRoutes = {
       // Sentinel value "NULL" means "company-level only" (no branch_id) — only
       // global admins / accountants are allowed to see this slice.
       const companyLevelOnly = queryParams.branchId === 'NULL';
-      let branchIdx: number | null = null;
+      // branchTemplate is an SQL fragment with a `__COL__` placeholder for the
+      // per-table branch column; we substitute it (e.g. `e.branch_id`) per
+      // query below so a multi-branch user gets one IN(...) clause that
+      // reuses the same param placeholders across every source SELECT.
+      let branchTemplate: string | null = null;
       if (companyLevelOnly) {
         if (!isGlobalAdmin(context)) {
           return apiError(403, 'ERRORS.REVENUES.GLOBAL_ADMIN_ONLY_COMPANY_LEVEL', 'Only Global Admins can view company-level revenue');
@@ -42,11 +46,12 @@ export const revenuesRoutes = {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
-        branchIdx = params.length;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        branchIdx = params.length;
+        branchTemplate = `__COL__ = $${params.length}`;
+      } else {
+        const clause = appendBranchSqlFilter(context, params, '__COL__');
+        if (clause) branchTemplate = clause;
       }
+      const applyBranch = (col: string) => branchTemplate ? branchTemplate.replace(/__COL__/g, col) : null;
       let startIdx: number | null = null;
       if (queryParams.startDate) { params.push(queryParams.startDate); startIdx = params.length; }
       let endIdx: number | null = null;
@@ -81,7 +86,8 @@ export const revenuesRoutes = {
         JOIN students s ON e.student_id = s.id
         JOIN courses c ON e.course_id = c.id
         WHERE e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')`;
-        if (branchIdx) sql += ` AND e.branch_id = $${branchIdx}`;
+        const b = applyBranch('e.branch_id');
+        if (b) sql += ` AND ${b}`;
         if (startIdx) sql += ` AND e.enrollment_date >= $${startIdx}`;
         if (endIdx) sql += ` AND e.enrollment_date <= $${endIdx}`;
         parts.push(sql);
@@ -112,7 +118,10 @@ export const revenuesRoutes = {
         JOIN products p ON ps.product_id = p.id
         WHERE ps.company_id = $1`;
         if (companyLevelOnly) sql += ` AND ps.branch_id IS NULL`;
-        else if (branchIdx) sql += ` AND ps.branch_id = $${branchIdx}`;
+        else {
+          const b = applyBranch('ps.branch_id');
+          if (b) sql += ` AND ${b}`;
+        }
         if (startIdx) sql += ` AND ps.sale_date >= $${startIdx}`;
         if (endIdx) sql += ` AND ps.sale_date <= $${endIdx}`;
         parts.push(sql);
@@ -143,7 +152,8 @@ export const revenuesRoutes = {
         JOIN students s ON me.student_id = s.id
         JOIN master_courses mc ON me.master_course_id = mc.id
         WHERE me.company_id = $1 AND me.amount_paid > 0`;
-        if (branchIdx) sql += ` AND me.branch_id = $${branchIdx}`;
+        const b = applyBranch('me.branch_id');
+        if (b) sql += ` AND ${b}`;
         if (startIdx) sql += ` AND me.enrollment_date >= $${startIdx}`;
         if (endIdx) sql += ` AND me.enrollment_date <= $${endIdx}`;
         parts.push(sql);
@@ -181,7 +191,10 @@ export const revenuesRoutes = {
         LEFT JOIN students s ON s.id = es.student_id
         WHERE es.company_id = $1 AND es.amount > 0`;
         if (companyLevelOnly) sql += ` AND es.branch_id IS NULL`;
-        else if (branchIdx) sql += ` AND es.branch_id = $${branchIdx}`;
+        else {
+          const b = applyBranch('es.branch_id');
+          if (b) sql += ` AND ${b}`;
+        }
         if (startIdx) sql += ` AND es.payment_date >= $${startIdx}`;
         if (endIdx) sql += ` AND es.payment_date <= $${endIdx}`;
         // Pad the other branches with NULLs for event_id/event_name columns.
@@ -258,12 +271,14 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.branch_id = $${params.length}`;
         masterConditions += ` AND me.branch_id = $${params.length}`;
         eventConditions += ` AND es.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        enrollmentConditions += ` AND e.branch_id = $${params.length}`;
-        productConditions += ` AND ps.branch_id = $${params.length}`;
-        masterConditions += ` AND me.branch_id = $${params.length}`;
-        eventConditions += ` AND es.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, '__COL__');
+        if (branchClause) {
+          enrollmentConditions += ` AND ${branchClause.replace(/__COL__/g, 'e.branch_id')}`;
+          productConditions += ` AND ${branchClause.replace(/__COL__/g, 'ps.branch_id')}`;
+          masterConditions += ` AND ${branchClause.replace(/__COL__/g, 'me.branch_id')}`;
+          eventConditions += ` AND ${branchClause.replace(/__COL__/g, 'es.branch_id')}`;
+        }
       }
 
       if (queryParams.startDate) {
@@ -316,6 +331,14 @@ export const revenuesRoutes = {
       const startIdx = queryParams.startDate ? params.indexOf(queryParams.startDate) + 1 : null;
       const endIdx = queryParams.endDate ? params.indexOf(queryParams.endDate) + 1 : null;
       const branchIdx = queryParams.branchId ? params.indexOf(queryParams.branchId) + 1 : null;
+      // For multi-branch admins with no explicit branchId filter, scope the
+      // by-branch breakdown to their assigned branches. Push fresh params so
+      // we don't have to chase indices through the param array above.
+      let adminBranchClause = '';
+      if (!queryParams.branchId) {
+        const adminClause = appendBranchSqlFilter(context, params, 'b.id');
+        if (adminClause) adminBranchClause = ` AND ${adminClause}`;
+      }
 
       const byBranchQuery = `
         SELECT
@@ -356,7 +379,7 @@ export const revenuesRoutes = {
           GROUP BY branch_id
         ) evt ON evt.branch_id = b.id
         WHERE b.company_id = $1
-        ${branchIdx ? `AND b.id = $${branchIdx}` : ''}
+        ${branchIdx ? `AND b.id = $${branchIdx}` : ''}${adminBranchClause}
         GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, evt.total
         ORDER BY revenue DESC
       `;

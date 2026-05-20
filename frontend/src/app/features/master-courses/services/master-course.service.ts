@@ -48,6 +48,14 @@ export class MasterCourseService {
     return this.api.delete<{ message: string }>(`master-courses/${id}`);
   }
 
+  deactivate(id: string): Observable<MasterCourse> {
+    return this.api.post<MasterCourse>(`master-courses/${id}/deactivate`, {});
+  }
+
+  activate(id: string): Observable<MasterCourse> {
+    return this.api.post<MasterCourse>(`master-courses/${id}/activate`, {});
+  }
+
   addCourse(id: string, courseId: string): Observable<{ message: string }> {
     return this.api.post<{ message: string }>(`master-courses/${id}/courses`, { courseId });
   }

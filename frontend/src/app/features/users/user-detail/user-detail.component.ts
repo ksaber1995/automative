@@ -76,6 +76,7 @@ export class UserDetailComponent implements OnInit {
   savingPassword = signal(false);
 
   isSelf = computed(() => this.authService.currentUser()?.id === this.user()?.id);
+  canDelete = computed(() => this.authService.isGlobalAdmin() && !this.isSelf() && !!this.user());
 
   showPasswordDialog = false;
   newPassword = '';
@@ -128,6 +129,29 @@ export class UserDetailComponent implements OnInit {
           },
         });
       }
+    });
+  }
+
+  deleteUser() {
+    const u = this.user();
+    if (!u) return;
+    const name = `${u.firstName} ${u.lastName}`;
+    this.confirmationService.confirm({
+      header: this.translate.instant('USERS.DETAIL.DELETE_HEADER'),
+      message: this.translate.instant('USERS.DETAIL.DELETE_CONFIRM', { name }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.userService.delete(u.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('USERS.DETAIL.DELETED'));
+            this.router.navigate(['/users']);
+          },
+          error: () => {
+            // Interceptor toasted the translated error.
+          },
+        });
+      },
     });
   }
 

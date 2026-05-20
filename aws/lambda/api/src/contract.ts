@@ -817,6 +817,7 @@ const EmployeeSchema = z.object({
   branchId: UUIDSchema.nullable(),
   isGlobal: z.boolean(),
   isActive: z.boolean(),
+  linkedUserId: UUIDSchema.nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1290,6 +1291,32 @@ export const contract = c.router({
       responses: {
         200: ApiErrorSchema,
         404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    deactivate: {
+      method: 'POST',
+      path: '/api/courses/:id/deactivate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: CourseSchema,
+        404: ApiErrorSchema,
+        409: z.object({
+          message: z.string(),
+          code: z.string().optional(),
+          classes: z.array(z.object({ id: z.string(), name: z.string(), code: z.string() })).optional(),
+        }),
+      },
+    },
+    activate: {
+      method: 'POST',
+      path: '/api/courses/:id/activate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: CourseSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -1490,6 +1517,32 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    deactivate: {
+      method: 'POST',
+      path: '/api/master-courses/:id/deactivate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: MasterCourseSchema,
+        404: ApiErrorSchema,
+        409: z.object({
+          message: z.string(),
+          code: z.string().optional(),
+          courses: z.array(z.object({ id: z.string(), name: z.string(), code: z.string() })).optional(),
+        }),
+      },
+    },
+    activate: {
+      method: 'POST',
+      path: '/api/master-courses/:id/activate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: MasterCourseSchema,
         404: ApiErrorSchema,
       },
     },
@@ -3367,6 +3420,18 @@ export const contract = c.router({
       body: ConvertEmployeeToUserSchema,
       responses: {
         201: SafeUserSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,

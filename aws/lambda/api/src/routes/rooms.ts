@@ -1,5 +1,5 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapRoomFromDB(row: any) {
@@ -86,9 +86,9 @@ export const roomsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND r.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND r.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'r.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' ORDER BY r.code ASC';
@@ -131,9 +131,9 @@ export const roomsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND r.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND r.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'r.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' ORDER BY r.code ASC';

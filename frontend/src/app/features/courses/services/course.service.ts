@@ -40,4 +40,12 @@ export class CourseService {
   deleteCourse(id: string): Observable<Course> {
     return this.api.delete<Course>(`courses/${id}`);
   }
+
+  deactivateCourse(id: string): Observable<Course> {
+    return this.api.post<Course>(`courses/${id}/deactivate`, {});
+  }
+
+  activateCourse(id: string): Observable<Course> {
+    return this.api.post<Course>(`courses/${id}/activate`, {});
+  }
 }

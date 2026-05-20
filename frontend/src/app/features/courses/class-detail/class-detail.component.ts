@@ -278,6 +278,12 @@ export class ClassDetailComponent implements OnInit {
     this.router.navigate(['/classes']);
   }
 
+  editClass() {
+    const cls = this.classDetail();
+    if (!cls?.courseId || !this.classId) return;
+    this.router.navigate(['/courses', cls.courseId, 'classes', this.classId, 'edit']);
+  }
+
   confirmFinishCourse() {
     const cls = this.classDetail();
     if (!cls) return;

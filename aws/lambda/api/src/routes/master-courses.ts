@@ -237,6 +237,23 @@ export const masterCoursesRoutes = {
         return apiError(403, 'ERRORS.MASTER_COURSES.ACCESS_DENIED', 'Access denied to this master course');
       }
 
+      // Block hard-delete if anyone has subscribed (including cancelled — kept for audit).
+      const enrollCount = await queryOne(
+        'SELECT COUNT(*)::int AS n FROM master_enrollments WHERE master_course_id = $1',
+        [params.id]
+      );
+      if ((enrollCount?.n || 0) > 0) {
+        return apiError(
+          409,
+          'ERRORS.MASTER_COURSES.HAS_ENROLLMENTS',
+          'Master course has enrollments and cannot be deleted; deactivate it instead'
+        );
+      }
+
+      await query(
+        'DELETE FROM master_course_courses WHERE master_course_id = $1',
+        [params.id]
+      );
       await query(
         'DELETE FROM master_courses WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
@@ -245,6 +262,84 @@ export const masterCoursesRoutes = {
     } catch (error: any) {
       console.error('Delete master course error:', error);
       return mapThrownError(error, 'ERRORS.MASTER_COURSES.DELETE_FAILED', 'Failed to delete master course', 404);
+    }
+  },
+
+  deactivate: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM master_courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
+      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.MASTER_COURSES.ACCESS_DENIED', 'Access denied to this master course');
+      }
+      if (!existing.is_active) {
+        return { status: 200 as const, body: mapMasterCourseFromDB(existing) };
+      }
+
+      // A linked course blocks deactivation if it is still active OR has an active/unfinished class.
+      const blocking = await query(
+        `SELECT c.id, c.name, c.code, c.is_active,
+                COUNT(cl.id) FILTER (WHERE cl.is_active = true AND cl.is_finished = false) AS active_class_count
+         FROM master_course_courses mcc
+         JOIN courses c ON c.id = mcc.course_id
+         LEFT JOIN classes cl ON cl.course_id = c.id
+         WHERE mcc.master_course_id = $1
+         GROUP BY c.id, c.name, c.code, c.is_active
+         HAVING c.is_active = true
+             OR COUNT(cl.id) FILTER (WHERE cl.is_active = true AND cl.is_finished = false) > 0`,
+        [params.id]
+      );
+
+      if (blocking.length > 0) {
+        return {
+          status: 409 as const,
+          body: {
+            message: 'Master course has active linked courses or running classes',
+            code: 'ERRORS.MASTER_COURSES.HAS_ACTIVE_COURSES',
+            courses: blocking.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+          } as any,
+        };
+      }
+
+      const row = await update('master_courses', params.id, { is_active: false });
+      if (!row) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
+      return { status: 200 as const, body: mapMasterCourseFromDB(row) };
+    } catch (error: any) {
+      console.error('Deactivate master course error:', error);
+      return mapThrownError(error, 'ERRORS.MASTER_COURSES.UPDATE_FAILED', 'Failed to deactivate master course', 400);
+    }
+  },
+
+  activate: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM master_courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
+      if (existing.branch_id && !canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.MASTER_COURSES.ACCESS_DENIED', 'Access denied to this master course');
+      }
+
+      const row = await update('master_courses', params.id, { is_active: true });
+      if (!row) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
+      return { status: 200 as const, body: mapMasterCourseFromDB(row) };
+    } catch (error: any) {
+      console.error('Activate master course error:', error);
+      return mapThrownError(error, 'ERRORS.MASTER_COURSES.UPDATE_FAILED', 'Failed to activate master course', 400);
     }
   },
 

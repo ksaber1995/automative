@@ -83,7 +83,7 @@ export class RoomListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.branchService.getAllBranches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }

@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapEnrollmentFromDB(row: any) {
@@ -137,9 +137,9 @@ export const enrollmentsRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       if (queryParams.status) {
@@ -265,15 +265,26 @@ export const enrollmentsRoutes = {
       if (q.branchId && !canAccessBranch(context, q.branchId)) {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
-      const branchFilter = q.branchId || (!isGlobalAdmin(context) && context.branchId ? context.branchId : null);
 
-      const eConditions: string[] = ['e.company_id = $1', "e.payment_mode = 'INSTALLMENTS'", "e.payment_status != 'PAID'", "e.status != 'DROPPED'"];
+      const eConditions: string[] = ['e.company_id = $1', 'e.amount_paid < e.final_price', 'COALESCE(e.total_refunded, 0) = 0', "e.status != 'DROPPED'"];
       const eParams: any[] = [context.companyId];
-      if (branchFilter) { eConditions.push(`e.branch_id = $2`); eParams.push(branchFilter); }
+      if (q.branchId) {
+        eParams.push(q.branchId);
+        eConditions.push(`e.branch_id = $${eParams.length}`);
+      } else {
+        const c = appendBranchSqlFilter(context, eParams, 'e.branch_id');
+        if (c) eConditions.push(c);
+      }
 
-      const meConditions: string[] = ['me.company_id = $1', "me.payment_mode = 'INSTALLMENTS'", "me.payment_status != 'PAID'", "me.status != 'CANCELLED'"];
+      const meConditions: string[] = ['me.company_id = $1', 'me.amount_paid < me.final_price', 'COALESCE(me.total_refunded, 0) = 0', "me.status != 'CANCELLED'"];
       const meParams: any[] = [context.companyId];
-      if (branchFilter) { meConditions.push(`me.branch_id = $2`); meParams.push(branchFilter); }
+      if (q.branchId) {
+        meParams.push(q.branchId);
+        meConditions.push(`me.branch_id = $${meParams.length}`);
+      } else {
+        const c = appendBranchSqlFilter(context, meParams, 'me.branch_id');
+        if (c) meConditions.push(c);
+      }
 
       const [enrollmentRows, masterRows] = await Promise.all([
         query(

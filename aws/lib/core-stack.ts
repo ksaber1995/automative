@@ -243,9 +243,13 @@ export class CoreStack extends cdk.Stack {
       restApiName: `automate-magic-api-${stage}`,
       description: 'Netrofit API Gateway',
       defaultCorsPreflightOptions: {
+        // Echoing a specific origin is required because `allowCredentials: true`
+        // is incompatible with `Allow-Origin: *` per CORS spec — browsers reject
+        // the preflight outright. CDK echoes the request Origin when this list
+        // contains explicit entries.
         allowOrigins: stage === 'prod'
-          ? ['https://yourdomain.com'] // Replace with your production domain
-          : apigateway.Cors.ALL_ORIGINS,
+          ? ['https://app.netrofit.com']
+          : ['http://localhost:4200', 'https://dev.netrofit.com'],
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',
@@ -253,8 +257,12 @@ export class CoreStack extends cdk.Stack {
           'Authorization',
           'X-Api-Key',
           'X-Amz-Security-Token',
+          'Accept-Language',
         ],
         allowCredentials: true,
+        // Cache preflight 10 min so the 20–30 parallel calls the reports page
+        // fires don't each trigger their own OPTIONS round-trip.
+        maxAge: cdk.Duration.minutes(10),
       },
       deployOptions: {
         stageName: stage,
@@ -277,6 +285,32 @@ export class CoreStack extends cdk.Stack {
 
     // Also add root path
     this.api.root.addMethod('ANY', lambdaIntegration);
+
+    // When API Gateway itself returns an error (Lambda throttle → 5xx,
+    // integration timeout → 504, default 4xx, etc.) it does NOT invoke our
+    // Lambda response handler, so the response is missing CORS headers and
+    // the browser masks the real status as a CORS error. We attach the same
+    // CORS headers to the gateway-generated error responses so the browser
+    // surfaces the underlying 4xx/5xx instead of a misleading CORS failure.
+    const corsErrorHeaders = {
+      'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+      'gatewayresponse.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Accept-Language'",
+      'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,PATCH,DELETE,OPTIONS'",
+    };
+    for (const type of [
+      apigateway.ResponseType.DEFAULT_4XX,
+      apigateway.ResponseType.DEFAULT_5XX,
+      apigateway.ResponseType.INTEGRATION_TIMEOUT,
+      apigateway.ResponseType.INTEGRATION_FAILURE,
+      apigateway.ResponseType.THROTTLED,
+      apigateway.ResponseType.QUOTA_EXCEEDED,
+    ]) {
+      new apigateway.GatewayResponse(this, `GwResp-${type.responseType}`, {
+        restApi: this.api,
+        type,
+        responseHeaders: corsErrorHeaders,
+      });
+    }
 
     // =============================================
     // Optional API Gateway Custom Domain

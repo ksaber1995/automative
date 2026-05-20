@@ -399,6 +399,35 @@ export const usersRoutes = {
     }
   },
 
+  delete: async ({ params, headers }: any) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (!isGlobalAdmin(context)) {
+        return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_DELETE', 'Only Global Admins can remove users');
+      }
+
+      const existing = await queryOne<any>(
+        'SELECT id, role FROM users WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.USERS.NOT_FOUND', 'User not found');
+
+      if (existing.id === context.userId) {
+        return apiError(400, 'ERRORS.USERS.CANNOT_DELETE_SELF', 'You cannot remove your own user account');
+      }
+
+      // user_branches has ON DELETE CASCADE; created_by_user_id columns are
+      // unconstrained UUIDs so they tolerate the user disappearing.
+      await query('DELETE FROM users WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+      return { status: 200 as const, body: { message: 'User removed successfully', code: 'USERS.DELETED' } };
+
+    } catch (error) {
+      console.error('Delete user error:', error);
+      return mapThrownError(error, 'ERRORS.USERS.DELETE_FAILED', 'Failed to remove user');
+    }
+  },
+
   convertEmployee: async ({ body, headers }: any) => {
     try {
       const context = await extractTenantContext(headers.authorization);

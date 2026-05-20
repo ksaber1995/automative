@@ -7,6 +7,8 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { DividerModule } from 'primeng/divider';
 import { DialogModule } from 'primeng/dialog';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { SelectModule } from 'primeng/select';
@@ -31,9 +33,10 @@ import { Branch } from '@shared/interfaces/branch.interface';
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DividerModule,
-    DialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
+    DialogModule, ConfirmDialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
     TableModule, TooltipModule, TranslateModule,
   ],
+  providers: [ConfirmationService],
   templateUrl: './employee-detail.component.html'
 })
 export class EmployeeDetailComponent implements OnInit {
@@ -45,6 +48,7 @@ export class EmployeeDetailComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
   private translate = inject(TranslateService);
+  private confirmationService = inject(ConfirmationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -53,6 +57,9 @@ export class EmployeeDetailComponent implements OnInit {
   branchName = signal('—');
   branches = signal<Branch[]>([]);
   converting = signal(false);
+  removingUser = signal(false);
+
+  hasLinkedUser = computed(() => !!this.employee()?.linkedUserId);
   salaryHistory = signal<ExpensePayment[]>([]);
   historyLoading = signal(false);
 
@@ -228,10 +235,43 @@ export class EmployeeDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('EMPLOYEES.DETAIL.USER_CREATED', { name: `${user.firstName} ${user.lastName}` }));
         this.showConvertDialog = false;
         this.converting.set(false);
+        // Reflect the new link so the action button swaps to "Remove user".
+        const emp = this.employee();
+        if (emp) this.employee.set({ ...emp, linkedUserId: user.id });
       },
       error: () => {
         // Interceptor toasted the translated error.
         this.converting.set(false);
+      }
+    });
+  }
+
+  confirmRemoveUser() {
+    const emp = this.employee();
+    if (!emp?.linkedUserId) return;
+    this.confirmationService.confirm({
+      message: this.translate.instant('EMPLOYEES.DETAIL.REMOVE_USER_CONFIRM', { name: `${emp.firstName} ${emp.lastName}` }),
+      header: this.translate.instant('EMPLOYEES.DETAIL.REMOVE_USER_TITLE'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('EMPLOYEES.DETAIL.REMOVE_USER_ACCEPT'),
+      rejectLabel: this.translate.instant('EMPLOYEES.DETAIL.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.removeUser(),
+    });
+  }
+
+  private removeUser() {
+    const emp = this.employee();
+    if (!emp?.linkedUserId) return;
+    this.removingUser.set(true);
+    this.userService.delete(emp.linkedUserId).subscribe({
+      next: (res) => {
+        this.notificationService.success(res.message);
+        this.employee.set({ ...emp, linkedUserId: null });
+        this.removingUser.set(false);
+      },
+      error: () => {
+        this.removingUser.set(false);
       }
     });
   }

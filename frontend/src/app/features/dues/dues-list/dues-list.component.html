@@ -8,7 +8,7 @@
     <div class="flex items-center gap-4">
       <div class="text-right">
         <p class="text-xs text-gray-500 uppercase tracking-wide">{{ 'DUES.LIST.TOTAL_REMAINING' | translate }}</p>
-        <p class="font-bold text-red-600 text-xl">{{ totalRemaining().toFixed(2) }} EGP</p>
+        <p class="font-bold text-red-600 text-xl">{{ totalRemaining() | number:'1.2-2' }} EGP</p>
       </div>
     </div>
   </div>
@@ -78,9 +78,9 @@
           </td>
           <td class="text-sm text-gray-500">{{ due.branchName }}</td>
           <td class="text-sm">{{ formatDate(due.enrollmentDate) }}</td>
-          <td class="text-right font-medium">{{ due.finalPrice.toFixed(2) }}</td>
-          <td class="text-right text-green-600">{{ due.amountPaid.toFixed(2) }}</td>
-          <td class="text-right font-bold text-red-600">{{ due.remaining.toFixed(2) }}</td>
+          <td class="text-right font-medium">{{ due.finalPrice | number:'1.2-2' }}</td>
+          <td class="text-right text-green-600">{{ due.amountPaid | number:'1.2-2' }}</td>
+          <td class="text-right font-bold text-red-600">{{ due.remaining | number:'1.2-2' }}</td>
           <td style="min-width: 120px">
             <p-progressbar
               [value]="getProgress(due)"
@@ -127,9 +127,9 @@
         @if (dues().length > 0) {
           <tr>
             <td colspan="4" class="text-right font-semibold text-gray-600">{{ 'DUES.LIST.TOTALS' | translate }}</td>
-            <td class="text-right font-bold">{{ totalFinal().toFixed(2) }}</td>
-            <td class="text-right font-bold text-green-600">{{ totalPaid().toFixed(2) }}</td>
-            <td class="text-right font-bold text-red-600">{{ totalRemaining().toFixed(2) }}</td>
+            <td class="text-right font-bold">{{ totalFinal() | number:'1.2-2' }}</td>
+            <td class="text-right font-bold text-green-600">{{ totalPaid() | number:'1.2-2' }}</td>
+            <td class="text-right font-bold text-red-600">{{ totalRemaining() | number:'1.2-2' }}</td>
             <td colspan="2"></td>
           </tr>
         }
@@ -153,7 +153,7 @@
         <p class="text-sm text-gray-500">{{ selectedDue()!.courseName }}</p>
         <div class="flex justify-between mt-2 text-sm">
           <span class="text-gray-600">{{ 'DUES.LIST.REMAINING_BALANCE' | translate }}</span>
-          <span class="font-bold text-red-600">{{ selectedDue()!.remaining.toFixed(2) }} EGP</span>
+          <span class="font-bold text-red-600">{{ selectedDue()!.remaining | number:'1.2-2' }} EGP</span>
         </div>
       </div>
 
@@ -168,7 +168,7 @@
           [style]="{ width: '100%' }"
           [placeholder]="'DUES.LIST.AMOUNT_PLACEHOLDER' | translate"
         ></p-inputnumber>
-        <p class="text-xs text-gray-400 mt-1">{{ 'DUES.LIST.MAX_LABEL' | translate }} {{ selectedDue()!.remaining.toFixed(2) }} EGP</p>
+        <p class="text-xs text-gray-400 mt-1">{{ 'DUES.LIST.MAX_LABEL' | translate }} {{ selectedDue()!.remaining | number:'1.2-2' }} EGP</p>
       </div>
 
       <div>

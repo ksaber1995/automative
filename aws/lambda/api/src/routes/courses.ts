@@ -1,5 +1,5 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapCourseFromDB(row: any) {
@@ -91,9 +91,9 @@ export const coursesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND c.branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND c.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'c.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' GROUP BY c.id ORDER BY c.created_at DESC';
@@ -125,9 +125,9 @@ export const coursesRoutes = {
         }
         params.push(queryParams.branchId);
         sql += ` AND branch_id = $${params.length}`;
-      } else if (!isGlobalAdmin(context) && context.branchId) {
-        params.push(context.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
       }
 
       sql += ' ORDER BY created_at DESC';
@@ -324,11 +324,29 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_DELETE', 'Access denied to delete this course');
       }
 
-      const course = await update('courses', params.id, { is_active: false });
-
-      if (!course) {
-        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      // Reject hard-delete if anyone has ever enrolled (direct or via a master bundle).
+      // Even DROPPED enrollments are kept for audit, so we count all rows.
+      const enrollCounts = await queryOne(
+        `SELECT
+            (SELECT COUNT(*) FROM enrollments WHERE course_id = $1) AS direct,
+            (SELECT COUNT(*) FROM master_class_enrollments WHERE course_id = $1) AS bundle`,
+        [params.id]
+      );
+      const direct = parseInt(enrollCounts?.direct || '0', 10);
+      const bundle = parseInt(enrollCounts?.bundle || '0', 10);
+      if (direct + bundle > 0) {
+        return apiError(
+          409,
+          'ERRORS.COURSES.HAS_ENROLLMENTS',
+          'Course has enrollments and cannot be deleted; deactivate it instead'
+        );
       }
+
+      await query('DELETE FROM classes WHERE course_id = $1', [params.id]);
+      await query(
+        'DELETE FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
 
       return {
         status: 200 as const,
@@ -337,6 +355,88 @@ export const coursesRoutes = {
     } catch (error) {
       console.error('Delete course error:', error);
       return mapThrownError(error, 'ERRORS.COURSES.DELETE_FAILED', 'Failed to delete course', 404);
+    }
+  },
+
+  deactivate: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_UPDATE', 'Access denied to update this course');
+      }
+      if (!existing.is_active) {
+        return { status: 200 as const, body: mapCourseFromDB(existing) };
+      }
+
+      // A class blocks deactivation if it is still active AND not finished.
+      // The caller must either finish the class (status DONE) or deactivate it first.
+      const blockingClasses = await query(
+        `SELECT id, name, code, start_date
+         FROM classes
+         WHERE course_id = $1 AND is_active = true AND is_finished = false`,
+        [params.id]
+      );
+
+      if (blockingClasses.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const inProgress = blockingClasses.filter((c: any) => {
+          const start = c.start_date ? new Date(c.start_date) : null;
+          return !start || start.getTime() <= today.getTime();
+        });
+        const codeKey = inProgress.length > 0
+          ? 'ERRORS.COURSES.HAS_IN_PROGRESS_CLASSES'
+          : 'ERRORS.COURSES.HAS_ACTIVE_CLASSES';
+        return {
+          status: 409 as const,
+          body: {
+            message: 'Course has classes that must be finished or deactivated first',
+            code: codeKey,
+            classes: blockingClasses.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+          } as any,
+        };
+      }
+
+      const course = await update('courses', params.id, { is_active: false });
+      if (!course) return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      return { status: 200 as const, body: mapCourseFromDB(course) };
+    } catch (error) {
+      console.error('Deactivate course error:', error);
+      return mapThrownError(error, 'ERRORS.COURSES.UPDATE_FAILED', 'Failed to deactivate course', 400);
+    }
+  },
+
+  activate: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_UPDATE', 'Access denied to update this course');
+      }
+
+      const course = await update('courses', params.id, { is_active: true });
+      if (!course) return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      return { status: 200 as const, body: mapCourseFromDB(course) };
+    } catch (error) {
+      console.error('Activate course error:', error);
+      return mapThrownError(error, 'ERRORS.COURSES.UPDATE_FAILED', 'Failed to activate course', 400);
     }
   },
 };

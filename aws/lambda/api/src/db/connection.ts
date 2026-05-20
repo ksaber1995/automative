@@ -16,9 +16,12 @@ export async function getPool(): Promise<Pool> {
     database: process.env.DB_NAME,
     user: credentials.username,
     password: credentials.password,
-    max: 10, // Maximum number of clients in the pool
+    max: 25, // Maximum number of clients in the pool — reports/analytics
+              // routes fan out many Promise.all queries per request, and a
+              // pool of 10 left them queueing past the 2s connection timeout
+              // when several handlers ran on the same warm container.
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 5000,
     ssl: {
       rejectUnauthorized: false, // For AWS RDS
     },

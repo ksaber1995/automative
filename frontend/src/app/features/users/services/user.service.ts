@@ -52,4 +52,8 @@ export class UserService {
   convertEmployee(dto: ConvertEmployeeToUserDto): Observable<SafeUser> {
     return this.http.post<SafeUser>(`${this.base}/convert-employee`, dto);
   }
+
+  delete(id: string): Observable<{ message: string; code?: string }> {
+    return this.http.delete<{ message: string; code?: string }>(`${this.base}/${id}`);
+  }
 }

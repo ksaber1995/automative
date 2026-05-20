@@ -12,8 +12,8 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { forkJoin, of } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { forkJoin, from, of, Observable } from 'rxjs';
+import { map, mergeMap, toArray } from 'rxjs/operators';
 import {
   ReportService,
   MonthlyPLRow,
@@ -470,7 +470,23 @@ export class ReportListComponent implements OnInit {
     // branches is instant after the first load.
     const aggregateBranchId = ids.length === 1 ? ids[0] : undefined;
     const churnBranchId = ids.length === 1 ? ids[0] : undefined;
-    const aggregate$ = forkJoin({
+
+    // The AWS account this app runs in has a low Lambda concurrent-execution
+    // quota (10). A naive forkJoin would fan out 25–35 requests at once on
+    // every filter change; Lambda throttles the overflow, API Gateway returns
+    // 5xx, and the user sees random "CORS" failures. Throttle the burst to
+    // a safe ceiling so every request actually runs.
+    const MAX_CONCURRENT = 5;
+    const limitedForkJoin = <T extends Record<string, Observable<any>>>(obs: T) => {
+      const entries = Object.entries(obs) as Array<[keyof T, Observable<any>]>;
+      return from(entries).pipe(
+        mergeMap(([k, o$]) => o$.pipe(map((v) => [k, v] as const)), MAX_CONCURRENT),
+        toArray(),
+        map((pairs) => Object.fromEntries(pairs) as { [K in keyof T]: T[K] extends Observable<infer R> ? R : never }),
+      );
+    };
+
+    const aggregate$ = limitedForkJoin({
       monthlyPL: this.reportService.monthlyPL({ ...range, branchId: aggregateBranchId }),
       salary: this.reportService.salaryGrowth({ ...range, branchId: aggregateBranchId }),
       topCourses: this.reportService.topCourses({ ...range }),
@@ -484,18 +500,24 @@ export class ReportListComponent implements OnInit {
     });
 
     // Compare-mode fan-out: one parallel set of time-series calls per selected
-    // branch. Skipped (empty observable) when ≤1 branch is selected.
+    // branch. Skipped (empty observable) when ≤1 branch is selected. Each
+    // per-branch forkJoin is also throttled to keep total in-flight low.
     const compare$ = ids.length >= 2
-      ? forkJoin(
-          ids.map((id, i) =>
-            forkJoin({
-              monthlyPL: this.reportService.monthlyPL({ ...range, branchId: id }),
-              salary: this.reportService.salaryGrowth({ ...range, branchId: id }),
-              studentsOT: this.reportService.studentsOverTime({ ...range, branchId: id }),
-              churn: this.reportService.studentChurn(id, this.inactiveMonths),
-              expenseCats: this.reportService.expensesByCategory({ ...range, branchId: id }),
-            }).pipe(map((v) => ({ branchId: id, idx: i, ...v }))),
+      ? from(ids.map((id, i) => ({ id, idx: i }))).pipe(
+          mergeMap(
+            ({ id, idx }) =>
+              limitedForkJoin({
+                monthlyPL: this.reportService.monthlyPL({ ...range, branchId: id }),
+                salary: this.reportService.salaryGrowth({ ...range, branchId: id }),
+                studentsOT: this.reportService.studentsOverTime({ ...range, branchId: id }),
+                churn: this.reportService.studentChurn(id, this.inactiveMonths),
+                expenseCats: this.reportService.expensesByCategory({ ...range, branchId: id }),
+              }).pipe(map((v) => ({ branchId: id, idx, ...v }))),
+            // Process branches one at a time so the aggregate calls above
+            // share the concurrency budget without contention.
+            1,
           ),
+          toArray(),
         )
       : of([] as Array<{ branchId: string; idx: number; monthlyPL: MonthlyPLRow[]; salary: SalaryMonthRow[]; studentsOT: StudentMonthRow[]; churn: ChurnSummary; expenseCats: ExpenseCategoryRow[] }>);
 
