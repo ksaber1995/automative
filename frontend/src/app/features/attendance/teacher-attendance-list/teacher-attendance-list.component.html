@@ -101,14 +101,14 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_DATE' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_TEACHER' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_CLASS' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_BRANCH' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_ROLE' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_STATUS' | translate }}</th>
-          <th class="text-right">{{ 'TEACHER_ATTENDANCE.COL_DURATION' | translate }}</th>
-          <th>{{ 'TEACHER_ATTENDANCE.COL_NOTES' | translate }}</th>
+          <th pSortableColumn="sessionStartDate">{{ 'TEACHER_ATTENDANCE.COL_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
+          <th pSortableColumn="employeeFirstName">{{ 'TEACHER_ATTENDANCE.COL_TEACHER' | translate }} <p-sortIcon field="employeeFirstName"></p-sortIcon></th>
+          <th pSortableColumn="className">{{ 'TEACHER_ATTENDANCE.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+          <th pSortableColumn="branchName">{{ 'TEACHER_ATTENDANCE.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+          <th pSortableColumn="role">{{ 'TEACHER_ATTENDANCE.COL_ROLE' | translate }} <p-sortIcon field="role"></p-sortIcon></th>
+          <th pSortableColumn="status">{{ 'TEACHER_ATTENDANCE.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="durationMinutes">{{ 'TEACHER_ATTENDANCE.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
+          <th pSortableColumn="notes">{{ 'TEACHER_ATTENDANCE.COL_NOTES' | translate }} <p-sortIcon field="notes"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>

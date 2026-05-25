@@ -1,0 +1,153 @@
+<div class="container mx-auto p-6 max-w-4xl">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'COMPANY_PROFILE.TITLE' | translate }}</h1>
+    <p class="text-gray-600 mt-1">{{ 'COMPANY_PROFILE.SUBTITLE' | translate }}</p>
+  </div>
+
+  @if (loading()) {
+    <p-card>
+      <p-skeleton height="2rem" styleClass="mb-3"></p-skeleton>
+      <p-skeleton height="1.5rem" styleClass="mb-2"></p-skeleton>
+      <p-skeleton height="1.5rem" styleClass="mb-2"></p-skeleton>
+      <p-skeleton height="1.5rem"></p-skeleton>
+    </p-card>
+  } @else if (profile(); as p) {
+    <!-- Subscription Banner -->
+    @if (p.subscription) {
+      <div class="mb-6 rounded-lg p-5 border flex items-center gap-4"
+           [class.bg-green-50]="expirySeverity() === 'success'"
+           [class.border-green-200]="expirySeverity() === 'success'"
+           [class.bg-amber-50]="expirySeverity() === 'warn'"
+           [class.border-amber-200]="expirySeverity() === 'warn'"
+           [class.bg-red-50]="expirySeverity() === 'danger'"
+           [class.border-red-200]="expirySeverity() === 'danger'">
+        <i class="pi text-3xl"
+           [class.pi-verified]="expirySeverity() === 'success'"
+           [class.text-green-600]="expirySeverity() === 'success'"
+           [class.pi-exclamation-triangle]="expirySeverity() === 'warn'"
+           [class.text-amber-600]="expirySeverity() === 'warn'"
+           [class.pi-times-circle]="expirySeverity() === 'danger'"
+           [class.text-red-600]="expirySeverity() === 'danger'"></i>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <p-tag
+              [value]="registrationType() === 'TRIAL'
+                ? ('COMPANY_PROFILE.TYPE_TRIAL' | translate)
+                : ('COMPANY_PROFILE.TYPE_SUBSCRIPTION' | translate)"
+              [severity]="registrationType() === 'TRIAL' ? 'info' : 'success'"></p-tag>
+            <span class="text-sm text-gray-600">{{ 'COMPANY_PROFILE.STATUS_' + p.subscription.status | translate }}</span>
+          </div>
+          @if (expirationDate()) {
+            <div class="text-sm">
+              <span class="text-gray-700">{{ 'COMPANY_PROFILE.EXPIRES_ON' | translate }}:</span>
+              <span class="font-semibold ml-1">{{ expirationDate() | date: 'mediumDate' }}</span>
+              @if (daysUntilExpiry() !== null) {
+                <span class="ml-2 text-sm"
+                      [class.text-green-700]="expirySeverity() === 'success'"
+                      [class.text-amber-700]="expirySeverity() === 'warn'"
+                      [class.text-red-700]="expirySeverity() === 'danger'">
+                  @if (daysUntilExpiry()! >= 0) {
+                    ({{ 'COMPANY_PROFILE.DAYS_REMAINING' | translate: { days: daysUntilExpiry() } }})
+                  } @else {
+                    ({{ 'COMPANY_PROFILE.EXPIRED_AGO' | translate: { days: -daysUntilExpiry()! } }})
+                  }
+                </span>
+              }
+            </div>
+          }
+          @if (p.subscription.price > 0) {
+            <div class="text-sm text-gray-600 mt-1">
+              {{ 'COMPANY_PROFILE.PRICE' | translate }}: <span class="font-semibold">{{ p.subscription.price | number: '1.2-2' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Identity -->
+    <p-card styleClass="mb-4">
+      <ng-template pTemplate="header">
+        <div class="px-5 pt-4 flex items-center gap-2">
+          <i class="pi pi-building text-blue-600"></i>
+          <h2 class="text-lg font-semibold m-0">{{ 'COMPANY_PROFILE.IDENTITY' | translate }}</h2>
+        </div>
+      </ng-template>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.NAME' | translate }}</dt>
+          <dd class="font-medium text-gray-900 mt-0.5">{{ p.company.name }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.CODE' | translate }}</dt>
+          <dd class="font-mono text-sm text-gray-900 mt-0.5">{{ p.company.code || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.EMAIL' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.email || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.PHONE' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.phone || '—' }}</dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.ADDRESS' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">
+            {{ fullAddress() || '—' }}
+          </dd>
+        </div>
+      </dl>
+    </p-card>
+
+    <!-- Registration -->
+    <p-card styleClass="mb-4">
+      <ng-template pTemplate="header">
+        <div class="px-5 pt-4 flex items-center gap-2">
+          <i class="pi pi-id-card text-purple-600"></i>
+          <h2 class="text-lg font-semibold m-0">{{ 'COMPANY_PROFILE.REGISTRATION' | translate }}</h2>
+        </div>
+      </ng-template>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.REGISTRATION_NUMBER' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.registrationNumber || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.TAX_ID' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.taxId || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.INDUSTRY' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.industry || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.REGISTERED_ON' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.createdAt | date: 'mediumDate' }}</dd>
+        </div>
+      </dl>
+    </p-card>
+
+    <!-- Preferences -->
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="px-5 pt-4 flex items-center gap-2">
+          <i class="pi pi-cog text-gray-600"></i>
+          <h2 class="text-lg font-semibold m-0">{{ 'COMPANY_PROFILE.PREFERENCES' | translate }}</h2>
+        </div>
+      </ng-template>
+      <dl class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.TIMEZONE' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.timezone || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.CURRENCY' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.currency || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.LOCALE' | translate }}</dt>
+          <dd class="text-gray-900 mt-0.5">{{ p.company.locale || '—' }}</dd>
+        </div>
+      </dl>
+    </p-card>
+  }
+</div>

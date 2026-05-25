@@ -30,6 +30,7 @@ import {
 import { BranchService } from '../../branches/services/branch.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { NotificationService } from '../../../core/services/notification.service';
+import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
 
 @Component({
   selector: 'app-report-list',
@@ -637,4 +638,194 @@ export class ReportListComponent implements OnInit {
   compareChurnRows = computed(() =>
     this.compareSeries().map((b) => ({ branchName: b.branchName, color: b.color, churn: b.churn })),
   );
+
+  // ── CSV export ───────────────────────────────────────────────────────────
+  // Filename suffix: ISO date range, so files don't collide between runs.
+  private rangeSuffix(): string {
+    return `${this.toIso(this.startDate)}_${this.toIso(this.endDate)}`;
+  }
+
+  private csvFile(name: string): string {
+    return `${name}_${this.rangeSuffix()}.csv`;
+  }
+
+  exportMonthlyPL() {
+    if (this.compareMode()) {
+      const rows = this.compareSeries().flatMap(b =>
+        b.monthlyPL.map(r => ({ branch: b.branchName, ...r })),
+      );
+      const cols: CsvColumn<{ branch: string } & MonthlyPLRow>[] = [
+        { header: 'Branch', value: r => r.branch },
+        { header: 'Month', value: r => r.month },
+        { header: 'Revenue', value: r => r.revenue },
+        { header: 'Expenses', value: r => r.expenses },
+        { header: 'Net Profit', value: r => r.netProfit },
+      ];
+      downloadCsv(this.csvFile('monthly_pl'), rows, cols);
+      return;
+    }
+    const cols: CsvColumn<MonthlyPLRow>[] = [
+      { header: 'Month', value: r => r.month },
+      { header: 'Revenue', value: r => r.revenue },
+      { header: 'Expenses', value: r => r.expenses },
+      { header: 'Net Profit', value: r => r.netProfit },
+    ];
+    downloadCsv(this.csvFile('monthly_pl'), this.monthlyPL(), cols);
+  }
+
+  exportExpenseCats() {
+    const cols: CsvColumn<ExpenseCategoryRow>[] = [
+      { header: 'Category', value: r => r.category },
+      { header: 'Total', value: r => r.total },
+      { header: 'Count', value: r => r.count },
+    ];
+    downloadCsv(this.csvFile('expenses_by_category'), this.visibleExpenseCats(), cols);
+  }
+
+  exportSalary() {
+    if (this.compareMode()) {
+      const rows = this.compareSeries().flatMap(b =>
+        b.salary.map(r => ({ branch: b.branchName, ...r })),
+      );
+      const cols: CsvColumn<{ branch: string } & SalaryMonthRow>[] = [
+        { header: 'Branch', value: r => r.branch },
+        { header: 'Month', value: r => r.month },
+        { header: 'Total', value: r => r.total },
+      ];
+      downloadCsv(this.csvFile('salary_growth'), rows, cols);
+      return;
+    }
+    const cols: CsvColumn<SalaryMonthRow>[] = [
+      { header: 'Month', value: r => r.month },
+      { header: 'Total', value: r => r.total },
+    ];
+    downloadCsv(this.csvFile('salary_growth'), this.salary(), cols);
+  }
+
+  exportStudentsOverTime() {
+    if (this.compareMode()) {
+      const rows = this.compareSeries().flatMap(b =>
+        b.studentsOT.map(r => ({ branch: b.branchName, ...r })),
+      );
+      const cols: CsvColumn<{ branch: string } & StudentMonthRow>[] = [
+        { header: 'Branch', value: r => r.branch },
+        { header: 'Month', value: r => r.month },
+        { header: 'New Students', value: r => r.newStudents },
+        { header: 'Churned', value: r => r.churned },
+      ];
+      downloadCsv(this.csvFile('students_over_time'), rows, cols);
+      return;
+    }
+    const cols: CsvColumn<StudentMonthRow>[] = [
+      { header: 'Month', value: r => r.month },
+      { header: 'New Students', value: r => r.newStudents },
+      { header: 'Churned', value: r => r.churned },
+    ];
+    downloadCsv(this.csvFile('students_over_time'), this.studentsOT(), cols);
+  }
+
+  exportChurn() {
+    if (this.compareMode()) {
+      const rows = this.compareChurnRows();
+      const cols: CsvColumn<typeof rows[number]>[] = [
+        { header: 'Branch', value: r => r.branchName },
+        { header: 'Total Students', value: r => r.churn?.totalStudents ?? 0 },
+        { header: 'Active', value: r => r.churn?.activeStudents ?? 0 },
+        { header: 'Churned', value: r => r.churn?.churnedStudents ?? 0 },
+        { header: 'Inactive', value: r => r.churn?.inactiveStudents ?? 0 },
+        { header: 'Churn Rate (%)', value: r => r.churn?.churnRate ?? 0 },
+        { header: 'Inactivity Rate (%)', value: r => r.churn?.inactivityRate ?? 0 },
+        { header: 'Inactive Months Window', value: r => r.churn?.inactiveMonths ?? this.inactiveMonths },
+      ];
+      downloadCsv(this.csvFile('churn'), rows, cols);
+      return;
+    }
+    const c = this.churn();
+    if (!c) {
+      downloadCsv(this.csvFile('churn'), [], [{ header: 'Metric', value: () => '' }, { header: 'Value', value: () => '' }]);
+      return;
+    }
+    const rows = [
+      { metric: 'Total Students', value: c.totalStudents },
+      { metric: 'Active', value: c.activeStudents },
+      { metric: 'Churned', value: c.churnedStudents },
+      { metric: 'Inactive', value: c.inactiveStudents },
+      { metric: 'Churn Rate (%)', value: c.churnRate },
+      { metric: 'Inactivity Rate (%)', value: c.inactivityRate },
+      { metric: 'Inactive Months Window', value: c.inactiveMonths },
+    ];
+    const cols: CsvColumn<typeof rows[number]>[] = [
+      { header: 'Metric', value: r => r.metric },
+      { header: 'Value', value: r => r.value },
+    ];
+    downloadCsv(this.csvFile('churn'), rows, cols);
+  }
+
+  exportTopCourses() {
+    const cols: CsvColumn<TopCourseRow>[] = [
+      { header: 'Type', value: r => r.type },
+      { header: 'Course', value: r => r.courseName },
+      { header: 'Code', value: r => r.courseCode },
+      { header: 'Branch', value: r => r.branchName },
+      { header: 'Enrollments', value: r => r.enrollmentCount },
+      { header: 'Revenue', value: r => r.revenue },
+    ];
+    downloadCsv(this.csvFile('top_courses'), this.visibleTopCourses(), cols);
+  }
+
+  exportProfitByCourse() {
+    const cols: CsvColumn<ProfitByCourseRow>[] = [
+      { header: 'Type', value: r => r.type },
+      { header: 'Course', value: r => r.courseName },
+      { header: 'Code', value: r => r.courseCode },
+      { header: 'Branch', value: r => r.branchName },
+      { header: 'Enrollments', value: r => r.enrollments },
+      { header: 'Revenue', value: r => r.revenue },
+      { header: 'Avg Price', value: r => r.avgPrice },
+    ];
+    downloadCsv(this.csvFile('profit_by_course'), this.visibleProfitCourses(), cols);
+  }
+
+  exportProfitByBranch() {
+    const cols: CsvColumn<ProfitByBranchRow>[] = [
+      { header: 'Branch', value: r => r.branchName },
+      { header: 'Code', value: r => r.branchCode },
+      { header: 'Revenue', value: r => r.revenue },
+      { header: 'Expenses', value: r => r.expenses },
+      { header: 'Net Profit', value: r => r.netProfit },
+      { header: 'Active Students', value: r => r.activeStudents },
+    ];
+    downloadCsv(this.csvFile('profit_by_branch'), this.visibleProfitBranches(), cols);
+  }
+
+  exportProfitByProduct() {
+    const cols: CsvColumn<ProfitByProductRow>[] = [
+      { header: 'Product', value: r => r.productName },
+      { header: 'Code', value: r => r.productCode },
+      { header: 'Branch', value: r => r.branchName },
+      { header: 'Units Sold', value: r => r.unitsSold },
+      { header: 'Revenue', value: r => r.revenue },
+      { header: 'Cost', value: r => r.cost },
+      { header: 'Margin', value: r => r.margin },
+      { header: 'Current Stock', value: r => r.currentStock },
+    ];
+    downloadCsv(this.csvFile('profit_by_product'), this.visibleProfitProducts(), cols);
+  }
+
+  exportProfitByEvent() {
+    const cols: CsvColumn<ProfitByEventRow>[] = [
+      { header: 'Event', value: r => r.name },
+      { header: 'Code', value: r => r.code },
+      { header: 'Type', value: r => r.eventType },
+      { header: 'Branch', value: r => r.branchName },
+      { header: 'Status', value: r => r.status },
+      { header: 'Subscribers', value: r => r.subscriberCount },
+      { header: 'Revenue', value: r => r.revenue },
+      { header: 'Product Margin', value: r => r.productMargin },
+      { header: 'Refunds', value: r => r.refunds },
+      { header: 'Expenses', value: r => r.expenses },
+      { header: 'Net Profit', value: r => r.netProfit },
+    ];
+    downloadCsv(this.csvFile('profit_by_event'), this.visibleProfitEvents(), cols);
+  }
 }

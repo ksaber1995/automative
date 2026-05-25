@@ -184,6 +184,13 @@ export const branchesRoutes = {
         return apiError(404, 'ERRORS.BRANCHES.NOT_FOUND', 'Branch not found');
       }
 
+      if (body.isActive === false) {
+        await query(
+          'UPDATE master_courses SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE branch_id = $1 AND company_id = $2',
+          [params.id, context.companyId]
+        );
+      }
+
       return {
         status: 200 as const,
         body: mapBranchFromDB(branch),
@@ -425,6 +432,10 @@ export const branchesRoutes = {
           await client.query(
             'UPDATE branches SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
             [params.id]
+          );
+          await client.query(
+            'UPDATE master_courses SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE branch_id = $1 AND company_id = $2',
+            [params.id, context.companyId]
           );
         } else {
           // Cascade user access for hard deletes. user_branches has ON DELETE

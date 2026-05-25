@@ -12,10 +12,12 @@
       <div class="flex items-center gap-4">
         @if (currentUser(); as user) {
           <!-- Company Badge -->
-          <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+          <a routerLink="/company-profile"
+             class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+             [pTooltip]="'COMPANY_PROFILE.OPEN' | translate">
             <i class="pi pi-building text-blue-600 text-sm"></i>
             <span class="text-sm font-medium text-blue-700">{{ getCompanyName(user) }}</span>
-          </div>
+          </a>
 
           <!-- User Info -->
           <div class="flex items-center gap-3">

@@ -112,9 +112,9 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th>{{ 'CLASSES.DETAIL.COL_STUDENT' | translate }}</th>
-                <th>{{ 'CLASSES.DETAIL.COL_ENROLLED' | translate }}</th>
-                <th>{{ 'CLASSES.DETAIL.COL_STATUS' | translate }}</th>
+                <th pSortableColumn="studentFirstName">{{ 'CLASSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentFirstName"></p-sortIcon></th>
+                <th pSortableColumn="enrollmentDate">{{ 'CLASSES.DETAIL.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+                <th pSortableColumn="status">{{ 'CLASSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                 <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
               </tr>
             </ng-template>
@@ -191,11 +191,11 @@
             >
               <ng-template pTemplate="header">
                 <tr>
-                  <th>{{ 'CLASSES.DETAIL.COL_ROOM' | translate }}</th>
-                  <th>{{ 'CLASSES.DETAIL.COL_STARTED' | translate }}</th>
-                  <th>{{ 'CLASSES.DETAIL.COL_ENDED' | translate }}</th>
-                  <th>{{ 'CLASSES.DETAIL.COL_DURATION' | translate }}</th>
-                  <th>{{ 'CLASSES.DETAIL.COL_STATUS' | translate }}</th>
+                  <th pSortableColumn="roomCode">{{ 'CLASSES.DETAIL.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+                  <th pSortableColumn="startDate">{{ 'CLASSES.DETAIL.COL_STARTED' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
+                  <th pSortableColumn="endDate">{{ 'CLASSES.DETAIL.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
+                  <th pSortableColumn="durationMinutes">{{ 'CLASSES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
+                  <th pSortableColumn="endDate">{{ 'CLASSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
                   <th>{{ 'CLASSES.DETAIL.COL_ATTENDANCE' | translate }}</th>
                 </tr>
               </ng-template>
@@ -260,11 +260,11 @@
               <p-table [value]="attendanceSummary()" responsiveLayout="scroll">
                 <ng-template pTemplate="header">
                   <tr>
-                    <th>{{ 'CLASSES.DETAIL.COL_SESSION_DATE' | translate }}</th>
-                    <th>{{ 'CLASSES.DETAIL.COL_ROOM' | translate }}</th>
-                    <th>{{ 'CLASSES.DETAIL.COL_PRESENT' | translate }}</th>
-                    <th>{{ 'CLASSES.DETAIL.COL_ABSENT' | translate }}</th>
-                    <th>{{ 'CLASSES.DETAIL.COL_RATE' | translate }}</th>
+                    <th pSortableColumn="sessionStartDate">{{ 'CLASSES.DETAIL.COL_SESSION_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
+                    <th pSortableColumn="roomCode">{{ 'CLASSES.DETAIL.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+                    <th pSortableColumn="presentCount">{{ 'CLASSES.DETAIL.COL_PRESENT' | translate }} <p-sortIcon field="presentCount"></p-sortIcon></th>
+                    <th pSortableColumn="absentCount">{{ 'CLASSES.DETAIL.COL_ABSENT' | translate }} <p-sortIcon field="absentCount"></p-sortIcon></th>
+                    <th pSortableColumn="presentCount">{{ 'CLASSES.DETAIL.COL_RATE' | translate }} <p-sortIcon field="presentCount"></p-sortIcon></th>
                     <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
                   </tr>
                 </ng-template>

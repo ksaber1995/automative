@@ -65,13 +65,14 @@
 
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'PRODUCTS.LIST.COL_CODE' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_NAME' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_CATEGORY' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_COST' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_SELL' | translate }}</th>
-          <th>{{ 'PRODUCTS.LIST.COL_STOCK' | translate }}</th>
+          <th pSortableColumn="code">{{ 'PRODUCTS.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
+          <th pSortableColumn="name">{{ 'PRODUCTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'PRODUCTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="category">{{ 'PRODUCTS.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
+          <th pSortableColumn="costPrice">{{ 'PRODUCTS.LIST.COL_COST' | translate }} <p-sortIcon field="costPrice"></p-sortIcon></th>
+          <th pSortableColumn="sellingPrice">{{ 'PRODUCTS.LIST.COL_SELL' | translate }} <p-sortIcon field="sellingPrice"></p-sortIcon></th>
+          <th pSortableColumn="stock">{{ 'PRODUCTS.LIST.COL_STOCK' | translate }} <p-sortIcon field="stock"></p-sortIcon></th>
+          <th pSortableColumn="totalSold">{{ 'PRODUCTS.LIST.COL_SOLD' | translate }} <p-sortIcon field="totalSold"></p-sortIcon></th>
           <th>{{ 'PRODUCTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -94,6 +95,9 @@
             } @else {
               <span class="text-green-600">{{ product.stock || 0 }}</span>
             }
+          </td>
+          <td>
+            <span class="font-semibold text-blue-600">{{ product.totalSold || 0 }}</span>
           </td>
           <td>
             <div class="flex gap-2">
@@ -140,7 +144,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center py-8 text-gray-500">
+          <td colspan="9" class="text-center py-8 text-gray-500">
             {{ 'PRODUCTS.LIST.NO_PRODUCTS' | translate }}
           </td>
         </tr>

@@ -110,12 +110,13 @@ export class OverviewComponent implements OnInit {
   }
 
   getAllocationLabel(method: string): string {
-    const labels: Record<string, string> = {
-      PROPORTIONAL: 'Proportional Allocation',
-      EQUAL: 'Equal Split',
-      OVERHEAD: 'Global Overhead Bucket',
+    const keys: Record<string, string> = {
+      PROPORTIONAL: 'DASHBOARD.ALLOCATION_PROPORTIONAL',
+      EQUAL: 'DASHBOARD.ALLOCATION_EQUAL',
+      OVERHEAD: 'DASHBOARD.ALLOCATION_OVERHEAD',
     };
-    return labels[method] || method;
+    const key = keys[method];
+    return key ? this.translate.instant(key) : method;
   }
 
   getAllocationIcon(method: string): string {

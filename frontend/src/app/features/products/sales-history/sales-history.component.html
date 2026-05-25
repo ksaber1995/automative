@@ -84,16 +84,16 @@
 
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'PRODUCTS.SALES.COL_DATE' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_QTY' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_UNIT_PRICE' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_DISCOUNT' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_TOTAL' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_REFUND_STATUS' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_PAYMENT' | translate }}</th>
-          <th>{{ 'PRODUCTS.SALES.COL_CUSTOMER' | translate }}</th>
+          <th pSortableColumn="saleDate">{{ 'PRODUCTS.SALES.COL_DATE' | translate }} <p-sortIcon field="saleDate"></p-sortIcon></th>
+          <th pSortableColumn="productName">{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="quantity">{{ 'PRODUCTS.SALES.COL_QTY' | translate }} <p-sortIcon field="quantity"></p-sortIcon></th>
+          <th pSortableColumn="unitPrice">{{ 'PRODUCTS.SALES.COL_UNIT_PRICE' | translate }} <p-sortIcon field="unitPrice"></p-sortIcon></th>
+          <th pSortableColumn="discountAmount">{{ 'PRODUCTS.SALES.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
+          <th pSortableColumn="totalAmount">{{ 'PRODUCTS.SALES.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
+          <th pSortableColumn="totalRefunded">{{ 'PRODUCTS.SALES.COL_REFUND_STATUS' | translate }} <p-sortIcon field="totalRefunded"></p-sortIcon></th>
+          <th pSortableColumn="paymentMethod">{{ 'PRODUCTS.SALES.COL_PAYMENT' | translate }} <p-sortIcon field="paymentMethod"></p-sortIcon></th>
+          <th pSortableColumn="customerName">{{ 'PRODUCTS.SALES.COL_CUSTOMER' | translate }} <p-sortIcon field="customerName"></p-sortIcon></th>
           <th>{{ 'PRODUCTS.SALES.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

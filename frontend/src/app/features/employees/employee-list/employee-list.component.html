@@ -52,13 +52,13 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'EMPLOYEES.LIST.COL_NAME' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_POSITION' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_DEPARTMENT' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_SALARY' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_HIRE_DATE' | translate }}</th>
-          <th>{{ 'EMPLOYEES.LIST.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="firstName">{{ 'EMPLOYEES.LIST.COL_NAME' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
+          <th pSortableColumn="position">{{ 'EMPLOYEES.LIST.COL_POSITION' | translate }} <p-sortIcon field="position"></p-sortIcon></th>
+          <th pSortableColumn="department">{{ 'EMPLOYEES.LIST.COL_DEPARTMENT' | translate }} <p-sortIcon field="department"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'EMPLOYEES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="salary">{{ 'EMPLOYEES.LIST.COL_SALARY' | translate }} <p-sortIcon field="salary"></p-sortIcon></th>
+          <th pSortableColumn="hireDate">{{ 'EMPLOYEES.LIST.COL_HIRE_DATE' | translate }} <p-sortIcon field="hireDate"></p-sortIcon></th>
+          <th pSortableColumn="isActive">{{ 'EMPLOYEES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
           <th>{{ 'EMPLOYEES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

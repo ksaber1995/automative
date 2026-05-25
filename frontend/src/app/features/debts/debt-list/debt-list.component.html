@@ -43,14 +43,14 @@
 
       <ng-template pTemplate="header">
         <tr>
-          <th>Creditor</th>
-          <th>Type</th>
-          <th>Principal</th>
-          <th>Current Balance</th>
+          <th pSortableColumn="creditorName">Creditor <p-sortIcon field="creditorName"></p-sortIcon></th>
+          <th pSortableColumn="debtType">Type <p-sortIcon field="debtType"></p-sortIcon></th>
+          <th pSortableColumn="principalAmount">Principal <p-sortIcon field="principalAmount"></p-sortIcon></th>
+          <th pSortableColumn="currentBalance">Current Balance <p-sortIcon field="currentBalance"></p-sortIcon></th>
           <th>Progress</th>
-          <th>Interest Rate</th>
-          <th>Due Date</th>
-          <th>Status</th>
+          <th pSortableColumn="interestRate">Interest Rate <p-sortIcon field="interestRate"></p-sortIcon></th>
+          <th pSortableColumn="dueDate">Due Date <p-sortIcon field="dueDate"></p-sortIcon></th>
+          <th pSortableColumn="status">Status <p-sortIcon field="status"></p-sortIcon></th>
           <th>Actions</th>
         </tr>
       </ng-template>

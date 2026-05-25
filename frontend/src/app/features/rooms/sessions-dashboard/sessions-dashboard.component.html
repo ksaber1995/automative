@@ -378,13 +378,13 @@
         >
           <ng-template pTemplate="header">
             <tr>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_CLASS' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_COURSE' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }}</th>
-              <th>{{ 'SESSIONS_DASHBOARD.COL_STATUS' | translate }}</th>
+              <th pSortableColumn="roomCode">{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+              <th pSortableColumn="className">{{ 'SESSIONS_DASHBOARD.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+              <th pSortableColumn="courseName">{{ 'SESSIONS_DASHBOARD.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+              <th pSortableColumn="startDate">{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
+              <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
+              <th pSortableColumn="durationMinutes">{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
+              <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_STATUS' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-session>

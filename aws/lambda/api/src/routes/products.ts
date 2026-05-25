@@ -3,7 +3,7 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapProductFromDB(row: any) {
-  return {
+  const mapped: any = {
     id: row.id,
     companyId: row.company_id,
     name: row.name,
@@ -20,6 +20,10 @@ function mapProductFromDB(row: any) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (row.total_sold !== undefined) {
+    mapped.totalSold = parseInt(row.total_sold) || 0;
+  }
+  return mapped;
 }
 
 export const productsRoutes = {
@@ -92,7 +96,10 @@ export const productsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = 'SELECT * FROM products WHERE company_id = $1 AND is_active = true';
+      let sql = `SELECT products.*,
+                        COALESCE((SELECT SUM(ps.quantity) FROM product_sales ps WHERE ps.product_id = products.id), 0) AS total_sold
+                 FROM products
+                 WHERE company_id = $1 AND is_active = true`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {

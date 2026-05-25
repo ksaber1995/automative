@@ -80,11 +80,11 @@
 
       <ng-template pTemplate="header">
         <tr class="bg-gray-50">
-          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_USER' | translate }}</th>
-          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_ROLE' | translate }}</th>
+          <th pSortableColumn="firstName" class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_USER' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
+          <th pSortableColumn="role" class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_ROLE' | translate }} <p-sortIcon field="role"></p-sortIcon></th>
           <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_BRANCHES' | translate }}</th>
-          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_LINKED' | translate }}</th>
-          <th class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="linkedEmployeeId" class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_LINKED' | translate }} <p-sortIcon field="linkedEmployeeId"></p-sortIcon></th>
+          <th pSortableColumn="isActive" class="font-semibold text-gray-600">{{ 'USERS.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
           <th class="font-semibold text-gray-600 text-center">{{ 'USERS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

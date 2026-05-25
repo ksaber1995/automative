@@ -122,11 +122,11 @@
           <ng-template pTemplate="header">
             <tr>
               <th style="width: 3rem"></th>
-              <th>{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }}</th>
-              <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+              <th pSortableColumn="masterCourseName">{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }} <p-sortIcon field="masterCourseName"></p-sortIcon></th>
+              <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+              <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+              <th pSortableColumn="completedCourses">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+              <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
               <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
             </tr>
           </ng-template>
@@ -139,7 +139,7 @@
                   [rounded]="true"
                   severity="secondary"
                   [pRowToggler]="me"
-                  [pTooltip]="expanded ? 'Hide courses' : 'View courses'"
+                  [pTooltip]="(expanded ? 'STUDENTS.DETAIL.HIDE_COURSES' : 'STUDENTS.DETAIL.VIEW_COURSES') | translate"
                 ></p-button>
               </td>
               <td>
@@ -185,7 +185,7 @@
                       [text]="true"
                       severity="success"
                       (onClick)="openMasterPaymentDialog(me)"
-                      pTooltip="Record payment"
+                      [pTooltip]="'STUDENTS.DETAIL.RECORD_PAYMENT_TOOLTIP' | translate"
                     ></p-button>
                   }
                   @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
@@ -223,13 +223,13 @@
                     <div class="mb-5">
                       <div class="flex items-center gap-2 mb-2">
                         <i class="pi pi-credit-card text-green-600"></i>
-                        <span class="font-semibold text-gray-700 text-sm">Installment Payments</span>
+                        <span class="font-semibold text-gray-700 text-sm">{{ 'STUDENTS.DETAIL.INSTALLMENT_PAYMENTS' | translate }}</span>
                         <span class="text-xs text-gray-400">
-                          {{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }} paid
+                          {{ 'STUDENTS.DETAIL.PAID_OF_TOTAL' | translate: { paid: me.amountPaid.toFixed(2), total: me.finalPrice.toFixed(2) } }}
                         </span>
                         @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
                           <span class="text-xs text-red-500 font-medium ml-1">
-                            · {{ (me.finalPrice - me.amountPaid).toFixed(2) }} remaining
+                            · {{ (me.finalPrice - me.amountPaid).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING_LOWER' | translate }}
                           </span>
                         }
                       </div>
@@ -248,11 +248,11 @@
                           </div>
                         }
                         @if (getMasterPaymentHistory(me.id).length === 0) {
-                          <p class="text-xs text-gray-400 italic">No payments recorded yet.</p>
+                          <p class="text-xs text-gray-400 italic">{{ 'STUDENTS.DETAIL.NO_INSTALLMENT_PAYMENTS_YET' | translate }}</p>
                         }
                         @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
                           <div class="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-sm">
-                            <span class="text-red-500 text-xs font-medium">Remaining balance</span>
+                            <span class="text-red-500 text-xs font-medium">{{ 'STUDENTS.DETAIL.REMAINING_BALANCE' | translate }}</span>
                             <span class="font-bold text-red-600">{{ (me.finalPrice - me.amountPaid).toFixed(2) }}</span>
                           </div>
                         }
@@ -268,16 +268,16 @@
                   <div class="flex items-center gap-2 mb-4">
                     <i class="pi pi-book text-purple-600"></i>
                     <h4 class="font-semibold text-purple-900 text-sm">
-                      Courses in <span class="font-bold">{{ me.masterCourseName }}</span>
+                      {{ 'STUDENTS.DETAIL.COURSES_IN' | translate }} <span class="font-bold">{{ me.masterCourseName }}</span>
                     </h4>
                     <span class="text-xs text-purple-500 bg-purple-100 rounded-full px-2 py-0.5">
-                      {{ me.completedCourses }}/{{ me.totalCourses }} completed
+                      {{ 'STUDENTS.DETAIL.COMPLETED_OF_TOTAL' | translate: { completed: me.completedCourses, total: me.totalCourses } }}
                     </span>
                   </div>
 
                   @if (getLinkedCourses(me.masterCourseId).length === 0) {
                     <div class="flex items-center gap-2 text-sm text-gray-400 py-2">
-                      <i class="pi pi-spin pi-spinner"></i> Loading courses…
+                      <i class="pi pi-spin pi-spinner"></i> {{ 'STUDENTS.DETAIL.LOADING_COURSES' | translate }}
                     </div>
                   } @else {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -320,7 +320,7 @@
                               @if (me.status === 'ACTIVE') {
                                 <p-button
                                   icon="pi pi-user-plus"
-                                  label="Re-join"
+                                  [label]="'STUDENTS.DETAIL.BUNDLE_REJOIN' | translate"
                                   size="small"
                                   severity="help"
                                   [outlined]="true"
@@ -328,11 +328,11 @@
                                 ></p-button>
                               }
                             } @else {
-                              <p-tag value="Not Enrolled" severity="secondary" styleClass="text-xs"></p-tag>
+                              <p-tag [value]="'STUDENTS.DETAIL.BUNDLE_NOT_ENROLLED' | translate" severity="secondary" styleClass="text-xs"></p-tag>
                               @if (me.status === 'ACTIVE') {
                                 <p-button
                                   icon="pi pi-user-plus"
-                                  label="Join"
+                                  [label]="'STUDENTS.DETAIL.BUNDLE_JOIN' | translate"
                                   size="small"
                                   severity="help"
                                   [outlined]="true"
@@ -358,11 +358,11 @@
                 <p-table [value]="finishedMasterEnrollments()" responsiveLayout="scroll" dataKey="id">
                   <ng-template pTemplate="header">
                     <tr>
-                      <th>{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }}</th>
-                      <th>{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }}</th>
-                      <th class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }}</th>
-                      <th class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }}</th>
-                      <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
+                      <th pSortableColumn="masterCourseName">{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }} <p-sortIcon field="masterCourseName"></p-sortIcon></th>
+                      <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+                      <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+                      <th pSortableColumn="completedCourses" class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+                      <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                       <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
                     </tr>
                   </ng-template>
@@ -433,13 +433,13 @@
         <ng-template pTemplate="header">
           <tr>
             <th style="width: 3rem"></th>
-            <th>{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_MODE' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_PAID' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }}</th>
-            <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
+            <th pSortableColumn="courseId">{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }} <p-sortIcon field="courseId"></p-sortIcon></th>
+            <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+            <th pSortableColumn="finalPrice">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }} <p-sortIcon field="finalPrice"></p-sortIcon></th>
+            <th pSortableColumn="paymentMode">{{ 'STUDENTS.DETAIL.COL_MODE' | translate }} <p-sortIcon field="paymentMode"></p-sortIcon></th>
+            <th pSortableColumn="amountPaid">{{ 'STUDENTS.DETAIL.COL_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+            <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+            <th pSortableColumn="paymentStatus">{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
             <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
@@ -525,7 +525,7 @@
                 <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
                 @if (hasRefund(enrollment)) {
                   <p-tag
-                    [value]="'Refund: -' + (enrollment.totalRefunded).toFixed(2)"
+                    [value]="'STUDENTS.DETAIL.REFUND_TAG' | translate: { amount: (enrollment.totalRefunded).toFixed(2) }"
                     severity="warn"
                     styleClass="text-xs"
                     [pTooltip]="'STUDENTS.DETAIL.CLICK_EXPAND' | translate"
@@ -657,12 +657,12 @@
               <p-table [value]="finishedEnrollments()" responsiveLayout="scroll" dataKey="id">
                 <ng-template pTemplate="header">
                   <tr>
-                    <th>{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</th>
-                    <th>{{ 'STUDENTS.DETAIL.COL_DATE' | translate }}</th>
-                    <th>{{ 'STUDENTS.DETAIL.COL_COMPLETION_DATE' | translate }}</th>
-                    <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }}</th>
-                    <th class="text-right">{{ 'STUDENTS.DETAIL.COL_PAID' | translate }}</th>
-                    <th>{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }}</th>
+                    <th pSortableColumn="courseId">{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }} <p-sortIcon field="courseId"></p-sortIcon></th>
+                    <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+                    <th pSortableColumn="completionDate">{{ 'STUDENTS.DETAIL.COL_COMPLETION_DATE' | translate }} <p-sortIcon field="completionDate"></p-sortIcon></th>
+                    <th pSortableColumn="finalPrice" class="text-right">{{ 'STUDENTS.DETAIL.COL_PRICING' | translate }} <p-sortIcon field="finalPrice"></p-sortIcon></th>
+                    <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+                    <th pSortableColumn="paymentStatus">{{ 'STUDENTS.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
                     <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
                   </tr>
                 </ng-template>
@@ -746,10 +746,10 @@
         <p-table [value]="attendanceRecords()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
-              <th>{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_DATE' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_CLASS' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_ROOM' | translate }}</th>
-              <th>{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_STATUS' | translate }}</th>
+              <th pSortableColumn="sessionStartDate">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
+              <th pSortableColumn="className">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+              <th pSortableColumn="roomCode">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+              <th pSortableColumn="isPresent">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_STATUS' | translate }} <p-sortIcon field="isPresent"></p-sortIcon></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-rec>
@@ -809,7 +809,7 @@
     </div>
     <div>
       <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.NOTES_LABEL' | translate }}</label>
-      <textarea pTextarea [(ngModel)]="dialogPaymentNotes" rows="2" class="w-full" placeholder="Optional notes..."></textarea>
+      <textarea pTextarea [(ngModel)]="dialogPaymentNotes" rows="2" class="w-full" [placeholder]="'STUDENTS.DETAIL.NOTES_PLACEHOLDER' | translate"></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
@@ -863,7 +863,7 @@
     </div>
     <div>
       <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.REASON' | translate }}</label>
-      <textarea pTextarea [(ngModel)]="refundReason" rows="2" class="w-full" placeholder="Reason for refund..."></textarea>
+      <textarea pTextarea [(ngModel)]="refundReason" rows="2" class="w-full" [placeholder]="'STUDENTS.DETAIL.REASON_PLACEHOLDER' | translate"></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
@@ -878,40 +878,40 @@
 <p-dialog
   [(visible)]="showMasterPaymentDialog"
   [modal]="true"
-  header="Record Installment Payment"
+  [header]="'STUDENTS.DETAIL.MASTER_INSTALL_DIALOG_TITLE' | translate"
   [style]="{ width: '420px' }"
 >
   @if (masterEnrollmentForAction(); as me) {
     <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm grid grid-cols-2 gap-2">
       <div class="col-span-2 font-semibold text-purple-900">🎁 {{ me.masterCourseName }}</div>
-      <div><span class="text-gray-500">Total price</span> <strong>{{ me.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">Paid so far</span> <strong class="text-green-600">{{ me.amountPaid.toFixed(2) }}</strong></div>
-      <div class="col-span-2"><span class="text-gray-500">Remaining</span> <strong class="text-red-600">{{ masterPaymentRemaining().toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_TOTAL_PRICE' | translate }}</span> <strong>{{ me.finalPrice.toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_PAID_SO_FAR' | translate }}</span> <strong class="text-green-600">{{ me.amountPaid.toFixed(2) }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_REMAINING' | translate }}</span> <strong class="text-red-600">{{ masterPaymentRemaining().toFixed(2) }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
     <div>
-      <label class="block text-sm font-medium mb-2">Amount <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.AMOUNT' | translate }} <span class="text-red-500">*</span></label>
       <p-inputnumber
         [(ngModel)]="masterDialogPaymentAmount"
         [min]="0.01"
         [max]="masterPaymentRemaining()"
-        placeholder="Enter payment amount"
+        [placeholder]="'STUDENTS.DETAIL.MASTER_PAYMENT_AMOUNT_PLACEHOLDER' | translate"
         [style]="{ width: '100%' }"
       />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Payment Date <span class="text-red-500">*</span></label>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
       <p-datepicker [(ngModel)]="masterDialogPaymentDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-2">Notes</label>
-      <textarea pTextarea [(ngModel)]="masterDialogPaymentNotes" rows="2" class="w-full" placeholder="Optional notes..."></textarea>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.NOTES_LABEL' | translate }}</label>
+      <textarea pTextarea [(ngModel)]="masterDialogPaymentNotes" rows="2" class="w-full" [placeholder]="'STUDENTS.DETAIL.NOTES_PLACEHOLDER' | translate"></textarea>
     </div>
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showMasterPaymentDialog = false"></p-button>
-    <p-button label="Record Payment" icon="pi pi-check" severity="success" [loading]="actionLoading()"
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showMasterPaymentDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" severity="success" [loading]="actionLoading()"
       [disabled]="!masterDialogPaymentAmount || !masterDialogPaymentDate"
       (onClick)="submitMasterPayment()"></p-button>
   </ng-template>
@@ -953,7 +953,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">{{ 'STUDENTS.DETAIL.REASON' | translate }}</label>
-        <textarea pTextarea [(ngModel)]="masterRefundReason" rows="2" class="w-full" placeholder="Reason for refund..."></textarea>
+        <textarea pTextarea [(ngModel)]="masterRefundReason" rows="2" class="w-full" [placeholder]="'STUDENTS.DETAIL.REASON_PLACEHOLDER' | translate"></textarea>
       </div>
     </div>
   </div>
@@ -969,19 +969,19 @@
 <!-- Join Bundle Course Dialog -->
 <p-dialog
   [(visible)]="showJoinBundleCourseDialog"
-  header="Choose a Class to Join"
+  [header]="'STUDENTS.DETAIL.JOIN_BUNDLE_DIALOG_TITLE' | translate"
   [modal]="true"
   [style]="{ width: '520px' }"
 >
   @if (joinBundleCourseLoading()) {
     <div class="flex items-center gap-2 py-6 justify-center text-gray-400">
       <i class="pi pi-spin pi-spinner text-xl"></i>
-      <span>Loading classes…</span>
+      <span>{{ 'STUDENTS.DETAIL.JOIN_CLASSES_LOADING' | translate }}</span>
     </div>
   } @else if (joinBundleCourseClasses().length === 0) {
     <div class="py-6 text-center text-gray-400">
       <i class="pi pi-inbox text-3xl mb-2 block"></i>
-      No active classes available for this course.
+      {{ 'STUDENTS.DETAIL.JOIN_NO_CLASSES' | translate }}
     </div>
   } @else {
     <div class="flex flex-col gap-3">
@@ -1017,9 +1017,9 @@
     </div>
   }
   <ng-template pTemplate="footer">
-    <p-button label="Cancel" severity="secondary" [outlined]="true" (onClick)="showJoinBundleCourseDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showJoinBundleCourseDialog = false"></p-button>
     <p-button
-      label="Enroll in Class"
+      [label]="'STUDENTS.DETAIL.JOIN_ENROLL_IN_CLASS' | translate"
       icon="pi pi-user-plus"
       severity="help"
       [loading]="actionLoading()"

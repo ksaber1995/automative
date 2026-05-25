@@ -17,7 +17,7 @@ import { EnrollmentService } from '../../enrollments/services/enrollment.service
 import { ClassService } from '../../courses/services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Student } from '@shared/interfaces/student.interface';
+import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Class } from '@shared/interfaces/class.interface';
 
@@ -60,6 +60,7 @@ export class StudentListComponent implements OnInit {
   allBranches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
+  searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
   activeTab = signal<'active' | 'inactive'>('active');
 
@@ -74,15 +75,34 @@ export class StudentListComponent implements OnInit {
     return map;
   });
 
+  branchActiveById = computed(() => {
+    const map = new Map<string, boolean>();
+    for (const b of this.allBranches()) map.set(b.id, b.isActive);
+    return map;
+  });
+
   filteredStudents = computed(() => {
     const list = this.students();
-    return this.activeTab() === 'active'
+    const byTab = this.activeTab() === 'active'
       ? list.filter(s => s.isActive)
       : list.filter(s => !s.isActive);
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return byTab;
+    return byTab.filter(s => {
+      const full = `${s.firstName ?? ''} ${s.lastName ?? ''}`.toLowerCase();
+      return full.includes(term)
+        || (s.firstName ?? '').toLowerCase().includes(term)
+        || (s.lastName ?? '').toLowerCase().includes(term)
+        || (s.parentName ?? '').toLowerCase().includes(term);
+    });
   });
 
   activeCount = computed(() => this.students().filter(s => s.isActive).length);
   inactiveCount = computed(() => this.students().filter(s => !s.isActive).length);
+
+  onSearchChange(value: string) {
+    this.searchTerm.set(value);
+  }
 
   ngOnInit() {
     this.loadBranches();
@@ -133,6 +153,16 @@ export class StudentListComponent implements OnInit {
   getBranchName(branchId: string | undefined | null): string {
     if (!branchId) return '';
     return this.branchNameById().get(branchId) || '';
+  }
+
+  isBranchActive(branchId: string | undefined | null): boolean {
+    if (!branchId) return false;
+    return this.branchActiveById().get(branchId) === true;
+  }
+
+  hasNoEnrollments(studentId: string): boolean {
+    const counts = this.getCounts(studentId);
+    return counts.active === 0 && counts.completed === 0;
   }
 
   loadStudents() {
@@ -199,8 +229,50 @@ export class StudentListComponent implements OnInit {
     });
   }
 
+  activateStudent(student: Student) {
+    this.confirmationService.confirm({
+      message: this.translate.instant('STUDENTS.ACTIVATE_CONFIRM', {
+        name: `${student.firstName} ${student.lastName}`,
+      }),
+      header: this.translate.instant('STUDENTS.ACTIVATE_HEADER'),
+      icon: 'pi pi-check-circle',
+      accept: () => {
+        this.studentService.reactivateStudent(student.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.ACTIVATED'));
+            this.loadStudents();
+          }
+        });
+      }
+    });
+  }
+
+  hardDeleteStudent(student: Student) {
+    this.confirmationService.confirm({
+      message: this.translate.instant('STUDENTS.HARD_DELETE_CONFIRM', {
+        name: `${student.firstName} ${student.lastName}`,
+      }),
+      header: this.translate.instant('STUDENTS.HARD_DELETE_HEADER'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.studentService.hardDeleteStudent(student.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.HARD_DELETED'));
+            this.loadStudents();
+          }
+        });
+      }
+    });
+  }
+
   createStudent() {
     this.router.navigate(['/students/create']);
+  }
+
+  getChannelLabel(channel: AcquisitionChannel | null | undefined): string {
+    if (!channel) return '';
+    return this.translate.instant('STUDENTS.FORM.CHANNEL_' + channel);
   }
 
   getAge(dateOfBirth: string): number {

@@ -50,15 +50,15 @@
             {{ 'EVENTS.LIST.COL_NAME' | translate }}
             <p-sortIcon field="name"></p-sortIcon>
           </th>
-          <th>{{ 'EVENTS.LIST.COL_TYPE' | translate }}</th>
-          <th>{{ 'EVENTS.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'EVENTS.LIST.COL_LOCATION' | translate }}</th>
+          <th pSortableColumn="eventType">{{ 'EVENTS.LIST.COL_TYPE' | translate }} <p-sortIcon field="eventType"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'EVENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="location">{{ 'EVENTS.LIST.COL_LOCATION' | translate }} <p-sortIcon field="location"></p-sortIcon></th>
           <th pSortableColumn="startDate">
             {{ 'EVENTS.LIST.COL_START_DATE' | translate }}
             <p-sortIcon field="startDate"></p-sortIcon>
           </th>
-          <th>{{ 'EVENTS.LIST.COL_END_DATE' | translate }}</th>
-          <th>{{ 'EVENTS.LIST.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="endDate">{{ 'EVENTS.LIST.COL_END_DATE' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
+          <th pSortableColumn="status">{{ 'EVENTS.LIST.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
           <th>{{ 'EVENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

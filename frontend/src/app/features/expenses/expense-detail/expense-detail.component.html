@@ -120,11 +120,11 @@
       <p-table [value]="payments()" [loading]="paymentsLoading()" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th>{{ 'EXPENSES.DETAIL.COL_DATE' | translate }}</th>
-            <th class="text-right">{{ 'EXPENSES.DETAIL.COL_AMOUNT' | translate }}</th>
-            <th>{{ 'EXPENSES.DETAIL.COL_VENDOR' | translate }}</th>
-            <th>{{ 'EXPENSES.DETAIL.COL_INVOICE' | translate }}</th>
-            <th>{{ 'EXPENSES.DETAIL.COL_NOTES' | translate }}</th>
+            <th pSortableColumn="date">{{ 'EXPENSES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+            <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.DETAIL.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+            <th pSortableColumn="vendor">{{ 'EXPENSES.DETAIL.COL_VENDOR' | translate }} <p-sortIcon field="vendor"></p-sortIcon></th>
+            <th pSortableColumn="invoiceNumber">{{ 'EXPENSES.DETAIL.COL_INVOICE' | translate }} <p-sortIcon field="invoiceNumber"></p-sortIcon></th>
+            <th pSortableColumn="notes">{{ 'EXPENSES.DETAIL.COL_NOTES' | translate }} <p-sortIcon field="notes"></p-sortIcon></th>
             <th style="width: 60px"></th>
           </tr>
         </ng-template>

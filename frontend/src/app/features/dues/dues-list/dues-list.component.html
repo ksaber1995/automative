@@ -56,8 +56,8 @@
           <th pSortableColumn="courseName">{{ 'DUES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
           <th pSortableColumn="branchName">{{ 'DUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
           <th pSortableColumn="enrollmentDate">{{ 'DUES.LIST.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
-          <th class="text-right">{{ 'DUES.LIST.COL_TOTAL' | translate }}</th>
-          <th class="text-right">{{ 'DUES.LIST.COL_PAID' | translate }}</th>
+          <th pSortableColumn="finalPrice" class="text-right">{{ 'DUES.LIST.COL_TOTAL' | translate }} <p-sortIcon field="finalPrice"></p-sortIcon></th>
+          <th pSortableColumn="amountPaid" class="text-right">{{ 'DUES.LIST.COL_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
           <th pSortableColumn="remaining" class="text-right">{{ 'DUES.LIST.COL_REMAINING' | translate }} <p-sortIcon field="remaining"></p-sortIcon></th>
           <th>{{ 'DUES.LIST.COL_PROGRESS' | translate }}</th>
           <th>{{ 'DUES.LIST.COL_ACTIONS' | translate }}</th>

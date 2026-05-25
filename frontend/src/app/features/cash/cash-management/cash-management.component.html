@@ -131,13 +131,13 @@
              responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'CASH.COL_DATE' | translate }}</th>
-          <th>{{ 'CASH.COL_SCOPE' | translate }}</th>
-          <th>{{ 'CASH.COL_TYPE' | translate }}</th>
-          <th class="text-right">{{ 'CASH.COL_AMOUNT' | translate }}</th>
-          <th class="text-right">{{ 'CASH.COL_OBSERVED' | translate }}</th>
-          <th class="text-right">{{ 'CASH.COL_SYSTEM' | translate }}</th>
-          <th>{{ 'CASH.COL_NOTES' | translate }}</th>
+          <th pSortableColumn="date">{{ 'CASH.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'CASH.COL_SCOPE' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="type">{{ 'CASH.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="amount">{{ 'CASH.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="observedAmount">{{ 'CASH.COL_OBSERVED' | translate }} <p-sortIcon field="observedAmount"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="systemAmount">{{ 'CASH.COL_SYSTEM' | translate }} <p-sortIcon field="systemAmount"></p-sortIcon></th>
+          <th pSortableColumn="notes">{{ 'CASH.COL_NOTES' | translate }} <p-sortIcon field="notes"></p-sortIcon></th>
           @if (canDelete()) {
             <th class="text-center">{{ 'CASH.COL_ACTIONS' | translate }}</th>
           }

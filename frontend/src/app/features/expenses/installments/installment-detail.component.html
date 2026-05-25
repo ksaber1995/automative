@@ -93,12 +93,12 @@
       <p-table [value]="schedule()" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th class="w-16">{{ 'INSTALLMENTS.DETAIL.COL_NUMBER' | translate }}</th>
-            <th>{{ 'INSTALLMENTS.DETAIL.COL_DUE_DATE' | translate }}</th>
-            <th>{{ 'INSTALLMENTS.DETAIL.COL_AMOUNT' | translate }}</th>
-            <th>{{ 'INSTALLMENTS.DETAIL.COL_STATUS' | translate }}</th>
-            <th>{{ 'INSTALLMENTS.DETAIL.COL_PAID_DATE' | translate }}</th>
-            <th>{{ 'INSTALLMENTS.DETAIL.COL_PAID_AMOUNT' | translate }}</th>
+            <th pSortableColumn="installmentNumber" class="w-16">{{ 'INSTALLMENTS.DETAIL.COL_NUMBER' | translate }} <p-sortIcon field="installmentNumber"></p-sortIcon></th>
+            <th pSortableColumn="dueDate">{{ 'INSTALLMENTS.DETAIL.COL_DUE_DATE' | translate }} <p-sortIcon field="dueDate"></p-sortIcon></th>
+            <th pSortableColumn="amount">{{ 'INSTALLMENTS.DETAIL.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+            <th pSortableColumn="status">{{ 'INSTALLMENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+            <th pSortableColumn="paidDate">{{ 'INSTALLMENTS.DETAIL.COL_PAID_DATE' | translate }} <p-sortIcon field="paidDate"></p-sortIcon></th>
+            <th pSortableColumn="paidAmount">{{ 'INSTALLMENTS.DETAIL.COL_PAID_AMOUNT' | translate }} <p-sortIcon field="paidAmount"></p-sortIcon></th>
             <th class="w-48">{{ 'INSTALLMENTS.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>

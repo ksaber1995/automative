@@ -34,7 +34,7 @@
           @if (master()!.isActive) {
             <p-button
               icon="pi pi-ban"
-              label="Deactivate"
+              [label]="'MASTER_COURSES.DETAIL.DEACTIVATE' | translate"
               severity="warn"
               [outlined]="true"
               (onClick)="toggleActive()"
@@ -42,7 +42,7 @@
           } @else {
             <p-button
               icon="pi pi-check-circle"
-              label="Activate"
+              [label]="'MASTER_COURSES.DETAIL.ACTIVATE' | translate"
               severity="success"
               [outlined]="true"
               (onClick)="toggleActive()"
@@ -52,7 +52,7 @@
         @if (authService.canDelete('academy')) {
           <p-button
             icon="pi pi-trash"
-            label="Delete"
+            [label]="'MASTER_COURSES.DETAIL.DELETE' | translate"
             severity="danger"
             [outlined]="true"
             (onClick)="confirmDelete()"
@@ -106,11 +106,11 @@
     <p-table [value]="linked() || []" [loading]="loadingLinked()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'MASTER_COURSES.DETAIL.COL_NAME' | translate }}</th>
-          <th>{{ 'MASTER_COURSES.DETAIL.COL_CODE' | translate }}</th>
-          <th class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_PRICE' | translate }}</th>
-          <th class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_DURATION' | translate }}</th>
-          <th>{{ 'MASTER_COURSES.DETAIL.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="name">{{ 'MASTER_COURSES.DETAIL.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="code">{{ 'MASTER_COURSES.DETAIL.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
+          <th pSortableColumn="price" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
+          <th pSortableColumn="duration" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="duration"></p-sortIcon></th>
+          <th pSortableColumn="isActive">{{ 'MASTER_COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
           @if (authService.canWrite('academy')) {
             <th>{{ 'MASTER_COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
           }
@@ -157,7 +157,7 @@
     <ng-template pTemplate="header">
       <div class="px-6 py-4 border-b">
         <h3 class="text-xl font-semibold">
-          Enrolled Students
+          {{ 'MASTER_COURSES.DETAIL.ENROLLED_STUDENTS' | translate }}
           <span class="text-sm font-normal text-gray-500 ml-2">({{ enrollments()?.length || 0 }})</span>
         </h3>
       </div>
@@ -166,13 +166,13 @@
     <p-table [value]="enrollments() || []" [loading]="loadingEnrollments()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>Student</th>
-          <th>Status</th>
-          <th>Payment</th>
-          <th class="text-center">Completed</th>
-          <th class="text-center">In Progress</th>
-          <th class="text-center">Pending</th>
-          <th class="text-center">Total</th>
+          <th pSortableColumn="studentName">{{ 'MASTER_COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
+          <th pSortableColumn="status">{{ 'MASTER_COURSES.DETAIL.COL_STATUS_ENROLL' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+          <th pSortableColumn="paymentStatus">{{ 'MASTER_COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+          <th pSortableColumn="completedCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_COMPLETED' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+          <th pSortableColumn="activeCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_IN_PROGRESS' | translate }} <p-sortIcon field="activeCourses"></p-sortIcon></th>
+          <th pSortableColumn="pendingCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_PENDING' | translate }} <p-sortIcon field="pendingCourses"></p-sortIcon></th>
+          <th pSortableColumn="totalCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_TOTAL' | translate }} <p-sortIcon field="totalCourses"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-e>
@@ -204,7 +204,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-6 text-gray-500">No students enrolled yet.</td>
+          <td colspan="7" class="text-center py-6 text-gray-500">{{ 'MASTER_COURSES.DETAIL.NO_ENROLLMENTS' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -267,8 +267,8 @@
 
   <app-delete-confirm-dialog
     [(visible)]="showDeleteDialog"
-    header="Delete Master Course"
-    [message]="'Are you sure you want to delete &quot;' + (master()?.name || '') + '&quot;? This cannot be undone.'"
+    [header]="'MASTER_COURSES.DETAIL.DELETE_TITLE' | translate"
+    [message]="'MASTER_COURSES.DETAIL.DELETE_MSG' | translate: { name: master()?.name || '' }"
     (confirm)="doDelete()"
   ></app-delete-confirm-dialog>
 </div>

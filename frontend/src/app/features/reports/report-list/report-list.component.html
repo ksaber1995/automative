@@ -108,9 +108,12 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.MONTHLY_PL_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.MONTHLY_PL_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.MONTHLY_PL_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.MONTHLY_PL_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportMonthlyPL()"></p-button>
               </div>
             </ng-template>
             @if (monthlyPLChart()) {
@@ -120,9 +123,12 @@
 
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.EXPENSES_CAT_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.EXPENSES_CAT_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.EXPENSES_CAT_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.EXPENSES_CAT_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportExpenseCats()"></p-button>
               </div>
             </ng-template>
             @if (expenseCatChart()) {
@@ -132,9 +138,12 @@
 
           <p-card styleClass="lg:col-span-2">
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.SALARY_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.SALARY_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.SALARY_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.SALARY_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportSalary()"></p-button>
               </div>
             </ng-template>
             @if (salaryChart()) {
@@ -149,9 +158,12 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.STUDENTS_OT_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.STUDENTS_OT_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.STUDENTS_OT_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.STUDENTS_OT_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportStudentsOverTime()"></p-button>
               </div>
             </ng-template>
             @if (studentsChart()) {
@@ -161,7 +173,7 @@
 
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2 flex justify-between items-center">
+              <div class="px-6 pt-4 pb-2 flex justify-between items-center flex-wrap gap-2">
                 <div>
                   <h3 class="text-lg font-semibold">{{ 'REPORTS.CHURN_TITLE' | translate }}</h3>
                   <p class="text-sm text-gray-500">{{ 'REPORTS.CHURN_DESC' | translate }}</p>
@@ -169,6 +181,7 @@
                 <div class="flex items-center gap-2">
                   <label class="text-sm whitespace-nowrap">{{ 'REPORTS.INACTIVE_MONTHS' | translate }}</label>
                   <p-inputnumber [(ngModel)]="inactiveMonths" [min]="1" [max]="24" [showButtons]="true" [inputStyle]="{ width: '60px' }" (onInput)="onChurnWindowChange()"></p-inputnumber>
+                  <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportChurn()"></p-button>
                 </div>
               </div>
             </ng-template>
@@ -176,12 +189,12 @@
               <p-table [value]="compareChurnRows()" responsiveLayout="scroll" styleClass="p-2">
                 <ng-template pTemplate="header">
                   <tr>
-                    <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
-                    <th class="text-right">{{ 'REPORTS.CHURN_TOTAL' | translate }}</th>
-                    <th class="text-right">{{ 'REPORTS.CHURN_ACTIVE' | translate }}</th>
-                    <th class="text-right">{{ 'REPORTS.CHURN_CHURNED' | translate }}</th>
-                    <th class="text-right">{{ 'REPORTS.CHURN_INACTIVE' | translate }}</th>
-                    <th class="text-right">{{ 'REPORTS.CHURN_RATE' | translate }}</th>
+                    <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                    <th class="text-right" pSortableColumn="churn.totalStudents">{{ 'REPORTS.CHURN_TOTAL' | translate }} <p-sortIcon field="churn.totalStudents"></p-sortIcon></th>
+                    <th class="text-right" pSortableColumn="churn.activeStudents">{{ 'REPORTS.CHURN_ACTIVE' | translate }} <p-sortIcon field="churn.activeStudents"></p-sortIcon></th>
+                    <th class="text-right" pSortableColumn="churn.churnedStudents">{{ 'REPORTS.CHURN_CHURNED' | translate }} <p-sortIcon field="churn.churnedStudents"></p-sortIcon></th>
+                    <th class="text-right" pSortableColumn="churn.inactiveStudents">{{ 'REPORTS.CHURN_INACTIVE' | translate }} <p-sortIcon field="churn.inactiveStudents"></p-sortIcon></th>
+                    <th class="text-right" pSortableColumn="churn.churnRate">{{ 'REPORTS.CHURN_RATE' | translate }} <p-sortIcon field="churn.churnRate"></p-sortIcon></th>
                   </tr>
                 </ng-template>
                 <ng-template pTemplate="body" let-row>
@@ -237,9 +250,12 @@
         <div class="grid grid-cols-1 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.TOP_COURSES_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.TOP_COURSES_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.TOP_COURSES_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.TOP_COURSES_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportTopCourses()"></p-button>
               </div>
             </ng-template>
             @if (topCoursesChart()) {
@@ -249,19 +265,20 @@
 
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
                 <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_COURSE_TITLE' | translate }}</h3>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportProfitByCourse()"></p-button>
               </div>
             </ng-template>
             <p-table [value]="visibleProfitCourses()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
-                  <th>{{ 'REPORTS.COL_TYPE' | translate }}</th>
-                  <th>{{ 'REPORTS.COL_COURSE' | translate }}</th>
-                  <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_ENROLLMENTS' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_REVENUE' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_AVG_PRICE' | translate }}</th>
+                  <th pSortableColumn="type">{{ 'REPORTS.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+                  <th pSortableColumn="courseName">{{ 'REPORTS.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="enrollments">{{ 'REPORTS.COL_ENROLLMENTS' | translate }} <p-sortIcon field="enrollments"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="avgPrice">{{ 'REPORTS.COL_AVG_PRICE' | translate }} <p-sortIcon field="avgPrice"></p-sortIcon></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-row>
@@ -291,9 +308,12 @@
         <div class="grid grid-cols-1 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_BRANCH_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.PROFIT_BRANCH_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_BRANCH_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.PROFIT_BRANCH_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportProfitByBranch()"></p-button>
               </div>
             </ng-template>
             @if (branchChart()) {
@@ -305,11 +325,11 @@
             <p-table [value]="visibleProfitBranches()" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
-                  <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_REVENUE' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_EXPENSES' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_NET_PROFIT' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_ACTIVE_STUDENTS' | translate }}</th>
+                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="expenses">{{ 'REPORTS.COL_EXPENSES' | translate }} <p-sortIcon field="expenses"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="netProfit">{{ 'REPORTS.COL_NET_PROFIT' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="activeStudents">{{ 'REPORTS.COL_ACTIVE_STUDENTS' | translate }} <p-sortIcon field="activeStudents"></p-sortIcon></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-row>
@@ -336,21 +356,24 @@
         <div class="grid grid-cols-1 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2">
-                <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_PRODUCT_TITLE' | translate }}</h3>
-                <p class="text-sm text-gray-500">{{ 'REPORTS.PROFIT_PRODUCT_DESC' | translate }}</p>
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.PROFIT_PRODUCT_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.PROFIT_PRODUCT_DESC' | translate }}</p>
+                </div>
+                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportProfitByProduct()"></p-button>
               </div>
             </ng-template>
             <p-table [value]="visibleProfitProducts()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
-                  <th>{{ 'REPORTS.COL_PRODUCT' | translate }}</th>
-                  <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_UNITS' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_REVENUE' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_COST' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_MARGIN' | translate }}</th>
-                  <th class="text-right">{{ 'REPORTS.COL_STOCK' | translate }}</th>
+                  <th pSortableColumn="productName">{{ 'REPORTS.COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
+                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="unitsSold">{{ 'REPORTS.COL_UNITS' | translate }} <p-sortIcon field="unitsSold"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="cost">{{ 'REPORTS.COL_COST' | translate }} <p-sortIcon field="cost"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="margin">{{ 'REPORTS.COL_MARGIN' | translate }} <p-sortIcon field="margin"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="currentStock">{{ 'REPORTS.COL_STOCK' | translate }} <p-sortIcon field="currentStock"></p-sortIcon></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-row>
@@ -413,24 +436,27 @@
 
         <p-card styleClass="mt-4">
           <ng-template pTemplate="header">
-            <div class="px-6 pt-4 pb-2">
-              <h3 class="text-lg font-semibold">{{ 'REPORTS.EVENT_TABLE_TITLE' | translate }}</h3>
-              <p class="text-sm text-gray-500">{{ 'REPORTS.EVENT_TABLE_DESC' | translate }}</p>
+            <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+              <div>
+                <h3 class="text-lg font-semibold">{{ 'REPORTS.EVENT_TABLE_TITLE' | translate }}</h3>
+                <p class="text-sm text-gray-500">{{ 'REPORTS.EVENT_TABLE_DESC' | translate }}</p>
+              </div>
+              <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportProfitByEvent()"></p-button>
             </div>
           </ng-template>
           <p-table [value]="visibleProfitEvents()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
             <ng-template pTemplate="header">
               <tr>
-                <th>{{ 'REPORTS.COL_EVENT' | translate }}</th>
-                <th>{{ 'REPORTS.COL_TYPE' | translate }}</th>
-                <th>{{ 'REPORTS.COL_BRANCH' | translate }}</th>
-                <th>{{ 'REPORTS.COL_STATUS' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_SUBSCRIBERS' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_REVENUE' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_PRODUCT_MARGIN' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_REFUNDS' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_EXPENSES' | translate }}</th>
-                <th class="text-right">{{ 'REPORTS.COL_NET_PROFIT' | translate }}</th>
+                <th pSortableColumn="name">{{ 'REPORTS.COL_EVENT' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+                <th pSortableColumn="eventType">{{ 'REPORTS.COL_TYPE' | translate }} <p-sortIcon field="eventType"></p-sortIcon></th>
+                <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                <th pSortableColumn="status">{{ 'REPORTS.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="subscriberCount">{{ 'REPORTS.COL_SUBSCRIBERS' | translate }} <p-sortIcon field="subscriberCount"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="productMargin">{{ 'REPORTS.COL_PRODUCT_MARGIN' | translate }} <p-sortIcon field="productMargin"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="refunds">{{ 'REPORTS.COL_REFUNDS' | translate }} <p-sortIcon field="refunds"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="expenses">{{ 'REPORTS.COL_EXPENSES' | translate }} <p-sortIcon field="expenses"></p-sortIcon></th>
+                <th class="text-right" pSortableColumn="netProfit">{{ 'REPORTS.COL_NET_PROFIT' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-row>

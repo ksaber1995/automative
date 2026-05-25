@@ -71,16 +71,16 @@
     <p-table [value]="plans()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'INSTALLMENTS.LIST.COL_NAME' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_CATEGORY' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_TOTAL' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_DOWN' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_MONTHLY' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_MONTHS' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_PROGRESS' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_NEXT_DUE' | translate }}</th>
-          <th>{{ 'INSTALLMENTS.LIST.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="name">{{ 'INSTALLMENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'INSTALLMENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="category">{{ 'INSTALLMENTS.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
+          <th pSortableColumn="totalAmount">{{ 'INSTALLMENTS.LIST.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
+          <th pSortableColumn="downpaymentAmount">{{ 'INSTALLMENTS.LIST.COL_DOWN' | translate }} <p-sortIcon field="downpaymentAmount"></p-sortIcon></th>
+          <th pSortableColumn="monthlyAmount">{{ 'INSTALLMENTS.LIST.COL_MONTHLY' | translate }} <p-sortIcon field="monthlyAmount"></p-sortIcon></th>
+          <th pSortableColumn="paidCount">{{ 'INSTALLMENTS.LIST.COL_MONTHS' | translate }} <p-sortIcon field="paidCount"></p-sortIcon></th>
+          <th pSortableColumn="paidCount">{{ 'INSTALLMENTS.LIST.COL_PROGRESS' | translate }} <p-sortIcon field="paidCount"></p-sortIcon></th>
+          <th pSortableColumn="nextDueDate">{{ 'INSTALLMENTS.LIST.COL_NEXT_DUE' | translate }} <p-sortIcon field="nextDueDate"></p-sortIcon></th>
+          <th pSortableColumn="status">{{ 'INSTALLMENTS.LIST.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
           <th>{{ 'INSTALLMENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

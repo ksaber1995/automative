@@ -497,7 +497,9 @@ export class StudentDetailComponent implements OnInit {
     this.showJoinBundleCourseDialog = true;
     this.classService.getClassesByCourse(courseId).subscribe({
       next: (classes) => {
-        this.joinBundleCourseClasses.set(classes.filter(c => c.isActive));
+        this.joinBundleCourseClasses.set(
+          classes.filter(c => c.isActive && c.status !== 'DONE' && c.isFinished !== true)
+        );
         this.joinBundleCourseLoading.set(false);
       },
       error: () => {

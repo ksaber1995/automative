@@ -58,6 +58,14 @@ export class StudentService {
     return this.api.delete<Student>(`students/${id}`);
   }
 
+  reactivateStudent(id: string): Observable<Student> {
+    return this.api.patch<Student>(`students/${id}/reactivate`, {});
+  }
+
+  hardDeleteStudent(id: string): Observable<{ message: string; code: string }> {
+    return this.api.delete<{ message: string; code: string }>(`students/${id}/permanent`);
+  }
+
   enrollStudent(studentId: string, enrollment: EnrollmentDto): Observable<Enrollment> {
     return this.api.post<Enrollment>(`students/${studentId}/enroll`, enrollment);
   }
