@@ -27,11 +27,12 @@ export class ForgotPasswordComponent {
   form: FormGroup;
   loading = signal(false);
   submitted = signal(false);
-  successMessage = signal('');
+  fullPhone = signal('');
 
   constructor() {
     this.form = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
+      countryCode: ['20', [Validators.required, Validators.pattern(/^\d{1,5}$/)]],
+      phone: ['', [Validators.required, Validators.pattern(/^\d{4,15}$/)]],
     });
   }
 
@@ -42,7 +43,10 @@ export class ForgotPasswordComponent {
     }
 
     this.loading.set(true);
-    const email = String(this.form.value.email || '').trim();
+    const countryCode = String(this.form.value.countryCode || '').replace(/\D/g, '');
+    const phone = String(this.form.value.phone || '').replace(/\D/g, '').replace(/^0+/, '');
+    const combined = `${countryCode}${phone}`;
+    this.fullPhone.set(combined);
 
     let recaptchaToken = '';
     try {
@@ -51,11 +55,10 @@ export class ForgotPasswordComponent {
       console.error('reCAPTCHA execute failed:', err);
     }
 
-    this.authService.forgotPassword(email, recaptchaToken).subscribe({
-      next: (res) => {
+    this.authService.forgotPassword(combined, recaptchaToken).subscribe({
+      next: () => {
         this.loading.set(false);
         this.submitted.set(true);
-        this.successMessage.set(res.message || this.translate.instant('AUTH.FORGOT_PASSWORD.SUCCESS'));
       },
       error: (err) => {
         this.loading.set(false);
@@ -66,5 +69,12 @@ export class ForgotPasswordComponent {
     });
   }
 
-  get email() { return this.form.get('email'); }
+  goToReset() {
+    this.router.navigate(['/auth/reset-password'], {
+      queryParams: { phone: this.fullPhone() },
+    });
+  }
+
+  get countryCode() { return this.form.get('countryCode'); }
+  get phone() { return this.form.get('phone'); }
 }

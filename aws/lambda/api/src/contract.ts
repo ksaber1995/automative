@@ -171,12 +171,13 @@ const ResendEmailOtpRequestSchema = z.object({
 });
 
 const ForgotPasswordRequestSchema = z.object({
-  email: z.string().email(),
+  phone: z.string().min(1),
   recaptchaToken: z.string().optional(),
 });
 
 const ResetPasswordRequestSchema = z.object({
-  token: z.string().min(1),
+  phone: z.string().min(1),
+  otp: z.string().length(6),
   password: z.string().min(6),
 });
 

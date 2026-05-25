@@ -492,6 +492,7 @@ CREATE TABLE refunds (
     enrollment_id UUID,
     master_enrollment_id UUID,
     company_id UUID NOT NULL,
+    branch_id UUID,
     student_id UUID,
     event_id UUID,
     product_sale_id UUID,
@@ -504,12 +505,14 @@ CREATE TABLE refunds (
     FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
-    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE CASCADE
+    FOREIGN KEY (product_sale_id) REFERENCES product_sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_refunds_enrollment_id ON refunds(enrollment_id);
 CREATE INDEX idx_refunds_master_enrollment_id ON refunds(master_enrollment_id);
 CREATE INDEX idx_refunds_company_id ON refunds(company_id);
+CREATE INDEX idx_refunds_branch_id ON refunds(branch_id);
 CREATE INDEX idx_refunds_student_id ON refunds(student_id);
 CREATE INDEX idx_refunds_event ON refunds(event_id);
 CREATE INDEX idx_refunds_product_sale ON refunds(product_sale_id);

@@ -82,15 +82,17 @@ new CoreStack(app, `AutomateMagicStack-prod`, {
   },
 });
 
-// Prod frontend at app.netrofit.com — same-origin /api/* proxy to API Gateway
-// custom domain so the network tab only ever shows app.netrofit.com.
+// Prod frontend at app.netrofit.com — same-origin /api/* proxy to API Gateway.
+// Using the execute-api hostname directly (with stage path prefix) to avoid
+// needing a separate DNS zone for netrofit.net.
 new LandingStack(app, `NetrofitFrontendStack-prod`, {
   domainName: 'app.netrofit.com',
   wwwDomain: 'www.app.netrofit.com',
   sourcePath: path.resolve(__dirname, '../../frontend/dist/automate-magic-frontend-prod/browser'),
   apiProxy: {
-    originDomain: 'prod.api.netrofit.net',
+    originDomain: 'xnbgr057y1.execute-api.eu-west-1.amazonaws.com',
     pathPattern: '/api/*',
+    originPath: '/prod',
   },
   hostedZoneId: netrofitZoneId,
   env: { account, region: 'us-east-1' },

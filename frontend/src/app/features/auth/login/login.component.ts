@@ -39,6 +39,7 @@ export class LoginComponent {
 
   loginForm: FormGroup;
   loading = signal(false);
+  serverError = signal('');
 
   constructor() {
     this.loginForm = this.fb.group({
@@ -55,6 +56,7 @@ export class LoginComponent {
     }
 
     this.loading.set(true);
+    this.serverError.set('');
     const { identifier, password } = this.loginForm.value;
 
     this.authService.login({ identifier: String(identifier).trim(), password }).subscribe({
@@ -64,7 +66,7 @@ export class LoginComponent {
       },
       error: (error) => {
         this.loading.set(false);
-        if (error.status === 403 && error.error?.code === 'EMAIL_NOT_VERIFIED') {
+        if (error.status === 403 && error.error?.code === 'ERRORS.AUTH.EMAIL_NOT_VERIFIED') {
           this.notificationService.error(this.translate.instant('AUTH.LOGIN.EMAIL_NOT_VERIFIED'));
           this.router.navigate(['/auth/verify-email'], {
             queryParams: {
@@ -73,9 +75,9 @@ export class LoginComponent {
           });
           return;
         }
-        this.notificationService.error(
-          error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED')
-        );
+        const msg = error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED');
+        this.serverError.set(msg);
+        this.notificationService.error(msg);
       },
       complete: () => {
         this.loading.set(false);
