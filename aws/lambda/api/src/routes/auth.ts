@@ -1,22 +1,11 @@
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { query, queryOne, getClient } from '../db/connection';
 import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { sendOtpEmail, sendPasswordResetEmail } from '../utils/email';
+import { sendWhatsappOtp, sendWhatsappPasswordResetOtp } from '../utils/whatsapp';
 import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
-
-const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function generateResetToken(): string {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-function resolveFrontendBase(): string {
-  return (process.env.FRONTEND_BASE_URL || 'http://localhost:4200').replace(/\/$/, '');
-}
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -140,17 +129,18 @@ export const authRoutes = {
         return apiError(401, 'ERRORS.AUTH.USER_INACTIVE', 'User account is inactive');
       }
 
-      // Block unverified emails — users must finish the OTP flow first.
-      if (!user.email_verified) {
-        return {
-          status: 403 as const,
-          body: {
-            message: 'Please verify your email address before logging in.',
-            code: 'ERRORS.AUTH.EMAIL_NOT_VERIFIED',
-            email: user.email,
-          },
-        };
-      }
+      // ── OTP verification temporarily disabled ──────────────────────────────
+      // if (!user.email_verified) {
+      //   return {
+      //     status: 403 as const,
+      //     body: {
+      //       message: 'Please verify your account via WhatsApp OTP before logging in.',
+      //       code: 'ERRORS.AUTH.EMAIL_NOT_VERIFIED',
+      //       email: user.email,
+      //     },
+      //   };
+      // }
+      // ──────────────────────────────────────────────────────────────────────
 
       const branchIds = await loadBranchIds(user);
 
@@ -273,9 +263,10 @@ export const authRoutes = {
 
       const hashedPassword = await bcrypt.hash(body.password, 10);
 
-      // Generate OTP before INSERT so it's part of the transaction.
-      const otp = generateOtp();
-      const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      // ── OTP verification temporarily disabled ──────────────────────────────
+      // const otp = generateOtp();
+      // const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      // ──────────────────────────────────────────────────────────────────────
 
       const userRes = await client.query(
         `INSERT INTO users
@@ -286,7 +277,7 @@ export const authRoutes = {
         [
           company.id, branch.id, email, hashedPassword,
           body.firstName, body.lastName, 'ADMIN', true,
-          countryCode, phone, false, otp, otpExpiresAt,
+          countryCode, phone, true, null, null,
         ]
       );
       const user = userRes.rows[0];
@@ -319,19 +310,20 @@ export const authRoutes = {
 
       await client.query('COMMIT');
 
-      // Send OTP via SES (best-effort — failure does not block registration).
-      try {
-        await sendOtpEmail(email, otp, body.firstName);
-      } catch (otpError) {
-        console.error('Failed to send verification email after registration:', otpError);
-      }
+      // ── OTP verification temporarily disabled ──────────────────────────────
+      // try {
+      //   await sendWhatsappOtp(countryCode, phone, otp, body.firstName);
+      // } catch (otpError) {
+      //   console.error('Failed to send WhatsApp OTP after registration:', otpError);
+      // }
+      // ──────────────────────────────────────────────────────────────────────
 
       return {
         status: 201 as const,
         body: {
           email,
-          message: 'Registration successful. Please check your email for the 6-digit verification code.',
-          code: 'AUTH.REGISTRATION_OTP_SENT',
+          message: 'Registration successful.',
+          code: 'AUTH.REGISTRATION_SUCCESS',
         },
       };
     } catch (error: any) {
@@ -368,9 +360,6 @@ export const authRoutes = {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
       const email = (body.email || '').trim().toLowerCase();
-      // Per-email cap on OTP attempts so an attacker can't brute-force a
-      // known target even from a fresh IP. Six-digit OTPs only give 10^6
-      // entropy, so this is essential.
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
       const user = await queryOne<any>(
@@ -386,7 +375,7 @@ export const authRoutes = {
       }
 
       if (user.email_verified) {
-        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'Email is already verified.');
+        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'Account is already verified.');
       }
 
       if (!user.email_otp || user.email_otp !== body.otp) {
@@ -428,7 +417,7 @@ export const authRoutes = {
         },
       };
     } catch (error) {
-      console.error('Verify email error:', error);
+      console.error('Verify OTP error:', error);
       return apiError(400, 'ERRORS.AUTH.VERIFICATION_FAILED', 'Verification failed. Please try again.');
     }
   },
@@ -441,8 +430,6 @@ export const authRoutes = {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
       const email = (body.email || '').trim().toLowerCase();
-      // Per-email cap so an attacker can't pump verification emails at a
-      // target. Same bucket as register/login since it's account-scoped.
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
       const user = await queryOne<any>(
@@ -451,15 +438,14 @@ export const authRoutes = {
       );
 
       if (!user) {
-        // Generic response to avoid enumeration
         return {
           status: 200 as const,
-          body: { message: 'If your email is registered, a new verification code has been sent.', code: 'AUTH.OTP_RESEND_OK_GENERIC' },
+          body: { message: 'If your account is registered, a new verification code has been sent to your WhatsApp.', code: 'AUTH.OTP_RESEND_OK_GENERIC' },
         };
       }
 
       if (user.email_verified) {
-        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'This email is already verified.');
+        return apiError(400, 'ERRORS.AUTH.EMAIL_ALREADY_VERIFIED', 'This account is already verified.');
       }
 
       const otp = generateOtp();
@@ -473,17 +459,17 @@ export const authRoutes = {
       );
 
       try {
-        await sendOtpEmail(user.email, otp, user.first_name);
+        await sendWhatsappOtp(user.country_code || '', user.phone || '', otp, user.first_name);
       } catch (otpError) {
-        console.error('Failed to send verification email on resend:', otpError);
+        console.error('Failed to send WhatsApp OTP on resend:', otpError);
       }
 
       return {
         status: 200 as const,
-        body: { message: 'A new verification code has been sent to your email.', code: 'AUTH.OTP_RESENT' },
+        body: { message: 'A new verification code has been sent to your WhatsApp.', code: 'AUTH.OTP_RESENT' },
       };
     } catch (error) {
-      console.error('Resend email OTP error:', error);
+      console.error('Resend OTP error:', error);
       return apiError(400, 'ERRORS.AUTH.OTP_RESEND_FAILED', 'Failed to resend code. Please try again.');
     }
   },
@@ -491,11 +477,11 @@ export const authRoutes = {
   forgotPassword: async ({
     body,
   }: {
-    body: { email: string; recaptchaToken?: string };
+    body: { phone: string; recaptchaToken?: string };
   }) => {
     enforceByIp(RATE_LIMITS.AUTH_IP);
-    const email = (body.email || '').trim().toLowerCase();
-    enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
+    const phone = normalizePhone(body.phone);
+    enforce(RATE_LIMITS.AUTH_EMAIL, phone || null);
 
     const captcha = await verifyRecaptcha(body.recaptchaToken, {
       expectedAction: 'forgot_password',
@@ -505,38 +491,39 @@ export const authRoutes = {
       return apiError(400, 'ERRORS.RECAPTCHA_FAILED', captcha.reason || 'Captcha verification failed');
     }
 
-    // Always respond 200 to avoid leaking which addresses are registered.
+    // Always respond 200 to avoid leaking which phone numbers are registered.
     const genericResponse = {
       status: 200 as const,
-      body: { message: 'If an account exists for that email, a reset link has been sent.', code: 'AUTH.PASSWORD_RESET_LINK_SENT_GENERIC' },
+      body: { message: 'If an account exists for that number, a reset code has been sent to your WhatsApp.', code: 'AUTH.PASSWORD_RESET_OTP_SENT_GENERIC' },
     };
 
-    if (!email) return genericResponse;
+    if (!phone) return genericResponse;
 
     try {
       const user = await queryOne<any>(
-        'SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1)',
-        [email]
+        `SELECT id, first_name, country_code, phone
+         FROM users
+         WHERE phone = $1 OR (phone IS NOT NULL AND $1 LIKE '%' || phone)
+         LIMIT 1`,
+        [phone]
       );
       if (!user) return genericResponse;
 
-      const token = generateResetToken();
-      const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+      const otp = generateOtp();
+      const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
       await query(
         `UPDATE users
          SET password_reset_token = $1, password_reset_expires = $2,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $3`,
-        [token, expiresAt, user.id]
+        [otp, otpExpiresAt, user.id]
       );
 
-      const resetLink = `${resolveFrontendBase()}/auth/reset-password?token=${encodeURIComponent(token)}`;
-
       try {
-        await sendPasswordResetEmail(user.email, user.first_name, resetLink);
+        await sendWhatsappPasswordResetOtp(user.country_code || '', user.phone || '', otp, user.first_name);
       } catch (err) {
-        console.error('Failed to send password reset email:', err);
+        console.error('Failed to send WhatsApp password reset OTP:', err);
       }
 
       return genericResponse;
@@ -549,31 +536,39 @@ export const authRoutes = {
   resetPassword: async ({
     body,
   }: {
-    body: { token: string; password: string };
+    body: { phone: string; otp: string; password: string };
   }) => {
     enforceByIp(RATE_LIMITS.AUTH_IP);
     try {
-      const token = (body.token || '').trim();
-      if (!token) {
-        return apiError(400, 'ERRORS.AUTH.RESET_TOKEN_REQUIRED', 'Reset token is required.');
+      const phone = normalizePhone(body.phone);
+      if (!phone) {
+        return apiError(400, 'ERRORS.AUTH.PHONE_REQUIRED', 'Phone number is required.');
+      }
+      if (!body.otp || body.otp.length !== 6) {
+        return apiError(400, 'ERRORS.AUTH.OTP_INVALID', 'Invalid verification code.');
       }
       if (!body.password || body.password.length < 6) {
         return apiError(400, 'ERRORS.AUTH.PASSWORD_TOO_SHORT', 'Password must be at least 6 characters.');
       }
 
       const user = await queryOne<any>(
-        `SELECT id, password_reset_expires
+        `SELECT id, password_reset_token, password_reset_expires
          FROM users
-         WHERE password_reset_token = $1`,
-        [token]
+         WHERE phone = $1 OR (phone IS NOT NULL AND $1 LIKE '%' || phone)
+         LIMIT 1`,
+        [phone]
       );
 
       if (!user) {
-        return apiError(400, 'ERRORS.AUTH.RESET_LINK_INVALID', 'Invalid or expired reset link. Please request a new one.');
+        return apiError(400, 'ERRORS.AUTH.INVALID_VERIFICATION_REQUEST', 'Invalid request.');
+      }
+
+      if (!user.password_reset_token || user.password_reset_token !== body.otp) {
+        return apiError(400, 'ERRORS.AUTH.OTP_INVALID', 'Invalid verification code.');
       }
 
       if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
-        return apiError(400, 'ERRORS.AUTH.RESET_LINK_EXPIRED', 'This reset link has expired. Please request a new one.');
+        return apiError(400, 'ERRORS.AUTH.OTP_EXPIRED', 'Verification code has expired. Please request a new one.');
       }
 
       const hashedPassword = await bcrypt.hash(body.password, 10);

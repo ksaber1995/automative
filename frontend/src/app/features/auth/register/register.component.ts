@@ -29,6 +29,7 @@ export class RegisterComponent {
 
   registerForm: FormGroup;
   loading = signal(false);
+  serverError = signal('');
 
   constructor() {
     this.registerForm = this.fb.group({
@@ -70,6 +71,7 @@ export class RegisterComponent {
     }
 
     this.loading.set(true);
+    this.serverError.set('');
     const { confirmPassword, ...registerData } = this.registerForm.value;
 
     let recaptchaToken = '';
@@ -92,19 +94,17 @@ export class RegisterComponent {
     };
 
     this.authService.register(dto).subscribe({
-      next: (response) => {
+      next: () => {
         this.notificationService.success(this.translate.instant('AUTH.REGISTER.SUCCESS'));
-        this.router.navigate(['/auth/verify-email'], {
-          queryParams: {
-            email: response.email,
-          },
-        });
+        // ── OTP verification temporarily disabled — go straight to login ──
+        this.router.navigate(['/auth/login']);
+        // ──────────────────────────────────────────────────────────────────
       },
       error: (error) => {
         this.loading.set(false);
-        this.notificationService.error(
-          error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED')
-        );
+        const msg = error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED');
+        this.serverError.set(msg);
+        this.notificationService.error(msg);
       }
     });
   }

@@ -94,12 +94,12 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/resend-email-otp`, { email });
   }
 
-  forgotPassword(email: string, recaptchaToken?: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/forgot-password`, { email, recaptchaToken });
+  forgotPassword(phone: string, recaptchaToken?: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/forgot-password`, { phone, recaptchaToken });
   }
 
-  resetPassword(token: string, password: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/reset-password`, { token, password });
+  resetPassword(phone: string, otp: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/reset-password`, { phone, otp, password });
   }
 
   logout(): void {

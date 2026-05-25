@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -199,10 +200,19 @@ export class CoreStack extends cdk.Stack {
     }
 
     // API Lambda Function
-    this.apiLambda = new lambda.Function(this, 'ApiLambdaFunction', {
+    this.apiLambda = new NodejsFunction(this, 'ApiLambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'dist/index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/api')),
+      entry: path.join(__dirname, '../lambda/api/src/index.ts'),
+      handler: 'handler',
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        target: 'node20',
+        // Bundle everything — don't rely on Lambda runtime versions
+        externalModules: [],
+        // Needed so esbuild can resolve path aliases and module resolution correctly
+        tsconfig: path.join(__dirname, '../lambda/api/tsconfig.json'),
+      },
       environment: {
         NODE_ENV: stage,
         DB_HOST: this.database.clusterEndpoint.hostname,

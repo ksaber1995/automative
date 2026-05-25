@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
@@ -12,7 +13,7 @@ import { NotificationService } from '../../../core/services/notification.service
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, PasswordModule, TranslateModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, CardModule, ButtonModule, InputTextModule, PasswordModule, TranslateModule],
   templateUrl: './reset-password.component.html',
 })
 export class ResetPasswordComponent implements OnInit {
@@ -27,10 +28,19 @@ export class ResetPasswordComponent implements OnInit {
   loading = signal(false);
   submitted = signal(false);
   successMessage = signal('');
-  token = signal('');
+  phone = signal('');
 
   constructor() {
     this.form = this.fb.group({
+      otp: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(6),
+          Validators.maxLength(6),
+          Validators.pattern(/^\d{6}$/),
+        ],
+      ],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
     }, {
@@ -39,12 +49,12 @@ export class ResetPasswordComponent implements OnInit {
   }
 
   ngOnInit() {
-    const token = this.route.snapshot.queryParamMap.get('token') || '';
-    if (!token) {
-      this.router.navigate(['/auth/login']);
+    const phone = this.route.snapshot.queryParamMap.get('phone') || '';
+    if (!phone) {
+      this.router.navigate(['/auth/forgot-password']);
       return;
     }
-    this.token.set(token);
+    this.phone.set(phone);
   }
 
   passwordMatchValidator(form: FormGroup) {
@@ -64,9 +74,9 @@ export class ResetPasswordComponent implements OnInit {
     }
 
     this.loading.set(true);
-    const password = this.form.value.password;
+    const { otp, password } = this.form.value;
 
-    this.authService.resetPassword(this.token(), password).subscribe({
+    this.authService.resetPassword(this.phone(), otp, password).subscribe({
       next: (res) => {
         this.loading.set(false);
         this.submitted.set(true);
@@ -81,6 +91,7 @@ export class ResetPasswordComponent implements OnInit {
     });
   }
 
+  get otp() { return this.form.get('otp'); }
   get password() { return this.form.get('password'); }
   get confirmPassword() { return this.form.get('confirmPassword'); }
 }

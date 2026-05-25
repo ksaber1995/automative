@@ -121,11 +121,20 @@
             }
           </div>
 
+          <!-- ── Forgot password temporarily disabled ───────────────────────
           <div class="flex justify-end -mt-2">
             <a routerLink="/auth/forgot-password" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
               {{ 'AUTH.LOGIN.FORGOT_PASSWORD' | translate }}
             </a>
           </div>
+          ──────────────────────────────────────────────────────────────────── -->
+
+          @if (serverError()) {
+            <div class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <i class="pi pi-exclamation-circle mt-0.5 shrink-0"></i>
+              <span>{{ serverError() }}</span>
+            </div>
+          }
 
           <p-button
             type="submit"
