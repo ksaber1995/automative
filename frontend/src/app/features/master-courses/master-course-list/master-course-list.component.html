@@ -56,10 +56,10 @@
             {{ 'MASTER_COURSES.LIST.COL_BRANCH' | translate }}
             <p-sortIcon field="branchName"></p-sortIcon>
           </th>
-          <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_PRICE' | translate }}</th>
-          <th>{{ 'MASTER_COURSES.LIST.COL_DEFAULT_DURATION' | translate }}</th>
-          <th>{{ 'MASTER_COURSES.LIST.COL_LINKED' | translate }}</th>
-          <th>{{ 'MASTER_COURSES.LIST.COL_STUDENTS' | translate }}</th>
+          <th pSortableColumn="defaultPrice">{{ 'MASTER_COURSES.LIST.COL_DEFAULT_PRICE' | translate }} <p-sortIcon field="defaultPrice"></p-sortIcon></th>
+          <th pSortableColumn="defaultDuration">{{ 'MASTER_COURSES.LIST.COL_DEFAULT_DURATION' | translate }} <p-sortIcon field="defaultDuration"></p-sortIcon></th>
+          <th pSortableColumn="linkedCourseCount">{{ 'MASTER_COURSES.LIST.COL_LINKED' | translate }} <p-sortIcon field="linkedCourseCount"></p-sortIcon></th>
+          <th pSortableColumn="studentCount">{{ 'MASTER_COURSES.LIST.COL_STUDENTS' | translate }} <p-sortIcon field="studentCount"></p-sortIcon></th>
           <th>{{ 'MASTER_COURSES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>

@@ -70,13 +70,13 @@
       >
         <ng-template pTemplate="header">
           <tr>
-            <th>{{ 'COURSES.DETAIL.COL_STUDENT' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_CLASS' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_ENROLLED' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_STATUS' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_MODE' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_PROGRESS' | translate }}</th>
-            <th>{{ 'COURSES.DETAIL.COL_PAYMENT_STATUS' | translate }}</th>
+            <th pSortableColumn="studentFirstName">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentFirstName"></p-sortIcon></th>
+            <th pSortableColumn="className">{{ 'COURSES.DETAIL.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+            <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+            <th pSortableColumn="status">{{ 'COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+            <th pSortableColumn="paymentMode">{{ 'COURSES.DETAIL.COL_PAYMENT_MODE' | translate }} <p-sortIcon field="paymentMode"></p-sortIcon></th>
+            <th pSortableColumn="amountPaid">{{ 'COURSES.DETAIL.COL_PAYMENT_PROGRESS' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+            <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT_STATUS' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
             <th>{{ 'COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
@@ -276,9 +276,9 @@
                   <p-table [value]="cls.students" responsiveLayout="scroll">
                     <ng-template pTemplate="header">
                       <tr>
-                        <th>{{ 'COURSES.DETAIL.COL_STUDENT' | translate }}</th>
-                        <th>{{ 'COURSES.DETAIL.COL_DATE' | translate }}</th>
-                        <th>{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }}</th>
+                        <th pSortableColumn="firstName">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
+                        <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+                        <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
                       </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-student>

@@ -167,6 +167,11 @@ export const routes: Routes = [
         canActivate: [roleGuard([UserRole.GLOBAL_ADMIN, UserRole.ADMIN, UserRole.BRANCH_ADMIN])],
         data: { breadcrumb: 'BREADCRUMBS.SETTINGS' },
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
+      },
+      {
+        path: 'company-profile',
+        data: { breadcrumb: 'BREADCRUMBS.COMPANY_PROFILE' },
+        loadComponent: () => import('./features/company-profile/company-profile.component').then(m => m.CompanyProfileComponent)
       }
     ]
   },

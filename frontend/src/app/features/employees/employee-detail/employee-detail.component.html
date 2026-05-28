@@ -177,12 +177,12 @@
         <p-table [value]="salaryHistory()" [paginator]="salaryHistory().length > 10" [rows]="10" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }}</th>
-              <th class="text-right">{{ 'EMPLOYEES.DETAIL.COL_BASE_SALARY' | translate }}</th>
-              <th class="text-right text-green-600">{{ 'EMPLOYEES.DETAIL.COL_BONUS' | translate }}</th>
-              <th class="text-right text-red-600">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }}</th>
-              <th class="text-right font-semibold">{{ 'EMPLOYEES.DETAIL.COL_TOTAL_PAID' | translate }}</th>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_REASON' | translate }}</th>
+              <th pSortableColumn="date">{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+              <th pSortableColumn="amount" class="text-right">{{ 'EMPLOYEES.DETAIL.COL_BASE_SALARY' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+              <th pSortableColumn="bonusAmount" class="text-right text-green-600">{{ 'EMPLOYEES.DETAIL.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
+              <th pSortableColumn="discountAmount" class="text-right text-red-600">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
+              <th pSortableColumn="amount" class="text-right font-semibold">{{ 'EMPLOYEES.DETAIL.COL_TOTAL_PAID' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+              <th pSortableColumn="adjustmentReason">{{ 'EMPLOYEES.DETAIL.COL_REASON' | translate }} <p-sortIcon field="adjustmentReason"></p-sortIcon></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-item>
@@ -274,12 +274,12 @@
         >
           <ng-template pTemplate="header">
             <tr>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }}</th>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_CLASS' | translate }}</th>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_BRANCH' | translate }}</th>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_ROLE' | translate }}</th>
-              <th>{{ 'EMPLOYEES.DETAIL.COL_STATUS' | translate }}</th>
-              <th class="text-right">{{ 'EMPLOYEES.DETAIL.COL_DURATION' | translate }}</th>
+              <th pSortableColumn="sessionStartDate">{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
+              <th pSortableColumn="className">{{ 'EMPLOYEES.DETAIL.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+              <th pSortableColumn="branchName">{{ 'EMPLOYEES.DETAIL.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+              <th pSortableColumn="role">{{ 'EMPLOYEES.DETAIL.COL_ROLE' | translate }} <p-sortIcon field="role"></p-sortIcon></th>
+              <th pSortableColumn="status">{{ 'EMPLOYEES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+              <th pSortableColumn="durationMinutes" class="text-right">{{ 'EMPLOYEES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-row>

@@ -139,9 +139,9 @@
       <ng-template pTemplate="header">
         <tr>
           <th style="width: 48px"></th>
-          <th>{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }}</th>
-          <th>{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }}</th>
-          <th class="text-right">{{ 'EXPENSES.SALARIES.COL_BASE_SALARY' | translate }}</th>
+          <th pSortableColumn="label">{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }} <p-sortIcon field="label"></p-sortIcon></th>
+          <th pSortableColumn="branchName">{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="amount">{{ 'EXPENSES.SALARIES.COL_BASE_SALARY' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
           <th style="width: 130px" class="text-right text-green-600">{{ 'EXPENSES.SALARIES.COL_BONUS' | translate }}</th>
           <th style="width: 130px" class="text-right text-red-600">{{ 'EXPENSES.SALARIES.COL_DISCOUNT' | translate }}</th>
           <th style="width: 200px">{{ 'EXPENSES.SALARIES.COL_REASON' | translate }}</th>
@@ -304,13 +304,13 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="date">{{ 'EXPENSES.SALARIES.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
-          <th>{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }}</th>
-          <th>{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }}</th>
+          <th pSortableColumn="employeeId">{{ 'EXPENSES.SALARIES.COL_EMPLOYEE' | translate }} <p-sortIcon field="employeeId"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'EXPENSES.SALARIES.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           <th class="text-right">{{ 'EXPENSES.SALARIES.COL_BASE' | translate }}</th>
-          <th class="text-right text-green-600">{{ 'EXPENSES.SALARIES.COL_BONUS' | translate }}</th>
-          <th class="text-right text-red-600">{{ 'EXPENSES.SALARIES.COL_DISCOUNT' | translate }}</th>
-          <th>{{ 'EXPENSES.SALARIES.COL_REASON' | translate }}</th>
-          <th class="text-right font-semibold">{{ 'EXPENSES.SALARIES.COL_NET_PAID' | translate }}</th>
+          <th class="text-right text-green-600" pSortableColumn="bonusAmount">{{ 'EXPENSES.SALARIES.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
+          <th class="text-right text-red-600" pSortableColumn="discountAmount">{{ 'EXPENSES.SALARIES.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
+          <th pSortableColumn="adjustmentReason">{{ 'EXPENSES.SALARIES.COL_REASON' | translate }} <p-sortIcon field="adjustmentReason"></p-sortIcon></th>
+          <th class="text-right font-semibold" pSortableColumn="amount">{{ 'EXPENSES.SALARIES.COL_NET_PAID' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
           <th style="width: 80px"></th>
         </tr>
       </ng-template>

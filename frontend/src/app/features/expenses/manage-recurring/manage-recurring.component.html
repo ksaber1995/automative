@@ -111,13 +111,13 @@
       <ng-template pTemplate="header">
         <tr>
           <th style="width: 48px"></th>
-          <th>Description</th>
-          <th>Category</th>
-          <th>Branch</th>
-          <th class="text-right">Expected</th>
+          <th pSortableColumn="template.description">Description <p-sortIcon field="template.description"></p-sortIcon></th>
+          <th pSortableColumn="template.category">Category <p-sortIcon field="template.category"></p-sortIcon></th>
+          <th pSortableColumn="template.branchId">Branch <p-sortIcon field="template.branchId"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="template.amount">Expected <p-sortIcon field="template.amount"></p-sortIcon></th>
           <th class="text-right" style="width: 140px">Pay Amount</th>
           <th style="width: 180px">Notes</th>
-          <th>Status</th>
+          <th pSortableColumn="payment">Status <p-sortIcon field="payment"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>

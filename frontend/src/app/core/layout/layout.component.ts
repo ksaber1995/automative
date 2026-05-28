@@ -7,7 +7,7 @@ import { AvatarModule } from 'primeng/avatar';
 import { MenuModule } from 'primeng/menu';
 import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
@@ -53,6 +53,7 @@ export class LayoutComponent implements OnInit {
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
   languageService = inject(LanguageService);
+  private translate = inject(TranslateService);
 
   constructor(
     private authService: AuthService,
@@ -200,7 +201,7 @@ export class LayoutComponent implements OnInit {
   }
 
   getCompanyName(_user: any): string {
-    return localStorage.getItem('company_name') || 'My Company';
+    return localStorage.getItem('company_name') || this.translate.instant('COMPANY_PROFILE.DEFAULT_NAME');
   }
 
   getAvatarColor(role: string): string {

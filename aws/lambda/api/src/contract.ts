@@ -1114,6 +1114,28 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    reactivate: {
+      method: 'PATCH',
+      path: '/api/students/:id/reactivate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: StudentSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    hardDelete: {
+      method: 'DELETE',
+      path: '/api/students/:id/permanent',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
   },
 
   // Branches routes
@@ -2392,6 +2414,45 @@ export const contract = c.router({
 
   // Companies routes
   companies: {
+    getProfile: {
+      method: 'GET' as const,
+      path: '/api/companies/profile',
+      responses: {
+        200: z.object({
+          company: z.object({
+            id: UUIDSchema,
+            name: z.string(),
+            code: z.string().nullable(),
+            email: z.string().nullable(),
+            phone: z.string().nullable(),
+            address: z.string().nullable(),
+            city: z.string().nullable(),
+            state: z.string().nullable(),
+            zipCode: z.string().nullable(),
+            country: z.string().nullable(),
+            taxId: z.string().nullable(),
+            registrationNumber: z.string().nullable(),
+            industry: z.string().nullable(),
+            timezone: z.string().nullable(),
+            currency: z.string().nullable(),
+            locale: z.string().nullable(),
+            isActive: z.boolean(),
+            createdAt: z.string(),
+            updatedAt: z.string(),
+          }),
+          subscription: z.object({
+            status: z.string(),
+            price: z.number(),
+            trialStartDate: z.string().nullable(),
+            trialEndDate: z.string().nullable(),
+            subscriptionStartDate: z.string().nullable(),
+            subscriptionEndDate: z.string().nullable(),
+          }).nullable(),
+        }),
+        401: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     getSettings: {
       method: 'GET' as const,
       path: '/api/companies/settings',

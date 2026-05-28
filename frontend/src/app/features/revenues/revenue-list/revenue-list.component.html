@@ -46,13 +46,13 @@
     <p-table [value]="revenues()" [loading]="loading()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'REVENUES.LIST.COL_DATE' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_BRANCH' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_SOURCE' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_DESC' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_AMOUNT' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_REFUND_STATUS' | translate }}</th>
-          <th>{{ 'REVENUES.LIST.COL_METHOD' | translate }}</th>
+          <th pSortableColumn="date">{{ 'REVENUES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+          <th pSortableColumn="branchId">{{ 'REVENUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="source">{{ 'REVENUES.LIST.COL_SOURCE' | translate }} <p-sortIcon field="source"></p-sortIcon></th>
+          <th pSortableColumn="description">{{ 'REVENUES.LIST.COL_DESC' | translate }} <p-sortIcon field="description"></p-sortIcon></th>
+          <th pSortableColumn="amount">{{ 'REVENUES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+          <th pSortableColumn="totalRefunded">{{ 'REVENUES.LIST.COL_REFUND_STATUS' | translate }} <p-sortIcon field="totalRefunded"></p-sortIcon></th>
+          <th pSortableColumn="paymentMethod">{{ 'REVENUES.LIST.COL_METHOD' | translate }} <p-sortIcon field="paymentMethod"></p-sortIcon></th>
           <th>{{ 'REVENUES.LIST.COL_LINK' | translate }}</th>
         </tr>
       </ng-template>

@@ -146,13 +146,13 @@
     <p-table [value]="subscriptions()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'EVENTS.DETAIL.COL_SUBSCRIBER' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_TYPE' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_MOBILE_AGE' | translate }}</th>
-          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
-          <th class="text-right">{{ 'EVENTS.DETAIL.COL_REFUNDED' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_METHOD' | translate }}</th>
+          <th pSortableColumn="studentId">{{ 'EVENTS.DETAIL.COL_SUBSCRIBER' | translate }} <p-sortIcon field="studentId"></p-sortIcon></th>
+          <th pSortableColumn="studentId">{{ 'EVENTS.DETAIL.COL_TYPE' | translate }} <p-sortIcon field="studentId"></p-sortIcon></th>
+          <th pSortableColumn="externalMobile">{{ 'EVENTS.DETAIL.COL_MOBILE_AGE' | translate }} <p-sortIcon field="externalMobile"></p-sortIcon></th>
+          <th pSortableColumn="amount" class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+          <th pSortableColumn="refundedAmount" class="text-right">{{ 'EVENTS.DETAIL.COL_REFUNDED' | translate }} <p-sortIcon field="refundedAmount"></p-sortIcon></th>
+          <th pSortableColumn="paymentDate">{{ 'EVENTS.DETAIL.COL_DATE' | translate }} <p-sortIcon field="paymentDate"></p-sortIcon></th>
+          <th pSortableColumn="paymentMethod">{{ 'EVENTS.DETAIL.COL_METHOD' | translate }} <p-sortIcon field="paymentMethod"></p-sortIcon></th>
           <th></th>
         </tr>
       </ng-template>
@@ -227,12 +227,12 @@
     <p-table [value]="expenses()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'EVENTS.DETAIL.COL_EXP_DESCRIPTION' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_CATEGORY' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_VENDOR' | translate }}</th>
-          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
-          <th class="text-right">{{ 'EVENTS.DETAIL.COL_PAID' | translate }}</th>
+          <th pSortableColumn="description">{{ 'EVENTS.DETAIL.COL_EXP_DESCRIPTION' | translate }} <p-sortIcon field="description"></p-sortIcon></th>
+          <th pSortableColumn="category">{{ 'EVENTS.DETAIL.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
+          <th pSortableColumn="date">{{ 'EVENTS.DETAIL.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+          <th pSortableColumn="vendor">{{ 'EVENTS.DETAIL.COL_VENDOR' | translate }} <p-sortIcon field="vendor"></p-sortIcon></th>
+          <th pSortableColumn="amount" class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+          <th pSortableColumn="totalPaid" class="text-right">{{ 'EVENTS.DETAIL.COL_PAID' | translate }} <p-sortIcon field="totalPaid"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-e>
@@ -277,11 +277,11 @@
     <p-table [value]="refunds()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ 'EVENTS.DETAIL.COL_DATE' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_STUDENT' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_TYPE' | translate }}</th>
-          <th class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }}</th>
-          <th>{{ 'EVENTS.DETAIL.COL_REASON' | translate }}</th>
+          <th pSortableColumn="refundDate">{{ 'EVENTS.DETAIL.COL_DATE' | translate }} <p-sortIcon field="refundDate"></p-sortIcon></th>
+          <th pSortableColumn="studentName">{{ 'EVENTS.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
+          <th pSortableColumn="type">{{ 'EVENTS.DETAIL.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+          <th pSortableColumn="amount" class="text-right">{{ 'EVENTS.DETAIL.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+          <th pSortableColumn="reason">{{ 'EVENTS.DETAIL.COL_REASON' | translate }} <p-sortIcon field="reason"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-r>

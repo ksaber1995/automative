@@ -14,6 +14,7 @@ export interface Product {
   unit: string;
   branchId: string;
   isActive: boolean;
+  totalSold?: number;
   createdAt: string;
   updatedAt: string;
 }

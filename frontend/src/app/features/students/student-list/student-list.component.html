@@ -7,20 +7,37 @@
       </div>
     </ng-template>
 
-    <!-- Branch Filter -->
-    <div class="mb-4">
-      <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.BRANCH_FILTER' | translate }}</label>
-      <select
-        id="branchFilter"
-        [(ngModel)]="selectedBranchId"
-        (change)="onBranchFilterChange()"
-        class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="">{{ 'STUDENTS.LIST.ALL_BRANCHES' | translate }}</option>
-        @for (branch of branches(); track branch.id) {
-          <option [value]="branch.id">{{ branch.name }}</option>
-        }
-      </select>
+    <!-- Filters -->
+    <div class="mb-4 flex flex-col md:flex-row gap-4">
+      <div class="flex-1">
+        <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.BRANCH_FILTER' | translate }}</label>
+        <select
+          id="branchFilter"
+          [(ngModel)]="selectedBranchId"
+          (change)="onBranchFilterChange()"
+          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">{{ 'STUDENTS.LIST.ALL_BRANCHES' | translate }}</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex-1">
+        <label for="studentSearch" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SEARCH' | translate }}</label>
+        <span class="p-input-icon-left w-full md:w-80 block relative">
+          <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+          <input
+            id="studentSearch"
+            type="text"
+            pInputText
+            [ngModel]="searchTerm()"
+            (ngModelChange)="onSearchChange($event)"
+            [placeholder]="'STUDENTS.LIST.SEARCH_PLACEHOLDER' | translate"
+            class="w-full md:w-80 pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </span>
+      </div>
     </div>
 
     <!-- Active/Inactive Tabs -->
@@ -53,12 +70,12 @@
         <tr>
           <th pSortableColumn="firstName">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
           <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
-          <th>{{ 'STUDENTS.LIST.COL_PARENT' | translate }}</th>
-          <th>{{ 'STUDENTS.LIST.COL_CONTACT' | translate }}</th>
+          <th pSortableColumn="parentName">{{ 'STUDENTS.LIST.COL_PARENT' | translate }} <p-sortIcon field="parentName"></p-sortIcon></th>
+          <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
           <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
-          <th>{{ 'STUDENTS.LIST.COL_BRANCH' | translate }}</th>
+          <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
-          <th pSortableColumn="isActive">{{ 'STUDENTS.LIST.COL_STATUS' | translate }}</th>
+          <th pSortableColumn="acquisitionChannel">{{ 'STUDENTS.LIST.COL_CHANNEL' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -92,10 +109,11 @@
             </div>
           </td>
           <td>
-            <p-tag
-              [value]="student.isActive ? ('STUDENTS.LIST.ACTIVE' | translate) : ('STUDENTS.LIST.INACTIVE' | translate)"
-              [severity]="student.isActive ? 'success' : 'danger'"
-            ></p-tag>
+            @if (student.acquisitionChannel) {
+              <p-tag [value]="getChannelLabel(student.acquisitionChannel)" severity="info"></p-tag>
+            } @else {
+              <span class="text-gray-400">—</span>
+            }
           </td>
           <td>
             <div class="flex gap-2">
@@ -116,13 +134,33 @@
                 ></button>
               }
               @if (authService.canDelete('students')) {
-                <button
-                  pButton
-                  icon="pi pi-trash"
-                  class="p-button-rounded p-button-text p-button-danger"
-                  [pTooltip]="'STUDENTS.LIST.DEACTIVATE' | translate"
-                  (click)="deleteStudent(student)"
-                ></button>
+                @if (student.isActive) {
+                  @if (hasNoEnrollments(student.id)) {
+                    <button
+                      pButton
+                      icon="pi pi-trash"
+                      class="p-button-rounded p-button-text p-button-danger"
+                      [pTooltip]="'STUDENTS.LIST.HARD_DELETE' | translate"
+                      (click)="hardDeleteStudent(student)"
+                    ></button>
+                  } @else {
+                    <button
+                      pButton
+                      icon="pi pi-ban"
+                      class="p-button-rounded p-button-text p-button-danger"
+                      [pTooltip]="'STUDENTS.LIST.DEACTIVATE' | translate"
+                      (click)="deleteStudent(student)"
+                    ></button>
+                  }
+                } @else if (isBranchActive(student.branchId)) {
+                  <button
+                    pButton
+                    icon="pi pi-check"
+                    class="p-button-rounded p-button-text p-button-success"
+                    [pTooltip]="'STUDENTS.LIST.ACTIVATE' | translate"
+                    (click)="activateStudent(student)"
+                  ></button>
+                }
               }
             </div>
           </td>

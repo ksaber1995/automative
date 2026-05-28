@@ -162,22 +162,22 @@
           <div class="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border">
             <i [class]="getAllocationIcon(data.companyWideSummary.allocationMethod)"></i>
             <span>{{ getAllocationLabel(data.companyWideSummary.allocationMethod) }}</span>
-            <a routerLink="/settings" class="text-blue-500 hover:underline ml-1 text-xs">Change</a>
+            <a routerLink="/settings" class="text-blue-500 hover:underline ml-1 text-xs">{{ 'DASHBOARD.CHANGE' | translate }}</a>
           </div>
         </div>
       </ng-template>
       <p-table [value]="data.branchSummaries" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th>{{ 'NAV.BRANCHES' | translate }}</th>
-            <th [pTooltip]="'DASHBOARD.BRANCH_REVENUE_TIP' | translate" tooltipPosition="top">{{ 'NAV.REVENUES' | translate }}</th>
-            <th [pTooltip]="'DASHBOARD.BRANCH_DIRECT_TIP' | translate" tooltipPosition="top">{{ 'DASHBOARD.COL_DIRECT' | translate }}</th>
-            <th [pTooltip]="'DASHBOARD.BRANCH_OVERHEAD_TIP' | translate" tooltipPosition="top">
-              {{ 'DASHBOARD.COL_OVERHEAD' | translate }}
+            <th pSortableColumn="branchName">{{ 'NAV.BRANCHES' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_REVENUE_TIP' | translate" tooltipPosition="top" pSortableColumn="totalRevenue">{{ 'NAV.REVENUES' | translate }} <p-sortIcon field="totalRevenue"></p-sortIcon></th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_DIRECT_TIP' | translate" tooltipPosition="top" pSortableColumn="directExpenses">{{ 'DASHBOARD.COL_DIRECT' | translate }} <p-sortIcon field="directExpenses"></p-sortIcon></th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_OVERHEAD_TIP' | translate" tooltipPosition="top" pSortableColumn="allocatedOverhead">
+              {{ 'DASHBOARD.COL_OVERHEAD' | translate }} <p-sortIcon field="allocatedOverhead"></p-sortIcon>
             </th>
-            <th [pTooltip]="'DASHBOARD.BRANCH_NET_TIP' | translate" tooltipPosition="top">{{ 'DASHBOARD.COL_NET_PROFIT' | translate }}</th>
-            <th>{{ 'DASHBOARD.COL_MARGIN' | translate }}</th>
-            <th>{{ 'DASHBOARD.COL_STATUS' | translate }}</th>
+            <th [pTooltip]="'DASHBOARD.BRANCH_NET_TIP' | translate" tooltipPosition="top" pSortableColumn="netProfit">{{ 'DASHBOARD.COL_NET_PROFIT' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
+            <th pSortableColumn="profitMargin">{{ 'DASHBOARD.COL_MARGIN' | translate }} <p-sortIcon field="profitMargin"></p-sortIcon></th>
+            <th pSortableColumn="netProfit">{{ 'DASHBOARD.COL_STATUS' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-branch>

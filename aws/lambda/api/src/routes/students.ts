@@ -225,4 +225,90 @@ export const studentsRoutes = {
       return mapThrownError(error, 'ERRORS.STUDENTS.DELETE_FAILED', 'Failed to delete student', 404);
     }
   },
+
+  reactivate: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne<any>(
+        'SELECT s.*, b.is_active AS branch_is_active FROM students s LEFT JOIN branches b ON b.id = s.branch_id WHERE s.id = $1 AND s.company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_UPDATE', 'Access denied to update this student');
+      }
+
+      if (existing.branch_is_active === false) {
+        return apiError(400, 'ERRORS.STUDENTS.BRANCH_INACTIVE', 'Cannot activate a student whose branch is inactive');
+      }
+
+      const student = await update('students', params.id, { is_active: true });
+
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      return {
+        status: 200 as const,
+        body: mapStudentFromDB(student),
+      };
+    } catch (error) {
+      console.error('Reactivate student error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.REACTIVATE_FAILED', 'Failed to reactivate student', 400);
+    }
+  },
+
+  hardDelete: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'delete')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_DELETE', 'Access denied to delete this student');
+      }
+
+      const enrollmentCount = await queryOne<{ count: string }>(
+        'SELECT COUNT(*) AS count FROM enrollments WHERE student_id = $1',
+        [params.id]
+      );
+      const masterEnrollmentCount = await queryOne<{ count: string }>(
+        'SELECT COUNT(*) AS count FROM master_enrollments WHERE student_id = $1',
+        [params.id]
+      );
+
+      const total = parseInt(enrollmentCount?.count || '0') + parseInt(masterEnrollmentCount?.count || '0');
+      if (total > 0) {
+        return apiError(400, 'ERRORS.STUDENTS.HAS_ENROLLMENTS', 'Cannot permanently delete a student with enrollments');
+      }
+
+      await query('DELETE FROM students WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+
+      return {
+        status: 200 as const,
+        body: { message: 'Student permanently deleted', code: 'STUDENTS.DELETED' },
+      };
+    } catch (error) {
+      console.error('Hard delete student error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.DELETE_FAILED', 'Failed to delete student', 400);
+    }
+  },
 };

@@ -99,11 +99,11 @@
           <p-table [value]="dueItems()" [loading]="dueLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
             <ng-template pTemplate="header">
               <tr>
-                <th>{{ 'EXPENSES.LIST.COL_KIND' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
+                <th pSortableColumn="type">{{ 'EXPENSES.LIST.COL_KIND' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+                <th pSortableColumn="label">{{ 'EXPENSES.LIST.COL_DESC' | translate }} <p-sortIcon field="label"></p-sortIcon></th>
+                <th pSortableColumn="branchName">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                <th pSortableColumn="category">{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
+                <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
                 <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
               </tr>
             </ng-template>
@@ -165,13 +165,13 @@
           <p-table [value]="salaryPayments()" [loading]="salaryLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
             <ng-template pTemplate="header">
               <tr>
-                <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_EMPLOYEE' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_BONUS' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_DISCOUNT' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_NOTES' | translate }}</th>
+                <th pSortableColumn="date">{{ 'EXPENSES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+                <th pSortableColumn="employeeId">{{ 'EXPENSES.LIST.COL_EMPLOYEE' | translate }} <p-sortIcon field="employeeId"></p-sortIcon></th>
+                <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+                <th pSortableColumn="bonusAmount" class="text-right">{{ 'EXPENSES.LIST.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
+                <th pSortableColumn="discountAmount" class="text-right">{{ 'EXPENSES.LIST.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
+                <th pSortableColumn="notes">{{ 'EXPENSES.LIST.COL_NOTES' | translate }} <p-sortIcon field="notes"></p-sortIcon></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-p>
@@ -221,14 +221,14 @@
           <p-table [value]="installmentPlans()" [loading]="installmentLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
             <ng-template pTemplate="header">
               <tr>
-                <th>{{ 'EXPENSES.LIST.COL_NAME' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_VENDOR' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_TOTAL' | translate }}</th>
-                <th class="text-right">{{ 'EXPENSES.LIST.COL_MONTHLY' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_PROGRESS' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_NEXT_DUE' | translate }}</th>
-                <th>{{ 'EXPENSES.LIST.COL_STATUS' | translate }}</th>
+                <th pSortableColumn="name">{{ 'EXPENSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+                <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                <th pSortableColumn="vendor">{{ 'EXPENSES.LIST.COL_VENDOR' | translate }} <p-sortIcon field="vendor"></p-sortIcon></th>
+                <th pSortableColumn="totalAmount" class="text-right">{{ 'EXPENSES.LIST.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
+                <th pSortableColumn="monthlyAmount" class="text-right">{{ 'EXPENSES.LIST.COL_MONTHLY' | translate }} <p-sortIcon field="monthlyAmount"></p-sortIcon></th>
+                <th pSortableColumn="paidAmount">{{ 'EXPENSES.LIST.COL_PROGRESS' | translate }} <p-sortIcon field="paidAmount"></p-sortIcon></th>
+                <th pSortableColumn="nextDueDate">{{ 'EXPENSES.LIST.COL_NEXT_DUE' | translate }} <p-sortIcon field="nextDueDate"></p-sortIcon></th>
+                <th pSortableColumn="status">{{ 'EXPENSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                 <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
               </tr>
             </ng-template>
@@ -354,17 +354,17 @@
   <p-table [value]="filteredExpenses()" [loading]="loading()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
     <ng-template pTemplate="header">
       <tr>
-        <th>{{ 'EXPENSES.LIST.COL_DATE' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_TYPE' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_BRANCH' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_DESC' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_TOTAL_PAID' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_PAYMENTS' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_LAST_PAYMENT' | translate }}</th>
+        <th pSortableColumn="date">{{ 'EXPENSES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
+        <th pSortableColumn="type">{{ 'EXPENSES.LIST.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
+        <th pSortableColumn="category">{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
+        <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+        <th pSortableColumn="description">{{ 'EXPENSES.LIST.COL_DESC' | translate }} <p-sortIcon field="description"></p-sortIcon></th>
+        <th pSortableColumn="amount">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+        <th pSortableColumn="totalPaid">{{ 'EXPENSES.LIST.COL_TOTAL_PAID' | translate }} <p-sortIcon field="totalPaid"></p-sortIcon></th>
+        <th pSortableColumn="paymentCount">{{ 'EXPENSES.LIST.COL_PAYMENTS' | translate }} <p-sortIcon field="paymentCount"></p-sortIcon></th>
+        <th pSortableColumn="lastPaymentDate">{{ 'EXPENSES.LIST.COL_LAST_PAYMENT' | translate }} <p-sortIcon field="lastPaymentDate"></p-sortIcon></th>
         <th>{{ 'EXPENSES.LIST.COL_STATUS' | translate }}</th>
-        <th>{{ 'EXPENSES.LIST.COL_RECURRING' | translate }}</th>
+        <th pSortableColumn="isRecurring">{{ 'EXPENSES.LIST.COL_RECURRING' | translate }} <p-sortIcon field="isRecurring"></p-sortIcon></th>
         <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
       </tr>
     </ng-template>
