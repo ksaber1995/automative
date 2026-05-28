@@ -14,15 +14,17 @@
           <p class="text-gray-600 text-lg">{{ 'BRANCHES.DETAIL.CODE' | translate }} {{ b.code }}</p>
         </div>
         <div class="flex gap-2">
-          @if (authService.canWrite('branches')) {
+          @if (authService.canWrite('branches') && !b.isActive) {
             <p-button
-              [label]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
-              [icon]="b.isActive ? 'pi pi-times-circle' : 'pi pi-check-circle'"
-              [severity]="b.isActive ? 'danger' : 'success'"
+              [label]="'BRANCHES.DETAIL.ACTIVATE' | translate"
+              icon="pi pi-check-circle"
+              severity="success"
               [outlined]="true"
               (onClick)="toggleBranchStatus()"
-              [pTooltip]="b.isActive ? ('BRANCHES.DETAIL.DEACTIVATE' | translate) : ('BRANCHES.DETAIL.ACTIVATE' | translate)"
+              [pTooltip]="'BRANCHES.DETAIL.ACTIVATE' | translate"
             ></p-button>
+          }
+          @if (authService.canWrite('branches')) {
             <p-button
               [label]="'BRANCHES.DETAIL.EDIT' | translate"
               icon="pi pi-pencil"
