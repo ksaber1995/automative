@@ -53,16 +53,30 @@ export const productsRoutes = {
       if (body.recordStockExpense && body.stock > 0) {
         const totalCost = parseFloat(body.costPrice) * body.stock;
         const purchaseDate = body.purchaseDate || new Date().toISOString().split('T')[0];
-        await client.query(
+        const description = `Stock purchase: ${body.name} × ${body.stock} units @ ${body.costPrice}`;
+        const expenseResult = await client.query(
           `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_id)
-           VALUES ($1,$2,'VARIABLE','INVENTORY',$3,$4,$5,$6)`,
+           VALUES ($1,$2,'VARIABLE','INVENTORY',$3,$4,$5,$6) RETURNING id`,
           [
             context.companyId,
             body.branchId,
             totalCost,
-            `Stock purchase: ${body.name} × ${body.stock} units @ ${body.costPrice}`,
+            description,
             purchaseDate,
             product.id,
+          ]
+        );
+        // Settle the expense immediately so cash reflects the outflow.
+        await client.query(
+          `INSERT INTO expense_payments (company_id, expense_id, branch_id, type, category, amount, date, notes)
+           VALUES ($1,$2,$3,'VARIABLE','INVENTORY',$4,$5,$6)`,
+          [
+            context.companyId,
+            expenseResult.rows[0].id,
+            body.branchId,
+            totalCost,
+            purchaseDate,
+            description,
           ]
         );
       }

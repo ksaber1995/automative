@@ -425,7 +425,7 @@
         </td>
         <td>
           <div class="flex gap-1">
-            @if (authService.canWrite('expenses')) {
+            @if (authService.canWrite('expenses') && !(expense.category === 'INVENTORY' && (expense.totalPaid ?? 0) >= expense.amount)) {
               <p-button
                 icon="pi pi-dollar"
                 [rounded]="true"
