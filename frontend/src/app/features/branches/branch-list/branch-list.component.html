@@ -89,16 +89,6 @@
                   [pTooltip]="'BRANCHES.LIST.EDIT' | translate"
                 ></p-button>
               }
-              @if (authService.canDelete('branches')) {
-                <p-button
-                  icon="pi pi-trash"
-                  [rounded]="true"
-                  [text]="true"
-                  severity="danger"
-                  (onClick)="confirmDelete(branch)"
-                  [pTooltip]="'BRANCHES.LIST.DELETE' | translate"
-                ></p-button>
-              }
             </div>
           </td>
         </tr>
