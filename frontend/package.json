@@ -8,7 +8,11 @@
     "build:prod": "ng build --configuration prod",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report"
   },
   "private": true,
   "dependencies": {
@@ -35,6 +39,7 @@
     "@angular-devkit/build-angular": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
+    "@playwright/test": "^1.60.0",
     "@types/file-saver": "^2.0.5",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
