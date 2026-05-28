@@ -36,6 +36,7 @@ export interface Student {
   churnReason?: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel | null;
+  hasSubscriptions?: boolean;
   createdAt: string;
   updatedAt: string;
 }

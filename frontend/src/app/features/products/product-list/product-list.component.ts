@@ -12,6 +12,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { TooltipModule } from 'primeng/tooltip';
 import { ProductService } from '../services/product.service';
 import { BranchService } from '../../branches/services/branch.service';
@@ -40,6 +41,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
     DeleteConfirmDialogComponent,
     TranslateModule,
     TooltipModule,
+    AmountPipe,
   ],
   templateUrl: './product-list.component.html',
 })

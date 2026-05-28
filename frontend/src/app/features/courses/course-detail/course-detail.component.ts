@@ -24,6 +24,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { Course } from '@shared/interfaces/course.interface';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 @Component({
   selector: 'app-course-detail',
@@ -45,7 +46,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
     TextareaModule,
     ProgressBarModule,
     SelectButtonModule,
-    TranslateModule
+    TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './course-detail.component.html',

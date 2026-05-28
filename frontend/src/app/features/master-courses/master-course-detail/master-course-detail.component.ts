@@ -10,6 +10,7 @@ import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { MasterCourseService, AvailableCourse } from '../services/master-course.service';
 import { MasterEnrollmentService } from '../services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -36,6 +37,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TooltipModule,
     TranslateModule,
     DeleteConfirmDialogComponent,
+    AmountPipe,
   ],
   templateUrl: './master-course-detail.component.html',
 })

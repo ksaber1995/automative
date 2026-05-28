@@ -299,6 +299,7 @@ const StudentSchema = z.object({
   churnReason: z.string().nullable(),
   notes: z.string().nullable(),
   acquisitionChannel: AcquisitionChannelSchema.nullable(),
+  hasSubscriptions: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -819,6 +820,7 @@ const EmployeeSchema = z.object({
   isGlobal: z.boolean(),
   isActive: z.boolean(),
   linkedUserId: UUIDSchema.nullable().optional(),
+  hasSalaryHistory: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -64,11 +64,11 @@
         </div>
         <div class="bg-green-50 p-4 rounded-lg">
           <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_REVENUE' | translate }}</div>
-          <div class="text-2xl font-bold text-green-600">{{ summary()!.totalRevenue.toFixed(2) }}</div>
+          <div class="text-2xl font-bold text-green-600">{{ summary()!.totalRevenue | amount }}</div>
         </div>
         <div class="bg-purple-50 p-4 rounded-lg">
           <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_QTY' | translate }}</div>
-          <div class="text-2xl font-bold">{{ summary()!.totalQuantity }}</div>
+          <div class="text-2xl font-bold">{{ summary()!.totalQuantity | amount:0 }}</div>
         </div>
       </div>
     }
@@ -108,21 +108,21 @@
             }
           </td>
           <td>{{ getBranchName(sale.branchId) }}</td>
-          <td>{{ sale.quantity }}</td>
-          <td>{{ sale.unitPrice.toFixed(2) }}</td>
+          <td>{{ sale.quantity | amount:0 }}</td>
+          <td>{{ sale.unitPrice | amount }}</td>
           <td>
             @if (sale.discountAmount > 0) {
-              <span class="text-orange-600">-{{ sale.discountAmount.toFixed(2) }}</span>
+              <span class="text-orange-600">-{{ sale.discountAmount | amount }}</span>
             } @else {
               <span class="text-gray-400">{{ 'PRODUCTS.SALES.NO_DISCOUNT' | translate }}</span>
             }
           </td>
           <td>
             @if ((sale.totalRefunded ?? 0) > 0) {
-              <div class="line-through text-gray-400">{{ sale.totalAmount.toFixed(2) }}</div>
-              <div class="text-green-600 font-semibold">{{ (sale.totalAmount - (sale.totalRefunded ?? 0)).toFixed(2) }}</div>
+              <div class="line-through text-gray-400">{{ sale.totalAmount | amount }}</div>
+              <div class="text-green-600 font-semibold">{{ (sale.totalAmount - (sale.totalRefunded ?? 0)) | amount }}</div>
             } @else {
-              <span class="font-semibold text-green-600">{{ sale.totalAmount.toFixed(2) }}</span>
+              <span class="font-semibold text-green-600">{{ sale.totalAmount | amount }}</span>
             }
           </td>
           <td>
@@ -131,7 +131,7 @@
               [severity]="getRefundSeverity(sale)">
             </p-tag>
             @if ((sale.totalRefunded ?? 0) > 0) {
-              <div class="text-xs text-orange-600 mt-1">-{{ sale.totalRefunded.toFixed(2) }}</div>
+              <div class="text-xs text-orange-600 mt-1">-{{ sale.totalRefunded | amount }}</div>
             }
           </td>
           <td>{{ ('PRODUCTS.SALES.METHOD_' + sale.paymentMethod) | translate }}</td>
@@ -187,8 +187,8 @@
       <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p class="text-sm text-blue-900 font-semibold">{{ refundingSale()!.productName }}</p>
         <p class="text-xs text-blue-700 mt-1">
-          {{ 'PRODUCTS.SALES.SOLD_FOR' | translate }} {{ refundingSale()!.totalAmount.toFixed(2) }}
-          · {{ 'PRODUCTS.SALES.REFUNDABLE' | translate }} <strong>{{ refundableNow().toFixed(2) }}</strong>
+          {{ 'PRODUCTS.SALES.SOLD_FOR' | translate }} {{ refundingSale()!.totalAmount | amount }}
+          · {{ 'PRODUCTS.SALES.REFUNDABLE' | translate }} <strong>{{ refundableNow() | amount }}</strong>
         </p>
       </div>
 

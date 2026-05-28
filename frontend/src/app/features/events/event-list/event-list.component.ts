@@ -49,6 +49,9 @@ export class EventListComponent implements OnInit {
   toDelete = signal<EventModel | null>(null);
 
   selectedBranchId = signal<string | null>(null);
+  // 'ACTIVE' = isActive && endDate not yet passed, 'FINISHED' = endDate < today,
+  // 'INACTIVE' = soft-deleted/cancelled (isActive === false). `null` = all.
+  selectedStatus = signal<'ACTIVE' | 'INACTIVE' | 'FINISHED' | null>(null);
 
   // Backend already scopes /api/events to the caller's accessible branches
   // (or all branches for global admins), so the dropdown just mirrors what
@@ -59,12 +62,35 @@ export class EventListComponent implements OnInit {
     ...this.branches().map(b => ({ label: b.name, value: b.id })),
   ]);
 
+  statusOptions = computed(() => [
+    { label: this.translate.instant('EVENTS.LIST.STATUS_ACTIVE'), value: 'ACTIVE' },
+    { label: this.translate.instant('EVENTS.LIST.STATUS_INACTIVE'), value: 'INACTIVE' },
+    { label: this.translate.instant('EVENTS.LIST.STATUS_FINISHED'), value: 'FINISHED' },
+  ]);
+
   filteredItems = computed(() => {
     const branch = this.selectedBranchId();
-    if (branch === null) return this.items();
-    if (branch === '__global__') return this.items().filter(e => e.branchId === null);
-    return this.items().filter(e => e.branchId === branch);
+    const status = this.selectedStatus();
+    const todayKey = new Date().toISOString().split('T')[0];
+
+    return this.items().filter((e) => {
+      if (branch === '__global__' && e.branchId !== null) return false;
+      if (branch && branch !== '__global__' && e.branchId !== branch) return false;
+
+      if (status) {
+        const finished = !!e.endDate && e.endDate < todayKey;
+        if (status === 'FINISHED' && !finished) return false;
+        if (status === 'ACTIVE' && (!e.isActive || finished)) return false;
+        if (status === 'INACTIVE' && e.isActive) return false;
+      }
+      return true;
+    });
   });
+
+  isFinished(item: EventModel): boolean {
+    const todayKey = new Date().toISOString().split('T')[0];
+    return !!item.endDate && item.endDate < todayKey;
+  }
 
   ngOnInit() {
     this.load();
@@ -88,6 +114,7 @@ export class EventListComponent implements OnInit {
 
   clearFilters() {
     this.selectedBranchId.set(null);
+    this.selectedStatus.set(null);
   }
 
   create() { this.router.navigate(['/events/create']); }

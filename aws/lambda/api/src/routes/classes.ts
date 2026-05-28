@@ -47,6 +47,30 @@ function deriveStatus(row: any): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
 }
 
 /**
+ * Map a raw `pg` driver error to a translated API error response when we can
+ * recognise it. Returns `null` for anything we don't have a friendlier message
+ * for so the caller can fall through to its generic fallback.
+ *
+ * Known cases:
+ *   23505 unique_class_code  → another class already uses this code
+ *   23505 (other unique)     → duplicate value, less specific
+ *   22001                    → a field is longer than the column allows (e.g. name/code > 50 chars)
+ */
+function mapClassDbError(error: any) {
+  if (!error || typeof error !== 'object') return null;
+  if (error.code === '23505') {
+    if (error.constraint === 'unique_class_code') {
+      return apiError(409, 'ERRORS.CLASSES.DUPLICATE_CODE', 'A class with this code already exists');
+    }
+    return apiError(409, 'ERRORS.CLASSES.DUPLICATE', 'A class with these details already exists');
+  }
+  if (error.code === '22001') {
+    return apiError(400, 'ERRORS.CLASSES.VALUE_TOO_LONG', 'One of the fields (name or code) is too long. Keep it under 50 characters.');
+  }
+  return null;
+}
+
+/**
  * Loads a class along with its derived branch/company (from the linked course).
  * Replaces the legacy `SELECT * FROM classes WHERE id=$1 AND company_id=$2`
  * pattern now that classes.branch_id and classes.company_id no longer exist.
@@ -154,6 +178,8 @@ export const classesRoutes = {
     } catch (error) {
       console.error('Create class error:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      const specific = mapClassDbError(error);
+      if (specific) return specific;
       return mapThrownError(error, 'ERRORS.CLASSES.CREATE_FAILED', 'Failed to create class', 400);
     }
   },
@@ -470,6 +496,8 @@ export const classesRoutes = {
       };
     } catch (error) {
       console.error('Update class error:', error);
+      const specific = mapClassDbError(error);
+      if (specific) return specific;
       return mapThrownError(error, 'ERRORS.CLASSES.UPDATE_FAILED', 'Failed to update class', 404);
     }
   },

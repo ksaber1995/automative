@@ -26,7 +26,18 @@
         [style]="{ minWidth: '200px' }"
       ></p-select>
 
-      @if (selectedBranchId()) {
+      <p-select
+        [options]="statusOptions()"
+        [ngModel]="selectedStatus()"
+        (ngModelChange)="selectedStatus.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'EVENTS.LIST.ALL_STATUSES' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      @if (selectedBranchId() || selectedStatus()) {
         <p-button
           [label]="'EVENTS.LIST.CLEAR' | translate"
           icon="pi pi-times"

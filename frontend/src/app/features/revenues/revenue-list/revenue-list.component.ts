@@ -12,11 +12,14 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { TranslateModule } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 @Component({
   selector: 'app-revenue-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TranslateModule,
+    AmountPipe,
+  ],
   templateUrl: './revenue-list.component.html',
   styleUrl: './revenue-list.component.scss'
 })

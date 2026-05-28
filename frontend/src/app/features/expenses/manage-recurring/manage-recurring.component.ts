@@ -14,6 +14,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { forkJoin } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -34,6 +35,7 @@ interface RecurringRow {
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DatePickerModule, CheckboxModule, TooltipModule, InputNumberModule,
     InputTextModule, SelectModule, TranslateModule,
+    AmountPipe,
   ],
   templateUrl: './manage-recurring.component.html'
 })

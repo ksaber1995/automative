@@ -12,6 +12,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { RefundService, RefundSource } from '../services/refund.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -25,6 +26,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, DatePickerModule, InputTextModule, TooltipModule,
     TabsModule, TranslateModule,
+    AmountPipe,
   ],
   templateUrl: './refund-list.component.html',
 })

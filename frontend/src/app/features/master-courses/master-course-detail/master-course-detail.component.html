@@ -66,16 +66,16 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.BUNDLE_PRICE' | translate }}</div>
-        <div class="text-2xl font-bold">{{ m.defaultPrice.toFixed(2) }}</div>
+        <div class="text-2xl font-bold">{{ m.defaultPrice | amount }}</div>
       </p-card>
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.SUM_OF_COURSES' | translate }}</div>
-        <div class="text-2xl font-bold">{{ sumOfLinked().toFixed(2) }}</div>
+        <div class="text-2xl font-bold">{{ sumOfLinked() | amount }}</div>
       </p-card>
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.SAVINGS' | translate }}</div>
         <div class="text-2xl font-bold" [class.text-green-700]="savings() >= 0" [class.text-red-700]="savings() < 0">
-          {{ savings().toFixed(2) }}
+          {{ savings() | amount }}
         </div>
       </p-card>
       <p-card>
@@ -120,7 +120,7 @@
         <tr>
           <td class="font-medium">{{ row.name }}</td>
           <td><span class="font-mono">{{ row.code }}</span></td>
-          <td class="text-right">{{ row.price.toFixed(2) }}</td>
+          <td class="text-right">{{ row.price | amount }}</td>
           <td class="text-right">{{ row.duration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
           <td>
             <p-tag
@@ -236,7 +236,7 @@
         <ng-template let-c pTemplate="item">
           <div class="flex justify-between items-center gap-3">
             <span>{{ c.name }} <span class="text-xs text-gray-500 font-mono ml-2">{{ c.code }}</span></span>
-            <span class="text-sm text-gray-600">{{ c.price.toFixed(2) }}</span>
+            <span class="text-sm text-gray-600">{{ c.price | amount }}</span>
           </div>
         </ng-template>
       </p-select>

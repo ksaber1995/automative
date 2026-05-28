@@ -5,6 +5,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { switchMap, map } from 'rxjs/operators';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -47,6 +48,7 @@ type EnrollmentType = 'COURSE' | 'MASTER';
     TextareaModule,
     RadioButtonModule,
     DividerModule,
+    AmountPipe,
   ],
   templateUrl: './enrollment-form.component.html'
 })

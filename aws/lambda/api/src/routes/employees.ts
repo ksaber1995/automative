@@ -18,13 +18,23 @@ function mapEmployeeFromDB(row: any) {
     isGlobal: row.is_global,
     isActive: row.is_active,
     linkedUserId: row.linked_user_id ?? null,
+    hasSalaryHistory: row.has_salary_history === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
+// has_salary_history: any past SALARIES payment makes the employee non-deletable
+// (we can only terminate them). Drives the delete-vs-terminate UI.
 const EMPLOYEE_BASE_SELECT = `
-  SELECT e.*, u.id AS linked_user_id
+  SELECT e.*,
+         u.id AS linked_user_id,
+         EXISTS (
+           SELECT 1 FROM expense_payments ep
+           WHERE ep.employee_id = e.id
+             AND ep.company_id = e.company_id
+             AND ep.category = 'SALARIES'
+         ) AS has_salary_history
   FROM employees e
   LEFT JOIN users u ON u.linked_employee_id = e.id
 `;
@@ -275,12 +285,30 @@ export const employeesRoutes = {
         };
       }
 
-      // Soft delete by setting is_active to false
-      const employee = await update('employees', params.id, { is_active: false });
+      // If this employee was ever paid a salary we keep history-preserving rows
+      // around and only deactivate. Otherwise we can safely remove the row.
+      const salaryPaid = await queryOne(
+        `SELECT 1 FROM expense_payments
+         WHERE employee_id = $1 AND company_id = $2 AND category = 'SALARIES'
+         LIMIT 1`,
+        [params.id, context.companyId]
+      );
 
-      if (!employee) {
-        return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+      if (salaryPaid) {
+        const employee = await update('employees', params.id, { is_active: false });
+        if (!employee) {
+          return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+        }
+        return {
+          status: 200 as const,
+          body: { message: 'Employee terminated successfully', code: 'EMPLOYEES.TERMINATED' },
+        };
       }
+
+      // No salary history — hard delete. Unlink any user pointing at this
+      // employee first (users.linked_employee_id has no FK).
+      await query('UPDATE users SET linked_employee_id = NULL WHERE linked_employee_id = $1', [params.id]);
+      await query('DELETE FROM employees WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
 
       return {
         status: 200 as const,

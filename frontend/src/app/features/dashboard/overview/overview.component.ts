@@ -199,7 +199,7 @@ export class OverviewComponent implements OnInit {
         tooltip: {
           callbacks: {
             label: (context: any) => {
-              return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+              return `${context.dataset.label}: ${this.formatCurrency(context.parsed.y)}`;
             }
           }
         }
@@ -226,7 +226,7 @@ export class OverviewComponent implements OnInit {
             label: (context: any) => {
               const label = context.label || '';
               const value = context.parsed || 0;
-              return `${label}: ${value.toFixed(2)}`;
+              return `${label}: ${this.formatCurrency(value)}`;
             }
           }
         }

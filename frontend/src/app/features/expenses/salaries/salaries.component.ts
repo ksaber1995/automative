@@ -16,6 +16,8 @@ import { InputTextModule } from 'primeng/inputtext';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -48,6 +50,7 @@ interface SalaryAdjustment {
     InputTextModule,
     ConfirmDialogModule,
     TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './salaries.component.html'
@@ -60,6 +63,7 @@ export class SalariesComponent implements OnInit {
   private confirmationService = inject(ConfirmationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  private numberFormat = inject(NumberFormatService);
 
   loading = signal(false);
   paying = signal(false);
@@ -207,7 +211,7 @@ export class SalariesComponent implements OnInit {
   confirmDeletePayment(p: ExpensePayment) {
     this.confirmationService.confirm({
       message: this.translate.instant('EXPENSES.SALARIES.VOID_CONFIRM', {
-        amount: p.amount.toFixed(2),
+        amount: this.numberFormat.format(p.amount),
         name: this.getEmployeeName(p.employeeId),
         date: p.date,
       }),

@@ -67,7 +67,7 @@
             {{ 'EVENTS.DETAIL.REVENUE' | translate }}
             <span class="text-gray-500 ml-2">({{ p.revenueCount }})</span>
           </div>
-          <div class="text-2xl font-bold text-green-700">{{ p.revenue.toFixed(2) }}</div>
+          <div class="text-2xl font-bold text-green-700">{{ p.revenue | amount }}</div>
         </div>
 
         <div class="bg-red-50 p-4 rounded">
@@ -75,7 +75,7 @@
             {{ 'EVENTS.DETAIL.EXPENSES' | translate }}
             <span class="text-gray-500 ml-2">({{ p.expenseCount }})</span>
           </div>
-          <div class="text-2xl font-bold text-red-700">{{ p.expenses.toFixed(2) }}</div>
+          <div class="text-2xl font-bold text-red-700">{{ p.expenses | amount }}</div>
         </div>
 
         <div class="bg-orange-50 p-4 rounded">
@@ -83,7 +83,7 @@
             {{ 'EVENTS.DETAIL.REFUNDS' | translate }}
             <span class="text-gray-500 ml-2">({{ p.refundCount }})</span>
           </div>
-          <div class="text-2xl font-bold text-orange-700">{{ p.refunds.toFixed(2) }}</div>
+          <div class="text-2xl font-bold text-orange-700">{{ p.refunds | amount }}</div>
         </div>
 
         <div class="bg-blue-50 p-4 rounded">
@@ -91,10 +91,10 @@
             {{ 'EVENTS.DETAIL.PRODUCT_MARGIN' | translate }}
             <span class="text-gray-500 ml-2">({{ p.productSaleCount }})</span>
           </div>
-          <div class="text-2xl font-bold text-blue-700">{{ p.productMargin.toFixed(2) }}</div>
+          <div class="text-2xl font-bold text-blue-700">{{ p.productMargin | amount }}</div>
           <div class="text-xs text-gray-500 mt-1">
-            {{ 'EVENTS.DETAIL.PRODUCT_REVENUE' | translate }}: {{ p.productRevenue.toFixed(2) }}
-            · {{ 'EVENTS.DETAIL.PRODUCT_COST' | translate }}: {{ p.productCost.toFixed(2) }}
+            {{ 'EVENTS.DETAIL.PRODUCT_REVENUE' | translate }}: {{ p.productRevenue | amount }}
+            · {{ 'EVENTS.DETAIL.PRODUCT_COST' | translate }}: {{ p.productCost | amount }}
           </div>
         </div>
       </div>
@@ -115,7 +115,7 @@
           class="text-3xl font-bold"
           [ngClass]="p.netProfit >= 0 ? 'text-green-700' : 'text-red-700'"
         >
-          {{ p.netProfit.toFixed(2) }}
+          {{ p.netProfit | amount }}
         </div>
       </div>
     } @else {
@@ -170,15 +170,15 @@
             @if (s.externalMobile) { <div>{{ s.externalMobile }}</div> }
             @if (s.externalAge) { <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.AGE_PREFIX' | translate }}: {{ s.externalAge }}</div> }
           </td>
-          <td class="text-right font-semibold text-green-600">{{ s.amount.toFixed(2) }}</td>
+          <td class="text-right font-semibold text-green-600">{{ s.amount | amount }}</td>
           <td class="text-right">
             @if (s.refundedAmount && s.refundedAmount > 0) {
               @if (refundRemaining(s) <= 0) {
-                <span class="text-orange-600 font-semibold">-{{ s.refundedAmount.toFixed(2) }}</span>
+                <span class="text-orange-600 font-semibold">-{{ s.refundedAmount | amount }}</span>
                 <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.FULLY_REFUNDED' | translate }}</div>
               } @else {
-                <span class="text-orange-600">-{{ s.refundedAmount.toFixed(2) }}</span>
-                <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.REMAINING_PREFIX' | translate }}: {{ refundRemaining(s).toFixed(2) }}</div>
+                <span class="text-orange-600">-{{ s.refundedAmount | amount }}</span>
+                <div class="text-xs text-gray-400">{{ 'EVENTS.DETAIL.REMAINING_PREFIX' | translate }}: {{ refundRemaining(s) | amount }}</div>
               }
             } @else {
               <span class="text-gray-400">—</span>
@@ -241,12 +241,12 @@
           <td><p-tag [value]="e.category" severity="secondary"></p-tag></td>
           <td>{{ e.date | date: 'mediumDate' }}</td>
           <td class="text-sm text-gray-600">{{ e.vendor || '—' }}</td>
-          <td class="text-right font-semibold">{{ e.amount.toFixed(2) }}</td>
+          <td class="text-right font-semibold">{{ e.amount | amount }}</td>
           <td class="text-right">
             @if (e.totalPaid >= e.amount) {
-              <span class="text-green-600 font-semibold">{{ e.totalPaid.toFixed(2) }}</span>
+              <span class="text-green-600 font-semibold">{{ e.totalPaid | amount }}</span>
             } @else if (e.totalPaid > 0) {
-              <span class="text-orange-600">{{ e.totalPaid.toFixed(2) }}</span>
+              <span class="text-orange-600">{{ e.totalPaid | amount }}</span>
             } @else {
               <span class="text-gray-400">0.00</span>
             }
@@ -289,7 +289,7 @@
           <td>{{ r.refundDate | date: 'mediumDate' }}</td>
           <td>{{ r.studentName || '—' }}</td>
           <td><p-tag [value]="('EVENTS.DETAIL.REFUND_TYPE_' + r.type) | translate" severity="warn"></p-tag></td>
-          <td class="text-right font-semibold text-orange-600">-{{ r.amount.toFixed(2) }}</td>
+          <td class="text-right font-semibold text-orange-600">-{{ r.amount | amount }}</td>
           <td class="text-sm text-gray-600">{{ r.reason || '—' }}</td>
         </tr>
       </ng-template>
@@ -444,15 +444,15 @@
         <div class="grid grid-cols-3 gap-2 mt-2 text-sm">
           <div>
             <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_ORIGINAL' | translate }}</div>
-            <div class="font-semibold text-green-600">{{ refSubscription.amount.toFixed(2) }}</div>
+            <div class="font-semibold text-green-600">{{ refSubscription.amount | amount }}</div>
           </div>
           <div>
             <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_REFUNDED' | translate }}</div>
-            <div class="font-semibold text-orange-600">{{ (refSubscription.refundedAmount || 0).toFixed(2) }}</div>
+            <div class="font-semibold text-orange-600">{{ (refSubscription.refundedAmount || 0) | amount }}</div>
           </div>
           <div>
             <div class="text-gray-500">{{ 'EVENTS.DETAIL.SUMMARY_REMAINING' | translate }}</div>
-            <div class="font-semibold text-blue-700">{{ refundRemaining(refSubscription).toFixed(2) }}</div>
+            <div class="font-semibold text-blue-700">{{ refundRemaining(refSubscription) | amount }}</div>
           </div>
         </div>
       </div>
@@ -469,7 +469,7 @@
             [min]="0"
             [max]="refundRemaining(refSubscription)"
             [style]="{ width: '100%' }" />
-          <div class="text-xs text-gray-500 mt-1">{{ 'EVENTS.DETAIL.MAX_PREFIX' | translate }}: {{ refundRemaining(refSubscription).toFixed(2) }}</div>
+          <div class="text-xs text-gray-500 mt-1">{{ 'EVENTS.DETAIL.MAX_PREFIX' | translate }}: {{ refundRemaining(refSubscription) | amount }}</div>
         </div>
         <div>
           <label class="block text-sm font-medium mb-2">{{ 'EVENTS.DETAIL.FIELD_DATE' | translate }} <span class="text-red-500">*</span></label>

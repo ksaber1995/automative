@@ -148,10 +148,10 @@
               </td>
               <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
               <td class="text-right">
-                <div class="font-semibold">{{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }}</div>
+                <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
                 @if ((me.totalRefunded || 0) > 0) {
                   <div class="text-xs text-orange-600 mt-0.5">
-                    {{ 'STUDENTS.DETAIL.REFUNDED' | translate }}: {{ me.totalRefunded.toFixed(2) }}
+                    {{ 'STUDENTS.DETAIL.REFUNDED' | translate }}: {{ me.totalRefunded | amount }}
                   </div>
                 }
               </td>
@@ -225,11 +225,11 @@
                         <i class="pi pi-credit-card text-green-600"></i>
                         <span class="font-semibold text-gray-700 text-sm">{{ 'STUDENTS.DETAIL.INSTALLMENT_PAYMENTS' | translate }}</span>
                         <span class="text-xs text-gray-400">
-                          {{ 'STUDENTS.DETAIL.PAID_OF_TOTAL' | translate: { paid: me.amountPaid.toFixed(2), total: me.finalPrice.toFixed(2) } }}
+                          {{ 'STUDENTS.DETAIL.PAID_OF_TOTAL' | translate: { paid: me.amountPaid | amount, total: me.finalPrice | amount } }}
                         </span>
                         @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
                           <span class="text-xs text-red-500 font-medium ml-1">
-                            · {{ (me.finalPrice - me.amountPaid).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING_LOWER' | translate }}
+                            · {{ (me.finalPrice - me.amountPaid) | amount }} {{ 'STUDENTS.DETAIL.REMAINING_LOWER' | translate }}
                           </span>
                         }
                       </div>
@@ -239,7 +239,7 @@
                           <div class="flex items-center justify-between bg-white border border-green-100 rounded-lg px-3 py-2 text-sm">
                             <div class="flex items-center gap-2">
                               <i class="pi pi-check-circle text-green-500 text-xs"></i>
-                              <span class="font-semibold text-green-700">+{{ p.amount.toFixed(2) }}</span>
+                              <span class="font-semibold text-green-700">+{{ p.amount | amount }}</span>
                               @if (p.notes) {
                                 <span class="text-xs text-gray-400">{{ p.notes }}</span>
                               }
@@ -253,7 +253,7 @@
                         @if (me.paymentStatus !== 'PAID' && me.status === 'ACTIVE') {
                           <div class="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-sm">
                             <span class="text-red-500 text-xs font-medium">{{ 'STUDENTS.DETAIL.REMAINING_BALANCE' | translate }}</span>
-                            <span class="font-bold text-red-600">{{ (me.finalPrice - me.amountPaid).toFixed(2) }}</span>
+                            <span class="font-bold text-red-600">{{ (me.finalPrice - me.amountPaid) | amount }}</span>
                           </div>
                         }
                       </div>
@@ -374,10 +374,10 @@
                       </td>
                       <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
                       <td class="text-right">
-                        <div class="font-semibold">{{ me.amountPaid.toFixed(2) }} / {{ me.finalPrice.toFixed(2) }}</div>
+                        <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
                         @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                           <div class="text-xs text-red-600 font-medium">
-                            -{{ (me.finalPrice - me.amountPaid).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
+                            -{{ (me.finalPrice - me.amountPaid) | amount }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
                           </div>
                         }
                       </td>
@@ -462,11 +462,11 @@
             <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
             <td>
               <div class="text-sm">
-                <span class="text-gray-500">{{ enrollment.originalPrice.toFixed(2) }}</span>
+                <span class="text-gray-500">{{ enrollment.originalPrice | amount }}</span>
                 @if (enrollment.discountAmount > 0) {
-                  <span class="text-orange-500 ml-1">-{{ enrollment.discountAmount.toFixed(2) }}</span>
+                  <span class="text-orange-500 ml-1">-{{ enrollment.discountAmount | amount }}</span>
                 }
-                <span class="font-semibold text-green-600 ml-1">= {{ enrollment.finalPrice.toFixed(2) }}</span>
+                <span class="font-semibold text-green-600 ml-1">= {{ enrollment.finalPrice | amount }}</span>
               </div>
             </td>
             <td>
@@ -482,7 +482,7 @@
                 <div class="space-y-1 min-w-[180px]">
                   @for (payment of getPaymentHistory(enrollment.id); track payment.id) {
                     <div class="flex items-center justify-between text-xs bg-green-50 border border-green-100 rounded px-2 py-1">
-                      <span class="font-semibold text-green-700">+{{ payment.amount.toFixed(2) }}</span>
+                      <span class="font-semibold text-green-700">+{{ payment.amount | amount }}</span>
                       <span class="text-gray-400 ml-2">{{ formatDate(payment.paymentDate) }}</span>
                     </div>
                   }
@@ -493,7 +493,7 @@
                   @if (enrollment.paymentStatus !== 'PAID') {
                     <div class="flex items-center justify-between text-xs bg-red-50 border border-red-100 rounded px-2 py-1">
                       <span class="text-red-500">{{ 'STUDENTS.DETAIL.REMAINING' | translate }}</span>
-                      <span class="font-semibold text-red-600">{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)).toFixed(2) }}</span>
+                      <span class="font-semibold text-red-600">{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)) | amount }}</span>
                     </div>
                   }
                 </div>
@@ -505,8 +505,8 @@
               } @else {
                 <!-- Full payment summary -->
                 <div class="text-sm">
-                  <span class="font-semibold text-green-600">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
-                  <span class="text-gray-400"> / {{ enrollment.finalPrice.toFixed(2) }}</span>
+                  <span class="font-semibold text-green-600">{{ (enrollment.amountPaid || 0) | amount }}</span>
+                  <span class="text-gray-400"> / {{ enrollment.finalPrice | amount }}</span>
                 </div>
                 @if (enrollment.finalPrice > 0) {
                   <p-progressbar
@@ -525,7 +525,7 @@
                 <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
                 @if (hasRefund(enrollment)) {
                   <p-tag
-                    [value]="'STUDENTS.DETAIL.REFUND_TAG' | translate: { amount: (enrollment.totalRefunded).toFixed(2) }"
+                    [value]="'STUDENTS.DETAIL.REFUND_TAG' | translate: { amount: (enrollment.totalRefunded) | amount }"
                     severity="warn"
                     styleClass="text-xs"
                     [pTooltip]="'STUDENTS.DETAIL.CLICK_EXPAND' | translate"
@@ -590,7 +590,7 @@
                             <div class="flex items-center gap-2">
                               <i class="pi pi-check-circle text-green-500 text-sm"></i>
                               <div>
-                                <span class="font-medium text-green-700">+{{ payment.amount.toFixed(2) }}</span>
+                                <span class="font-medium text-green-700">+{{ payment.amount | amount }}</span>
                                 @if (payment.notes) {
                                   <span class="text-xs text-gray-500 ml-2">{{ payment.notes }}</span>
                                 }
@@ -616,7 +616,7 @@
                             <div class="flex items-center gap-2">
                               <i class="pi pi-minus-circle text-orange-500 text-sm"></i>
                               <div>
-                                <span class="font-medium text-orange-700">-{{ refund.amount.toFixed(2) }}</span>
+                                <span class="font-medium text-orange-700">-{{ refund.amount | amount }}</span>
                                 <span class="text-xs ml-2">
                                   <p-tag [value]="refund.type" severity="warn" styleClass="text-xs"></p-tag>
                                 </span>
@@ -680,12 +680,12 @@
                         <span class="text-gray-400">—</span>
                       }
                     </td>
-                    <td class="text-right font-semibold text-green-600">{{ enrollment.finalPrice.toFixed(2) }}</td>
+                    <td class="text-right font-semibold text-green-600">{{ enrollment.finalPrice | amount }}</td>
                     <td class="text-right">
-                      <span class="font-semibold">{{ (enrollment.amountPaid || 0).toFixed(2) }}</span>
+                      <span class="font-semibold">{{ (enrollment.amountPaid || 0) | amount }}</span>
                       @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
                         <div class="text-xs text-red-600 font-medium">
-                          -{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)).toFixed(2) }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
+                          -{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)) | amount }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
                         </div>
                       }
                     </td>
@@ -793,9 +793,9 @@
 >
   @if (enrollmentForAction()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
-      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.REMAINING_LABEL' | translate }}</span> <strong class="text-red-600">{{ remaining().toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice | amount }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0) | amount }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.REMAINING_LABEL' | translate }}</span> <strong class="text-red-600">{{ remaining() | amount }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
@@ -829,8 +829,8 @@
 >
   @if (enrollmentForAction()) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0).toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ enrollmentForAction()!.finalPrice | amount }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (enrollmentForAction()!.amountPaid || 0) | amount }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
@@ -839,7 +839,7 @@
       <div class="flex gap-6">
         <div class="flex items-center gap-2">
           <p-radiobutton name="refundType" value="FULL" [(ngModel)]="refundType" (onClick)="onRefundTypeChange()"></p-radiobutton>
-          <label>{{ 'STUDENTS.DETAIL.FULL_REFUND' | translate }} ({{ (enrollmentForAction()?.amountPaid || 0).toFixed(2) }})</label>
+          <label>{{ 'STUDENTS.DETAIL.FULL_REFUND' | translate }} ({{ (enrollmentForAction()?.amountPaid || 0) | amount }})</label>
         </div>
         <div class="flex items-center gap-2">
           <p-radiobutton name="refundType" value="PARTIAL" [(ngModel)]="refundType"></p-radiobutton>
@@ -884,9 +884,9 @@
   @if (masterEnrollmentForAction(); as me) {
     <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm grid grid-cols-2 gap-2">
       <div class="col-span-2 font-semibold text-purple-900">🎁 {{ me.masterCourseName }}</div>
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_TOTAL_PRICE' | translate }}</span> <strong>{{ me.finalPrice.toFixed(2) }}</strong></div>
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_PAID_SO_FAR' | translate }}</span> <strong class="text-green-600">{{ me.amountPaid.toFixed(2) }}</strong></div>
-      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_REMAINING' | translate }}</span> <strong class="text-red-600">{{ masterPaymentRemaining().toFixed(2) }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_TOTAL_PRICE' | translate }}</span> <strong>{{ me.finalPrice | amount }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_PAID_SO_FAR' | translate }}</span> <strong class="text-green-600">{{ me.amountPaid | amount }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MASTER_PAYMENT_REMAINING' | translate }}</span> <strong class="text-red-600">{{ masterPaymentRemaining() | amount }}</strong></div>
     </div>
   }
   <div class="grid gap-4">
@@ -926,8 +926,8 @@
       <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
         <div class="font-semibold text-purple-900">🎁 {{ me.masterCourseName }}</div>
         <div class="text-sm text-purple-700 mt-1">
-          {{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }} {{ me.amountPaid.toFixed(2) }}
-          · {{ 'STUDENTS.DETAIL.REFUNDABLE' | translate }}: <strong>{{ masterRefundable().toFixed(2) }}</strong>
+          {{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }} {{ me.amountPaid | amount }}
+          · {{ 'STUDENTS.DETAIL.REFUNDABLE' | translate }}: <strong>{{ masterRefundable() | amount }}</strong>
         </div>
       </div>
     }

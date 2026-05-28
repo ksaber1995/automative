@@ -7,6 +7,8 @@ import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ButtonModule } from 'primeng/button';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ProductService } from '../services/product.service';
 import { ProductSaleService } from '../services/product-sale.service';
 import { EventService } from '../../events/services/event.service';
@@ -28,6 +30,7 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
     InputNumberModule,
     ButtonModule,
     TranslateModule,
+    AmountPipe,
   ],
   templateUrl: './product-sale.component.html',
   styles: [
@@ -46,6 +49,7 @@ export class ProductSaleComponent implements OnInit {
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private numberFormat = inject(NumberFormatService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -176,7 +180,7 @@ export class ProductSaleComponent implements OnInit {
       next: (sale: any) => {
         this.submitting.set(false);
         this.notificationService.success(
-          this.translate.instant('PRODUCTS.SALE_COMPLETED', { total: sale.totalAmount.toFixed(2) })
+          this.translate.instant('PRODUCTS.SALE_COMPLETED', { total: this.numberFormat.format(sale.totalAmount) })
         );
         this.router.navigate(['/products/sales']);
       },

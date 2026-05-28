@@ -144,6 +144,7 @@
             optionLabel="label"
             optionValue="value"
             [placeholder]="'CLASSES.FORM.INSTRUCTOR_PLACEHOLDER' | translate"
+            [showClear]="true"
             styleClass="w-full"
             [class.ng-invalid]="classForm.get('instructorId')?.invalid && classForm.get('instructorId')?.touched"
             [class.ng-dirty]="classForm.get('instructorId')?.touched">

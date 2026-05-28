@@ -106,7 +106,10 @@
       "CANNOT_DEACTIVATE_FINISHED": "Finished classes cannot be deactivated",
       "ALREADY_FINISHED": "Class is already finished",
       "HAS_ACTIVE_SESSION": "Class has an active session and cannot be finished",
-      "FINISH_FAILED": "Failed to finish class"
+      "FINISH_FAILED": "Failed to finish class",
+      "DUPLICATE_CODE": "A class with this code already exists. Choose a different code.",
+      "DUPLICATE": "A class with these details already exists.",
+      "VALUE_TOO_LONG": "Class name or code is too long. Keep each under 50 characters."
     },
     "COMPANIES": {
       "NOT_FOUND": "Company not found",
@@ -771,6 +774,10 @@
       "COL_STATUS": "Status",
       "COL_ACTIONS": "Actions",
       "ALL_BRANCHES": "All Branches",
+      "ALL_STATUSES": "All Statuses",
+      "STATUS_ACTIVE": "Active",
+      "STATUS_INACTIVE": "Inactive",
+      "STATUS_FINISHED": "Finished",
       "GLOBAL_NO_BRANCH": "Global (no branch)",
       "GLOBAL": "Global",
       "CLEAR": "Clear",
@@ -1550,6 +1557,7 @@
       "VIEW": "View",
       "EDIT": "Edit",
       "TERMINATE": "Terminate",
+      "DELETE": "Delete",
       "GLOBAL": "Global",
       "NO_DATA": "No employees found."
     },
@@ -1680,7 +1688,9 @@
     "TERMINATED": "Employee terminated successfully",
     "TERMINATE_HEADER": "Confirm Termination",
     "TERMINATE_CONFIRM": "Are you sure you want to terminate {{name}}?",
-    "DELETED": "Employee deleted"
+    "DELETED": "Employee deleted",
+    "DELETE_HEADER": "Confirm Delete",
+    "DELETE_CONFIRM": "Are you sure you want to permanently delete {{name}}? They have no salary payments, so they can be fully removed."
   },
   "EXPENSES": {
     "LIST": {
@@ -2863,6 +2873,7 @@
     "COL_SCOPE": "Scope",
     "ADD_DEPOSIT": "Deposit",
     "ADD_WITHDRAWAL": "Withdraw",
+    "WITHDRAW_DISABLED_NEGATIVE": "Cannot withdraw — current balance is negative.",
     "RECORD_ADJUSTMENT": "Record Mistake",
     "HISTORY_TITLE": "Adjustments History",
     "COL_DATE": "Date",

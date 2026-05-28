@@ -26,7 +26,7 @@
             </div>
             <div class="flex">
               <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.PRICE' | translate }}</span>
-              <span>{{ c.price.toFixed(2) }}</span>
+              <span>{{ c.price | amount }}</span>
             </div>
             @if (c.maxStudents) {
               <div class="flex">
@@ -327,15 +327,15 @@
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
       <div class="flex justify-between mb-1">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.FINAL_PRICE' | translate }}</span>
-        <span class="font-semibold">{{ selectedEnrollment()!.finalPrice.toFixed(2) }}</span>
+        <span class="font-semibold">{{ selectedEnrollment()!.finalPrice | amount }}</span>
       </div>
       <div class="flex justify-between mb-1">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.PAID_SO_FAR' | translate }}</span>
-        <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid.toFixed(2) }}</span>
+        <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid | amount }}</span>
       </div>
       <div class="flex justify-between">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.REMAINING' | translate }}</span>
-        <span class="font-semibold text-red-600">{{ (selectedEnrollment()!.finalPrice - selectedEnrollment()!.amountPaid).toFixed(2) }}</span>
+        <span class="font-semibold text-red-600">{{ (selectedEnrollment()!.finalPrice - selectedEnrollment()!.amountPaid) | amount }}</span>
       </div>
     </div>
   }
@@ -397,15 +397,15 @@
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
       <div class="flex justify-between mb-1">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.AMOUNT_PAID' | translate }}</span>
-        <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid.toFixed(2) }}</span>
+        <span class="font-semibold text-green-600">{{ selectedEnrollment()!.amountPaid | amount }}</span>
       </div>
       <div class="flex justify-between mb-1">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.ALREADY_REFUNDED' | translate }}</span>
-        <span class="font-semibold text-orange-500">{{ (selectedEnrollment()!.totalRefunded || 0).toFixed(2) }}</span>
+        <span class="font-semibold text-orange-500">{{ (selectedEnrollment()!.totalRefunded || 0) | amount }}</span>
       </div>
       <div class="flex justify-between border-t pt-1 mt-1">
         <span class="text-gray-600">{{ 'COURSES.DETAIL.REFUNDABLE' | translate }}</span>
-        <span class="font-semibold text-blue-600">{{ refundableAmount(selectedEnrollment()!).toFixed(2) }}</span>
+        <span class="font-semibold text-blue-600">{{ refundableAmount(selectedEnrollment()!) | amount }}</span>
       </div>
     </div>
   }

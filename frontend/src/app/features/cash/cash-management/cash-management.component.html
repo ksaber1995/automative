@@ -71,9 +71,14 @@
           <button pButton type="button" icon="pi pi-plus" severity="success"
                   [label]="'CASH.ADD_DEPOSIT' | translate"
                   (click)="openDialog('DEPOSIT')"></button>
-          <button pButton type="button" icon="pi pi-minus" severity="danger"
-                  [label]="'CASH.ADD_WITHDRAWAL' | translate"
-                  (click)="openDialog('WITHDRAWAL')"></button>
+          <span [pTooltip]="filteredBalance() < 0 ? ('CASH.WITHDRAW_DISABLED_NEGATIVE' | translate) : ''"
+                tooltipPosition="top"
+                [tooltipDisabled]="filteredBalance() >= 0">
+            <button pButton type="button" icon="pi pi-minus" severity="danger"
+                    [label]="'CASH.ADD_WITHDRAWAL' | translate"
+                    [disabled]="filteredBalance() < 0"
+                    (click)="openDialog('WITHDRAWAL')"></button>
+          </span>
           <button pButton type="button" icon="pi pi-pencil" severity="warn"
                   [label]="'CASH.RECORD_ADJUSTMENT' | translate"
                   (click)="openDialog('ADJUSTMENT')"></button>

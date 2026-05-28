@@ -11,6 +11,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { MasterCourseService } from '../services/master-course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -43,6 +44,7 @@ type MasterCourseRow = MasterCourse & {
     TabPanel,
     TabPanels,
     TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './master-course-list.component.html',

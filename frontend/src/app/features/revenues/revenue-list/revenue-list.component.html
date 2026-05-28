@@ -3,7 +3,7 @@
     <ng-template pTemplate="header">
       <div class="p-4">
         <h2 class="text-2xl font-bold">{{ 'REVENUES.LIST.TITLE' | translate }}</h2>
-        <p class="text-gray-600 mt-1">{{ 'REVENUES.LIST.TOTAL' | translate }} {{ totalRevenue | currency }}</p>
+        <p class="text-gray-600 mt-1">{{ 'REVENUES.LIST.TOTAL' | translate }} {{ totalRevenue | amount }}</p>
         <p class="text-sm text-gray-500 mt-1">{{ 'REVENUES.LIST.AUTO_HINT' | translate }}</p>
       </div>
     </ng-template>
@@ -69,17 +69,17 @@
           <td>{{ revenue.description }}</td>
           <td>
             @if (revenue.totalRefunded > 0) {
-              <div class="line-through text-gray-400">{{ revenue.amount | currency }}</div>
+              <div class="line-through text-gray-400">{{ revenue.amount | amount }}</div>
               <div class="text-red-600 text-xs font-medium">
-                -{{ revenue.totalRefunded | currency }} {{ 'REVENUES.LIST.REFUNDED' | translate }}
+                -{{ revenue.totalRefunded | amount }} {{ 'REVENUES.LIST.REFUNDED' | translate }}
               </div>
               @if (revenue.totalRefunded < revenue.amount) {
                 <div class="text-green-600 font-semibold text-sm">
-                  {{ 'REVENUES.LIST.NET' | translate }}: {{ (revenue.amount - revenue.totalRefunded) | currency }}
+                  {{ 'REVENUES.LIST.NET' | translate }}: {{ (revenue.amount - revenue.totalRefunded) | amount }}
                 </div>
               }
             } @else {
-              <span class="font-semibold text-green-600">{{ revenue.amount | currency }}</span>
+              <span class="font-semibold text-green-600">{{ revenue.amount | amount }}</span>
             }
           </td>
           <td>

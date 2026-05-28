@@ -15,6 +15,7 @@ import { RadioButtonModule } from 'primeng/radiobutton';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -55,6 +56,7 @@ import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface'
     TabPanel,
     TabPanels,
     TranslateModule,
+    AmountPipe,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss'

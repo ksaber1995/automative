@@ -68,7 +68,7 @@
           <td><span class="font-mono">{{ item.code }}</span></td>
           <td class="font-medium">{{ item.name }}</td>
           <td>{{ item.branchName || '—' }}</td>
-          <td>{{ item.defaultPrice.toFixed(2) }}</td>
+          <td>{{ item.defaultPrice | amount }}</td>
           <td>{{ item.defaultDuration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
           <td>
             <p-tag [value]="item.linkedCourseCount || 0" severity="info"></p-tag>

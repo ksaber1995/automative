@@ -106,7 +106,10 @@
       "CANNOT_DEACTIVATE_FINISHED": "لا يمكن تعطيل الفصول المنتهية",
       "ALREADY_FINISHED": "الفصل منتهٍ بالفعل",
       "HAS_ACTIVE_SESSION": "الفصل لديه جلسة نشطة ولا يمكن إنهاؤه",
-      "FINISH_FAILED": "فشل إنهاء الفصل"
+      "FINISH_FAILED": "فشل إنهاء الفصل",
+      "DUPLICATE_CODE": "يوجد فصل بهذا الكود مسبقاً. اختر كوداً مختلفاً.",
+      "DUPLICATE": "يوجد فصل بهذه البيانات مسبقاً.",
+      "VALUE_TOO_LONG": "اسم الفصل أو الكود طويل جداً. يجب ألا يتجاوز كل منهما 50 حرفاً."
     },
     "COMPANIES": {
       "NOT_FOUND": "الشركة غير موجودة",
@@ -771,6 +774,10 @@
       "COL_STATUS": "الحالة",
       "COL_ACTIONS": "إجراءات",
       "ALL_BRANCHES": "كل الفروع",
+      "ALL_STATUSES": "كل الحالات",
+      "STATUS_ACTIVE": "نشطة",
+      "STATUS_INACTIVE": "غير نشطة",
+      "STATUS_FINISHED": "منتهية",
       "GLOBAL_NO_BRANCH": "عام (بدون فرع)",
       "GLOBAL": "عام",
       "CLEAR": "مسح",
@@ -1550,6 +1557,7 @@
       "VIEW": "عرض",
       "EDIT": "تعديل",
       "TERMINATE": "إنهاء الخدمة",
+      "DELETE": "حذف",
       "GLOBAL": "عام",
       "NO_DATA": "لا يوجد موظفون."
     },
@@ -1680,7 +1688,9 @@
     "TERMINATED": "تم إنهاء عمل الموظف بنجاح",
     "TERMINATE_HEADER": "تأكيد إنهاء العمل",
     "TERMINATE_CONFIRM": "هل أنت متأكد من إنهاء عمل {{name}}؟",
-    "DELETED": "تم حذف الموظف"
+    "DELETED": "تم حذف الموظف",
+    "DELETE_HEADER": "تأكيد الحذف",
+    "DELETE_CONFIRM": "هل أنت متأكد من حذف {{name}} نهائياً؟ لم يتم صرف أي راتب له، لذلك يمكن إزالته كلياً."
   },
   "EXPENSES": {
     "LIST": {
@@ -2863,6 +2873,7 @@
     "COL_SCOPE": "النطاق",
     "ADD_DEPOSIT": "إيداع",
     "ADD_WITHDRAWAL": "سحب",
+    "WITHDRAW_DISABLED_NEGATIVE": "لا يمكن السحب — الرصيد الحالي بالسالب.",
     "RECORD_ADJUSTMENT": "تسجيل خطأ",
     "HISTORY_TITLE": "سجل التعديلات",
     "COL_DATE": "التاريخ",

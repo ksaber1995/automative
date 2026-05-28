@@ -19,6 +19,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { NumberFormatService } from '../../../shared/services/number-format.service';
 import {
   EventService,
   EventSubscription,
@@ -55,6 +57,7 @@ import { ExpenseCategory, ExpenseType } from '@shared/enums/expense-type.enum';
     TooltipModule,
     ConfirmDialogModule,
     TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './event-detail.component.html',
@@ -69,6 +72,7 @@ export class EventDetailComponent implements OnInit {
   private notifications = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
   private translate = inject(TranslateService);
+  private numberFormat = inject(NumberFormatService);
   authService = inject(AuthService);
 
   id!: string;
@@ -255,7 +259,7 @@ export class EventDetailComponent implements OnInit {
   deleteSubscription(sub: EventSubscription) {
     const refunded = sub.refundedAmount || 0;
     const message = refunded > 0
-      ? `This subscription has ${refunded.toFixed(2)} in refunds against it. Deleting it will also delete those refund records and the linked revenue. Continue?`
+      ? `This subscription has ${this.numberFormat.format(refunded)} in refunds against it. Deleting it will also delete those refund records and the linked revenue. Continue?`
       : 'Delete this subscription? Linked revenue (if any) will also be removed.';
     this.confirmationService.confirm({
       message,
@@ -385,7 +389,7 @@ export class EventDetailComponent implements OnInit {
     if (!this.refSubscription || !this.refAmount || !this.refDate) return;
     const remaining = this.refundRemaining(this.refSubscription);
     if (this.refAmount > remaining + 0.005) {
-      this.notifications.error(`Cannot refund more than the remaining amount (${remaining.toFixed(2)})`);
+      this.notifications.error(`Cannot refund more than the remaining amount (${this.numberFormat.format(remaining)})`);
       return;
     }
 

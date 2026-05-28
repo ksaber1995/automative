@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { EnrollmentService } from '../services/enrollment.service';
 import { StudentService } from '../../students/services/student.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -32,7 +33,8 @@ interface EnrollmentDisplay extends Enrollment {
     ButtonModule,
     TagModule,
     TooltipModule,
-    DeleteConfirmDialogComponent
+    DeleteConfirmDialogComponent,
+    AmountPipe,
   ],
   templateUrl: './enrollment-list.component.html'
 })

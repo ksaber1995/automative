@@ -22,10 +22,19 @@ function mapStudentFromDB(row: any) {
     churnReason: row.churn_reason,
     notes: row.notes,
     acquisitionChannel: row.acquisition_channel,
+    hasSubscriptions: row.has_subscriptions === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+// has_subscriptions: any past enrollment / master enrollment / event subscription
+// blocks hard delete. Drives the delete-vs-deactivate UI.
+const STUDENT_SUBSCRIPTIONS_EXISTS = `
+  EXISTS (SELECT 1 FROM enrollments en WHERE en.student_id = s.id)
+  OR EXISTS (SELECT 1 FROM master_enrollments me WHERE me.student_id = s.id)
+  OR EXISTS (SELECT 1 FROM event_subscriptions es WHERE es.student_id = s.id)
+`;
 
 export const studentsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
@@ -75,7 +84,8 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = 'SELECT * FROM students WHERE company_id = $1';
+      let sql = `SELECT s.*, (${STUDENT_SUBSCRIPTIONS_EXISTS}) AS has_subscriptions
+                 FROM students s WHERE s.company_id = $1`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
@@ -83,13 +93,13 @@ export const studentsRoutes = {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND s.branch_id = $${params.length}`;
       } else {
-        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        const branchClause = appendBranchSqlFilter(context, params, 's.branch_id');
         if (branchClause) sql += ` AND ${branchClause}`;
       }
 
-      sql += ' ORDER BY created_at DESC';
+      sql += ' ORDER BY s.created_at DESC';
 
       const students = await query(sql, params);
       return {
@@ -110,7 +120,8 @@ export const studentsRoutes = {
       }
 
       const student = await queryOne(
-        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        `SELECT s.*, (${STUDENT_SUBSCRIPTIONS_EXISTS}) AS has_subscriptions
+         FROM students s WHERE s.id = $1 AND s.company_id = $2`,
         [params.id, context.companyId]
       );
 
@@ -286,18 +297,17 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_DELETE', 'Access denied to delete this student');
       }
 
-      const enrollmentCount = await queryOne<{ count: string }>(
-        'SELECT COUNT(*) AS count FROM enrollments WHERE student_id = $1',
-        [params.id]
-      );
-      const masterEnrollmentCount = await queryOne<{ count: string }>(
-        'SELECT COUNT(*) AS count FROM master_enrollments WHERE student_id = $1',
+      const subscriptionCheck = await queryOne<{ has_any: boolean }>(
+        `SELECT (
+           EXISTS (SELECT 1 FROM enrollments WHERE student_id = $1)
+           OR EXISTS (SELECT 1 FROM master_enrollments WHERE student_id = $1)
+           OR EXISTS (SELECT 1 FROM event_subscriptions WHERE student_id = $1)
+         ) AS has_any`,
         [params.id]
       );
 
-      const total = parseInt(enrollmentCount?.count || '0') + parseInt(masterEnrollmentCount?.count || '0');
-      if (total > 0) {
-        return apiError(400, 'ERRORS.STUDENTS.HAS_ENROLLMENTS', 'Cannot permanently delete a student with enrollments');
+      if (subscriptionCheck?.has_any) {
+        return apiError(400, 'ERRORS.STUDENTS.HAS_ENROLLMENTS', 'Cannot permanently delete a student with subscriptions or enrollments');
       }
 
       await query('DELETE FROM students WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);

@@ -14,6 +14,7 @@ export interface Employee {
   terminationDate?: string | null;
   isActive: boolean;
   linkedUserId?: string | null;
+  hasSalaryHistory?: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;

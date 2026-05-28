@@ -7,7 +7,7 @@
     </div>
     <div class="flex items-center gap-2">
       <span class="text-sm text-gray-500">{{ 'REFUNDS.LIST.TOTAL' | translate }}</span>
-      <span class="font-bold text-orange-600 text-lg">{{ totalRefunded().toFixed(2) }} EGP</span>
+      <span class="font-bold text-orange-600 text-lg">{{ totalRefunded() | amount }} EGP</span>
     </div>
   </div>
 
@@ -154,7 +154,7 @@
             ></p-tag>
           </td>
           <td class="text-right">
-            <span class="font-semibold text-orange-600">{{ refund.amount.toFixed(2) }}</span>
+            <span class="font-semibold text-orange-600">{{ refund.amount | amount }}</span>
           </td>
           <td class="text-sm text-gray-500 max-w-xs truncate">
             {{ refund.reason || '—' }}
@@ -188,7 +188,7 @@
         @if (refunds().length > 0) {
           <tr>
             <td colspan="5" class="text-right font-semibold text-gray-600">{{ 'REFUNDS.LIST.TOTAL_REFUNDED' | translate }}</td>
-            <td class="text-right font-bold text-orange-600">{{ totalRefunded().toFixed(2) }}</td>
+            <td class="text-right font-bold text-orange-600">{{ totalRefunded() | amount }}</td>
             <td colspan="2"></td>
           </tr>
         }

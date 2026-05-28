@@ -12,6 +12,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -33,7 +34,8 @@ import { Branch } from '@shared/interfaces/branch.interface';
     DialogModule,
     TooltipModule,
     TabsModule,
-    TranslateModule
+    TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './employee-list.component.html',
@@ -119,27 +121,41 @@ export class EmployeeListComponent implements OnInit {
   }
 
   terminateEmployee(employee: Employee) {
+    this.runDelete(employee, {
+      messageKey: 'EMPLOYEES.TERMINATE_CONFIRM',
+      headerKey: 'EMPLOYEES.TERMINATE_HEADER',
+      successKey: 'EMPLOYEES.TERMINATED',
+    });
+  }
+
+  deleteEmployee(employee: Employee) {
+    this.runDelete(employee, {
+      messageKey: 'EMPLOYEES.DELETE_CONFIRM',
+      headerKey: 'EMPLOYEES.DELETE_HEADER',
+      successKey: 'EMPLOYEES.DELETED',
+    });
+  }
+
+  private runDelete(employee: Employee, keys: { messageKey: string; headerKey: string; successKey: string }) {
     this.confirmationService.confirm({
-      message: this.translate.instant('EMPLOYEES.TERMINATE_CONFIRM', {
+      message: this.translate.instant(keys.messageKey, {
         name: `${employee.firstName} ${employee.lastName}`,
       }),
-      header: this.translate.instant('EMPLOYEES.TERMINATE_HEADER'),
+      header: this.translate.instant(keys.headerKey),
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
         this.employeeService.deleteEmployee(employee.id).subscribe({
           next: () => {
-            this.notificationService.success(this.translate.instant('EMPLOYEES.TERMINATED'));
+            this.notificationService.success(this.translate.instant(keys.successKey));
             this.loadEmployees();
           },
           error: (err) => {
             const assigned = err?.error?.assignedClasses;
             if (err?.status === 400 && Array.isArray(assigned) && assigned.length > 0) {
-              // Show the specialized "assigned to classes" dialog instead of relying on the interceptor toast.
               this.blockedEmployee.set(employee);
               this.blockingClasses.set(assigned);
               this.showAssignedClassesDialog.set(true);
             }
-            // Otherwise the interceptor toasted the translated error.
           }
         });
       }

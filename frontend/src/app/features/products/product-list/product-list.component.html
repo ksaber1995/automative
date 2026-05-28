@@ -86,8 +86,8 @@
           </td>
           <td>{{ getBranchName(product.branchId) }}</td>
           <td>{{ getCategoryLabel(product.category) }}</td>
-          <td>{{ (product.costPrice || 0).toFixed(2) }}</td>
-          <td class="font-semibold">{{ (product.sellingPrice || 0).toFixed(2) }}</td>
+          <td>{{ (product.costPrice || 0) | amount }}</td>
+          <td class="font-semibold">{{ (product.sellingPrice || 0) | amount }}</td>
           <td>
             @if ((product.stock || 0) <= (product.minStock || 0)) {
               <span class="text-red-600 font-bold">{{ product.stock || 0 }}</span>
@@ -287,7 +287,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             Cost per unit *
-            <span class="text-xs text-gray-400 ml-1">(current: {{ (selectedProduct()!.costPrice || 0).toFixed(2) }})</span>
+            <span class="text-xs text-gray-400 ml-1">(current: {{ (selectedProduct()!.costPrice || 0) | amount }})</span>
           </label>
           <p-inputNumber
             [(ngModel)]="restockForm.costPerUnit"
@@ -301,7 +301,7 @@
         <div class="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
           <span class="text-sm text-gray-600">Total cost</span>
           <span class="text-lg font-bold text-gray-800">
-            {{ ((restockForm.quantity || 0) * (restockForm.costPerUnit || 0)).toFixed(2) }}
+            {{ ((restockForm.quantity || 0) * (restockForm.costPerUnit || 0)) | amount }}
           </span>
         </div>
 

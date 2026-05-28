@@ -135,7 +135,7 @@
               }
               @if (authService.canDelete('students')) {
                 @if (student.isActive) {
-                  @if (hasNoEnrollments(student.id)) {
+                  @if (!student.hasSubscriptions) {
                     <button
                       pButton
                       icon="pi pi-trash"

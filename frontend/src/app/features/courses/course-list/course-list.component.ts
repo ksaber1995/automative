@@ -13,6 +13,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -40,6 +41,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
     TabPanel,
     TabPanels,
     TranslateModule,
+    AmountPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './course-list.component.html'

@@ -25,7 +25,7 @@
             <div class="mt-2 p-3 bg-blue-50 rounded">
               <div class="flex justify-between items-center">
                 <span class="text-sm font-medium">{{ 'PRODUCTS.SALE.SELL_PRICE_LABEL' | translate }}</span>
-                <span class="text-lg font-bold text-blue-600">{{ selectedProduct()!.sellingPrice.toFixed(2) }}</span>
+                <span class="text-lg font-bold text-blue-600">{{ selectedProduct()!.sellingPrice | amount }}</span>
               </div>
               <div class="flex justify-between items-center mt-1">
                 <span class="text-sm font-medium">{{ 'PRODUCTS.SALE.STOCK_LABEL' | translate }}</span>
@@ -71,18 +71,18 @@
           <div class="space-y-2">
             <div class="flex justify-between items-center">
               <span class="font-medium">{{ 'PRODUCTS.SALE.SUBTOTAL' | translate }}</span>
-              <span class="text-lg">{{ subtotal().toFixed(2) }}</span>
+              <span class="text-lg">{{ subtotal() | amount }}</span>
             </div>
             @if (discountAmount() > 0) {
               <div class="flex justify-between items-center text-orange-600">
                 <span class="font-medium">{{ 'PRODUCTS.SALE.DISCOUNT' | translate }}</span>
-                <span class="text-lg">-{{ discountAmount().toFixed(2) }}</span>
+                <span class="text-lg">-{{ discountAmount() | amount }}</span>
               </div>
             }
             <hr class="border-green-300" />
             <div class="flex justify-between items-center">
               <span class="font-bold text-xl">{{ 'PRODUCTS.SALE.TOTAL' | translate }}</span>
-              <span class="text-2xl font-bold text-green-600">{{ totalAmount().toFixed(2) }}</span>
+              <span class="text-2xl font-bold text-green-600">{{ totalAmount() | amount }}</span>
             </div>
           </div>
         </div>

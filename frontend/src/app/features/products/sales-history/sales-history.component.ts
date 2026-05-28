@@ -13,6 +13,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ProductSaleService, SalesSummary } from '../services/product-sale.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -26,7 +27,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
   imports: [
     CommonModule, TableModule, ButtonModule, CardModule, DialogModule, TagModule,
     InputNumberModule, DatePickerModule, SelectModule, TextareaModule, TooltipModule,
-    FormsModule, TranslateModule,
+    FormsModule, TranslateModule, AmountPipe,
   ],
   templateUrl: './sales-history.component.html',
 })

@@ -74,7 +74,7 @@
               {{ getBranchName(employee.branchId) }}
             }
           </td>
-          <td>{{ employee.salary | currency }}</td>
+          <td>{{ employee.salary | amount }}</td>
           <td>{{ employee.hireDate | date: 'MMM d, y' }}</td>
           <td>
             <p-tag
@@ -101,13 +101,23 @@
                 ></button>
               }
               @if (authService.canDelete('employees') && employee.isActive) {
-                <button
-                  pButton
-                  icon="pi pi-trash"
-                  class="p-button-rounded p-button-text p-button-danger"
-                  [pTooltip]="'EMPLOYEES.LIST.TERMINATE' | translate"
-                  (click)="terminateEmployee(employee)"
-                ></button>
+                @if (employee.hasSalaryHistory) {
+                  <button
+                    pButton
+                    icon="pi pi-ban"
+                    class="p-button-rounded p-button-text p-button-danger"
+                    [pTooltip]="'EMPLOYEES.LIST.TERMINATE' | translate"
+                    (click)="terminateEmployee(employee)"
+                  ></button>
+                } @else {
+                  <button
+                    pButton
+                    icon="pi pi-trash"
+                    class="p-button-rounded p-button-text p-button-danger"
+                    [pTooltip]="'EMPLOYEES.LIST.DELETE' | translate"
+                    (click)="deleteEmployee(employee)"
+                  ></button>
+                }
               }
             </div>
           </td>
