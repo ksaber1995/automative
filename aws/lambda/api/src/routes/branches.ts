@@ -9,7 +9,7 @@ import {
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapBranchFromDB(row: any) {
-  return {
+  const mapped: any = {
     id: row.id,
     companyId: row.company_id,
     name: row.name,
@@ -24,6 +24,10 @@ function mapBranchFromDB(row: any) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (row.has_financials !== undefined) {
+    mapped.hasFinancials = row.has_financials === true;
+  }
+  return mapped;
 }
 
 export const branchesRoutes = {
@@ -70,7 +74,14 @@ export const branchesRoutes = {
       }
 
       const params: any[] = [context.companyId];
-      let sql = 'SELECT * FROM branches WHERE company_id = $1';
+      let sql = `
+        SELECT branches.*,
+          (EXISTS (SELECT 1 FROM revenues         WHERE branch_id = branches.id)
+            OR EXISTS (SELECT 1 FROM expenses         WHERE branch_id = branches.id)
+            OR EXISTS (SELECT 1 FROM expense_payments WHERE branch_id = branches.id)
+          ) AS has_financials
+        FROM branches
+        WHERE company_id = $1`;
       const branchClause = appendBranchSqlFilter(context, params, 'id');
       if (branchClause) sql += ` AND ${branchClause}`;
       sql += ' ORDER BY created_at DESC';

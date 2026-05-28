@@ -6,6 +6,7 @@ import {
   Context
 } from 'aws-lambda';
 import { createLambdaHandler } from '@ts-rest/serverless/aws';
+import { RequestValidationError, TsRestResponse } from '@ts-rest/serverless';
 
 type ApiGatewayEvent = APIGatewayProxyEvent | APIGatewayProxyEventV2;
 type ApiGatewayResponse = APIGatewayProxyResult | APIGatewayProxyResultV2;
@@ -133,6 +134,39 @@ const router = {
 // 'Allow-Credentials: true' combo is invalid per CORS spec — browsers reject
 // the response whenever the request runs in credentials mode 'include'.
 const lambdaHandler = createLambdaHandler(contract, router, {
+  // ts-rest's default body-validation failure returns `{ message: 'Request
+  // validation failed', bodyErrors: { issues: [...] } }` with no `code`, so the
+  // frontend interceptor falls through to showing that raw English text. Wrap
+  // it in our standard `{ code, message }` shape with a translatable code and
+  // a human-readable summary of the first Zod issue (so the user sees e.g.
+  // "email: Invalid email" instead of "Request validation failed").
+  errorHandler: (err) => {
+    if (err instanceof RequestValidationError) {
+      const firstIssue =
+        err.bodyError?.issues?.[0] ||
+        err.queryError?.issues?.[0] ||
+        err.pathParamsError?.issues?.[0] ||
+        err.headersError?.issues?.[0];
+      if (firstIssue) {
+        // The field+message tells the user exactly what's wrong (e.g.
+        // "email: Invalid email"). Omit `code` so the frontend interceptor
+        // uses this specific message instead of a generic translated string.
+        const field =
+          firstIssue.path && firstIssue.path.length > 0
+            ? firstIssue.path.join('.')
+            : undefined;
+        const message = field
+          ? `${field}: ${firstIssue.message}`
+          : firstIssue.message;
+        return TsRestResponse.fromJson({ message }, { status: 400 });
+      }
+      return TsRestResponse.fromJson(
+        { code: 'ERRORS.VALIDATION_FAILED', message: 'Request validation failed' },
+        { status: 400 }
+      );
+    }
+    return undefined;
+  },
   responseHandlers: [
     (response, request, args) => {
       const origin = request.headers.get('origin');

@@ -14,6 +14,7 @@ export interface Branch {
   openingDate: string;
   createdAt: string;
   updatedAt: string;
+  hasFinancials?: boolean;
 }
 
 export interface BranchCreateDto {

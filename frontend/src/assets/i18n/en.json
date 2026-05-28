@@ -5,6 +5,7 @@
     "FORBIDDEN": "You do not have permission to perform this action.",
     "NOT_FOUND": "Resource not found.",
     "SERVER": "Internal server error. Please try again later.",
+    "VALIDATION_FAILED": "Please check the form — some fields are invalid.",
     "SUBSCRIPTION": {
       "REQUIRED": "An active subscription is required to perform this action."
     },

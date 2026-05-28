@@ -336,6 +336,7 @@ const BranchSchema = z.object({
   openingDate: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  hasFinancials: z.boolean().optional(),
 });
 
 // =============================================
