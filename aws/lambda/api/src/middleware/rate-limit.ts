@@ -30,12 +30,12 @@ export const RATE_LIMITS = {
   // Per-IP cap on unauthenticated auth endpoints (login / register /
   // verify-phone / resend-otp). Protects against credential stuffing and
   // mass registration from a single IP.
-  AUTH_IP: { name: 'auth:ip', limit: 20, windowMs: 15 * 60_000 },
+  AUTH_IP: { name: 'auth:ip', limit: 60, windowMs: 15 * 60_000 },
 
   // Per-email cap on register / forgot-password style flows. Stops an
   // attacker from spamming targeted account-creation or recovery emails for
   // a known address even if they rotate IPs.
-  AUTH_EMAIL: { name: 'auth:email', limit: 5, windowMs: 15 * 60_000 },
+  AUTH_EMAIL: { name: 'auth:email', limit: 30, windowMs: 15 * 60_000 },
 
   // Demo-lead / public contact form submissions. Tight — these are
   // unauthenticated and there is no legitimate burst.
@@ -46,7 +46,7 @@ export const RATE_LIMITS = {
   // mode branches), and a power user re-filtering a few times in a minute
   // can burn through a low limit fast. Sized to comfortably cover that
   // workload while still flagging a runaway client.
-  AUTHED_USER: { name: 'authed:user', limit: 3000, windowMs: 15 * 60_000 },
+  AUTHED_USER: { name: 'authed:user', limit: 4000, windowMs: 15 * 60_000 },
 
   // Per-company cap so one tenant can't monopolize the Lambda's burst
   // budget. Scales with team size — bump if a real company hits it.
