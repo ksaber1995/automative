@@ -297,7 +297,7 @@ export const authRoutes = {
 
       const trialStart = new Date();
       const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 60);
+      trialEnd.setDate(trialEnd.getDate() + 14);
       await client.query(
         `INSERT INTO subscriptions (company_id, status, price, trial_start_date, trial_end_date)
          VALUES ($1,$2,$3,$4,$5)`,
