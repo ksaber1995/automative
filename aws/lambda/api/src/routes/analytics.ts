@@ -253,14 +253,20 @@ export const analyticsRoutes = {
              WHERE ep.branch_id = b.id AND ep.company_id = $1
                AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS direct_expenses,
-           -- Refunds attributable to this branch (joined via the parent enrollment)
+           -- Refunds attributable to this branch. Try every link the refund
+           -- might have (enrollment → master → product sale → event subscription),
+           -- then fall back to the refund's own branch_id. Without this,
+           -- product-sale refunds silently reduced company net profit without
+           -- ever appearing on a branch row, breaking sum(branches) ≈ company net.
            COALESCE((
              SELECT SUM(r.amount) FROM refunds r
              LEFT JOIN enrollments e ON r.enrollment_id = e.id
              LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+             LEFT JOIN product_sales ps ON r.product_sale_id = ps.id
+             LEFT JOIN event_subscriptions es ON r.subscription_id = es.id
              WHERE r.company_id = $1
                AND r.refund_date >= $2 AND r.refund_date <= $3
-               AND COALESCE(e.branch_id, me.branch_id) = b.id
+               AND COALESCE(e.branch_id, me.branch_id, ps.branch_id, es.branch_id, r.branch_id) = b.id
            ), 0) AS refunds_amount,
            -- Students enrolled in courses or master courses within the period
            (SELECT COUNT(DISTINCT s.student_id) FROM (
@@ -322,6 +328,21 @@ export const analyticsRoutes = {
           }
         }
 
+        // Overhead share: the positive cost portion of overhead this branch
+        // would absorb. Shown for every allocation method (informational in
+        // OVERHEAD mode, since overhead stays at company level there).
+        let overheadShare = 0;
+        if (totalGlobalOverhead > 0) {
+          if (allocationMethod === 'EQUAL') {
+            overheadShare = branchCount > 0 ? totalGlobalOverhead / branchCount : 0;
+          } else {
+            // PROPORTIONAL or OVERHEAD — both share by revenue ratio for display
+            overheadShare = totalBranchRevenue > 0
+              ? totalGlobalOverhead * (netRevenue / totalBranchRevenue)
+              : (branchCount > 0 ? totalGlobalOverhead / branchCount : 0);
+          }
+        }
+
         const totalBranchExpenses = directExpenses;
         const branchNetProfit = netRevenue - totalBranchExpenses + allocatedUnallocated;
         const profitMargin = netRevenue > 0 ? (branchNetProfit / netRevenue) * 100 : 0;
@@ -335,6 +356,7 @@ export const analyticsRoutes = {
           refunds: Math.round(refunds * 100) / 100,
           directExpenses,
           allocatedOverhead: Math.round(allocatedUnallocated * 100) / 100,
+          overheadShare: Math.round(overheadShare * 100) / 100,
           totalExpenses: Math.round((totalBranchExpenses - allocatedUnallocated) * 100) / 100,
           netProfit: Math.round(branchNetProfit * 100) / 100,
           profitMargin: Math.round(profitMargin * 10) / 10,
@@ -388,6 +410,13 @@ export const analyticsRoutes = {
       );
 
       const sumBranchNetProfit = branchSummaries.reduce((s: number, b: any) => s + b.netProfit, 0);
+      const sumBranchRefunds = branchSummaries.reduce((s: number, b: any) => s + (b.refunds || 0), 0);
+      // Refunds that couldn't be attributed to any branch (no enrollment / master
+      // / product sale / event subscription link, and no branch_id on the refund
+      // row). These reduce companyNet without appearing on any branch row, so
+      // they need to be surfaced explicitly for sum(branches) − overhead to
+      // reconcile with companyNet.
+      const unattributedRefunds = Math.max(0, Math.round((totalRefunds - sumBranchRefunds) * 100) / 100);
 
       return {
         status: 200 as const,
@@ -398,6 +427,7 @@ export const analyticsRoutes = {
             productRevenue,
             masterRevenue,
             totalRefunds,
+            unattributedRefunds,
             grossProfit,
             fixedExpenses,
             variableExpenses,

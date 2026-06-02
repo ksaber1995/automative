@@ -172,8 +172,8 @@
             <th pSortableColumn="branchName">{{ 'NAV.BRANCHES' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
             <th [pTooltip]="'DASHBOARD.BRANCH_REVENUE_TIP' | translate" tooltipPosition="top" pSortableColumn="totalRevenue">{{ 'NAV.REVENUES' | translate }} <p-sortIcon field="totalRevenue"></p-sortIcon></th>
             <th [pTooltip]="'DASHBOARD.BRANCH_DIRECT_TIP' | translate" tooltipPosition="top" pSortableColumn="directExpenses">{{ 'DASHBOARD.COL_DIRECT' | translate }} <p-sortIcon field="directExpenses"></p-sortIcon></th>
-            <th [pTooltip]="'DASHBOARD.BRANCH_OVERHEAD_TIP' | translate" tooltipPosition="top" pSortableColumn="allocatedOverhead">
-              {{ 'DASHBOARD.COL_OVERHEAD' | translate }} <p-sortIcon field="allocatedOverhead"></p-sortIcon>
+            <th [pTooltip]="'DASHBOARD.BRANCH_OVERHEAD_TIP' | translate" tooltipPosition="top" pSortableColumn="overheadShare">
+              {{ 'DASHBOARD.COL_OVERHEAD' | translate }} <p-sortIcon field="overheadShare"></p-sortIcon>
             </th>
             <th [pTooltip]="'DASHBOARD.BRANCH_NET_TIP' | translate" tooltipPosition="top" pSortableColumn="netProfit">{{ 'DASHBOARD.COL_NET_PROFIT' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
             <th pSortableColumn="profitMargin">{{ 'DASHBOARD.COL_MARGIN' | translate }} <p-sortIcon field="profitMargin"></p-sortIcon></th>
@@ -189,8 +189,12 @@
             <td class="font-medium text-blue-700">{{ formatCurrency(branch.totalRevenue) }}</td>
             <td class="text-red-600">{{ formatCurrency(branch.directExpenses) }}</td>
             <td>
-              @if (branch.allocatedOverhead > 0) {
-                <span class="text-orange-600">{{ formatCurrency(branch.allocatedOverhead) }}</span>
+              @if ((branch.overheadShare || 0) > 0) {
+                <span class="text-orange-600">{{ formatCurrency(branch.overheadShare) }}</span>
+                @if (data.companyWideSummary.allocationMethod === 'OVERHEAD') {
+                  <i class="pi pi-info-circle text-gray-400 text-xs ml-1"
+                     [pTooltip]="'DASHBOARD.OVERHEAD_INFO_TIP' | translate" tooltipPosition="top"></i>
+                }
               } @else {
                 <span class="text-gray-400 text-sm">—</span>
               }
@@ -257,6 +261,17 @@
                 </td>
                 <td>
                   <span class="font-bold text-orange-700">− {{ formatCurrency(unallocatedCogsAndInventory(data)) }}</span>
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            }
+            @if (unattributedRefunds(data) > 0) {
+              <tr class="bg-orange-50">
+                <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
+                  <i class="pi pi-replay mr-2"></i>{{ 'DASHBOARD.UNATTRIBUTED_REFUNDS' | translate }}
+                </td>
+                <td>
+                  <span class="font-bold text-orange-700">− {{ formatCurrency(unattributedRefunds(data)) }}</span>
                 </td>
                 <td colspan="2"></td>
               </tr>

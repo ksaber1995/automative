@@ -3,6 +3,7 @@ export interface FinancialSummary {
   enrollmentRevenue?: number;
   productRevenue?: number;
   totalRefunds?: number;
+  unattributedRefunds?: number;
   fixedExpenses: number;
   variableExpenses: number;
   salaries: number;
@@ -24,6 +25,12 @@ export interface BranchFinancialSummary extends FinancialSummary {
   branchId: string;
   branchName: string;
   branchCode: string;
+  refunds?: number;
+  directExpenses?: number;
+  allocatedOverhead?: number;
+  overheadShare?: number;
+  profitMargin?: number;
+  studentCount?: number;
 }
 
 export interface DashboardMetrics {

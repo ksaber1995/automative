@@ -1528,6 +1528,8 @@
     "UNALLOCATED_REVENUE": "Unallocated revenue (no branch)",
     "UNALLOCATED_EXPENSES": "Unallocated expenses (no branch)",
     "UNALLOCATED_COGS": "Unallocated COGS / Inventory (no branch)",
+    "UNATTRIBUTED_REFUNDS": "Refunds not tied to a branch",
+    "OVERHEAD_INFO_TIP": "Hypothetical proportional share. In Global Bucket mode, overhead stays at the company level and is not deducted from this branch's net profit.",
     "DUE_MONTH": "Due This Month",
     "UNPAID": "unpaid",
     "TOTAL_DUE": "Total Due",

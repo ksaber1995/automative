@@ -256,11 +256,19 @@ export class OverviewComponent implements OnInit {
 
   // Unallocated expenses that aren't "overhead" — i.e. unbranched COGS/Inventory
   // payments. The footer needs to show this separately so sumBranches − overhead
-  // − cogs/inv + unallocatedRevenue reconciles with the displayed Company Net.
+  // − cogs/inv − unattributedRefunds + unallocatedRevenue reconciles with the
+  // displayed Company Net.
   unallocatedCogsAndInventory(data: DashboardMetrics): number {
     const c = data.companyWideSummary;
     const diff = (c.unallocatedExpenses || 0) - (c.globalOverhead || 0);
     return diff > 0 ? diff : 0;
+  }
+
+  // Refunds the backend couldn't tie to any branch (e.g. product-sale refunds
+  // before branch attribution, refunds with no parent record). Surfaced as a
+  // row so the breakdown still adds up to companyNet.
+  unattributedRefunds(data: DashboardMetrics): number {
+    return data.companyWideSummary.unattributedRefunds || 0;
   }
 
   hasOverheadFooter(data: DashboardMetrics): boolean {
@@ -268,7 +276,8 @@ export class OverviewComponent implements OnInit {
     if (c.allocationMethod !== 'OVERHEAD') return false;
     return (c.globalOverhead || 0) > 0
       || (c.unallocatedRevenue || 0) > 0
-      || this.unallocatedCogsAndInventory(data) > 0;
+      || this.unallocatedCogsAndInventory(data) > 0
+      || this.unattributedRefunds(data) > 0;
   }
 
   getProfitBreakdownTooltip(data: DashboardMetrics): string {
