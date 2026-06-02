@@ -55,12 +55,12 @@ export class StudentFormComponent implements OnInit {
   constructor() {
     const today = new Date();
     this.studentForm = this.fb.group({
-      firstName: ['', [Validators.required, Validators.minLength(2)]],
-      lastName: ['', [Validators.required, Validators.minLength(2)]],
-      dateOfBirth: [null, [Validators.required]],
+      firstName: ['', [Validators.required]],
+      lastName: ['', [Validators.required]],
+      dateOfBirth: [null],
       email: ['', [Validators.email]],
       phone: [''],
-      parentName: ['', [Validators.required, Validators.minLength(3)]],
+      parentName: ['', [Validators.required]],
       parentPhone: ['', [Validators.required]],
       parentEmail: ['', [Validators.email]],
       address: [''],
@@ -97,8 +97,8 @@ export class StudentFormComponent implements OnInit {
       next: (student) => {
         this.studentForm.patchValue({
           ...student,
-          dateOfBirth: new Date(student.dateOfBirth),
-          enrollmentDate: new Date(student.enrollmentDate)
+          dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth) : null,
+          enrollmentDate: student.enrollmentDate ? new Date(student.enrollmentDate) : null
         });
         this.loading.set(false);
       },

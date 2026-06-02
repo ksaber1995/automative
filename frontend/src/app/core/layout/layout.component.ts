@@ -91,7 +91,6 @@ export class LayoutComponent implements OnInit {
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.TEACHER_ATTENDANCE', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') },
     ].filter(c => c.visible);
     if (academic.length) {
@@ -145,10 +144,11 @@ export class LayoutComponent implements OnInit {
       }});
     }
 
-    // Admin
+    // Admin — Settings mirrors the route guard (GLOBAL_ADMIN / ADMIN / BRANCH_ADMIN only).
+    const canAccessSettings = auth.hasAnyRole([UserRole.GLOBAL_ADMIN, UserRole.ADMIN, UserRole.BRANCH_ADMIN]);
     const admin: NavLeaf[] = [
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
-      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
+      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: canAccessSettings },
     ].filter(c => c.visible);
     if (admin.length) {
       entries.push({ kind: 'group', group: {

@@ -214,16 +214,53 @@
           </tr>
         </ng-template>
         <ng-template pTemplate="footer">
-          @if (data.companyWideSummary.allocationMethod === 'OVERHEAD' && data.companyWideSummary.globalOverhead > 0) {
-            <tr class="bg-orange-50">
-              <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
-                <i class="pi pi-building mr-2"></i>{{ 'DASHBOARD.GLOBAL_OVERHEAD' | translate }}
+          @if (hasOverheadFooter(data)) {
+            <tr class="bg-blue-50">
+              <td colspan="4" class="text-right text-sm font-medium text-blue-700 pr-4">
+                {{ 'DASHBOARD.SUM_BRANCH_NET' | translate }}
               </td>
               <td>
-                <span class="font-bold text-orange-700">− {{ formatCurrency(data.companyWideSummary.globalOverhead) }}</span>
+                <span class="font-bold"
+                  [class.text-green-700]="(data.companyWideSummary.sumBranchNetProfit || 0) >= 0"
+                  [class.text-red-700]="(data.companyWideSummary.sumBranchNetProfit || 0) < 0">
+                  {{ formatCurrency(data.companyWideSummary.sumBranchNetProfit || 0) }}
+                </span>
               </td>
               <td colspan="2"></td>
             </tr>
+            @if ((data.companyWideSummary.unallocatedRevenue || 0) > 0) {
+              <tr class="bg-green-50">
+                <td colspan="4" class="text-right text-sm font-medium text-green-700 pr-4">
+                  <i class="pi pi-shopping-cart mr-2"></i>{{ 'DASHBOARD.UNALLOCATED_REVENUE' | translate }}
+                </td>
+                <td>
+                  <span class="font-bold text-green-700">+ {{ formatCurrency(data.companyWideSummary.unallocatedRevenue || 0) }}</span>
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            }
+            @if ((data.companyWideSummary.globalOverhead || 0) > 0) {
+              <tr class="bg-orange-50">
+                <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
+                  <i class="pi pi-building mr-2"></i>{{ 'DASHBOARD.GLOBAL_OVERHEAD' | translate }}
+                </td>
+                <td>
+                  <span class="font-bold text-orange-700">− {{ formatCurrency(data.companyWideSummary.globalOverhead || 0) }}</span>
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            }
+            @if (unallocatedCogsAndInventory(data) > 0) {
+              <tr class="bg-orange-50">
+                <td colspan="4" class="text-right text-sm font-medium text-orange-700 pr-4">
+                  <i class="pi pi-box mr-2"></i>{{ 'DASHBOARD.UNALLOCATED_COGS' | translate }}
+                </td>
+                <td>
+                  <span class="font-bold text-orange-700">− {{ formatCurrency(unallocatedCogsAndInventory(data)) }}</span>
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            }
             <tr class="bg-green-50 border-t-2 border-green-200">
               <td colspan="4" class="text-right text-sm font-bold text-green-800 pr-4">{{ 'DASHBOARD.COMPANY_NET' | translate }}</td>
               <td>

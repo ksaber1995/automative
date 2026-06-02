@@ -254,6 +254,23 @@ export class OverviewComponent implements OnInit {
     return (c.unallocatedRevenue || 0) !== 0 || (c.unallocatedExpenses || 0) !== 0;
   }
 
+  // Unallocated expenses that aren't "overhead" — i.e. unbranched COGS/Inventory
+  // payments. The footer needs to show this separately so sumBranches − overhead
+  // − cogs/inv + unallocatedRevenue reconciles with the displayed Company Net.
+  unallocatedCogsAndInventory(data: DashboardMetrics): number {
+    const c = data.companyWideSummary;
+    const diff = (c.unallocatedExpenses || 0) - (c.globalOverhead || 0);
+    return diff > 0 ? diff : 0;
+  }
+
+  hasOverheadFooter(data: DashboardMetrics): boolean {
+    const c = data.companyWideSummary;
+    if (c.allocationMethod !== 'OVERHEAD') return false;
+    return (c.globalOverhead || 0) > 0
+      || (c.unallocatedRevenue || 0) > 0
+      || this.unallocatedCogsAndInventory(data) > 0;
+  }
+
   getProfitBreakdownTooltip(data: DashboardMetrics): string {
     const c = data.companyWideSummary;
     const parts = [

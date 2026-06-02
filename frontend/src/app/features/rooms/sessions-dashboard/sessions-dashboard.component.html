@@ -322,18 +322,31 @@
         @if (!loadingRooms()) {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             @for (room of filteredRooms(); track room.id) {
-              <div [class]="room.isOccupied
-                ? 'bg-red-50 border border-red-200 rounded-xl p-4'
-                : 'bg-green-50 border border-green-200 rounded-xl p-4'">
+              <div [class]="!room.isActive
+                ? 'bg-gray-100 border border-gray-300 rounded-xl p-4 opacity-75'
+                : room.isOccupied
+                  ? 'bg-red-50 border border-red-200 rounded-xl p-4'
+                  : 'bg-green-50 border border-green-200 rounded-xl p-4'">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
-                    <i [class]="room.isOccupied ? 'pi pi-building text-red-600' : 'pi pi-building text-green-600'"></i>
+                    <i [class]="!room.isActive
+                      ? 'pi pi-building text-gray-500'
+                      : room.isOccupied
+                        ? 'pi pi-building text-red-600'
+                        : 'pi pi-building text-green-600'"></i>
                     <span class="font-bold text-gray-900">{{ room.code }}</span>
                   </div>
-                  <p-tag
-                    [value]="(room.isOccupied ? 'SESSIONS_DASHBOARD.ROOM_OCCUPIED' : 'SESSIONS_DASHBOARD.ROOM_FREE') | translate"
-                    [severity]="room.isOccupied ? 'danger' : 'success'"
-                  ></p-tag>
+                  @if (!room.isActive) {
+                    <p-tag
+                      [value]="'SESSIONS_DASHBOARD.ROOM_INACTIVE' | translate"
+                      severity="secondary"
+                    ></p-tag>
+                  } @else {
+                    <p-tag
+                      [value]="(room.isOccupied ? 'SESSIONS_DASHBOARD.ROOM_OCCUPIED' : 'SESSIONS_DASHBOARD.ROOM_FREE') | translate"
+                      [severity]="room.isOccupied ? 'danger' : 'success'"
+                    ></p-tag>
+                  }
                 </div>
                 @if (room.branchName) {
                   <p class="text-xs text-gray-400 mb-1">{{ room.branchName }}</p>
@@ -345,7 +358,7 @@
                   <p class="text-sm font-medium text-red-800">{{ room.activeSession.className }}</p>
                   <p class="text-xs text-red-600">{{ 'SESSIONS_DASHBOARD.SINCE' | translate: { time: formatTime(room.activeSession.startDate) } }}</p>
                 }
-                @if (!room.isOccupied) {
+                @if (room.isActive && !room.isOccupied) {
                   <p-button
                     [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
                     icon="pi pi-play"

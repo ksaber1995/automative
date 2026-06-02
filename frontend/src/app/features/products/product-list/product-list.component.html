@@ -156,7 +156,7 @@
 <!-- Stock Management Dialog -->
 <p-dialog
   [(visible)]="showStockDialog"
-  [header]="selectedProduct()?.name || 'Stock Management'"
+  [header]="selectedProduct()?.name || ('PRODUCTS.STOCK_DIALOG.TITLE' | translate)"
   [modal]="true"
   [style]="{width: '480px'}"
   [closable]="!stockSubmitting()"
@@ -167,7 +167,7 @@
     <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-5">
       <i class="pi pi-box text-blue-500 text-xl"></i>
       <div>
-        <div class="text-xs text-gray-500 uppercase tracking-wide">Current Stock</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wide">{{ 'PRODUCTS.STOCK_DIALOG.CURRENT_STOCK' | translate }}</div>
         <div class="text-2xl font-bold" [class.text-red-600]="(selectedProduct()!.stock || 0) <= (selectedProduct()!.minStock || 0)" [class.text-gray-800]="(selectedProduct()!.stock || 0) > (selectedProduct()!.minStock || 0)">
           {{ selectedProduct()!.stock || 0 }}
           <span class="text-sm font-normal text-gray-500">{{ selectedProduct()!.unit }}</span>
@@ -175,7 +175,7 @@
       </div>
       @if ((selectedProduct()!.stock || 0) <= (selectedProduct()!.minStock || 0)) {
         <div class="ml-auto text-xs text-red-500 flex items-center gap-1">
-          <i class="pi pi-exclamation-triangle"></i> Low stock
+          <i class="pi pi-exclamation-triangle"></i> {{ 'PRODUCTS.STOCK_DIALOG.LOW_STOCK' | translate }}
         </div>
       }
     </div>
@@ -189,7 +189,7 @@
         [class.border-transparent]="activeTab !== 'adjust'"
         [class.text-gray-500]="activeTab !== 'adjust'"
         (click)="activeTab = 'adjust'">
-        <i class="pi pi-sliders-h mr-2"></i>Adjust Stock
+        <i class="pi pi-sliders-h mr-2"></i>{{ 'PRODUCTS.STOCK_DIALOG.TAB_ADJUST' | translate }}
       </button>
       <button
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
@@ -198,7 +198,7 @@
         [class.border-transparent]="activeTab !== 'restock'"
         [class.text-gray-500]="activeTab !== 'restock'"
         (click)="activeTab = 'restock'">
-        <i class="pi pi-shopping-bag mr-2"></i>Buy More
+        <i class="pi pi-shopping-bag mr-2"></i>{{ 'PRODUCTS.STOCK_DIALOG.TAB_RESTOCK' | translate }}
       </button>
     </div>
 
@@ -206,7 +206,7 @@
     @if (activeTab === 'adjust') {
       <div class="flex flex-col gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Operation</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.OPERATION' | translate }}</label>
           <div class="flex gap-2">
             <button
               class="flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all"
@@ -216,7 +216,7 @@
               [class.border-gray-200]="adjustForm.operation !== 'add'"
               [class.text-gray-600]="adjustForm.operation !== 'add'"
               (click)="adjustForm.operation = 'add'">
-              <i class="pi pi-plus mr-1"></i> Add
+              <i class="pi pi-plus mr-1"></i> {{ 'PRODUCTS.STOCK_DIALOG.ADD' | translate }}
             </button>
             <button
               class="flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all"
@@ -226,13 +226,13 @@
               [class.border-gray-200]="adjustForm.operation !== 'subtract'"
               [class.text-gray-600]="adjustForm.operation !== 'subtract'"
               (click)="adjustForm.operation = 'subtract'">
-              <i class="pi pi-minus mr-1"></i> Subtract
+              <i class="pi pi-minus mr-1"></i> {{ 'PRODUCTS.STOCK_DIALOG.SUBTRACT' | translate }}
             </button>
           </div>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.QUANTITY' | translate }} *</label>
           <p-inputNumber
             [(ngModel)]="adjustForm.quantity"
             [min]="1"
@@ -242,18 +242,18 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.NOTES' | translate }}</label>
           <input
             pInputText
             [(ngModel)]="adjustForm.notes"
-            placeholder="Optional reason for adjustment"
+            [placeholder]="'PRODUCTS.STOCK_DIALOG.ADJUST_NOTES_PLACEHOLDER' | translate"
             class="w-full" />
         </div>
 
         @if (adjustForm.quantity > 0) {
           <div class="p-3 rounded-lg text-sm" [class.bg-green-50]="adjustForm.operation === 'add'" [class.bg-red-50]="adjustForm.operation === 'subtract'">
             <span [class.text-green-700]="adjustForm.operation === 'add'" [class.text-red-700]="adjustForm.operation === 'subtract'">
-              New stock will be:
+              {{ 'PRODUCTS.STOCK_DIALOG.NEW_STOCK_WILL_BE' | translate }}
               <strong>
                 {{ adjustForm.operation === 'add'
                     ? (selectedProduct()!.stock || 0) + (adjustForm.quantity || 0)
@@ -271,11 +271,11 @@
       <div class="flex flex-col gap-4">
         <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
           <i class="pi pi-info-circle mr-1"></i>
-          Adds stock and records an inventory expense for accounting.
+          {{ 'PRODUCTS.STOCK_DIALOG.RESTOCK_INFO' | translate }}
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.QUANTITY' | translate }} *</label>
           <p-inputNumber
             [(ngModel)]="restockForm.quantity"
             [min]="1"
@@ -286,8 +286,8 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Cost per unit *
-            <span class="text-xs text-gray-400 ml-1">(current: {{ (selectedProduct()!.costPrice || 0) | amount }})</span>
+            {{ 'PRODUCTS.STOCK_DIALOG.COST_PER_UNIT' | translate }} *
+            <span class="text-xs text-gray-400 ml-1">{{ 'PRODUCTS.STOCK_DIALOG.COST_CURRENT' | translate: { value: ((selectedProduct()!.costPrice || 0) | amount) } }}</span>
           </label>
           <p-inputNumber
             [(ngModel)]="restockForm.costPerUnit"
@@ -299,14 +299,14 @@
         </div>
 
         <div class="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
-          <span class="text-sm text-gray-600">Total cost</span>
+          <span class="text-sm text-gray-600">{{ 'PRODUCTS.STOCK_DIALOG.TOTAL_COST' | translate }}</span>
           <span class="text-lg font-bold text-gray-800">
             {{ ((restockForm.quantity || 0) * (restockForm.costPerUnit || 0)) | amount }}
           </span>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Purchase date *</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.PURCHASE_DATE' | translate }} *</label>
           <p-datepicker
             [(ngModel)]="restockForm.date"
             dateFormat="yy-mm-dd"
@@ -317,17 +317,17 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'PRODUCTS.STOCK_DIALOG.NOTES' | translate }}</label>
           <input
             pInputText
             [(ngModel)]="restockForm.notes"
-            placeholder="Optional notes"
+            [placeholder]="'PRODUCTS.STOCK_DIALOG.RESTOCK_NOTES_PLACEHOLDER' | translate"
             class="w-full" />
         </div>
 
         @if (restockForm.quantity > 0) {
           <div class="p-3 bg-green-50 rounded-lg text-sm text-green-700">
-            New stock will be:
+            {{ 'PRODUCTS.STOCK_DIALOG.NEW_STOCK_WILL_BE' | translate }}
             <strong>{{ (selectedProduct()!.stock || 0) + (restockForm.quantity || 0) }}</strong>
             {{ selectedProduct()!.unit }}
           </div>
@@ -339,14 +339,14 @@
   <ng-template pTemplate="footer">
     <div class="flex gap-2 justify-end">
       <p-button
-        label="Cancel"
+        [label]="'PRODUCTS.STOCK_DIALOG.CANCEL' | translate"
         severity="secondary"
         [outlined]="true"
         [disabled]="stockSubmitting()"
         (onClick)="closeStockDialog()">
       </p-button>
       <p-button
-        [label]="activeTab === 'adjust' ? 'Apply Adjustment' : 'Confirm Purchase'"
+        [label]="(activeTab === 'adjust' ? 'PRODUCTS.STOCK_DIALOG.APPLY_ADJUSTMENT' : 'PRODUCTS.STOCK_DIALOG.CONFIRM_PURCHASE') | translate"
         [icon]="activeTab === 'adjust' ? 'pi pi-check' : 'pi pi-shopping-bag'"
         [loading]="stockSubmitting()"
         (onClick)="confirmStockAction()">

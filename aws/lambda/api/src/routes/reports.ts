@@ -670,9 +670,10 @@ export const reportsRoutes = {
   },
 
   // Per-event P&L within a date range.
-  // The date range is matched against events.start_date (falling back to created_at
-  // when start_date is NULL) so that events without a scheduled start still show up
-  // when they were created in the period.
+  // An event appears if either its scheduled dates overlap the range OR it had
+  // any subscription / expense / refund / product-sale activity in the range —
+  // so a long-running event keeps showing up while only the in-range financials
+  // are aggregated.
   profitByEvent: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -710,6 +711,7 @@ export const reportsRoutes = {
            SELECT event_id, SUM(amount) AS total, COUNT(*) AS count
            FROM event_subscriptions
            WHERE company_id = $1
+             AND payment_date BETWEEN $2 AND $3
            GROUP BY event_id
          ) rev ON rev.event_id = e.id
          LEFT JOIN (
@@ -719,13 +721,16 @@ export const reportsRoutes = {
            FROM expense_payments ep
            LEFT JOIN expenses ex ON ex.id = ep.expense_id
            WHERE ep.company_id = $1
+             AND ep.date BETWEEN $2 AND $3
              AND (ep.event_id IS NOT NULL OR ex.event_id IS NOT NULL)
            GROUP BY COALESCE(ep.event_id, ex.event_id)
          ) exp ON exp.event_id = e.id
          LEFT JOIN (
            SELECT event_id, SUM(amount) AS total, COUNT(*) AS count
            FROM refunds
-           WHERE company_id = $1 AND event_id IS NOT NULL
+           WHERE company_id = $1
+             AND event_id IS NOT NULL
+             AND refund_date BETWEEN $2 AND $3
            GROUP BY event_id
          ) ref ON ref.event_id = e.id
          LEFT JOIN (
@@ -734,12 +739,20 @@ export const reportsRoutes = {
                   SUM(COALESCE(p.cost_price, 0) * ps.quantity) AS cost
            FROM product_sales ps
            LEFT JOIN products p ON p.id = ps.product_id
-           WHERE ps.company_id = $1 AND ps.event_id IS NOT NULL
+           WHERE ps.company_id = $1
+             AND ps.event_id IS NOT NULL
+             AND ps.sale_date BETWEEN $2 AND $3
            GROUP BY ps.event_id
          ) prod ON prod.event_id = e.id
          WHERE e.company_id = $1
-           AND COALESCE(e.start_date, e.created_at::date) >= $2
-           AND COALESCE(e.start_date, e.created_at::date) <= $3
+           AND (
+             (COALESCE(e.start_date, e.created_at::date) <= $3
+              AND COALESCE(e.end_date, e.start_date, e.created_at::date) >= $2)
+             OR rev.event_id IS NOT NULL
+             OR exp.event_id IS NOT NULL
+             OR ref.event_id IS NOT NULL
+             OR prod.event_id IS NOT NULL
+           )
            ${branchClause}
          ORDER BY COALESCE(e.start_date, e.created_at::date) DESC, e.name ASC`,
         params
