@@ -144,12 +144,11 @@ export class LayoutComponent implements OnInit {
       }});
     }
 
-    // Admin — Settings mirrors the route guard (GLOBAL_ADMIN / ADMIN / BRANCH_ADMIN only).
-    const canAccessSettings = auth.hasAnyRole([UserRole.GLOBAL_ADMIN, UserRole.ADMIN, UserRole.BRANCH_ADMIN]);
-    const admin: NavLeaf[] = [
+    // Admin — only Global Admins see this section at all.
+    const admin: NavLeaf[] = auth.isGlobalAdmin() ? [
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
-      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: canAccessSettings },
-    ].filter(c => c.visible);
+      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
+    ].filter(c => c.visible) : [];
     if (admin.length) {
       entries.push({ kind: 'group', group: {
         groupKey: 'admin', labelKey: 'NAV.GROUPS.ADMIN', icon: 'pi pi-shield', children: admin,

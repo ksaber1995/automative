@@ -356,9 +356,24 @@ export const enrollmentsRoutes = {
       const params: any[] = [context.companyId];
       let idx = 2;
 
+      // Branch column is a COALESCE across the four refund sources. We can't
+      // pass that expression to appendBranchSqlFilter (it only accepts a safe
+      // identifier), so we use the `__COL__` template trick like revenues.ts.
+      const branchCol = 'COALESCE(e.branch_id, me.branch_id, ev.branch_id, ps.branch_id)';
       if (q.branchId) {
-        conditions.push(`COALESCE(e.branch_id, me.branch_id, ev.branch_id, ps.branch_id) = $${idx++}`);
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        conditions.push(`${branchCol} = $${idx++}`);
         params.push(q.branchId);
+      } else {
+        // No explicit branch requested: restrict branch admins/managers to
+        // their assigned branches. Global admins get null (no filter).
+        const clause = appendBranchSqlFilter(context, params, '__COL__');
+        if (clause) {
+          conditions.push(clause.replace(/__COL__/g, branchCol));
+          idx = params.length + 1;
+        }
       }
       if (q.studentId) { conditions.push(`r.student_id = $${idx++}`); params.push(q.studentId); }
       if (q.type) { conditions.push(`r.type = $${idx++}`); params.push(q.type); }
