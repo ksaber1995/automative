@@ -2142,6 +2142,7 @@
       "GENDER_PLACEHOLDER": "Select gender",
       "GENDER_MALE": "Male",
       "GENDER_FEMALE": "Female",
+      "GENDER_REQUIRED": "Gender is required",
       "BRANCH": "Branch",
       "BRANCH_PLACEHOLDER": "Select a branch",
       "BRANCH_REQUIRED": "Branch is required",

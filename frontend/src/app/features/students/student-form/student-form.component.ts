@@ -63,7 +63,7 @@ export class StudentFormComponent implements OnInit {
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
       dateOfBirth: [null],
-      gender: [null],
+      gender: [null, [Validators.required]],
       email: ['', [Validators.email]],
       phone: [''],
       parentName: ['', [Validators.required]],
@@ -161,6 +161,7 @@ export class StudentFormComponent implements OnInit {
   get firstName() { return this.studentForm.get('firstName'); }
   get lastName() { return this.studentForm.get('lastName'); }
   get dateOfBirth() { return this.studentForm.get('dateOfBirth'); }
+  get gender() { return this.studentForm.get('gender'); }
   get email() { return this.studentForm.get('email'); }
   get parentName() { return this.studentForm.get('parentName'); }
   get parentPhone() { return this.studentForm.get('parentPhone'); }

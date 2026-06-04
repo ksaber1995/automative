@@ -2182,6 +2182,7 @@
       "GENDER_PLACEHOLDER": "اختر النوع",
       "GENDER_MALE": "ذكر",
       "GENDER_FEMALE": "أنثى",
+      "GENDER_REQUIRED": "النوع مطلوب",
       "BRANCH": "الفرع",
       "BRANCH_PLACEHOLDER": "اختر فرعاً",
       "BRANCH_REQUIRED": "الفرع مطلوب",

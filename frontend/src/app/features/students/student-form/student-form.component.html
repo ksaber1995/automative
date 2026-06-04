@@ -77,7 +77,7 @@
           <!-- Gender -->
           <div class="field">
             <label for="gender" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.GENDER' | translate }}
+              {{ 'STUDENTS.FORM.GENDER' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-select
               inputId="gender"
@@ -85,9 +85,9 @@
               [options]="genderOptions"
               optionLabel="label"
               optionValue="value"
-              [showClear]="true"
               [placeholder]="'STUDENTS.FORM.GENDER_PLACEHOLDER' | translate"
               [style]="{'width': '100%'}"
+              [class.ng-invalid]="gender?.invalid && gender?.touched"
             >
               <ng-template let-option pTemplate="item">
                 {{ option.label | translate }}
@@ -96,6 +96,9 @@
                 @if (selected) { {{ selected.label | translate }} }
               </ng-template>
             </p-select>
+            @if (gender?.invalid && gender?.touched) {
+              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.GENDER_REQUIRED' | translate }}</small>
+            }
           </div>
 
           <!-- Branch -->
