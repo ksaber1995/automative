@@ -262,10 +262,13 @@ export const ACQUISITION_CHANNELS = [
 ] as const;
 const AcquisitionChannelSchema = z.enum(ACQUISITION_CHANNELS);
 
+const GenderSchema = z.enum(['MALE', 'FEMALE']);
+
 const CreateStudentSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.string().optional(),
+  gender: GenderSchema.optional(),
   email: z.union([z.string().email(), z.literal('')]).optional(),
   phone: z.string().optional(),
   parentName: z.string(),
@@ -286,6 +289,7 @@ const StudentSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.string().nullable(),
+  gender: GenderSchema.nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
   parentName: z.string(),
@@ -340,6 +344,25 @@ const BranchSchema = z.object({
 });
 
 // =============================================
+// Level Schemas
+// =============================================
+const CreateLevelSchema = z.object({
+  name: z.string(),
+  age: z.number().nullable().optional(),
+});
+
+const UpdateLevelSchema = CreateLevelSchema.partial();
+
+const LevelSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  name: z.string(),
+  age: z.number().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
 // Course Schemas
 // =============================================
 const CreateCourseSchema = z.object({
@@ -352,6 +375,7 @@ const CreateCourseSchema = z.object({
   maxStudents: z.number().optional(),
   instructorId: OptionalUUIDSchema,
   defaultRoomId: OptionalUUIDSchema,
+  levelId: OptionalUUIDSchema,
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
@@ -367,6 +391,7 @@ const CreateMasterCourseSchema = z.object({
   defaultPrice: z.number(),
   defaultDuration: z.number(),
   defaultMaxStudents: z.number().optional(),
+  levelId: OptionalUUIDSchema,
 });
 
 const UpdateMasterCourseSchema = z.object({
@@ -376,6 +401,7 @@ const UpdateMasterCourseSchema = z.object({
   defaultPrice: z.number().optional(),
   defaultDuration: z.number().optional(),
   defaultMaxStudents: z.number().optional(),
+  levelId: OptionalUUIDSchema,
   isActive: z.boolean().optional(),
 });
 
@@ -390,6 +416,8 @@ const MasterCourseSchema = z.object({
   defaultPrice: z.number(),
   defaultDuration: z.number(),
   defaultMaxStudents: z.number().nullable(),
+  levelId: UUIDSchema.nullable().optional(),
+  levelName: z.string().nullable().optional(),
   isActive: z.boolean(),
   linkedCourseCount: z.number().optional(),
   branchCount: z.number().optional(),
@@ -477,6 +505,8 @@ const CourseSchema = z.object({
   duration: z.number(),
   maxStudents: z.number().nullable(),
   instructorId: UUIDSchema.nullable(),
+  levelId: UUIDSchema.nullable().optional(),
+  levelName: z.string().nullable().optional(),
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
   createdAt: z.string(),
@@ -1342,6 +1372,55 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: CourseSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Levels routes
+  levels: {
+    create: {
+      method: 'POST',
+      path: '/api/levels',
+      body: CreateLevelSchema,
+      responses: {
+        201: LevelSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/levels',
+      responses: {
+        200: z.array(LevelSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: LevelSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateLevelSchema,
+      responses: {
+        200: LevelSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },
@@ -3153,6 +3232,38 @@ export const contract = c.router({
 
   // Migration routes (one-time use)
   migrations: {
+    addGenderToStudents: {
+      method: 'POST',
+      path: '/api/migrations/add-gender-to-students',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+    createLevelsFeature: {
+      method: 'POST',
+      path: '/api/migrations/create-levels',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
     runInstructorMigration: {
       method: 'POST',
       path: '/api/migrations/add-instructor',

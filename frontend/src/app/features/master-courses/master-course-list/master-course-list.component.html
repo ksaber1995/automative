@@ -18,6 +18,28 @@
   </div>
 
   <p-card>
+    <div class="flex flex-wrap gap-3 mb-4">
+      <p-select
+        [options]="levelOptions()"
+        [ngModel]="selectedLevelId()"
+        (ngModelChange)="selectedLevelId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'MASTER_COURSES.LIST.ALL_LEVELS' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+      @if (selectedLevelId()) {
+        <p-button
+          [label]="'MASTER_COURSES.LIST.CLEAR' | translate"
+          icon="pi pi-times"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="clearFilters()"
+        ></p-button>
+      }
+    </div>
+
     <p-tabs [value]="selectedTab()" (valueChange)="selectedTab.set($any($event))">
       <p-tablist>
         <p-tab value="active">
@@ -56,6 +78,10 @@
             {{ 'MASTER_COURSES.LIST.COL_BRANCH' | translate }}
             <p-sortIcon field="branchName"></p-sortIcon>
           </th>
+          <th pSortableColumn="levelName">
+            {{ 'MASTER_COURSES.LIST.COL_LEVEL' | translate }}
+            <p-sortIcon field="levelName"></p-sortIcon>
+          </th>
           <th pSortableColumn="defaultPrice">{{ 'MASTER_COURSES.LIST.COL_DEFAULT_PRICE' | translate }} <p-sortIcon field="defaultPrice"></p-sortIcon></th>
           <th pSortableColumn="defaultDuration">{{ 'MASTER_COURSES.LIST.COL_DEFAULT_DURATION' | translate }} <p-sortIcon field="defaultDuration"></p-sortIcon></th>
           <th pSortableColumn="linkedCourseCount">{{ 'MASTER_COURSES.LIST.COL_LINKED' | translate }} <p-sortIcon field="linkedCourseCount"></p-sortIcon></th>
@@ -68,6 +94,7 @@
           <td><span class="font-mono">{{ item.code }}</span></td>
           <td class="font-medium">{{ item.name }}</td>
           <td>{{ item.branchName || '—' }}</td>
+          <td>{{ item.levelName || '—' }}</td>
           <td>{{ item.defaultPrice | amount }}</td>
           <td>{{ item.defaultDuration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
           <td>
@@ -148,7 +175,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center py-8">
+          <td colspan="9" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-th-large text-4xl mb-3"></i>
               <p>{{ 'MASTER_COURSES.LIST.EMPTY' | translate }}</p>

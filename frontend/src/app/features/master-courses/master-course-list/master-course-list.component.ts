@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { SelectModule } from 'primeng/select';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
@@ -13,9 +15,11 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { MasterCourseService } from '../services/master-course.service';
+import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { MasterCourse } from '@shared/interfaces/master-course.interface';
+import { Level } from '@shared/interfaces/level.interface';
 
 type MasterCourseRow = MasterCourse & {
   linkedCourseCount?: number;
@@ -31,11 +35,13 @@ type MasterCourseRow = MasterCourse & {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     CardModule,
     TableModule,
     ButtonModule,
     TagModule,
     TooltipModule,
+    SelectModule,
     ConfirmDialogModule,
     DialogModule,
     TabsModule,
@@ -51,6 +57,7 @@ type MasterCourseRow = MasterCourse & {
 })
 export class MasterCourseListComponent implements OnInit {
   private service = inject(MasterCourseService);
+  private levelService = inject(LevelService);
   private router = inject(Router);
   private notifications = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -58,22 +65,40 @@ export class MasterCourseListComponent implements OnInit {
   authService = inject(AuthService);
 
   items = signal<MasterCourseRow[]>([]);
+  levels = signal<Level[]>([]);
   loading = signal(true);
   selectedTab = signal<'active' | 'inactive'>('active');
+  selectedLevelId = signal<string | null>(null);
 
   // Blocker dialog: server returns 409 with `courses` (linked courses still active).
   showBlockerDialog = signal(false);
   blockerName = signal('');
   blockerCourses = signal<{ id: string; name: string; code: string }[]>([]);
 
-  activeCount = computed(() => this.items().filter(i => i.isActive).length);
-  inactiveCount = computed(() => this.items().filter(i => !i.isActive).length);
-  filteredItems = computed(() => {
-    const wantActive = this.selectedTab() === 'active';
-    return this.items().filter(i => i.isActive === wantActive);
+  levelOptions = computed(() => this.levels().map(l => ({ label: l.name, value: l.id })));
+
+  private byLevel = computed(() => {
+    const level = this.selectedLevelId();
+    return this.items().filter(i => level === null ? true : i.levelId === level);
   });
 
-  ngOnInit() { this.load(); }
+  activeCount = computed(() => this.byLevel().filter(i => i.isActive).length);
+  inactiveCount = computed(() => this.byLevel().filter(i => !i.isActive).length);
+  filteredItems = computed(() => {
+    const wantActive = this.selectedTab() === 'active';
+    return this.byLevel().filter(i => i.isActive === wantActive);
+  });
+
+  ngOnInit() {
+    this.load();
+    this.levelService.getAllLevels().subscribe({
+      next: (rows) => this.levels.set(rows),
+    });
+  }
+
+  clearFilters() {
+    this.selectedLevelId.set(null);
+  }
 
   load() {
     this.loading.set(true);

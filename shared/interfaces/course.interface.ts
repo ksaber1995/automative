@@ -10,6 +10,8 @@ export interface Course {
   maxStudents: number | null;
   instructorId: string | null;
   defaultRoomId: string | null;
+  levelId?: string | null;
+  levelName?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +32,7 @@ export interface CourseCreateDto {
   duration: number;
   maxStudents?: number;
   instructorId?: string;
+  levelId?: string | null;
 }
 
 export interface CourseUpdateDto {
@@ -41,5 +44,6 @@ export interface CourseUpdateDto {
   duration?: number;
   maxStudents?: number;
   instructorId?: string;
+  levelId?: string | null;
   isActive?: boolean;
 }

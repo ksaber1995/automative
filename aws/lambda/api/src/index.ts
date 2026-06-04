@@ -16,6 +16,7 @@ import { authRoutes } from './routes/auth';
 import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
+import { levelsRoutes } from './routes/levels';
 import { masterCoursesRoutes } from './routes/master-courses';
 import { masterEnrollmentsRoutes } from './routes/master-enrollments';
 import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments';
@@ -60,6 +61,7 @@ const router = {
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,
+  levels: levelsRoutes,
   masterCourses: { ...masterCoursesRoutes, listEnrollments: masterEnrollmentsRoutes.listByMaster },
   // Route order matters — specific paths first, before `/:id`.
   masterEnrollments: {

@@ -18,6 +18,8 @@ function mapMasterCourseFromDB(row: any) {
     defaultPrice: parseFloat(row.default_price),
     defaultDuration: row.default_duration,
     defaultMaxStudents: row.default_max_students,
+    levelId: row.level_id ?? null,
+    levelName: row.level_name ?? null,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -61,6 +63,7 @@ export const masterCoursesRoutes = {
         default_price: body.defaultPrice,
         default_duration: body.defaultDuration,
         default_max_students: body.defaultMaxStudents || null,
+        level_id: body.levelId || null,
         is_active: true,
       });
 
@@ -82,6 +85,7 @@ export const masterCoursesRoutes = {
         SELECT
           mc.*,
           b.name AS branch_name,
+          l.name AS level_name,
           COUNT(DISTINCT c.id) FILTER (WHERE c.is_active = true) AS linked_course_count,
           COUNT(DISTINCT c.branch_id) FILTER (WHERE c.is_active = true) AS branch_count,
           COUNT(DISTINCT me.id) FILTER (WHERE me.status != 'CANCELLED') AS student_count,
@@ -90,11 +94,12 @@ export const masterCoursesRoutes = {
           COUNT(DISTINCT me.id) FILTER (WHERE me.payment_status = 'PENDING' AND me.status != 'CANCELLED') AS pending_count
         FROM master_courses mc
         LEFT JOIN branches b ON b.id = mc.branch_id
+        LEFT JOIN levels l ON l.id = mc.level_id
         LEFT JOIN master_course_courses mcc ON mcc.master_course_id = mc.id
         LEFT JOIN courses c ON c.id = mcc.course_id
         LEFT JOIN master_enrollments me ON me.master_course_id = mc.id
         WHERE mc.company_id = $1
-        GROUP BY mc.id, b.name
+        GROUP BY mc.id, b.name, l.name
         ORDER BY mc.created_at DESC
       `;
       const rows = await query(sql, [context.companyId]);
@@ -115,9 +120,10 @@ export const masterCoursesRoutes = {
       }
 
       const row = await queryOne(
-        `SELECT mc.*, b.name AS branch_name
+        `SELECT mc.*, b.name AS branch_name, l.name AS level_name
          FROM master_courses mc
          LEFT JOIN branches b ON b.id = mc.branch_id
+         LEFT JOIN levels l ON l.id = mc.level_id
          WHERE mc.id = $1 AND mc.company_id = $2`,
         [params.id, context.companyId]
       );
@@ -202,15 +208,17 @@ export const masterCoursesRoutes = {
       if (body.defaultPrice !== undefined) updateData.default_price = body.defaultPrice;
       if (body.defaultDuration !== undefined) updateData.default_duration = body.defaultDuration;
       if (body.defaultMaxStudents !== undefined) updateData.default_max_students = body.defaultMaxStudents;
+      if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 
       const row = await update('master_courses', params.id, updateData);
       if (!row) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
 
       const withBranch = await queryOne(
-        `SELECT mc.*, b.name AS branch_name
+        `SELECT mc.*, b.name AS branch_name, l.name AS level_name
          FROM master_courses mc
          LEFT JOIN branches b ON b.id = mc.branch_id
+         LEFT JOIN levels l ON l.id = mc.level_id
          WHERE mc.id = $1`,
         [row.id]
       );

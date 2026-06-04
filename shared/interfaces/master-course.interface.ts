@@ -9,6 +9,8 @@ export interface MasterCourse {
   defaultPrice: number;
   defaultDuration: number;
   defaultMaxStudents: number | null;
+  levelId?: string | null;
+  levelName?: string | null;
   isActive: boolean;
   linkedCourseCount?: number;
   branchCount?: number;
@@ -24,6 +26,7 @@ export interface MasterCourseCreateDto {
   defaultPrice: number;
   defaultDuration: number;
   defaultMaxStudents?: number;
+  levelId?: string | null;
 }
 
 export interface MasterCourseUpdateDto {
@@ -33,6 +36,7 @@ export interface MasterCourseUpdateDto {
   defaultPrice?: number;
   defaultDuration?: number;
   defaultMaxStudents?: number;
+  levelId?: string | null;
   isActive?: boolean;
 }
 

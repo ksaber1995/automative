@@ -11,8 +11,10 @@ import { SelectModule } from 'primeng/select';
 import { TranslateModule } from '@ngx-translate/core';
 import { MasterCourseService } from '../services/master-course.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-master-course-form',
@@ -34,6 +36,7 @@ export class MasterCourseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(MasterCourseService);
   private branchService = inject(BranchService);
+  private levelService = inject(LevelService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
@@ -42,6 +45,7 @@ export class MasterCourseFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   branches = signal<Branch[]>([]);
+  levels = signal<Level[]>([]);
   id: string | null = null;
 
   constructor() {
@@ -53,12 +57,16 @@ export class MasterCourseFormComponent implements OnInit {
       defaultPrice: [0, [Validators.required, Validators.min(0)]],
       defaultDuration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
       defaultMaxStudents: [null],
+      levelId: [null],
     });
   }
 
   ngOnInit() {
     this.branchService.getActiveBranches().subscribe({
       next: (rows) => this.branches.set(rows),
+    });
+    this.levelService.getAllLevels().subscribe({
+      next: (rows) => this.levels.set(rows),
     });
     this.id = this.route.snapshot.paramMap.get('id');
     if (this.id) {
@@ -79,6 +87,7 @@ export class MasterCourseFormComponent implements OnInit {
           defaultPrice: row.defaultPrice,
           defaultDuration: row.defaultDuration,
           defaultMaxStudents: row.defaultMaxStudents,
+          levelId: row.levelId || null,
         });
         this.form.get('branchId')?.disable();
         this.loading.set(false);
@@ -106,6 +115,7 @@ export class MasterCourseFormComponent implements OnInit {
         defaultPrice: v.defaultPrice,
         defaultDuration: v.defaultDuration,
         defaultMaxStudents: v.defaultMaxStudents || undefined,
+        levelId: v.levelId || null,
       };
       this.service.update(this.id, updatePayload).subscribe({
         next: () => {
@@ -126,6 +136,7 @@ export class MasterCourseFormComponent implements OnInit {
         defaultPrice: v.defaultPrice,
         defaultDuration: v.defaultDuration,
         defaultMaxStudents: v.defaultMaxStudents || undefined,
+        levelId: v.levelId || null,
       };
       this.service.create(createPayload).subscribe({
         next: () => {

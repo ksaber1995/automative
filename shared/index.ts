@@ -2,6 +2,7 @@
 export * from './interfaces/user.interface';
 export * from './interfaces/branch.interface';
 export * from './interfaces/course.interface';
+export * from './interfaces/level.interface';
 export * from './interfaces/student.interface';
 export * from './interfaces/enrollment.interface';
 export * from './interfaces/employee.interface';

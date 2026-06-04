@@ -13,10 +13,12 @@ import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
+import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
+import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-course-form',
@@ -51,7 +53,9 @@ export class CourseFormComponent implements OnInit {
   branches = signal<Branch[]>([]);
   employees = signal<any[]>([]);
   rooms = signal<Room[]>([]);
+  levels = signal<Level[]>([]);
   private roomService = inject(RoomService);
+  private levelService = inject(LevelService);
 
   constructor() {
     this.courseForm = this.fb.group({
@@ -64,12 +68,14 @@ export class CourseFormComponent implements OnInit {
       maxStudents: [null],
       instructorId: [''],
       defaultRoomId: [null],
+      levelId: [null],
     });
   }
 
   ngOnInit() {
     this.loadBranches();
     this.loadEmployees();
+    this.loadLevels();
     this.courseId = this.route.snapshot.paramMap.get('id');
     if (this.courseId) {
       this.isEditMode.set(true);
@@ -84,6 +90,13 @@ export class CourseFormComponent implements OnInit {
   loadRooms(branchId: string) {
     this.roomService.listActive(branchId).subscribe({
       next: (r) => this.rooms.set(r),
+      error: () => {},
+    });
+  }
+
+  loadLevels() {
+    this.levelService.getAllLevels().subscribe({
+      next: (l) => this.levels.set(l),
       error: () => {},
     });
   }
@@ -129,6 +142,7 @@ export class CourseFormComponent implements OnInit {
           maxStudents: course.maxStudents,
           instructorId: course.instructorId || '',
           defaultRoomId: (course as any).defaultRoomId || null,
+          levelId: course.levelId || null,
         });
         // Load rooms for the selected branch
         if (course.branchId) this.loadRooms(course.branchId);

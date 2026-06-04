@@ -18,7 +18,18 @@
         [style]="{ minWidth: '200px' }"
       ></p-select>
 
-      @if (selectedBranchId()) {
+      <p-select
+        [options]="levelOptions()"
+        [ngModel]="selectedLevelId()"
+        (ngModelChange)="selectedLevelId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'COURSES.LIST.ALL_LEVELS' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      @if (selectedBranchId() || selectedLevelId()) {
         <p-button
           [label]="'COURSES.LIST.CLEAR' | translate"
           icon="pi pi-times"
@@ -61,6 +72,7 @@
           <th pSortableColumn="code">{{ 'COURSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
           <th pSortableColumn="duration">{{ 'COURSES.LIST.COL_DURATION' | translate }}</th>
           <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
           <th pSortableColumn="maxStudents">{{ 'COURSES.LIST.COL_MAX_STUDENTS' | translate }} <p-sortIcon field="maxStudents"></p-sortIcon></th>
@@ -73,6 +85,7 @@
           <td>{{ course.code }}</td>
           <td>{{ course.name }}</td>
           <td>{{ getBranchName(course.branchId) }}</td>
+          <td>{{ course.levelName || '—' }}</td>
           <td>{{ course.duration }} {{ 'COURSES.LIST.WEEKS' | translate }}</td>
           <td>{{ course.price | amount }}</td>
           <td>{{ course.maxStudents || ('COURSES.LIST.UNLIMITED' | translate) }}</td>
@@ -158,7 +171,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center py-8">
+          <td colspan="9" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>

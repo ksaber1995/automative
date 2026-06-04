@@ -43,6 +43,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/master-courses/master-courses.routes').then(m => m.MASTER_COURSES_ROUTES)
       },
       {
+        path: 'levels',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.LEVELS' },
+        loadComponent: () => import('./features/levels/level-list/level-list.component').then(m => m.LevelListComponent)
+      },
+      {
         path: 'events',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.EVENTS' },

@@ -64,6 +64,22 @@
 
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'MASTER_COURSES.FORM.LEVEL' | translate }}
+            </label>
+            <p-select
+              formControlName="levelId"
+              [options]="levels()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="'MASTER_COURSES.FORM.SELECT_LEVEL' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+              appendTo="body"
+            ></p-select>
+          </div>
+
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'MASTER_COURSES.FORM.DESCRIPTION' | translate }}
             </label>
             <textarea pTextarea formControlName="description" rows="4" class="w-full"></textarea>

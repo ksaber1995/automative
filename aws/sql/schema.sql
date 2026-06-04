@@ -151,6 +151,22 @@ CREATE INDEX idx_branches_manager_id ON branches(manager_id);
 ALTER TABLE users ADD CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL;
 
 -- =============================================
+-- LEVELS TABLE  (migration 026)
+-- Company-wide catalog of skill/age levels. Courses and master courses may
+-- optionally be tagged with one level (courses.level_id / master_courses.level_id).
+-- =============================================
+CREATE TABLE levels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    age INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_levels_company_id ON levels(company_id);
+
+-- =============================================
 -- COURSES TABLE
 -- =============================================
 -- =============================================
@@ -169,6 +185,7 @@ CREATE TABLE master_courses (
     default_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
     default_duration INTEGER NOT NULL DEFAULT 8,
     default_max_students INTEGER,
+    level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -177,6 +194,7 @@ CREATE TABLE master_courses (
 
 CREATE INDEX idx_master_courses_company ON master_courses(company_id);
 CREATE INDEX idx_master_courses_branch ON master_courses(branch_id);
+CREATE INDEX idx_master_courses_level_id ON master_courses(level_id);
 
 -- =============================================
 -- MASTER ENROLLMENTS TABLE
@@ -265,6 +283,7 @@ CREATE TABLE courses (
     duration INTEGER NOT NULL,
     max_students INTEGER,
     instructor_id UUID,
+    level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -276,6 +295,7 @@ CREATE TABLE courses (
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX idx_courses_company_id ON courses(company_id);
 CREATE INDEX idx_courses_code ON courses(code);
+CREATE INDEX idx_courses_level_id ON courses(level_id);
 
 CREATE TABLE master_course_courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -329,6 +349,7 @@ CREATE TABLE students (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     date_of_birth DATE,
+    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE')),
     email VARCHAR(255),
     phone VARCHAR(50),
     parent_name VARCHAR(200),
@@ -1048,6 +1069,7 @@ CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH R
 CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_levels_updated_at BEFORE UPDATE ON levels FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_courses_updated_at BEFORE UPDATE ON master_courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_enrollments_updated_at BEFORE UPDATE ON master_enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_master_class_enrollments_updated_at BEFORE UPDATE ON master_class_enrollments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

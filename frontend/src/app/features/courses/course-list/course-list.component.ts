@@ -16,10 +16,12 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-course-list',
@@ -49,6 +51,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 export class CourseListComponent implements OnInit {
   private courseService = inject(CourseService);
   private branchService = inject(BranchService);
+  private levelService = inject(LevelService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -56,9 +59,11 @@ export class CourseListComponent implements OnInit {
 
   courses = signal<CourseWithEnrollmentCount[]>([]);
   branches = signal<Branch[]>([]);
+  levels = signal<Level[]>([]);
   loading = signal(true);
 
   selectedBranchId = signal<string | null>(null);
+  selectedLevelId = signal<string | null>(null);
   selectedTab = signal<'active' | 'inactive'>('active');
 
   // Blocker dialog shown when the API returns a 409 with the list of classes
@@ -75,15 +80,21 @@ export class CourseListComponent implements OnInit {
     ...this.branches().map(b => ({ label: b.name, value: b.id })),
   ]);
 
+  levelOptions = computed(() => this.levels().map(l => ({ label: l.name, value: l.id })));
+
   activeCount = computed(() => this.byBranch().filter(c => c.isActive).length);
   inactiveCount = computed(() => this.byBranch().filter(c => !c.isActive).length);
 
   private byBranch = computed(() => {
     const branch = this.selectedBranchId();
+    const level = this.selectedLevelId();
     return this.courses().filter(c => {
-      if (branch === null) return true;
-      if (branch === '__global__') return c.branchId === null;
-      return c.branchId === branch;
+      const branchMatch =
+        branch === null ? true :
+        branch === '__global__' ? c.branchId === null :
+        c.branchId === branch;
+      const levelMatch = level === null ? true : c.levelId === level;
+      return branchMatch && levelMatch;
     });
   });
 
@@ -96,6 +107,9 @@ export class CourseListComponent implements OnInit {
     this.loadCourses();
     this.branchService.getAllBranches().subscribe({
       next: (branches) => this.branches.set(branches),
+    });
+    this.levelService.getAllLevels().subscribe({
+      next: (levels) => this.levels.set(levels),
     });
   }
 
@@ -120,6 +134,7 @@ export class CourseListComponent implements OnInit {
 
   clearFilters() {
     this.selectedBranchId.set(null);
+    this.selectedLevelId.set(null);
   }
 
   viewCourse(course: CourseWithEnrollmentCount) {

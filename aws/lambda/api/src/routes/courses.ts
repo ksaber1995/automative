@@ -14,6 +14,8 @@ function mapCourseFromDB(row: any) {
     duration: row.duration,
     maxStudents: row.max_students,
     instructorId: row.instructor_id,
+    levelId: row.level_id ?? null,
+    levelName: row.level_name ?? null,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -53,6 +55,7 @@ export const coursesRoutes = {
         duration: body.duration,
         max_students: body.maxStudents || null,
         instructor_id: body.instructorId || null,
+        level_id: body.levelId || null,
         is_active: true,
       });
 
@@ -76,9 +79,11 @@ export const coursesRoutes = {
       let sql = `
         SELECT
           c.*,
+          l.name as level_name,
           COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as direct_enrollment_count,
           COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
+        LEFT JOIN levels l ON c.level_id = l.id
         LEFT JOIN enrollments e ON c.id = e.course_id AND e.status != 'DROPPED'
         LEFT JOIN master_class_enrollments mce ON c.id = mce.course_id AND mce.status != 'DROPPED'
         WHERE c.company_id = $1
@@ -96,7 +101,7 @@ export const coursesRoutes = {
         if (branchClause) sql += ` AND ${branchClause}`;
       }
 
-      sql += ' GROUP BY c.id ORDER BY c.created_at DESC';
+      sql += ' GROUP BY c.id, l.name ORDER BY c.created_at DESC';
 
       const courses = await query(sql, params);
       return {
@@ -151,7 +156,10 @@ export const coursesRoutes = {
       }
 
       const course = await queryOne(
-        'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
+        `SELECT c.*, l.name as level_name
+         FROM courses c
+         LEFT JOIN levels l ON c.level_id = l.id
+         WHERE c.id = $1 AND c.company_id = $2`,
         [params.id, context.companyId]
       );
 
@@ -208,6 +216,7 @@ export const coursesRoutes = {
       if (body.duration !== undefined) updateData.duration = body.duration;
       if (body.maxStudents !== undefined) updateData.max_students = body.maxStudents;
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
+      if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
 
       const course = await update('courses', params.id, updateData);
 

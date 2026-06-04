@@ -156,6 +156,23 @@
             <small class="text-gray-400">{{ 'COURSES.FORM.DEFAULT_ROOM_HINT' | translate }}</small>
           </div>
 
+          <!-- Level -->
+          <div class="col-span-2">
+            <label for="levelId" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.LEVEL_LABEL' | translate }}
+            </label>
+            <p-select
+              id="levelId"
+              formControlName="levelId"
+              [options]="levels()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="'COURSES.FORM.LEVEL_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+            ></p-select>
+          </div>
+
           <!-- Description -->
           <div class="col-span-2">
             <label for="description" class="block text-sm font-medium text-gray-700 mb-2">

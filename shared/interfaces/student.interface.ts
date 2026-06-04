@@ -17,12 +17,15 @@ export const ACQUISITION_CHANNELS: AcquisitionChannel[] = [
   'OTHER',
 ];
 
+export type Gender = 'MALE' | 'FEMALE';
+
 export interface Student {
   id: string;
   companyId: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;
+  gender?: Gender | null;
   email?: string;
   phone?: string;
   parentName: string;
@@ -45,6 +48,7 @@ export interface StudentCreateDto {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
+  gender?: Gender;
   email?: string;
   phone?: string;
   parentName: string;
@@ -61,6 +65,7 @@ export interface StudentUpdateDto {
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
+  gender?: Gender | null;
   email?: string;
   phone?: string;
   parentName?: string;

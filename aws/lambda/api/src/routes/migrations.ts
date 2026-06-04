@@ -1049,7 +1049,112 @@ async function addAcquisitionChannelToStudents() {
   return { success: true, message: 'acquisition_channel column ensured on students' };
 }
 
+async function createLevelsFeature() {
+  console.log('Starting migration: levels table + course/master_course level_id');
+
+  // 1) levels table
+  await query(`
+    CREATE TABLE IF NOT EXISTS levels (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      age INTEGER,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_levels_company_id ON levels(company_id)`);
+  await query(`DROP TRIGGER IF EXISTS update_levels_updated_at ON levels`);
+  await query(`
+    CREATE TRIGGER update_levels_updated_at
+      BEFORE UPDATE ON levels
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+  `);
+  console.log('✓ levels table ready');
+
+  // 2) courses.level_id
+  await query(`
+    ALTER TABLE courses
+      ADD COLUMN IF NOT EXISTS level_id UUID REFERENCES levels(id) ON DELETE SET NULL
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_courses_level_id ON courses(level_id)`);
+  console.log('✓ courses.level_id ready');
+
+  // 3) master_courses.level_id
+  await query(`
+    ALTER TABLE master_courses
+      ADD COLUMN IF NOT EXISTS level_id UUID REFERENCES levels(id) ON DELETE SET NULL
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_master_courses_level_id ON master_courses(level_id)`);
+  console.log('✓ master_courses.level_id ready');
+
+  console.log('✅ levels migration completed!');
+  return { success: true, message: 'levels table created; level_id added to courses and master_courses' };
+}
+
+async function addGenderToStudents() {
+  console.log('Starting migration: add gender to students');
+
+  await query(`
+    ALTER TABLE students
+      ADD COLUMN IF NOT EXISTS gender VARCHAR(10)
+  `);
+
+  // Backfill all existing rows to MALE before adding the CHECK constraint.
+  const backfilled = await query(`
+    UPDATE students SET gender = 'MALE' WHERE gender IS NULL RETURNING id
+  `);
+  console.log(`✓ Backfilled ${backfilled.length} student(s) to gender = MALE`);
+
+  // Add the CHECK constraint if it isn't there yet.
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'students' AND constraint_name = 'students_gender_check'
+      ) THEN
+        ALTER TABLE students
+          ADD CONSTRAINT students_gender_check CHECK (gender IN ('MALE', 'FEMALE'));
+      END IF;
+    END$$;
+  `);
+
+  console.log('✅ students.gender migration completed!');
+  return { success: true, message: `students.gender ready; ${backfilled.length} existing row(s) set to MALE` };
+}
+
 export const migrationsRoutes = {
+  addGenderToStudents: async () => {
+    try {
+      const result = await addGenderToStudents();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createLevelsFeature: async () => {
+    try {
+      const result = await createLevelsFeature();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   addAcquisitionChannelToStudents: async () => {
     try {
       const result = await addAcquisitionChannelToStudents();

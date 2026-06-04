@@ -9,6 +9,7 @@ function mapStudentFromDB(row: any) {
     firstName: row.first_name,
     lastName: row.last_name,
     dateOfBirth: row.date_of_birth,
+    gender: row.gender,
     email: row.email,
     phone: row.phone,
     parentName: row.parent_name,
@@ -54,6 +55,7 @@ export const studentsRoutes = {
         first_name: body.firstName,
         last_name: body.lastName,
         date_of_birth: body.dateOfBirth || null,
+        gender: body.gender || null,
         email: body.email || null,
         phone: body.phone || null,
         parent_name: body.parentName,
@@ -168,6 +170,7 @@ export const studentsRoutes = {
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
       if (body.lastName !== undefined) updateData.last_name = body.lastName;
       if (body.dateOfBirth !== undefined) updateData.date_of_birth = body.dateOfBirth;
+      if (body.gender !== undefined) updateData.gender = body.gender || null;
       if (body.email !== undefined) updateData.email = body.email;
       if (body.phone !== undefined) updateData.phone = body.phone;
       if (body.parentName !== undefined) updateData.parent_name = body.parentName;

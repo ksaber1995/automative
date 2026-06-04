@@ -1,0 +1,127 @@
+<div class="container-custom py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'LEVELS.LIST.TITLE' | translate }}</h1>
+    @if (authService.canWrite('academy')) {
+      <p-button [label]="'LEVELS.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="openCreate()"></p-button>
+    }
+  </div>
+
+  <p-card>
+    <p-table
+      [value]="levels()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="name">{{ 'LEVELS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="age">{{ 'LEVELS.LIST.COL_AGE' | translate }} <p-sortIcon field="age"></p-sortIcon></th>
+          <th>{{ 'LEVELS.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-level>
+        <tr>
+          <td>{{ level.name }}</td>
+          <td>{{ level.age ?? ('LEVELS.LIST.NO_AGE' | translate) }}</td>
+          <td>
+            <div class="flex gap-2">
+              @if (authService.canWrite('academy')) {
+                <p-button
+                  icon="pi pi-pencil"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  (onClick)="openEdit(level)"
+                  [pTooltip]="'LEVELS.LIST.EDIT' | translate"
+                ></p-button>
+              }
+              @if (authService.canDelete('academy')) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="deleteLevel(level)"
+                  [pTooltip]="'LEVELS.LIST.DELETE' | translate"
+                ></p-button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="3" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-inbox text-4xl mb-3"></i>
+              <p>{{ 'LEVELS.LIST.NO_LEVELS' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <p-dialog
+    [visible]="showDialog()"
+    (visibleChange)="showDialog.set($event)"
+    [modal]="true"
+    [style]="{ width: '420px' }"
+    [header]="(isEditMode() ? 'LEVELS.FORM.EDIT_TITLE' : 'LEVELS.FORM.CREATE_TITLE') | translate"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="flex flex-col gap-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LEVELS.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <input
+            pInputText
+            id="name"
+            formControlName="name"
+            [placeholder]="'LEVELS.FORM.NAME_PLACEHOLDER' | translate"
+            class="w-full"
+            [class.border-red-500]="name?.invalid && name?.touched"
+          />
+          @if (name?.invalid && name?.touched) {
+            <small class="text-red-500">{{ 'LEVELS.FORM.NAME_REQUIRED' | translate }}</small>
+          }
+        </div>
+
+        <div>
+          <label for="age" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LEVELS.FORM.AGE_LABEL' | translate }}
+          </label>
+          <p-inputnumber
+            id="age"
+            formControlName="age"
+            [min]="0"
+            [max]="120"
+            [placeholder]="'LEVELS.FORM.AGE_PLACEHOLDER' | translate"
+            [style]="{ width: '100%' }"
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <p-button
+          [label]="'LEVELS.FORM.CANCEL' | translate"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="closeDialog()"
+          type="button"
+        ></p-button>
+        <p-button
+          [label]="(isEditMode() ? 'LEVELS.FORM.UPDATE' : 'LEVELS.FORM.CREATE') | translate"
+          type="submit"
+          [loading]="saving()"
+          [disabled]="form.invalid"
+        ></p-button>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

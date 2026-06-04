@@ -74,6 +74,30 @@
             }
           </div>
 
+          <!-- Gender -->
+          <div class="field">
+            <label for="gender" class="block text-sm font-medium mb-2">
+              {{ 'STUDENTS.FORM.GENDER' | translate }}
+            </label>
+            <p-select
+              inputId="gender"
+              formControlName="gender"
+              [options]="genderOptions"
+              optionLabel="label"
+              optionValue="value"
+              [showClear]="true"
+              [placeholder]="'STUDENTS.FORM.GENDER_PLACEHOLDER' | translate"
+              [style]="{'width': '100%'}"
+            >
+              <ng-template let-option pTemplate="item">
+                {{ option.label | translate }}
+              </ng-template>
+              <ng-template let-selected pTemplate="selectedItem">
+                @if (selected) { {{ selected.label | translate }} }
+              </ng-template>
+            </p-select>
+          </div>
+
           <!-- Branch -->
           <div class="field">
             <label for="branchId" class="block text-sm font-medium mb-2">

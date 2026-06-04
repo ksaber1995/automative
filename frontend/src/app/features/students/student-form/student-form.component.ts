@@ -52,12 +52,18 @@ export class StudentFormComponent implements OnInit {
     label: `STUDENTS.FORM.CHANNEL_${value}`,
   }));
 
+  genderOptions = [
+    { value: 'MALE', label: 'STUDENTS.FORM.GENDER_MALE' },
+    { value: 'FEMALE', label: 'STUDENTS.FORM.GENDER_FEMALE' },
+  ];
+
   constructor() {
     const today = new Date();
     this.studentForm = this.fb.group({
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
       dateOfBirth: [null],
+      gender: [null],
       email: ['', [Validators.email]],
       phone: [''],
       parentName: ['', [Validators.required]],
