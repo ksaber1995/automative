@@ -267,18 +267,18 @@ const GenderSchema = z.enum(['MALE', 'FEMALE']);
 const CreateStudentSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
-  dateOfBirth: z.string().optional(),
-  gender: GenderSchema.optional(),
-  email: z.union([z.string().email(), z.literal('')]).optional(),
-  phone: z.string().optional(),
+  dateOfBirth: z.string().nullable().optional(),
+  gender: GenderSchema.nullable().optional(),
+  email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
+  phone: z.string().nullable().optional(),
   parentName: z.string(),
   parentPhone: z.string(),
-  parentEmail: z.union([z.string().email(), z.literal('')]).optional(),
-  address: z.string().optional(),
+  parentEmail: z.union([z.string().email(), z.literal('')]).nullable().optional(),
+  address: z.string().nullable().optional(),
   branchId: UUIDSchema,
   enrollmentDate: z.string(),
-  notes: z.string().optional(),
-  acquisitionChannel: AcquisitionChannelSchema.optional(),
+  notes: z.string().nullable().optional(),
+  acquisitionChannel: AcquisitionChannelSchema.nullable().optional(),
 });
 
 const UpdateStudentSchema = CreateStudentSchema.partial();
