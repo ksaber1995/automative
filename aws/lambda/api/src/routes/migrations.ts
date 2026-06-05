@@ -1052,6 +1052,18 @@ async function addAcquisitionChannelToStudents() {
 async function createLevelsFeature() {
   console.log('Starting migration: levels table + course/master_course level_id');
 
+  // 0) Ensure the shared updated_at trigger function exists (some DBs were
+  //    initialized without it). Idempotent via CREATE OR REPLACE.
+  await query(`
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql'
+  `);
+
   // 1) levels table
   await query(`
     CREATE TABLE IF NOT EXISTS levels (
