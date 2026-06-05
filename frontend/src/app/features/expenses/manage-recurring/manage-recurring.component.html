@@ -3,8 +3,8 @@
   <div class="flex items-center gap-4 mb-6">
     <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()"></p-button>
     <div class="flex-1">
-      <h1 class="text-3xl font-bold text-gray-900">Manage Recurring Expenses</h1>
-      <p class="text-gray-500 mt-1">{{ displayMonth() }} — review and pay recurring obligations</p>
+      <h1 class="text-3xl font-bold text-gray-900">{{ 'EXPENSES.MANAGE_RECURRING.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ displayMonth() }} — {{ 'EXPENSES.MANAGE_RECURRING.SUBTITLE' | translate }}</p>
     </div>
   </div>
 
@@ -12,35 +12,35 @@
   <p-card styleClass="mb-6">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Month</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.MANAGE_RECURRING.MONTH' | translate }}</label>
         <p-datepicker
           [(ngModel)]="selectedMonth"
           view="month"
           dateFormat="yy-mm"
           [showIcon]="true"
-          placeholder="Select month"
+          [placeholder]="'EXPENSES.MANAGE_RECURRING.SELECT_MONTH' | translate"
           (onSelect)="onMonthChange()"
           [style]="{ width: '100%' }"
         ></p-datepicker>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.MANAGE_RECURRING.PAYMENT_DATE' | translate }}</label>
         <p-datepicker
           [(ngModel)]="paymentDate"
           [showIcon]="true"
           dateFormat="yy-mm-dd"
-          placeholder="Date to record payment"
+          [placeholder]="'EXPENSES.MANAGE_RECURRING.PAYMENT_DATE_PLACEHOLDER' | translate"
           [style]="{ width: '100%' }"
         ></p-datepicker>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Branch</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.MANAGE_RECURRING.BRANCH' | translate }}</label>
         <p-select
           [(ngModel)]="selectedBranchId"
           [options]="branchOptions()"
           optionLabel="label"
           optionValue="value"
-          placeholder="All branches"
+          [placeholder]="'EXPENSES.MANAGE_RECURRING.ALL_BRANCHES' | translate"
           [style]="{ width: '100%' }"
           (onChange)="applyBranchFilter()"
         ></p-select>
@@ -52,19 +52,19 @@
   @if (!loading()) {
     <div class="grid grid-cols-4 gap-4 mb-6">
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-        <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Recurring</p>
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'EXPENSES.MANAGE_RECURRING.TOTAL_RECURRING' | translate }}</p>
         <p class="text-3xl font-bold text-gray-800">{{ filteredRows().length }}</p>
       </div>
       <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-        <p class="text-xs text-red-600 uppercase tracking-wider mb-1">Unpaid</p>
+        <p class="text-xs text-red-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.MANAGE_RECURRING.UNPAID' | translate }}</p>
         <p class="text-3xl font-bold text-red-700">{{ unpaidRows().length }}</p>
       </div>
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-        <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">Selected</p>
+        <p class="text-xs text-blue-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.MANAGE_RECURRING.SELECTED' | translate }}</p>
         <p class="text-3xl font-bold text-blue-700">{{ selectedIds().size }}</p>
       </div>
       <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-        <p class="text-xs text-green-600 uppercase tracking-wider mb-1">Selected Total</p>
+        <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ 'EXPENSES.MANAGE_RECURRING.SELECTED_TOTAL' | translate }}</p>
         <p class="text-3xl font-bold text-green-700">{{ selectedTotal() | amount }}</p>
       </div>
     </div>
@@ -82,12 +82,14 @@
             [indeterminate]="someSelected()"
           ></p-checkbox>
           <span class="text-sm text-gray-600">
-            {{ selectedIds().size > 0 ? selectedIds().size + ' selected' : 'Select unpaid to pay' }}
+            {{ selectedIds().size > 0
+              ? ('EXPENSES.MANAGE_RECURRING.N_SELECTED' | translate: { count: selectedIds().size })
+              : ('EXPENSES.MANAGE_RECURRING.SELECT_HINT' | translate) }}
           </span>
         </div>
         <div class="flex gap-2">
           <p-button
-            label="Pay Selected"
+            [label]="'EXPENSES.MANAGE_RECURRING.PAY_SELECTED' | translate"
             icon="pi pi-check"
             severity="success"
             [outlined]="true"
@@ -96,7 +98,7 @@
             (onClick)="paySelected()"
           ></p-button>
           <p-button
-            label="Pay All Unpaid"
+            [label]="'EXPENSES.MANAGE_RECURRING.PAY_ALL_UNPAID' | translate"
             icon="pi pi-check-circle"
             severity="warn"
             [disabled]="unpaidRows().length === 0 || paying()"
@@ -111,13 +113,13 @@
       <ng-template pTemplate="header">
         <tr>
           <th style="width: 48px"></th>
-          <th pSortableColumn="template.description">Description <p-sortIcon field="template.description"></p-sortIcon></th>
-          <th pSortableColumn="template.category">Category <p-sortIcon field="template.category"></p-sortIcon></th>
-          <th pSortableColumn="template.branchId">Branch <p-sortIcon field="template.branchId"></p-sortIcon></th>
-          <th class="text-right" pSortableColumn="template.amount">Expected <p-sortIcon field="template.amount"></p-sortIcon></th>
-          <th class="text-right" style="width: 140px">Pay Amount</th>
-          <th style="width: 180px">Notes</th>
-          <th pSortableColumn="payment">Status <p-sortIcon field="payment"></p-sortIcon></th>
+          <th pSortableColumn="template.description">{{ 'EXPENSES.MANAGE_RECURRING.COL_DESCRIPTION' | translate }} <p-sortIcon field="template.description"></p-sortIcon></th>
+          <th pSortableColumn="template.category">{{ 'EXPENSES.MANAGE_RECURRING.COL_CATEGORY' | translate }} <p-sortIcon field="template.category"></p-sortIcon></th>
+          <th pSortableColumn="template.branchId">{{ 'EXPENSES.MANAGE_RECURRING.COL_BRANCH' | translate }} <p-sortIcon field="template.branchId"></p-sortIcon></th>
+          <th class="text-right" pSortableColumn="template.amount">{{ 'EXPENSES.MANAGE_RECURRING.COL_EXPECTED' | translate }} <p-sortIcon field="template.amount"></p-sortIcon></th>
+          <th class="text-right" style="width: 140px">{{ 'EXPENSES.MANAGE_RECURRING.COL_PAY_AMOUNT' | translate }}</th>
+          <th style="width: 180px">{{ 'EXPENSES.MANAGE_RECURRING.COL_NOTES' | translate }}</th>
+          <th pSortableColumn="payment">{{ 'EXPENSES.MANAGE_RECURRING.COL_STATUS' | translate }} <p-sortIcon field="payment"></p-sortIcon></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>
@@ -135,7 +137,7 @@
             <span class="font-medium">{{ row.template.description }}</span>
           </td>
           <td>
-            <span class="text-sm text-gray-600">{{ row.template.category }}</span>
+            <span class="text-sm text-gray-600">{{ row.template.category ? (('EXPENSES.CATEGORY_VALUES.' + row.template.category) | translate) : '—' }}</span>
           </td>
           <td>
             <span class="text-sm text-gray-600">{{ getBranchName(row.template.branchId) }}</span>
@@ -160,7 +162,7 @@
               <input
                 pInputText
                 [(ngModel)]="row.notes"
-                placeholder="Notes (optional)"
+                [placeholder]="'EXPENSES.MANAGE_RECURRING.NOTES_PLACEHOLDER' | translate"
                 class="w-full text-sm"
               />
             } @else {
@@ -170,11 +172,11 @@
           <td>
             @if (row.payment) {
               <div>
-                <p-tag value="Paid" severity="success" icon="pi pi-check"></p-tag>
+                <p-tag [value]="'EXPENSES.MANAGE_RECURRING.PAID' | translate" severity="success" icon="pi pi-check"></p-tag>
                 <p class="text-xs text-gray-400 mt-1">{{ row.payment.date | date:'mediumDate' }}</p>
               </div>
             } @else {
-              <p-tag value="Unpaid" severity="danger"></p-tag>
+              <p-tag [value]="'EXPENSES.MANAGE_RECURRING.UNPAID_TAG' | translate" severity="danger"></p-tag>
             }
           </td>
         </tr>
@@ -187,8 +189,8 @@
                 <i class="pi pi-spin pi-spinner text-4xl"></i>
               } @else {
                 <i class="pi pi-check-circle text-4xl mb-3 text-green-400"></i>
-                <p class="text-lg font-medium text-green-600">All caught up for {{ displayMonth() }}</p>
-                <p class="text-sm mt-1">No recurring expenses found or all are paid.</p>
+                <p class="text-lg font-medium text-green-600">{{ 'EXPENSES.MANAGE_RECURRING.ALL_CAUGHT_UP' | translate }} {{ displayMonth() }}</p>
+                <p class="text-sm mt-1">{{ 'EXPENSES.MANAGE_RECURRING.NO_RECURRING' | translate }}</p>
               }
             </div>
           </td>

@@ -533,10 +533,21 @@ export const reportsRoutes = {
                AND me.amount_paid > 0
                AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            ), 0) AS master_revenue,
+           -- Refunds attributable to this branch. Most refunds have a NULL
+           -- branch_id and are linked via enrollment / master enrollment /
+           -- product sale / event subscription, so attribute through those
+           -- links and only fall back to the refund's own branch_id. Matching
+           -- solely on rf.branch_id missed almost all refunds, so branch net
+           -- profit was overstated.
            COALESCE((
              SELECT SUM(rf.amount) FROM refunds rf
-             WHERE rf.branch_id = b.id AND rf.company_id = $1
+             LEFT JOIN enrollments e2 ON rf.enrollment_id = e2.id
+             LEFT JOIN master_enrollments me2 ON rf.master_enrollment_id = me2.id
+             LEFT JOIN product_sales ps2 ON rf.product_sale_id = ps2.id
+             LEFT JOIN event_subscriptions es2 ON rf.subscription_id = es2.id
+             WHERE rf.company_id = $1
                AND rf.refund_date >= $2 AND rf.refund_date <= $3
+               AND COALESCE(e2.branch_id, me2.branch_id, ps2.branch_id, es2.branch_id, rf.branch_id) = b.id
            ), 0) AS refunds,
            COALESCE((
              SELECT SUM(ep.amount) FROM expense_payments ep

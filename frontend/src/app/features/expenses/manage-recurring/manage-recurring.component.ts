@@ -58,7 +58,7 @@ export class ManageRecurringComponent implements OnInit {
   selectedIds = signal<Set<string>>(new Set());
 
   branchOptions = computed(() => [
-    { label: 'All Branches', value: null },
+    { label: this.translate.instant('EXPENSES.MANAGE_RECURRING.ALL_BRANCHES'), value: null },
     ...this.branches().map(b => ({ label: b.name, value: b.id }))
   ]);
 
@@ -206,8 +206,8 @@ export class ManageRecurringComponent implements OnInit {
   }
 
   getBranchName(branchId?: string | null): string {
-    if (!branchId) return 'Global';
-    return this.branches().find(b => b.id === branchId)?.name || 'Unknown';
+    if (!branchId) return this.translate.instant('EXPENSES.MANAGE_RECURRING.GLOBAL_BRANCH');
+    return this.branches().find(b => b.id === branchId)?.name || this.translate.instant('EXPENSES.MANAGE_RECURRING.UNKNOWN_BRANCH');
   }
 
   formatMonth(date: Date): string {

@@ -433,7 +433,7 @@
           <ng-template pTemplate="body" let-p>
             <tr [class.opacity-50]="p.alreadyPaid">
               <td class="font-medium">{{ p.monthLabel }}</td>
-              <td class="text-xs text-gray-500">{{ p.startDate }} → {{ p.endDate }}</td>
+              <td class="text-xs text-gray-500">{{ p.startDate | date: 'MMM d, y' }} → {{ p.endDate | date: 'MMM d, y' }}</td>
               <td class="text-right">{{ p.daysWorked }} / {{ p.daysInMonth }}</td>
               <td class="text-right font-semibold">{{ p.amount | number:'1.2-2' }}</td>
               <td>

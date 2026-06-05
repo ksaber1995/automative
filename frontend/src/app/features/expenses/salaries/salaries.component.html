@@ -316,7 +316,7 @@
       </ng-template>
       <ng-template pTemplate="body" let-p>
         <tr>
-          <td class="whitespace-nowrap">{{ p.date }}</td>
+          <td class="whitespace-nowrap">{{ p.date | date: 'MMM d, y' }}</td>
           <td class="font-medium">{{ getEmployeeName(p.employeeId) }}</td>
           <td>{{ getBranchName(p.branchId) || ('EXPENSES.SALARIES.BRANCH_NA' | translate) }}</td>
           <td class="text-right text-gray-700">{{ getBasePaid(p) | amount }}</td>
