@@ -63,7 +63,7 @@
   <p-tabs [value]="activeStatus()" (valueChange)="onStatusTabChange($event)" styleClass="mb-4">
     <p-tablist>
       <p-tab value="IN_PROGRESS">
-        <i class="pi pi-spin pi-spinner mr-2"></i>{{ 'CLASSES.LIST.STATUS_IN_PROGRESS' | translate }}
+        <i class="pi pi-play-circle mr-2"></i>{{ 'CLASSES.LIST.STATUS_IN_PROGRESS' | translate }}
         <span class="ml-2 text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">{{ countByStatus('IN_PROGRESS') }}</span>
       </p-tab>
       <p-tab value="SCHEDULED">

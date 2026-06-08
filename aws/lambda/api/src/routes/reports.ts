@@ -97,9 +97,12 @@ export const reportsRoutes = {
            )::date AS month_start
          ),
          enroll_rev AS (
+           -- Include REFUNDED: amount_paid survives a refund (only total_refunded
+           -- grows), so it's real collected revenue. The refund_amt CTE subtracts
+           -- it once below; excluding REFUNDED here would double-count the loss.
            SELECT date_trunc('month', enrollment_date)::date AS m, SUM(amount_paid) AS amt
            FROM enrollments
-           WHERE company_id = $1 AND payment_status IN ('PAID','PARTIAL')
+           WHERE company_id = $1 AND payment_status IN ('PAID','PARTIAL','REFUNDED')
              AND enrollment_date >= $2 AND enrollment_date <= $3 ${branchClause}
            GROUP BY 1
          ),
@@ -114,6 +117,13 @@ export const reportsRoutes = {
            FROM master_enrollments
            WHERE company_id = $1 AND amount_paid > 0
              AND enrollment_date >= $2 AND enrollment_date <= $3 ${branchClause}
+           GROUP BY 1
+         ),
+         sub_rev AS (
+           SELECT date_trunc('month', paid_date)::date AS m, SUM(amount_paid) AS amt
+           FROM monthly_subscription_payments
+           WHERE company_id = $1 AND amount_paid > 0
+             AND paid_date >= $2 AND paid_date <= $3 ${branchClause}
            GROUP BY 1
          ),
          refund_amt AS (
@@ -133,12 +143,14 @@ export const reportsRoutes = {
            COALESCE(enroll_rev.amt, 0) AS enrollment_revenue,
            COALESCE(product_rev.amt, 0) AS product_revenue,
            COALESCE(master_rev.amt, 0) AS master_revenue,
+           COALESCE(sub_rev.amt, 0) AS subscription_revenue,
            COALESCE(refund_amt.amt, 0) AS refunds,
            COALESCE(expense_amt.amt, 0) AS expenses
          FROM months
          LEFT JOIN enroll_rev ON enroll_rev.m = months.month_start
          LEFT JOIN product_rev ON product_rev.m = months.month_start
          LEFT JOIN master_rev ON master_rev.m = months.month_start
+         LEFT JOIN sub_rev ON sub_rev.m = months.month_start
          LEFT JOIN refund_amt ON refund_amt.m = months.month_start
          LEFT JOIN expense_amt ON expense_amt.m = months.month_start
          ORDER BY months.month_start ASC`,
@@ -149,9 +161,10 @@ export const reportsRoutes = {
         const enrollmentRevenue = parseFloat(r.enrollment_revenue);
         const productRevenue = parseFloat(r.product_revenue);
         const masterRevenue = parseFloat(r.master_revenue);
+        const subscriptionRevenue = parseFloat(r.subscription_revenue);
         const refunds = parseFloat(r.refunds);
         const expenses = parseFloat(r.expenses);
-        const revenue = enrollmentRevenue + productRevenue + masterRevenue - refunds;
+        const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - refunds;
         return {
           month: r.month,
           enrollmentRevenue,
@@ -519,7 +532,7 @@ export const reportsRoutes = {
            COALESCE((
              SELECT SUM(e.amount_paid) FROM enrollments e
              WHERE e.branch_id = b.id AND e.company_id = $1
-               AND e.payment_status IN ('PAID','PARTIAL')
+               AND e.payment_status IN ('PAID','PARTIAL','REFUNDED')
                AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
            ), 0) AS enrollment_revenue,
            COALESCE((
@@ -533,6 +546,12 @@ export const reportsRoutes = {
                AND me.amount_paid > 0
                AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            ), 0) AS master_revenue,
+           COALESCE((
+             SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
+             WHERE msp.branch_id = b.id AND msp.company_id = $1
+               AND msp.amount_paid > 0
+               AND msp.paid_date >= $2 AND msp.paid_date <= $3
+           ), 0) AS subscription_revenue,
            -- Refunds attributable to this branch. Most refunds have a NULL
            -- branch_id and are linked via enrollment / master enrollment /
            -- product sale / event subscription, so attribute through those
@@ -566,9 +585,12 @@ export const reportsRoutes = {
           const enrollmentRevenue = parseFloat(r.enrollment_revenue);
           const productRevenue = parseFloat(r.product_revenue);
           const masterRevenue = parseFloat(r.master_revenue);
+          // Subscription revenue is folded into the branch total (no separate
+          // response field) so branch revenue/profit reconciles with the P&L.
+          const subscriptionRevenue = parseFloat(r.subscription_revenue);
           const refunds = parseFloat(r.refunds);
           const expenses = parseFloat(r.expenses);
-          const revenue = enrollmentRevenue + productRevenue + masterRevenue - refunds;
+          const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - refunds;
           return {
             branchId: r.branch_id,
             branchName: r.branch_name,

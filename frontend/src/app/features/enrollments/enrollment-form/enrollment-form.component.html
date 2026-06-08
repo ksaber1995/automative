@@ -145,11 +145,17 @@
             </div>
           }
 
-          <!-- Enrollment Date -->
+          <!-- Enrollment / Subscription Start Date -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_ENROLLMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ (isMonthly() ? 'ENROLLMENT_FORM.LABEL_START_DATE' : 'ENROLLMENT_FORM.LABEL_ENROLLMENT_DATE') | translate }}
+              <span class="text-red-500">*</span>
+            </label>
             <p-datepicker formControlName="enrollmentDate" [showIcon]="true" dateFormat="yy-mm-dd"
               [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_DATE' | translate" [style]="{ width: '100%' }"></p-datepicker>
+            @if (isMonthly()) {
+              <small class="text-gray-500 block mt-1">{{ 'ENROLLMENT_FORM.START_DATE_HINT' | translate }}</small>
+            }
           </div>
 
           <!-- Status -->
@@ -196,7 +202,7 @@
         <!-- Pricing summary card -->
         <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'ENROLLMENT_FORM.ORIGINAL_PRICE' | translate }}</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ (isMonthly() ? 'ENROLLMENT_FORM.MONTHLY_FEE' : 'ENROLLMENT_FORM.ORIGINAL_PRICE') | translate }}</p>
             <p class="text-2xl font-bold text-gray-800">{{ originalPriceSig() | amount }}</p>
           </div>
           <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
@@ -209,7 +215,7 @@
             </p>
           </div>
           <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ 'ENROLLMENT_FORM.FINAL_PRICE' | translate }}</p>
+            <p class="text-xs text-green-600 uppercase tracking-wider mb-1">{{ (isMonthly() ? 'ENROLLMENT_FORM.FINAL_MONTHLY_FEE' : 'ENROLLMENT_FORM.FINAL_PRICE') | translate }}</p>
             <p class="text-2xl font-bold text-green-700">{{ finalPriceSig() | amount }}</p>
           </div>
         </div>
@@ -269,6 +275,38 @@
         <p-divider></p-divider>
         <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PAYMENT' | translate }}</h3>
 
+        @if (isMonthly()) {
+        <!-- Monthly subscription: choose to collect the first month now or defer it -->
+        <div class="grid grid-cols-1 gap-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <i class="pi pi-calendar-clock text-blue-500 mt-0.5"></i>
+            <p class="text-sm text-blue-700" [innerHTML]="'ENROLLMENT_FORM.MONTHLY_INFO' | translate: { fee: (finalPriceSig() | amount) }"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.MONTHLY_PAY_OPTION' | translate }} <span class="text-red-500">*</span></label>
+            <div class="flex gap-8">
+              <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
+                [class.border-green-500]="monthlyPayOptionSig() === 'PAY_NOW'"
+                [class.bg-green-50]="monthlyPayOptionSig() === 'PAY_NOW'">
+                <p-radiobutton name="monthlyPayOption" value="PAY_NOW" formControlName="monthlyPayOption" (onClick)="monthlyPayOptionSig.set('PAY_NOW')"></p-radiobutton>
+                <div>
+                  <p class="font-medium">{{ 'ENROLLMENT_FORM.PAY_FIRST_MONTH' | translate }}</p>
+                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.PAY_FIRST_MONTH_DESC' | translate: { amount: (finalPriceSig() | amount) } }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
+                [class.border-blue-500]="monthlyPayOptionSig() === 'PAY_LATER'"
+                [class.bg-blue-50]="monthlyPayOptionSig() === 'PAY_LATER'">
+                <p-radiobutton name="monthlyPayOption" value="PAY_LATER" formControlName="monthlyPayOption" (onClick)="monthlyPayOptionSig.set('PAY_LATER')"></p-radiobutton>
+                <div>
+                  <p class="font-medium">{{ 'ENROLLMENT_FORM.PAY_LATER' | translate }}</p>
+                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.PAY_LATER_DESC' | translate }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        } @else {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.PAYMENT_METHOD' | translate }} <span class="text-red-500">*</span></label>
@@ -312,6 +350,7 @@
             </div>
           }
         </div>
+        }
 
         }
 

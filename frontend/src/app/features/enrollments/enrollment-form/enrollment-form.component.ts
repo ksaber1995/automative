@@ -96,6 +96,14 @@ export class EnrollmentFormComponent implements OnInit {
   paymentModeSig = signal<'FULL' | 'INSTALLMENTS'>('FULL');
   downPaymentSig = signal(0);
   coverage = signal<CoverageInfo | null>(null);
+  // Monthly-subscription enrollment: pay the start month now or defer it.
+  monthlyPayOptionSig = signal<'PAY_NOW' | 'PAY_LATER'>('PAY_LATER');
+
+  // True when the selected single course is billed as a monthly subscription.
+  isMonthly = computed(() =>
+    this.enrollmentType() === 'COURSE' &&
+    this.selectedCourse()?.paymentType === 'MONTHLY_SUBSCRIPTION'
+  );
 
   filteredStudents = computed(() => {
     const branchId = this.selectedBranchId();
@@ -156,6 +164,7 @@ export class EnrollmentFormComponent implements OnInit {
       finalPrice: [0],
       paymentMode: [PaymentMode.FULL, [Validators.required]],
       downPayment: [0],
+      monthlyPayOption: ['PAY_LATER'],
       notes: ['']
     });
   }
@@ -515,6 +524,7 @@ export class EnrollmentFormComponent implements OnInit {
     }
 
     this.loading.set(true);
+    const monthly = this.isMonthly();
     const enrollmentData = {
       studentId: v.studentId,
       classId: v.classId,
@@ -526,8 +536,12 @@ export class EnrollmentFormComponent implements OnInit {
       discountPercent: this.discountPercentSig(),
       discountAmount: this.discountAmountSig(),
       finalPrice: this.finalPriceSig(),
-      paymentMode: v.paymentMode,
-      downPayment: v.paymentMode === 'INSTALLMENTS' ? (v.downPayment || 0) : 0,
+      // Monthly courses are billed per month — no installments; finalPrice is the
+      // discounted monthly fee and payFirstMonth records the start month up-front.
+      paymentMode: monthly ? PaymentMode.FULL : v.paymentMode,
+      downPayment: (!monthly && v.paymentMode === 'INSTALLMENTS') ? (v.downPayment || 0) : 0,
+      paymentType: monthly ? 'MONTHLY_SUBSCRIPTION' as const : 'ONE_TIME' as const,
+      payFirstMonth: monthly ? this.monthlyPayOptionSig() === 'PAY_NOW' : undefined,
       notes: v.notes || undefined
     };
 

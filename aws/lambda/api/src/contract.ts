@@ -379,6 +379,10 @@ const CreateCourseSchema = z.object({
   instructorId: OptionalUUIDSchema,
   defaultRoomId: OptionalUUIDSchema,
   levelId: OptionalUUIDSchema,
+  // Payment model: ONE_TIME (default) or MONTHLY_SUBSCRIPTION. Without this the
+  // field is stripped from the request body and every course saves as ONE_TIME.
+  paymentType: CoursePaymentTypeSchema.optional(),
+  monthlyFee: z.number().optional(),
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
@@ -512,8 +516,7 @@ const CourseSchema = z.object({
   levelName: z.string().nullable().optional(),
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
-  paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),  // NEW
-  monthlyFee: z.number().nullable(),                          // NEW
+  paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -657,6 +660,9 @@ const CreateEnrollmentSchema = z.object({
   paymentMode: PaymentModeSchema.default('FULL'),
   downPayment: z.number().optional(),
   paymentStatus: PaymentStatusSchema.optional(),
+  // Monthly-subscription enrollment fields (ignored for one-time courses):
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
+  payFirstMonth: z.boolean().optional(),
   notes: z.string().optional(),
 });
 
@@ -676,6 +682,7 @@ const EnrollmentSchema = z.object({
   discountAmount: z.number(),
   finalPrice: z.number(),
   paymentMode: PaymentModeSchema,
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
   downPayment: z.number(),
   amountPaid: z.number(),
   paymentStatus: PaymentStatusSchema,
@@ -4023,9 +4030,14 @@ export const contract = c.router({
     list: {
       method: 'GET' as const,
       path: '/api/monthly-subscriptions',
+      // Inclusive (fromYear,fromMonth)..(toYear,toMonth) range so a single month,
+      // a whole year, or a rolling "last N months" window (which can cross a year
+      // boundary) are all expressible.
       query: z.object({
-        billingYear: z.string(),
-        billingMonth: z.string(),
+        fromYear: z.string(),
+        fromMonth: z.string(),
+        toYear: z.string(),
+        toMonth: z.string(),
         branchId: z.string().optional(),
         courseId: z.string().optional(),
         status: z.string().optional(),
@@ -4039,8 +4051,10 @@ export const contract = c.router({
       method: 'GET' as const,
       path: '/api/monthly-subscriptions/summary',
       query: z.object({
-        billingYear: z.string(),
-        billingMonth: z.string(),
+        fromYear: z.string(),
+        fromMonth: z.string(),
+        toYear: z.string(),
+        toMonth: z.string(),
         branchId: z.string().optional(),
       }),
       responses: {
@@ -4053,6 +4067,18 @@ export const contract = c.router({
       path: '/api/monthly-subscriptions/:id/pay',
       pathParams: z.object({ id: UUIDSchema }),
       body: RecordMonthlyPaymentSchema,
+      responses: {
+        200: MonthlySubscriptionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    voidPayment: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/:id/void',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ reason: z.string().optional() }),
       responses: {
         200: MonthlySubscriptionPaymentSchema,
         400: ApiErrorSchema,

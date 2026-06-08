@@ -64,6 +64,7 @@ export class CourseListComponent implements OnInit {
 
   selectedBranchId = signal<string | null>(null);
   selectedLevelId = signal<string | null>(null);
+  selectedPaymentType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION'>('ALL');
   selectedTab = signal<'active' | 'inactive'>('active');
 
   // Blocker dialog shown when the API returns a 409 with the list of classes
@@ -82,19 +83,27 @@ export class CourseListComponent implements OnInit {
 
   levelOptions = computed(() => this.levels().map(l => ({ label: l.name, value: l.id })));
 
+  paymentTypeOptions = computed(() => [
+    { label: this.translate.instant('COURSES.LIST.TYPE_ONE_TIME'), value: 'ONE_TIME' },
+    { label: this.translate.instant('COURSES.LIST.TYPE_MONTHLY'), value: 'MONTHLY_SUBSCRIPTION' },
+  ]);
+
   activeCount = computed(() => this.byBranch().filter(c => c.isActive).length);
   inactiveCount = computed(() => this.byBranch().filter(c => !c.isActive).length);
 
   private byBranch = computed(() => {
     const branch = this.selectedBranchId();
     const level = this.selectedLevelId();
+    const paymentType = this.selectedPaymentType();
     return this.courses().filter(c => {
       const branchMatch =
         branch === null ? true :
         branch === '__global__' ? c.branchId === null :
         c.branchId === branch;
       const levelMatch = level === null ? true : c.levelId === level;
-      return branchMatch && levelMatch;
+      const paymentTypeMatch =
+        paymentType === 'ALL' ? true : (c.paymentType ?? 'ONE_TIME') === paymentType;
+      return branchMatch && levelMatch && paymentTypeMatch;
     });
   });
 
@@ -135,6 +144,7 @@ export class CourseListComponent implements OnInit {
   clearFilters() {
     this.selectedBranchId.set(null);
     this.selectedLevelId.set(null);
+    this.selectedPaymentType.set('ALL');
   }
 
   viewCourse(course: CourseWithEnrollmentCount) {

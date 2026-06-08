@@ -6,11 +6,11 @@
 --
 -- What this migration does:
 --   1. Adds courses.payment_type  (ONE_TIME | MONTHLY_SUBSCRIPTION)
---   2. Adds courses.monthly_fee   (recurring fee per calendar month)
---   3. Adds enrollments.payment_type  (denormalised copy for fast queries)
---   4. Creates monthly_subscription_payments table
---   5. Creates 9 indexes on monthly_subscription_payments
---   6. Creates updated_at trigger on monthly_subscription_payments
+--      NOTE: price column is reused as the monthly fee when MONTHLY_SUBSCRIPTION
+--   2. Adds enrollments.payment_type  (denormalised copy for fast queries)
+--   3. Creates monthly_subscription_payments table
+--   4. Creates 9 indexes on monthly_subscription_payments
+--   5. Creates updated_at trigger on monthly_subscription_payments
 --
 -- All statements are idempotent (IF NOT EXISTS / IF EXISTS guards).
 -- ============================================================
@@ -23,13 +23,7 @@ ALTER TABLE courses
         CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION'));
 
 -- ------------------------------------------------------------
--- 2. courses.monthly_fee
--- ------------------------------------------------------------
-ALTER TABLE courses
-    ADD COLUMN IF NOT EXISTS monthly_fee DECIMAL(10, 2);
-
--- ------------------------------------------------------------
--- 3. enrollments.payment_type  (denormalised from courses for fast queries)
+-- 2. enrollments.payment_type  (denormalised from courses for fast queries)
 -- ------------------------------------------------------------
 ALTER TABLE enrollments
     ADD COLUMN IF NOT EXISTS payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'

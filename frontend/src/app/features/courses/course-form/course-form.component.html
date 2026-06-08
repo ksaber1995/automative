@@ -73,40 +73,32 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'COURSES.FORM.PAYMENT_TYPE_LABEL' | translate }} <span class="text-red-500">*</span>
             </label>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
+            <div class="flex gap-4" [class.opacity-60]="isEditMode()">
+              <label class="flex items-center gap-2" [class.cursor-pointer]="!isEditMode()" [class.cursor-not-allowed]="isEditMode()">
                 <input type="radio" formControlName="paymentType" value="ONE_TIME" class="accent-blue-600" />
                 <span>{{ 'COURSES.FORM.PAYMENT_TYPE_ONE_TIME' | translate }}</span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
+              <label class="flex items-center gap-2" [class.cursor-pointer]="!isEditMode()" [class.cursor-not-allowed]="isEditMode()">
                 <input type="radio" formControlName="paymentType" value="MONTHLY_SUBSCRIPTION" class="accent-blue-600" />
                 <span>{{ 'COURSES.FORM.PAYMENT_TYPE_MONTHLY' | translate }}</span>
               </label>
             </div>
+            @if (isEditMode()) {
+              <small class="text-gray-500 flex items-center gap-1 mt-1">
+                <i class="pi pi-lock" style="font-size: 0.7rem"></i>
+                {{ 'COURSES.FORM.PAYMENT_TYPE_LOCKED' | translate }}
+              </small>
+            }
           </div>
 
-          <!-- Monthly Fee (shown only when MONTHLY_SUBSCRIPTION) -->
-          @if (courseForm.get('paymentType')?.value === 'MONTHLY_SUBSCRIPTION') {
-            <div>
-              <label for="monthlyFee" class="block text-sm font-medium text-gray-700 mb-2">
-                {{ 'COURSES.FORM.MONTHLY_FEE_LABEL' | translate }} <span class="text-red-500">*</span>
-              </label>
-              <p-inputnumber
-                id="monthlyFee"
-                formControlName="monthlyFee"
-                mode="currency"
-                currency="USD"
-                [min]="0"
-                [placeholder]="'COURSES.FORM.MONTHLY_FEE_PLACEHOLDER' | translate"
-                [style]="{ width: '100%' }"
-              />
-            </div>
-          }
-
-          <!-- Price -->
+          <!-- Price / Monthly Fee (label changes based on payment type) -->
           <div>
             <label for="price" class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'COURSES.FORM.PRICE_LABEL' | translate }} <span class="text-red-500">*</span>
+              {{
+                (courseForm.get('paymentType')?.value === 'MONTHLY_SUBSCRIPTION'
+                  ? 'COURSES.FORM.MONTHLY_FEE_LABEL'
+                  : 'COURSES.FORM.PRICE_LABEL') | translate
+              }} <span class="text-red-500">*</span>
             </label>
             <p-inputnumber
               id="price"

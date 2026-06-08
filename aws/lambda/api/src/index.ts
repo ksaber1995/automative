@@ -134,6 +134,7 @@ const router = {
     list: monthlySubscriptionsRoutes.list,
     summary: monthlySubscriptionsRoutes.summary,
     recordPayment: monthlySubscriptionsRoutes.recordPayment,
+    voidPayment: monthlySubscriptionsRoutes.voidPayment,
     listByCourse: monthlySubscriptionsRoutes.listByCourse,
   },
 };

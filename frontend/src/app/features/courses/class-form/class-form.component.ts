@@ -68,13 +68,13 @@ export class ClassFormComponent implements OnInit {
   checkingAvailability = signal(false);
 
   daysOfWeek = [
-    { label: 'Sunday', value: 'SUNDAY' },
-    { label: 'Monday', value: 'MONDAY' },
-    { label: 'Tuesday', value: 'TUESDAY' },
-    { label: 'Wednesday', value: 'WEDNESDAY' },
-    { label: 'Thursday', value: 'THURSDAY' },
-    { label: 'Friday', value: 'FRIDAY' },
-    { label: 'Saturday', value: 'SATURDAY' }
+    { label: 'CLASSES.FORM.DAY_SUNDAY', value: 'SUNDAY' },
+    { label: 'CLASSES.FORM.DAY_MONDAY', value: 'MONDAY' },
+    { label: 'CLASSES.FORM.DAY_TUESDAY', value: 'TUESDAY' },
+    { label: 'CLASSES.FORM.DAY_WEDNESDAY', value: 'WEDNESDAY' },
+    { label: 'CLASSES.FORM.DAY_THURSDAY', value: 'THURSDAY' },
+    { label: 'CLASSES.FORM.DAY_FRIDAY', value: 'FRIDAY' },
+    { label: 'CLASSES.FORM.DAY_SATURDAY', value: 'SATURDAY' }
   ];
 
   get classTypes() {

@@ -63,6 +63,9 @@ export const monthlySubscriptionsRoutes = {
       const dueDateStr = dueDate.toISOString().split('T')[0];
 
       // Build query to find active enrollments in monthly-subscription courses
+      // The monthly fee is the enrollment's discounted fee (final_price), so the
+      // per-subscription discount carries forward to every month. Falls back to the
+      // course price for legacy rows whose final_price wasn't set.
       let sql = `
         SELECT
           e.id AS enrollment_id,
@@ -70,14 +73,13 @@ export const monthlySubscriptionsRoutes = {
           e.course_id,
           e.branch_id,
           e.company_id,
-          c.monthly_fee
+          COALESCE(NULLIF(e.final_price, 0), c.price) AS monthly_fee
         FROM enrollments e
         JOIN courses c ON e.course_id = c.id
         WHERE e.company_id = $1
           AND e.status = 'ACTIVE'
           AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
           AND c.is_active = true
-          AND c.monthly_fee IS NOT NULL
       `;
       const params: any[] = [context.companyId];
 
@@ -136,15 +138,16 @@ export const monthlySubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const billingYear = parseInt(q.billingYear, 10);
-      const billingMonth = parseInt(q.billingMonth, 10);
+      // Inclusive month range, encoded as year*12+month so it compares cleanly
+      // across year boundaries (e.g. last 3 months ending in January).
+      const fromKey = parseInt(q.fromYear, 10) * 12 + parseInt(q.fromMonth, 10);
+      const toKey = parseInt(q.toYear, 10) * 12 + parseInt(q.toMonth, 10);
 
       const conditions: string[] = [
         'msp.company_id = $1',
-        'msp.billing_year = $2',
-        'msp.billing_month = $3',
+        '(msp.billing_year * 12 + msp.billing_month) BETWEEN $2 AND $3',
       ];
-      const params: any[] = [context.companyId, billingYear, billingMonth];
+      const params: any[] = [context.companyId, fromKey, toKey];
 
       if (q.branchId) {
         if (!canAccessBranch(context, q.branchId)) {
@@ -177,7 +180,7 @@ export const monthlySubscriptionsRoutes = {
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
          WHERE ${conditions.join(' AND ')}
-         ORDER BY s.first_name, s.last_name`,
+         ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.first_name, s.last_name`,
         params
       );
 
@@ -206,15 +209,14 @@ export const monthlySubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const billingYear = parseInt(q.billingYear, 10);
-      const billingMonth = parseInt(q.billingMonth, 10);
+      const fromKey = parseInt(q.fromYear, 10) * 12 + parseInt(q.fromMonth, 10);
+      const toKey = parseInt(q.toYear, 10) * 12 + parseInt(q.toMonth, 10);
 
       const conditions: string[] = [
         'msp.company_id = $1',
-        'msp.billing_year = $2',
-        'msp.billing_month = $3',
+        '(msp.billing_year * 12 + msp.billing_month) BETWEEN $2 AND $3',
       ];
-      const params: any[] = [context.companyId, billingYear, billingMonth];
+      const params: any[] = [context.companyId, fromKey, toKey];
 
       if (q.branchId) {
         if (!canAccessBranch(context, q.branchId)) {
@@ -253,8 +255,9 @@ export const monthlySubscriptionsRoutes = {
       return {
         status: 200 as const,
         body: {
-          billingYear,
-          billingMonth,
+          // Echo the range end so the client can label the period.
+          billingYear: parseInt(q.toYear, 10),
+          billingMonth: parseInt(q.toMonth, 10),
           totalStudents: rows.length,
           paidCount,
           pendingCount,
@@ -310,20 +313,9 @@ export const monthlySubscriptionsRoutes = {
         [newPaid, newStatus, paidDate, body.notes || null, params.id]
       );
 
-      // Insert a revenue row so financial reports stay accurate
-      if (parseFloat(body.amount) > 0) {
-        await insert('revenues', {
-          branch_id: row.branch_id,
-          course_id: row.course_id,
-          student_id: row.student_id,
-          amount: parseFloat(body.amount),
-          description: 'Monthly subscription payment - ' + row.billing_year + '-' + String(row.billing_month).padStart(2, '0'),
-          date: body.paymentDate,
-          source: 'ENROLLMENT',
-          source_id: row.id,
-          company_id: context.companyId,
-        }).catch(() => { /* revenue insert is best-effort */ });
-      }
+      // No separate revenues row is written: the monthly_subscription_payments row
+      // is the single source of truth and is summed directly into dashboard/report
+      // revenue (bucketed by paid_date). This also makes voiding a no-side-effect reset.
 
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',
@@ -334,6 +326,49 @@ export const monthlySubscriptionsRoutes = {
     } catch (error) {
       console.error('Record monthly payment error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.PAY_FAILED', 'Failed to record payment', 400);
+    }
+  },
+
+  /** POST /api/monthly-subscriptions/:id/void
+   *  Reverse a recorded payment: clears amount_paid and resets the bill to unpaid.
+   *  Because revenue is derived from amount_paid, this removes it from revenue too.
+   */
+  voidPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const row = await queryOne(
+        'SELECT * FROM monthly_subscription_payments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!row) return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_FOUND', 'Payment record not found');
+
+      if (!canAccessBranch(context, row.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const reason = body?.reason ? String(body.reason).slice(0, 500) : null;
+
+      await query(
+        `UPDATE monthly_subscription_payments
+         SET amount_paid = 0, payment_status = 'PENDING', paid_date = NULL,
+             notes = $2, updated_at = NOW()
+         WHERE id = $1`,
+        [params.id, reason ? 'Voided: ' + reason : 'Payment voided']
+      );
+
+      const updated = await queryOne(
+        'SELECT * FROM monthly_subscription_payments WHERE id = $1',
+        [params.id]
+      );
+
+      return { status: 200 as const, body: mapPaymentFromDB(updated) };
+    } catch (error) {
+      console.error('Void monthly payment error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.VOID_FAILED', 'Failed to void payment', 400);
     }
   },
 

@@ -11,11 +11,11 @@ import sys
 #
 # What this migration does:
 #   1. Adds courses.payment_type  (ONE_TIME | MONTHLY_SUBSCRIPTION)
-#   2. Adds courses.monthly_fee   (recurring fee per calendar month)
-#   3. Adds enrollments.payment_type  (denormalised copy for fast queries)
-#   4. Creates monthly_subscription_payments table
-#   5. Creates 9 indexes on monthly_subscription_payments
-#   6. Creates updated_at trigger on monthly_subscription_payments
+#      NOTE: price column is reused as the monthly fee when MONTHLY_SUBSCRIPTION
+#   2. Adds enrollments.payment_type  (denormalised copy for fast queries)
+#   3. Creates monthly_subscription_payments table
+#   4. Creates 9 indexes on monthly_subscription_payments
+#   5. Creates updated_at trigger on monthly_subscription_payments
 # ---------------------------------------------------------------------------
 
 PROD = '--prod' in sys.argv
@@ -44,20 +44,14 @@ statements = [
         "Add courses.payment_type"
     ),
 
-    # 2. Add monthly_fee to courses
-    (
-        "ALTER TABLE courses ADD COLUMN IF NOT EXISTS monthly_fee DECIMAL(10, 2)",
-        "Add courses.monthly_fee"
-    ),
-
-    # 3. Add payment_type to enrollments (denormalised)
+    # 2. Add payment_type to enrollments (denormalised)
     (
         "ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME' "
         "CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION'))",
         "Add enrollments.payment_type"
     ),
 
-    # 4. Create monthly_subscription_payments table
+    # 3. Create monthly_subscription_payments table
     (
         """CREATE TABLE IF NOT EXISTS monthly_subscription_payments (
             id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -82,7 +76,7 @@ statements = [
         "Create monthly_subscription_payments table"
     ),
 
-    # 5a–5i. Indexes
+    # 4a–4i. Indexes
     (
         "CREATE INDEX IF NOT EXISTS idx_msp_enrollment_id  ON monthly_subscription_payments(enrollment_id)",
         "Index msp.enrollment_id"

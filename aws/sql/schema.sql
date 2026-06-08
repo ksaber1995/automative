@@ -285,11 +285,10 @@ CREATE TABLE courses (
     instructor_id UUID,
     level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
-    -- Payment model: ONE_TIME (default, existing behaviour) or MONTHLY_SUBSCRIPTION
+    -- Payment model: ONE_TIME (default, existing behaviour) or MONTHLY_SUBSCRIPTION.
+    -- When MONTHLY_SUBSCRIPTION, the existing `price` column holds the monthly fee.
     payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'
         CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION')),
-    -- Recurring fee charged each calendar month (used when payment_type = MONTHLY_SUBSCRIPTION)
-    monthly_fee DECIMAL(10, 2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,

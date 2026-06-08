@@ -1,219 +1,327 @@
-<div class="page-container" [dir]="isRtl ? 'rtl' : 'ltr'">
-  <!-- Page Header -->
-  <div class="page-header">
-    <div class="page-header-content">
-      <h1 class="page-title">
-        <i class="fas fa-calendar-alt me-2 text-primary"></i>
-        {{ 'MONTHLY_SUBSCRIPTIONS.TITLE' | translate }}
-      </h1>
-      <p class="page-subtitle">{{ 'MONTHLY_SUBSCRIPTIONS.SUBTITLE' | translate }}</p>
+<div class="container-custom py-8" [dir]="isRtl ? 'rtl' : 'ltr'">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ 'MONTHLY_SUBSCRIPTIONS.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.SUBTITLE' | translate }}</p>
     </div>
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate"
+      icon="pi pi-bolt"
+      severity="success"
+      [loading]="generating()"
+      (onClick)="generateBills()"
+    ></p-button>
   </div>
 
-  <!-- Filters -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <form [formGroup]="filterForm" (ngSubmit)="loadData()" class="row g-3 align-items-end">
-        <!-- Year -->
-        <div class="col-md-2">
-          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.YEAR' | translate }}</label>
-          <select class="form-select" formControlName="billingYear">
-            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-          </select>
-        </div>
-        <!-- Month -->
-        <div class="col-md-2">
-          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.MONTH' | translate }}</label>
-          <select class="form-select" formControlName="billingMonth">
-            <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
-          </select>
-        </div>
-        <!-- Branch -->
-        <div class="col-md-3">
-          <label class="form-label">{{ 'COMMON.BRANCH' | translate }}</label>
-          <select class="form-select" formControlName="branchId">
-            <option value="">{{ 'COMMON.ALL_BRANCHES' | translate }}</option>
-            <option *ngFor="let b of branches" [value]="b.id">{{ b.name }}</option>
-          </select>
-        </div>
-        <!-- Course -->
-        <div class="col-md-3">
-          <label class="form-label">{{ 'COMMON.COURSE' | translate }}</label>
-          <select class="form-select" formControlName="courseId">
-            <option value="">{{ 'COMMON.ALL_COURSES' | translate }}</option>
-            <option *ngFor="let c of courses" [value]="c.id">{{ c.name }}</option>
-          </select>
-        </div>
-        <!-- Actions -->
-        <div class="col-md-2 d-flex gap-2">
-          <button type="submit" class="btn btn-primary flex-fill" [disabled]="loading">
-            <i class="fas fa-search me-1"></i>
-            {{ 'COMMON.SEARCH' | translate }}
-          </button>
-          <button type="button" class="btn btn-success flex-fill" (click)="generateBills()" [disabled]="generating">
-            <i class="fas fa-bolt me-1" *ngIf="!generating"></i>
-            <span class="spinner-border spinner-border-sm me-1" *ngIf="generating"></span>
-            {{ 'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <p-card>
+    <!-- Filters -->
+    <form [formGroup]="filterForm" class="flex flex-wrap gap-3 mb-6">
+      <!-- View mode: specific month / whole year / last N months -->
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.VIEW' | translate }}</label>
+        <p-select
+          [options]="filterModeOptions"
+          formControlName="filterMode"
+          optionLabel="label"
+          optionValue="value"
+          (onChange)="loadData()"
+          [style]="{ minWidth: '170px' }"
+        ></p-select>
+      </div>
 
-  <!-- Summary Cards -->
-  <div class="row g-3 mb-4" *ngIf="summary">
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 shadow-sm">
-        <div class="card-body">
-          <div class="fs-2 fw-bold text-primary">{{ summary.totalStudents }}</div>
-          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.TOTAL_STUDENTS' | translate }}</div>
+      @if (filterMode !== 'LAST_N') {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.YEAR' | translate }}</label>
+          <p-select
+            [options]="yearOptions"
+            formControlName="billingYear"
+            optionLabel="label"
+            optionValue="value"
+            (onChange)="loadData()"
+            [style]="{ minWidth: '120px' }"
+          ></p-select>
+        </div>
+      }
+
+      @if (filterMode === 'MONTH') {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.MONTH' | translate }}</label>
+          <p-select
+            [options]="monthOptions"
+            formControlName="billingMonth"
+            optionLabel="label"
+            optionValue="value"
+            (onChange)="loadData()"
+            [style]="{ minWidth: '150px' }"
+          ></p-select>
+        </div>
+      }
+
+      @if (filterMode === 'LAST_N') {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.PERIOD_RANGE' | translate }}</label>
+          <p-select
+            [options]="lastNOptions"
+            formControlName="lastN"
+            optionLabel="label"
+            optionValue="value"
+            (onChange)="loadData()"
+            [style]="{ minWidth: '180px' }"
+          ></p-select>
+        </div>
+      }
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.BRANCH' | translate }}</label>
+        <p-select
+          [options]="branches()"
+          formControlName="branchId"
+          optionLabel="name"
+          optionValue="id"
+          [placeholder]="'MONTHLY_SUBSCRIPTIONS.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          (onChange)="loadData()"
+          [style]="{ minWidth: '200px' }"
+        ></p-select>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.COURSE' | translate }}</label>
+        <p-select
+          [options]="courses()"
+          formControlName="courseId"
+          optionLabel="name"
+          optionValue="id"
+          [placeholder]="'MONTHLY_SUBSCRIPTIONS.ALL_COURSES' | translate"
+          [showClear]="true"
+          (onChange)="loadData()"
+          [style]="{ minWidth: '200px' }"
+        ></p-select>
+      </div>
+    </form>
+
+    <!-- Summary Cards -->
+    @if (summary(); as s) {
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+          <div class="text-2xl font-bold text-gray-700">{{ s.totalStudents }}</div>
+          <div class="text-xs text-gray-500 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.TOTAL_STUDENTS' | translate }}</div>
+        </div>
+        <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
+          <div class="text-2xl font-bold text-green-600">{{ s.paidCount }}</div>
+          <div class="text-xs text-green-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.PAID' | translate }}</div>
+        </div>
+        <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-center">
+          <div class="text-2xl font-bold text-yellow-600">{{ s.pendingCount }}</div>
+          <div class="text-xs text-yellow-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.PENDING' | translate }}</div>
+        </div>
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
+          <div class="text-2xl font-bold text-blue-600">{{ s.partialCount }}</div>
+          <div class="text-xs text-blue-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.PARTIAL' | translate }}</div>
+        </div>
+        <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
+          <div class="text-2xl font-bold text-red-600">{{ s.overdueCount }}</div>
+          <div class="text-xs text-red-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.OVERDUE' | translate }}</div>
+        </div>
+        <div class="rounded-lg border border-purple-200 bg-purple-50 p-4 text-center">
+          <div class="text-2xl font-bold text-purple-600">{{ s.totalRevenue | amount }}</div>
+          <div class="text-xs text-purple-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.COLLECTED' | translate }}</div>
         </div>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 shadow-sm">
-        <div class="card-body">
-          <div class="fs-2 fw-bold text-success">{{ summary.paidCount }}</div>
-          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.PAID' | translate }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 shadow-sm">
-        <div class="card-body">
-          <div class="fs-2 fw-bold text-danger">{{ summary.overdueCount }}</div>
-          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.OVERDUE' | translate }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 shadow-sm">
-        <div class="card-body">
-          <div class="fs-2 fw-bold text-info">{{ summary.totalRevenue | number:'1.0-0' }}</div>
-          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.COLLECTED' | translate }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
+    }
 
-  <!-- Status Filter Tabs -->
-  <div class="d-flex gap-2 mb-3 flex-wrap">
-    <button
-      *ngFor="let s of statuses"
-      class="btn btn-sm"
-      [class.btn-primary]="statusFilter === s"
-      [class.btn-outline-secondary]="statusFilter !== s"
-      (click)="onStatusFilterChange(s)">
-      {{ 'MONTHLY_SUBSCRIPTIONS.STATUS.' + s | translate }}
-      <span class="badge ms-1 bg-white text-dark" *ngIf="s === 'ALL'">{{ payments.length }}</span>
-    </button>
-  </div>
-
-  <!-- Loading -->
-  <div class="text-center py-5" *ngIf="loading">
-    <div class="spinner-border text-primary"></div>
-    <p class="mt-2 text-muted">{{ 'COMMON.LOADING' | translate }}</p>
-  </div>
-
-  <!-- Empty State -->
-  <div class="text-center py-5" *ngIf="!loading && filteredPayments.length === 0">
-    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-    <p class="text-muted">{{ 'MONTHLY_SUBSCRIPTIONS.NO_RECORDS' | translate }}</p>
-    <p class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.GENERATE_HINT' | translate }}</p>
-  </div>
-
-  <!-- Payments Table -->
-  <div class="card shadow-sm" *ngIf="!loading && filteredPayments.length > 0">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>{{ 'COMMON.STUDENT' | translate }}</th>
-              <th>{{ 'COMMON.COURSE' | translate }}</th>
-              <th>{{ 'COMMON.BRANCH' | translate }}</th>
-              <th>{{ 'MONTHLY_SUBSCRIPTIONS.DUE_DATE' | translate }}</th>
-              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_DUE' | translate }}</th>
-              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_PAID' | translate }}</th>
-              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.REMAINING' | translate }}</th>
-              <th>{{ 'COMMON.STATUS' | translate }}</th>
-              <th>{{ 'COMMON.ACTIONS' | translate }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let p of filteredPayments">
-              <td>
-                <span class="fw-medium">{{ p.studentFirstName }} {{ p.studentLastName }}</span>
-              </td>
-              <td>{{ p.courseName }}</td>
-              <td>{{ p.branchName }}</td>
-              <td>{{ p.dueDate | date:'mediumDate' }}</td>
-              <td class="text-end">{{ p.amountDue | number:'1.0-2' }}</td>
-              <td class="text-end text-success">{{ p.amountPaid | number:'1.0-2' }}</td>
-              <td class="text-end" [class.text-danger]="p.amountDue - p.amountPaid > 0">
-                {{ (p.amountDue - p.amountPaid) | number:'1.0-2' }}
-              </td>
-              <td>
-                <span class="badge" [ngClass]="getStatusClass(p.paymentStatus)">
-                  {{ 'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate }}
-                </span>
-              </td>
-              <td>
-                <button
-                  class="btn btn-sm btn-outline-primary"
-                  *ngIf="p.paymentStatus !== 'PAID'"
-                  (click)="openPayDialog(p)"
-                  [disabled]="payingId === p.id">
-                  <i class="fas fa-money-bill-wave me-1"></i>
-                  {{ 'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate }}
-                </button>
-                <span class="text-success small" *ngIf="p.paymentStatus === 'PAID'">
-                  <i class="fas fa-check-circle me-1"></i>{{ p.paidDate | date:'shortDate' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <!-- Status Filter Tabs -->
+    <div class="flex gap-2 mb-4 flex-wrap">
+      @for (st of statuses; track st) {
+        <p-button
+          [label]="('MONTHLY_SUBSCRIPTIONS.STATUS.' + st | translate) + ' (' + statusCount(st) + ')'"
+          size="small"
+          [outlined]="statusFilter() !== st"
+          [severity]="st === 'ALL' ? 'primary' : getStatusSeverity(st)"
+          (onClick)="onStatusFilterChange(st)"
+        ></p-button>
+      }
     </div>
-  </div>
+
+    <!-- Payments Table -->
+    <p-table
+      [value]="filteredPayments()"
+      [loading]="loading()"
+      dataKey="id"
+      [paginator]="filteredPayments().length > 10"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 20, 50]"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th style="width: 3rem"></th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.PERIOD' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.STUDENT' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.COURSE' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.BRANCH' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.DUE_DATE' | translate }}</th>
+          <th class="text-right">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_DUE' | translate }}</th>
+          <th class="text-right">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_PAID' | translate }}</th>
+          <th class="text-right">{{ 'MONTHLY_SUBSCRIPTIONS.REMAINING' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.STATUS_LABEL' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-p let-expanded="expanded">
+        <tr [class.bg-red-50]="p.paymentStatus === 'OVERDUE'">
+          <td>
+            <p-button
+              type="button"
+              [pRowToggler]="p"
+              [text]="true"
+              [rounded]="true"
+              [plain]="true"
+              [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+              [pTooltip]="'MONTHLY_SUBSCRIPTIONS.SHOW_NOTES' | translate"
+            ></p-button>
+          </td>
+          <td class="whitespace-nowrap font-medium text-gray-700">{{ periodLabel(p) }}</td>
+          <td class="font-medium">{{ p.studentFirstName }} {{ p.studentLastName }}</td>
+          <td>{{ p.courseName }}</td>
+          <td>{{ p.branchName }}</td>
+          <td>{{ p.dueDate | date:'mediumDate' }}</td>
+          <td class="text-right">{{ p.amountDue | amount }}</td>
+          <td class="text-right text-green-600">{{ p.amountPaid | amount }}</td>
+          <td class="text-right" [class.text-red-600]="p.amountDue - p.amountPaid > 0">
+            {{ (p.amountDue - p.amountPaid) | amount }}
+          </td>
+          <td>
+            <p-tag
+              [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate"
+              [severity]="getStatusSeverity(p.paymentStatus)"
+            ></p-tag>
+          </td>
+          <td>
+            <div class="flex items-center gap-1">
+              @if (p.paymentStatus !== 'PAID') {
+                <p-button
+                  icon="pi pi-wallet"
+                  [label]="'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate"
+                  size="small"
+                  severity="success"
+                  [outlined]="true"
+                  [disabled]="payingId() === p.id"
+                  (onClick)="openPayDialog(p)"
+                ></p-button>
+              }
+              @if (p.amountPaid > 0) {
+                <p-button
+                  icon="pi pi-times-circle"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="danger"
+                  [disabled]="voidingId() === p.id"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate"
+                  (onClick)="voidPayment(p, $event)"
+                ></p-button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="expandedrow" let-p>
+        <tr>
+          <td colspan="11">
+            <div class="p-4 bg-gray-50 border-l-4 border-gray-300">
+              <div class="text-sm font-semibold text-gray-700 mb-1">
+                <i class="pi pi-file-edit mr-1"></i>{{ 'MONTHLY_SUBSCRIPTIONS.NOTES' | translate }}
+              </div>
+              @if (p.notes) {
+                <div class="text-sm text-gray-700 whitespace-pre-line">{{ p.notes }}</div>
+              } @else {
+                <div class="text-sm text-gray-400 italic">{{ 'MONTHLY_SUBSCRIPTIONS.NO_NOTES' | translate }}</div>
+              }
+              @if (p.paidDate) {
+                <div class="text-xs text-gray-500 mt-2">
+                  {{ 'MONTHLY_SUBSCRIPTIONS.PAID_ON' | translate }}: {{ p.paidDate | date:'mediumDate' }}
+                </div>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="11" class="text-center py-10">
+            <div class="text-gray-500">
+              <i class="pi pi-calendar-times text-4xl mb-3 block"></i>
+              <p class="mb-1">{{ 'MONTHLY_SUBSCRIPTIONS.NO_RECORDS' | translate }}</p>
+              <p class="text-sm">{{ 'MONTHLY_SUBSCRIPTIONS.GENERATE_HINT' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
 </div>
 
-<!-- Pay Dialog Modal -->
-<div class="modal fade show d-block" tabindex="-1" *ngIf="showPayDialog" style="background:rgba(0,0,0,0.5)">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">{{ 'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate }}</h5>
-        <button type="button" class="btn-close" (click)="closePayDialog()"></button>
+<!-- Pay Dialog -->
+<p-dialog
+  [visible]="showPayDialog()"
+  (visibleChange)="showPayDialog.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '420px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate"
+>
+  @if (selectedPayment(); as sel) {
+    <div class="flex flex-col gap-4 pt-2">
+      <div class="text-sm text-gray-700">
+        <strong>{{ sel.studentFirstName }} {{ sel.studentLastName }}</strong>
+        &mdash; {{ sel.courseName }} &middot; {{ periodLabel(sel) }}
       </div>
-      <div class="modal-body" *ngIf="selectedPayment">
-        <p class="mb-3">
-          <strong>{{ selectedPayment.studentFirstName }} {{ selectedPayment.studentLastName }}</strong>
-          &mdash; {{ selectedPayment.courseName }}
-        </p>
-        <div class="mb-3">
-          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT' | translate }}</label>
-          <input type="number" class="form-control" [(ngModel)]="payAmount" min="0.01" step="0.01" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.PAYMENT_DATE' | translate }}</label>
-          <input type="date" class="form-control" [(ngModel)]="payDate" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">{{ 'COMMON.NOTES' | translate }}</label>
-          <textarea class="form-control" rows="2" [(ngModel)]="payNotes"></textarea>
-        </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT' | translate }}</label>
+        <p-inputnumber
+          [(ngModel)]="payAmount"
+          mode="decimal"
+          [min]="0"
+          [minFractionDigits]="0"
+          [maxFractionDigits]="2"
+          [style]="{ width: '100%' }"
+        ></p-inputnumber>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="closePayDialog()">
-          {{ 'COMMON.CANCEL' | translate }}
-        </button>
-        <button type="button" class="btn btn-primary" (click)="confirmPayment()" [disabled]="payingId !== null || payAmount <= 0">
-          <span class="spinner-border spinner-border-sm me-1" *ngIf="payingId !== null"></span>
-          {{ 'COMMON.CONFIRM' | translate }}
-        </button>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.PAYMENT_DATE' | translate }}</label>
+        <p-datepicker
+          [(ngModel)]="payDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body"
+        ></p-datepicker>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.NOTES' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="payNotes" rows="2" class="w-full"></textarea>
       </div>
     </div>
-  </div>
-</div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closePayDialog()"
+    ></p-button>
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.CONFIRM' | translate"
+      icon="pi pi-check"
+      [loading]="payingId() !== null"
+      [disabled]="payAmount <= 0"
+      (onClick)="confirmPayment()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<p-confirmDialog></p-confirmDialog>

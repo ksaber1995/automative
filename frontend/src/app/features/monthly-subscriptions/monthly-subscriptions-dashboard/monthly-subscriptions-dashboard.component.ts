@@ -1,14 +1,28 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil, forkJoin } from 'rxjs';
+
+import { CardModule } from 'primeng/card';
+import { TableModule } from 'primeng/table';
+import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
+import { SelectModule } from 'primeng/select';
+import { DialogModule } from 'primeng/dialog';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { DatePickerModule } from 'primeng/datepicker';
+import { TextareaModule } from 'primeng/textarea';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary } from '@shared/interfaces/monthly-subscription.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -17,7 +31,25 @@ import { Course } from '@shared/interfaces/course.interface';
 @Component({
   selector: 'app-monthly-subscriptions-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, TranslateModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    TranslateModule,
+    CardModule,
+    TableModule,
+    ButtonModule,
+    TagModule,
+    TooltipModule,
+    SelectModule,
+    DialogModule,
+    InputNumberModule,
+    DatePickerModule,
+    TextareaModule,
+    ConfirmDialogModule,
+    AmountPipe,
+  ],
+  providers: [ConfirmationService],
   templateUrl: './monthly-subscriptions-dashboard.component.html',
 })
 export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy {
@@ -25,26 +57,27 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // Filter state
   filterForm!: FormGroup;
-  branches: Branch[] = [];
-  courses: Course[] = [];
+  branches = signal<Branch[]>([]);
+  courses = signal<Course[]>([]);
 
-  // Data
-  payments: MonthlyPaymentWithDetails[] = [];
-  filteredPayments: MonthlyPaymentWithDetails[] = [];
-  summary: MonthlyPaymentSummary | null = null;
+  // Data — signals so async-loaded data renders without needing a user interaction.
+  payments = signal<MonthlyPaymentWithDetails[]>([]);
+  filteredPayments = signal<MonthlyPaymentWithDetails[]>([]);
+  summary = signal<MonthlyPaymentSummary | null>(null);
 
   // UI state
-  loading = false;
-  generating = false;
-  payingId: string | null = null;
-  showPayDialog = false;
-  selectedPayment: MonthlyPaymentWithDetails | null = null;
+  loading = signal(false);
+  generating = signal(false);
+  payingId = signal<string | null>(null);
+  voidingId = signal<string | null>(null);
+  showPayDialog = signal(false);
+  selectedPayment = signal<MonthlyPaymentWithDetails | null>(null);
   payAmount = 0;
-  payDate = '';
+  payDate: Date = new Date();
   payNotes = '';
 
   // Status filter
-  statusFilter = 'ALL';
+  statusFilter = signal('ALL');
   readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE'];
 
   get isRtl(): boolean {
@@ -59,26 +92,29 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private notify: NotificationService,
     private auth: AuthService,
     private translate: TranslateService,
+    private confirm: ConfirmationService,
   ) {}
 
   ngOnInit(): void {
     const now = new Date();
     this.filterForm = this.fb.group({
+      // 'MONTH' = a specific year+month, 'YEAR' = whole year up to the current
+      // month, 'LAST_N' = a rolling window of the last N months (can cross a year).
+      filterMode: ['MONTH'],
       billingYear: [now.getFullYear(), Validators.required],
       billingMonth: [now.getMonth() + 1, [Validators.required, Validators.min(1), Validators.max(12)]],
-      branchId: [''],
-      courseId: [''],
+      lastN: [3],
+      branchId: [null],
+      courseId: [null],
     });
-
-    this.payDate = now.toISOString().split('T')[0];
 
     forkJoin({
       branches: this.branchSvc.getAllBranches(),
       courses: this.courseSvc.getAllCourses(),
     }).pipe(takeUntil(this.destroy$)).subscribe(({ branches, courses }) => {
-      this.branches = branches;
+      this.branches.set(branches);
       // Only show monthly-subscription courses in the filter
-      this.courses = courses.filter((c: Course) => c.paymentType === 'MONTHLY_SUBSCRIPTION');
+      this.courses.set(courses.filter((c: Course) => c.paymentType === 'MONTHLY_SUBSCRIPTION'));
       this.loadData();
     });
   }
@@ -88,120 +124,229 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.destroy$.complete();
   }
 
-  loadData(): void {
-    const { billingYear, billingMonth, branchId, courseId } = this.filterForm.value;
-    if (!billingYear || !billingMonth) return;
+  /** Inclusive (from..to) month range for the active filter mode. */
+  computeRange(): { fromYear: number; fromMonth: number; toYear: number; toMonth: number } {
+    const v = this.filterForm.value;
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
 
-    this.loading = true;
+    if (v.filterMode === 'LAST_N') {
+      const n = Math.max(1, Number(v.lastN) || 1);
+      const toKey = curY * 12 + curM;
+      const fromKey = toKey - (n - 1);
+      return {
+        fromYear: Math.floor((fromKey - 1) / 12),
+        fromMonth: ((fromKey - 1) % 12) + 1,
+        toYear: curY,
+        toMonth: curM,
+      };
+    }
+
+    if (v.filterMode === 'YEAR') {
+      const y = Number(v.billingYear);
+      // Current year stops at the current month; past years show all 12.
+      const toMonth = y === curY ? curM : 12;
+      return { fromYear: y, fromMonth: 1, toYear: y, toMonth };
+    }
+
+    // MONTH — a single month.
+    return {
+      fromYear: Number(v.billingYear),
+      fromMonth: Number(v.billingMonth),
+      toYear: Number(v.billingYear),
+      toMonth: Number(v.billingMonth),
+    };
+  }
+
+  loadData(): void {
+    const r = this.computeRange();
+    const { branchId, courseId } = this.filterForm.value;
+    if (!r.fromYear || !r.fromMonth) return;
+
+    this.loading.set(true);
     forkJoin({
-      payments: this.svc.list({ billingYear, billingMonth, branchId: branchId || undefined, courseId: courseId || undefined }),
-      summary: this.svc.summary({ billingYear, billingMonth, branchId: branchId || undefined }),
+      payments: this.svc.list({ ...r, branchId: branchId || undefined, courseId: courseId || undefined }),
+      summary: this.svc.summary({ ...r, branchId: branchId || undefined }),
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: ({ payments, summary }) => {
-        this.payments = payments;
-        this.summary = summary;
+        this.payments.set(payments);
+        this.summary.set(summary);
         this.applyStatusFilter();
-        this.loading = false;
+        this.loading.set(false);
       },
       error: () => {
-        this.loading = false;
+        this.loading.set(false);
         this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.LOAD_ERROR'));
       },
     });
   }
 
   applyStatusFilter(): void {
-    if (this.statusFilter === 'ALL') {
-      this.filteredPayments = [...this.payments];
-    } else {
-      this.filteredPayments = this.payments.filter(p => p.paymentStatus === this.statusFilter);
-    }
+    const status = this.statusFilter();
+    const all = this.payments();
+    this.filteredPayments.set(status === 'ALL' ? [...all] : all.filter(p => p.paymentStatus === status));
   }
 
   onStatusFilterChange(status: string): void {
-    this.statusFilter = status;
+    this.statusFilter.set(status);
     this.applyStatusFilter();
   }
 
+  statusCount(status: string): number {
+    const all = this.payments();
+    if (status === 'ALL') return all.length;
+    return all.filter(p => p.paymentStatus === status).length;
+  }
+
   generateBills(): void {
-    const { billingYear, billingMonth, branchId, courseId } = this.filterForm.value;
-    this.generating = true;
+    // Generate bills for the most recent month in the active range.
+    const r = this.computeRange();
+    const { branchId, courseId } = this.filterForm.value;
+    this.generating.set(true);
     this.svc.generate({
-      billingYear,
-      billingMonth,
+      billingYear: r.toYear,
+      billingMonth: r.toMonth,
       branchId: branchId || undefined,
       courseId: courseId || undefined,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
-        this.generating = false;
+        this.generating.set(false);
         this.notify.success(
           this.translate.instant('MONTHLY_SUBSCRIPTIONS.GENERATED', { count: res.generated, month: res.month })
         );
         this.loadData();
       },
       error: () => {
-        this.generating = false;
+        this.generating.set(false);
         this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.GENERATE_ERROR'));
       },
     });
   }
 
   openPayDialog(payment: MonthlyPaymentWithDetails): void {
-    this.selectedPayment = payment;
+    this.selectedPayment.set(payment);
     this.payAmount = payment.amountDue - payment.amountPaid;
-    this.payDate = new Date().toISOString().split('T')[0];
+    this.payDate = new Date();
     this.payNotes = '';
-    this.showPayDialog = true;
+    this.showPayDialog.set(true);
   }
 
   closePayDialog(): void {
-    this.showPayDialog = false;
-    this.selectedPayment = null;
+    this.showPayDialog.set(false);
+    this.selectedPayment.set(null);
   }
 
   confirmPayment(): void {
-    if (!this.selectedPayment || this.payAmount <= 0) return;
-    this.payingId = this.selectedPayment.id;
-    this.svc.recordPayment(this.selectedPayment.id, {
+    const sel = this.selectedPayment();
+    if (!sel || this.payAmount <= 0) return;
+    this.payingId.set(sel.id);
+    this.svc.recordPayment(sel.id, {
       amount: this.payAmount,
-      paymentDate: this.payDate,
+      paymentDate: this.formatDate(this.payDate),
       notes: this.payNotes || undefined,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
-        this.payingId = null;
+        this.payingId.set(null);
         this.closePayDialog();
         this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_RECORDED'));
         this.loadData();
       },
       error: () => {
-        this.payingId = null;
+        this.payingId.set(null);
         this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_ERROR'));
       },
     });
   }
 
-  getStatusClass(status: string): string {
+  /** Void a recorded payment after confirmation — clears it and removes its revenue. */
+  voidPayment(payment: MonthlyPaymentWithDetails, event: Event): void {
+    this.confirm.confirm({
+      target: event.target as EventTarget,
+      message: this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_CONFIRM', {
+        name: `${payment.studentFirstName} ${payment.studentLastName}`,
+      }),
+      header: this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_TITLE'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.voidingId.set(payment.id);
+        this.svc.voidPayment(payment.id).pipe(takeUntil(this.destroy$)).subscribe({
+          next: () => {
+            this.voidingId.set(null);
+            this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOIDED'));
+            this.loadData();
+          },
+          error: () => {
+            this.voidingId.set(null);
+            this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_ERROR'));
+          },
+        });
+      },
+    });
+  }
+
+  private formatDate(d: Date): string {
+    // Local YYYY-MM-DD (avoid UTC shift from toISOString)
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  getStatusSeverity(status: string): 'success' | 'warn' | 'danger' | 'info' | 'secondary' {
     switch (status) {
-      case 'PAID': return 'badge-success';
-      case 'PARTIAL': return 'badge-warning';
-      case 'OVERDUE': return 'badge-danger';
-      default: return 'badge-secondary';
+      case 'PAID': return 'success';
+      case 'PENDING': return 'warn';
+      case 'OVERDUE': return 'danger';
+      case 'PARTIAL': return 'info';
+      default: return 'secondary';
     }
   }
 
   getMonthName(month: number): string {
-    return new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' });
+    return this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + month);
   }
 
-  get months(): { value: number; label: string }[] {
+  get monthOptions(): { value: number; label: string }[] {
     return Array.from({ length: 12 }, (_, i) => ({
       value: i + 1,
       label: this.getMonthName(i + 1),
     }));
   }
 
-  get years(): number[] {
+  get yearOptions(): { value: number; label: number }[] {
     const current = new Date().getFullYear();
-    return [current - 1, current, current + 1];
+    return [current - 2, current - 1, current, current + 1].map(y => ({ value: y, label: y }));
+  }
+
+  get filterModeOptions(): { value: string; label: string }[] {
+    return [
+      { value: 'MONTH', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.MODE_MONTH') },
+      { value: 'YEAR', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.MODE_YEAR') },
+      { value: 'LAST_N', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.MODE_LAST_N') },
+    ];
+  }
+
+  get lastNOptions(): { value: number; label: string }[] {
+    return Array.from({ length: 12 }, (_, i) => {
+      const n = i + 1;
+      return {
+        value: n,
+        label: this.translate.instant(
+          n === 1 ? 'MONTHLY_SUBSCRIPTIONS.LAST_ONE_MONTH' : 'MONTHLY_SUBSCRIPTIONS.LAST_N_MONTHS',
+          { count: n }
+        ),
+      };
+    });
+  }
+
+  get filterMode(): string {
+    return this.filterForm?.get('filterMode')?.value || 'MONTH';
+  }
+
+  /** "March 2026" style label for a payment row's billing period. */
+  periodLabel(p: { billingMonth: number; billingYear: number }): string {
+    return `${this.getMonthName(p.billingMonth)} ${p.billingYear}`;
   }
 }

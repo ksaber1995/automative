@@ -18,7 +18,6 @@ function mapCourseFromDB(row: any) {
     levelName: row.level_name ?? null,
     isActive: row.is_active,
     paymentType: row.payment_type || 'ONE_TIME',
-    monthlyFee: row.monthly_fee != null ? parseFloat(row.monthly_fee) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -60,7 +59,6 @@ export const coursesRoutes = {
         level_id: body.levelId || null,
         is_active: true,
         payment_type: body.paymentType || 'ONE_TIME',
-        monthly_fee: body.paymentType === 'MONTHLY_SUBSCRIPTION' ? (body.monthlyFee ?? null) : null,
       });
 
       return {
@@ -222,7 +220,6 @@ export const coursesRoutes = {
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.paymentType !== undefined) updateData.payment_type = body.paymentType;
-      if (body.monthlyFee !== undefined) updateData.monthly_fee = body.monthlyFee ?? null;
 
       const course = await update('courses', params.id, updateData);
 

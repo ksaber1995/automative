@@ -29,7 +29,18 @@
         [style]="{ minWidth: '200px' }"
       ></p-select>
 
-      @if (selectedBranchId() || selectedLevelId()) {
+      <p-select
+        [options]="paymentTypeOptions()"
+        [ngModel]="selectedPaymentType() === 'ALL' ? null : selectedPaymentType()"
+        (ngModelChange)="selectedPaymentType.set($event ?? 'ALL')"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'COURSES.LIST.ALL_PAYMENT_TYPES' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      @if (selectedBranchId() || selectedLevelId() || selectedPaymentType() !== 'ALL') {
         <p-button
           [label]="'COURSES.LIST.CLEAR' | translate"
           icon="pi pi-times"

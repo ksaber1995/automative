@@ -1,6 +1,47 @@
 <div class="container-custom py-8">
   <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ 'DASHBOARD.TITLE' | translate }}</h1>
 
+  <!-- Date range filter -->
+  <p-card styleClass="mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DASHBOARD.START_DATE' | translate }}</label>
+        <p-datepicker
+          [(ngModel)]="startDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [style]="{ width: '100%' }"
+          styleClass="w-full"
+        ></p-datepicker>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DASHBOARD.END_DATE' | translate }}</label>
+        <p-datepicker
+          [(ngModel)]="endDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [style]="{ width: '100%' }"
+          styleClass="w-full"
+        ></p-datepicker>
+      </div>
+      <div class="flex items-end gap-2">
+        <p-button
+          icon="pi pi-refresh"
+          [label]="'DASHBOARD.APPLY' | translate"
+          [loading]="loading()"
+          (onClick)="applyFilters()"
+        ></p-button>
+        <p-button
+          icon="pi pi-filter-slash"
+          severity="secondary"
+          [outlined]="true"
+          [label]="'DASHBOARD.RESET' | translate"
+          (onClick)="resetFilters()"
+        ></p-button>
+      </div>
+    </div>
+  </p-card>
+
   @if (loading()) {
   <div class="flex justify-center items-center py-20">
     <i class="pi pi-spinner pi-spin text-4xl text-primary-500"></i>
@@ -325,7 +366,7 @@
             </div>
           } @else {
             <div class="space-y-2">
-              @for (item of due.items; track item.id) {
+              @for (item of pagedDueItems(); track item.id) {
                 <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
                   <div class="flex items-center gap-3">
                     <i class="pi text-lg"
@@ -359,6 +400,15 @@
                 </div>
               }
             </div>
+            @if (due.items.length > dueRows) {
+              <p-paginator
+                [rows]="dueRows"
+                [totalRecords]="due.items.length"
+                [first]="duePage() * dueRows"
+                (onPageChange)="onDuePageChange($event)"
+                styleClass="mt-3 justify-end"
+              ></p-paginator>
+            }
           }
         }
       </p-card>

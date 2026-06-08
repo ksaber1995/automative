@@ -64,7 +64,6 @@ export class CourseFormComponent implements OnInit {
       code: ['', [Validators.required, Validators.minLength(2)]],
       description: [''],
       paymentType: ['ONE_TIME', Validators.required],
-      monthlyFee: [null],
       price: [0, [Validators.required, Validators.min(0)]],
       duration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
       maxStudents: [null],
@@ -140,7 +139,6 @@ export class CourseFormComponent implements OnInit {
           code: course.code,
           description: course.description || '',
           paymentType: (course as any).paymentType || 'ONE_TIME',
-          monthlyFee: (course as any).monthlyFee ?? null,
           price: course.price,
           duration: course.duration,
           maxStudents: course.maxStudents,
@@ -148,6 +146,8 @@ export class CourseFormComponent implements OnInit {
           defaultRoomId: (course as any).defaultRoomId || null,
           levelId: course.levelId || null,
         });
+        // Payment type is fixed once a course is created — lock it in edit mode.
+        this.courseForm.get('paymentType')?.disable();
         // Load rooms for the selected branch
         if (course.branchId) this.loadRooms(course.branchId);
         this.loading.set(false);
@@ -167,7 +167,8 @@ export class CourseFormComponent implements OnInit {
     }
 
     this.loading.set(true);
-    const formValue = this.courseForm.value;
+    // getRawValue() so the disabled paymentType control is still included on edit.
+    const formValue = this.courseForm.getRawValue();
 
     // Clean the data
     const courseData = {

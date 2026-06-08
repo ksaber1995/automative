@@ -11,7 +11,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class MonthlySubscriptionsService {
-  private readonly base = `${environment.apiUrl}/api/monthly-subscriptions`;
+  private readonly base = `${environment.apiUrl}/monthly-subscriptions`;
 
   constructor(private http: HttpClient) {}
 
@@ -20,15 +20,19 @@ export class MonthlySubscriptionsService {
   }
 
   list(params: {
-    billingYear: number;
-    billingMonth: number;
+    fromYear: number;
+    fromMonth: number;
+    toYear: number;
+    toMonth: number;
     branchId?: string;
     courseId?: string;
     status?: string;
   }): Observable<MonthlyPaymentWithDetails[]> {
     let httpParams = new HttpParams()
-      .set('billingYear', params.billingYear.toString())
-      .set('billingMonth', params.billingMonth.toString());
+      .set('fromYear', params.fromYear.toString())
+      .set('fromMonth', params.fromMonth.toString())
+      .set('toYear', params.toYear.toString())
+      .set('toMonth', params.toMonth.toString());
     if (params.branchId) httpParams = httpParams.set('branchId', params.branchId);
     if (params.courseId) httpParams = httpParams.set('courseId', params.courseId);
     if (params.status) httpParams = httpParams.set('status', params.status);
@@ -36,19 +40,27 @@ export class MonthlySubscriptionsService {
   }
 
   summary(params: {
-    billingYear: number;
-    billingMonth: number;
+    fromYear: number;
+    fromMonth: number;
+    toYear: number;
+    toMonth: number;
     branchId?: string;
   }): Observable<MonthlyPaymentSummary> {
     let httpParams = new HttpParams()
-      .set('billingYear', params.billingYear.toString())
-      .set('billingMonth', params.billingMonth.toString());
+      .set('fromYear', params.fromYear.toString())
+      .set('fromMonth', params.fromMonth.toString())
+      .set('toYear', params.toYear.toString())
+      .set('toMonth', params.toMonth.toString());
     if (params.branchId) httpParams = httpParams.set('branchId', params.branchId);
     return this.http.get<MonthlyPaymentSummary>(`${this.base}/summary`, { params: httpParams });
   }
 
   recordPayment(id: string, dto: RecordMonthlyPaymentDto): Observable<any> {
     return this.http.post<any>(`${this.base}/${id}/pay`, dto);
+  }
+
+  voidPayment(id: string, reason?: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/${id}/void`, { reason });
   }
 
   listByCourse(courseId: string, billingYear?: number, billingMonth?: number): Observable<MonthlyPaymentWithDetails[]> {

@@ -55,9 +55,12 @@ export const analyticsRoutes = {
       // aggregate so the company-wide summary becomes a scoped-branches summary.
       const erParams: any[] = [context.companyId, startDate, endDate];
       const enrollmentRevenueData = await query(
+        // Include REFUNDED: a refunded enrollment keeps its original amount_paid
+        // (only total_refunded grows), so the money WAS collected. Refunds are
+        // subtracted once below — excluding REFUNDED here would double-penalise.
         `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
          FROM enrollments
-         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+         WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
            AND enrollment_date >= $2 AND enrollment_date <= $3
            ${buildBranchClause('branch_id', erParams)}`,
         erParams
@@ -81,9 +84,23 @@ export const analyticsRoutes = {
         mrParams
       );
 
+      // Monthly subscription payments are revenue too, attributed to the date the
+      // money was collected (paid_date). This is the single source for subscription
+      // revenue; the underlying enrollments stay PENDING/0 so nothing double-counts.
+      const msParams: any[] = [context.companyId, startDate, endDate];
+      const subscriptionRevenueData = await query(
+        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
+         FROM monthly_subscription_payments
+         WHERE company_id = $1 AND amount_paid > 0
+           AND paid_date >= $2 AND paid_date <= $3
+           ${buildBranchClause('branch_id', msParams)}`,
+        msParams
+      );
+
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
       const masterRevenue = parseFloat(masterRevenueData[0]?.total_revenue || '0');
+      const subscriptionRevenue = parseFloat(subscriptionRevenueData[0]?.total_revenue || '0');
 
       // Subtract refunds from revenue (includes master-bundle refunds via the
       // polymorphic refunds table).
@@ -95,7 +112,7 @@ export const analyticsRoutes = {
         rfParams
       );
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue - totalRefunds;
+      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - totalRefunds;
 
       // --- Company-wide expenses (actual payments only) ---
       const exParams: any[] = [context.companyId, startDate, endDate];
@@ -231,7 +248,7 @@ export const analyticsRoutes = {
            COALESCE((
              SELECT SUM(e.amount_paid) FROM enrollments e
              WHERE e.branch_id = b.id AND e.company_id = $1
-               AND e.payment_status IN ('PAID', 'PARTIAL')
+               AND e.payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')
                AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
            ), 0) AS enrollment_revenue,
            -- Product sale revenue
@@ -293,7 +310,7 @@ export const analyticsRoutes = {
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
          FROM branches b
          WHERE b.company_id = $1 ${branchScopeClause}
-         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0)) DESC`,
+         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL','REFUNDED') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0)) DESC`,
         brParams
       );
 
@@ -375,9 +392,13 @@ export const analyticsRoutes = {
       const masterBc   = buildBranchClause('branch_id', mParams);
       const expBc      = buildBranchClause('branch_id', mParams);
       const refundBc   = buildBranchClause('branch_id', mParams);
+      const subBc      = buildBranchClause('branch_id', mParams);
       const monthlyRevenue = await query(
+        // revenue is reported NET of refunds (matches the summary cards and the
+        // reports P&L). refunds stays as its own series for display; profit is
+        // unchanged since it already subtracted refunds.
         `SELECT TO_CHAR(date, 'YYYY-MM') as month,
-                SUM(revenue) as revenue,
+                SUM(revenue) - SUM(refunds) as revenue,
                 SUM(expenses) as expenses,
                 SUM(refunds) as refunds,
                 SUM(revenue) - SUM(refunds) - SUM(expenses) as profit
@@ -395,6 +416,11 @@ export const analyticsRoutes = {
            FROM master_enrollments
            WHERE company_id = $1 AND amount_paid > 0
              AND enrollment_date >= $2 AND enrollment_date <= $3 ${masterBc}
+           UNION ALL
+           SELECT paid_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
+           FROM monthly_subscription_payments
+           WHERE company_id = $1 AND amount_paid > 0
+             AND paid_date >= $2 AND paid_date <= $3 ${subBc}
            UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expense_payments

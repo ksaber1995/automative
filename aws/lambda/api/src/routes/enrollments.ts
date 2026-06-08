@@ -17,6 +17,7 @@ function mapEnrollmentFromDB(row: any) {
     discountAmount: parseFloat(row.discount_amount || 0),
     finalPrice: parseFloat(row.final_price),
     paymentMode: row.payment_mode || 'FULL',
+    paymentType: row.payment_type || 'ONE_TIME',
     downPayment: parseFloat(row.down_payment || 0),
     amountPaid: parseFloat(row.amount_paid || 0),
     totalRefunded: parseFloat(row.total_refunded || 0),
@@ -32,6 +33,101 @@ function computePaymentStatus(finalPrice: number, amountPaid: number): string {
   if (amountPaid <= 0) return 'PENDING';
   if (amountPaid >= finalPrice) return 'PAID';
   return 'PARTIAL';
+}
+
+/**
+ * Monthly-subscription enrollment. The course is billed per calendar month rather
+ * than as a one-time price / installment plan.
+ *  - `final_price` stores the discounted monthly fee — the per-subscription discount
+ *    persists and is applied to every month's bill (see monthly-subscriptions.generate).
+ *  - Bills are generated from the start month (enrollment_date) through the current
+ *    month, so a backdated enrollment immediately shows its outstanding/overdue months.
+ *  - If `payFirstMonth` is set, the start month's bill is marked PAID and a revenue row
+ *    is recorded; otherwise nothing is collected up-front.
+ */
+async function createMonthlySubscriptionEnrollment(context: any, body: any, course: any) {
+  const coursePrice = course?.price != null ? parseFloat(course.price) : (body.originalPrice || 0);
+  const originalPrice = body.originalPrice != null ? body.originalPrice : coursePrice;
+  const discountPercent = body.discountPercent || 0;
+  const discountAmount = body.discountAmount || 0;
+  // Discounted monthly fee — what every monthly bill charges.
+  const monthlyFee = body.finalPrice != null ? body.finalPrice : originalPrice;
+  const payFirstMonth = !!body.payFirstMonth;
+  const notes = body.notes || null;
+
+  // The enrollment row itself carries no collected money for monthly subscriptions
+  // (amount_paid stays 0 / PENDING). Each month's payment lives in
+  // monthly_subscription_payments, which is the single source of truth for both
+  // status and revenue — this keeps monthly revenue out of the enrollment-based
+  // revenue sums (which only count PAID/PARTIAL enrollments) so nothing is
+  // double-counted.
+  const enrollment = await insert('enrollments', {
+    company_id: context.companyId,
+    student_id: body.studentId,
+    class_id: body.classId,
+    course_id: body.courseId,
+    branch_id: body.branchId,
+    enrollment_date: body.enrollmentDate,
+    status: body.status,
+    original_price: originalPrice,
+    discount_percent: discountPercent,
+    discount_amount: discountAmount,
+    final_price: monthlyFee,
+    payment_mode: 'FULL',
+    down_payment: 0,
+    amount_paid: 0,
+    payment_status: 'PENDING',
+    payment_type: 'MONTHLY_SUBSCRIPTION',
+    completion_date: null,
+    notes,
+  });
+
+  // Generate one bill per calendar month from the start month → current month.
+  const start = new Date(body.enrollmentDate);
+  const startY = start.getFullYear();
+  const startM = start.getMonth() + 1; // 1-based
+  const now = new Date();
+  const endY = now.getFullYear();
+  const endM = now.getMonth() + 1;
+
+  let y = startY;
+  let m = startM;
+  let firstBillId: string | null = null;
+  let guard = 0; // safety bound: never loop more than 120 months
+  while ((y < endY || (y === endY && m <= endM)) && guard < 120) {
+    const due = new Date(y, m, 0); // day 0 of next month = last day of month m
+    const dueStr = due.toISOString().split('T')[0];
+    const row = await queryOne(
+      `INSERT INTO monthly_subscription_payments
+         (enrollment_id, company_id, student_id, course_id, branch_id,
+          billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'PENDING',$9)
+       ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
+       RETURNING id`,
+      [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId, y, m, monthlyFee, dueStr]
+    );
+    if (y === startY && m === startM) firstBillId = row?.id || null;
+    m++;
+    if (m > 12) { m = 1; y++; }
+    guard++;
+  }
+
+  // Collect the first month up-front if requested. The payment (and its revenue)
+  // lives entirely in the monthly_subscription_payments row.
+  if (payFirstMonth && monthlyFee > 0 && firstBillId) {
+    await query(
+      `UPDATE monthly_subscription_payments
+       SET amount_paid = $1, payment_status = 'PAID', paid_date = $2,
+           notes = 'First month paid at enrollment', updated_at = NOW()
+       WHERE id = $3`,
+      [monthlyFee, body.enrollmentDate, firstBillId]
+    );
+  }
+
+  return {
+    status: 201 as const,
+    body: mapEnrollmentFromDB(enrollment),
+  };
 }
 
 export const enrollmentsRoutes = {
@@ -57,6 +153,17 @@ export const enrollmentsRoutes = {
         if (targetClass && targetClass.is_finished) {
           return apiError(400, 'ERRORS.ENROLLMENTS.CLASS_FINISHED', 'This class is finished. Enrollment is closed.');
         }
+      }
+
+      // Monthly-subscription courses follow a per-month billing model, not a
+      // one-time price/installment plan. Route them to a dedicated path.
+      const course = await queryOne(
+        'SELECT id, payment_type, price FROM courses WHERE id = $1 AND company_id = $2',
+        [body.courseId, context.companyId]
+      );
+      const paymentType: string = course?.payment_type || body.paymentType || 'ONE_TIME';
+      if (paymentType === 'MONTHLY_SUBSCRIPTION') {
+        return await createMonthlySubscriptionEnrollment(context, body, course);
       }
 
       const paymentMode = body.paymentMode || 'FULL';
@@ -86,6 +193,7 @@ export const enrollmentsRoutes = {
         down_payment: downPayment,
         amount_paid: amountPaid,
         payment_status: paymentStatus,
+        payment_type: 'ONE_TIME',
         completion_date: null,
         notes,
       });

@@ -101,7 +101,7 @@ export const revenuesRoutes = {
           ps.branch_id,
           b.name as branch_name,
           ps.total_amount as amount,
-          CAST(0 AS NUMERIC) as total_refunded,
+          COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) as total_refunded,
           CONCAT('Product Sale: ', p.name, ' (', ps.quantity, ' units)') as description,
           ps.sale_date as date,
           'PAID' as payment_status,

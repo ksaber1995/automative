@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
@@ -8,6 +9,8 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
+import { DatePickerModule } from 'primeng/datepicker';
+import { PaginatorModule } from 'primeng/paginator';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { AnalyticsService } from '../services/analytics.service';
 import { ExpenseService } from '../../expenses/services/expense.service';
@@ -18,7 +21,7 @@ import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule, ProgressSpinnerModule, TranslateModule],
+  imports: [CommonModule, FormsModule, RouterModule, CardModule, ChartModule, TableModule, TagModule, ButtonModule, TooltipModule, DatePickerModule, PaginatorModule, ProgressSpinnerModule, TranslateModule],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss'
 })
@@ -30,11 +33,28 @@ export class OverviewComponent implements OnInit {
   private router = inject(Router);
   private translate = inject(TranslateService);
 
+  // Date range filter — mirrors the Reports page (default: last 12 months) so
+  // the two screens reconcile out of the box. Without an explicit range the
+  // dashboard previously defaulted to year-to-date server-side while Reports
+  // used a rolling 12 months, which is why their totals didn't match.
+  startDate: Date;
+  endDate: Date;
+
   dashboardData = signal<DashboardMetrics | null>(null);
   loading = signal(true);
   dueExpenses = signal<{ items: any[]; totalDue: number; month: string } | null>(null);
   dueLoading = signal(false);
   payingId = signal<string | null>(null);
+
+  // Client-side pagination for the "Due This Month" list (all items are already
+  // loaded, so we just slice the current page).
+  readonly dueRows = 5;
+  duePage = signal(0);
+  pagedDueItems = computed(() => {
+    const items = this.dueExpenses()?.items ?? [];
+    const start = this.duePage() * this.dueRows;
+    return items.slice(start, start + this.dueRows);
+  });
   currentCash = signal<CurrentCashResponse | null>(null);
   cashLoading = signal(false);
 
@@ -42,6 +62,15 @@ export class OverviewComponent implements OnInit {
   revenueChartOptions: any;
   expenseChartData: any;
   expenseChartOptions: any;
+
+  constructor() {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 11);
+    start.setDate(1);
+    this.startDate = start;
+    this.endDate = end;
+  }
 
   ngOnInit() {
     this.loadDashboard();
@@ -65,7 +94,7 @@ export class OverviewComponent implements OnInit {
 
   loadDashboard() {
     this.loading.set(true);
-    this.analyticsService.getDashboard().subscribe({
+    this.analyticsService.getDashboard(this.rangeFilters()).subscribe({
       next: (data) => {
         this.dashboardData.set(data);
         this.prepareCharts(data);
@@ -77,17 +106,53 @@ export class OverviewComponent implements OnInit {
     });
   }
 
+  private toIso(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private rangeFilters() {
+    return {
+      startDate: this.toIso(this.startDate),
+      endDate: this.toIso(this.endDate),
+    };
+  }
+
+  /** Apply the selected date range — reloads the range-dependent dashboard data.
+   * (Current cash is a point-in-time snapshot, so it isn't re-fetched here.) */
+  applyFilters() {
+    this.loadDashboard();
+  }
+
+  /** Reset the range to the default rolling 12 months and reload. */
+  resetFilters() {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 11);
+    start.setDate(1);
+    this.startDate = start;
+    this.endDate = end;
+    this.applyFilters();
+  }
+
   loadDueExpenses() {
     this.dueLoading.set(true);
     this.expenseService.getDue().subscribe({
       next: (data) => {
         this.dueExpenses.set(data);
+        this.duePage.set(0);
         this.dueLoading.set(false);
       },
       error: () => {
         this.dueLoading.set(false);
       }
     });
+  }
+
+  onDuePageChange(event: { page?: number }) {
+    this.duePage.set(event.page ?? 0);
   }
 
   payDueItem(item: any) {

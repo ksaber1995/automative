@@ -14,7 +14,6 @@ export interface Course {
   levelName?: string | null;
   isActive: boolean;
   paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';  // NEW
-  monthlyFee: number | null;                           // NEW
   createdAt: string;
   updatedAt: string;
 }
@@ -35,8 +34,7 @@ export interface CourseCreateDto {
   maxStudents?: number;
   instructorId?: string;
   levelId?: string | null;
-  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';  // NEW
-  monthlyFee?: number;                                  // NEW
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
 }
 
 export interface CourseUpdateDto {
@@ -50,6 +48,5 @@ export interface CourseUpdateDto {
   instructorId?: string;
   levelId?: string | null;
   isActive?: boolean;
-  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';  // NEW
-  monthlyFee?: number | null;                           // NEW
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
 }

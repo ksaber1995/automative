@@ -14,6 +14,7 @@ export interface Enrollment {
   discountAmount: number;
   finalPrice: number;
   paymentMode: PaymentMode;
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
   downPayment: number;
   amountPaid: number;
   totalRefunded: number;
@@ -112,6 +113,11 @@ export interface EnrollmentCreateDto {
   finalPrice: number;
   paymentMode: PaymentMode;
   downPayment?: number;
+  // Monthly-subscription fields (ignored for one-time courses).
+  // For monthly courses, `finalPrice` is the discounted monthly fee and
+  // `payFirstMonth` records the start month's payment up-front.
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
+  payFirstMonth?: boolean;
   notes?: string;
 }
 
