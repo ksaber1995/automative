@@ -71,10 +71,14 @@
   </p-card>
 
   <!-- KPI cards -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
     <p-card>
       <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_REVENUE' | translate }}</div>
       <div class="text-2xl font-bold text-green-700">{{ totalRevenue() | number:'1.0-0' }}</div>
+    </p-card>
+    <p-card>
+      <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_REFUNDS' | translate }}</div>
+      <div class="text-2xl font-bold text-orange-600">{{ totalRefunds() | number:'1.0-0' }}</div>
     </p-card>
     <p-card>
       <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_EXPENSES' | translate }}</div>
@@ -148,6 +152,28 @@
             </ng-template>
             @if (salaryChart()) {
               <p-chart type="bar" [data]="salaryChart()" [options]="barOpts" [style]="{ height: '320px' }"></p-chart>
+            }
+          </p-card>
+
+          <!-- Refunds panel -->
+          <p-card styleClass="lg:col-span-2">
+            <ng-template pTemplate="header">
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{{ 'REPORTS.REFUNDS_TITLE' | translate }}</h3>
+                  <p class="text-sm text-gray-500">{{ 'REPORTS.REFUNDS_DESC' | translate }}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-right">
+                    <div class="text-xs text-gray-500">{{ 'REPORTS.KPI_REFUNDS' | translate }}</div>
+                    <div class="text-lg font-bold text-orange-600">{{ totalRefunds() | number:'1.0-0' }}</div>
+                  </div>
+                  <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportRefunds()"></p-button>
+                </div>
+              </div>
+            </ng-template>
+            @if (refundsChart()) {
+              <p-chart type="bar" [data]="refundsChart()" [options]="barOpts" [style]="{ height: '320px' }"></p-chart>
             }
           </p-card>
         </div>

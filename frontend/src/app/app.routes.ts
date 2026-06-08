@@ -157,6 +157,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/rooms/sessions-dashboard/sessions-dashboard.component').then(m => m.SessionsDashboardComponent)
       },
       {
+        path: 'sessions/:id/attendance',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.SESSIONS' },
+        loadComponent: () => import('./features/rooms/session-attendance/session-attendance.component').then(m => m.SessionAttendanceComponent)
+      },
+      {
         path: 'timetable',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.TIMETABLE' },

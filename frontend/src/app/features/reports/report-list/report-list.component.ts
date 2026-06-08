@@ -132,6 +132,16 @@ export class ReportListComponent implements OnInit {
     const rev = this.totalRevenue();
     return rev > 0 ? (this.totalNetProfit() / rev) * 100 : 0;
   });
+  // Total refunds over the period (already netted out of revenue; surfaced
+  // separately so the refund panel/KPI can show the gross amount returned).
+  totalRefunds = computed(() => {
+    if (this.compareMode()) {
+      return this.compareSeries().reduce(
+        (s, b) => s + b.monthlyPL.reduce((ss, r) => ss + r.refunds, 0), 0,
+      );
+    }
+    return this.monthlyPL().reduce((s, r) => s + r.refunds, 0);
+  });
 
   branchOptions = computed(() =>
     this.branches().map((b) => ({ label: b.name, value: b.id }))
@@ -234,6 +244,35 @@ export class ReportListComponent implements OnInit {
           backgroundColor: 'rgba(59, 130, 246, 0.15)',
           tension: 0.3,
           borderDash: [5, 5],
+        },
+      ],
+    };
+  });
+
+  // Refunds by month — bar series. In compare mode, one bar series per branch.
+  refundsChart = computed(() => {
+    if (this.compareMode()) {
+      const series = this.compareSeries();
+      if (!series.length) return null;
+      const labels = series[0].monthlyPL.map((r) => r.month);
+      return {
+        labels,
+        datasets: series.map((b) => ({
+          label: b.branchName,
+          data: b.monthlyPL.map((r) => r.refunds),
+          backgroundColor: b.color,
+        })),
+      };
+    }
+    const data = this.monthlyPL();
+    if (!data.length) return null;
+    return {
+      labels: data.map((r) => r.month),
+      datasets: [
+        {
+          label: this.translate.instant('REPORTS.CHART_REFUNDS'),
+          data: data.map((r) => r.refunds),
+          backgroundColor: '#f97316',
         },
       ],
     };
@@ -671,6 +710,26 @@ export class ReportListComponent implements OnInit {
       { header: 'Net Profit', value: r => r.netProfit },
     ];
     downloadCsv(this.csvFile('monthly_pl'), this.monthlyPL(), cols);
+  }
+
+  exportRefunds() {
+    if (this.compareMode()) {
+      const rows = this.compareSeries().flatMap(b =>
+        b.monthlyPL.map(r => ({ branch: b.branchName, ...r })),
+      );
+      const cols: CsvColumn<{ branch: string } & MonthlyPLRow>[] = [
+        { header: 'Branch', value: r => r.branch },
+        { header: 'Month', value: r => r.month },
+        { header: 'Refunds', value: r => r.refunds },
+      ];
+      downloadCsv(this.csvFile('refunds'), rows, cols);
+      return;
+    }
+    const cols: CsvColumn<MonthlyPLRow>[] = [
+      { header: 'Month', value: r => r.month },
+      { header: 'Refunds', value: r => r.refunds },
+    ];
+    downloadCsv(this.csvFile('refunds'), this.monthlyPL(), cols);
   }
 
   exportExpenseCats() {

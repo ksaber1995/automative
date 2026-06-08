@@ -1,0 +1,109 @@
+<div class="container-custom py-6 max-w-4xl">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <div>
+      <a routerLink="/sessions" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-1">
+        <i class="pi pi-arrow-left"></i> {{ 'SESSIONS_DASHBOARD.BACK_TO_SESSIONS' | translate }}
+      </a>
+      @if (session(); as s) {
+        <h1 class="text-2xl font-bold text-gray-900">{{ s.className }}</h1>
+        <p class="text-sm text-gray-500">
+          {{ s.courseName }}
+          @if (s.roomCode) { · {{ 'SESSIONS_DASHBOARD.ROOM' | translate }} {{ s.roomCode }} }
+          @if (s.startDate) { · {{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(s.startDate) } }} }
+        </p>
+      } @else {
+        <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.ATTENDANCE_TITLE' | translate }}</h1>
+      }
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
+      <span class="text-gray-300">·</span>
+      <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCount() } }}</span>
+      <span class="ml-2 flex items-center gap-1"
+        [class.text-gray-400]="saveState() !== 'saving' && saveState() !== 'error'"
+        [class.text-blue-500]="saveState() === 'saving'"
+        [class.text-red-500]="saveState() === 'error'">
+        @if (saveState() === 'saving') {
+          <i class="pi pi-spin pi-spinner"></i> {{ 'SESSIONS_DASHBOARD.SAVING' | translate }}
+        } @else if (saveState() === 'saved') {
+          <i class="pi pi-check"></i> {{ 'SESSIONS_DASHBOARD.SAVED' | translate }}
+        } @else if (saveState() === 'error') {
+          <i class="pi pi-times"></i> {{ 'SESSIONS_DASHBOARD.SAVE_FAILED' | translate }}
+        } @else {
+          {{ 'SESSIONS_DASHBOARD.AUTOSAVES' | translate }}
+        }
+      </span>
+    </div>
+  </div>
+
+  <p-card>
+    @if (loading()) {
+      <div class="text-center py-12 text-gray-400">
+        <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+        <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_STUDENTS' | translate }}</p>
+      </div>
+    } @else if (students().length === 0) {
+      <div class="text-center py-12 text-gray-400">
+        <i class="pi pi-users text-4xl mb-2 text-gray-300"></i>
+        <p>{{ 'SESSIONS_DASHBOARD.NO_STUDENTS_ENROLLED' | translate }}</p>
+      </div>
+    } @else {
+      <!-- Search + bulk actions -->
+      <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <span class="p-input-icon-left flex-1 min-w-[200px]">
+          <i class="pi pi-search"></i>
+          <input pInputText type="text" [ngModel]="search()" (ngModelChange)="search.set($event)"
+            [placeholder]="'SESSIONS_DASHBOARD.SEARCH_STUDENTS' | translate"
+            class="w-full" />
+        </span>
+        <p-button icon="pi pi-check-circle" severity="success" [outlined]="true" size="small"
+          [label]="'SESSIONS_DASHBOARD.MARK_ALL_PRESENT' | translate"
+          (onClick)="markAllFiltered(true)"></p-button>
+        <p-button icon="pi pi-circle" severity="secondary" [outlined]="true" size="small"
+          [label]="'SESSIONS_DASHBOARD.MARK_ALL_ABSENT' | translate"
+          (onClick)="markAllFiltered(false)"></p-button>
+      </div>
+
+      <div class="text-xs text-gray-500 mb-2">
+        {{ 'SESSIONS_DASHBOARD.SHOWING_COUNT' | translate: { shown: filteredStudents().length, total: students().length } }}
+      </div>
+
+      @if (filteredStudents().length === 0) {
+        <div class="text-center py-8 text-gray-400 text-sm">
+          <i class="pi pi-search text-2xl mb-2 text-gray-300"></i>
+          <p>{{ 'SESSIONS_DASHBOARD.NO_MATCH' | translate }}</p>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          @for (student of filteredStudents(); track student.studentId) {
+            <div class="flex items-center justify-between p-2.5 rounded-lg border"
+              [class.border-green-200]="student.isPresent"
+              [class.bg-green-50]="student.isPresent"
+              [class.border-gray-200]="!student.isPresent">
+              <div class="flex items-center gap-3">
+                <p-checkbox
+                  [ngModel]="student.isPresent"
+                  (ngModelChange)="togglePresence(student, $event)"
+                  [binary]="true"
+                  [inputId]="'att-' + student.studentId"
+                ></p-checkbox>
+                <label [for]="'att-' + student.studentId"
+                  class="cursor-pointer text-sm font-medium text-gray-800">
+                  {{ student.studentFirstName }} {{ student.studentLastName }}
+                </label>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                [class.bg-green-100]="student.isPresent"
+                [class.text-green-700]="student.isPresent"
+                [class.bg-gray-100]="!student.isPresent"
+                [class.text-gray-500]="!student.isPresent">
+                {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+    }
+  </p-card>
+</div>

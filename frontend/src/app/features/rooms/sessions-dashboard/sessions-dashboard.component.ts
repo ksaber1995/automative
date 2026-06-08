@@ -354,6 +354,13 @@ export class SessionsDashboardComponent implements OnInit {
     this.showStartDialog = true;
   }
 
+  /** Open the full-page attendance editor for a session in a new browser tab.
+   * The inline accordion is too small for large classes; the dedicated page
+   * adds search + bulk actions for rosters of 100+ students. */
+  openAttendancePage(session: Session) {
+    window.open(`/sessions/${session.id}/attendance`, '_blank');
+  }
+
   openStartDialogForRoom(room: Room) {
     this.buildSessionForm(room.id, room.branchId);
     this.populateDialogOptionsForBranch(room.branchId);
