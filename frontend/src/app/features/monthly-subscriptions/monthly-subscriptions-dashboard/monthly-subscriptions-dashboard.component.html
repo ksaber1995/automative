@@ -1,0 +1,219 @@
+<div class="page-container" [dir]="isRtl ? 'rtl' : 'ltr'">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">
+        <i class="fas fa-calendar-alt me-2 text-primary"></i>
+        {{ 'MONTHLY_SUBSCRIPTIONS.TITLE' | translate }}
+      </h1>
+      <p class="page-subtitle">{{ 'MONTHLY_SUBSCRIPTIONS.SUBTITLE' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <form [formGroup]="filterForm" (ngSubmit)="loadData()" class="row g-3 align-items-end">
+        <!-- Year -->
+        <div class="col-md-2">
+          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.YEAR' | translate }}</label>
+          <select class="form-select" formControlName="billingYear">
+            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+          </select>
+        </div>
+        <!-- Month -->
+        <div class="col-md-2">
+          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.MONTH' | translate }}</label>
+          <select class="form-select" formControlName="billingMonth">
+            <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+          </select>
+        </div>
+        <!-- Branch -->
+        <div class="col-md-3">
+          <label class="form-label">{{ 'COMMON.BRANCH' | translate }}</label>
+          <select class="form-select" formControlName="branchId">
+            <option value="">{{ 'COMMON.ALL_BRANCHES' | translate }}</option>
+            <option *ngFor="let b of branches" [value]="b.id">{{ b.name }}</option>
+          </select>
+        </div>
+        <!-- Course -->
+        <div class="col-md-3">
+          <label class="form-label">{{ 'COMMON.COURSE' | translate }}</label>
+          <select class="form-select" formControlName="courseId">
+            <option value="">{{ 'COMMON.ALL_COURSES' | translate }}</option>
+            <option *ngFor="let c of courses" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+        <!-- Actions -->
+        <div class="col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill" [disabled]="loading">
+            <i class="fas fa-search me-1"></i>
+            {{ 'COMMON.SEARCH' | translate }}
+          </button>
+          <button type="button" class="btn btn-success flex-fill" (click)="generateBills()" [disabled]="generating">
+            <i class="fas fa-bolt me-1" *ngIf="!generating"></i>
+            <span class="spinner-border spinner-border-sm me-1" *ngIf="generating"></span>
+            {{ 'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row g-3 mb-4" *ngIf="summary">
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body">
+          <div class="fs-2 fw-bold text-primary">{{ summary.totalStudents }}</div>
+          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.TOTAL_STUDENTS' | translate }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body">
+          <div class="fs-2 fw-bold text-success">{{ summary.paidCount }}</div>
+          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.PAID' | translate }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body">
+          <div class="fs-2 fw-bold text-danger">{{ summary.overdueCount }}</div>
+          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.OVERDUE' | translate }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body">
+          <div class="fs-2 fw-bold text-info">{{ summary.totalRevenue | number:'1.0-0' }}</div>
+          <div class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.COLLECTED' | translate }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Filter Tabs -->
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <button
+      *ngFor="let s of statuses"
+      class="btn btn-sm"
+      [class.btn-primary]="statusFilter === s"
+      [class.btn-outline-secondary]="statusFilter !== s"
+      (click)="onStatusFilterChange(s)">
+      {{ 'MONTHLY_SUBSCRIPTIONS.STATUS.' + s | translate }}
+      <span class="badge ms-1 bg-white text-dark" *ngIf="s === 'ALL'">{{ payments.length }}</span>
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-5" *ngIf="loading">
+    <div class="spinner-border text-primary"></div>
+    <p class="mt-2 text-muted">{{ 'COMMON.LOADING' | translate }}</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5" *ngIf="!loading && filteredPayments.length === 0">
+    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+    <p class="text-muted">{{ 'MONTHLY_SUBSCRIPTIONS.NO_RECORDS' | translate }}</p>
+    <p class="text-muted small">{{ 'MONTHLY_SUBSCRIPTIONS.GENERATE_HINT' | translate }}</p>
+  </div>
+
+  <!-- Payments Table -->
+  <div class="card shadow-sm" *ngIf="!loading && filteredPayments.length > 0">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>{{ 'COMMON.STUDENT' | translate }}</th>
+              <th>{{ 'COMMON.COURSE' | translate }}</th>
+              <th>{{ 'COMMON.BRANCH' | translate }}</th>
+              <th>{{ 'MONTHLY_SUBSCRIPTIONS.DUE_DATE' | translate }}</th>
+              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_DUE' | translate }}</th>
+              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_PAID' | translate }}</th>
+              <th class="text-end">{{ 'MONTHLY_SUBSCRIPTIONS.REMAINING' | translate }}</th>
+              <th>{{ 'COMMON.STATUS' | translate }}</th>
+              <th>{{ 'COMMON.ACTIONS' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of filteredPayments">
+              <td>
+                <span class="fw-medium">{{ p.studentFirstName }} {{ p.studentLastName }}</span>
+              </td>
+              <td>{{ p.courseName }}</td>
+              <td>{{ p.branchName }}</td>
+              <td>{{ p.dueDate | date:'mediumDate' }}</td>
+              <td class="text-end">{{ p.amountDue | number:'1.0-2' }}</td>
+              <td class="text-end text-success">{{ p.amountPaid | number:'1.0-2' }}</td>
+              <td class="text-end" [class.text-danger]="p.amountDue - p.amountPaid > 0">
+                {{ (p.amountDue - p.amountPaid) | number:'1.0-2' }}
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getStatusClass(p.paymentStatus)">
+                  {{ 'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate }}
+                </span>
+              </td>
+              <td>
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  *ngIf="p.paymentStatus !== 'PAID'"
+                  (click)="openPayDialog(p)"
+                  [disabled]="payingId === p.id">
+                  <i class="fas fa-money-bill-wave me-1"></i>
+                  {{ 'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate }}
+                </button>
+                <span class="text-success small" *ngIf="p.paymentStatus === 'PAID'">
+                  <i class="fas fa-check-circle me-1"></i>{{ p.paidDate | date:'shortDate' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pay Dialog Modal -->
+<div class="modal fade show d-block" tabindex="-1" *ngIf="showPayDialog" style="background:rgba(0,0,0,0.5)">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ 'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate }}</h5>
+        <button type="button" class="btn-close" (click)="closePayDialog()"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedPayment">
+        <p class="mb-3">
+          <strong>{{ selectedPayment.studentFirstName }} {{ selectedPayment.studentLastName }}</strong>
+          &mdash; {{ selectedPayment.courseName }}
+        </p>
+        <div class="mb-3">
+          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT' | translate }}</label>
+          <input type="number" class="form-control" [(ngModel)]="payAmount" min="0.01" step="0.01" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">{{ 'MONTHLY_SUBSCRIPTIONS.PAYMENT_DATE' | translate }}</label>
+          <input type="date" class="form-control" [(ngModel)]="payDate" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">{{ 'COMMON.NOTES' | translate }}</label>
+          <textarea class="form-control" rows="2" [(ngModel)]="payNotes"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closePayDialog()">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" class="btn btn-primary" (click)="confirmPayment()" [disabled]="payingId !== null || payAmount <= 0">
+          <span class="spinner-border spinner-border-sm me-1" *ngIf="payingId !== null"></span>
+          {{ 'COMMON.CONFIRM' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

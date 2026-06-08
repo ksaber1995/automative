@@ -46,6 +46,7 @@ import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
+import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
 
 // Create the router implementation
 const router = {
@@ -127,6 +128,13 @@ const router = {
   },
   timetable: {
     getDay: timetableRoutes.getDay,
+  },
+  monthlySubscriptions: {
+    generate: monthlySubscriptionsRoutes.generate,
+    list: monthlySubscriptionsRoutes.list,
+    summary: monthlySubscriptionsRoutes.summary,
+    recordPayment: monthlySubscriptionsRoutes.recordPayment,
+    listByCourse: monthlySubscriptionsRoutes.listByCourse,
   },
 };
 

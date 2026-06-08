@@ -71,7 +71,10 @@ const EnrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'DROPPED', 'PENDIN
 const PaymentStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
 
 // Payment Mode
-const PaymentModeSchema = z.enum(['FULL', 'INSTALLMENTS']);
+const PaymentModeSchema = z.enum(['FULL', 'INSTALLMENTS', 'MONTHLY_SUBSCRIPTION']);
+
+// Course Payment Type
+const CoursePaymentTypeSchema = z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']);
 
 // Payment Methods
 const PaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CREDIT_CARD', 'CHECK']);
@@ -509,8 +512,67 @@ const CourseSchema = z.object({
   levelName: z.string().nullable().optional(),
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
+  paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),  // NEW
+  monthlyFee: z.number().nullable(),                          // NEW
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+// =============================================
+// Monthly Subscription Schemas  (NEW)
+// =============================================
+const MonthlyPaymentStatusSchema = z.enum(['PENDING', 'PAID', 'PARTIAL', 'OVERDUE']);
+
+const MonthlySubscriptionPaymentSchema = z.object({
+  id: UUIDSchema,
+  enrollmentId: UUIDSchema,
+  companyId: UUIDSchema,
+  studentId: UUIDSchema,
+  courseId: UUIDSchema,
+  branchId: UUIDSchema,
+  billingYear: z.number(),
+  billingMonth: z.number(),
+  amountDue: z.number(),
+  amountPaid: z.number(),
+  paymentStatus: MonthlyPaymentStatusSchema,
+  dueDate: z.string(),
+  paidDate: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend({
+  studentFirstName: z.string(),
+  studentLastName: z.string(),
+  courseName: z.string(),
+  branchName: z.string(),
+  className: z.string().nullable().optional(),
+});
+
+const MonthlyPaymentSummarySchema = z.object({
+  billingYear: z.number(),
+  billingMonth: z.number(),
+  totalStudents: z.number(),
+  paidCount: z.number(),
+  pendingCount: z.number(),
+  overdueCount: z.number(),
+  partialCount: z.number(),
+  totalRevenue: z.number(),
+  totalExpected: z.number(),
+});
+
+const RecordMonthlyPaymentSchema = z.object({
+  amount: z.number().positive(),
+  paymentDate: z.string(),
+  notes: z.string().optional(),
+});
+
+const GenerateMonthlyBillsSchema = z.object({
+  courseId: OptionalUUIDSchema,
+  branchId: OptionalUUIDSchema,
+  billingYear: z.number().int().min(2020).max(2100),
+  billingMonth: z.number().int().min(1).max(12),
 });
 
 // =============================================
@@ -3940,6 +4002,76 @@ export const contract = c.router({
         200: z.any(),
         404: ApiErrorSchema,
         403: ApiErrorSchema,
+      },
+    },
+  },
+
+  // ============================================================
+  // Monthly Subscriptions  (NEW)
+  // ============================================================
+  monthlySubscriptions: {
+    generate: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/generate',
+      body: GenerateMonthlyBillsSchema,
+      responses: {
+        201: z.object({ generated: z.number(), month: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    list: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions',
+      query: z.object({
+        billingYear: z.string(),
+        billingMonth: z.string(),
+        branchId: z.string().optional(),
+        courseId: z.string().optional(),
+        status: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(MonthlyPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    summary: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/summary',
+      query: z.object({
+        billingYear: z.string(),
+        billingMonth: z.string(),
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: MonthlyPaymentSummarySchema,
+        403: ApiErrorSchema,
+      },
+    },
+    recordPayment: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/:id/pay',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RecordMonthlyPaymentSchema,
+      responses: {
+        200: MonthlySubscriptionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    listByCourse: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/course/:courseId',
+      pathParams: z.object({ courseId: UUIDSchema }),
+      query: z.object({
+        billingYear: z.string().optional(),
+        billingMonth: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(MonthlyPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },

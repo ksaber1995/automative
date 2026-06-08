@@ -83,7 +83,15 @@
       <ng-template pTemplate="body" let-course>
         <tr>
           <td>{{ course.code }}</td>
-          <td>{{ course.name }}</td>
+          <td>
+            {{ course.name }}
+            @if (course.paymentType === 'MONTHLY_SUBSCRIPTION') {
+              <span class="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <i class="pi pi-calendar me-1" style="font-size:0.65rem"></i>
+                {{ 'COURSES.LIST.MONTHLY_BADGE' | translate }}
+              </span>
+            }
+          </td>
           <td>{{ getBranchName(course.branchId) }}</td>
           <td>{{ course.levelName || '—' }}</td>
           <td>{{ course.duration }} {{ 'COURSES.LIST.WEEKS' | translate }}</td>

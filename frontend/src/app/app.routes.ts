@@ -37,6 +37,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/courses/courses.routes').then(m => m.COURSES_ROUTES)
       },
       {
+        path: 'monthly-subscriptions',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.MONTHLY_SUBSCRIPTIONS' },
+        loadComponent: () => import('./features/monthly-subscriptions/monthly-subscriptions-dashboard/monthly-subscriptions-dashboard.component').then(m => m.MonthlySubscriptionsDashboardComponent)
+      },
+      {
         path: 'master-courses',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.MASTER_COURSES' },

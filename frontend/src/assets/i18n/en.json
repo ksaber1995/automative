@@ -449,12 +449,45 @@
     "PRODUCTS_SALES": "Sales History",
     "USERS": "Users",
     "ROOMS": "Rooms",
+    "MONTHLY_SUBSCRIPTIONS": "Monthly Subscriptions",
     "SESSIONS": "Sessions",
     "TIMETABLE": "Timetable",
     "ATTENDANCE_TEACHERS": "Teacher Attendance",
     "SETTINGS": "Settings",
     "CASH": "Cash",
     "COMPANY_PROFILE": "Company Profile"
+  },
+  "MONTHLY_SUBSCRIPTIONS": {
+    "TITLE": "Monthly Subscriptions",
+    "SUBTITLE": "Manage monthly billing for subscription-based courses",
+    "YEAR": "Year",
+    "MONTH": "Month",
+    "GENERATE": "Generate Bills",
+    "GENERATED": "Generated {{count}} bills for {{month}}",
+    "GENERATE_ERROR": "Failed to generate bills",
+    "GENERATE_HINT": "Click 'Generate Bills' to create monthly bills for the selected period.",
+    "LOAD_ERROR": "Failed to load subscriptions",
+    "NO_RECORDS": "No subscription records found for this period.",
+    "TOTAL_STUDENTS": "Total Students",
+    "PAID": "Paid",
+    "OVERDUE": "Overdue",
+    "COLLECTED": "Collected",
+    "DUE_DATE": "Due Date",
+    "AMOUNT_DUE": "Amount Due",
+    "AMOUNT_PAID": "Amount Paid",
+    "REMAINING": "Remaining",
+    "RECORD_PAYMENT": "Record Payment",
+    "PAYMENT_RECORDED": "Payment recorded successfully",
+    "PAYMENT_ERROR": "Failed to record payment",
+    "AMOUNT": "Amount",
+    "PAYMENT_DATE": "Payment Date",
+    "STATUS": {
+      "ALL": "All",
+      "PENDING": "Pending",
+      "PARTIAL": "Partial",
+      "PAID": "Paid",
+      "OVERDUE": "Overdue"
+    }
   },
   "NAV": {
     "DASHBOARD": "Dashboard",
@@ -1203,7 +1236,8 @@
       "DIRECT_ENROLLMENTS_TOOLTIP": "Direct course enrollments",
       "BUNDLE_ENROLLMENTS_TOOLTIP": "From master course bundle enrollments",
       "TOTAL": "Total",
-      "LOAD_ERROR": "Failed to load courses"
+      "LOAD_ERROR": "Failed to load courses",
+      "MONTHLY_BADGE": "Monthly"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Course",
@@ -1245,7 +1279,12 @@
       "UPDATE_ERROR": "Failed to update course",
       "CREATE_ERROR": "Failed to create course",
       "LOAD_BRANCHES_ERROR": "Failed to load branches",
-      "LOAD_EMPLOYEES_ERROR": "Failed to load employees"
+      "LOAD_EMPLOYEES_ERROR": "Failed to load employees",
+      "PAYMENT_TYPE_LABEL": "Payment Type",
+      "PAYMENT_TYPE_ONE_TIME": "One-Time Payment",
+      "PAYMENT_TYPE_MONTHLY": "Monthly Subscription",
+      "MONTHLY_FEE_LABEL": "Monthly Fee",
+      "MONTHLY_FEE_PLACEHOLDER": "0.00"
     },
     "DELETED": "Course deleted successfully"
   },

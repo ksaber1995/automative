@@ -454,12 +454,46 @@
     "ATTENDANCE_TEACHERS": "حضور المدرسين",
     "SETTINGS": "الإعدادات",
     "CASH": "الخزينة",
+    "MONTHLY_SUBSCRIPTIONS": "الاشتراكات الشهرية",
     "COMPANY_PROFILE": "ملف الشركة"
+  },
+  "MONTHLY_SUBSCRIPTIONS": {
+    "TITLE": "الاشتراكات الشهرية",
+    "SUBTITLE": "إدارة الفواتير الشهرية للكورسات ذات الاشتراك الشهري",
+    "YEAR": "السنة",
+    "MONTH": "الشهر",
+    "GENERATE": "إنشاء الفواتير",
+    "GENERATED": "تم إنشاء {{count}} فاتورة لشهر {{month}}",
+    "GENERATE_ERROR": "فشل إنشاء الفواتير",
+    "GENERATE_HINT": "اضغط على 'إنشاء الفواتير' لإنشاء فواتير شهرية للفترة المحددة.",
+    "LOAD_ERROR": "فشل تحميل الاشتراكات",
+    "NO_RECORDS": "لا توجد سجلات اشتراك لهذه الفترة.",
+    "TOTAL_STUDENTS": "إجمالي الطلاب",
+    "PAID": "مدفوع",
+    "OVERDUE": "متأخر",
+    "COLLECTED": "المحصّل",
+    "DUE_DATE": "تاريخ الاستحقاق",
+    "AMOUNT_DUE": "المبلغ المستحق",
+    "AMOUNT_PAID": "المبلغ المدفوع",
+    "REMAINING": "المتبقي",
+    "RECORD_PAYMENT": "تسجيل دفعة",
+    "PAYMENT_RECORDED": "تم تسجيل الدفعة بنجاح",
+    "PAYMENT_ERROR": "فشل تسجيل الدفعة",
+    "AMOUNT": "المبلغ",
+    "PAYMENT_DATE": "تاريخ الدفع",
+    "STATUS": {
+      "ALL": "الكل",
+      "PENDING": "معلق",
+      "PARTIAL": "جزئي",
+      "PAID": "مدفوع",
+      "OVERDUE": "متأخر"
+    }
   },
   "NAV": {
     "DASHBOARD": "لوحة التحكم",
     "BRANCHES": "الفروع",
     "COURSES": "الكورسات",
+    "MONTHLY_SUBSCRIPTIONS": "الاشتراكات الشهرية",
     "MASTER_COURSES": "الكورسات الرئيسية",
     "LEVELS": "المستويات",
     "EVENTS": "الفعاليات",
@@ -1203,7 +1237,8 @@
       "DIRECT_ENROLLMENTS_TOOLTIP": "تسجيلات الكورس المباشرة",
       "BUNDLE_ENROLLMENTS_TOOLTIP": "من تسجيلات حزم الكورسات الرئيسية",
       "TOTAL": "الإجمالي",
-      "LOAD_ERROR": "فشل تحميل الكورسات"
+      "LOAD_ERROR": "فشل تحميل الكورسات",
+      "MONTHLY_BADGE": "شهري"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل الكورس",
@@ -1245,7 +1280,12 @@
       "UPDATE_ERROR": "فشل تحديث الكورس",
       "CREATE_ERROR": "فشل إنشاء الكورس",
       "LOAD_BRANCHES_ERROR": "فشل تحميل الفروع",
-      "LOAD_EMPLOYEES_ERROR": "فشل تحميل الموظفين"
+      "LOAD_EMPLOYEES_ERROR": "فشل تحميل الموظفين",
+      "PAYMENT_TYPE_LABEL": "نوع الدفع",
+      "PAYMENT_TYPE_ONE_TIME": "دفعة واحدة",
+      "PAYMENT_TYPE_MONTHLY": "اشتراك شهري",
+      "MONTHLY_FEE_LABEL": "الرسوم الشهرية",
+      "MONTHLY_FEE_PLACEHOLDER": "0.00"
     },
     "DELETED": "تم حذف الدورة بنجاح"
   },

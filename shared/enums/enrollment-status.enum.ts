@@ -15,6 +15,7 @@ export enum PaymentStatus {
 export enum PaymentMode {
   FULL = 'FULL',
   INSTALLMENTS = 'INSTALLMENTS',
+  MONTHLY_SUBSCRIPTION = 'MONTHLY_SUBSCRIPTION',  // NEW
 }
 
 export enum PaymentMethod {
