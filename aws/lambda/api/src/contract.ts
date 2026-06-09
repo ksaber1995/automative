@@ -142,6 +142,9 @@ const LoginRequestSchema = z.object({
 const RegisterRequestSchema = z.object({
   // Company details
   companyName: z.string().min(1),
+  // Account type: ACADEMY (institution) or TEACHER (individual). Optional so
+  // older clients that omit it still validate; the backend defaults to ACADEMY.
+  type: z.enum(['ACADEMY', 'TEACHER']).optional(),
   // Industry is hidden in the registration UI but submitted with a default
   // ("Tech Center") so the backend can store it. Optional so future clients
   // that omit it still validate.
@@ -3301,6 +3304,22 @@ export const contract = c.router({
 
   // Migration routes (one-time use)
   migrations: {
+    addCompanyType: {
+      method: 'POST',
+      path: '/api/migrations/add-company-type',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
     addGenderToStudents: {
       method: 'POST',
       path: '/api/migrations/add-gender-to-students',

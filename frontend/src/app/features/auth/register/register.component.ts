@@ -35,6 +35,8 @@ export class RegisterComponent {
     this.registerForm = this.fb.group({
       // Company Information
       companyName: ['', [Validators.required, Validators.minLength(2)]],
+      // Account type: ACADEMY (institution) or TEACHER (individual). Defaults to ACADEMY.
+      type: ['ACADEMY', [Validators.required]],
       // TODO: re-enable later. Hidden for now to simplify onboarding.
       // companyEmail: ['', [Validators.required, Validators.email]],
       // companyCode: [''],
@@ -111,6 +113,7 @@ export class RegisterComponent {
 
   // Form field getters
   get companyName() { return this.registerForm.get('companyName'); }
+  get type() { return this.registerForm.get('type'); }
   // TODO: re-enable later. Hidden for now to simplify onboarding.
   // get companyEmail() { return this.registerForm.get('companyEmail'); }
   // get companyCode() { return this.registerForm.get('companyCode'); }

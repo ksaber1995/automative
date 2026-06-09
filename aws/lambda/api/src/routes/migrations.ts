@@ -1136,7 +1136,59 @@ async function addGenderToStudents() {
   return { success: true, message: `students.gender ready; ${backfilled.length} existing row(s) set to MALE` };
 }
 
+async function addCompanyType() {
+  console.log('Starting migration: add type to companies');
+
+  // 1) Add the column (idempotent).
+  await query(`
+    ALTER TABLE companies
+      ADD COLUMN IF NOT EXISTS type VARCHAR(20)
+  `);
+
+  // 2) Backfill existing rows to ACADEMY before adding the CHECK constraint.
+  const backfilled = await query(`
+    UPDATE companies SET type = 'ACADEMY' WHERE type IS NULL RETURNING id
+  `);
+  console.log(`✓ Backfilled ${backfilled.length} compan(y/ies) to type = ACADEMY`);
+
+  // 3) Default + NOT NULL so future inserts always have a value.
+  await query(`ALTER TABLE companies ALTER COLUMN type SET DEFAULT 'ACADEMY'`);
+  await query(`ALTER TABLE companies ALTER COLUMN type SET NOT NULL`);
+
+  // 4) Add the CHECK constraint if it isn't there yet.
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'companies' AND constraint_name = 'companies_type_check'
+      ) THEN
+        ALTER TABLE companies
+          ADD CONSTRAINT companies_type_check CHECK (type IN ('ACADEMY', 'TEACHER'));
+      END IF;
+    END$$;
+  `);
+
+  console.log('✅ companies.type migration completed!');
+  return { success: true, message: `companies.type ready; ${backfilled.length} existing row(s) set to ACADEMY` };
+}
+
 export const migrationsRoutes = {
+  addCompanyType: async () => {
+    try {
+      const result = await addCompanyType();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   addGenderToStudents: async () => {
     try {
       const result = await addGenderToStudents();

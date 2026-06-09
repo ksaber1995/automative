@@ -175,6 +175,7 @@ export const authRoutes = {
   }: {
     body: {
       companyName: string;
+      type?: 'ACADEMY' | 'TEACHER';
       industry?: string;
       firstName: string;
       lastName: string;
@@ -234,15 +235,19 @@ export const authRoutes = {
         return apiError(400, 'ERRORS.AUTH.PHONE_TAKEN', 'A user with this phone number already exists.');
       }
 
+      // Account type chosen at signup; anything other than TEACHER falls back
+      // to ACADEMY so a missing/garbage value can't violate the CHECK constraint.
+      const companyType = body.type === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
+
       const companyRes = await client.query(
         `INSERT INTO companies
-          (name, industry, subscription_tier, subscription_status,
+          (name, type, industry, subscription_tier, subscription_status,
            subscription_start_date, subscription_end_date, max_branches, max_users,
            timezone, currency, locale, is_active, onboarding_completed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING *`,
         [
-          body.companyName, body.industry || 'Tech Center',
+          body.companyName, companyType, body.industry || 'Tech Center',
           'BASIC', 'TRIAL',
           new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false,

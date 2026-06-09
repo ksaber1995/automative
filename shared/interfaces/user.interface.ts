@@ -78,6 +78,8 @@ export interface LoginDto {
 export interface RegisterDto {
   // Company details
   companyName: string;
+  // Account type chosen at signup: ACADEMY (institution) or TEACHER (individual).
+  type?: 'ACADEMY' | 'TEACHER';
   industry?: string;
   timezone?: string;
 

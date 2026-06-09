@@ -1,0 +1,17 @@
+# Dependencies
+/node_modules
+
+# Angular build output
+/dist
+/.angular
+
+# Secrets — NEVER commit your AWS access keys
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
