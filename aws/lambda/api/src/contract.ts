@@ -3302,6 +3302,34 @@ export const contract = c.router({
     },
   },
 
+  // Obscure, unauthenticated read-only endpoint for the owner's local admin
+  // console (cross-tenant company/subscription numbers). The path is the secret.
+  adminSecret: {
+    getSubscriptions: {
+      method: 'GET',
+      path: '/api/karim-admin-secret',
+      responses: {
+        200: z.array(
+          z.object({
+            company_id: z.string(),
+            company_name: z.string(),
+            company_active: z.boolean().nullable(),
+            currency: z.string().nullable(),
+            company_created_at: z.string().nullable(),
+            subscription_type: z.string().nullable(),
+            price: z.number().nullable(),
+            start_date: z.string().nullable(),
+            end_date: z.string().nullable(),
+            employee_count: z.number(),
+            branch_count: z.number(),
+            student_count: z.number(),
+          })
+        ),
+        500: z.object({ message: z.string() }),
+      },
+    },
+  },
+
   // Migration routes (one-time use)
   migrations: {
     addCompanyType: {

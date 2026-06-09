@@ -46,6 +46,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 <th>Company</th>
                 <th>Type</th>
                 <th class="num">Price</th>
+                <th class="num">Students</th>
                 <th class="num">Employees</th>
                 <th class="num">Branches</th>
                 <th>Start</th>
@@ -63,6 +64,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                     </span>
                   </td>
                   <td class="num">{{ formatPrice(r) }}</td>
+                  <td class="num">{{ r.student_count }}</td>
                   <td class="num">{{ r.employee_count }}</td>
                   <td class="num">{{ r.branch_count }}</td>
                   <td>{{ formatDate(r.start_date) }}</td>
@@ -74,7 +76,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 </tr>
               }
               @if (filtered().length === 0) {
-                <tr><td colspan="8" class="state">No matches.</td></tr>
+                <tr><td colspan="9" class="state">No matches.</td></tr>
               }
             </tbody>
           </table>
@@ -160,7 +162,7 @@ export class AppComponent implements OnInit {
       },
       error: (err) => {
         const msg = err?.error?.message || err?.message || 'Request failed';
-        this.error.set(`Could not load subscriptions: ${msg}\nIs the local server running (npm run server) and is .env filled in?`);
+        this.error.set(`Could not load subscriptions: ${msg}`);
         this.loading.set(false);
       },
     });

@@ -38,6 +38,7 @@ import { reportsRoutes } from './routes/reports';
 import { enrollmentsRoutes } from './routes/enrollments';
 import { subscriptionsRoutes } from './routes/subscriptions';
 import { migrationsRoutes } from './routes/migrations';
+import { adminSecretRoutes } from './routes/admin-secret';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
@@ -114,6 +115,7 @@ const router = {
   reports: reportsRoutes,
   debug: debugRoutes,
   subscriptions: subscriptionsRoutes,
+  adminSecret: adminSecretRoutes,
   migrations: migrationsRoutes,
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,

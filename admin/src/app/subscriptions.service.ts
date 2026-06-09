@@ -15,13 +15,20 @@ export interface CompanySubscription {
   end_date: string | null;
   employee_count: number;
   branch_count: number;
+  student_count: number;
 }
+
+// Obscure, unauthenticated read-only endpoint on the production API. The path
+// is the only gate; it returns aggregate numbers + company names, which is
+// accepted as safe to expose.
+const ADMIN_ENDPOINT =
+  'https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret';
 
 @Injectable({ providedIn: 'root' })
 export class SubscriptionsService {
   private http = inject(HttpClient);
 
   getAll(): Observable<CompanySubscription[]> {
-    return this.http.get<CompanySubscription[]>('/api/subscriptions');
+    return this.http.get<CompanySubscription[]>(ADMIN_ENDPOINT);
   }
 }
