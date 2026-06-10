@@ -20,6 +20,7 @@ CREATE TABLE companies (
     tax_id VARCHAR(100),
     registration_number VARCHAR(100),
     industry VARCHAR(100),
+    type VARCHAR(20) NOT NULL DEFAULT 'ACADEMY',
     subscription_tier VARCHAR(50) DEFAULT 'BASIC' CHECK (subscription_tier IN ('BASIC', 'PROFESSIONAL', 'ENTERPRISE')),
     subscription_status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (subscription_status IN ('TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED')),
     subscription_start_date DATE DEFAULT CURRENT_DATE,
