@@ -1,16 +1,47 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
+import { DialogModule } from 'primeng/dialog';
+import { TextareaModule } from 'primeng/textarea';
+import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode } from 'html5-qrcode';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
+import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
+import { EmployeeService } from '../../employees/services/employee.service';
+import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
+
+interface TeacherRow {
+  employeeId: string;
+  role: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT';
+  status: 'PRESENT' | 'ABSENT';
+}
+
+interface TeacherOption {
+  id: string;
+  displayName: string;
+}
+
+/** Cross-field validator: endTime must not produce a datetime before startDate */
+function endTimeAfterStartValidator(startDate: string) {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const timeVal: string = control.value; // "HH:mm"
+    if (!timeVal || !startDate) return null;
+    const start = new Date(startDate);
+    const [hours, minutes] = timeVal.split(':').map(Number);
+    const end = new Date(start);
+    end.setHours(hours, minutes, 0, 0);
+    return end < start ? { endBeforeStart: true } : null;
+  };
+}
 
 /**
  * Full-page attendance editor for a single session, opened in a new tab from the
@@ -22,15 +53,19 @@ import { NotificationService } from '../../../core/services/notification.service
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, TranslateModule],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, TextareaModule, TooltipModule, TranslateModule],
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
+  private teacherAttendanceService = inject(TeacherAttendanceService);
+  private employeeService = inject(EmployeeService);
+  private languageService = inject(LanguageService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private fb = inject(FormBuilder);
 
   sessionId = '';
   session = signal<Session | null>(null);
@@ -70,6 +105,48 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   presentCount = computed(() => this.students().filter((s) => s.isPresent).length);
   absentCount = computed(() => this.students().filter((s) => !s.isPresent).length);
 
+  /** True while the session is still running (no end date yet). */
+  isActive = computed(() => !!this.session() && !this.session()!.endDate);
+
+  // ── Teacher management ──────────────────────────────────────────────────────
+  teacherPanelOpen = signal(false);
+  loadingTeachers = signal(false);
+  savingTeachers = signal(false);
+  teacherRows = signal<TeacherRow[]>([]);
+  allEmployees = signal<TeacherOption[]>([]);
+  newTeacherEmployeeId: string | null = null;
+
+  availableEmployees = computed<TeacherOption[]>(() => {
+    const used = new Set(this.teacherRows().map((t) => t.employeeId));
+    return this.allEmployees().filter((e) => !used.has(e.id));
+  });
+
+  /** Role/status option labels — recompute when the active language changes. */
+  roleOptions = computed<{ label: string; value: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT' }[]>(() => {
+    this.languageService.currentLang(); // dependency
+    return [
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_PRIMARY'), value: 'PRIMARY' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_SUBSTITUTE'), value: 'SUBSTITUTE' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.ROLE_ASSISTANT'), value: 'ASSISTANT' },
+    ];
+  });
+  statusOptions = computed<{ label: string; value: 'PRESENT' | 'ABSENT' }[]>(() => {
+    this.languageService.currentLang();
+    return [
+      { label: this.translate.instant('SESSIONS_DASHBOARD.STATUS_PRESENT'), value: 'PRESENT' },
+      { label: this.translate.instant('SESSIONS_DASHBOARD.STATUS_ABSENT'), value: 'ABSENT' },
+    ];
+  });
+
+  // ── End session ─────────────────────────────────────────────────────────────
+  showEndDialog = false;
+  endingSession = signal(false);
+  endDateDisplay = signal('');
+  endSessionForm: FormGroup = this.fb.group({
+    endTime: ['', Validators.required],
+    notes: [''],
+  });
+
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
     if (!this.sessionId) {
@@ -83,6 +160,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       },
     });
     this.loadStudents();
+    this.loadEmployees();
   }
 
   loadStudents() {
@@ -134,6 +212,127 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.savedClearTimer = setTimeout(() => this.saveState.set(undefined), 2000);
       },
       error: () => this.saveState.set('error'),
+    });
+  }
+
+  // ============================================================
+  // Teacher management
+  // ============================================================
+
+  loadEmployees() {
+    this.employeeService.getAllEmployees().subscribe({
+      next: (list: any[]) => {
+        this.allEmployees.set(
+          list.map((e: any) => ({
+            id: e.id,
+            displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
+          })),
+        );
+      },
+    });
+  }
+
+  employeeLabel(id: string): string {
+    return this.allEmployees().find((e) => e.id === id)?.displayName || '—';
+  }
+
+  toggleTeacherPanel() {
+    const open = !this.teacherPanelOpen();
+    this.teacherPanelOpen.set(open);
+    if (open && this.teacherRows().length === 0) {
+      this.loadTeachers();
+    }
+  }
+
+  loadTeachers() {
+    this.loadingTeachers.set(true);
+    this.teacherAttendanceService.getBySession(this.sessionId).subscribe({
+      next: (rows: SessionTeacherAttendanceRow[]) => {
+        this.teacherRows.set(rows.map((r) => ({ employeeId: r.employeeId, role: r.role, status: r.status })));
+        this.loadingTeachers.set(false);
+      },
+      error: () => this.loadingTeachers.set(false),
+    });
+  }
+
+  addTeacher() {
+    const empId = this.newTeacherEmployeeId;
+    if (!empId) return;
+    const rows = this.teacherRows();
+    if (rows.some((t) => t.employeeId === empId)) return;
+    const primaryAlreadyPresent = rows.some((t) => t.role === 'PRIMARY' && t.status === 'PRESENT');
+    this.teacherRows.update((list) => [
+      ...list,
+      { employeeId: empId, role: primaryAlreadyPresent ? 'SUBSTITUTE' : 'PRIMARY', status: 'PRESENT' },
+    ]);
+    this.newTeacherEmployeeId = null;
+  }
+
+  removeTeacher(employeeId: string) {
+    this.teacherRows.update((list) => list.filter((t) => t.employeeId !== employeeId));
+  }
+
+  updateTeacherRole(employeeId: string, role: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT') {
+    this.teacherRows.update((list) => list.map((t) => (t.employeeId === employeeId ? { ...t, role } : t)));
+  }
+
+  updateTeacherStatus(employeeId: string, status: 'PRESENT' | 'ABSENT') {
+    this.teacherRows.update((list) => list.map((t) => (t.employeeId === employeeId ? { ...t, status } : t)));
+  }
+
+  saveTeachers() {
+    const payload = this.teacherRows().map((t) => ({ employeeId: t.employeeId, role: t.role, status: t.status }));
+    this.savingTeachers.set(true);
+    this.teacherAttendanceService.saveForSession(this.sessionId, payload).subscribe({
+      next: (res) => {
+        this.savingTeachers.set(false);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVED', { count: res.count }));
+      },
+      error: () => this.savingTeachers.set(false),
+    });
+  }
+
+  // ============================================================
+  // End session
+  // ============================================================
+
+  confirmEndSession() {
+    const s = this.session();
+    if (!s) return;
+    const now = new Date();
+    const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const startDate = new Date(s.startDate);
+    this.endDateDisplay.set(
+      startDate.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }),
+    );
+    this.endSessionForm = this.fb.group({
+      endTime: [defaultTime, [Validators.required, endTimeAfterStartValidator(s.startDate)]],
+      notes: [''],
+    });
+    this.showEndDialog = true;
+  }
+
+  endSession() {
+    const s = this.session();
+    if (!s || this.endSessionForm.invalid) {
+      this.endSessionForm.markAllAsTouched();
+      return;
+    }
+    const startDate = new Date(s.startDate);
+    const [hours, minutes] = (this.endSessionForm.value.endTime as string).split(':').map(Number);
+    const endDateTime = new Date(startDate);
+    endDateTime.setHours(hours, minutes, 0, 0);
+
+    this.endingSession.set(true);
+    this.sessionService.end(s.id, this.endSessionForm.value.notes || undefined, endDateTime.toISOString()).subscribe({
+      next: () => {
+        this.endingSession.set(false);
+        this.showEndDialog = false;
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_ENDED'));
+        // Refetch so the header reflects the ended state (and keeps enriched fields).
+        this.sessionService.getById(this.sessionId).subscribe({ next: (s) => this.session.set(s) });
+      },
+      error: () => this.endingSession.set(false),
     });
   }
 

@@ -16,7 +16,16 @@
         <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.ATTENDANCE_TITLE' | translate }}</h1>
       }
     </div>
-    <div class="flex items-center gap-2 text-sm">
+    <div class="flex items-center gap-2 text-sm flex-wrap">
+      @if (isActive()) {
+        <p-button icon="pi pi-user-edit" severity="warn" [outlined]="true" size="small"
+          [label]="(teacherPanelOpen() ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
+          (onClick)="toggleTeacherPanel()"></p-button>
+        <p-button icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
+          [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
+          (onClick)="confirmEndSession()"></p-button>
+        <span class="text-gray-300">·</span>
+      }
       <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
       <span class="text-gray-300">·</span>
       <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCount() } }}</span>
@@ -74,6 +83,97 @@
       </p-card>
     }
   </div>
+
+  <!-- Teacher management -->
+  @if (teacherPanelOpen()) {
+    <div class="mb-4">
+      <p-card>
+        @if (loadingTeachers()) {
+          <div class="text-center py-6 text-gray-400">
+            <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+            <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_TEACHERS' | translate }}</p>
+          </div>
+        } @else {
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-semibold text-gray-700">{{ 'SESSIONS_DASHBOARD.TEACHERS_TITLE' | translate }}</span>
+            <span class="text-xs text-gray-500">{{ 'SESSIONS_DASHBOARD.TEACHERS_DESC' | translate }}</span>
+          </div>
+
+          @if (teacherRows().length > 0) {
+            <div class="space-y-2 mb-3">
+              @for (t of teacherRows(); track t.employeeId) {
+                <div class="grid grid-cols-12 gap-2 items-center bg-gray-50 border border-gray-200 rounded-md p-2">
+                  <div class="col-span-4 text-sm font-medium truncate" [title]="employeeLabel(t.employeeId)">
+                    {{ employeeLabel(t.employeeId) }}
+                  </div>
+                  <div class="col-span-3">
+                    <p-select
+                      [options]="roleOptions()"
+                      [ngModel]="t.role"
+                      (ngModelChange)="updateTeacherRole(t.employeeId, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                      optionLabel="label"
+                      optionValue="value"
+                      appendTo="body"
+                      [style]="{ width: '100%' }"
+                    ></p-select>
+                  </div>
+                  <div class="col-span-3">
+                    <p-select
+                      [options]="statusOptions()"
+                      [ngModel]="t.status"
+                      (ngModelChange)="updateTeacherStatus(t.employeeId, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                      optionLabel="label"
+                      optionValue="value"
+                      appendTo="body"
+                      [style]="{ width: '100%' }"
+                    ></p-select>
+                  </div>
+                  <div class="col-span-2 flex justify-end">
+                    <p-button icon="pi pi-times" severity="danger" [text]="true" [rounded]="true"
+                      [pTooltip]="'SESSIONS_DASHBOARD.TEACHER_REMOVE' | translate"
+                      (onClick)="removeTeacher(t.employeeId)"></p-button>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="text-xs text-gray-400 mb-3">{{ 'SESSIONS_DASHBOARD.NO_TEACHERS_YET' | translate }}</p>
+          }
+
+          <div class="flex items-center gap-2">
+            <p-select
+              [options]="availableEmployees()"
+              [(ngModel)]="newTeacherEmployeeId"
+              [ngModelOptions]="{ standalone: true }"
+              optionLabel="displayName"
+              optionValue="id"
+              appendTo="body"
+              [placeholder]="'SESSIONS_DASHBOARD.ADD_TEACHER' | translate"
+              [filter]="true"
+              filterBy="displayName"
+              [showClear]="true"
+              [style]="{ flex: '1' }"
+            ></p-select>
+            <p-button icon="pi pi-plus" severity="secondary"
+              [disabled]="!newTeacherEmployeeId"
+              (onClick)="addTeacher()"></p-button>
+          </div>
+
+          <div class="mt-3 pt-3 border-t flex justify-end">
+            <p-button
+              [label]="'SESSIONS_DASHBOARD.SAVE_TEACHERS' | translate"
+              icon="pi pi-check"
+              size="small"
+              [loading]="savingTeachers()"
+              (onClick)="saveTeachers()"
+            ></p-button>
+          </div>
+        }
+      </p-card>
+    </div>
+  }
 
   <p-card>
     @if (loading()) {
@@ -145,3 +245,70 @@
     }
   </p-card>
 </div>
+
+<!-- End Session Dialog -->
+<p-dialog
+  [(visible)]="showEndDialog"
+  [header]="'SESSIONS_DASHBOARD.DIALOG_END_TITLE' | translate"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+>
+  @if (session(); as s) {
+    <div class="pt-2 space-y-4">
+      <!-- Session info -->
+      <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+        <p [innerHTML]="'SESSIONS_DASHBOARD.ENDING_FOR' | translate: { className: s.className, roomCode: s.roomCode }"></p>
+        <p class="text-gray-500 mt-1">
+          <i class="pi pi-clock mr-1"></i>{{ 'SESSIONS_DASHBOARD.STARTED_LABEL' | translate: { time: formatTime(s.startDate) } }}
+        </p>
+      </div>
+
+      <form [formGroup]="endSessionForm" class="space-y-4">
+        <!-- End Date (locked — always same as start date) -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            {{ 'SESSIONS_DASHBOARD.END_DATE' | translate }}
+            <span class="ml-1 text-xs text-gray-400 font-normal">{{ 'SESSIONS_DASHBOARD.SAME_AS_START' | translate }}</span>
+          </label>
+          <input pInputText type="text" [value]="endDateDisplay()" [disabled]="true"
+            class="w-full bg-gray-100 text-gray-500 cursor-not-allowed" style="width:100%" />
+        </div>
+
+        <!-- End Time (editable) -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            {{ 'SESSIONS_DASHBOARD.END_TIME' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <input pInputText type="time" formControlName="endTime" class="w-full" style="width:100%" />
+          @if (endSessionForm.get('endTime')?.errors?.['required'] && endSessionForm.get('endTime')?.touched) {
+            <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_END_TIME_REQUIRED' | translate }}</small>
+          }
+          @if (endSessionForm.get('endTime')?.errors?.['endBeforeStart']) {
+            <small class="text-red-500">
+              {{ 'SESSIONS_DASHBOARD.ERR_END_BEFORE_START' | translate: { time: formatTime(s.startDate) } }}
+            </small>
+          }
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.NOTES_OPTIONAL' | translate }}</label>
+          <textarea pTextarea formControlName="notes" rows="2"
+            [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_END_NOTES' | translate" class="w-full"></textarea>
+        </div>
+      </form>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSIONS_DASHBOARD.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showEndDialog = false"></p-button>
+    <p-button
+      [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
+      icon="pi pi-stop"
+      severity="danger"
+      [loading]="endingSession()"
+      [disabled]="endSessionForm.invalid"
+      (onClick)="endSession()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
