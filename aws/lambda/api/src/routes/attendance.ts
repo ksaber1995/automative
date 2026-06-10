@@ -118,6 +118,89 @@ export const attendanceRoutes = {
   },
 
   /**
+   * POST /api/attendance/session/:sessionId/checkin
+   * Mark a single student present by scanning their QR token. Idempotent —
+   * re-scanning an already-present student is a no-op (returns alreadyPresent).
+   * Body: { qrToken: string }
+   */
+  checkinByQr: async ({ params, body, headers }: { params: { sessionId: string }; body: { qrToken: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const session = await queryOne(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) {
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      }
+      if (!canAccessBranch(context, session.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+
+      const token = (body?.qrToken || '').trim();
+      if (!token) {
+        return apiError(400, 'ERRORS.ATTENDANCE.QR_TOKEN_REQUIRED', 'QR token is required');
+      }
+
+      // Resolve the student by token, scoped to this tenant — a token from
+      // another company must not be accepted.
+      const student = await queryOne<any>(
+        'SELECT id, first_name, last_name FROM students WHERE qr_token = $1 AND company_id = $2 AND is_active = true',
+        [token, context.companyId]
+      );
+      if (!student) {
+        return apiError(404, 'ERRORS.ATTENDANCE.QR_STUDENT_NOT_FOUND', 'No active student matches this QR code');
+      }
+
+      // The student must actually be enrolled in this session's class.
+      const enrolled = await queryOne<any>(
+        `SELECT 1 FROM (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+         ) enrolled
+         WHERE student_id = $3`,
+        [session.class_id, context.companyId, student.id]
+      );
+      if (!enrolled) {
+        return apiError(409, 'ERRORS.ATTENDANCE.STUDENT_NOT_IN_CLASS', 'This student is not enrolled in this class');
+      }
+
+      // Idempotent insert. RETURNING only yields a row when a NEW record was
+      // inserted; an ON CONFLICT no-op returns nothing — that's how we tell a
+      // fresh check-in from a re-scan of an already-present student.
+      const inserted = await query(
+        `INSERT INTO session_attendance (session_id, student_id) VALUES ($1, $2)
+         ON CONFLICT (session_id, student_id) DO NOTHING
+         RETURNING id`,
+        [params.sessionId, student.id]
+      );
+      const alreadyPresent = inserted.length === 0;
+
+      return {
+        status: 200 as const,
+        body: {
+          studentId: student.id,
+          studentFirstName: student.first_name,
+          studentLastName: student.last_name,
+          alreadyPresent,
+          code: alreadyPresent ? 'ATTENDANCE.ALREADY_PRESENT' : 'ATTENDANCE.CHECKED_IN',
+          message: alreadyPresent ? 'Student was already marked present' : 'Student marked present',
+        },
+      };
+    } catch (error) {
+      console.error('QR check-in error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.CHECKIN_FAILED', 'Failed to check in student');
+    }
+  },
+
+  /**
    * GET /api/attendance/student/:studentId
    * Returns attendance history for a student across all their sessions.
    */

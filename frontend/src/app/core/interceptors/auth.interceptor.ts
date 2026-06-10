@@ -25,8 +25,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // back to the same locale when the server emits a translation code.
   const lang = languageService.currentLang();
 
-  // Skip auth for login/register requests, but still send the language.
-  if (req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
+  // Skip auth for login/register and public (unauthenticated) endpoints, but
+  // still send the language. The public student-profile page is reached with
+  // no session, and we must never attach a stale token or trigger a logout
+  // from it.
+  if (
+    req.url.includes('/auth/login') ||
+    req.url.includes('/auth/register') ||
+    req.url.includes('/public/')
+  ) {
     return next(req.clone({ setHeaders: { 'Accept-Language': lang } }));
   }
 

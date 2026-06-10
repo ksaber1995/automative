@@ -369,12 +369,17 @@ CREATE TABLE students (
     churn_reason TEXT,
     notes TEXT,
     acquisition_channel VARCHAR(50),
+    -- Random, unguessable token encoded into the student's QR code. Drives the
+    -- public read-only profile page and QR-based attendance check-in. See
+    -- migration 029. Not the UUID, so the public page can't be enumerated.
+    qr_token VARCHAR(32),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_students_branch_id ON students(branch_id);
+CREATE UNIQUE INDEX idx_students_qr_token ON students(qr_token);
 CREATE INDEX idx_students_company_id ON students(company_id);
 CREATE INDEX idx_students_enrollment_date ON students(enrollment_date);
 CREATE INDEX idx_students_churn_date ON students(churn_date);

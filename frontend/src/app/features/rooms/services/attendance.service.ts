@@ -21,6 +21,15 @@ export interface StudentAttendanceRecord {
   isPresent: boolean;
 }
 
+export interface QrCheckinResult {
+  studentId: string;
+  studentFirstName: string;
+  studentLastName: string;
+  alreadyPresent: boolean;
+  code: string;
+  message: string;
+}
+
 export interface ClassAttendanceSummary {
   sessionId: string;
   sessionStartDate: string;
@@ -45,6 +54,14 @@ export class AttendanceService {
     return this.api.post<{ message: string; presentCount: number }>(
       `attendance/session/${sessionId}`,
       { presentStudentIds }
+    );
+  }
+
+  /** Mark a single student present by scanning their QR token. Idempotent. */
+  checkinByQr(sessionId: string, qrToken: string): Observable<QrCheckinResult> {
+    return this.api.post<QrCheckinResult>(
+      `attendance/session/${sessionId}/checkin`,
+      { qrToken }
     );
   }
 

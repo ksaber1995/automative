@@ -309,6 +309,7 @@ const StudentSchema = z.object({
   churnReason: z.string().nullable(),
   notes: z.string().nullable(),
   acquisitionChannel: AcquisitionChannelSchema.nullable(),
+  qrToken: z.string().nullable().optional(),
   hasSubscriptions: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -1241,6 +1242,18 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    regenerateQr: {
+      method: 'POST',
+      path: '/api/students/:id/regenerate-qr',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: StudentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
   },
 
   // Branches routes
@@ -1637,6 +1650,48 @@ export const contract = c.router({
       responses: {
         200: z.array(z.any()),
         401: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Public, unauthenticated student profile (resolved by QR token). No
+  // `authorization` header → auth is NOT required. See routes/public-students.ts.
+  publicStudents: {
+    profile: {
+      method: 'GET',
+      path: '/api/public/students/:qrToken',
+      pathParams: z.object({ qrToken: z.string().min(16).max(64) }),
+      responses: {
+        200: z.object({
+          student: z.object({
+            firstName: z.string(),
+            lastName: z.string(),
+            branchName: z.string(),
+            academyName: z.string(),
+          }),
+          courses: z.array(z.object({
+            courseName: z.string(),
+            className: z.string().nullable(),
+            status: z.string(),
+            paymentStatus: z.string(),
+            enrollmentDate: z.string().nullable(),
+          })),
+          attendance: z.object({
+            totalSessions: z.number(),
+            presentCount: z.number(),
+            absentCount: z.number(),
+            attendanceRate: z.number(),
+            recent: z.array(z.object({
+              sessionStartDate: z.string(),
+              className: z.string(),
+              roomCode: z.string().nullable(),
+              isPresent: z.boolean(),
+            })),
+          }),
+        }),
+        404: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
   },
@@ -3854,6 +3909,29 @@ export const contract = c.router({
         402: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    checkinByQr: {
+      method: 'POST' as const,
+      path: '/api/attendance/session/:sessionId/checkin',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      body: z.object({ qrToken: z.string().min(1) }),
+      responses: {
+        200: z.object({
+          studentId: UUIDSchema,
+          studentFirstName: z.string(),
+          studentLastName: z.string(),
+          alreadyPresent: z.boolean(),
+          code: z.string(),
+          message: z.string(),
+        }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
         500: ApiErrorSchema,
       },
     },

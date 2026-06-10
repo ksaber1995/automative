@@ -41,6 +41,12 @@ export const RATE_LIMITS = {
   // unauthenticated and there is no legitimate burst.
   PUBLIC_FORM_IP: { name: 'public-form:ip', limit: 10, windowMs: 60 * 60_000 },
 
+  // Public student-profile page (QR scan, no auth). The token is the only
+  // secret protecting the data, so cap per-IP to make brute-forcing the
+  // 32-hex-char token space hopeless, while still allowing a parent to
+  // refresh / a front desk to scan many students legitimately.
+  PUBLIC_PROFILE_IP: { name: 'public-profile:ip', limit: 120, windowMs: 15 * 60_000 },
+
   // Per-authenticated-user cap across all endpoints. The reports/analytics
   // pages fan out 25–35 parallel calls per reload (one per chart × compare-
   // mode branches), and a power user re-filtering a few times in a minute

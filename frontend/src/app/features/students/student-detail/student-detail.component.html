@@ -1,5 +1,8 @@
 <div class="container mx-auto p-6">
   @if (student(); as s) {
+    <!-- QR code dialog -->
+    <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)"></app-student-qr-dialog>
+
     <!-- Student Information Card -->
     <p-card>
       <ng-template pTemplate="header">
@@ -9,6 +12,7 @@
             <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
           </div>
           <div class="flex gap-2">
+            <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>

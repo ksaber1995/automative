@@ -39,6 +39,8 @@ export interface Student {
   churnReason?: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel | null;
+  /** Random token encoded in the student's QR code (public profile + check-in). */
+  qrToken?: string | null;
   hasSubscriptions?: boolean;
   createdAt: string;
   updatedAt: string;

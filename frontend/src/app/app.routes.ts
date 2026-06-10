@@ -15,6 +15,13 @@ export const routes: Routes = [
     loadChildren: () => import('./features/auth/auth.routes').then(m => m.AUTH_ROUTES)
   },
   {
+    // Public, unauthenticated student profile reached by scanning a student's
+    // QR code. Mounted here (outside LayoutComponent + authGuard) so it has no
+    // app chrome and requires no login. The :qrToken is the only credential.
+    path: 'p/s/:qrToken',
+    loadComponent: () => import('./features/public/public-student/public-student.component').then(m => m.PublicStudentComponent)
+  },
+  {
     path: '',
     component: LayoutComponent,
     canActivate: [authGuard],

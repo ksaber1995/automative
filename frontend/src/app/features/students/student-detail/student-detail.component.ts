@@ -16,6 +16,7 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
 import { StudentService } from '../services/student.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -57,6 +58,7 @@ import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface'
     TabPanels,
     TranslateModule,
     AmountPipe,
+    StudentQrDialogComponent,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss'
@@ -76,6 +78,7 @@ export class StudentDetailComponent implements OnInit {
   private translate = inject(TranslateService);
 
   student = signal<Student | null>(null);
+  showQrDialog = signal(false);
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   classDoneMap = signal<Map<string, boolean>>(new Map());
@@ -599,6 +602,11 @@ export class StudentDetailComponent implements OnInit {
 
   backToList() {
     this.router.navigate(['/students']);
+  }
+
+  /** Update the local student copy after the QR dialog rotates the token. */
+  onQrRegenerated(updated: Student) {
+    this.student.set(updated);
   }
 
   enrollStudent() {

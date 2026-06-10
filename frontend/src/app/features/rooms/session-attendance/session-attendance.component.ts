@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Html5Qrcode } from 'html5-qrcode';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -24,7 +25,7 @@ import { NotificationService } from '../../../core/services/notification.service
   imports: [CommonModule, RouterModule, FormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, TranslateModule],
   templateUrl: './session-attendance.component.html',
 })
-export class SessionAttendanceComponent implements OnInit {
+export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
@@ -37,6 +38,21 @@ export class SessionAttendanceComponent implements OnInit {
   loading = signal(true);
   search = signal('');
   saveState = signal<'saving' | 'saved' | 'error' | undefined>(undefined);
+
+  // QR check-in
+  scannerOpen = signal(false);
+  scannerStarting = signal(false);
+  manualToken = signal('');
+  lastScanResult = signal<{ name: string; alreadyPresent: boolean } | null>(null);
+  private readonly SCANNER_ELEMENT_ID = 'qr-scanner-region';
+  private html5Qr?: Html5Qrcode;
+  // Web Audio context for the check-in beep. Created on the user gesture that
+  // opens the scanner (browsers block audio without one).
+  private audioCtx?: AudioContext;
+  // Suppress the rapid repeat decodes html5-qrcode fires for one physical scan.
+  private lastToken = '';
+  private lastTokenAt = 0;
+  private readonly SCAN_DEDUP_MS = 2500;
 
   private saveTimer?: ReturnType<typeof setTimeout>;
   private savedClearTimer?: ReturnType<typeof setTimeout>;
@@ -119,6 +135,147 @@ export class SessionAttendanceComponent implements OnInit {
       },
       error: () => this.saveState.set('error'),
     });
+  }
+
+  // ============================================================
+  // QR check-in
+  // ============================================================
+
+  /** Open the scanner panel and start the camera. */
+  async openScanner() {
+    this.scannerOpen.set(true);
+    this.lastScanResult.set(null);
+    // This click is the user gesture browsers require before audio can play.
+    this.ensureAudio();
+    // Wait a tick so the #qr-scanner-region element exists in the DOM.
+    setTimeout(() => this.startCamera(), 0);
+  }
+
+  private ensureAudio() {
+    if (!this.audioCtx) {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (Ctx) this.audioCtx = new Ctx();
+    }
+    if (this.audioCtx?.state === 'suspended') this.audioCtx.resume();
+  }
+
+  /**
+   * Loud beep on check-in. A fresh "marked present" plays two ascending tones;
+   * an already-present re-scan plays a single lower tone so staff can tell them
+   * apart by ear in a noisy room. Square wave + high gain = carries.
+   */
+  private playBeep(freshCheckin: boolean) {
+    this.ensureAudio();
+    const ctx = this.audioCtx;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const tones = freshCheckin ? [880, 1320] : [520];
+    tones.forEach((freq, i) => {
+      const start = now + i * 0.13;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.9, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.18);
+    });
+  }
+
+  closeScanner() {
+    this.stopCamera();
+    this.scannerOpen.set(false);
+  }
+
+  private async startCamera() {
+    if (this.html5Qr) return;
+    this.scannerStarting.set(true);
+    try {
+      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
+      await this.html5Qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => this.handleScan(decodedText),
+        // Per-frame decode failures are normal (no QR in view) — ignore.
+        () => {},
+      );
+    } catch {
+      this.notificationService.error(this.translate.instant('SESSION_QR.CAMERA_FAILED'));
+      this.html5Qr = undefined;
+    } finally {
+      this.scannerStarting.set(false);
+    }
+  }
+
+  private stopCamera() {
+    const qr = this.html5Qr;
+    this.html5Qr = undefined;
+    if (!qr) return;
+    // stop() rejects if already stopped; swallow it.
+    qr.stop().then(() => qr.clear()).catch(() => {});
+  }
+
+  /** Extract the token from a scanned value: either a full profile URL or the raw token. */
+  private extractToken(text: string): string {
+    const raw = (text || '').trim();
+    const marker = '/p/s/';
+    const idx = raw.indexOf(marker);
+    if (idx >= 0) {
+      return raw.slice(idx + marker.length).split(/[/?#]/)[0];
+    }
+    return raw;
+  }
+
+  /** Camera decode callback. */
+  private handleScan(decodedText: string) {
+    const token = this.extractToken(decodedText);
+    if (!token) return;
+    const now = Date.now();
+    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = token;
+    this.lastTokenAt = now;
+    this.checkin(token);
+  }
+
+  /** USB scanner / manual entry submit (Enter key). */
+  submitManualToken() {
+    const token = this.extractToken(this.manualToken());
+    this.manualToken.set('');
+    if (!token) return;
+    this.checkin(token);
+  }
+
+  private checkin(token: string) {
+    this.attendanceService.checkinByQr(this.sessionId, token).subscribe({
+      next: (res) => {
+        const name = `${res.studentFirstName} ${res.studentLastName}`;
+        this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent });
+        this.playBeep(!res.alreadyPresent);
+        // Reflect in the local roster so a later checkbox save doesn't drop it.
+        this.students.update((list) =>
+          list.map((s) => (s.studentId === res.studentId ? { ...s, isPresent: true } : s)),
+        );
+        if (res.alreadyPresent) {
+          this.notificationService.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
+        } else {
+          this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
+        }
+      },
+      error: () => {
+        // Interceptor toasts the translated server error (unknown token / not enrolled).
+        this.lastScanResult.set(null);
+      },
+    });
+  }
+
+  ngOnDestroy() {
+    this.stopCamera();
+    this.audioCtx?.close().catch(() => {});
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    if (this.savedClearTimer) clearTimeout(this.savedClearTimer);
   }
 
   formatTime(dateStr: string): string {

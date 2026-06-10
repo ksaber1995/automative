@@ -3175,6 +3175,51 @@
     "LIVE": "LIVE",
     "ROOM_PREFIX": "Room {{code}}"
   },
+  "PUBLIC_PROFILE": {
+    "LANGUAGE_TOGGLE": "العربية",
+    "LOADING": "Loading…",
+    "NOT_AVAILABLE_TITLE": "Profile not available",
+    "NOT_AVAILABLE_TEXT": "This QR code is invalid or no longer active.",
+    "ATTENDANCE": "Attendance",
+    "PRESENT": "Present",
+    "ABSENT": "Absent",
+    "COURSES": "Courses",
+    "NO_COURSES": "No course enrollments.",
+    "RECENT_SESSIONS": "Recent sessions",
+    "NO_SESSIONS": "No sessions recorded yet.",
+    "POWERED_BY": "Powered by {{name}}",
+    "PAYMENT": {
+      "PAID": "Paid",
+      "PARTIAL": "Partial",
+      "PENDING": "Pending",
+      "REFUNDED": "Refunded"
+    },
+    "STATUS": {
+      "ACTIVE": "Active",
+      "COMPLETED": "Completed",
+      "DROPPED": "Dropped",
+      "PENDING": "Pending",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "STUDENT_QR": {
+    "BUTTON": "QR Code",
+    "TITLE": "Student QR Code",
+    "SCAN_HINT": "Scan to open this student's profile",
+    "PRINT": "Print",
+    "DOWNLOAD": "Download",
+    "REGENERATE": "Regenerate"
+  },
+  "SESSION_QR": {
+    "SCAN_BUTTON": "Scan QR to check in",
+    "TITLE": "QR check-in",
+    "CLOSE": "Close",
+    "STARTING_CAMERA": "Starting camera…",
+    "CAMERA_FAILED": "Could not start the camera. Check permissions or use a USB scanner / manual entry.",
+    "MANUAL_PLACEHOLDER": "Or scan with a USB reader / paste a code, then press Enter",
+    "CHECKED_IN": "{{name}} marked present",
+    "ALREADY_PRESENT": "{{name}} was already present"
+  },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",
     "SUBTITLE": "Track room usage and manage active sessions",

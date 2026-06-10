@@ -3216,6 +3216,51 @@
     "LIVE": "مباشر",
     "ROOM_PREFIX": "غرفة {{code}}"
   },
+  "PUBLIC_PROFILE": {
+    "LANGUAGE_TOGGLE": "English",
+    "LOADING": "جارٍ التحميل…",
+    "NOT_AVAILABLE_TITLE": "الملف غير متاح",
+    "NOT_AVAILABLE_TEXT": "رمز QR هذا غير صالح أو لم يعد نشطًا.",
+    "ATTENDANCE": "نسبة الحضور",
+    "PRESENT": "حاضر",
+    "ABSENT": "غائب",
+    "COURSES": "الدورات",
+    "NO_COURSES": "لا توجد دورات مسجّلة.",
+    "RECENT_SESSIONS": "الجلسات الأخيرة",
+    "NO_SESSIONS": "لا توجد جلسات مسجّلة بعد.",
+    "POWERED_BY": "مُقدَّم من {{name}}",
+    "PAYMENT": {
+      "PAID": "مدفوع",
+      "PARTIAL": "مدفوع جزئيًا",
+      "PENDING": "قيد الانتظار",
+      "REFUNDED": "مُسترد"
+    },
+    "STATUS": {
+      "ACTIVE": "نشط",
+      "COMPLETED": "مكتمل",
+      "DROPPED": "منسحب",
+      "PENDING": "قيد الانتظار",
+      "CANCELLED": "ملغى"
+    }
+  },
+  "STUDENT_QR": {
+    "BUTTON": "رمز QR",
+    "TITLE": "رمز QR للطالب",
+    "SCAN_HINT": "امسح الرمز لعرض ملف الطالب",
+    "PRINT": "طباعة",
+    "DOWNLOAD": "تحميل",
+    "REGENERATE": "إعادة إنشاء"
+  },
+  "SESSION_QR": {
+    "SCAN_BUTTON": "امسح رمز QR لتسجيل الحضور",
+    "TITLE": "تسجيل الحضور برمز QR",
+    "CLOSE": "إغلاق",
+    "STARTING_CAMERA": "جارٍ تشغيل الكاميرا…",
+    "CAMERA_FAILED": "تعذّر تشغيل الكاميرا. تحقق من الأذونات أو استخدم قارئ USB أو الإدخال اليدوي.",
+    "MANUAL_PLACEHOLDER": "أو امسح بقارئ USB / الصق الرمز ثم اضغط Enter",
+    "CHECKED_IN": "تم تسجيل حضور {{name}}",
+    "ALREADY_PRESENT": "{{name}} مسجّل حاضر بالفعل"
+  },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الجلسات",
     "SUBTITLE": "تتبع استخدام الغرف وإدارة الجلسات النشطة",

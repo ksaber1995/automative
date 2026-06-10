@@ -66,6 +66,11 @@ export class StudentService {
     return this.api.delete<{ message: string; code: string }>(`students/${id}/permanent`);
   }
 
+  /** Rotate the student's QR token (invalidates any previously printed code). */
+  regenerateQr(id: string): Observable<Student> {
+    return this.api.post<Student>(`students/${id}/regenerate-qr`, {});
+  }
+
   enrollStudent(studentId: string, enrollment: EnrollmentDto): Observable<Enrollment> {
     return this.api.post<Enrollment>(`students/${studentId}/enroll`, enrollment);
   }

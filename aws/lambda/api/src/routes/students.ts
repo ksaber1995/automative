@@ -1,6 +1,14 @@
+import { randomBytes } from 'crypto';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+
+// 16 random bytes → 32 hex chars. ~128 bits of entropy, matching the
+// students.qr_token VARCHAR(32) column. Unguessable so the unauthenticated
+// public profile page can't be enumerated.
+function generateQrToken(): string {
+  return randomBytes(16).toString('hex');
+}
 
 function mapStudentFromDB(row: any) {
   return {
@@ -23,6 +31,7 @@ function mapStudentFromDB(row: any) {
     churnReason: row.churn_reason,
     notes: row.notes,
     acquisitionChannel: row.acquisition_channel,
+    qrToken: row.qr_token,
     hasSubscriptions: row.has_subscriptions === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -66,6 +75,7 @@ export const studentsRoutes = {
         enrollment_date: body.enrollmentDate,
         notes: body.notes || null,
         acquisition_channel: body.acquisitionChannel || null,
+        qr_token: generateQrToken(),
         is_active: true,
       });
 
@@ -322,6 +332,44 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Hard delete student error:', error);
       return mapThrownError(error, 'ERRORS.STUDENTS.DELETE_FAILED', 'Failed to delete student', 400);
+    }
+  },
+
+  // Rotate a student's QR token. Use when a printed code is lost/leaked — the
+  // old QR stops resolving immediately and a fresh one must be reprinted.
+  regenerateQr: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+
+      if (!existing) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_UPDATE', 'Access denied to update this student');
+      }
+
+      const student = await update('students', params.id, { qr_token: generateQrToken() });
+
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      return {
+        status: 200 as const,
+        body: mapStudentFromDB(student),
+      };
+    } catch (error) {
+      console.error('Regenerate student QR error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.QR_REGENERATE_FAILED', 'Failed to regenerate QR code', 400);
     }
   },
 };
