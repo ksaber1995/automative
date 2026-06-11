@@ -11,6 +11,8 @@ export interface CompanySubscription {
   company_created_at: string;
   /** Registration type chosen at signup: ACADEMY (institution) or TEACHER (individual). */
   company_type: string | null;
+  /** Owner's mobile number (E.164-ish, e.g. +201234567890), from the registrant user. */
+  mobile: string | null;
   subscription_type: string | null;
   price: number | null;
   start_date: string | null;
@@ -39,6 +41,17 @@ export class SubscriptionsService {
     return this.http.post<{ success: boolean; end_date: string | null }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/extend`,
       { months },
+    );
+  }
+
+  /** Switch a company's registration type between ACADEMY and TEACHER. */
+  setType(
+    companyId: string,
+    type: 'ACADEMY' | 'TEACHER',
+  ): Observable<{ success: boolean; company_type: string }> {
+    return this.http.post<{ success: boolean; company_type: string }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/type`,
+      { type },
     );
   }
 

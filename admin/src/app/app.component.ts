@@ -44,6 +44,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
             <thead>
               <tr>
                 <th>Company</th>
+                <th>Mobile</th>
                 <th>Registration</th>
                 <th>Type</th>
                 <th class="num">Price</th>
@@ -60,6 +61,13 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
               @for (r of filtered(); track r.company_id) {
                 <tr>
                   <td class="name">{{ r.company_name }}</td>
+                  <td>
+                    @if (r.mobile) {
+                      <a class="mobile" [href]="'tel:' + r.mobile">{{ r.mobile }}</a>
+                    } @else {
+                      —
+                    }
+                  </td>
                   <td>
                     <span class="reg" [class.teacher]="r.company_type === 'TEACHER'" [class.academy]="r.company_type === 'ACADEMY'">
                       {{ r.company_type || '—' }}
@@ -90,6 +98,11 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                       <button class="act" [disabled]="busyId() === r.company_id" (click)="openExtend(r)">
                         Extend
                       </button>
+                      @if (r.company_type === 'ACADEMY' || r.company_type === 'TEACHER') {
+                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openType(r)">
+                          Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
+                        </button>
+                      }
                       <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
                         Delete
                       </button>
@@ -98,7 +111,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 </tr>
               }
               @if (filtered().length === 0) {
-                <tr><td colspan="11" class="state">No matches.</td></tr>
+                <tr><td colspan="12" class="state">No matches.</td></tr>
               }
             </tbody>
           </table>
@@ -125,6 +138,29 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
             </div>
             <div class="modal-foot">
               <button class="act" [disabled]="busyId() === row.company_id" (click)="closeExtend()">Cancel</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Change registration type dialog -->
+      @if (typeRow(); as row) {
+        <div class="overlay" (click)="closeType()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>Change registration type</h2>
+            <p class="modal-sub">
+              Switch <strong>{{ row.company_name }}</strong> from
+              <strong>{{ row.company_type }}</strong> to <strong>{{ otherType(row) }}</strong>.
+            </p>
+            <p class="modal-sub">
+              This changes which features the tenant sees (academy-only vs teacher-only).
+              No other data is affected.
+            </p>
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="closeType()">Cancel</button>
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="confirmType(row)">
+                {{ busyId() === row.company_id ? 'Saving…' : 'Make ' + otherType(row) }}
+              </button>
             </div>
           </div>
         </div>
@@ -190,6 +226,8 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
     tbody tr:hover { background: #fafafa; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .name { font-weight: 600; }
+    .mobile { color: #1d4ed8; text-decoration: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mobile:hover { text-decoration: underline; }
     .badge {
       display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
       font-weight: 600; background: #dcfce7; color: #166534;
@@ -258,6 +296,7 @@ export class AppComponent implements OnInit {
   flash = signal<string | null>(null);
   private flashTimer?: ReturnType<typeof setTimeout>;
   extendRow = signal<CompanySubscription | null>(null);
+  typeRow = signal<CompanySubscription | null>(null);
   deleteRow = signal<CompanySubscription | null>(null);
   deleteConfirmText = signal('');
   readonly extendPresets = [1, 3, 6, 12];
@@ -269,6 +308,7 @@ export class AppComponent implements OnInit {
     return list.filter(
       (r) =>
         r.company_name?.toLowerCase().includes(q) ||
+        (r.mobile || '').toLowerCase().includes(q) ||
         (r.company_type || '').toLowerCase().includes(q) ||
         (r.subscription_type || '').toLowerCase().includes(q),
     );
@@ -351,6 +391,37 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Extend failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  // ── Change registration type (ACADEMY ↔ TEACHER) ─────────────────────────────
+  otherType(r: CompanySubscription): 'ACADEMY' | 'TEACHER' {
+    return r.company_type === 'ACADEMY' ? 'TEACHER' : 'ACADEMY';
+  }
+
+  openType(r: CompanySubscription) {
+    this.typeRow.set(r);
+  }
+
+  closeType() {
+    if (this.busyId()) return;
+    this.typeRow.set(null);
+  }
+
+  confirmType(r: CompanySubscription) {
+    const target = this.otherType(r);
+    this.busyId.set(r.company_id);
+    this.service.setType(r.company_id, target).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.typeRow.set(null);
+        this.showFlash(`${r.company_name} is now ${target}.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Change type failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

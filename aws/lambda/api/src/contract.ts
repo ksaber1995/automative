@@ -3373,6 +3373,7 @@ export const contract = c.router({
             currency: z.string().nullable(),
             company_created_at: z.string().nullable(),
             company_type: z.string().nullable(),
+            mobile: z.string().nullable(),
             subscription_type: z.string().nullable(),
             price: z.number().nullable(),
             start_date: z.string().nullable(),
@@ -3407,6 +3408,19 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), subscription_type: z.string().nullable() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Switch a company's registration type between ACADEMY and TEACHER.
+    setCompanyType: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/type',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ type: z.enum(['ACADEMY', 'TEACHER']) }),
+      responses: {
+        200: z.object({ success: z.boolean(), company_type: z.string() }),
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

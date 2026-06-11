@@ -16,6 +16,7 @@ const SUBSCRIPTIONS_SQL = `
     c.currency                                                 AS currency,
     c.created_at                                               AS company_created_at,
     c.type                                                     AS company_type,
+    NULLIF(CONCAT('+', u.country_code, u.phone), '+')          AS mobile,
     s.status                                                   AS subscription_type,
     s.price                                                    AS price,
     COALESCE(s.subscription_start_date, s.trial_start_date)    AS start_date,
@@ -25,6 +26,7 @@ const SUBSCRIPTIONS_SQL = `
     (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id) AS student_count
   FROM companies c
   LEFT JOIN subscriptions s ON s.company_id = c.id
+  LEFT JOIN users u ON u.id = c.created_by
   ORDER BY c.created_at DESC
 `;
 
@@ -45,6 +47,7 @@ export const adminSecretRoutes = {
         currency: r.currency ?? null,
         company_created_at: toIso(r.company_created_at),
         company_type: r.company_type ?? null,
+        mobile: r.mobile ?? null,
         subscription_type: r.subscription_type ?? null,
         price: r.price == null ? null : Number(r.price),
         start_date: toIso(r.start_date),
@@ -125,6 +128,31 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret activate failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Activate failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/type
+   * Switch a company's registration type between ACADEMY and TEACHER. This is
+   * the `companies.type` set at signup, which gates teacher-only vs academy-only
+   * features; nothing else about the tenant's data changes.
+   */
+  setCompanyType: async ({ params, body }: { params: { companyId: string }; body: { type: 'ACADEMY' | 'TEACHER' } }) => {
+    try {
+      const type = body?.type === 'TEACHER' ? 'TEACHER' : body?.type === 'ACADEMY' ? 'ACADEMY' : null;
+      if (!type) {
+        return { status: 400 as const, body: { message: "type must be 'ACADEMY' or 'TEACHER'" } };
+      }
+
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      await query('UPDATE companies SET type = $2, updated_at = NOW() WHERE id = $1', [params.companyId, type]);
+
+      return { status: 200 as const, body: { success: true, company_type: type } };
+    } catch (error: any) {
+      console.error('karim-admin-secret set company type failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set type failed' } };
     }
   },
 
