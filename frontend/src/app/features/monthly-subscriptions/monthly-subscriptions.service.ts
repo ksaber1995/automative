@@ -63,6 +63,21 @@ export class MonthlySubscriptionsService {
     return this.http.post<any>(`${this.base}/${id}/void`, { reason });
   }
 
+  /** Resolve a scanned student barcode (QR token) to that student and their still-due months. */
+  getDueByToken(qrToken: string): Observable<{
+    studentId: string;
+    studentFirstName: string;
+    studentLastName: string;
+    dueMonths: MonthlyPaymentWithDetails[];
+  }> {
+    return this.http.get<{
+      studentId: string;
+      studentFirstName: string;
+      studentLastName: string;
+      dueMonths: MonthlyPaymentWithDetails[];
+    }>(`${this.base}/by-token/${encodeURIComponent(qrToken)}`);
+  }
+
   listByCourse(courseId: string, billingYear?: number, billingMonth?: number): Observable<MonthlyPaymentWithDetails[]> {
     let httpParams = new HttpParams();
     if (billingYear) httpParams = httpParams.set('billingYear', billingYear.toString());

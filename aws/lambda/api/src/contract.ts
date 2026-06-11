@@ -194,6 +194,7 @@ const SafeUserSchema = z.object({
   lastName: z.string(),
   role: UserRoleSchema,
   companyId: UUIDSchema,
+  companyType: z.enum(['ACADEMY', 'TEACHER']).optional(),
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
   linkedEmployeeId: UUIDSchema.nullable().optional(),
@@ -4221,6 +4222,23 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(MonthlyPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Resolve a scanned student barcode (QR token) to that student and their
+    // still-due monthly bills, so staff can collect a payment by scanning.
+    byToken: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/by-token/:qrToken',
+      pathParams: z.object({ qrToken: z.string().min(1).max(64) }),
+      responses: {
+        200: z.object({
+          studentId: z.string(),
+          studentFirstName: z.string(),
+          studentLastName: z.string(),
+          dueMonths: z.array(MonthlyPaymentWithDetailsSchema),
+        }),
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },

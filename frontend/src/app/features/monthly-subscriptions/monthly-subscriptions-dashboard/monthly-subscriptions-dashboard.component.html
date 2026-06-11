@@ -5,13 +5,22 @@
       <h1 class="text-3xl font-bold text-gray-900">{{ 'MONTHLY_SUBSCRIPTIONS.TITLE' | translate }}</h1>
       <p class="text-gray-500 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.SUBTITLE' | translate }}</p>
     </div>
-    <p-button
-      [label]="'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate"
-      icon="pi pi-bolt"
-      severity="success"
-      [loading]="generating()"
-      (onClick)="generateBills()"
-    ></p-button>
+    <div class="flex items-center gap-2">
+      <p-button
+        [label]="'MONTHLY_SUBSCRIPTIONS.SCAN_BUTTON' | translate"
+        icon="pi pi-qrcode"
+        severity="info"
+        [outlined]="true"
+        (onClick)="openScanner()"
+      ></p-button>
+      <p-button
+        [label]="'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate"
+        icon="pi pi-bolt"
+        severity="success"
+        [loading]="generating()"
+        (onClick)="generateBills()"
+      ></p-button>
+    </div>
   </div>
 
   <p-card>
@@ -320,6 +329,101 @@
       [loading]="payingId() !== null"
       [disabled]="payAmount <= 0"
       (onClick)="confirmPayment()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Barcode Scanner Dialog -->
+<p-dialog
+  [visible]="scannerOpen()"
+  (visibleChange)="$event ? null : closeScanner()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '420px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.SCAN_TITLE' | translate"
+>
+  <div class="flex flex-col gap-3 pt-2">
+    <p class="text-sm text-gray-500">{{ 'MONTHLY_SUBSCRIPTIONS.SCAN_HINT' | translate }}</p>
+
+    <!-- Camera preview region (html5-qrcode renders the <video> here). -->
+    <div id="subscription-qr-region" class="mx-auto rounded-lg overflow-hidden w-full" style="max-width: 320px;"></div>
+
+    @if (scannerStarting()) {
+      <p class="text-center text-sm text-gray-400">
+        <i class="pi pi-spin pi-spinner"></i> {{ 'MONTHLY_SUBSCRIPTIONS.SCAN_STARTING_CAMERA' | translate }}
+      </p>
+    }
+    @if (resolvingToken()) {
+      <p class="text-center text-sm text-gray-400">
+        <i class="pi pi-spin pi-spinner"></i> {{ 'MONTHLY_SUBSCRIPTIONS.SCAN_LOOKING_UP' | translate }}
+      </p>
+    }
+
+    <!-- USB scanner / manual entry: a keyboard-wedge scanner "types" the code then presses Enter. -->
+    <input
+      pInputText
+      [ngModel]="manualToken()"
+      (ngModelChange)="manualToken.set($event)"
+      (keyup.enter)="submitManualToken()"
+      [placeholder]="'MONTHLY_SUBSCRIPTIONS.SCAN_MANUAL_PLACEHOLDER' | translate"
+      class="w-full"
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeScanner()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Due-Month Picker (after a successful scan) -->
+<p-dialog
+  [visible]="showMonthPicker()"
+  (visibleChange)="$event ? null : closeMonthPicker()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '460px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH' | translate"
+>
+  <div class="flex flex-col gap-3 pt-2">
+    <div class="text-sm text-gray-700">
+      <i class="pi pi-user mr-1"></i><strong>{{ scannedStudentName() }}</strong>
+      <span class="text-gray-500"> &mdash; {{ 'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH_HINT' | translate }}</span>
+    </div>
+
+    <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
+      @for (m of dueMonths(); track m.id) {
+        <button
+          type="button"
+          class="w-full text-start border border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-blue-300 transition-colors flex items-center justify-between gap-3"
+          (click)="selectDueMonth(m)"
+        >
+          <div class="min-w-0">
+            <div class="font-medium text-gray-800">{{ periodLabel(m) }}</div>
+            <div class="text-xs text-gray-500 truncate">{{ m.courseName }}</div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <p-tag
+              [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + m.paymentStatus | translate"
+              [severity]="getStatusSeverity(m.paymentStatus)"
+            ></p-tag>
+            <span class="font-semibold" [class.text-red-600]="m.amountDue - m.amountPaid > 0">
+              {{ (m.amountDue - m.amountPaid) | amount }}
+            </span>
+          </div>
+        </button>
+      }
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeMonthPicker()"
     ></p-button>
   </ng-template>
 </p-dialog>

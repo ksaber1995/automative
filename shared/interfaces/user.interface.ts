@@ -24,6 +24,7 @@ export interface SafeUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  companyType?: 'ACADEMY' | 'TEACHER'; // Owning company's registration type
   branchId?: string | null;
   branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)
   linkedEmployeeId?: string | null;

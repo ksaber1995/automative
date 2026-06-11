@@ -94,7 +94,8 @@
       }
     </p-card>
 
-    <!-- Master Course (Bundle) Enrollments -->
+    <!-- Master Course (Bundle) Enrollments — hidden for TEACHER companies -->
+    @if (!isTeacher()) {
     <p-card class="mt-6">
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
@@ -412,6 +413,7 @@
         </p-tabs>
       }
     </p-card>
+    }
 
     <!-- Course Enrollments Card -->
     <p-card class="mt-6">

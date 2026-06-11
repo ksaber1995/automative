@@ -87,7 +87,7 @@ export class LayoutComponent implements OnInit {
     const academic: NavLeaf[] = [
       { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') },
+      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') },

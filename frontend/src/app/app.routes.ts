@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { permissionGuard, roleGuard } from './core/guards/permission.guard';
+import { permissionGuard, roleGuard, notTeacherGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
 import { UserRole } from '@shared/enums/user-role.enum';
 
@@ -51,7 +51,7 @@ export const routes: Routes = [
       },
       {
         path: 'master-courses',
-        canActivate: [permissionGuard('academy')],
+        canActivate: [permissionGuard('academy'), notTeacherGuard],
         data: { breadcrumb: 'BREADCRUMBS.MASTER_COURSES' },
         loadChildren: () => import('./features/master-courses/master-courses.routes').then(m => m.MASTER_COURSES_ROUTES)
       },

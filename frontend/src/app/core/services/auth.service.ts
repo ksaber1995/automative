@@ -165,6 +165,15 @@ export class AuthService {
     return this.isGlobalAdmin();
   }
 
+  /**
+   * True when the signed-in user's company registered as an individual TEACHER
+   * (rather than an ACADEMY). Used to hide academy-only features such as
+   * master courses/classes.
+   */
+  isTeacher(): boolean {
+    return this.currentUser()?.companyType === 'TEACHER';
+  }
+
   // ─── Permission checks ───────────────────────────────────────────────────────
 
   /**

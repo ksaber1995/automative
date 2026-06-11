@@ -372,6 +372,77 @@ export const monthlySubscriptionsRoutes = {
     }
   },
 
+  /** GET /api/monthly-subscriptions/by-token/:qrToken
+   *  Resolve a scanned student barcode (QR token) to that student and their
+   *  still-outstanding monthly bills (anything not fully paid), oldest first.
+   *  Powers the "scan barcode → pick a due month → record payment" flow.
+   */
+  byToken: async ({ params, headers }: { params: { qrToken: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const token = (params.qrToken || '').trim();
+      if (!token) {
+        return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.STUDENT_NOT_FOUND', 'Student not found for this code');
+      }
+
+      // Scope the lookup to the caller's company — a token from another company
+      // must not resolve.
+      const student = await queryOne<any>(
+        'SELECT id, first_name, last_name FROM students WHERE qr_token = $1 AND company_id = $2 AND is_active = true',
+        [token, context.companyId]
+      );
+      if (!student) {
+        return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.STUDENT_NOT_FOUND', 'Student not found for this code');
+      }
+
+      const rows = await query(
+        `SELECT
+           msp.*,
+           s.first_name AS student_first_name,
+           s.last_name  AS student_last_name,
+           c.name       AS course_name,
+           b.name       AS branch_name,
+           cl.name      AS class_name
+         FROM monthly_subscription_payments msp
+         JOIN students s  ON msp.student_id = s.id
+         JOIN courses  c  ON msp.course_id  = c.id
+         JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN enrollments e ON msp.enrollment_id = e.id
+         LEFT JOIN classes cl    ON e.class_id = cl.id
+         WHERE msp.company_id = $1
+           AND msp.student_id = $2
+           AND (msp.amount_due - msp.amount_paid) > 0
+         ORDER BY msp.billing_year ASC, msp.billing_month ASC, c.name`,
+        [context.companyId, student.id]
+      );
+
+      // Respect branch scoping for branch-limited users.
+      const dueMonths = rows
+        .filter((r: any) => canAccessBranch(context, r.branch_id))
+        .map((r: any) => ({
+          ...mapPaymentWithDetailsFromDB(r),
+          paymentStatus: resolveStatus(r),
+        }));
+
+      return {
+        status: 200 as const,
+        body: {
+          studentId: student.id,
+          studentFirstName: student.first_name,
+          studentLastName: student.last_name,
+          dueMonths,
+        },
+      };
+    } catch (error) {
+      console.error('Monthly by-token lookup error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to load due months for this code');
+    }
+  },
+
   /** GET /api/monthly-subscriptions/course/:courseId */
   listByCourse: async ({ params, query: q, headers }: { params: { courseId: string }; query: any; headers: { authorization: string } }) => {
     try {

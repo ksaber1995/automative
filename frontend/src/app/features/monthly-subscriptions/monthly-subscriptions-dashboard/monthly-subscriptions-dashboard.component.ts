@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil, forkJoin } from 'rxjs';
+import { Html5Qrcode } from 'html5-qrcode';
+import { InputTextModule } from 'primeng/inputtext';
 
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
@@ -47,6 +49,7 @@ import { Course } from '@shared/interfaces/course.interface';
     DatePickerModule,
     TextareaModule,
     ConfirmDialogModule,
+    InputTextModule,
     AmountPipe,
   ],
   providers: [ConfirmationService],
@@ -79,6 +82,24 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   // Status filter
   statusFilter = signal('ALL');
   readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE'];
+
+  // ── Barcode scan → collect payment ──────────────────────────────────────────
+  // Scan a student's barcode, pick one of their due months, then drop into the
+  // existing Record Payment dialog for that month.
+  scannerOpen = signal(false);
+  scannerStarting = signal(false);
+  resolvingToken = signal(false);
+  manualToken = signal('');
+  // The due-month picker shown after a successful scan.
+  showMonthPicker = signal(false);
+  scannedStudentName = signal('');
+  dueMonths = signal<MonthlyPaymentWithDetails[]>([]);
+  private readonly SCANNER_ELEMENT_ID = 'subscription-qr-region';
+  private html5Qr?: Html5Qrcode;
+  // Suppress the rapid repeat decodes html5-qrcode fires for one physical scan.
+  private lastToken = '';
+  private lastTokenAt = 0;
+  private readonly SCAN_DEDUP_MS = 2500;
 
   get isRtl(): boolean {
     return document.documentElement.dir === 'rtl';
@@ -120,8 +141,120 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.stopCamera();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // ── Barcode scan flow ────────────────────────────────────────────────────────
+
+  /** Open the scanner dialog and start the camera. */
+  openScanner(): void {
+    this.scannerOpen.set(true);
+    this.manualToken.set('');
+    this.lastToken = '';
+    // Wait a tick so the scanner region element exists in the DOM.
+    setTimeout(() => this.startCamera(), 0);
+  }
+
+  closeScanner(): void {
+    this.stopCamera();
+    this.scannerOpen.set(false);
+  }
+
+  private async startCamera(): Promise<void> {
+    if (this.html5Qr) return;
+    this.scannerStarting.set(true);
+    try {
+      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
+      await this.html5Qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => this.handleScan(decodedText),
+        // Per-frame decode failures are normal (no code in view) — ignore.
+        () => {},
+      );
+    } catch {
+      this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.SCAN_CAMERA_FAILED'));
+      this.html5Qr = undefined;
+    } finally {
+      this.scannerStarting.set(false);
+    }
+  }
+
+  private stopCamera(): void {
+    const qr = this.html5Qr;
+    this.html5Qr = undefined;
+    if (!qr) return;
+    // stop() rejects if already stopped; swallow it.
+    qr.stop().then(() => qr.clear()).catch(() => {});
+  }
+
+  /** Extract the token from a scanned value: either a full profile URL or the raw token. */
+  private extractToken(text: string): string {
+    const raw = (text || '').trim();
+    const marker = '/p/s/';
+    const idx = raw.indexOf(marker);
+    if (idx >= 0) {
+      return raw.slice(idx + marker.length).split(/[/?#]/)[0];
+    }
+    return raw;
+  }
+
+  /** Camera decode callback. */
+  private handleScan(decodedText: string): void {
+    const token = this.extractToken(decodedText);
+    if (!token) return;
+    const now = Date.now();
+    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = token;
+    this.lastTokenAt = now;
+    this.resolveToken(token);
+  }
+
+  /** USB scanner / manual entry submit (Enter key). */
+  submitManualToken(): void {
+    const token = this.extractToken(this.manualToken());
+    this.manualToken.set('');
+    if (!token) return;
+    this.resolveToken(token);
+  }
+
+  /** Look up the scanned student's due months and open the month picker. */
+  private resolveToken(token: string): void {
+    if (this.resolvingToken()) return;
+    this.resolvingToken.set(true);
+    this.svc.getDueByToken(token).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        this.resolvingToken.set(false);
+        this.scannedStudentName.set(`${res.studentFirstName} ${res.studentLastName}`.trim());
+        this.dueMonths.set(res.dueMonths);
+        // Stop the camera and swap the scanner dialog for the month picker.
+        this.closeScanner();
+        if (res.dueMonths.length === 0) {
+          this.notify.info(
+            this.translate.instant('MONTHLY_SUBSCRIPTIONS.SCAN_NO_DUE', { name: this.scannedStudentName() })
+          );
+          return;
+        }
+        this.showMonthPicker.set(true);
+      },
+      error: () => {
+        this.resolvingToken.set(false);
+        // Interceptor toasts the translated/fallback server error (unknown token).
+      },
+    });
+  }
+
+  closeMonthPicker(): void {
+    this.showMonthPicker.set(false);
+    this.dueMonths.set([]);
+  }
+
+  /** A due month was picked — hand off to the existing Record Payment dialog. */
+  selectDueMonth(payment: MonthlyPaymentWithDetails): void {
+    this.closeMonthPicker();
+    this.openPayDialog(payment);
   }
 
   /** Inclusive (from..to) month range for the active filter mode. */

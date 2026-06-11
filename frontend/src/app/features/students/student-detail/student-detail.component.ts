@@ -25,6 +25,7 @@ import { MasterEnrollmentService } from '../../master-courses/services/master-en
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
@@ -76,6 +77,10 @@ export class StudentDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private authService = inject(AuthService);
+
+  /** TEACHER companies don't use master courses, so hide that whole section. */
+  isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
 
   student = signal<Student | null>(null);
   showQrDialog = signal(false);
@@ -181,7 +186,7 @@ export class StudentDetailComponent implements OnInit {
       this.loadClassesForDoneMap();
       this.loadStudent(this.studentId);
       this.loadEnrollments(this.studentId);
-      this.loadMasterEnrollments(this.studentId);
+      if (!this.isTeacher()) this.loadMasterEnrollments(this.studentId);
       this.loadAttendance(this.studentId);
     }
   }

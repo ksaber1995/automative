@@ -58,6 +58,27 @@ export const permissionGuard = (
 };
 
 /**
+ * Blocks TEACHER companies from academy-only features (e.g. master courses).
+ * Redirects them to the first route they can access.
+ */
+export const notTeacherGuard = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/auth/login']);
+    return false;
+  }
+
+  if (authService.isTeacher()) {
+    router.navigate([getFirstAccessiblePath(authService)]);
+    return false;
+  }
+
+  return true;
+};
+
+/**
  * Role-restricted guard. Only allows users whose role is in the allowed list.
  * Used for admin-only pages that don't map to a granular resource.
  */
