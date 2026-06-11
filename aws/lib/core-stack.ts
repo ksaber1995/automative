@@ -257,9 +257,12 @@ export class CoreStack extends cdk.Stack {
         // is incompatible with `Allow-Origin: *` per CORS spec — browsers reject
         // the preflight outright. CDK echoes the request Origin when this list
         // contains explicit entries.
+        // localhost:4300 is the owner's local-only admin console (netrofit-admin),
+        // which talks to the prod API via the karim-admin-secret routes — so its
+        // POST/DELETE preflights must be allowed even in prod.
         allowOrigins: stage === 'prod'
-          ? ['https://app.netrofit.com']
-          : ['http://localhost:4200', 'https://dev.netrofit.com'],
+          ? ['https://app.netrofit.com', 'http://localhost:4300']
+          : ['http://localhost:4200', 'http://localhost:4300', 'https://dev.netrofit.com'],
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',

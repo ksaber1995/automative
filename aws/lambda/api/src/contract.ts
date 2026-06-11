@@ -3372,6 +3372,7 @@ export const contract = c.router({
             company_active: z.boolean().nullable(),
             currency: z.string().nullable(),
             company_created_at: z.string().nullable(),
+            company_type: z.string().nullable(),
             subscription_type: z.string().nullable(),
             price: z.number().nullable(),
             start_date: z.string().nullable(),
@@ -3381,6 +3382,43 @@ export const contract = c.router({
             student_count: z.number(),
           })
         ),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Extend a company's subscription by a preset number of months (added onto
+    // the current end date, or from today if already expired).
+    extendSubscription: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/extend',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ months: z.number().int().positive() }),
+      responses: {
+        200: z.object({ success: z.boolean(), end_date: z.string().nullable() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Promote a TRIAL (or any status) subscription to ACTIVE.
+    activateSubscription: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/activate',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), subscription_type: z.string().nullable() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Permanently delete a company and ALL its data (FK cascade). Irreversible.
+    deleteCompany: {
+      method: 'DELETE',
+      path: '/api/karim-admin-secret/companies/:companyId',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean(), company_name: z.string() }),
+        404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },
     },

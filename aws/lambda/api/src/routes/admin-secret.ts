@@ -1,4 +1,4 @@
-import { query } from '../db/connection';
+import { query, queryOne } from '../db/connection';
 
 /**
  * Intentionally-obscure, unauthenticated read-only endpoint for the owner's
@@ -15,6 +15,7 @@ const SUBSCRIPTIONS_SQL = `
     c.is_active                                                AS company_active,
     c.currency                                                 AS currency,
     c.created_at                                               AS company_created_at,
+    c.type                                                     AS company_type,
     s.status                                                   AS subscription_type,
     s.price                                                    AS price,
     COALESCE(s.subscription_start_date, s.trial_start_date)    AS start_date,
@@ -43,6 +44,7 @@ export const adminSecretRoutes = {
         company_active: r.company_active == null ? null : !!r.company_active,
         currency: r.currency ?? null,
         company_created_at: toIso(r.company_created_at),
+        company_type: r.company_type ?? null,
         subscription_type: r.subscription_type ?? null,
         price: r.price == null ? null : Number(r.price),
         start_date: toIso(r.start_date),
@@ -55,6 +57,94 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret query failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Query failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/extend
+   * Extend the subscription by N months. Added onto the current end date, or
+   * from today if the subscription has already lapsed. Updates whichever end
+   * column currently drives the displayed end date (subscription_end_date when
+   * ACTIVE / already set, otherwise trial_end_date) so the table stays consistent.
+   */
+  extendSubscription: async ({ params, body }: { params: { companyId: string }; body: { months: number } }) => {
+    try {
+      const months = Number(body?.months);
+      if (!Number.isInteger(months) || months <= 0) {
+        return { status: 400 as const, body: { message: 'months must be a positive integer' } };
+      }
+
+      const sub = await queryOne<any>('SELECT * FROM subscriptions WHERE company_id = $1', [params.companyId]);
+      if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this company' } };
+
+      const useSubCol = sub.subscription_end_date != null || sub.status === 'ACTIVE';
+      const currentEndRaw = useSubCol ? sub.subscription_end_date : sub.trial_end_date;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let base = currentEndRaw ? new Date(currentEndRaw) : today;
+      if (isNaN(base.getTime()) || base < today) base = today;
+
+      const newEnd = new Date(base);
+      newEnd.setMonth(newEnd.getMonth() + months);
+      const newEndStr = newEnd.toISOString().split('T')[0];
+
+      const col = useSubCol ? 'subscription_end_date' : 'trial_end_date';
+      await query(`UPDATE subscriptions SET ${col} = $2, updated_at = NOW() WHERE id = $1`, [sub.id, newEndStr]);
+
+      return { status: 200 as const, body: { success: true, end_date: newEndStr } };
+    } catch (error: any) {
+      console.error('karim-admin-secret extend failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Extend failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/activate
+   * Promote the subscription to ACTIVE. Sets a subscription start date if absent
+   * and carries the trial end over to the subscription end so the displayed end
+   * date stays meaningful.
+   */
+  activateSubscription: async ({ params }: { params: { companyId: string } }) => {
+    try {
+      const sub = await queryOne<any>('SELECT id FROM subscriptions WHERE company_id = $1', [params.companyId]);
+      if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this company' } };
+
+      const today = new Date().toISOString().split('T')[0];
+      await query(
+        `UPDATE subscriptions
+           SET status = 'ACTIVE',
+               subscription_start_date = COALESCE(subscription_start_date, $2),
+               subscription_end_date   = COALESCE(subscription_end_date, trial_end_date),
+               updated_at = NOW()
+         WHERE id = $1`,
+        [sub.id, today]
+      );
+
+      return { status: 200 as const, body: { success: true, subscription_type: 'ACTIVE' } };
+    } catch (error: any) {
+      console.error('karim-admin-secret activate failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Activate failed' } };
+    }
+  },
+
+  /**
+   * DELETE /api/karim-admin-secret/companies/:companyId
+   * Permanently delete a company and ALL its data. Every FK referencing
+   * companies is ON DELETE CASCADE, so the single delete removes the whole
+   * tenant atomically. Irreversible.
+   */
+  deleteCompany: async ({ params }: { params: { companyId: string } }) => {
+    try {
+      const company = await queryOne<any>('SELECT id, name FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      await query('DELETE FROM companies WHERE id = $1', [params.companyId]);
+
+      return { status: 200 as const, body: { success: true, company_name: company.name } };
+    } catch (error: any) {
+      console.error('karim-admin-secret delete company failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
     }
   },
 };
