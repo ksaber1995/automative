@@ -476,14 +476,18 @@
               </div>
             </td>
             <td>
-              @if (enrollment.paymentMode === 'INSTALLMENTS') {
+              @if (isMonthly(enrollment)) {
+                <p-tag [value]="'STUDENTS.DETAIL.MONTHLY_TAG' | translate" severity="warn"></p-tag>
+              } @else if (enrollment.paymentMode === 'INSTALLMENTS') {
                 <p-tag [value]="'STUDENTS.DETAIL.INSTALLMENTS' | translate" severity="info"></p-tag>
               } @else {
                 <p-tag [value]="'STUDENTS.DETAIL.FULL' | translate" severity="success"></p-tag>
               }
             </td>
             <td>
-              @if (enrollment.paymentMode === 'INSTALLMENTS') {
+              @if (isMonthly(enrollment)) {
+                <span class="text-gray-300">—</span>
+              } @else if (enrollment.paymentMode === 'INSTALLMENTS') {
                 <!-- Installment breakdown -->
                 <div class="space-y-1 min-w-[180px]">
                   @for (payment of getPaymentHistory(enrollment.id); track payment.id) {
@@ -527,6 +531,9 @@
               <p-tag [value]="statusLabel(enrollment.status)" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
             <td>
+              @if (isMonthly(enrollment)) {
+                <span class="text-gray-300">—</span>
+              } @else {
               <div class="flex flex-col gap-1">
                 <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
                 @if (hasRefund(enrollment)) {
@@ -538,8 +545,12 @@
                   ></p-tag>
                 }
               </div>
+              }
             </td>
             <td>
+              @if (isMonthly(enrollment)) {
+                <span class="text-gray-300">—</span>
+              } @else {
               <div class="flex gap-1">
                 <!-- Pay button (any enrollment with remaining balance and no refund) -->
                 @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
@@ -572,14 +583,66 @@
                   [pTooltip]="'STUDENTS.DETAIL.EDIT_ENROLLMENT' | translate"
                 ></p-button>
               </div>
+              }
             </td>
           </tr>
         </ng-template>
 
-        <!-- Expanded row: payment history -->
+        <!-- Expanded row: payment history (one-time / installments) OR monthly bills -->
         <ng-template pTemplate="expandedrow" let-enrollment>
           <tr>
             <td colspan="9">
+              @if (isMonthly(enrollment)) {
+                <div class="p-4 bg-amber-50/40">
+                  <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <i class="pi pi-calendar text-amber-600"></i> {{ 'STUDENTS.DETAIL.MONTHLY_BILLS' | translate }}
+                  </h4>
+                  @if (getMonthlyPayments(enrollment.id).length === 0) {
+                    <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</p>
+                  } @else {
+                    <p-table [value]="getMonthlyPayments(enrollment.id)" responsiveLayout="scroll" dataKey="id" styleClass="p-datatable-sm">
+                      <ng-template pTemplate="header">
+                        <tr>
+                          <th>{{ 'STUDENTS.DETAIL.MONTHLY_PERIOD' | translate }}</th>
+                          <th class="text-right">{{ 'STUDENTS.DETAIL.MONTHLY_AMOUNT_DUE' | translate }}</th>
+                          <th class="text-right">{{ 'STUDENTS.DETAIL.MONTHLY_AMOUNT_PAID' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.MONTHLY_STATUS' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.MONTHLY_PAID_ON' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
+                        </tr>
+                      </ng-template>
+                      <ng-template pTemplate="body" let-m>
+                        <tr>
+                          <td class="font-medium">{{ monthlyPeriodLabel(m) }}</td>
+                          <td class="text-right">{{ m.amountDue | amount }}</td>
+                          <td class="text-right">
+                            <span class="font-semibold text-green-600">{{ (m.amountPaid || 0) | amount }}</span>
+                            @if ((m.amountPaid || 0) < m.amountDue) {
+                              <div class="text-xs text-red-600">-{{ (m.amountDue - (m.amountPaid || 0)) | amount }} {{ 'STUDENTS.DETAIL.REMAINING_LOWER' | translate }}</div>
+                            }
+                          </td>
+                          <td><p-tag [value]="monthlyStatusLabel(m.paymentStatus)" [severity]="getMonthlyStatusSeverity(m.paymentStatus)"></p-tag></td>
+                          <td class="text-sm text-gray-500">
+                            @if (m.paidDate) { {{ formatDate(m.paidDate) }} } @else { <span class="text-gray-300">—</span> }
+                          </td>
+                          <td>
+                            @if (m.paymentStatus !== 'PAID') {
+                              <p-button
+                                icon="pi pi-wallet"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="success"
+                                (onClick)="openMonthlyPayDialog(m)"
+                                [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
+                              ></p-button>
+                            }
+                          </td>
+                        </tr>
+                      </ng-template>
+                    </p-table>
+                  }
+                </div>
+              } @else {
               <div class="p-4 bg-gray-50">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <!-- Payment history -->
@@ -639,6 +702,7 @@
                   </div>
                 </div>
               </div>
+              }
             </td>
           </tr>
         </ng-template>
@@ -688,18 +752,26 @@
                     </td>
                     <td class="text-right font-semibold text-green-600">{{ enrollment.finalPrice | amount }}</td>
                     <td class="text-right">
+                      @if (isMonthly(enrollment)) {
+                        <span class="text-gray-300">—</span>
+                      } @else {
                       <span class="font-semibold">{{ (enrollment.amountPaid || 0) | amount }}</span>
                       @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
                         <div class="text-xs text-red-600 font-medium">
                           -{{ (enrollment.finalPrice - (enrollment.amountPaid || 0)) | amount }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
                         </div>
                       }
+                      }
                     </td>
                     <td>
-                      <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+                      @if (isMonthly(enrollment)) {
+                        <p-tag [value]="'STUDENTS.DETAIL.MONTHLY_TAG' | translate" severity="warn"></p-tag>
+                      } @else {
+                        <p-tag [value]="paymentLabel(enrollment.paymentStatus)" [severity]="getPaymentSeverity(enrollment.paymentStatus)"></p-tag>
+                      }
                     </td>
                     <td>
-                      @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
+                      @if (!isMonthly(enrollment) && (enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
                         <p-button
                           icon="pi pi-wallet"
                           [rounded]="true"
@@ -838,6 +910,43 @@
     <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
       (onClick)="submitPayment()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Monthly Subscription Payment Dialog -->
+<p-dialog
+  [(visible)]="showMonthlyPayDialog"
+  [header]="('STUDENTS.DETAIL.MONTHLY_PAY_TITLE' | translate) + (monthlyForAction() ? ' — ' + monthlyPeriodLabel(monthlyForAction()!) : '')"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+>
+  @if (monthlyForAction(); as m) {
+    <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.COL_COURSE' | translate }}</span> <strong>{{ m.courseName }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.MONTHLY_AMOUNT_DUE' | translate }}</span> <strong>{{ m.amountDue | amount }}</strong></div>
+      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (m.amountPaid || 0) | amount }}</strong></div>
+      <div class="col-span-2"><span class="text-gray-500">{{ 'STUDENTS.DETAIL.REMAINING_LABEL' | translate }}</span> <strong class="text-red-600">{{ monthlyRemaining() | amount }}</strong></div>
+    </div>
+  }
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.AMOUNT' | translate }} <span class="text-red-500">*</span></label>
+      <p-inputnumber [(ngModel)]="monthlyDialogAmount" [min]="0.01" [placeholder]="'STUDENTS.DETAIL.AMOUNT' | translate" [style]="{ width: '100%' }" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.PAYMENT_DATE' | translate }} <span class="text-red-500">*</span></label>
+      <p-datepicker [(ngModel)]="monthlyDialogDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.NOTES_LABEL' | translate }}</label>
+      <textarea pTextarea [(ngModel)]="monthlyDialogNotes" rows="2" class="w-full" [placeholder]="'STUDENTS.DETAIL.NOTES_PLACEHOLDER' | translate"></textarea>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showMonthlyPayDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
+      [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
+      (onClick)="submitMonthlyPayment()"></p-button>
   </ng-template>
 </p-dialog>
 

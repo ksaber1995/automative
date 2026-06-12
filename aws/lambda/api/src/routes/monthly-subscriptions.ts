@@ -494,4 +494,51 @@ export const monthlySubscriptionsRoutes = {
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list payments by course');
     }
   },
+
+  /** GET /api/monthly-subscriptions/student/:studentId
+   *  Every monthly bill for one student (newest month first), grouped by
+   *  enrollment on the client. Powers the monthly-subscription panel on the
+   *  student detail page.
+   */
+  listByStudent: async ({ params, headers }: { params: { studentId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const rows = await query(
+        `SELECT
+           msp.*,
+           s.first_name AS student_first_name,
+           s.last_name  AS student_last_name,
+           c.name       AS course_name,
+           b.name       AS branch_name,
+           cl.name      AS class_name
+         FROM monthly_subscription_payments msp
+         JOIN students s  ON msp.student_id = s.id
+         JOIN courses  c  ON msp.course_id  = c.id
+         JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN enrollments e ON msp.enrollment_id = e.id
+         LEFT JOIN classes cl    ON e.class_id = cl.id
+         WHERE msp.company_id = $1
+           AND msp.student_id = $2
+         ORDER BY msp.billing_year DESC, msp.billing_month DESC, c.name`,
+        [context.companyId, params.studentId]
+      );
+
+      // Respect branch scoping for branch-limited users.
+      const result = rows
+        .filter((r: any) => canAccessBranch(context, r.branch_id))
+        .map((r: any) => ({
+          ...mapPaymentWithDetailsFromDB(r),
+          paymentStatus: resolveStatus(r),
+        }));
+
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      console.error('List by student error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list payments by student');
+    }
+  },
 };

@@ -146,6 +146,7 @@ const router = {
     recordPayment: monthlySubscriptionsRoutes.recordPayment,
     voidPayment: monthlySubscriptionsRoutes.voidPayment,
     listByCourse: monthlySubscriptionsRoutes.listByCourse,
+    listByStudent: monthlySubscriptionsRoutes.listByStudent,
     byToken: monthlySubscriptionsRoutes.byToken,
   },
 };

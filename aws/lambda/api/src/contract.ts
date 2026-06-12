@@ -4318,6 +4318,16 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    listByStudent: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.array(MonthlyPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     // Resolve a scanned student barcode (QR token) to that student and their
     // still-due monthly bills, so staff can collect a payment by scanning.
     byToken: {

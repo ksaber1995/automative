@@ -24,6 +24,7 @@ import { ClassService } from '../../courses/services/class.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
+import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
@@ -34,6 +35,7 @@ import { Class } from '@shared/interfaces/class.interface';
 import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
 import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
+import { MonthlyPaymentWithDetails } from '@shared/interfaces/monthly-subscription.interface';
 
 @Component({
   selector: 'app-student-detail',
@@ -72,6 +74,7 @@ export class StudentDetailComponent implements OnInit {
   private masterEnrollmentService = inject(MasterEnrollmentService);
   private masterCourseService = inject(MasterCourseService);
   private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
+  private monthlyService = inject(MonthlySubscriptionsService);
   private attendanceService = inject(AttendanceService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -104,6 +107,21 @@ export class StudentDetailComponent implements OnInit {
   expandedRows: { [key: string]: boolean } = {};
   paymentHistoryMap = signal<Map<string, EnrollmentPayment[]>>(new Map());
   refundHistoryMap = signal<Map<string, Refund[]>>(new Map());
+
+  // Monthly-subscription bills, grouped by enrollmentId (newest month first).
+  monthlyByEnrollment = signal<Map<string, MonthlyPaymentWithDetails[]>>(new Map());
+
+  // Monthly-subscription payment dialog
+  showMonthlyPayDialog = false;
+  monthlyForAction = signal<MonthlyPaymentWithDetails | null>(null);
+  monthlyDialogAmount: number | null = null;
+  monthlyDialogDate: Date = new Date();
+  monthlyDialogNotes = '';
+  monthlyRemaining = computed(() => {
+    const m = this.monthlyForAction();
+    if (!m) return 0;
+    return Math.max(0, m.amountDue - (m.amountPaid || 0));
+  });
 
   // Expandable rows (master enrollments → linked courses + payment history)
   expandedMasterRows: { [key: string]: boolean } = {};
@@ -187,6 +205,7 @@ export class StudentDetailComponent implements OnInit {
       await this.loadCourses();
       this.loadClassesForDoneMap();
       this.loadStudent(this.studentId);
+      this.loadMonthlySubscriptions(this.studentId);
       this.loadEnrollments(this.studentId);
       if (!this.isTeacher()) this.loadMasterEnrollments(this.studentId);
       this.loadAttendance(this.studentId);
@@ -268,15 +287,102 @@ export class StudentDetailComponent implements OnInit {
     this.enrollmentService.getEnrollmentsByStudent(id).subscribe({
       next: (enrollments) => {
         this.enrollments.set(enrollments);
-        // Auto-load payment & refund history for every enrollment
+        // Auto-load payment & refund history for every enrollment.
+        // Monthly-subscription enrollments use the months table instead, and
+        // are auto-expanded so the bills are visible without a click.
         enrollments.forEach(e => {
-          this.loadPaymentHistory(e.id);
-          if ((e.totalRefunded || 0) > 0) this.loadRefundHistory(e.id);
+          if (this.isMonthly(e)) {
+            this.expandedRows[e.id] = true;
+          } else {
+            this.loadPaymentHistory(e.id);
+            if ((e.totalRefunded || 0) > 0) this.loadRefundHistory(e.id);
+          }
         });
+        this.expandedRows = { ...this.expandedRows };
       },
       error: () => {
         // Interceptor toasted the translated error.
       }
+    });
+  }
+
+  // ─── Monthly subscriptions ──────────────────────────────────────────────────
+
+  loadMonthlySubscriptions(studentId: string) {
+    this.monthlyService.listByStudent(studentId).subscribe({
+      next: (rows) => {
+        const map = new Map<string, MonthlyPaymentWithDetails[]>();
+        for (const r of rows) {
+          const list = map.get(r.enrollmentId) || [];
+          list.push(r);
+          map.set(r.enrollmentId, list);
+        }
+        this.monthlyByEnrollment.set(map);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+      },
+    });
+  }
+
+  /** A course billed monthly (vs. a one-time / installment course). */
+  isMonthly(enrollment: Enrollment): boolean {
+    return this.courses.get(enrollment.courseId)?.paymentType === 'MONTHLY_SUBSCRIPTION';
+  }
+
+  getMonthlyPayments(enrollmentId: string): MonthlyPaymentWithDetails[] {
+    return this.monthlyByEnrollment().get(enrollmentId) || [];
+  }
+
+  /** "March 2026" style label for a billing period. */
+  monthlyPeriodLabel(p: { billingMonth: number; billingYear: number }): string {
+    const month = this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + p.billingMonth);
+    return `${month} ${p.billingYear}`;
+  }
+
+  getMonthlyStatusSeverity(status: string): 'success' | 'warn' | 'danger' | 'info' | 'secondary' {
+    switch (status) {
+      case 'PAID': return 'success';
+      case 'PENDING': return 'warn';
+      case 'OVERDUE': return 'danger';
+      case 'PARTIAL': return 'info';
+      default: return 'secondary';
+    }
+  }
+
+  monthlyStatusLabel(status: string): string {
+    const key = `MONTHLY_SUBSCRIPTIONS.STATUS.${status}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? status : translated;
+  }
+
+  openMonthlyPayDialog(payment: MonthlyPaymentWithDetails) {
+    this.monthlyForAction.set(payment);
+    this.monthlyDialogAmount = Math.max(0, payment.amountDue - (payment.amountPaid || 0));
+    this.monthlyDialogDate = new Date();
+    this.monthlyDialogNotes = '';
+    this.showMonthlyPayDialog = true;
+  }
+
+  submitMonthlyPayment() {
+    const payment = this.monthlyForAction();
+    if (!payment || !this.monthlyDialogAmount || !this.monthlyDialogDate) return;
+    this.actionLoading.set(true);
+    const dateStr = this.monthlyDialogDate.toISOString().split('T')[0];
+    this.monthlyService.recordPayment(payment.id, {
+      amount: this.monthlyDialogAmount,
+      paymentDate: dateStr,
+      notes: this.monthlyDialogNotes || undefined,
+    }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
+        this.showMonthlyPayDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadMonthlySubscriptions(this.studentId);
+      },
+      error: () => {
+        this.actionLoading.set(false);
+      },
     });
   }
 

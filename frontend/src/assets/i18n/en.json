@@ -2473,7 +2473,16 @@
       "JOIN_BUNDLE_DIALOG_TITLE": "Choose a Class to Join",
       "JOIN_CLASSES_LOADING": "Loading classes…",
       "JOIN_NO_CLASSES": "No active classes available for this course.",
-      "JOIN_ENROLL_IN_CLASS": "Enroll in Class"
+      "JOIN_ENROLL_IN_CLASS": "Enroll in Class",
+      "MONTHLY_TAG": "Monthly",
+      "MONTHLY_BILLS": "Monthly Subscription Bills",
+      "NO_MONTHLY_BILLS": "No monthly bills generated yet.",
+      "MONTHLY_PERIOD": "Period",
+      "MONTHLY_AMOUNT_DUE": "Amount Due",
+      "MONTHLY_AMOUNT_PAID": "Amount Paid",
+      "MONTHLY_STATUS": "Status",
+      "MONTHLY_PAID_ON": "Paid On",
+      "MONTHLY_PAY_TITLE": "Record Monthly Payment"
     },
     "CREATED": "Student created successfully",
     "UPDATED": "Student updated successfully",

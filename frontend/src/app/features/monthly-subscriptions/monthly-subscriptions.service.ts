@@ -84,4 +84,9 @@ export class MonthlySubscriptionsService {
     if (billingMonth) httpParams = httpParams.set('billingMonth', billingMonth.toString());
     return this.http.get<MonthlyPaymentWithDetails[]>(`${this.base}/course/${courseId}`, { params: httpParams });
   }
+
+  /** Every monthly bill for one student (newest month first). */
+  listByStudent(studentId: string): Observable<MonthlyPaymentWithDetails[]> {
+    return this.http.get<MonthlyPaymentWithDetails[]>(`${this.base}/student/${studentId}`);
+  }
 }

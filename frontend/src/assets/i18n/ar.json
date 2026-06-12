@@ -2513,7 +2513,16 @@
       "JOIN_BUNDLE_DIALOG_TITLE": "اختر فصلاً للانضمام",
       "JOIN_CLASSES_LOADING": "جاري تحميل الفصول…",
       "JOIN_NO_CLASSES": "لا توجد فصول نشطة متاحة لهذا الكورس.",
-      "JOIN_ENROLL_IN_CLASS": "التسجيل في الفصل"
+      "JOIN_ENROLL_IN_CLASS": "التسجيل في الفصل",
+      "MONTHLY_TAG": "شهري",
+      "MONTHLY_BILLS": "فواتير الاشتراك الشهري",
+      "NO_MONTHLY_BILLS": "لم يتم إنشاء فواتير شهرية بعد.",
+      "MONTHLY_PERIOD": "الفترة",
+      "MONTHLY_AMOUNT_DUE": "المبلغ المستحق",
+      "MONTHLY_AMOUNT_PAID": "المبلغ المدفوع",
+      "MONTHLY_STATUS": "الحالة",
+      "MONTHLY_PAID_ON": "تاريخ الدفع",
+      "MONTHLY_PAY_TITLE": "تسجيل دفعة شهرية"
     },
     "CREATED": "تم إنشاء الطالب بنجاح",
     "UPDATED": "تم تحديث الطالب بنجاح",
