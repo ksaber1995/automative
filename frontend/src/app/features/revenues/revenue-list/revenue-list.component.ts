@@ -34,7 +34,7 @@ export class RevenueListComponent implements OnInit {
   branches = signal<Branch[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
-  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'ALL' = 'ALL';
+  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'ALL' = 'ALL';
   startDate: string = '';
   endDate: string = '';
   totalRevenue: number = 0;
@@ -79,6 +79,7 @@ export class RevenueListComponent implements OnInit {
     if (source === 'ENROLLMENT') return { severity: 'success', label: 'Course' };
     if (source === 'MASTER_ENROLLMENT') return { severity: 'secondary', label: 'Bundle' };
     if (source === 'EVENT') return { severity: 'warn', label: 'Event' };
+    if (source === 'SUBSCRIPTION') return { severity: 'success', label: 'Subscription' };
     return { severity: 'info', label: 'Product' };
   }
 
@@ -117,6 +118,12 @@ export class RevenueListComponent implements OnInit {
     } else if (revenue.source === 'EVENT') {
       if (revenue.eventId) {
         this.router.navigate(['/events', revenue.eventId]);
+      }
+    } else if (revenue.source === 'SUBSCRIPTION') {
+      // Monthly subscription bills have no edit page — jump to the student so the
+      // user can view the enrollment and its monthly payment history.
+      if (revenue.studentId) {
+        this.router.navigate(['/students', revenue.studentId]);
       }
     } else {
       this.router.navigate(['/products/sales']);

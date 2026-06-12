@@ -8,8 +8,8 @@
 
     <p-card>
       <form [formGroup]="enrollmentForm" (ngSubmit)="onSubmit()">
-        <!-- Enrollment type toggle -->
-        @if (!isEditMode()) {
+        <!-- Enrollment type toggle — hidden for TEACHER companies -->
+        @if (!isEditMode() && !isTeacher()) {
           <div class="mb-6">
             <div class="text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.ENROLLMENT_TYPE' | translate }}</div>
             <div class="flex gap-3">

@@ -770,7 +770,7 @@ const RevenueItemSchema = z.object({
   companyId: UUIDSchema,
   branchId: UUIDSchema.nullable(),
   branchName: z.string().nullable(),
-  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT']),
+  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION']),
   sourceId: UUIDSchema,
   studentId: UUIDSchema.nullable(),
   amount: z.number(),
@@ -2237,7 +2237,7 @@ export const contract = c.router({
       path: '/api/revenues',
       query: z.object({
         branchId: UUIDSchema.optional(),
-        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'ALL']).optional(),
+        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION', 'ALL']).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),

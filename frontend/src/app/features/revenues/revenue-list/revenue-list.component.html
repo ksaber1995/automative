@@ -29,6 +29,7 @@
           <option value="ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_ENROLLMENT' | translate }}</option>
           <option value="MASTER_ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_MASTER_ENROLLMENT' | translate }}</option>
           <option value="EVENT">{{ 'REVENUES.LIST.SOURCE_EVENT' | translate }}</option>
+          <option value="SUBSCRIPTION">{{ 'REVENUES.LIST.SOURCE_SUBSCRIPTION' | translate }}</option>
           <option value="PRODUCT_SALE">{{ 'REVENUES.LIST.SOURCE_PRODUCT_SALE' | translate }}</option>
         </select>
       </div>
@@ -106,6 +107,8 @@
                 {{ 'REVENUES.LIST.VIEW_BUNDLE' | translate }}
               } @else if (revenue.source === 'EVENT') {
                 {{ 'REVENUES.LIST.VIEW_EVENT' | translate }}
+              } @else if (revenue.source === 'SUBSCRIPTION') {
+                {{ 'REVENUES.LIST.VIEW_SUBSCRIPTION' | translate }}
               } @else {
                 {{ 'REVENUES.LIST.VIEW_SALE' | translate }}
               }

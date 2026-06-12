@@ -6,7 +6,7 @@ export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
     query: {
       branchId?: string;
-      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'ALL';
+      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'ALL';
       startDate?: string;
       endDate?: string;
     };
@@ -27,6 +27,7 @@ export const revenuesRoutes = {
       const includeProducts = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'PRODUCT_SALE';
       const includeMasters = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'MASTER_ENROLLMENT';
       const includeEvents = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'EVENT';
+      const includeSubscriptions = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'SUBSCRIPTION';
 
       // Shared filters — push once, reuse positional index for every branch.
       // Sentinel value "NULL" means "company-level only" (no branch_id) — only
@@ -199,6 +200,43 @@ export const revenuesRoutes = {
         if (endIdx) sql += ` AND es.payment_date <= $${endIdx}`;
         // Pad the other branches with NULLs for event_id/event_name columns.
         // We do this by re-projecting each existing part with NULL placeholders.
+        parts.push(sql);
+      }
+
+      // Monthly subscription payments are revenue too, attributed to the date the
+      // money was collected (paid_date). The monthly_subscription_payments row is the
+      // single source of truth (same as the dashboard) — one entry per paid bill.
+      // branch_id is NOT NULL on these, so they never appear in the company-level slice.
+      if (includeSubscriptions && !companyLevelOnly) {
+        let sql = `SELECT
+          'SUBSCRIPTION' as source,
+          msp.id as source_id,
+          msp.company_id,
+          msp.branch_id,
+          b.name as branch_name,
+          msp.amount_paid as amount,
+          0::numeric as total_refunded,
+          CONCAT('Monthly subscription: ', s.first_name, ' ', s.last_name, ' - ', c.name,
+            ' (', msp.billing_year, '-', LPAD(msp.billing_month::text, 2, '0'), ')') as description,
+          msp.paid_date as date,
+          'PAID' as payment_status,
+          NULL::text as payment_method,
+          CONCAT(s.first_name, ' ', s.last_name) as student_name,
+          c.name as course_name,
+          NULL::text as product_name,
+          msp.student_id as student_id,
+          msp.created_at,
+          NULL::uuid as event_id,
+          NULL::text as event_name
+        FROM monthly_subscription_payments msp
+        JOIN branches b ON msp.branch_id = b.id
+        JOIN students s ON msp.student_id = s.id
+        JOIN courses c ON msp.course_id = c.id
+        WHERE msp.company_id = $1 AND msp.amount_paid > 0`;
+        const b = applyBranch('msp.branch_id');
+        if (b) sql += ` AND ${b}`;
+        if (startIdx) sql += ` AND msp.paid_date >= $${startIdx}`;
+        if (endIdx) sql += ` AND msp.paid_date <= $${endIdx}`;
         parts.push(sql);
       }
 

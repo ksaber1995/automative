@@ -23,6 +23,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterEnrollmentService, CoverageInfo } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { EnrollmentStatus, PaymentMode } from '@shared/enums/enrollment-status.enum';
 import { Student } from '@shared/interfaces/student.interface';
 import { Course } from '@shared/interfaces/course.interface';
@@ -65,6 +66,10 @@ export class EnrollmentFormComponent implements OnInit {
   private masterCourseService = inject(MasterCourseService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
   private translate = inject(TranslateService);
+  private authService = inject(AuthService);
+
+  /** TEACHER companies don't use master courses, so hide the bundle toggle. */
+  isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
 
   enrollmentForm: FormGroup;
   loading = signal(false);
@@ -175,7 +180,7 @@ export class EnrollmentFormComponent implements OnInit {
     const courseId = this.route.snapshot.queryParamMap.get('courseId');
     const branchId = this.route.snapshot.queryParamMap.get('branchId');
     const typeParam = (this.route.snapshot.queryParamMap.get('type') || '').toUpperCase();
-    if (typeParam === 'MASTER') this.setEnrollmentType('MASTER');
+    if (typeParam === 'MASTER' && !this.isTeacher()) this.setEnrollmentType('MASTER');
 
     this.loadData().then(() => {
       if (branchId) {

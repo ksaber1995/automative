@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 
-export type RevenueSource = 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT';
+export type RevenueSource = 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION';
 
 export interface RevenueItem {
   id: string;
