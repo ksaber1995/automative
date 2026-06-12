@@ -11,6 +11,8 @@ export interface SalesSummary {
   totalSales: number;
   totalQuantity: number;
   totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
   byProduct: Array<{
     productId: string;
     productName: string;
@@ -35,6 +37,7 @@ export class ProductSaleService {
   getAllSales(params?: {
     branchId?: string;
     productId?: string;
+    studentId?: string;
     startDate?: string;
     endDate?: string;
   }): Observable<ProductSale[]> {
@@ -76,6 +79,7 @@ export class ProductSaleService {
     amount: number;
     refundDate: string;
     reason?: string;
+    restockQuantity?: number;
   }): Observable<any> {
     return this.api.post(`product-sales/${saleId}/refunds`, dto);
   }

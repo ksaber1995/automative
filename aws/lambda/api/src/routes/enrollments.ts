@@ -1,6 +1,7 @@
-import { insert, update, findById, query, queryOne } from '../db/connection';
+import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { insertProductSaleWithClient } from './product-sales';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -176,6 +177,64 @@ export const enrollmentsRoutes = {
       const notes = body.notes || null;
 
       const paymentStatus = computePaymentStatus(finalPrice, amountPaid);
+
+      // Enroll-and-buy: when linked products are chosen, the enrollment, its
+      // payment, and all product sales (stock + COGS) must commit atomically —
+      // an out-of-stock book rolls back the whole enrollment.
+      const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
+      if (buyProducts.length > 0) {
+        const client = await getClient();
+        try {
+          await client.query('BEGIN');
+          const enrRes = await client.query(
+            `INSERT INTO enrollments
+               (company_id, student_id, class_id, course_id, branch_id, enrollment_date, status,
+                original_price, discount_percent, discount_amount, final_price, payment_mode,
+                down_payment, amount_paid, payment_status, payment_type, completion_date, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'ONE_TIME',NULL,$16) RETURNING *`,
+            [context.companyId, body.studentId, body.classId, body.courseId, body.branchId,
+             body.enrollmentDate, body.status, originalPrice, discountPercent, discountAmount,
+             finalPrice, paymentMode, downPayment, amountPaid, paymentStatus, notes]
+          );
+          const enrollment = enrRes.rows[0];
+
+          if (amountPaid > 0) {
+            await client.query(
+              `INSERT INTO enrollment_payments (enrollment_id, company_id, amount, payment_date, notes)
+               VALUES ($1,$2,$3,$4,$5)`,
+              [enrollment.id, context.companyId, amountPaid, body.enrollmentDate,
+               paymentMode === 'FULL' ? 'Full payment' : 'Down payment']
+            );
+          }
+
+          for (const p of buyProducts) {
+            await insertProductSaleWithClient(client, context.companyId, {
+              productId: p.productId,
+              branchId: body.branchId,
+              quantity: p.quantity ?? 1,
+              discountType: p.discountType,
+              discountValue: p.discountValue,
+              date: body.enrollmentDate,
+              paymentMethod: p.paymentMethod || null,
+              studentId: body.studentId,
+              courseId: body.courseId,
+              enrollmentId: enrollment.id,
+            });
+          }
+
+          await client.query('COMMIT');
+          return { status: 201 as const, body: mapEnrollmentFromDB(enrollment) };
+        } catch (error: any) {
+          await client.query('ROLLBACK');
+          console.error('Create enrollment with products error:', error);
+          if (error?.statusCode && error?.code) {
+            return apiError(error.statusCode, error.code, error.message);
+          }
+          return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_FAILED', 'Failed to create enrollment', 400);
+        } finally {
+          client.release();
+        }
+      }
 
       const enrollment = await insert('enrollments', {
         company_id: context.companyId,

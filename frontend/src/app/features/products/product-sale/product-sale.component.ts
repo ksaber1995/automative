@@ -133,7 +133,7 @@ export class ProductSaleComponent implements OnInit {
       quantity: [1, [Validators.required, Validators.min(1)]],
       discountType: [DiscountType.NONE, Validators.required],
       discountValue: [0, Validators.min(0)],
-      paymentMethod: ['', Validators.required],
+      paymentMethod: ['CASH', Validators.required],
       receiptNumber: [''],
       customerName: [''],
       customerPhone: [''],

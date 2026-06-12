@@ -146,6 +146,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/products/products.routes').then(m => m.PRODUCTS_ROUTES)
       },
       {
+        path: 'educational-books',
+        canActivate: [permissionGuard('product_sales')],
+        data: { breadcrumb: 'BREADCRUMBS.EDUCATIONAL_BOOKS' },
+        loadChildren: () => import('./features/educational-books/educational-books.routes').then(m => m.EDUCATIONAL_BOOKS_ROUTES)
+      },
+      {
         path: 'users',
         canActivate: [permissionGuard('users')],
         data: { breadcrumb: 'BREADCRUMBS.USERS' },

@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { switchMap, map } from 'rxjs/operators';
@@ -15,6 +15,8 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { DividerModule } from 'primeng/divider';
+import { CheckboxModule } from 'primeng/checkbox';
+import { TagModule } from 'primeng/tag';
 import { EnrollmentService } from '../services/enrollment.service';
 import { StudentService } from '../../students/services/student.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -30,6 +32,9 @@ import { Course } from '@shared/interfaces/course.interface';
 import { Class } from '@shared/interfaces/class.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { MasterCourse } from '@shared/interfaces/master-course.interface';
+import { CourseProductService } from '../../educational-books/services/course-product.service';
+import { CourseProduct } from '@shared/interfaces/course-product.interface';
+import { DiscountType } from '@shared/enums/product.enum';
 
 type EnrollmentType = 'COURSE' | 'MASTER';
 
@@ -39,6 +44,7 @@ type EnrollmentType = 'COURSE' | 'MASTER';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     TranslateModule,
     CardModule,
     ButtonModule,
@@ -49,6 +55,8 @@ type EnrollmentType = 'COURSE' | 'MASTER';
     TextareaModule,
     RadioButtonModule,
     DividerModule,
+    CheckboxModule,
+    TagModule,
     AmountPipe,
   ],
   templateUrl: './enrollment-form.component.html'
@@ -67,6 +75,7 @@ export class EnrollmentFormComponent implements OnInit {
   private masterEnrollmentService = inject(MasterEnrollmentService);
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
+  private courseProductService = inject(CourseProductService);
 
   /** TEACHER companies don't use master courses, so hide the bundle toggle. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -109,6 +118,35 @@ export class EnrollmentFormComponent implements OnInit {
     this.enrollmentType() === 'COURSE' &&
     this.selectedCourse()?.paymentType === 'MONTHLY_SUBSCRIPTION'
   );
+
+  // ─── Educational Books: products linked to the selected course ──────────────
+  // Linked products for the selected course (COURSE mode only).
+  courseBooks = signal<CourseProduct[]>([]);
+  // Set of selected (to-be-bought) courseProduct ids.
+  selectedBookIds = signal<Set<string>>(new Set());
+
+  // Books are hidden for monthly-subscription courses (backend ignores products there).
+  showBooksSection = computed(() =>
+    this.enrollmentType() === 'COURSE' &&
+    !this.isMonthly() &&
+    this.courseBooks().length > 0
+  );
+
+  // Net total of the currently selected books (selling price minus default discount).
+  booksNetTotal = computed(() => {
+    const selected = this.selectedBookIds();
+    return this.courseBooks()
+      .filter(b => selected.has(b.id))
+      .reduce((sum, b) => sum + this.bookNetPrice(b), 0);
+  });
+
+  selectedBooksCount = computed(() => {
+    const selected = this.selectedBookIds();
+    return this.courseBooks().filter(b => selected.has(b.id)).length;
+  });
+
+  // Enrollment final price + selected books net total.
+  grandTotal = computed(() => this.finalPriceSig() + this.booksNetTotal());
 
   filteredStudents = computed(() => {
     const branchId = this.selectedBranchId();
@@ -195,6 +233,8 @@ export class EnrollmentFormComponent implements OnInit {
           this.selectedCourse.set(course);
           this.setPrices(course.price, 0, 0, course.price);
         }
+        // Load linked books for the pre-selected course (COURSE mode only).
+        this.loadCourseBooks(courseId);
       }
       if (classId) {
         this.enrollmentForm.patchValue({ classId });
@@ -317,6 +357,9 @@ export class EnrollmentFormComponent implements OnInit {
     this.setPrices(0, 0, 0, 0);
     this.discountTypeSig.set('none');
     this.enrollmentForm.patchValue({ discountType: 'none' });
+    // Course was cleared — drop any linked books.
+    this.courseBooks.set([]);
+    this.selectedBookIds.set(new Set());
   }
 
   setEnrollmentType(t: EnrollmentType) {
@@ -336,6 +379,9 @@ export class EnrollmentFormComponent implements OnInit {
       this.selectedCourse.set(null);
       this.setPrices(0, 0, 0, 0);
       this.coverage.set(null);
+      // MASTER mode has no per-course books.
+      this.courseBooks.set([]);
+      this.selectedBookIds.set(new Set());
     } else {
       masterCtl?.clearValidators();
       this.enrollmentForm.patchValue({ masterCourseId: '' });
@@ -400,6 +446,8 @@ export class EnrollmentFormComponent implements OnInit {
         this.setPrices(course.price, 0, 0, course.price);
       }
     }
+    // Refresh the linked-books list for the newly selected course.
+    this.loadCourseBooks(courseId || null);
     this.checkCoverage();
   }
 
@@ -559,7 +607,23 @@ export class EnrollmentFormComponent implements OnInit {
         }
       });
     } else {
-      this.enrollmentService.createEnrollment(enrollmentData).subscribe({
+      // Educational Books: attach selected linked products (COURSE mode, non-monthly only).
+      const createData: typeof enrollmentData & {
+        products?: Array<{ productId: string; quantity: number; discountType: DiscountType; discountValue: number }>;
+      } = { ...enrollmentData };
+      if (this.enrollmentType() === 'COURSE' && !monthly) {
+        const selected = this.selectedBookIds();
+        const products = this.courseBooks()
+          .filter(b => selected.has(b.id))
+          .map(b => ({
+            productId: b.productId,
+            quantity: 1,
+            discountType: b.defaultDiscountType,
+            discountValue: b.defaultDiscountValue,
+          }));
+        if (products.length > 0) createData.products = products;
+      }
+      this.enrollmentService.createEnrollment(createData).subscribe({
         next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_CREATED')); this.router.navigate(['/students']); },
         error: () => {
           // Interceptor toasted the translated error.
@@ -567,6 +631,59 @@ export class EnrollmentFormComponent implements OnInit {
         }
       });
     }
+  }
+
+  // ─── Educational Books helpers ──────────────────────────────────────────────
+
+  /** Fetch the products linked to the given course (COURSE mode only). */
+  loadCourseBooks(courseId: string | null | undefined) {
+    this.courseBooks.set([]);
+    this.selectedBookIds.set(new Set());
+    if (!courseId || this.enrollmentType() !== 'COURSE') return;
+    this.courseProductService.list(courseId).subscribe({
+      next: (books) => {
+        this.courseBooks.set(books);
+        // Pre-check required items by default (still toggleable).
+        const preChecked = new Set(books.filter(b => b.isRequired).map(b => b.id));
+        this.selectedBookIds.set(preChecked);
+      },
+      error: () => {
+        this.courseBooks.set([]);
+        this.selectedBookIds.set(new Set());
+      },
+    });
+  }
+
+  /** Toggle a book in/out of the selection. */
+  toggleBook(book: CourseProduct, checked: boolean) {
+    const next = new Set(this.selectedBookIds());
+    if (checked) next.add(book.id); else next.delete(book.id);
+    this.selectedBookIds.set(next);
+  }
+
+  isBookSelected(book: CourseProduct): boolean {
+    return this.selectedBookIds().has(book.id);
+  }
+
+  /** Net unit price after applying the linked product's default discount. */
+  bookNetPrice(book: CourseProduct): number {
+    const price = book.sellingPrice || 0;
+    const value = book.defaultDiscountValue || 0;
+    if (book.defaultDiscountType === DiscountType.PERCENTAGE) {
+      return Math.max(0, price - (price * value) / 100);
+    }
+    if (book.defaultDiscountType === DiscountType.FIXED_AMOUNT) {
+      return Math.max(0, price - value);
+    }
+    return price;
+  }
+
+  /** Human-readable default discount, or null when there's none. */
+  bookDiscountLabel(book: CourseProduct): string | null {
+    const value = book.defaultDiscountValue || 0;
+    if (!value || book.defaultDiscountType === DiscountType.NONE) return null;
+    if (book.defaultDiscountType === DiscountType.PERCENTAGE) return `-${value}%`;
+    return `-${value}`;
   }
 
   formatDate(date: Date): string {

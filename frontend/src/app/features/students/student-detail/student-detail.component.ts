@@ -28,6 +28,7 @@ import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
+import { ProductSaleService } from '../../products/services/product-sale.service';
 import { Student } from '@shared/interfaces/student.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
@@ -36,6 +37,7 @@ import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.i
 import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
 import { MonthlyPaymentWithDetails } from '@shared/interfaces/monthly-subscription.interface';
+import { ProductSale } from '@shared/interfaces/product-sale.interface';
 
 @Component({
   selector: 'app-student-detail',
@@ -76,6 +78,7 @@ export class StudentDetailComponent implements OnInit {
   private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
   private monthlyService = inject(MonthlySubscriptionsService);
   private attendanceService = inject(AttendanceService);
+  private productSaleService = inject(ProductSaleService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -186,6 +189,9 @@ export class StudentDetailComponent implements OnInit {
   private joinBundleCourseId: string | null = null;
   private joinBundleMasterEnrollmentId: string | null = null;
 
+  // Books & Products purchases attributed to this student.
+  bookPurchases = signal<ProductSale[]>([]);
+
   // Attendance
   attendanceRecords = signal<StudentAttendanceRecord[]>([]);
   loadingAttendance = signal(false);
@@ -209,7 +215,17 @@ export class StudentDetailComponent implements OnInit {
       this.loadEnrollments(this.studentId);
       if (!this.isTeacher()) this.loadMasterEnrollments(this.studentId);
       this.loadAttendance(this.studentId);
+      this.loadBookPurchases(this.studentId);
     }
+  }
+
+  loadBookPurchases(studentId: string) {
+    this.productSaleService.getAllSales({ studentId }).subscribe({
+      next: (sales) => this.bookPurchases.set(sales),
+      error: () => {
+        // Interceptor toasted the translated error.
+      },
+    });
   }
 
   loadClassesForDoneMap() {

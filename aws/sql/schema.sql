@@ -535,6 +535,9 @@ CREATE TABLE refunds (
     refund_date DATE NOT NULL,
     type VARCHAR(20) NOT NULL CHECK (type IN ('FULL', 'PARTIAL')),
     reason TEXT,
+    -- Units returned to inventory by this refund (product sales only). 0 = the
+    -- customer was refunded without returning the physical product.
+    restock_quantity INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
     FOREIGN KEY (master_enrollment_id) REFERENCES master_enrollments(id) ON DELETE CASCADE,
@@ -913,22 +916,56 @@ CREATE TABLE product_sales (
     subtotal DECIMAL(10, 2),
     total_amount DECIMAL(10, 2) NOT NULL,
     sale_date DATE NOT NULL,
-    payment_method VARCHAR(50),
+    payment_method VARCHAR(50) DEFAULT 'CASH',
     receipt_number VARCHAR(100),
     customer_name VARCHAR(255),
     customer_phone VARCHAR(50),
     notes TEXT,
     event_id UUID,
+    -- Educational Books (migration 031): attribute a sale to a student/course/enrollment.
+    -- All nullable so plain walk-in product sales are unaffected.
+    student_id UUID,
+    course_id UUID,
+    enrollment_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_product_sales_product_id ON product_sales(product_id);
 CREATE INDEX idx_product_sales_branch_id ON product_sales(branch_id);
 CREATE INDEX idx_product_sales_sale_date ON product_sales(sale_date);
 CREATE INDEX idx_product_sales_event ON product_sales(event_id);
+CREATE INDEX idx_product_sales_student ON product_sales(student_id);
+CREATE INDEX idx_product_sales_course ON product_sales(course_id);
+CREATE INDEX idx_product_sales_enrollment ON product_sales(enrollment_id);
+
+-- =============================================
+-- COURSE_PRODUCTS TABLE  (migration 031)
+-- Links a course to one or more products (usually books). Powers the
+-- Educational Books page and buy-with-enrollment. UNIQUE(course, product).
+-- =============================================
+CREATE TABLE course_products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    course_id  UUID NOT NULL REFERENCES courses(id)  ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    is_required BOOLEAN NOT NULL DEFAULT true,
+    default_discount_type  VARCHAR(20) NOT NULL DEFAULT 'NONE' CHECK (default_discount_type IN ('NONE', 'PERCENTAGE', 'FIXED_AMOUNT')),
+    default_discount_value DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    added_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT course_products_course_product_key UNIQUE (course_id, product_id)
+);
+
+CREATE INDEX idx_course_products_course  ON course_products(course_id);
+CREATE INDEX idx_course_products_product ON course_products(product_id);
+CREATE INDEX idx_course_products_company ON course_products(company_id);
 
 -- =============================================
 -- STOCK PURCHASES TABLE  (migration 025)

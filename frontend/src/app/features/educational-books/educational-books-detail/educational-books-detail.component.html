@@ -1,0 +1,285 @@
+<div class="container mx-auto p-4">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-center p-4">
+        <div class="flex items-center gap-3">
+          <p-button
+            icon="pi pi-arrow-left"
+            [rounded]="true"
+            [text]="true"
+            [pTooltip]="'EDUCATIONAL_BOOKS.BACK' | translate"
+            (onClick)="back()">
+          </p-button>
+          <div>
+            <h2 class="text-2xl font-bold">{{ courseDetail()?.courseName }}</h2>
+            <div class="text-sm text-gray-500">
+              @if (courseDetail()?.courseCode) {
+                <span class="font-mono mr-3">{{ courseDetail()!.courseCode }}</span>
+              }
+              <span>
+                {{ 'EDUCATIONAL_BOOKS.ENROLLED' | translate }}: {{ courseDetail()?.enrolledCount || 0 }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+    @if (loading()) {
+      <div class="text-center py-8 text-gray-500">
+        <i class="pi pi-spin pi-spinner text-2xl"></i>
+      </div>
+    } @else if (courseDetail()) {
+      @if (courseDetail()!.products.length === 0) {
+        <div class="text-center py-12 text-gray-500">
+          <i class="pi pi-book text-4xl mb-3 block"></i>
+          {{ 'EDUCATIONAL_BOOKS.NO_COURSES' | translate }}
+        </div>
+      }
+
+      @for (product of courseDetail()!.products; track product.courseProductId) {
+        <div class="border rounded-lg p-4 mb-6">
+          <!-- Product header -->
+          <div class="flex justify-between items-start gap-3 flex-wrap mb-4">
+            <div>
+              <div class="font-bold text-lg">{{ product.productName }}</div>
+              @if (product.productCode) {
+                <div class="text-sm text-gray-500 font-mono">{{ product.productCode }}</div>
+              }
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <p-tag
+                [value]="(product.isRequired ? 'EDUCATIONAL_BOOKS.REQUIRED' : 'EDUCATIONAL_BOOKS.OPTIONAL') | translate"
+                [severity]="product.isRequired ? 'danger' : 'info'">
+              </p-tag>
+              <div class="text-sm">
+                <span class="text-gray-500">{{ 'EDUCATIONAL_BOOKS.PRICE' | translate }}:</span>
+                <span class="font-semibold ml-1">{{ product.sellingPrice | amount }}</span>
+              </div>
+              <div class="text-sm">
+                <span class="text-gray-500">{{ 'EDUCATIONAL_BOOKS.STOCK' | translate }}:</span>
+                <span class="font-semibold ml-1">{{ product.stock }}</span>
+              </div>
+              @if (product.defaultDiscountType !== DiscountType.NONE && product.defaultDiscountValue > 0) {
+                <p-tag severity="warn"
+                  [value]="('EDUCATIONAL_BOOKS.DISCOUNT_VALUE' | translate) + ': ' +
+                    (product.defaultDiscountType === DiscountType.PERCENTAGE
+                      ? (product.defaultDiscountValue + '%')
+                      : (product.defaultDiscountValue | amount))">
+                </p-tag>
+              }
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Bought -->
+            <div>
+              <h4 class="font-semibold text-green-700 mb-2">
+                {{ 'EDUCATIONAL_BOOKS.BUYERS' | translate }} ({{ product.buyers.length }})
+              </h4>
+              @if (product.buyers.length === 0) {
+                <div class="text-sm text-gray-400 py-3">{{ 'EDUCATIONAL_BOOKS.NO_BUYERS' | translate }}</div>
+              } @else {
+                <p-table [value]="product.buyers" [tableStyle]="{ 'min-width': '100%' }">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th>{{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}</th>
+                      <th>{{ 'EDUCATIONAL_BOOKS.COL_QTY' | translate }}</th>
+                      <th>{{ 'EDUCATIONAL_BOOKS.COL_AMOUNT' | translate }}</th>
+                      <th>{{ 'EDUCATIONAL_BOOKS.COL_DATE' | translate }}</th>
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-buyer>
+                    <tr>
+                      <td>{{ buyer.studentName || '—' }}</td>
+                      <td>{{ buyer.quantity }}</td>
+                      <td class="text-green-600 font-medium">{{ buyer.totalAmount | amount }}</td>
+                      <td>{{ buyer.saleDate | date: 'shortDate' }}</td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              }
+            </div>
+
+            <!-- Not bought -->
+            <div>
+              <h4 class="font-semibold text-amber-700 mb-2">
+                {{ 'EDUCATIONAL_BOOKS.NON_BUYERS' | translate }} ({{ product.nonBuyers.length }})
+              </h4>
+              @if (product.nonBuyers.length === 0) {
+                <div class="text-sm text-gray-400 py-3">{{ 'EDUCATIONAL_BOOKS.ALL_BOUGHT' | translate }}</div>
+              } @else {
+                <p-table [value]="product.nonBuyers" [tableStyle]="{ 'min-width': '100%' }">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th>{{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}</th>
+                      <th class="text-right"></th>
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-student>
+                    <tr>
+                      <td>{{ student.studentName || '—' }}</td>
+                      <td class="text-right">
+                        <p-button
+                          [label]="'EDUCATIONAL_BOOKS.SELL' | translate"
+                          icon="pi pi-shopping-cart"
+                          size="small"
+                          severity="success"
+                          (onClick)="openSellDialog(product, student)">
+                        </p-button>
+                      </td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </p-card>
+</div>
+
+<!-- Sell Dialog -->
+<p-dialog
+  [header]="'EDUCATIONAL_BOOKS.SELL_TITLE' | translate"
+  [(visible)]="showSellDialog"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  [draggable]="false"
+  [closable]="!submitting()">
+
+  @if (sellingProduct() && sellingStudent()) {
+    <div class="flex flex-col gap-4 py-2">
+      <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p class="text-sm text-blue-900 font-semibold">{{ sellingProduct()!.productName }}</p>
+        <p class="text-xs text-blue-700 mt-1">
+          {{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}: {{ sellingStudent()!.studentName || '—' }}
+        </p>
+      </div>
+
+      <!-- Branch (only for global courses) -->
+      @if (needsBranchSelect()) {
+        <div>
+          <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.BRANCH' | translate }} *</label>
+          <p-select
+            [options]="branchOptions()"
+            [ngModel]="sellBranchId()"
+            (ngModelChange)="sellBranchId.set($event)"
+            optionLabel="label"
+            optionValue="value"
+            appendTo="body"
+            [placeholder]="'EDUCATIONAL_BOOKS.BRANCH' | translate"
+            [style]="{ width: '100%' }">
+          </p-select>
+        </div>
+      }
+
+      <!-- Quantity -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.QUANTITY' | translate }} *</label>
+        <p-inputnumber
+          [ngModel]="sellQuantity()"
+          (ngModelChange)="sellQuantity.set($event || 1)"
+          [min]="1"
+          [showButtons]="true"
+          class="w-full">
+        </p-inputnumber>
+      </div>
+
+      <!-- Discount -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.DISCOUNT_TYPE' | translate }}</label>
+          <p-select
+            [options]="discountTypeOptions"
+            [ngModel]="sellDiscountType()"
+            (ngModelChange)="sellDiscountType.set($event)"
+            optionValue="value"
+            appendTo="body"
+            [style]="{ width: '100%' }">
+            <ng-template let-opt pTemplate="selectedItem">{{ opt.label | translate }}</ng-template>
+            <ng-template let-opt pTemplate="item">{{ opt.label | translate }}</ng-template>
+          </p-select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.DISCOUNT_VALUE' | translate }}</label>
+          <p-inputnumber
+            [ngModel]="sellDiscountValue()"
+            (ngModelChange)="sellDiscountValue.set($event || 0)"
+            [min]="0"
+            [disabled]="sellDiscountType() === DiscountType.NONE"
+            class="w-full">
+          </p-inputnumber>
+        </div>
+      </div>
+
+      <!-- Payment date -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.PAYMENT_DATE' | translate }} *</label>
+        <p-datepicker
+          [(ngModel)]="sellDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          class="w-full"
+          appendTo="body">
+        </p-datepicker>
+      </div>
+
+      <!-- Payment method -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.PAYMENT_METHOD' | translate }}</label>
+        <p-select
+          [options]="paymentMethodOptions"
+          [ngModel]="sellPaymentMethod()"
+          (ngModelChange)="sellPaymentMethod.set($event)"
+          optionValue="value"
+          appendTo="body"
+          [showClear]="true"
+          [placeholder]="'EDUCATIONAL_BOOKS.PAYMENT_METHOD' | translate"
+          [style]="{ width: '100%' }">
+          <ng-template let-opt pTemplate="selectedItem">{{ opt.label | translate }}</ng-template>
+          <ng-template let-opt pTemplate="item">{{ opt.label | translate }}</ng-template>
+        </p-select>
+      </div>
+
+      <!-- Totals -->
+      <div class="p-3 bg-gray-50 rounded-lg space-y-1 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-600">{{ 'EDUCATIONAL_BOOKS.UNIT_PRICE' | translate }}</span>
+          <span>{{ unitPrice() | amount }}</span>
+        </div>
+        @if (discountAmount() > 0) {
+          <div class="flex justify-between text-orange-600">
+            <span>{{ 'EDUCATIONAL_BOOKS.DISCOUNT_VALUE' | translate }}</span>
+            <span>-{{ discountAmount() | amount }}</span>
+          </div>
+        }
+        <div class="flex justify-between font-bold text-base pt-1 border-t">
+          <span>{{ 'EDUCATIONAL_BOOKS.TOTAL' | translate }}</span>
+          <span class="text-green-600">{{ totalAmount() | amount }}</span>
+        </div>
+      </div>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.CANCEL' | translate"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="submitting()"
+        (onClick)="showSellDialog = false">
+      </p-button>
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.CONFIRM' | translate"
+        icon="pi pi-check"
+        severity="success"
+        [loading]="submitting()"
+        [disabled]="!canSubmit()"
+        (onClick)="confirmSell()">
+      </p-button>
+    </div>
+  </ng-template>
+</p-dialog>

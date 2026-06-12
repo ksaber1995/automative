@@ -354,6 +354,57 @@
 
         }
 
+        <!-- Course books (Educational Books) — COURSE mode, non-monthly, with linked products -->
+        @if (showBooksSection()) {
+          <p-divider></p-divider>
+          <h3 class="text-lg font-semibold text-gray-800 mb-1">{{ 'ENROLLMENT_FORM.COURSE_BOOKS_TITLE' | translate }}</h3>
+          <p class="text-sm text-gray-500 mb-4">{{ 'ENROLLMENT_FORM.COURSE_BOOKS_HINT' | translate }}</p>
+
+          <div class="flex flex-col gap-3">
+            @for (book of courseBooks(); track book.id) {
+              <div class="flex items-center gap-3 p-3 border rounded-lg transition-colors"
+                [class.border-blue-400]="isBookSelected(book)"
+                [class.bg-blue-50]="isBookSelected(book)">
+                <p-checkbox [binary]="true" [ngModel]="isBookSelected(book)" [ngModelOptions]="{ standalone: true }"
+                  (onChange)="toggleBook(book, $event.checked)"
+                  [inputId]="'book-' + book.id"></p-checkbox>
+                <label [for]="'book-' + book.id" class="flex-1 cursor-pointer">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-medium text-gray-900">{{ book.productName }}</span>
+                    @if (book.productCode) {
+                      <span class="text-xs text-gray-500 font-mono">{{ book.productCode }}</span>
+                    }
+                    @if (book.isRequired) {
+                      <p-tag severity="danger" [value]="'ENROLLMENT_FORM.REQUIRED' | translate"></p-tag>
+                    } @else {
+                      <p-tag severity="secondary" [value]="'ENROLLMENT_FORM.OPTIONAL' | translate"></p-tag>
+                    }
+                  </div>
+                  <div class="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                    <span>{{ book.sellingPrice | amount }}</span>
+                    @if (bookDiscountLabel(book); as disc) {
+                      <span class="text-orange-600">{{ disc }}</span>
+                      <span class="text-green-700 font-medium">{{ bookNetPrice(book) | amount }}</span>
+                    }
+                  </div>
+                </label>
+              </div>
+            }
+          </div>
+
+          <!-- Summary line -->
+          <div class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm flex flex-col gap-1">
+            <div class="flex justify-between">
+              <span class="text-gray-600">{{ 'ENROLLMENT_FORM.BOOKS_SELECTED' | translate: { count: selectedBooksCount() } }}</span>
+              <span class="font-semibold text-gray-800">{{ 'ENROLLMENT_FORM.BOOKS_TOTAL' | translate }}: {{ booksNetTotal() | amount }}</span>
+            </div>
+            <div class="flex justify-between pt-1 border-t mt-1">
+              <span class="text-gray-700 font-medium">{{ 'ENROLLMENT_FORM.GRAND_TOTAL' | translate }}</span>
+              <span class="font-bold text-green-700">{{ grandTotal() | amount }}</span>
+            </div>
+          </div>
+        }
+
         <p-divider></p-divider>
 
         <!-- Notes -->

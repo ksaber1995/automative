@@ -16,13 +16,21 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { SelectButtonModule } from 'primeng/selectbutton';
+import { SelectModule } from 'primeng/select';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmationService } from 'primeng/api';
 import { CourseService } from '../services/course.service';
 import { ClassService } from '../services/class.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { CourseProductService } from '../../educational-books/services/course-product.service';
+import { ProductService } from '../../products/services/product.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
+import { CourseProduct } from '@shared/interfaces/course-product.interface';
+import { Product } from '@shared/interfaces/product.interface';
+import { DiscountType } from '@shared/enums/product.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
@@ -46,6 +54,8 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
     TextareaModule,
     ProgressBarModule,
     SelectButtonModule,
+    SelectModule,
+    CheckboxModule,
     TranslateModule,
     AmountPipe,
   ],
@@ -61,6 +71,9 @@ export class CourseDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
+  private courseProductService = inject(CourseProductService);
+  private productService = inject(ProductService);
+  protected auth = inject(AuthService);
   private translate = inject(TranslateService);
 
   course = signal<Course | null>(null);
@@ -90,6 +103,53 @@ export class CourseDetailComponent implements OnInit {
     { label: this.translate.instant('COURSES.DETAIL.REFUND_TYPE_PARTIAL'), value: 'PARTIAL' },
     { label: this.translate.instant('COURSES.DETAIL.REFUND_TYPE_FULL'), value: 'FULL' },
   ]);
+
+  // ─── Linked products (books) ───────────────────────────────────────────────
+  DiscountType = DiscountType;
+  linkedProducts = signal<CourseProduct[]>([]);
+  loadingLinkedProducts = signal(false);
+  allProducts = signal<Product[]>([]);
+  linkSaving = signal(false);
+
+  // Add-product form
+  newProductId: string | null = null;
+  newIsRequired = true;
+  newDiscountType: DiscountType = DiscountType.NONE;
+  newDiscountValue: number | null = null;
+
+  // Edit-discount dialog
+  showDiscountDialog = false;
+  editingProduct = signal<CourseProduct | null>(null);
+  editDiscountType: DiscountType = DiscountType.NONE;
+  editDiscountValue: number | null = null;
+  discountSaving = signal(false);
+
+  discountTypeOptions = computed(() => [
+    { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_NONE'), value: DiscountType.NONE },
+    { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_PERCENTAGE'), value: DiscountType.PERCENTAGE },
+    { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_FIXED'), value: DiscountType.FIXED_AMOUNT },
+  ]);
+
+  // Products not yet linked, for the add-product select.
+  availableProducts = computed(() => {
+    const linkedIds = new Set(this.linkedProducts().map(lp => lp.productId));
+    return this.allProducts().filter(p => !linkedIds.has(p.id));
+  });
+
+  canManageProducts(): boolean {
+    return this.auth.canWrite('academy');
+  }
+
+  discountLabel(cp: CourseProduct): string {
+    switch (cp.defaultDiscountType) {
+      case DiscountType.PERCENTAGE:
+        return `${cp.defaultDiscountValue}%`;
+      case DiscountType.FIXED_AMOUNT:
+        return this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_FIXED_VALUE', { value: cp.defaultDiscountValue });
+      default:
+        return this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_NONE');
+    }
+  }
 
   classStatus(cls: ClassWithDetails): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
     if (cls.status) return cls.status;
@@ -122,7 +182,132 @@ export class CourseDetailComponent implements OnInit {
       this.loadCourse(this.courseId);
       this.loadClasses(this.courseId);
       this.loadEnrollments(this.courseId);
+      this.loadLinkedProducts(this.courseId);
+      this.loadAllProducts();
     }
+  }
+
+  // ─── Linked products (books) ───────────────────────────────────────────────
+  loadLinkedProducts(courseId: string) {
+    this.loadingLinkedProducts.set(true);
+    this.courseProductService.list(courseId).subscribe({
+      next: (data) => {
+        this.linkedProducts.set(data);
+        this.loadingLinkedProducts.set(false);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.loadingLinkedProducts.set(false);
+      }
+    });
+  }
+
+  loadAllProducts() {
+    this.productService.getAllProducts().subscribe({
+      next: (data) => this.allProducts.set(data),
+      error: () => {
+        // Interceptor toasted the translated error.
+      }
+    });
+  }
+
+  addLinkedProduct() {
+    if (!this.courseId || !this.newProductId || this.linkSaving()) return;
+    this.linkSaving.set(true);
+    this.courseProductService.link({
+      courseId: this.courseId,
+      productId: this.newProductId,
+      isRequired: this.newIsRequired,
+      defaultDiscountType: this.newDiscountType,
+      defaultDiscountValue: this.newDiscountType === DiscountType.NONE ? 0 : (this.newDiscountValue || 0),
+    }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('COURSES.LINKED_PRODUCTS.PRODUCT_LINKED'));
+        this.linkSaving.set(false);
+        this.resetAddForm();
+        if (this.courseId) this.loadLinkedProducts(this.courseId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.linkSaving.set(false);
+      }
+    });
+  }
+
+  resetAddForm() {
+    this.newProductId = null;
+    this.newIsRequired = true;
+    this.newDiscountType = DiscountType.NONE;
+    this.newDiscountValue = null;
+  }
+
+  toggleRequired(cp: CourseProduct) {
+    this.courseProductService.update(cp.id, { isRequired: !cp.isRequired }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('COURSES.LINKED_PRODUCTS.PRODUCT_UPDATED'));
+        if (this.courseId) this.loadLinkedProducts(this.courseId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+      }
+    });
+  }
+
+  openDiscountDialog(cp: CourseProduct) {
+    this.editingProduct.set(cp);
+    this.editDiscountType = cp.defaultDiscountType;
+    this.editDiscountValue = cp.defaultDiscountValue;
+    this.showDiscountDialog = true;
+  }
+
+  closeDiscountDialog() {
+    this.showDiscountDialog = false;
+    this.editingProduct.set(null);
+  }
+
+  saveDiscount() {
+    const cp = this.editingProduct();
+    if (!cp || this.discountSaving()) return;
+    this.discountSaving.set(true);
+    this.courseProductService.update(cp.id, {
+      defaultDiscountType: this.editDiscountType,
+      defaultDiscountValue: this.editDiscountType === DiscountType.NONE ? 0 : (this.editDiscountValue || 0),
+    }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('COURSES.LINKED_PRODUCTS.PRODUCT_UPDATED'));
+        this.discountSaving.set(false);
+        this.closeDiscountDialog();
+        if (this.courseId) this.loadLinkedProducts(this.courseId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.discountSaving.set(false);
+      }
+    });
+  }
+
+  confirmUnlinkProduct(cp: CourseProduct) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('COURSES.LINKED_PRODUCTS.UNLINK_TITLE'),
+      message: this.translate.instant('COURSES.LINKED_PRODUCTS.UNLINK_MSG', { name: cp.productName || '' }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('COURSES.LINKED_PRODUCTS.UNLINK'),
+      rejectLabel: this.translate.instant('COURSES.LINKED_PRODUCTS.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.unlinkProduct(cp),
+    });
+  }
+
+  unlinkProduct(cp: CourseProduct) {
+    this.courseProductService.unlink(cp.id).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('COURSES.LINKED_PRODUCTS.PRODUCT_UNLINKED'));
+        if (this.courseId) this.loadLinkedProducts(this.courseId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+      }
+    });
   }
 
   loadCourse(id: string) {

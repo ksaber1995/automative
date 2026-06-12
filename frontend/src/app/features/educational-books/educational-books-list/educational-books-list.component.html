@@ -1,0 +1,94 @@
+<div class="container mx-auto p-4">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="p-4">
+        <h2 class="text-2xl font-bold">{{ 'EDUCATIONAL_BOOKS.TITLE' | translate }}</h2>
+        <p class="text-sm text-gray-600 mt-1">{{ 'EDUCATIONAL_BOOKS.SUBTITLE' | translate }}</p>
+      </div>
+    </ng-template>
+
+    <!-- Branch filter -->
+    <div class="mb-4 flex gap-4 flex-wrap">
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-sm font-medium mb-1">{{ 'EDUCATIONAL_BOOKS.BRANCH' | translate }}</label>
+        <p-select
+          [options]="branchOptions()"
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="selectedBranchId.set($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'EDUCATIONAL_BOOKS.GLOBAL' | translate"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="text-center py-8 text-gray-500">
+        <i class="pi pi-spin pi-spinner text-2xl"></i>
+      </div>
+    } @else if (filteredCourses().length === 0) {
+      <div class="text-center py-12 text-gray-500">
+        <i class="pi pi-book text-4xl mb-3 block"></i>
+        {{ 'EDUCATIONAL_BOOKS.NO_COURSES' | translate }}
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (course of filteredCourses(); track course.courseId) {
+          <div class="border rounded-lg p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start gap-2">
+              <div>
+                <div class="font-bold text-lg">{{ course.courseName }}</div>
+                @if (course.courseCode) {
+                  <div class="text-sm text-gray-500 font-mono">{{ course.courseCode }}</div>
+                }
+              </div>
+              <p-tag
+                [value]="course.branchName || ('EDUCATIONAL_BOOKS.GLOBAL' | translate)"
+                [severity]="course.branchName ? 'info' : 'secondary'">
+              </p-tag>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div class="bg-gray-50 rounded p-2">
+                <div class="text-xs text-gray-500">{{ 'EDUCATIONAL_BOOKS.LINKED' | translate }}</div>
+                <div class="font-semibold">{{ course.linkedProductCount }}</div>
+              </div>
+              <div class="bg-gray-50 rounded p-2">
+                <div class="text-xs text-gray-500">{{ 'EDUCATIONAL_BOOKS.ENROLLED' | translate }}</div>
+                <div class="font-semibold">{{ course.enrolledCount }}</div>
+              </div>
+              <div class="bg-green-50 rounded p-2">
+                <div class="text-xs text-gray-500">{{ 'EDUCATIONAL_BOOKS.BOUGHT' | translate }}</div>
+                <div class="font-semibold text-green-600">{{ course.boughtCount }}</div>
+              </div>
+              <div class="bg-amber-50 rounded p-2">
+                <div class="text-xs text-gray-500">{{ 'EDUCATIONAL_BOOKS.NOT_BOUGHT' | translate }}</div>
+                <div class="font-semibold text-amber-600">{{ course.notBoughtCount }}</div>
+              </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-auto pt-2">
+              @if (course.notBoughtCount > 0) {
+                <p-tag
+                  severity="warn"
+                  [value]="course.notBoughtCount + ' ' + ('EDUCATIONAL_BOOKS.OUTSTANDING' | translate)">
+                </p-tag>
+              } @else {
+                <span></span>
+              }
+              <p-button
+                [label]="'EDUCATIONAL_BOOKS.VIEW' | translate"
+                icon="pi pi-arrow-right"
+                iconPos="right"
+                size="small"
+                (onClick)="view(course)">
+              </p-button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </p-card>
+</div>

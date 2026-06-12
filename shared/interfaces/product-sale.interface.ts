@@ -7,6 +7,10 @@ export interface ProductSale {
   branchId: string;
   productId: string;
   productName: string | null;
+  studentId?: string | null;
+  studentName?: string | null;
+  courseId?: string | null;
+  enrollmentId?: string | null;
   quantity: number;
   unitPrice: number;
   discountType: DiscountType;
@@ -40,6 +44,10 @@ export interface ProductSaleCreateDto {
   customerName?: string;
   customerPhone?: string;
   date: string;
+  // Educational Books: attribute the sale to a student/course/enrollment.
+  studentId?: string | null;
+  courseId?: string | null;
+  enrollmentId?: string | null;
 }
 
 export interface ProductSaleUpdateDto {

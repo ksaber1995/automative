@@ -7,6 +7,7 @@ import { CardModule } from 'primeng/card';
 import { DialogModule } from 'primeng/dialog';
 import { TagModule } from 'primeng/tag';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { CheckboxModule } from 'primeng/checkbox';
 import { DatePickerModule } from 'primeng/datepicker';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
@@ -26,7 +27,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
   standalone: true,
   imports: [
     CommonModule, TableModule, ButtonModule, CardModule, DialogModule, TagModule,
-    InputNumberModule, DatePickerModule, SelectModule, TextareaModule, TooltipModule,
+    InputNumberModule, CheckboxModule, DatePickerModule, SelectModule, TextareaModule, TooltipModule,
     FormsModule, TranslateModule, AmountPipe,
   ],
   templateUrl: './sales-history.component.html',
@@ -70,6 +71,10 @@ export class SalesHistoryComponent implements OnInit {
   refundDate: Date = new Date();
   refundReason = '';
   processingRefund = signal(false);
+  // Restock: when the customer physically returns the product, add the units
+  // back to inventory. Off by default — a refund doesn't always mean a return.
+  restockToInventory = false;
+  restockQuantity = 1;
 
   refundTypeOptions = () => [
     { label: this.translate.instant('PRODUCTS.SALES.REFUND_FULL_OPT'), value: 'FULL' },
@@ -173,6 +178,8 @@ export class SalesHistoryComponent implements OnInit {
     this.refundAmount = this.getRefundableAmount(sale);
     this.refundDate = new Date();
     this.refundReason = '';
+    this.restockToInventory = false;
+    this.restockQuantity = sale.quantity;
     this.showRefundDialog = true;
   }
 
@@ -213,6 +220,7 @@ export class SalesHistoryComponent implements OnInit {
       amount: this.refundAmount,
       refundDate: dateStr,
       reason: this.refundReason || undefined,
+      restockQuantity: this.restockToInventory ? this.restockQuantity : 0,
     }).subscribe({
       next: () => {
         this.processingRefund.set(false);

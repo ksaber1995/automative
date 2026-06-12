@@ -1072,7 +1072,7 @@ this.courseForm.get('paymentType')?.valueChanges.subscribe(type => {
   "TAB_PARTIAL": "جزئي",
   "COL_STUDENT": "الطالب",
   "COL_COURSE": "الكورس",
-  "COL_CLASS": "الفصل",
+  "COL_CLASS": "المجموعة",
   "COL_DUE_DATE": "تاريخ الاستحقاق",
   "COL_AMOUNT": "المبلغ",
   "COL_STATUS": "الحالة",

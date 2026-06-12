@@ -1,4 +1,4 @@
-import { insert, findById, query, queryOne } from '../db/connection';
+import { query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { getClient } from '../db/connection';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -10,6 +10,10 @@ function mapProductSaleFromDB(row: any) {
     productId: row.product_id,
     productName: row.product_name || null,
     branchId: row.branch_id,
+    studentId: row.student_id || null,
+    studentName: row.student_name || null,
+    courseId: row.course_id || null,
+    enrollmentId: row.enrollment_id || null,
     quantity: parseInt(row.quantity),
     unitPrice: parseFloat(row.unit_price),
     discountType: row.discount_type || 'NONE',
@@ -31,6 +35,88 @@ function mapProductSaleFromDB(row: any) {
   };
 }
 
+/**
+ * Insert a single product sale on an existing transaction client: deduct stock,
+ * auto-create the COGS expense, and persist optional student/course/enrollment
+ * attribution. Shared by productSales.create and the enroll-and-buy flow so the
+ * stock/COGS logic is never duplicated. Throws on insufficient stock or missing
+ * product — the caller's transaction rolls back.
+ */
+export async function insertProductSaleWithClient(
+  client: any,
+  companyId: string,
+  input: {
+    productId: string;
+    branchId: string | null;
+    quantity: number;
+    discountType?: string;
+    discountValue?: number;
+    date: string;
+    paymentMethod?: string | null;
+    receiptNumber?: string | null;
+    customerName?: string | null;
+    customerPhone?: string | null;
+    notes?: string | null;
+    eventId?: string | null;
+    studentId?: string | null;
+    courseId?: string | null;
+    enrollmentId?: string | null;
+  }
+): Promise<any> {
+  const product = (await client.query(
+    'SELECT * FROM products WHERE id = $1 AND company_id = $2',
+    [input.productId, companyId]
+  )).rows[0];
+  if (!product) {
+    const err: any = new Error('Product not found');
+    err.statusCode = 404;
+    err.code = 'ERRORS.PRODUCTS.NOT_FOUND';
+    throw err;
+  }
+
+  const currentStock = parseInt(product.stock) || 0;
+  if (currentStock < input.quantity) {
+    const err: any = new Error(`Insufficient stock for ${product.name}`);
+    err.statusCode = 400;
+    err.code = 'ERRORS.PRODUCT_SALES.INSUFFICIENT_STOCK';
+    throw err;
+  }
+
+  const unitPrice = parseFloat(product.selling_price);
+  const subtotal = unitPrice * input.quantity;
+  const discountType: string = input.discountType || 'NONE';
+  const discountValue: number = input.discountValue || 0;
+  let discountAmount = 0;
+  if (discountType === 'PERCENTAGE') discountAmount = (subtotal * discountValue) / 100;
+  else if (discountType === 'FIXED_AMOUNT') discountAmount = discountValue;
+  const totalAmount = Math.max(0, subtotal - discountAmount);
+
+  const saleResult = await client.query(
+    `INSERT INTO product_sales
+       (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes, event_id, student_id, course_id, enrollment_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+    [companyId, input.productId, input.branchId, input.quantity, unitPrice,
+     discountType, discountValue, discountAmount, subtotal, totalAmount,
+     input.date, input.paymentMethod || 'CASH', input.receiptNumber || null,
+     input.customerName || null, input.customerPhone || null, input.notes || null,
+     input.eventId || null, input.studentId || null, input.courseId || null,
+     input.enrollmentId || null]
+  );
+  const sale = saleResult.rows[0];
+
+  await client.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [input.quantity, input.productId]);
+
+  const cogsAmount = parseFloat(product.cost_price) * input.quantity;
+  await client.query(
+    `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id, event_id)
+     VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7,$8)`,
+    [companyId, input.branchId, cogsAmount, `COGS: ${product.name} × ${input.quantity} units`,
+     input.date, sale.id, input.productId, input.eventId || null]
+  );
+
+  return sale;
+}
+
 export const productSalesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     const client = await getClient();
@@ -42,67 +128,29 @@ export const productSalesRoutes = {
       }
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        client.release();
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
-      // Fetch product to get cost_price for COGS
-      const product = await queryOne<any>(
-        'SELECT * FROM products WHERE id = $1 AND company_id = $2',
-        [body.productId, context.companyId]
-      );
-
-      if (!product) {
-        return apiError(404, 'ERRORS.PRODUCTS.NOT_FOUND', 'Product not found');
-      }
-
-      // Compute pricing server-side from product's selling price
-      const unitPrice = parseFloat(product.selling_price);
-      const subtotal = unitPrice * body.quantity;
-      const discountType: string = body.discountType || 'NONE';
-      const discountValue: number = body.discountValue || 0;
-      let discountAmount = 0;
-      if (discountType === 'PERCENTAGE') discountAmount = (subtotal * discountValue) / 100;
-      else if (discountType === 'FIXED_AMOUNT') discountAmount = discountValue;
-      const totalAmount = Math.max(0, subtotal - discountAmount);
-
       await client.query('BEGIN');
 
-      // 1. Create the sale record
-      const saleResult = await client.query(
-        `INSERT INTO product_sales
-           (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes, event_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
-        [context.companyId, body.productId, body.branchId, body.quantity, unitPrice,
-         discountType, discountValue, discountAmount, subtotal, totalAmount,
-         body.date, body.paymentMethod || null, body.receiptNumber || null,
-         body.customerName || null, body.customerPhone || null, body.notes || null,
-         body.eventId || null]
-      );
-      const sale = saleResult.rows[0];
-
-      // 2. Deduct stock
-      await client.query(
-        'UPDATE products SET stock = stock - $1 WHERE id = $2',
-        [body.quantity, body.productId]
-      );
-
-      // 3. Auto-create COGS expense (cost_price × quantity sold)
-      const cogsAmount = parseFloat(product.cost_price) * body.quantity;
-      const saleDate = body.date;
-      await client.query(
-        `INSERT INTO expenses (company_id, branch_id, type, category, amount, description, date, product_sale_id, product_id, event_id)
-         VALUES ($1,$2,'VARIABLE','COGS',$3,$4,$5,$6,$7,$8)`,
-        [
-          context.companyId,
-          body.branchId,
-          cogsAmount,
-          `COGS: ${product.name} × ${body.quantity} units`,
-          saleDate,
-          sale.id,
-          body.productId,
-          body.eventId || null,
-        ]
-      );
+      const sale = await insertProductSaleWithClient(client, context.companyId, {
+        productId: body.productId,
+        branchId: body.branchId,
+        quantity: body.quantity,
+        discountType: body.discountType,
+        discountValue: body.discountValue,
+        date: body.date,
+        paymentMethod: body.paymentMethod,
+        receiptNumber: body.receiptNumber,
+        customerName: body.customerName,
+        customerPhone: body.customerPhone,
+        notes: body.notes,
+        eventId: body.eventId,
+        studentId: body.studentId,
+        courseId: body.courseId,
+        enrollmentId: body.enrollmentId,
+      });
 
       await client.query('COMMIT');
 
@@ -110,16 +158,19 @@ export const productSalesRoutes = {
         status: 201 as const,
         body: mapProductSaleFromDB(sale),
       };
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       console.error('Create product sale error:', error);
+      if (error?.statusCode && error?.code) {
+        return apiError(error.statusCode, error.code, error.message);
+      }
       return mapThrownError(error, 'ERRORS.PRODUCT_SALES.CREATE_FAILED', 'Failed to create product sale', 400);
     } finally {
       client.release();
     }
   },
 
-  list: async ({ query: queryParams, headers }: { query: { branchId?: string; productId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; productId?: string; studentId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'product_sales', 'read')) {
@@ -127,9 +178,11 @@ export const productSalesRoutes = {
       }
 
       let sql = `SELECT ps.*, p.name AS product_name,
+                        NULLIF(TRIM(COALESCE(st.first_name,'') || ' ' || COALESCE(st.last_name,'')), '') AS student_name,
                         COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
                  FROM product_sales ps
                  LEFT JOIN products p ON ps.product_id = p.id
+                 LEFT JOIN students st ON ps.student_id = st.id
                  WHERE ps.company_id = $1`;
       const params: any[] = [context.companyId];
 
@@ -147,6 +200,11 @@ export const productSalesRoutes = {
       if (queryParams.productId) {
         params.push(queryParams.productId);
         sql += ` AND ps.product_id = $${params.length}`;
+      }
+
+      if (queryParams.studentId) {
+        params.push(queryParams.studentId);
+        sql += ` AND ps.student_id = $${params.length}`;
       }
 
       if (queryParams.startDate) {
@@ -206,21 +264,24 @@ export const productSalesRoutes = {
         filters += ` AND sale_date <= $${params.length}`;
       }
 
-      const sql = `
-        SELECT
-          COUNT(*) as total_sales,
-          SUM(quantity) as total_quantity,
-          SUM(total_amount) as total_revenue
-        FROM product_sales
-        WHERE company_id = $1${filters}
-      `;
-      const summaryResult = await query(sql, params);
-      const summary = summaryResult[0];
-
-      // The product breakdown uses the same filter but qualified with `ps.`
+      // The product breakdown (and the cost rollup) uses the same filter but
+      // qualified with `ps.` since they JOIN products.
       const productFilters = filters
         .replace(/\bbranch_id\b/g, 'ps.branch_id')
         .replace(/\bsale_date\b/g, 'ps.sale_date');
+
+      const sql = `
+        SELECT
+          COUNT(*) as total_sales,
+          SUM(ps.quantity) as total_quantity,
+          SUM(ps.total_amount) as total_revenue,
+          COALESCE(SUM(ps.quantity * p.cost_price), 0) as total_cost
+        FROM product_sales ps
+        LEFT JOIN products p ON ps.product_id = p.id
+        WHERE ps.company_id = $1${productFilters}
+      `;
+      const summaryResult = await query(sql, params);
+      const summary = summaryResult[0];
       const productSql = `
         SELECT
           ps.product_id,
@@ -240,6 +301,8 @@ export const productSalesRoutes = {
           totalSales: parseInt(summary.total_sales) || 0,
           totalQuantity: parseInt(summary.total_quantity) || 0,
           totalRevenue: parseFloat(summary.total_revenue) || 0,
+          totalCost: parseFloat(summary.total_cost) || 0,
+          totalProfit: (parseFloat(summary.total_revenue) || 0) - (parseFloat(summary.total_cost) || 0),
           byProduct: byProduct.map((row: any) => ({
             productId: row.product_id,
             productName: row.product_name || 'Unknown',
@@ -318,9 +381,12 @@ export const productSalesRoutes = {
       }
 
       const sale = await queryOne(
-        `SELECT ps.*,
+        `SELECT ps.*, p.name AS product_name,
+                NULLIF(TRIM(COALESCE(st.first_name,'') || ' ' || COALESCE(st.last_name,'')), '') AS student_name,
                 COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
          FROM product_sales ps
+         LEFT JOIN products p ON ps.product_id = p.id
+         LEFT JOIN students st ON ps.student_id = st.id
          WHERE ps.id = $1 AND ps.company_id = $2`,
         [params.id, context.companyId]
       );
@@ -372,6 +438,7 @@ export const productSalesRoutes = {
           refundDate: r.refund_date,
           type: r.type,
           reason: r.reason,
+          restockQuantity: parseInt(r.restock_quantity) || 0,
           createdAt: r.created_at,
         })),
       };
@@ -381,45 +448,68 @@ export const productSalesRoutes = {
   },
 
   createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    const client = await getClient();
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'product_sales', 'write')) {
+        client.release();
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
-      const sale = await queryOne(
+      const sale = (await client.query(
         'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
-      );
-      if (!sale) return apiError(404, 'ERRORS.PRODUCT_SALES.NOT_FOUND', 'Product sale not found');
+      )).rows[0];
+      if (!sale) { client.release(); return apiError(404, 'ERRORS.PRODUCT_SALES.NOT_FOUND', 'Product sale not found'); }
       if (sale.branch_id && !canAccessBranch(context, sale.branch_id)) {
+        client.release();
         return apiError(403, 'ERRORS.PRODUCT_SALES.ACCESS_DENIED', 'Access denied to this product sale');
       }
 
       const refundAmount = parseFloat(body.amount);
       const total = parseFloat(sale.total_amount);
-      const alreadyRefunded = parseFloat(
-        (await queryOne(
-          'SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE product_sale_id = $1',
-          [params.id]
-        ))?.total || 0
-      );
+      const aggregates = (await client.query(
+        'SELECT COALESCE(SUM(amount), 0) AS refunded, COALESCE(SUM(restock_quantity), 0) AS restocked FROM refunds WHERE product_sale_id = $1',
+        [params.id]
+      )).rows[0];
+      const alreadyRefunded = parseFloat(aggregates?.refunded || 0);
+      const alreadyRestocked = parseInt(aggregates?.restocked || 0);
       const remaining = total - alreadyRefunded;
 
       if (refundAmount <= 0) {
+        client.release();
         return apiError(400, 'ERRORS.PRODUCT_SALES.REFUND_NON_POSITIVE', 'Refund amount must be positive');
       }
       if (refundAmount > remaining) {
+        client.release();
         return apiError(400, 'ERRORS.PRODUCT_SALES.REFUND_EXCEEDS_REMAINING', `Cannot refund more than remaining (${remaining.toFixed(2)})`);
       }
 
-      const refund = await insert('refunds', {
-        product_sale_id: params.id,
-        company_id: context.companyId,
-        amount: refundAmount,
-        refund_date: body.refundDate,
-        type: body.type,
-        reason: body.reason || null,
-      });
+      // Optional restock: add the returned units back to inventory. Capped so
+      // cumulative restocks across all refunds never exceed the sale quantity.
+      const restockQuantity = Math.max(0, parseInt(body.restockQuantity || 0) || 0);
+      const restockableLeft = parseInt(sale.quantity) - alreadyRestocked;
+      if (restockQuantity > restockableLeft) {
+        client.release();
+        return apiError(400, 'ERRORS.PRODUCT_SALES.RESTOCK_EXCEEDS_QUANTITY', `Cannot return more than ${restockableLeft} unit(s) to inventory`);
+      }
+
+      await client.query('BEGIN');
+
+      const refundResult = await client.query(
+        `INSERT INTO refunds (product_sale_id, company_id, amount, refund_date, type, reason, restock_quantity)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        [params.id, context.companyId, refundAmount, body.refundDate, body.type, body.reason || null, restockQuantity]
+      );
+      const refund = refundResult.rows[0];
+
+      if (restockQuantity > 0) {
+        await client.query(
+          'UPDATE products SET stock = stock + $1 WHERE id = $2 AND company_id = $3',
+          [restockQuantity, sale.product_id, context.companyId]
+        );
+      }
+
+      await client.query('COMMIT');
 
       return {
         status: 201 as const,
@@ -432,11 +522,15 @@ export const productSalesRoutes = {
           refundDate: refund.refund_date,
           type: refund.type,
           reason: refund.reason,
+          restockQuantity: parseInt(refund.restock_quantity) || 0,
           createdAt: refund.created_at,
         },
       };
     } catch (error: any) {
+      await client.query('ROLLBACK').catch(() => {});
       return mapThrownError(error, 'ERRORS.PRODUCT_SALES.CREATE_REFUND_FAILED', 'Failed to create refund', 400);
+    } finally {
+      client.release();
     }
   },
 };

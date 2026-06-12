@@ -870,6 +870,58 @@
       }
     </p-card>
 
+    <!-- Books & Products Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-book text-teal-600"></i>
+            {{ 'STUDENTS.DETAIL.BOOKS_TITLE' | translate }} ({{ bookPurchases().length }})
+          </h3>
+        </div>
+      </ng-template>
+
+      <p-table [value]="bookPurchases()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th pSortableColumn="productName">{{ 'STUDENTS.DETAIL.BOOK_COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
+            <th pSortableColumn="quantity" class="text-right">{{ 'STUDENTS.DETAIL.BOOK_COL_QTY' | translate }} <p-sortIcon field="quantity"></p-sortIcon></th>
+            <th pSortableColumn="unitPrice" class="text-right">{{ 'STUDENTS.DETAIL.BOOK_COL_UNIT_PRICE' | translate }} <p-sortIcon field="unitPrice"></p-sortIcon></th>
+            <th pSortableColumn="totalAmount" class="text-right">{{ 'STUDENTS.DETAIL.BOOK_COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
+            <th pSortableColumn="saleDate">{{ 'STUDENTS.DETAIL.BOOK_COL_DATE' | translate }} <p-sortIcon field="saleDate"></p-sortIcon></th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-sale>
+          <tr>
+            <td>
+              <div class="font-medium">{{ sale.productName }}</div>
+              @if ((sale.totalRefunded || 0) > 0) {
+                <p-tag
+                  [value]="'STUDENTS.DETAIL.BOOK_REFUNDED' | translate: { amount: (sale.totalRefunded) | amount }"
+                  severity="warn"
+                  styleClass="text-xs"
+                ></p-tag>
+              }
+            </td>
+            <td class="text-right">{{ sale.quantity }}</td>
+            <td class="text-right">{{ sale.unitPrice | amount }}</td>
+            <td class="text-right font-semibold text-green-600">{{ sale.totalAmount | amount }}</td>
+            <td class="text-sm">{{ formatDate(sale.saleDate) }}</td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="5" class="text-center py-8">
+              <div class="text-gray-500">
+                <i class="pi pi-book text-4xl mb-3 block"></i>
+                <p>{{ 'STUDENTS.DETAIL.NO_BOOKS' | translate }}</p>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+
   } @else if (loading()) {
     <div class="flex justify-center items-center h-64">
       <i class="pi pi-spin pi-spinner text-4xl"></i>

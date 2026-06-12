@@ -669,6 +669,15 @@ const CreateEnrollmentSchema = z.object({
   paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
   payFirstMonth: z.boolean().optional(),
   notes: z.string().optional(),
+  // Educational Books: optional linked products bought together with the enrollment
+  // (one atomic transaction). Each becomes an attributed product sale.
+  products: z.array(z.object({
+    productId: UUIDSchema,
+    quantity: z.number().optional(),
+    discountType: z.enum(['NONE', 'PERCENTAGE', 'FIXED_AMOUNT']).optional(),
+    discountValue: z.number().optional(),
+    paymentMethod: z.string().optional(),
+  })).optional(),
 });
 
 const UpdateEnrollmentSchema = CreateEnrollmentSchema.partial();
@@ -739,6 +748,7 @@ const RefundSchema = z.object({
   refundDate: z.string(),
   type: z.enum(['FULL', 'PARTIAL']),
   reason: z.string().nullable(),
+  restockQuantity: z.number().optional(),
   createdAt: z.string(),
 });
 
@@ -760,6 +770,9 @@ const CreateRefundSchema = z.object({
   amount: z.number().positive(),
   refundDate: z.string(),
   reason: z.string().optional(),
+  // Product-sale refunds only: units the customer physically returned, added
+  // back to inventory. Omit or 0 to refund without restocking.
+  restockQuantity: z.number().int().nonnegative().optional(),
 });
 
 // =============================================
@@ -1067,6 +1080,10 @@ const CreateProductSaleSchema = z.object({
   customerPhone: z.string().optional(),
   notes: z.string().optional(),
   eventId: OptionalUUIDSchema,
+  // Educational Books: attribute the sale to a student/course/enrollment.
+  studentId: OptionalUUIDSchema,
+  courseId: OptionalUUIDSchema,
+  enrollmentId: OptionalUUIDSchema,
 });
 
 const ProductSaleSchema = z.object({
@@ -1075,6 +1092,10 @@ const ProductSaleSchema = z.object({
   productId: UUIDSchema,
   productName: z.string().nullable(),
   branchId: UUIDSchema,
+  studentId: UUIDSchema.nullable().optional(),
+  studentName: z.string().nullable().optional(),
+  courseId: UUIDSchema.nullable().optional(),
+  enrollmentId: UUIDSchema.nullable().optional(),
   quantity: z.number(),
   unitPrice: z.number(),
   discountType: z.string(),
@@ -1091,6 +1112,84 @@ const ProductSaleSchema = z.object({
   eventId: UUIDSchema.nullable().optional(),
   totalRefunded: z.number().optional(),
   createdAt: z.string(),
+});
+
+// =============================================
+// Course Products + Educational Books Schemas
+// =============================================
+const CourseProductSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  courseId: UUIDSchema,
+  productId: UUIDSchema,
+  isRequired: z.boolean(),
+  defaultDiscountType: z.string(),
+  defaultDiscountValue: z.number(),
+  addedAt: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+  productName: z.string().optional(),
+  productCode: z.string().optional(),
+  sellingPrice: z.number().optional(),
+  stock: z.number().optional(),
+});
+
+const CreateCourseProductSchema = z.object({
+  courseId: UUIDSchema,
+  productId: UUIDSchema,
+  isRequired: z.boolean().optional(),
+  defaultDiscountType: DiscountTypeSchema.optional(),
+  defaultDiscountValue: z.number().optional(),
+});
+
+const UpdateCourseProductSchema = z.object({
+  isRequired: z.boolean().optional(),
+  defaultDiscountType: DiscountTypeSchema.optional(),
+  defaultDiscountValue: z.number().optional(),
+});
+
+const EducationalBooksCourseSummarySchema = z.object({
+  courseId: UUIDSchema,
+  courseName: z.string(),
+  courseCode: z.string().nullable().optional(),
+  branchId: UUIDSchema.nullable(),
+  branchName: z.string().nullable(),
+  linkedProductCount: z.number(),
+  enrolledCount: z.number(),
+  boughtCount: z.number(),
+  notBoughtCount: z.number(),
+});
+
+const EducationalBooksCourseDetailSchema = z.object({
+  courseId: UUIDSchema,
+  courseName: z.string(),
+  courseCode: z.string().nullable().optional(),
+  branchId: UUIDSchema.nullable(),
+  enrolledCount: z.number(),
+  products: z.array(z.object({
+    courseProductId: UUIDSchema,
+    productId: UUIDSchema,
+    productName: z.string(),
+    productCode: z.string().nullable(),
+    sellingPrice: z.number(),
+    stock: z.number(),
+    isRequired: z.boolean(),
+    defaultDiscountType: z.string(),
+    defaultDiscountValue: z.number(),
+    buyers: z.array(z.object({
+      studentId: UUIDSchema,
+      studentName: z.string().nullable(),
+      saleId: UUIDSchema,
+      quantity: z.number(),
+      totalAmount: z.number(),
+      saleDate: z.string(),
+    })),
+    nonBuyers: z.array(z.object({
+      studentId: UUIDSchema,
+      studentName: z.string().nullable(),
+      enrollmentId: UUIDSchema.nullable(),
+    })),
+  })),
 });
 
 // =============================================
@@ -2940,6 +3039,7 @@ export const contract = c.router({
       query: z.object({
         branchId: OptionalUUIDSchema,
         productId: OptionalUUIDSchema,
+        studentId: OptionalUUIDSchema,
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
@@ -2960,6 +3060,8 @@ export const contract = c.router({
           totalSales: z.number(),
           totalQuantity: z.number(),
           totalRevenue: z.number(),
+          totalCost: z.number(),
+          totalProfit: z.number(),
           byProduct: z.array(z.object({
             productId: z.string(),
             productName: z.string(),
@@ -3011,6 +3113,75 @@ export const contract = c.router({
       responses: {
         201: RefundSchema,
         400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Course ↔ product links (Educational Books admin)
+  courseProducts: {
+    list: {
+      method: 'GET',
+      path: '/api/course-products',
+      query: z.object({ courseId: OptionalUUIDSchema }),
+      responses: {
+        200: z.array(CourseProductSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    link: {
+      method: 'POST',
+      path: '/api/course-products',
+      body: CreateCourseProductSchema,
+      responses: {
+        201: CourseProductSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/course-products/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateCourseProductSchema,
+      responses: {
+        200: CourseProductSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    unlink: {
+      method: 'DELETE',
+      path: '/api/course-products/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Educational Books aggregate views (who bought / who didn't)
+  educationalBooks: {
+    courses: {
+      method: 'GET',
+      path: '/api/educational-books/courses',
+      responses: {
+        200: z.array(EducationalBooksCourseSummarySchema),
+        403: ApiErrorSchema,
+      },
+    },
+    courseDetail: {
+      method: 'GET',
+      path: '/api/educational-books/course/:courseId',
+      pathParams: z.object({ courseId: UUIDSchema }),
+      responses: {
+        200: EducationalBooksCourseDetailSchema,
+        403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },

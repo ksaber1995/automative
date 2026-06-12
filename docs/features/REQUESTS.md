@@ -270,4 +270,12 @@ can sell to a school".
 
 ## 🕐 Pending (ad-hoc requests)
 
-_None right now — add new one-off requests below the roadmap._
+### Student detail — "Outstanding books" list
+**Request:** On the student detail page, alongside the existing **Books & Products** purchases list, show the books the student is *expected to have but hasn't bought yet* — i.e. linked books (`course_products`) for the courses they're enrolled in, minus what they've already purchased.
+**Why:** It's the per-student view of the "Not bought" column already on the Educational Books course page. Lets staff see, from the student's page, exactly which (especially **required**) books are still owed, with a one-click **Sell** shortcut per book.
+**Scope:**
+- New read endpoint, e.g. `GET /api/educational-books/student/:studentId/outstanding` → for each of the student's non-dropped enrollments, the course's `course_products` not matched by a non-fully-refunded `product_sales` row for `(student_id, course_id, product_id)`. Return `{ courseId, courseName, productId, productName, isRequired, defaultDiscount, sellingPrice, enrollmentId }`.
+- Reuses the same "bought" logic as `educationalBooks.courseDetail` (just keyed by student instead of course) — factor it into a shared SQL/helper.
+- Frontend: an "Outstanding books" card on `student-detail` (under the new Books & Products card) with a Required/Optional tag and a **Sell** button per row that opens the existing sell flow pre-filled with `studentId`, `courseId`, default discount.
+**Context:** Deferred from the Educational Books (course-linked products) build — the purchases list shipped, this companion list did not. The backend already attributes sales via `product_sales.student_id/course_id` (migration 031), so no schema change is needed.
+**Estimate:** ~0.5 day (1 endpoint + 1 card, reusing existing sell dialog).

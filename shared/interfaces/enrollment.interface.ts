@@ -119,6 +119,14 @@ export interface EnrollmentCreateDto {
   paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
   payFirstMonth?: boolean;
   notes?: string;
+  // Educational Books: linked products bought together with the enrollment.
+  products?: Array<{
+    productId: string;
+    quantity?: number;
+    discountType?: 'NONE' | 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue?: number;
+    paymentMethod?: string;
+  }>;
 }
 
 export interface EnrollmentUpdateDto {

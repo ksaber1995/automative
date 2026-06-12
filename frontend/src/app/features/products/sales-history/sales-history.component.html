@@ -57,7 +57,7 @@
 
     <!-- Summary Cards -->
     @if (summary()) {
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-blue-50 p-4 rounded-lg">
           <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_SALES' | translate }}</div>
           <div class="text-2xl font-bold">{{ summary()!.totalSales }}</div>
@@ -65,6 +65,11 @@
         <div class="bg-green-50 p-4 rounded-lg">
           <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_REVENUE' | translate }}</div>
           <div class="text-2xl font-bold text-green-600">{{ summary()!.totalRevenue | amount }}</div>
+        </div>
+        <div class="bg-emerald-50 p-4 rounded-lg">
+          <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_PROFIT' | translate }}</div>
+          <div class="text-2xl font-bold" [ngClass]="summary()!.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ summary()!.totalProfit | amount }}</div>
+          <div class="text-xs text-gray-500 mt-1">{{ 'PRODUCTS.SALES.TOTAL_COST' | translate }}: {{ summary()!.totalCost | amount }}</div>
         </div>
         <div class="bg-purple-50 p-4 rounded-lg">
           <div class="text-sm text-gray-600">{{ 'PRODUCTS.SALES.TOTAL_QTY' | translate }}</div>
@@ -93,7 +98,6 @@
           <th pSortableColumn="totalAmount">{{ 'PRODUCTS.SALES.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
           <th pSortableColumn="totalRefunded">{{ 'PRODUCTS.SALES.COL_REFUND_STATUS' | translate }} <p-sortIcon field="totalRefunded"></p-sortIcon></th>
           <th pSortableColumn="paymentMethod">{{ 'PRODUCTS.SALES.COL_PAYMENT' | translate }} <p-sortIcon field="paymentMethod"></p-sortIcon></th>
-          <th pSortableColumn="customerName">{{ 'PRODUCTS.SALES.COL_CUSTOMER' | translate }} <p-sortIcon field="customerName"></p-sortIcon></th>
           <th>{{ 'PRODUCTS.SALES.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -134,17 +138,7 @@
               <div class="text-xs text-orange-600 mt-1">-{{ sale.totalRefunded | amount }}</div>
             }
           </td>
-          <td>{{ ('PRODUCTS.SALES.METHOD_' + sale.paymentMethod) | translate }}</td>
-          <td>
-            @if (sale.customerName) {
-              <div class="font-medium">{{ sale.customerName }}</div>
-              @if (sale.customerPhone) {
-                <div class="text-sm text-gray-500">{{ sale.customerPhone }}</div>
-              }
-            } @else {
-              <span class="text-gray-400">-</span>
-            }
-          </td>
+          <td>{{ ('PRODUCTS.SALES.METHOD_' + (sale.paymentMethod || 'CASH')) | translate }}</td>
           <td>
             @if (authService.canWrite('product_sales') && getRefundableAmount(sale) > 0) {
               <p-button
@@ -164,7 +158,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="11" class="text-center py-8 text-gray-500">
+          <td colspan="10" class="text-center py-8 text-gray-500">
             {{ 'PRODUCTS.SALES.NO_SALES' | translate }}
           </td>
         </tr>
@@ -238,6 +232,34 @@
           rows="2"
           class="w-full">
         </textarea>
+      </div>
+
+      <!-- Restock: customer returned the physical product -->
+      <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-col gap-3">
+        <div class="flex items-start gap-2">
+          <p-checkbox
+            [(ngModel)]="restockToInventory"
+            [binary]="true"
+            inputId="restockToInventory">
+          </p-checkbox>
+          <label for="restockToInventory" class="text-sm cursor-pointer">
+            <span class="font-medium">{{ 'PRODUCTS.SALES.RESTOCK_LABEL' | translate }}</span>
+            <span class="block text-xs text-gray-500">{{ 'PRODUCTS.SALES.RESTOCK_HINT' | translate }}</span>
+          </label>
+        </div>
+        @if (restockToInventory) {
+          <div>
+            <label class="block text-sm font-medium mb-2">{{ 'PRODUCTS.SALES.RESTOCK_QTY' | translate }}</label>
+            <p-inputnumber
+              [(ngModel)]="restockQuantity"
+              [min]="1"
+              [max]="refundingSale()!.quantity"
+              [showButtons]="true"
+              class="w-full">
+            </p-inputnumber>
+            <p class="text-xs text-gray-500 mt-1">{{ 'PRODUCTS.SALES.RESTOCK_MAX' | translate:{ qty: refundingSale()!.quantity } }}</p>
+          </div>
+        }
       </div>
     </div>
   }

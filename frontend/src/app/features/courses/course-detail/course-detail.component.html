@@ -169,6 +169,163 @@
       </p-table>
     </p-card>
 
+    <!-- Linked Products (Books) Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <div>
+            <h3 class="text-xl font-bold">{{ 'COURSES.LINKED_PRODUCTS.TITLE' | translate }}</h3>
+            <p class="text-sm text-gray-500 mt-0.5">{{ 'COURSES.LINKED_PRODUCTS.SUBTITLE' | translate }}</p>
+          </div>
+          <p-tag [value]="'COURSES.LINKED_PRODUCTS.COUNT' | translate: { count: linkedProducts().length }" severity="info" icon="pi pi-book"></p-tag>
+        </div>
+      </ng-template>
+
+      <!-- Add product -->
+      @if (canManageProducts()) {
+        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+          <h4 class="text-md font-semibold mb-3 text-gray-700">{{ 'COURSES.LINKED_PRODUCTS.ADD_TITLE' | translate }}</h4>
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div class="md:col-span-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.LINKED_PRODUCTS.PRODUCT' | translate }}</label>
+              <p-select
+                [(ngModel)]="newProductId"
+                [options]="availableProducts()"
+                optionLabel="name"
+                optionValue="id"
+                [filter]="true"
+                filterBy="name,code"
+                [placeholder]="'COURSES.LINKED_PRODUCTS.SELECT_PRODUCT' | translate"
+                appendTo="body"
+                [style]="{ width: '100%' }"
+              >
+                <ng-template let-product pTemplate="item">
+                  <div class="flex justify-between gap-3">
+                    <span>{{ product.name }} <span class="text-gray-400 text-xs">{{ product.code }}</span></span>
+                    <span class="text-gray-500">{{ product.sellingPrice | amount }}</span>
+                  </div>
+                </ng-template>
+              </p-select>
+            </div>
+            <div class="md:col-span-3">
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.LINKED_PRODUCTS.DISCOUNT_TYPE' | translate }}</label>
+              <p-select
+                [(ngModel)]="newDiscountType"
+                [options]="discountTypeOptions()"
+                optionLabel="label"
+                optionValue="value"
+                appendTo="body"
+                [style]="{ width: '100%' }"
+              ></p-select>
+            </div>
+            @if (newDiscountType !== DiscountType.NONE) {
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.LINKED_PRODUCTS.DISCOUNT_VALUE' | translate }}</label>
+                <p-inputnumber
+                  [(ngModel)]="newDiscountValue"
+                  [min]="0"
+                  [placeholder]="'COURSES.LINKED_PRODUCTS.DISCOUNT_VALUE_PLACEHOLDER' | translate"
+                  [style]="{ width: '100%' }"
+                />
+              </div>
+            }
+            <div class="md:col-span-1 flex items-center gap-2 pb-2">
+              <p-checkbox [(ngModel)]="newIsRequired" [binary]="true" inputId="newIsRequired"></p-checkbox>
+              <label for="newIsRequired" class="text-sm text-gray-700">{{ 'COURSES.LINKED_PRODUCTS.REQUIRED' | translate }}</label>
+            </div>
+            <div class="md:col-span-2">
+              <p-button
+                [label]="'COURSES.LINKED_PRODUCTS.ADD_BTN' | translate"
+                icon="pi pi-plus"
+                [loading]="linkSaving()"
+                [disabled]="!newProductId"
+                (onClick)="addLinkedProduct()"
+                styleClass="w-full"
+              ></p-button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <p-table
+        [value]="linkedProducts()"
+        [loading]="loadingLinkedProducts()"
+        responsiveLayout="scroll"
+      >
+        <ng-template pTemplate="header">
+          <tr>
+            <th>{{ 'COURSES.LINKED_PRODUCTS.COL_PRODUCT' | translate }}</th>
+            <th>{{ 'COURSES.LINKED_PRODUCTS.COL_PRICE' | translate }}</th>
+            <th>{{ 'COURSES.LINKED_PRODUCTS.COL_STOCK' | translate }}</th>
+            <th>{{ 'COURSES.LINKED_PRODUCTS.COL_REQUIRED' | translate }}</th>
+            <th>{{ 'COURSES.LINKED_PRODUCTS.COL_DISCOUNT' | translate }}</th>
+            @if (canManageProducts()) {
+              <th>{{ 'COURSES.LINKED_PRODUCTS.COL_ACTIONS' | translate }}</th>
+            }
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="body" let-cp>
+          <tr>
+            <td class="font-medium">
+              {{ cp.productName || '—' }}
+              <span class="text-gray-400 text-xs block">{{ cp.productCode }}</span>
+            </td>
+            <td>{{ cp.sellingPrice | amount }}</td>
+            <td>{{ cp.stock ?? '—' }}</td>
+            <td>
+              <p-tag
+                [value]="(cp.isRequired ? 'COURSES.LINKED_PRODUCTS.REQUIRED' : 'COURSES.LINKED_PRODUCTS.OPTIONAL') | translate"
+                [severity]="cp.isRequired ? 'success' : 'secondary'"
+              ></p-tag>
+            </td>
+            <td>{{ discountLabel(cp) }}</td>
+            @if (canManageProducts()) {
+              <td>
+                <div class="flex gap-1">
+                  <p-button
+                    [icon]="cp.isRequired ? 'pi pi-times-circle' : 'pi pi-check-circle'"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="info"
+                    (onClick)="toggleRequired(cp)"
+                    [pTooltip]="(cp.isRequired ? 'COURSES.LINKED_PRODUCTS.TOOLTIP_MAKE_OPTIONAL' : 'COURSES.LINKED_PRODUCTS.TOOLTIP_MAKE_REQUIRED') | translate"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-percentage"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="success"
+                    (onClick)="openDiscountDialog(cp)"
+                    [pTooltip]="'COURSES.LINKED_PRODUCTS.TOOLTIP_EDIT_DISCOUNT' | translate"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="confirmUnlinkProduct(cp)"
+                    [pTooltip]="'COURSES.LINKED_PRODUCTS.TOOLTIP_UNLINK' | translate"
+                  ></p-button>
+                </div>
+              </td>
+            }
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td [attr.colspan]="canManageProducts() ? 6 : 5" class="text-center py-8">
+              <div class="text-gray-500">
+                <i class="pi pi-book text-4xl mb-3 block"></i>
+                <p>{{ 'COURSES.LINKED_PRODUCTS.EMPTY' | translate }}</p>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+
     <!-- Classes Card -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">
@@ -462,6 +619,50 @@
       [loading]="refundLoading()"
       [disabled]="!refundAmount || !refundDate"
       (onClick)="submitRefund()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Edit Discount Dialog -->
+<p-dialog
+  [(visible)]="showDiscountDialog"
+  [header]="'COURSES.LINKED_PRODUCTS.DISCOUNT_DIALOG_TITLE' | translate: { name: editingProduct()?.productName || '' }"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+  [closable]="true"
+>
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.LINKED_PRODUCTS.DISCOUNT_TYPE' | translate }}</label>
+      <p-select
+        [(ngModel)]="editDiscountType"
+        [options]="discountTypeOptions()"
+        optionLabel="label"
+        optionValue="value"
+        appendTo="body"
+        [style]="{ width: '100%' }"
+      ></p-select>
+    </div>
+    @if (editDiscountType !== DiscountType.NONE) {
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.LINKED_PRODUCTS.DISCOUNT_VALUE' | translate }}</label>
+        <p-inputnumber
+          [(ngModel)]="editDiscountValue"
+          [min]="0"
+          [placeholder]="'COURSES.LINKED_PRODUCTS.DISCOUNT_VALUE_PLACEHOLDER' | translate"
+          [style]="{ width: '100%' }"
+        />
+      </div>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'COURSES.LINKED_PRODUCTS.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeDiscountDialog()"></p-button>
+    <p-button
+      [label]="'COURSES.LINKED_PRODUCTS.SAVE' | translate"
+      icon="pi pi-check"
+      [loading]="discountSaving()"
+      (onClick)="saveDiscount()"
     ></p-button>
   </ng-template>
 </p-dialog>

@@ -32,6 +32,8 @@ import { employeesRoutes } from './routes/employees';
 import { withdrawalsRoutes } from './routes/withdrawals';
 import { productsRoutes } from './routes/products';
 import { productSalesRoutes } from './routes/product-sales';
+import { courseProductsRoutes } from './routes/course-products';
+import { educationalBooksRoutes } from './routes/educational-books';
 import { debtsRoutes } from './routes/debts';
 import { cashRoutes } from './routes/cash';
 import { reportsRoutes } from './routes/reports';
@@ -111,6 +113,8 @@ const router = {
   withdrawals: withdrawalsRoutes,
   products: productsRoutes,
   productSales: productSalesRoutes,
+  courseProducts: courseProductsRoutes,
+  educationalBooks: educationalBooksRoutes,
   debts: debtsRoutes,
   cash: cashRoutes,
   reports: reportsRoutes,
