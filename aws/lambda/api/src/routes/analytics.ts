@@ -97,10 +97,24 @@ export const analyticsRoutes = {
         msParams
       );
 
+      // Event subscription payments are revenue too (matches the revenues page,
+      // which lists EVENT as a source). Without this the dashboard total
+      // under-reports by the event income.
+      const evParams: any[] = [context.companyId, startDate, endDate];
+      const eventRevenueData = await query(
+        `SELECT COALESCE(SUM(amount), 0) as total_revenue
+         FROM event_subscriptions
+         WHERE company_id = $1 AND amount > 0
+           AND payment_date >= $2 AND payment_date <= $3
+           ${buildBranchClause('branch_id', evParams)}`,
+        evParams
+      );
+
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
       const masterRevenue = parseFloat(masterRevenueData[0]?.total_revenue || '0');
       const subscriptionRevenue = parseFloat(subscriptionRevenueData[0]?.total_revenue || '0');
+      const eventRevenue = parseFloat(eventRevenueData[0]?.total_revenue || '0');
 
       // Subtract refunds from revenue (includes master-bundle refunds via the
       // polymorphic refunds table).
@@ -112,7 +126,7 @@ export const analyticsRoutes = {
         rfParams
       );
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - totalRefunds;
+      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + eventRevenue - totalRefunds;
 
       // --- Company-wide expenses (actual payments only) ---
       const exParams: any[] = [context.companyId, startDate, endDate];
@@ -393,6 +407,7 @@ export const analyticsRoutes = {
       const expBc      = buildBranchClause('branch_id', mParams);
       const refundBc   = buildBranchClause('branch_id', mParams);
       const subBc      = buildBranchClause('branch_id', mParams);
+      const eventBc    = buildBranchClause('branch_id', mParams);
       const monthlyRevenue = await query(
         // revenue is reported NET of refunds (matches the summary cards and the
         // reports P&L). refunds stays as its own series for display; profit is
@@ -421,6 +436,11 @@ export const analyticsRoutes = {
            FROM monthly_subscription_payments
            WHERE company_id = $1 AND amount_paid > 0
              AND paid_date >= $2 AND paid_date <= $3 ${subBc}
+           UNION ALL
+           SELECT payment_date as date, amount as revenue, 0 as expenses, 0 as refunds
+           FROM event_subscriptions
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${eventBc}
            UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expense_payments
