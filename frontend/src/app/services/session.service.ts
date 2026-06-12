@@ -9,6 +9,7 @@ export interface Session {
   branchId: string;
   roomId: string;
   classId: string;
+  sessionNumber: number | null;
   startDate: string;
   endDate: string | null;
   notes: string | null;
@@ -28,6 +29,7 @@ export interface StartSessionDto {
   classId: string;
   branchId: string;
   notes?: string;
+  sessionNumber?: number;
 }
 
 export interface EndSessionDto {
@@ -64,5 +66,14 @@ export class SessionService {
 
   end(id: string, dto?: EndSessionDto): Observable<Session> {
     return this.http.patch<Session>(`${this.base}/${id}/end`, dto || {});
+  }
+
+  nextNumber(classId: string): Observable<{ sessionNumber: number }> {
+    const params = new HttpParams().set('classId', classId);
+    return this.http.get<{ sessionNumber: number }>(`${this.base}/next-number`, { params });
+  }
+
+  update(id: string, body: { sessionNumber?: number; notes?: string }): Observable<Session> {
+    return this.http.patch<Session>(`${this.base}/${id}`, body);
   }
 }

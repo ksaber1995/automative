@@ -2,23 +2,32 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 
+export type AttendanceType = 'NORMAL' | 'SUBSTITUTION';
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
+
 export interface SessionAttendanceStudent {
   studentId: string;
   studentFirstName: string;
   studentLastName: string;
   isPresent: boolean;
   attendanceId?: string | null;
+  attendanceType?: AttendanceType | null;
+  homeClassName?: string | null;
+  isEnrolled?: boolean;
 }
 
 export interface StudentAttendanceRecord {
   sessionId: string;
   sessionStartDate: string;
   sessionEndDate?: string | null;
+  sessionNumber?: number | null;
   classId: string;
   className: string;
   classCode: string;
   roomCode?: string | null;
   isPresent: boolean;
+  status?: AttendanceStatus;
+  substitutedInClassName?: string | null;
 }
 
 export interface QrCheckinResult {
@@ -26,6 +35,9 @@ export interface QrCheckinResult {
   studentFirstName: string;
   studentLastName: string;
   alreadyPresent: boolean;
+  attendanceType?: AttendanceType;
+  homeClassName?: string | null;
+  sessionNumber?: number | null;
   code: string;
   message: string;
 }
@@ -34,6 +46,7 @@ export interface ClassAttendanceSummary {
   sessionId: string;
   sessionStartDate: string;
   sessionEndDate?: string | null;
+  sessionNumber?: number | null;
   roomCode?: string | null;
   totalStudents: number;
   presentCount: number;

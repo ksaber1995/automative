@@ -175,6 +175,12 @@ export class SessionsDashboardComponent implements OnInit {
       roomCtrl.updateValueAndValidity({ emitEvent: false });
     }
 
+    // Prefill the suggested session number for this class's course (editable).
+    this.sessionService.nextNumber(classId).subscribe({
+      next: (res) => this.sessionForm.get('sessionNumber')?.setValue(res.sessionNumber),
+      error: () => {},
+    });
+
     // If the user already added rows, don't overwrite — they're driving.
     if (this.dialogTeachers().length > 0) return;
     const instructorId = cls?.instructorId || cls?.instructor_id;
@@ -393,6 +399,7 @@ export class SessionsDashboardComponent implements OnInit {
       branchId: [branchId || '', Validators.required],
       roomId: [roomId || '', Validators.required],
       classId: ['', Validators.required],
+      sessionNumber: [null as number | null],
       notes: [''],
     });
     this.dialogTeachers.set([]);
@@ -427,6 +434,7 @@ export class SessionsDashboardComponent implements OnInit {
       classId: val.classId,
       branchId: val.branchId,
       notes: val.notes || undefined,
+      sessionNumber: val.sessionNumber != null && val.sessionNumber !== '' ? Number(val.sessionNumber) : undefined,
       teachers: teachers.length > 0 ? teachers : undefined,
     }).subscribe({
       next: () => {

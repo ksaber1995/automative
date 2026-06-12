@@ -171,8 +171,10 @@ export class StudentDetailComponent implements OnInit {
   // Attendance
   attendanceRecords = signal<StudentAttendanceRecord[]>([]);
   loadingAttendance = signal(false);
+  // Present count includes substitutions (they count as present for the rate).
   attendancePresentCount = computed(() => this.attendanceRecords().filter(r => r.isPresent).length);
   attendanceAbsentCount = computed(() => this.attendanceRecords().filter(r => !r.isPresent).length);
+  attendanceSubstitutedCount = computed(() => this.attendanceRecords().filter(r => r.status === 'SUBSTITUTED').length);
   attendanceRate = computed(() => {
     const total = this.attendanceRecords().length;
     if (!total) return 0;

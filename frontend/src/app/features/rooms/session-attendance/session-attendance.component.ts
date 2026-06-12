@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
@@ -58,6 +58,7 @@ function endTimeAfterStartValidator(startDate: string) {
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
@@ -78,7 +79,12 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   scannerOpen = signal(false);
   scannerStarting = signal(false);
   manualToken = signal('');
-  lastScanResult = signal<{ name: string; alreadyPresent: boolean } | null>(null);
+  lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: 'NORMAL' | 'SUBSTITUTION'; homeClassName?: string | null } | null>(null);
+
+  // Session number inline edit
+  editingNumber = signal(false);
+  numberDraft = signal<number | null>(null);
+  savingNumber = signal(false);
   private readonly SCANNER_ELEMENT_ID = 'qr-scanner-region';
   private html5Qr?: Html5Qrcode;
   // Web Audio context for the check-in beep. Created on the user gesture that
@@ -329,8 +335,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.endingSession.set(false);
         this.showEndDialog = false;
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_ENDED'));
-        // Refetch so the header reflects the ended state (and keeps enriched fields).
-        this.sessionService.getById(this.sessionId).subscribe({ next: (s) => this.session.set(s) });
+        // Redirect back to the sessions dashboard after ending.
+        this.router.navigate(['/sessions']);
       },
       error: () => this.endingSession.set(false),
     });
@@ -451,13 +457,31 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.attendanceService.checkinByQr(this.sessionId, token).subscribe({
       next: (res) => {
         const name = `${res.studentFirstName} ${res.studentLastName}`;
-        this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent });
+        const isSub = res.attendanceType === 'SUBSTITUTION';
+        this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent, attendanceType: res.attendanceType, homeClassName: res.homeClassName });
         this.playBeep(!res.alreadyPresent);
         // Reflect in the local roster so a later checkbox save doesn't drop it.
-        this.students.update((list) =>
-          list.map((s) => (s.studentId === res.studentId ? { ...s, isPresent: true } : s)),
-        );
-        if (res.alreadyPresent) {
+        // Substitution attendees may not be in the enrolled roster — add them.
+        this.students.update((list) => {
+          const exists = list.some((s) => s.studentId === res.studentId);
+          if (exists) {
+            return list.map((s) => (s.studentId === res.studentId
+              ? { ...s, isPresent: true, attendanceType: res.attendanceType ?? s.attendanceType, homeClassName: res.homeClassName ?? s.homeClassName }
+              : s));
+          }
+          return [...list, {
+            studentId: res.studentId,
+            studentFirstName: res.studentFirstName,
+            studentLastName: res.studentLastName,
+            isPresent: true,
+            attendanceType: res.attendanceType ?? null,
+            homeClassName: res.homeClassName ?? null,
+            isEnrolled: !isSub,
+          }];
+        });
+        if (isSub) {
+          this.notificationService.success(this.translate.instant('SESSION_QR.SUBSTITUTION_CHECKED_IN', { name, className: res.homeClassName }));
+        } else if (res.alreadyPresent) {
           this.notificationService.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
         } else {
           this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
@@ -479,5 +503,33 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
 
   formatTime(dateStr: string): string {
     return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ============================================================
+  // Session number inline edit
+  // ============================================================
+
+  startEditNumber() {
+    this.numberDraft.set(this.session()?.sessionNumber ?? null);
+    this.editingNumber.set(true);
+  }
+
+  cancelEditNumber() {
+    this.editingNumber.set(false);
+  }
+
+  saveSessionNumber() {
+    const n = this.numberDraft();
+    if (n == null || n < 1) return;
+    this.savingNumber.set(true);
+    this.sessionService.update(this.sessionId, { sessionNumber: Number(n) }).subscribe({
+      next: (s) => {
+        this.session.set(s);
+        this.savingNumber.set(false);
+        this.editingNumber.set(false);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_NUMBER_SAVED'));
+      },
+      error: () => this.savingNumber.set(false),
+    });
   }
 }

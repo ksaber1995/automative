@@ -128,7 +128,13 @@ const router = {
     end: sessionsRoutes.end,
     list: sessionsRoutes.list,
     listActive: sessionsRoutes.listActive,
+    // NOTE: itty-router (used by @ts-rest/serverless) matches in registration
+    // order with no static-over-param precedence. The static `/next-number`
+    // route MUST be registered before the `/:id` route, or `next-number` is
+    // captured as `:id` and fails "id: Invalid uuid".
+    nextNumber: sessionsRoutes.nextNumber,
     getById: sessionsRoutes.getById,
+    update: sessionsRoutes.update,
   },
   timetable: {
     getDay: timetableRoutes.getDay,

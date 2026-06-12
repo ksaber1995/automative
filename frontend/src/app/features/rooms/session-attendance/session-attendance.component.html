@@ -6,7 +6,22 @@
         <i class="pi pi-arrow-left"></i> {{ 'SESSIONS_DASHBOARD.BACK_TO_SESSIONS' | translate }}
       </a>
       @if (session(); as s) {
-        <h1 class="text-2xl font-bold text-gray-900">{{ s.className }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+          {{ s.className }}
+          @if (!editingNumber()) {
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-sm font-semibold rounded-full bg-indigo-100 text-indigo-700">
+              {{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: s.sessionNumber ?? '—' } }}
+              <i class="pi pi-pencil text-xs cursor-pointer" (click)="startEditNumber()"></i>
+            </span>
+          } @else {
+            <span class="inline-flex items-center gap-1">
+              <input type="number" min="1" pInputText class="w-20 text-sm"
+                [ngModel]="numberDraft()" (ngModelChange)="numberDraft.set($event)" />
+              <p-button icon="pi pi-check" size="small" [text]="true" [loading]="savingNumber()" (onClick)="saveSessionNumber()"></p-button>
+              <p-button icon="pi pi-times" size="small" [text]="true" severity="secondary" (onClick)="cancelEditNumber()"></p-button>
+            </span>
+          }
+        </h1>
         <p class="text-sm text-gray-500">
           {{ s.courseName }}
           @if (s.roomCode) { · {{ 'SESSIONS_DASHBOARD.ROOM' | translate }} {{ s.roomCode }} }
@@ -73,12 +88,19 @@
         </div>
 
         @if (lastScanResult(); as r) {
-          <div class="mt-3 text-center text-sm font-medium"
-            [class.text-green-600]="!r.alreadyPresent"
-            [class.text-gray-500]="r.alreadyPresent">
-            <i class="pi" [class.pi-check-circle]="!r.alreadyPresent" [class.pi-info-circle]="r.alreadyPresent"></i>
-            {{ (r.alreadyPresent ? 'SESSION_QR.ALREADY_PRESENT' : 'SESSION_QR.CHECKED_IN') | translate: { name: r.name } }}
-          </div>
+          @if (r.attendanceType === 'SUBSTITUTION') {
+            <div class="mt-3 text-center text-sm font-medium text-amber-600">
+              <i class="pi pi-sync"></i>
+              {{ 'SESSION_QR.SUBSTITUTION_CHECKED_IN' | translate: { name: r.name, className: r.homeClassName } }}
+            </div>
+          } @else {
+            <div class="mt-3 text-center text-sm font-medium"
+              [class.text-green-600]="!r.alreadyPresent"
+              [class.text-gray-500]="r.alreadyPresent">
+              <i class="pi" [class.pi-check-circle]="!r.alreadyPresent" [class.pi-info-circle]="r.alreadyPresent"></i>
+              {{ (r.alreadyPresent ? 'SESSION_QR.ALREADY_PRESENT' : 'SESSION_QR.CHECKED_IN') | translate: { name: r.name } }}
+            </div>
+          }
         }
       </p-card>
     }
@@ -224,20 +246,32 @@
                   [ngModel]="student.isPresent"
                   (ngModelChange)="togglePresence(student, $event)"
                   [binary]="true"
+                  [disabled]="student.attendanceType === 'SUBSTITUTION'"
                   [inputId]="'att-' + student.studentId"
                 ></p-checkbox>
                 <label [for]="'att-' + student.studentId"
                   class="cursor-pointer text-sm font-medium text-gray-800">
                   {{ student.studentFirstName }} {{ student.studentLastName }}
+                  @if (student.attendanceType === 'SUBSTITUTION') {
+                    <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      {{ 'SESSIONS_DASHBOARD.SUBSTITUTION_FROM' | translate: { className: student.homeClassName } }}
+                    </span>
+                  }
                 </label>
               </div>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                [class.bg-green-100]="student.isPresent"
-                [class.text-green-700]="student.isPresent"
-                [class.bg-gray-100]="!student.isPresent"
-                [class.text-gray-500]="!student.isPresent">
-                {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
-              </span>
+              @if (student.attendanceType === 'SUBSTITUTION') {
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  {{ 'SESSIONS_DASHBOARD.SUBSTITUTION' | translate }}
+                </span>
+              } @else {
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  [class.bg-green-100]="student.isPresent"
+                  [class.text-green-700]="student.isPresent"
+                  [class.bg-gray-100]="!student.isPresent"
+                  [class.text-gray-500]="!student.isPresent">
+                  {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
+                </span>
+              }
             </div>
           }
         </div>

@@ -1,6 +1,7 @@
 import { query, queryOne } from '../db/connection';
 import { enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { apiError } from '../utils/api-error';
+import { ensureAttendanceMagicColumns } from './sessions';
 
 type AuthHeaders = { authorization?: string };
 
@@ -25,6 +26,7 @@ export const publicStudentsRoutes = {
     // Rate-limit by IP so the token space can't be brute-forced.
     enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);
     try {
+      await ensureAttendanceMagicColumns();
       const token = (params.qrToken || '').trim();
       // Cheap shape check before hitting the DB; tokens are 32 hex chars.
       if (!/^[a-f0-9]{16,64}$/i.test(token)) {
@@ -67,13 +69,28 @@ export const publicStudentsRoutes = {
       const attendance = await query<any>(
         `SELECT
             s.start_date AS session_start_date,
+            s.session_number AS session_number,
             cl.name AS class_name,
             r.code AS room_code,
-            CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present
+            CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
+            sub.sub_class_name AS substituted_in_class_name
          FROM sessions s
          JOIN classes cl ON s.class_id = cl.id
          LEFT JOIN rooms r ON s.room_id = r.id
-         LEFT JOIN session_attendance sa ON sa.session_id = s.id AND sa.student_id = $1
+         LEFT JOIN session_attendance sa
+           ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
+         LEFT JOIN LATERAL (
+           SELECT c2.name AS sub_class_name
+           FROM session_attendance sub2
+           JOIN sessions s2 ON s2.id = sub2.session_id
+           JOIN classes c2 ON c2.id = s2.class_id
+           WHERE sub2.student_id = $1
+             AND sub2.attendance_type = 'SUBSTITUTION'
+             AND c2.course_id = cl.course_id
+             AND s2.session_number = s.session_number
+             AND s.session_number IS NOT NULL
+           LIMIT 1
+         ) sub ON true
          WHERE s.company_id = $2
            AND s.class_id IN (
              SELECT class_id FROM enrollments
@@ -86,8 +103,49 @@ export const publicStudentsRoutes = {
         [student.id, student.company_id]
       );
 
-      const totalSessions = attendance.length;
-      const presentCount = attendance.filter((a) => a.is_present === true).length;
+      // Substitutions into a non-enrolled class with no matching home-class session
+      // yet — surfaced so they show even before the home session is started.
+      const orphanSubs = await query<any>(
+        `SELECT
+            s2.start_date AS session_start_date,
+            s2.session_number AS session_number,
+            c2.name AS class_name,
+            r2.code AS room_code,
+            false AS is_present_normal,
+            c2.name AS substituted_in_class_name
+         FROM session_attendance sub
+         JOIN sessions s2 ON s2.id = sub.session_id
+         JOIN classes c2 ON c2.id = s2.class_id
+         LEFT JOIN rooms r2 ON r2.id = s2.room_id
+         WHERE sub.student_id = $1
+           AND sub.attendance_type = 'SUBSTITUTION'
+           AND s2.company_id = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM sessions hs
+             JOIN classes hcc ON hcc.id = hs.class_id
+             WHERE hcc.course_id = c2.course_id
+               AND hs.session_number = s2.session_number
+               AND s2.session_number IS NOT NULL
+               AND hs.class_id IN (
+                 SELECT class_id FROM enrollments
+                 WHERE student_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+                 UNION
+                 SELECT class_id FROM master_class_enrollments
+                 WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
+               )
+           )`,
+        [student.id, student.company_id]
+      );
+
+      // Derive status per session: SUBSTITUTED counts as present.
+      const withStatus = [...attendance, ...orphanSubs]
+        .map((a: any) => ({
+          ...a,
+          status: a.is_present_normal ? 'PRESENT' : (a.substituted_in_class_name ? 'SUBSTITUTED' : 'ABSENT'),
+        }))
+        .sort((a: any, b: any) => new Date(b.session_start_date).getTime() - new Date(a.session_start_date).getTime());
+      const totalSessions = withStatus.length;
+      const presentCount = withStatus.filter((a: any) => a.status !== 'ABSENT').length;
       const absentCount = totalSessions - presentCount;
       const attendanceRate = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
 
@@ -112,11 +170,17 @@ export const publicStudentsRoutes = {
             presentCount,
             absentCount,
             attendanceRate,
-            recent: attendance.slice(0, 10).map((row) => ({
+            recent: withStatus.slice(0, 10).map((row: any) => ({
               sessionStartDate: row.session_start_date,
+              sessionNumber: row.session_number === null || row.session_number === undefined
+                ? null
+                : parseInt(row.session_number, 10),
               className: row.class_name,
               roomCode: row.room_code,
-              isPresent: row.is_present,
+              status: row.status,
+              substitutedInClassName: row.substituted_in_class_name || null,
+              // Backward-compatible: present OR substituted.
+              isPresent: row.status !== 'ABSENT',
             })),
           },
         },

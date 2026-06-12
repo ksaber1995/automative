@@ -98,7 +98,14 @@
                       <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                       <span class="text-xs font-semibold text-green-700 uppercase tracking-wide">{{ 'SESSIONS_DASHBOARD.LIVE' | translate }}</span>
                     </div>
-                    <h3 class="font-bold text-gray-900 text-lg">{{ session.className }}</h3>
+                    <h3 class="font-bold text-gray-900 text-lg">
+                      {{ session.className }}
+                      @if (session.sessionNumber != null) {
+                        <span class="ml-2 inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                          {{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: session.sessionNumber } }}
+                        </span>
+                      }
+                    </h3>
                     <p class="text-sm text-gray-500">{{ session.courseName }}</p>
                   </div>
                   <div class="flex items-start gap-2">
@@ -272,20 +279,32 @@
                                   [ngModel]="student.isPresent"
                                   (ngModelChange)="toggleStudentPresence(session.id, student, $event)"
                                   [binary]="true"
+                                  [disabled]="student.attendanceType === 'SUBSTITUTION'"
                                   [inputId]="'att-' + session.id + '-' + student.studentId"
                                 ></p-checkbox>
                                 <label [for]="'att-' + session.id + '-' + student.studentId"
                                   class="cursor-pointer text-sm font-medium text-gray-800">
                                   {{ student.studentFirstName }} {{ student.studentLastName }}
+                                  @if (student.attendanceType === 'SUBSTITUTION') {
+                                    <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                      {{ 'SESSIONS_DASHBOARD.SUBSTITUTION_FROM' | translate: { className: student.homeClassName } }}
+                                    </span>
+                                  }
                                 </label>
                               </div>
-                              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                [class.bg-green-100]="student.isPresent"
-                                [class.text-green-700]="student.isPresent"
-                                [class.bg-gray-100]="!student.isPresent"
-                                [class.text-gray-500]="!student.isPresent">
-                                {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
-                              </span>
+                              @if (student.attendanceType === 'SUBSTITUTION') {
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                  {{ 'SESSIONS_DASHBOARD.SUBSTITUTION' | translate }}
+                                </span>
+                              } @else {
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                  [class.bg-green-100]="student.isPresent"
+                                  [class.text-green-700]="student.isPresent"
+                                  [class.bg-gray-100]="!student.isPresent"
+                                  [class.text-gray-500]="!student.isPresent">
+                                  {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
+                                </span>
+                              }
                             </div>
                           }
                         </div>
@@ -546,6 +565,14 @@
       @if (sessionForm.get('branchId')?.value && !loadingDialogClasses() && dialogActiveClasses().length === 0) {
         <small class="text-orange-500">{{ 'SESSIONS_DASHBOARD.NO_ELIGIBLE_CLASSES' | translate }}</small>
       }
+    </div>
+
+    <!-- Session number (auto-suggested per course; editable) -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_SESSION_NUMBER' | translate }}</label>
+      <input type="number" min="1" pInputText formControlName="sessionNumber"
+        [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_SESSION_NUMBER' | translate" class="w-full" />
+      <small class="text-gray-400">{{ 'SESSIONS_DASHBOARD.HINT_SESSION_NUMBER' | translate }}</small>
     </div>
 
     <!-- Notes -->

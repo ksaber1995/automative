@@ -988,6 +988,9 @@ CREATE TABLE sessions (
     branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
     room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    -- Per-Course sequence number (1, 2, 3 …). Session number N is conceptually
+    -- "the same session" across every class of a course (migration 030).
+    session_number INTEGER,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date TIMESTAMP WITH TIME ZONE,
     notes TEXT,
@@ -1001,16 +1004,29 @@ CREATE INDEX idx_sessions_room_id ON sessions(room_id);
 CREATE INDEX idx_sessions_class_id ON sessions(class_id);
 CREATE INDEX idx_sessions_start_date ON sessions(start_date);
 CREATE INDEX idx_sessions_end_date ON sessions(end_date);
+CREATE INDEX idx_sessions_session_number ON sessions(session_number);
 
 -- =============================================
--- SESSION ATTENDANCE TABLE  (migration 024)
+-- SESSION ATTENDANCE TABLE  (migration 024; substitution: migration 030)
 -- Records which students were present at a given session.
 -- One row per present student; absence = no row.
+--
+-- attendance_type:
+--   NORMAL       — an enrolled student attended their own class (default).
+--   SUBSTITUTION — a student attended a sibling class of the SAME course they
+--                  are NOT enrolled in (they were/are absent from their own
+--                  class's session of the same session_number). home_class_id
+--                  points at the enrolled class the attendance substitutes for.
+-- "Absent-with-substitution" on the home class is derived: no NORMAL row there
+-- + a SUBSTITUTION row for the same (course, session_number).
 -- =============================================
 CREATE TABLE session_attendance (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    attendance_type VARCHAR(16) NOT NULL DEFAULT 'NORMAL'
+        CHECK (attendance_type IN ('NORMAL', 'SUBSTITUTION')),
+    home_class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (session_id, student_id)
@@ -1018,6 +1034,7 @@ CREATE TABLE session_attendance (
 
 CREATE INDEX idx_session_attendance_session ON session_attendance(session_id);
 CREATE INDEX idx_session_attendance_student ON session_attendance(student_id);
+CREATE INDEX idx_session_attendance_home_class ON session_attendance(home_class_id);
 
 -- =============================================
 -- SESSION TEACHER ATTENDANCE TABLE

@@ -731,6 +731,9 @@
               <span class="text-sm text-gray-500">
                 <span class="text-green-600 font-semibold">{{ attendancePresentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_PRESENT' | translate }} ·
                 <span class="text-red-500 font-semibold">{{ attendanceAbsentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_ABSENT' | translate }} ·
+                @if (attendanceSubstitutedCount() > 0) {
+                  <span class="text-amber-600 font-semibold">{{ attendanceSubstitutedCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_SUBSTITUTED' | translate }} ·
+                }
                 <span class="font-semibold text-indigo-600">{{ attendanceRate() }}%</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_RATE' | translate }}
               </span>
             }
@@ -762,12 +765,24 @@
             <tr>
               <td class="font-medium">{{ formatDate(rec.sessionStartDate) }}</td>
               <td>
-                <div class="font-medium text-sm">{{ rec.className }}</div>
+                <div class="font-medium text-sm">
+                  {{ rec.className }}
+                  @if (rec.sessionNumber != null) {
+                    <span class="ml-1 text-xs font-semibold text-indigo-600">{{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: rec.sessionNumber } }}</span>
+                  }
+                </div>
                 <div class="text-xs text-gray-400 font-mono">{{ rec.classCode }}</div>
               </td>
               <td class="text-gray-600 text-sm">{{ rec.roomCode || '—' }}</td>
               <td>
-                @if (rec.isPresent) {
+                @if (rec.status === 'SUBSTITUTED') {
+                  <span class="inline-flex items-center gap-1.5 text-amber-700 font-semibold text-sm">
+                    <i class="pi pi-sync text-amber-500"></i> {{ 'STUDENTS.DETAIL.ATTENDANCE_SUBSTITUTED_LABEL' | translate }}
+                    @if (rec.substitutedInClassName) {
+                      <span class="text-xs text-gray-400 font-normal">({{ rec.substitutedInClassName }})</span>
+                    }
+                  </span>
+                } @else if (rec.isPresent) {
                   <span class="inline-flex items-center gap-1.5 text-green-700 font-semibold text-sm">
                     <i class="pi pi-check-circle text-green-500"></i> {{ 'STUDENTS.DETAIL.ATTENDANCE_PRESENT_LABEL' | translate }}
                   </span>

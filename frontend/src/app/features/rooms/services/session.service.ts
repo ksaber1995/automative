@@ -8,6 +8,7 @@ export interface Session {
   branchId: string;
   roomId: string | null;
   classId: string;
+  sessionNumber: number | null;
   startDate: string;
   endDate: string | null;
   notes: string | null;
@@ -34,6 +35,7 @@ export interface StartSessionDto {
   classId: string;
   branchId: string;
   notes?: string;
+  sessionNumber?: number;
   teachers?: StartSessionTeacher[];
 }
 
@@ -59,5 +61,15 @@ export class SessionService {
 
   end(id: string, notes?: string, endDate?: string): Observable<Session> {
     return this.api.patch<Session>(`sessions/${id}/end`, { notes, endDate });
+  }
+
+  /** Suggested next session number for a class's course (prefills the Start dialog). */
+  nextNumber(classId: string): Observable<{ sessionNumber: number }> {
+    return this.api.get<{ sessionNumber: number }>('sessions/next-number', { classId });
+  }
+
+  /** Edit a session's number (and/or notes) after it was started. */
+  update(id: string, body: { sessionNumber?: number; notes?: string }): Observable<Session> {
+    return this.api.patch<Session>(`sessions/${id}`, body);
   }
 }

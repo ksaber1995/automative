@@ -12,9 +12,12 @@ export interface PublicStudentCourse {
 
 export interface PublicStudentAttendanceRecent {
   sessionStartDate: string;
+  sessionNumber?: number | null;
   className: string;
   roomCode: string | null;
   isPresent: boolean;
+  status?: 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
+  substitutedInClassName?: string | null;
 }
 
 export interface PublicStudentProfile {
