@@ -50,7 +50,7 @@ CREATE INDEX idx_companies_subscription_status ON companies(subscription_status)
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
-    status VARCHAR(20) NOT NULL DEFAULT 'TRIAL' CHECK (status IN ('TRIAL', 'MONTHLY', 'ANNUAL', 'EXPIRED')),
+    status VARCHAR(20) NOT NULL DEFAULT 'TRIAL' CHECK (status IN ('TRIAL', 'ACTIVE', 'MONTHLY', 'ANNUAL', 'EXPIRED')),
     price DECIMAL(10, 2) NOT NULL DEFAULT 0,
     trial_start_date DATE,
     trial_end_date DATE,
