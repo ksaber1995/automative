@@ -1,3 +1,5 @@
+export type SalaryType = 'MONTHLY' | 'SESSION_BASED';
+
 export interface Employee {
   id: string;
   companyId: string;
@@ -10,6 +12,9 @@ export interface Employee {
   branchId?: string | null;
   isGlobal: boolean;
   salary: number;
+  salaryType: SalaryType;
+  /** Pay per taught session, when salaryType === 'SESSION_BASED'. */
+  sessionRate?: number | null;
   hireDate: string;
   terminationDate?: string | null;
   isActive: boolean;
@@ -30,6 +35,8 @@ export interface EmployeeCreateDto {
   branchId?: string | null;
   isGlobal: boolean;
   salary: number;
+  salaryType?: SalaryType;
+  sessionRate?: number | null;
   hireDate: string;
   notes?: string;
 }
@@ -44,6 +51,8 @@ export interface EmployeeUpdateDto {
   branchId?: string | null;
   isGlobal?: boolean;
   salary?: number;
+  salaryType?: SalaryType;
+  sessionRate?: number | null;
   terminationDate?: string;
   isActive?: boolean;
   notes?: string;

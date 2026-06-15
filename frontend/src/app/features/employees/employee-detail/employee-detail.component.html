@@ -178,7 +178,7 @@
           <ng-template pTemplate="header">
             <tr>
               <th pSortableColumn="date">{{ 'EMPLOYEES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
-              <th pSortableColumn="amount" class="text-right">{{ 'EMPLOYEES.DETAIL.COL_BASE_SALARY' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
+              <th class="text-right">{{ (isSessionBased() ? 'EMPLOYEES.DETAIL.COL_SESSIONS' : 'EMPLOYEES.DETAIL.COL_BASE_SALARY') | translate }}</th>
               <th pSortableColumn="bonusAmount" class="text-right text-green-600">{{ 'EMPLOYEES.DETAIL.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
               <th pSortableColumn="discountAmount" class="text-right text-red-600">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
               <th pSortableColumn="amount" class="text-right font-semibold">{{ 'EMPLOYEES.DETAIL.COL_TOTAL_PAID' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
@@ -189,7 +189,11 @@
             <tr>
               <td class="font-medium">{{ item.date | date:'mediumDate' }}</td>
               <td class="text-right text-gray-600">
-                {{ getBaseSalary(item) | number:'1.2-2' }}
+                @if (isSessionBased()) {
+                  <span>{{ item.sessionCount || 0 }} × {{ sessionRate(item) | number:'1.0-2' }}</span>
+                } @else {
+                  {{ getBaseSalary(item) | number:'1.2-2' }}
+                }
               </td>
               <td class="text-right">
                 @if (item.bonusAmount && item.bonusAmount > 0) {
@@ -279,6 +283,9 @@
               <th pSortableColumn="branchName">{{ 'EMPLOYEES.DETAIL.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
               <th pSortableColumn="role">{{ 'EMPLOYEES.DETAIL.COL_ROLE' | translate }} <p-sortIcon field="role"></p-sortIcon></th>
               <th pSortableColumn="status">{{ 'EMPLOYEES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+              @if (isSessionBased()) {
+                <th pSortableColumn="paid">{{ 'EMPLOYEES.DETAIL.COL_PAID' | translate }} <p-sortIcon field="paid"></p-sortIcon></th>
+              }
               <th pSortableColumn="durationMinutes" class="text-right">{{ 'EMPLOYEES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
             </tr>
           </ng-template>
@@ -311,6 +318,18 @@
                   [severity]="row.status === 'PRESENT' ? 'success' : 'danger'"
                 ></p-tag>
               </td>
+              @if (isSessionBased()) {
+                <td>
+                  @if (row.status === 'PRESENT') {
+                    <p-tag
+                      [value]="(row.paid ? 'EMPLOYEES.DETAIL.PAID' : 'EMPLOYEES.DETAIL.UNPAID') | translate"
+                      [severity]="row.paid ? 'success' : 'warn'"
+                    ></p-tag>
+                  } @else {
+                    <span class="text-gray-300">—</span>
+                  }
+                </td>
+              }
               <td class="text-right text-sm">
                 @if (row.durationMinutes !== null) {
                   {{ formatDuration(row.durationMinutes) }}
@@ -322,7 +341,7 @@
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="6" class="text-center py-8 text-gray-400">
+              <td [attr.colspan]="isSessionBased() ? 7 : 6" class="text-center py-8 text-gray-400">
                 <i class="pi pi-inbox text-2xl mb-2 block"></i>
                 {{ 'EMPLOYEES.DETAIL.NO_ATTENDANCE' | translate }}
               </td>

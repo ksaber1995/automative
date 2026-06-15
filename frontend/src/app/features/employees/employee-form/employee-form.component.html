@@ -47,11 +47,28 @@
           <input pInputText formControlName="department" class="w-full" [placeholder]="'EMPLOYEES.FORM.DEPARTMENT_PLACEHOLDER' | translate" />
         </div>
 
-        <!-- Salary -->
+        <!-- Salary type -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
-          <p-inputnumber formControlName="salary" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY_TYPE' | translate }} <span class="text-red-500">*</span></label>
+          <p-select formControlName="salaryType" [options]="salaryTypeOptions()" optionLabel="label" optionValue="value" class="w-full" [style]="{ width: '100%' }"></p-select>
         </div>
+
+        <!-- Monthly salary (when salary type = MONTHLY) -->
+        @if (salaryType?.value !== 'SESSION_BASED') {
+          <div class="field">
+            <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
+            <p-inputnumber formControlName="salary" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+          </div>
+        }
+
+        <!-- Session rate (when salary type = SESSION_BASED) -->
+        @if (salaryType?.value === 'SESSION_BASED') {
+          <div class="field">
+            <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SESSION_RATE' | translate }} <span class="text-red-500">*</span></label>
+            <p-inputnumber formControlName="sessionRate" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+            <small class="text-gray-400">{{ 'EMPLOYEES.FORM.SESSION_RATE_HINT' | translate }}</small>
+          </div>
+        }
 
         <!-- Hire Date -->
         <div class="field">
@@ -59,11 +76,13 @@
           <input pInputText type="date" formControlName="hireDate" class="w-full" />
         </div>
 
-        <!-- Is Global Checkbox -->
-        <div class="field col-span-2">
-          <p-checkbox formControlName="isGlobal" [binary]="true" inputId="isGlobal"></p-checkbox>
-          <label for="isGlobal" class="ml-2">{{ 'EMPLOYEES.FORM.GLOBAL_EMPLOYEE' | translate }}</label>
-        </div>
+        <!-- Is Global Checkbox (pointless when the company has a single branch) -->
+        @if (!branchState.isSingleBranch()) {
+          <div class="field col-span-2">
+            <p-checkbox formControlName="isGlobal" [binary]="true" inputId="isGlobal"></p-checkbox>
+            <label for="isGlobal" class="ml-2">{{ 'EMPLOYEES.FORM.GLOBAL_EMPLOYEE' | translate }}</label>
+          </div>
+        }
 
         <!-- Branch Selection -->
         @if (!isGlobal?.value && !branchState.isSingleBranch()) {

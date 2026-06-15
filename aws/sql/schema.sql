@@ -569,6 +569,9 @@ CREATE TABLE employees (
     position VARCHAR(100),
     department VARCHAR(100),
     salary DECIMAL(10, 2),
+    salary_type VARCHAR(20) NOT NULL DEFAULT 'MONTHLY'
+        CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED')),
+    session_rate DECIMAL(10, 2),
     hire_date DATE,
     notes TEXT,
     branch_id UUID,
@@ -1288,6 +1291,26 @@ CREATE TRIGGER update_exams_updated_at
 CREATE TRIGGER update_exam_results_updated_at
     BEFORE UPDATE ON exam_results
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- SESSION SALARY PAYMENTS
+-- Links a taught session to the salary payment that covered it, so
+-- session-based teachers can be paid partially through a month and reappear
+-- for newly-attended sessions. See migration 038 / exam.md-style flow.
+-- =============================================
+CREATE TABLE session_salary_payments (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id  UUID NOT NULL REFERENCES companies(id)        ON DELETE CASCADE,
+    employee_id UUID NOT NULL REFERENCES employees(id)        ON DELETE CASCADE,
+    session_id  UUID NOT NULL REFERENCES sessions(id)         ON DELETE CASCADE,
+    payment_id  UUID NOT NULL REFERENCES expense_payments(id) ON DELETE CASCADE,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, session_id)
+);
+
+CREATE INDEX idx_ssp_employee ON session_salary_payments(employee_id);
+CREATE INDEX idx_ssp_payment  ON session_salary_payments(payment_id);
+CREATE INDEX idx_ssp_session  ON session_salary_payments(session_id);
 
 -- Grant permissions (adjust as needed for your specific AWS RDS setup)
 -- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automative_user;

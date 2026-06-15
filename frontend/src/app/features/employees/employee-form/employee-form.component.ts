@@ -47,8 +47,12 @@ export class EmployeeFormComponent implements OnInit {
   isEditMode = signal(false);
   employeeId: string | null = null;
   branches = signal<Branch[]>([]);
+  salaryTypeOptions = signal<{ label: string; value: string }[]>([]);
 
   constructor() {
+    this.rebuildSalaryTypeOptions();
+    this.translate.onLangChange.subscribe(() => this.rebuildSalaryTypeOptions());
+
     const today = new Date().toISOString().split('T')[0];
     this.employeeForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
@@ -59,7 +63,9 @@ export class EmployeeFormComponent implements OnInit {
       department: ['', [Validators.required]],
       isGlobal: [false],
       branchId: [''],
+      salaryType: ['MONTHLY', [Validators.required]],
       salary: [0, [Validators.required, Validators.min(0)]],
+      sessionRate: [null],
       hireDate: [today, [Validators.required]],
       notes: ['']
     });
@@ -75,6 +81,28 @@ export class EmployeeFormComponent implements OnInit {
       }
       branchControl?.updateValueAndValidity();
     });
+
+    // Monthly → require `salary`; session-based → require `sessionRate`.
+    this.employeeForm.get('salaryType')?.valueChanges.subscribe((type: string) => {
+      const salaryCtrl = this.employeeForm.get('salary');
+      const rateCtrl = this.employeeForm.get('sessionRate');
+      if (type === 'SESSION_BASED') {
+        salaryCtrl?.clearValidators();
+        rateCtrl?.setValidators([Validators.required, Validators.min(0)]);
+      } else {
+        salaryCtrl?.setValidators([Validators.required, Validators.min(0)]);
+        rateCtrl?.clearValidators();
+      }
+      salaryCtrl?.updateValueAndValidity();
+      rateCtrl?.updateValueAndValidity();
+    });
+  }
+
+  private rebuildSalaryTypeOptions() {
+    this.salaryTypeOptions.set([
+      { label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_MONTHLY'), value: 'MONTHLY' },
+      { label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_SESSION'), value: 'SESSION_BASED' },
+    ]);
   }
 
   ngOnInit() {
@@ -164,6 +192,8 @@ export class EmployeeFormComponent implements OnInit {
   get position() { return this.employeeForm.get('position'); }
   get department() { return this.employeeForm.get('department'); }
   get salary() { return this.employeeForm.get('salary'); }
+  get salaryType() { return this.employeeForm.get('salaryType'); }
+  get sessionRate() { return this.employeeForm.get('sessionRate'); }
   get hireDate() { return this.employeeForm.get('hireDate'); }
   get branchId() { return this.employeeForm.get('branchId'); }
   get isGlobal() { return this.employeeForm.get('isGlobal'); }

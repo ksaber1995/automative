@@ -46,8 +46,23 @@ export class TeacherAttendanceListComponent implements OnInit {
 
   selectedBranchId: string | null = null;
   selectedEmployeeId: string | null = null;
-  startDate: string = '';
-  endDate: string = '';
+  // Default to the current calendar month; the user can widen/change the range.
+  startDate: string = this.monthStartIso();
+  endDate: string = this.monthEndIso();
+
+  private static iso(d: Date): string {
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+  private monthStartIso(): string {
+    const n = new Date();
+    return TeacherAttendanceListComponent.iso(new Date(n.getFullYear(), n.getMonth(), 1));
+  }
+  private monthEndIso(): string {
+    const n = new Date();
+    return TeacherAttendanceListComponent.iso(new Date(n.getFullYear(), n.getMonth() + 1, 0));
+  }
 
   presentCount = computed(() => this.rows().filter((r) => r.status === 'PRESENT').length);
   absentCount = computed(() => this.rows().filter((r) => r.status === 'ABSENT').length);
@@ -95,8 +110,9 @@ export class TeacherAttendanceListComponent implements OnInit {
   clearFilters() {
     this.selectedBranchId = null;
     this.selectedEmployeeId = null;
-    this.startDate = '';
-    this.endDate = '';
+    // Reset back to the default (current month) rather than all-time.
+    this.startDate = this.monthStartIso();
+    this.endDate = this.monthEndIso();
     this.load();
   }
 

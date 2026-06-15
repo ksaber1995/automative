@@ -672,7 +672,11 @@ export const attendanceRoutes = {
           cl.code AS class_code,
           co.name AS course_name,
           b.name AS branch_name,
-          r.code AS room_code
+          r.code AS room_code,
+          EXISTS (
+            SELECT 1 FROM session_salary_payments ssp
+            WHERE ssp.session_id = sta.session_id AND ssp.employee_id = sta.employee_id
+          ) AS paid
         FROM session_teacher_attendance sta
         JOIN sessions s ON s.id = sta.session_id
         JOIN employees e ON e.id = sta.employee_id
@@ -743,6 +747,7 @@ export const attendanceRoutes = {
             classCode: row.class_code,
             courseName: row.course_name,
             roomCode: row.room_code,
+            paid: row.paid === true,
           };
         }),
       };

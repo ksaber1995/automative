@@ -3,6 +3,59 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { mapPaymentFromDB } from './expense-payments';
 import { apiError, mapThrownError } from '../utils/api-error';
 
+// Idempotent guard — ensures the session-based salary columns exist even on a
+// DB that hasn't had migration 037 applied yet (mirrors ensureExamTables).
+let salaryColumnsEnsured = false;
+async function ensureSalaryColumns(): Promise<void> {
+  if (salaryColumnsEnsured) return;
+  await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS salary_type VARCHAR(20) NOT NULL DEFAULT 'MONTHLY'`);
+  await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS session_rate DECIMAL(10, 2)`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS session_salary_payments (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id  UUID NOT NULL REFERENCES companies(id)        ON DELETE CASCADE,
+      employee_id UUID NOT NULL REFERENCES employees(id)        ON DELETE CASCADE,
+      session_id  UUID NOT NULL REFERENCES sessions(id)         ON DELETE CASCADE,
+      payment_id  UUID NOT NULL REFERENCES expense_payments(id) ON DELETE CASCADE,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (employee_id, session_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ssp_employee ON session_salary_payments(employee_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ssp_payment  ON session_salary_payments(payment_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ssp_session  ON session_salary_payments(session_id)`);
+  salaryColumnsEnsured = true;
+}
+
+// Session ids an employee was PRESENT for within [monthStart, monthEnd] that
+// have NOT yet been covered by a salary payment. These are what's owed now.
+async function getUnpaidSessionIds(
+  companyId: string,
+  employeeId: string,
+  monthStart: string,
+  monthEnd: string,
+): Promise<string[]> {
+  const rows = await query<{ id: string }>(
+    `SELECT DISTINCT s.id
+     FROM session_teacher_attendance sta
+     JOIN sessions s ON s.id = sta.session_id
+     WHERE s.company_id = $1
+       AND sta.employee_id = $2
+       AND sta.status = 'PRESENT'
+       AND s.start_date::date >= $3
+       AND s.start_date::date <= $4
+       AND NOT EXISTS (
+         SELECT 1 FROM session_salary_payments ssp
+         WHERE ssp.session_id = s.id AND ssp.employee_id = $2
+       )`,
+    [companyId, employeeId, monthStart, monthEnd],
+  );
+  return rows.map((r) => r.id);
+}
+
+// Total PRESENT sessions for an employee in a month (paid or not) — used for
+// the per-payment session count on the salary history view.
+
 // Parse a YYYY-MM-DD string into a calendar-only date with no timezone drift.
 function parseDateOnly(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
@@ -222,6 +275,7 @@ export const expensesRoutes = {
       if (!checkGranularPermission(context, 'expenses', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      await ensureSalaryColumns();
 
       const targetMonth = queryParams.month || new Date().toISOString().substring(0, 7);
       const monthStart = targetMonth + '-01';
@@ -251,18 +305,50 @@ export const expensesRoutes = {
       const employeeParams: any[] = [context.companyId, monthStart, monthEnd];
       const employeeBranchClause = appendBranchSqlFilter(context, employeeParams, 'e.branch_id');
       const employeeScope = employeeBranchClause ? ` AND (${employeeBranchClause} OR e.branch_id IS NULL)` : '';
+      // Candidates: monthly staff with a salary not yet paid this month, AND
+      // session-based staff with a rate (their "due" is computed from unpaid
+      // sessions below — they may reappear after a mid-month payment).
       const unpaidEmployees = await query(
         `SELECT e.*, b.name as branch_name
          FROM employees e
          LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE e.company_id = $1 AND e.is_active = true AND e.salary > 0${employeeScope}
-           AND NOT EXISTS (
-             SELECT 1 FROM expense_payments ep
-             WHERE ep.employee_id = e.id AND ep.category = 'SALARIES'
-               AND ep.date >= $2 AND ep.date <= $3
+         WHERE e.company_id = $1 AND e.is_active = true${employeeScope}
+           AND (
+             (COALESCE(e.salary_type, 'MONTHLY') = 'MONTHLY' AND e.salary > 0
+              AND NOT EXISTS (
+                SELECT 1 FROM expense_payments ep
+                WHERE ep.employee_id = e.id AND ep.category = 'SALARIES'
+                  AND ep.date >= $2 AND ep.date <= $3
+              ))
+             OR (e.salary_type = 'SESSION_BASED' AND e.session_rate > 0)
            )`,
         employeeParams
       );
+
+      // For session-based employees the amount = UNPAID present sessions × rate.
+      const salaryItems: any[] = [];
+      for (const e of unpaidEmployees as any[]) {
+        const base = {
+          id: e.id,
+          type: 'salary' as const,
+          label: `Salary: ${e.first_name} ${e.last_name}`,
+          category: 'SALARIES',
+          branchId: e.branch_id,
+          branchName: e.branch_name,
+          templateId: null,
+          employeeId: e.id,
+        };
+        if (e.salary_type === 'SESSION_BASED') {
+          const rate = e.session_rate ? parseFloat(e.session_rate) : 0;
+          const unpaidIds = await getUnpaidSessionIds(context.companyId, e.id, monthStart, monthEnd);
+          const amount = unpaidIds.length * rate;
+          if (amount > 0) {
+            salaryItems.push({ ...base, amount, salaryType: 'SESSION_BASED', sessionCount: unpaidIds.length, sessionRate: rate });
+          }
+        } else {
+          salaryItems.push({ ...base, amount: parseFloat(e.salary), salaryType: 'MONTHLY' });
+        }
+      }
 
       const items: any[] = [
         ...recurringTemplates.map((t: any) => ({
@@ -276,17 +362,7 @@ export const expensesRoutes = {
           templateId: t.id,
           employeeId: null,
         })),
-        ...unpaidEmployees.map((e: any) => ({
-          id: e.id,
-          type: 'salary',
-          label: `Salary: ${e.first_name} ${e.last_name}`,
-          amount: parseFloat(e.salary),
-          category: 'SALARIES',
-          branchId: e.branch_id,
-          branchName: e.branch_name,
-          templateId: null,
-          employeeId: e.id,
-        })),
+        ...salaryItems,
       ];
 
       const totalDue = items.reduce((sum, i) => sum + i.amount, 0);
@@ -579,6 +655,7 @@ export const expensesRoutes = {
       if (!checkGranularPermission(context, 'expenses', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      await ensureSalaryColumns();
 
       const emp = await queryOne(
         'SELECT * FROM employees WHERE id = $1 AND company_id = $2 AND is_active = true',
@@ -586,7 +663,12 @@ export const expensesRoutes = {
       );
 
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
-      if (!emp.salary || parseFloat(emp.salary) <= 0) {
+      const isSessionBased = emp.salary_type === 'SESSION_BASED';
+      if (isSessionBased) {
+        if (!emp.session_rate || parseFloat(emp.session_rate) <= 0) {
+          return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no session rate configured');
+        }
+      } else if (!emp.salary || parseFloat(emp.salary) <= 0) {
         return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
       }
 
@@ -595,16 +677,30 @@ export const expensesRoutes = {
       const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().split('T')[0];
       const monthLabel = new Date(payDate).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-      const existing = await queryOne(
-        `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
-        [context.companyId, emp.id, monthStart, monthEnd]
-      );
-
-      if (existing) {
-        return apiError(400, 'ERRORS.EXPENSES.SALARY_ALREADY_PAID', `Salary already paid for ${monthLabel}`);
+      // Session-based: base = UNPAID present sessions in the month × rate, and
+      // multiple payments per month are allowed (one per batch of new sessions).
+      // Monthly: base = salary, and only one payment per month is allowed.
+      let baseSalary: number;
+      let baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`;
+      let unpaidSessionIds: string[] = [];
+      if (isSessionBased) {
+        const rate = parseFloat(emp.session_rate);
+        unpaidSessionIds = await getUnpaidSessionIds(context.companyId, emp.id, monthStart, monthEnd);
+        if (unpaidSessionIds.length === 0) {
+          return apiError(400, 'ERRORS.EXPENSES.NO_UNPAID_SESSIONS', 'No unpaid sessions for this month');
+        }
+        baseSalary = unpaidSessionIds.length * rate;
+        baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${unpaidSessionIds.length} sessions × ${rate})`;
+      } else {
+        const existing = await queryOne(
+          `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
+          [context.companyId, emp.id, monthStart, monthEnd]
+        );
+        if (existing) {
+          return apiError(400, 'ERRORS.EXPENSES.SALARY_ALREADY_PAID', `Salary already paid for ${monthLabel}`);
+        }
+        baseSalary = parseFloat(emp.salary);
       }
-
-      const baseSalary = parseFloat(emp.salary);
       const bonus = body.bonusAmount || 0;
       const discount = body.discountAmount || 0;
       const finalAmount = baseSalary + bonus - discount;
@@ -621,11 +717,21 @@ export const expensesRoutes = {
         category: 'SALARIES',
         amount: finalAmount,
         date: payDate,
-        notes: `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`,
+        notes: baseNote,
         bonus_amount: bonus,
         discount_amount: discount,
         adjustment_reason: body.adjustmentReason || null,
       });
+
+      // Mark the covered sessions as paid (links cascade-delete if voided).
+      for (const sid of unpaidSessionIds) {
+        await query(
+          `INSERT INTO session_salary_payments (company_id, employee_id, session_id, payment_id)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (employee_id, session_id) DO NOTHING`,
+          [context.companyId, emp.id, sid, payment.id],
+        );
+      }
 
       return { status: 201 as const, body: mapPaymentFromDB(payment) };
     } catch (error) {
@@ -641,6 +747,7 @@ export const expensesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      await ensureSalaryColumns();
       const emp = await queryOne(
         'SELECT id FROM employees WHERE id = $1 AND company_id = $2',
         [params.employeeId, context.companyId]
@@ -649,11 +756,21 @@ export const expensesRoutes = {
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
       const rows = await query(
-        `SELECT * FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' ORDER BY date DESC`,
+        `SELECT ep.*,
+                (SELECT COUNT(*) FROM session_salary_payments ssp WHERE ssp.payment_id = ep.id) AS session_count
+         FROM expense_payments ep
+         WHERE ep.company_id = $1 AND ep.employee_id = $2 AND ep.category = 'SALARIES'
+         ORDER BY ep.date DESC`,
         [context.companyId, params.employeeId]
       );
 
-      return { status: 200 as const, body: rows.map(mapPaymentFromDB) };
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          ...mapPaymentFromDB(r),
+          sessionCount: r.session_count !== null && r.session_count !== undefined ? parseInt(r.session_count, 10) : 0,
+        })),
+      };
     } catch (error) {
       console.error('Get employee salary history error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.SALARY_HISTORY_FAILED', 'Failed to get salary history');

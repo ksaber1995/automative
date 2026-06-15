@@ -36,6 +36,8 @@ export interface TeacherAttendanceHistoryRow extends Omit<SessionTeacherAttendan
   classCode: string | null;
   courseName: string | null;
   roomCode: string | null;
+  /** True when this session has been covered by a salary payment. */
+  paid?: boolean;
 }
 
 export interface TeacherHistoryFilters {

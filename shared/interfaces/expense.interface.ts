@@ -74,6 +74,8 @@ export interface ExpensePayment {
   bonusAmount?: number;
   discountAmount?: number;
   adjustmentReason?: string | null;
+  /** Sessions covered by this payment (session-based salary only). */
+  sessionCount?: number;
   createdAt: string;
   updatedAt: string;
 }

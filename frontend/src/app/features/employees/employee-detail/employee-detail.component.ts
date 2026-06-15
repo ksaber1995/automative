@@ -93,8 +93,16 @@ export class EmployeeDetailComponent implements OnInit {
     return this.authService.canManageUsers();
   }
 
+  isSessionBased = computed(() => this.employee()?.salaryType === 'SESSION_BASED');
+
   getBaseSalary(item: ExpensePayment): number {
     return item.amount - (item.bonusAmount || 0) + (item.discountAmount || 0);
+  }
+
+  /** Per-session rate for a session-based payment = base ÷ sessions covered. */
+  sessionRate(item: ExpensePayment): number {
+    const count = item.sessionCount || 0;
+    return count > 0 ? this.getBaseSalary(item) / count : 0;
   }
 
   ngOnInit() {

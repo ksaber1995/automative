@@ -163,7 +163,12 @@
             <span class="font-medium">{{ item.label.replace('Salary: ', '') }}</span>
           </td>
           <td>{{ item.branchName || ('EXPENSES.SALARIES.BRANCH_NA' | translate) }}</td>
-          <td class="text-right text-gray-700">{{ item.amount | amount }}</td>
+          <td class="text-right text-gray-700">
+            {{ item.amount | amount }}
+            @if (item.salaryType === 'SESSION_BASED') {
+              <div class="text-xs text-gray-400">{{ 'EXPENSES.SALARIES.SESSION_BREAKDOWN' | translate: { count: item.sessionCount, rate: (item.sessionRate | amount) } }}</div>
+            }
+          </td>
           <td class="text-right">
             <p-inputNumber
               [(ngModel)]="adjustments[item.employeeId].bonusAmount"

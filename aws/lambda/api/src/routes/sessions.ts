@@ -248,6 +248,16 @@ export const sessionsRoutes = {
         return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
+      // A session can't be ended unless at least one teacher was present.
+      const presentTeacher = await queryOne(
+        `SELECT 1 FROM session_teacher_attendance
+         WHERE session_id = $1 AND status = 'PRESENT' LIMIT 1`,
+        [params.id]
+      );
+      if (!presentTeacher) {
+        return apiError(400, 'ERRORS.SESSIONS.NO_TEACHER_PRESENT', 'Cannot end the session — no teacher is marked present');
+      }
+
       // Allow caller to supply a custom end date (e.g. forgot to end session yesterday)
       let endDate: Date;
       if (body?.endDate) {

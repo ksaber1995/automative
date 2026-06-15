@@ -108,6 +108,7 @@ export class LayoutComponent implements OnInit {
       { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('branches') },
       { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
       { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') },
+      { labelKey: 'NAV.ATTENDANCE_TEACHERS', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('academy') && !auth.isTeacher() },
     ].filter(c => c.visible);
     if (people.length) {
       entries.push({ kind: 'group', group: {
