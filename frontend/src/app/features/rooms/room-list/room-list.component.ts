@@ -123,6 +123,10 @@ export class RoomListComponent implements OnInit {
       description: [''],
       branchId: ['', Validators.required],
     });
+    // Single-branch companies hide the branch picker, so preselect the only
+    // branch — otherwise the required branchId stays empty and save is blocked.
+    const only = this.branchState.onlyBranchId();
+    if (only) this.roomForm.get('branchId')?.setValue(only);
     this.showDialog = true;
   }
 

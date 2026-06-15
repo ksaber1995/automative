@@ -474,23 +474,25 @@
 >
   <form [formGroup]="sessionForm" class="space-y-4 pt-2">
 
-    <!-- Branch -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_BRANCH' | translate }} <span class="text-red-500">*</span></label>
-      <p-select
-        formControlName="branchId"
-        [options]="branches()"
-        optionLabel="name"
-        optionValue="id"
-        appendTo="body"
-        [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_BRANCH' | translate"
-        [style]="{ width: '100%' }"
-        (onChange)="onDialogBranchChange()"
-      ></p-select>
-      @if (sessionForm.get('branchId')?.invalid && sessionForm.get('branchId')?.touched) {
-        <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_BRANCH_REQUIRED' | translate }}</small>
-      }
-    </div>
+    <!-- Branch (hidden for single-branch companies — preselected) -->
+    @if (!branchState.isSingleBranch()) {
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSIONS_DASHBOARD.FIELD_BRANCH' | translate }} <span class="text-red-500">*</span></label>
+        <p-select
+          formControlName="branchId"
+          [options]="branches()"
+          optionLabel="name"
+          optionValue="id"
+          appendTo="body"
+          [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_BRANCH' | translate"
+          [style]="{ width: '100%' }"
+          (onChange)="onDialogBranchChange()"
+        ></p-select>
+        @if (sessionForm.get('branchId')?.invalid && sessionForm.get('branchId')?.touched) {
+          <small class="text-red-500">{{ 'SESSIONS_DASHBOARD.ERR_BRANCH_REQUIRED' | translate }}</small>
+        }
+      </div>
+    }
 
     <!-- Room (filtered by selected branch) — optional when class is online -->
     <div>

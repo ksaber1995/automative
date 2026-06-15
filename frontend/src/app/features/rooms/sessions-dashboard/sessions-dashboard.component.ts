@@ -22,6 +22,7 @@ import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../att
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -83,6 +84,7 @@ export class SessionsDashboardComponent implements OnInit {
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
   private branchService = inject(BranchService);
+  protected branchState = inject(BranchStateService);
   private attendanceService = inject(AttendanceService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
   private employeeService = inject(EmployeeService);
@@ -356,7 +358,11 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   openStartDialog() {
-    this.buildSessionForm();
+    // Single-branch companies hide the branch picker, so preselect the only
+    // branch and load its rooms/classes up front.
+    const only = this.branchState.onlyBranchId();
+    this.buildSessionForm(undefined, only || undefined);
+    if (only) this.populateDialogOptionsForBranch(only);
     this.showStartDialog = true;
   }
 
