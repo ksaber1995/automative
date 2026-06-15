@@ -9,6 +9,7 @@
 
     <!-- Filters -->
     <div class="mb-4 flex flex-col md:flex-row gap-4">
+      @if (!branchState.isSingleBranch()) {
       <div class="flex-1">
         <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.BRANCH_FILTER' | translate }}</label>
         <select
@@ -23,6 +24,7 @@
           }
         </select>
       </div>
+      }
       <div class="flex-1">
         <label for="studentSearch" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SEARCH' | translate }}</label>
         <span class="p-input-icon-left w-full md:w-80 block relative">

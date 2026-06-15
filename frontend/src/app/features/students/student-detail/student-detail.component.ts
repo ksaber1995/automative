@@ -29,7 +29,9 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
+import { ExamService } from '../../exams/services/exam.service';
 import { Student } from '@shared/interfaces/student.interface';
+import { StudentExamResult } from '@shared/interfaces/exam.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Class } from '@shared/interfaces/class.interface';
@@ -79,6 +81,7 @@ export class StudentDetailComponent implements OnInit {
   private monthlyService = inject(MonthlySubscriptionsService);
   private attendanceService = inject(AttendanceService);
   private productSaleService = inject(ProductSaleService);
+  private examService = inject(ExamService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -192,6 +195,10 @@ export class StudentDetailComponent implements OnInit {
   // Books & Products purchases attributed to this student.
   bookPurchases = signal<ProductSale[]>([]);
 
+  // Exam grades
+  examResults = signal<StudentExamResult[]>([]);
+  loadingExams = signal(false);
+
   // Attendance
   attendanceRecords = signal<StudentAttendanceRecord[]>([]);
   loadingAttendance = signal(false);
@@ -216,7 +223,16 @@ export class StudentDetailComponent implements OnInit {
       if (!this.isTeacher()) this.loadMasterEnrollments(this.studentId);
       this.loadAttendance(this.studentId);
       this.loadBookPurchases(this.studentId);
+      this.loadExamResults(this.studentId);
     }
+  }
+
+  loadExamResults(studentId: string) {
+    this.loadingExams.set(true);
+    this.examService.getByStudent(studentId).subscribe({
+      next: (rows) => { this.examResults.set(rows); this.loadingExams.set(false); },
+      error: () => this.loadingExams.set(false),
+    });
   }
 
   loadBookPurchases(studentId: string) {

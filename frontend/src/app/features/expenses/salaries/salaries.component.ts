@@ -22,6 +22,7 @@ import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
 
@@ -64,6 +65,7 @@ export class SalariesComponent implements OnInit {
   private router = inject(Router);
   private translate = inject(TranslateService);
   private numberFormat = inject(NumberFormatService);
+  protected branchState = inject(BranchStateService);
 
   loading = signal(false);
   paying = signal(false);

@@ -26,6 +26,7 @@
 
   <!-- Branch Filter -->
   <div class="flex items-center gap-3 mb-6">
+    @if (!branchState.isSingleBranch()) {
     <div class="flex items-center gap-2 flex-1 max-w-xs">
       <i class="pi pi-filter text-gray-400"></i>
       <p-select
@@ -40,6 +41,7 @@
         (onChange)="onBranchFilterChange()"
       ></p-select>
     </div>
+    }
     @if (selectedBranchId() !== null) {
       <p-button
         [label]="'ROOMS.CLEAR_FILTER' | translate"
@@ -173,7 +175,7 @@
       <textarea pTextarea formControlName="description" rows="2" [placeholder]="'ROOMS.FIELD_DESCRIPTION_PLACEHOLDER' | translate" class="w-full"></textarea>
     </div>
 
-    @if (!editingRoom()) {
+    @if (!editingRoom() && !branchState.isSingleBranch()) {
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'ROOMS.FIELD_BRANCH' | translate }} <span class="text-red-500">*</span></label>
         <p-select

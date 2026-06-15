@@ -17,6 +17,7 @@ import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 
@@ -49,6 +50,7 @@ export class EmployeeListComponent implements OnInit {
   private confirmationService = inject(ConfirmationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
 
   employees = signal<Employee[]>([]);
   branches = signal<Branch[]>([]);

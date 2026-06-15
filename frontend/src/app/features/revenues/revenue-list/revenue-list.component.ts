@@ -10,6 +10,7 @@ import { RevenueService, RevenueItem } from '../services/revenue.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { TranslateModule } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
@@ -29,6 +30,7 @@ export class RevenueListComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
 
   revenues = signal<RevenueItem[]>([]);
   branches = signal<Branch[]>([]);

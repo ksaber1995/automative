@@ -18,6 +18,7 @@ import { ProductService } from '../services/product.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -52,6 +53,7 @@ export class ProductListComponent implements OnInit {
   private router = inject(Router);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
 
   readonly Math = Math;
 

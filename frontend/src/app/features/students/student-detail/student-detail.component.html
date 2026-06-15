@@ -870,6 +870,49 @@
       }
     </p-card>
 
+    <!-- Exam Results Card -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-file-edit text-indigo-600"></i>
+            {{ 'STUDENTS.DETAIL.EXAMS_TITLE' | translate }} ({{ examResults().length }})
+          </h3>
+        </div>
+      </ng-template>
+
+      @if (loadingExams()) {
+        <div class="text-center py-6 text-gray-500">
+          <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+          <p>{{ 'STUDENTS.DETAIL.EXAMS_LOADING' | translate }}</p>
+        </div>
+      } @else if (examResults().length === 0) {
+        <div class="text-center py-6 text-gray-500">
+          <i class="pi pi-file text-3xl mb-2"></i>
+          <p>{{ 'STUDENTS.DETAIL.EXAMS_EMPTY' | translate }}</p>
+        </div>
+      } @else {
+        <p-table [value]="examResults()" [paginator]="examResults().length > 10" [rows]="10" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'STUDENTS.DETAIL.EXAMS_COL_DATE' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.EXAMS_COL_COURSE' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.EXAMS_COL_EXAM' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.EXAMS_COL_GRADE' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-row>
+            <tr>
+              <td>{{ row.examDate | date: 'mediumDate' }}</td>
+              <td>{{ row.courseName }}</td>
+              <td class="font-medium">{{ row.examName }}</td>
+              <td><span class="font-semibold text-indigo-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span></td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </p-card>
+
     <!-- Books & Products Card -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">

@@ -10,6 +10,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../services/teacher-attendance.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EmployeeService } from '../../employees/services/employee.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface TeacherOption {
@@ -36,6 +37,7 @@ export class TeacherAttendanceListComponent implements OnInit {
   private attendanceService = inject(TeacherAttendanceService);
   private branchService = inject(BranchService);
   private employeeService = inject(EmployeeService);
+  protected branchState = inject(BranchStateService);
 
   rows = signal<TeacherAttendanceHistoryRow[]>([]);
   branches = signal<Branch[]>([]);

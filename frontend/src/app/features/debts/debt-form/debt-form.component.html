@@ -149,20 +149,22 @@
           </p-select>
         </div>
 
-        <div class="field">
-          <label for="branchId" class="block text-sm font-medium mb-2">
-            Branch (Optional)
-          </label>
-          <p-select
-            id="branchId"
-            formControlName="branchId"
-            [options]="branches()"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="Select branch"
-            [style]="{ width: '100%' }">
-          </p-select>
-        </div>
+        @if (!branchState.isSingleBranch()) {
+          <div class="field">
+            <label for="branchId" class="block text-sm font-medium mb-2">
+              Branch (Optional)
+            </label>
+            <p-select
+              id="branchId"
+              formControlName="branchId"
+              [options]="branches()"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select branch"
+              [style]="{ width: '100%' }">
+            </p-select>
+          </div>
+        }
 
         <div class="field md:col-span-2">
           <label for="purpose" class="block text-sm font-medium mb-2">

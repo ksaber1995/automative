@@ -14,6 +14,7 @@ import { ClassService } from '../services/class.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ClassStatus, ClassWithDetails } from '@shared/interfaces/class.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
@@ -43,6 +44,7 @@ export class ClassListComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   classes = signal<ClassWithDetails[]>([]);
   courses = signal<any[]>([]);

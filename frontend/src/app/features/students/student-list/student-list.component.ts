@@ -17,6 +17,7 @@ import { EnrollmentService } from '../../enrollments/services/enrollment.service
 import { ClassService } from '../../courses/services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Class } from '@shared/interfaces/class.interface';
@@ -55,6 +56,7 @@ export class StudentListComponent implements OnInit {
   private confirmationService = inject(ConfirmationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
 
   students = signal<Student[]>([]);
   allBranches = signal<Branch[]>([]);

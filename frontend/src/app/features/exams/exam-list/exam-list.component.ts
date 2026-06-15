@@ -1,0 +1,136 @@
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { CardModule } from 'primeng/card';
+import { TableModule } from 'primeng/table';
+import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
+import { SelectModule } from 'primeng/select';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { ExamService } from '../services/exam.service';
+import { CourseService } from '../../courses/services/course.service';
+import { BranchService } from '../../branches/services/branch.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
+import { ExamModel } from '@shared/interfaces/exam.interface';
+import { Branch } from '@shared/interfaces/branch.interface';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+
+@Component({
+  selector: 'app-exam-list',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    CardModule,
+    TableModule,
+    ButtonModule,
+    TagModule,
+    TooltipModule,
+    SelectModule,
+    TranslateModule,
+    DeleteConfirmDialogComponent,
+  ],
+  templateUrl: './exam-list.component.html',
+})
+export class ExamListComponent implements OnInit {
+  private service = inject(ExamService);
+  private courseService = inject(CourseService);
+  private branchService = inject(BranchService);
+  private router = inject(Router);
+  private notifications = inject(NotificationService);
+  private translate = inject(TranslateService);
+  authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
+
+  items = signal<ExamModel[]>([]);
+  branches = signal<Branch[]>([]);
+  courses = signal<{ id: string; name: string }[]>([]);
+  loading = signal(true);
+  showDeleteDialog = false;
+  toDelete = signal<ExamModel | null>(null);
+
+  selectedBranchId = signal<string | null>(null);
+  selectedCourseId = signal<string | null>(null);
+  selectedStatus = signal<'SCHEDULED' | 'DONE' | null>(null);
+
+  branchOptions = computed(() => this.branches().map(b => ({ label: b.name, value: b.id })));
+  courseOptions = computed(() => this.courses().map(c => ({ label: c.name, value: c.id })));
+  statusOptions = computed(() => [
+    { label: this.translate.instant('EXAMS.STATUS.SCHEDULED'), value: 'SCHEDULED' },
+    { label: this.translate.instant('EXAMS.STATUS.DONE'), value: 'DONE' },
+  ]);
+
+  filteredItems = computed(() => {
+    const branch = this.selectedBranchId();
+    const course = this.selectedCourseId();
+    const status = this.selectedStatus();
+    return this.items().filter((e) => {
+      if (branch && e.branchId !== branch) return false;
+      if (course && e.courseId !== course) return false;
+      if (status && e.status !== status) return false;
+      return true;
+    });
+  });
+
+  ngOnInit() {
+    this.load();
+    this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b) });
+    this.courseService.getAllCourses().subscribe({
+      next: (c) => this.courses.set(c.map((x) => ({ id: x.id, name: x.name }))),
+    });
+  }
+
+  load() {
+    this.loading.set(true);
+    this.service.getAll().subscribe({
+      next: (rows) => { this.items.set(rows); this.loading.set(false); },
+      error: () => { this.loading.set(false); },
+    });
+  }
+
+  getBranchName(branchId: string | null): string {
+    if (!branchId) return '—';
+    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+  }
+
+  clearFilters() {
+    this.selectedBranchId.set(null);
+    this.selectedCourseId.set(null);
+    this.selectedStatus.set(null);
+  }
+
+  hasFilters(): boolean {
+    return !!(this.selectedBranchId() || this.selectedCourseId() || this.selectedStatus());
+  }
+
+  create() { this.router.navigate(['/exams/create']); }
+  view(item: ExamModel) { this.router.navigate(['/exams', item.id]); }
+  edit(item: ExamModel) { this.router.navigate(['/exams', item.id, 'edit']); }
+
+  confirmDelete(item: ExamModel) {
+    this.toDelete.set(item);
+    this.showDeleteDialog = true;
+  }
+
+  doDelete() {
+    const item = this.toDelete();
+    if (!item) return;
+    this.service.delete(item.id).subscribe({
+      next: () => {
+        this.notifications.success(this.translate.instant('EXAMS.LIST.DELETE_SUCCESS'));
+        this.showDeleteDialog = false;
+        this.toDelete.set(null);
+        this.load();
+      },
+      error: () => { this.showDeleteDialog = false; },
+    });
+  }
+
+  statusSeverity(status: string): 'success' | 'info' | 'warn' | 'secondary' {
+    return status === 'DONE' ? 'success' : 'info';
+  }
+}

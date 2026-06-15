@@ -19,6 +19,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 
 @Component({
@@ -41,6 +42,7 @@ export class DuesListComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   dues = signal<DueEnrollment[]>([]);
   loading = signal(true);

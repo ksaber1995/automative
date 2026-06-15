@@ -16,19 +16,21 @@
   <!-- Filters -->
   <p-card>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
-        <p-select
-          [(ngModel)]="filterBranch"
-          [options]="branchOptions"
-          optionLabel="label"
-          optionValue="value"
-          [placeholder]="'DUES.LIST.ALL_BRANCHES' | translate"
-          [showClear]="true"
-          [style]="{ width: '100%' }"
-          (onChange)="load()"
-        ></p-select>
-      </div>
+      @if (!branchState.isSingleBranch()) {
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
+          <p-select
+            [(ngModel)]="filterBranch"
+            [options]="branchOptions"
+            optionLabel="label"
+            optionValue="value"
+            [placeholder]="'DUES.LIST.ALL_BRANCHES' | translate"
+            [showClear]="true"
+            [style]="{ width: '100%' }"
+            (onChange)="load()"
+          ></p-select>
+        </div>
+      }
       <div class="flex items-end">
         <button pButton [label]="'DUES.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
           class="p-button-outlined" (click)="clearFilters()"></button>

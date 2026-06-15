@@ -137,6 +137,23 @@ export const publicStudentsRoutes = {
         [student.id, student.company_id]
       );
 
+      // Exam grades (low-sensitivity: exam name, course, date, grade). Tolerant
+      // of DBs that haven't had the exams migration applied yet.
+      let exams: any[] = [];
+      try {
+        exams = await query<any>(
+          `SELECT e.name AS exam_name, c.name AS course_name, e.exam_date, e.max_grade, r.grade
+           FROM exam_results r
+           JOIN exams e   ON e.id = r.exam_id AND e.is_active = true
+           JOIN courses c ON c.id = e.course_id
+           WHERE r.student_id = $1 AND r.company_id = $2
+           ORDER BY e.exam_date DESC`,
+          [student.id, student.company_id],
+        );
+      } catch {
+        exams = [];
+      }
+
       // Derive status per session: SUBSTITUTED counts as present.
       const withStatus = [...attendance, ...orphanSubs]
         .map((a: any) => ({
@@ -183,6 +200,13 @@ export const publicStudentsRoutes = {
               isPresent: row.status !== 'ABSENT',
             })),
           },
+          exams: exams.map((row: any) => ({
+            examName: row.exam_name,
+            courseName: row.course_name,
+            examDate: row.exam_date,
+            grade: row.grade,
+            maxGrade: row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null,
+          })),
         },
       };
     } catch (error) {

@@ -20,6 +20,14 @@ export interface PublicStudentAttendanceRecent {
   substitutedInClassName?: string | null;
 }
 
+export interface PublicStudentExam {
+  examName: string;
+  courseName: string;
+  examDate: string;
+  grade: string;
+  maxGrade?: number | null;
+}
+
 export interface PublicStudentProfile {
   student: {
     firstName: string;
@@ -35,6 +43,7 @@ export interface PublicStudentProfile {
     attendanceRate: number;
     recent: PublicStudentAttendanceRecent[];
   };
+  exams?: PublicStudentExam[];
 }
 
 /**

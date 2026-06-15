@@ -50,20 +50,22 @@
             <input pInputText formControlName="code" class="w-full" />
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'EVENTS.FORM.BRANCH' | translate }}
-            </label>
-            <p-select
-              formControlName="branchId"
-              [options]="branches()"
-              optionLabel="name"
-              optionValue="id"
-              [placeholder]="'EVENTS.FORM.BRANCH_PLACEHOLDER' | translate"
-              [showClear]="true"
-              [style]="{ width: '100%' }"
-            ></p-select>
-          </div>
+          @if (!branchState.isSingleBranch()) {
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                {{ 'EVENTS.FORM.BRANCH' | translate }}
+              </label>
+              <p-select
+                formControlName="branchId"
+                [options]="branches()"
+                optionLabel="name"
+                optionValue="id"
+                [placeholder]="'EVENTS.FORM.BRANCH_PLACEHOLDER' | translate"
+                [showClear]="true"
+                [style]="{ width: '100%' }"
+              ></p-select>
+            </div>
+          }
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">

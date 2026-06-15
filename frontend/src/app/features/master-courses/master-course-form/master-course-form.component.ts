@@ -13,6 +13,7 @@ import { MasterCourseService } from '../services/master-course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Level } from '@shared/interfaces/level.interface';
 
@@ -40,6 +41,7 @@ export class MasterCourseFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
+  protected branchState = inject(BranchStateService);
 
   form: FormGroup;
   loading = signal(false);
@@ -63,7 +65,13 @@ export class MasterCourseFormComponent implements OnInit {
 
   ngOnInit() {
     this.branchService.getActiveBranches().subscribe({
-      next: (rows) => this.branches.set(rows),
+      next: (rows) => {
+        this.branches.set(rows);
+        if (rows.length === 1 && !this.isEditMode()) {
+          const c = this.form.get('branchId');
+          if (c && !c.value) c.setValue(rows[0].id);
+        }
+      },
     });
     this.levelService.getAllLevels().subscribe({
       next: (rows) => this.levels.set(rows),

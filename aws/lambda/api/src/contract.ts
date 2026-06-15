@@ -493,6 +493,65 @@ const EventPLSchema = z.object({
   netProfit: z.number(),
 });
 
+// =============================================
+// Exam Schemas
+// =============================================
+const ExamStatusSchema = z.enum(['SCHEDULED', 'DONE']);
+
+const CreateExamSchema = z.object({
+  courseId: UUIDSchema,
+  name: z.string().min(1),
+  examDate: z.string().min(1),
+  maxGrade: z.number().nullable().optional(),
+  status: ExamStatusSchema.optional(),
+});
+
+const UpdateExamSchema = CreateExamSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+const ExamSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  courseId: UUIDSchema,
+  courseName: z.string().optional(),
+  name: z.string(),
+  examDate: z.string(),
+  maxGrade: z.number().nullable(),
+  status: z.string(),
+  resultCount: z.number().optional(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ExamResultRowSchema = z.object({
+  studentId: UUIDSchema,
+  firstName: z.string(),
+  lastName: z.string(),
+  grade: z.string().nullable(),
+  recordedAt: z.string().nullable(),
+});
+
+const QrExamResultSchema = z.object({
+  studentId: UUIDSchema,
+  studentFirstName: z.string(),
+  studentLastName: z.string(),
+  grade: z.string(),
+  alreadyRecorded: z.boolean(),
+  code: z.string(),
+  message: z.string(),
+});
+
+const StudentExamResultSchema = z.object({
+  examName: z.string(),
+  courseName: z.string(),
+  examDate: z.string(),
+  grade: z.string(),
+  maxGrade: z.number().nullable().optional(),
+});
+
 const LinkedCourseSummarySchema = z.object({
   id: UUIDSchema,
   branchId: UUIDSchema.nullable(),
@@ -1722,6 +1781,86 @@ export const contract = c.router({
     },
   },
 
+  // Exams routes. Order matters — static/specific paths before `/:id`
+  // (itty-router matches in registration order; see sessions note in index.ts).
+  exams: {
+    create: {
+      method: 'POST',
+      path: '/api/exams',
+      body: CreateExamSchema,
+      responses: { 201: ExamSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/exams',
+      query: z.object({
+        branchId: OptionalUUIDSchema,
+        courseId: OptionalUUIDSchema,
+        status: z.string().optional(),
+      }),
+      responses: { 200: z.array(ExamSchema), 403: ApiErrorSchema },
+    },
+    getByStudent: {
+      method: 'GET',
+      path: '/api/exams/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: { 200: z.array(StudentExamResultSchema), 403: ApiErrorSchema },
+    },
+    results: {
+      method: 'GET',
+      path: '/api/exams/:id/results',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(ExamResultRowSchema), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    recordByQr: {
+      method: 'POST',
+      path: '/api/exams/:id/record-by-qr',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ qrToken: z.string().min(1), grade: z.string().min(1) }),
+      responses: {
+        200: QrExamResultSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    saveResult: {
+      method: 'POST',
+      path: '/api/exams/:id/results',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ studentId: UUIDSchema, grade: z.string().min(1) }),
+      responses: { 200: z.any(), 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+    },
+    deleteResult: {
+      method: 'DELETE',
+      path: '/api/exams/:id/results/:studentId',
+      pathParams: z.object({ id: UUIDSchema, studentId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/exams/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: ExamSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/exams/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateExamSchema,
+      responses: { 200: ExamSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/exams/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
   // Demo leads (public contact form from landing page)
   demoLeads: {
     create: {
@@ -1791,6 +1930,13 @@ export const contract = c.router({
               substitutedInClassName: z.string().nullable().optional(),
             })),
           }),
+          exams: z.array(z.object({
+            examName: z.string(),
+            courseName: z.string(),
+            examDate: z.string(),
+            grade: z.string(),
+            maxGrade: z.number().nullable().optional(),
+          })).optional(),
         }),
         404: ApiErrorSchema,
         429: ApiErrorSchema,

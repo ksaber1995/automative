@@ -14,6 +14,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Revenue } from '@shared/interfaces/revenue.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
@@ -49,6 +50,7 @@ export class RevenueFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   revenueForm: FormGroup;
   loading = signal(false);
@@ -88,7 +90,13 @@ export class RevenueFormComponent implements OnInit {
 
   loadBranches() {
     this.branchService.getActiveBranches().subscribe({
-      next: (branches) => this.branches.set(branches)
+      next: (branches) => {
+        this.branches.set(branches);
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.revenueForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
+      }
     });
   }
 

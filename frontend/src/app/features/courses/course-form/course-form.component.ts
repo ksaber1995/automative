@@ -15,6 +15,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
 import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
@@ -45,6 +46,7 @@ export class CourseFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   courseForm: FormGroup;
   loading = signal(false);
@@ -106,6 +108,10 @@ export class CourseFormComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.courseForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
       },
       error: () => {
         // Interceptor toasted the translated error.

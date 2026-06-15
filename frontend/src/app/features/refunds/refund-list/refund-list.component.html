@@ -14,19 +14,21 @@
   <!-- Filters -->
   <p-card>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_BRANCH' | translate }}</label>
-        <p-select
-          [(ngModel)]="filterBranch"
-          [options]="branchOptions"
-          optionLabel="label"
-          optionValue="value"
-          [placeholder]="'REFUNDS.LIST.ALL_BRANCHES' | translate"
-          [showClear]="true"
-          [style]="{ width: '100%' }"
-          (onChange)="load()"
-        ></p-select>
-      </div>
+      @if (!branchState.isSingleBranch()) {
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_BRANCH' | translate }}</label>
+          <p-select
+            [(ngModel)]="filterBranch"
+            [options]="branchOptions"
+            optionLabel="label"
+            optionValue="value"
+            [placeholder]="'REFUNDS.LIST.ALL_BRANCHES' | translate"
+            [showClear]="true"
+            [style]="{ width: '100%' }"
+            (onChange)="load()"
+          ></p-select>
+        </div>
+      }
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_TYPE' | translate }}</label>
         <p-select

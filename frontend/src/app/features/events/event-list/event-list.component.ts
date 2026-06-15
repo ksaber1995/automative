@@ -13,6 +13,7 @@ import { EventService } from '../services/event.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EventModel } from '@shared/interfaces/event.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
@@ -41,6 +42,7 @@ export class EventListComponent implements OnInit {
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  protected branchState = inject(BranchStateService);
 
   items = signal<EventModel[]>([]);
   branches = signal<Branch[]>([]);

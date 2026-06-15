@@ -15,16 +15,18 @@
 
   <p-card>
     <div class="flex flex-wrap gap-3 mb-4">
-      <p-select
-        [options]="branchOptions()"
-        [ngModel]="selectedBranchId()"
-        (ngModelChange)="selectedBranchId.set($event)"
-        optionLabel="label"
-        optionValue="value"
-        [placeholder]="'EVENTS.LIST.ALL_BRANCHES' | translate"
-        [showClear]="true"
-        [style]="{ minWidth: '200px' }"
-      ></p-select>
+      @if (!branchState.isSingleBranch()) {
+        <p-select
+          [options]="branchOptions()"
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="selectedBranchId.set($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'EVENTS.LIST.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          [style]="{ minWidth: '200px' }"
+        ></p-select>
+      }
 
       <p-select
         [options]="statusOptions()"

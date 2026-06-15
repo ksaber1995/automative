@@ -9,22 +9,24 @@
     <form [formGroup]="revenueForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Branch -->
-        <div>
-          <label class="block text-sm font-medium mb-2">
-            {{ 'REVENUES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
-          </label>
-          <p-select
-            formControlName="branchId"
-            [options]="branches()"
-            optionLabel="name"
-            optionValue="id"
-            [placeholder]="'REVENUES.FORM.BRANCH_PLACEHOLDER' | translate"
-            styleClass="w-full"
-            [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
-          @if (branchId?.invalid && branchId?.touched) {
-            <small class="text-red-500">{{ 'REVENUES.FORM.BRANCH_REQUIRED' | translate }}</small>
-          }
-        </div>
+        @if (!branchState.isSingleBranch()) {
+          <div>
+            <label class="block text-sm font-medium mb-2">
+              {{ 'REVENUES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-select
+              formControlName="branchId"
+              [options]="branches()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="'REVENUES.FORM.BRANCH_PLACEHOLDER' | translate"
+              styleClass="w-full"
+              [ngClass]="{'ng-invalid ng-dirty': branchId?.invalid && branchId?.touched}"></p-select>
+            @if (branchId?.invalid && branchId?.touched) {
+              <small class="text-red-500">{{ 'REVENUES.FORM.BRANCH_REQUIRED' | translate }}</small>
+            }
+          </div>
+        }
 
         <!-- Date -->
         <div>

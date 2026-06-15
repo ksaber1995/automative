@@ -15,6 +15,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ExpenseService } from '../services/expense.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Expense } from '@shared/interfaces/expense.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
@@ -49,6 +50,7 @@ export class ExpenseFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   expenseForm: FormGroup;
   loading = signal(false);
@@ -154,6 +156,10 @@ export class ExpenseFormComponent implements OnInit {
       next: (branches) => {
         this.branches.set(branches);
         this.branchOptions.set(branches.map(branch => ({ label: branch.name, value: branch.id })));
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.expenseForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
       }
     });
   }

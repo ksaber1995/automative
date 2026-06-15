@@ -11,6 +11,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { DebtService, CreateDebtDto } from '../../../core/services/debt.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfaces/debt.interface';
 import { NotificationService } from '../../../core/services/notification.service';
 
@@ -37,6 +38,7 @@ export class DebtFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  protected branchState = inject(BranchStateService);
 
   debtForm!: FormGroup;
   isEditMode = signal(false);
@@ -107,6 +109,10 @@ export class DebtFormComponent implements OnInit {
           label: `${b.name} (${b.code})`,
           value: b.id
         })));
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.debtForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
       },
       error: (err) => console.error('Error loading branches:', err)
     });

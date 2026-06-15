@@ -1,0 +1,119 @@
+<div class="container-custom py-8 max-w-2xl">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">
+      {{ (isEditMode() ? 'EXAMS.FORM.EDIT_TITLE' : 'EXAMS.FORM.CREATE_TITLE') | translate }}
+    </h1>
+    <p class="text-gray-600 mt-1">{{ 'EXAMS.FORM.SUBTITLE' | translate }}</p>
+  </div>
+
+  <p-card>
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="grid grid-cols-1 gap-5">
+      <!-- Course -->
+      <div>
+        <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.COURSE' | translate }} <span class="text-red-500">*</span>
+        </label>
+        <p-select
+          inputId="courseId"
+          formControlName="courseId"
+          [options]="courses()"
+          optionLabel="name"
+          optionValue="id"
+          [filter]="true"
+          [placeholder]="'EXAMS.FORM.COURSE_PLACEHOLDER' | translate"
+          [style]="{ width: '100%' }"
+          [class.ng-invalid]="courseId?.invalid && courseId?.touched"
+        ></p-select>
+        @if (courseId?.invalid && courseId?.touched) {
+          <small class="text-red-500">{{ 'EXAMS.FORM.COURSE_REQUIRED' | translate }}</small>
+        }
+      </div>
+
+      <!-- Name -->
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.NAME' | translate }} <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="name"
+          type="text"
+          pInputText
+          formControlName="name"
+          class="w-full"
+          [placeholder]="'EXAMS.FORM.NAME_PLACEHOLDER' | translate"
+        />
+        @if (name?.invalid && name?.touched) {
+          <small class="text-red-500">{{ 'EXAMS.FORM.NAME_REQUIRED' | translate }}</small>
+        }
+      </div>
+
+      <!-- Date -->
+      <div>
+        <label for="examDate" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.DATE' | translate }} <span class="text-red-500">*</span>
+        </label>
+        <p-datepicker
+          inputId="examDate"
+          formControlName="examDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [style]="{ width: '100%' }"
+          styleClass="w-full"
+        ></p-datepicker>
+        @if (examDate?.invalid && examDate?.touched) {
+          <small class="text-red-500">{{ 'EXAMS.FORM.DATE_REQUIRED' | translate }}</small>
+        }
+      </div>
+
+      <!-- Total marks (out of) -->
+      <div>
+        <label for="maxGrade" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.MAX_GRADE' | translate }}
+        </label>
+        <p-inputNumber
+          inputId="maxGrade"
+          formControlName="maxGrade"
+          [min]="0"
+          [showButtons]="false"
+          mode="decimal"
+          [useGrouping]="false"
+          [style]="{ width: '100%' }"
+          styleClass="w-full"
+          [placeholder]="'EXAMS.FORM.MAX_GRADE_PLACEHOLDER' | translate"
+        ></p-inputNumber>
+        <small class="text-gray-400">{{ 'EXAMS.FORM.MAX_GRADE_HINT' | translate }}</small>
+      </div>
+
+      <!-- Status -->
+      <div>
+        <label for="status" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.STATUS' | translate }}
+        </label>
+        <p-select
+          inputId="status"
+          formControlName="status"
+          [options]="statusOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [style]="{ width: '100%' }"
+        ></p-select>
+        <small class="text-gray-400">{{ 'EXAMS.FORM.STATUS_HINT' | translate }}</small>
+      </div>
+
+      <div class="flex gap-3 justify-end mt-2">
+        <p-button
+          type="button"
+          [label]="'EXAMS.FORM.CANCEL' | translate"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="cancel()"
+        ></p-button>
+        <p-button
+          type="submit"
+          [label]="(isEditMode() ? 'EXAMS.FORM.SAVE' : 'EXAMS.FORM.CREATE') | translate"
+          [loading]="loading()"
+        ></p-button>
+      </div>
+    </form>
+  </p-card>
+</div>

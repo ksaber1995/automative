@@ -121,6 +121,7 @@
           }
         </div>
 
+        @if (!branchState.isSingleBranch()) {
         <div class="field md:col-span-2">
           <label for="branchId" class="block text-sm font-medium mb-2">
             {{ 'PRODUCTS.FORM.BRANCH_LABEL' | translate }} *
@@ -147,6 +148,7 @@
             </small>
           }
         </div>
+        }
       </div>
 
       @if (!isEditMode()) {

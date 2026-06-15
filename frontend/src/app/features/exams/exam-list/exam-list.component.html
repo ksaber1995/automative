@@ -1,0 +1,152 @@
+<div class="container-custom py-8">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ 'EXAMS.LIST.TITLE' | translate }}</h1>
+      <p class="text-gray-600 mt-1">{{ 'EXAMS.LIST.SUBTITLE' | translate }}</p>
+    </div>
+    @if (authService.canWrite('academy')) {
+      <p-button
+        [label]="'EXAMS.LIST.ADD' | translate"
+        icon="pi pi-plus"
+        (onClick)="create()"
+      ></p-button>
+    }
+  </div>
+
+  <p-card>
+    <div class="flex flex-wrap gap-3 mb-4">
+      @if (!branchState.isSingleBranch()) {
+        <p-select
+          [options]="branchOptions()"
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="selectedBranchId.set($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'EXAMS.LIST.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          [style]="{ minWidth: '200px' }"
+        ></p-select>
+      }
+
+      <p-select
+        [options]="courseOptions()"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="selectedCourseId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'EXAMS.LIST.ALL_COURSES' | translate"
+        [showClear]="true"
+        [filter]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      <p-select
+        [options]="statusOptions()"
+        [ngModel]="selectedStatus()"
+        (ngModelChange)="selectedStatus.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'EXAMS.LIST.ALL_STATUSES' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '180px' }"
+      ></p-select>
+
+      @if (hasFilters()) {
+        <p-button
+          [label]="'EXAMS.LIST.CLEAR' | translate"
+          icon="pi pi-times"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="clearFilters()"
+        ></p-button>
+      }
+    </div>
+
+    <p-table
+      [value]="filteredItems()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="name">{{ 'EXAMS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="courseName">{{ 'EXAMS.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+          @if (!branchState.isSingleBranch()) {
+            <th pSortableColumn="branchId">{{ 'EXAMS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
+          <th pSortableColumn="examDate">{{ 'EXAMS.LIST.COL_DATE' | translate }} <p-sortIcon field="examDate"></p-sortIcon></th>
+          <th>{{ 'EXAMS.LIST.COL_GRADED' | translate }}</th>
+          <th pSortableColumn="status">{{ 'EXAMS.LIST.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+          <th>{{ 'EXAMS.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-item>
+        <tr>
+          <td class="font-medium">{{ item.name }}</td>
+          <td>{{ item.courseName || '—' }}</td>
+          @if (!branchState.isSingleBranch()) {
+            <td>{{ getBranchName(item.branchId) }}</td>
+          }
+          <td>{{ item.examDate | date: 'mediumDate' }}</td>
+          <td>{{ item.resultCount ?? 0 }}</td>
+          <td>
+            <p-tag
+              [value]="('EXAMS.STATUS.' + item.status) | translate"
+              [severity]="statusSeverity(item.status)"
+            ></p-tag>
+          </td>
+          <td>
+            <div class="flex gap-2">
+              <p-button
+                icon="pi pi-pencil"
+                [rounded]="true"
+                [text]="true"
+                severity="info"
+                [pTooltip]="'EXAMS.LIST.RECORD_RESULTS' | translate"
+                (onClick)="view(item)"
+              ></p-button>
+              @if (authService.canWrite('academy')) {
+                <p-button
+                  icon="pi pi-cog"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  [pTooltip]="'EXAMS.LIST.EDIT' | translate"
+                  (onClick)="edit(item)"
+                ></p-button>
+              }
+              @if (authService.canDelete('academy')) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="confirmDelete(item)"
+                ></p-button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-file-edit text-4xl mb-3"></i>
+              <p>{{ 'EXAMS.LIST.EMPTY' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <app-delete-confirm-dialog
+    [(visible)]="showDeleteDialog"
+    [header]="'EXAMS.LIST.DELETE_TITLE' | translate"
+    [message]="'EXAMS.LIST.DELETE_MSG' | translate: { name: toDelete()?.name }"
+    (confirm)="doDelete()"
+  ></app-delete-confirm-dialog>
+</div>

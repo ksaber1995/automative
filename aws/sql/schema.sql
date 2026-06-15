@@ -1238,6 +1238,57 @@ CREATE TRIGGER update_monthly_subscription_payments_updated_at
     BEFORE UPDATE ON monthly_subscription_payments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- =============================================
+-- EXAMS TABLES
+-- An exam belongs to a Course (name + date + status SCHEDULED/DONE). Grades are
+-- recorded one-per-student-per-exam, usually via QR scan. branch_id/company_id
+-- are denormalised from the course for fast, branch-scoped listing. See exam.md.
+-- =============================================
+CREATE TABLE exams (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id   UUID REFERENCES branches(id) ON DELETE SET NULL,
+    course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    name        VARCHAR(255) NOT NULL,
+    exam_date   DATE NOT NULL,
+    max_grade   DECIMAL(6, 2),
+    status      VARCHAR(16) NOT NULL DEFAULT 'SCHEDULED'
+                  CHECK (status IN ('SCHEDULED', 'DONE')),
+    is_active   BOOLEAN NOT NULL DEFAULT true,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_exams_company   ON exams(company_id);
+CREATE INDEX idx_exams_branch    ON exams(branch_id);
+CREATE INDEX idx_exams_course    ON exams(course_id);
+CREATE INDEX idx_exams_exam_date ON exams(exam_date);
+
+CREATE TABLE exam_results (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    exam_id     UUID NOT NULL REFERENCES exams(id)     ON DELETE CASCADE,
+    company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    course_id   UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+    student_id  UUID NOT NULL REFERENCES students(id)  ON DELETE CASCADE,
+    grade       VARCHAR(50) NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (exam_id, student_id)
+);
+
+CREATE INDEX idx_exam_results_exam    ON exam_results(exam_id);
+CREATE INDEX idx_exam_results_student ON exam_results(student_id);
+CREATE INDEX idx_exam_results_company ON exam_results(company_id);
+
+CREATE TRIGGER update_exams_updated_at
+    BEFORE UPDATE ON exams
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_exam_results_updated_at
+    BEFORE UPDATE ON exam_results
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Grant permissions (adjust as needed for your specific AWS RDS setup)
 -- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automative_user;
 -- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO automative_user;

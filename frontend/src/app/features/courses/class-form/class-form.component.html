@@ -29,6 +29,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Global-create only: Branch first, then Course (filtered by branch) -->
         @if (isGlobalCreate()) {
+          @if (!branchState.isSingleBranch()) {
           <div class="field md:col-span-2">
             <label for="branchId" class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'CLASSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
@@ -48,6 +49,7 @@
               <small class="text-red-500">{{ 'CLASSES.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
+          }
 
           <div class="field md:col-span-2">
             <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">

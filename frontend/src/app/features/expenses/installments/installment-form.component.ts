@@ -13,6 +13,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseCategory } from '@shared/enums/expense-type.enum';
 
@@ -33,6 +34,7 @@ export class InstallmentFormComponent implements OnInit {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   form: FormGroup;
   branches = signal<Branch[]>([]);
@@ -76,7 +78,13 @@ export class InstallmentFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({ next: bs => this.branches.set(bs) });
+    this.branchService.getActiveBranches().subscribe({ next: bs => {
+      this.branches.set(bs);
+      if (bs.length === 1) {
+        const ctrl = this.form.get('branchId');
+        if (ctrl && !ctrl.value) ctrl.setValue(bs[0].id);
+      }
+    } });
   }
 
   cancel() { this.router.navigate(['/expenses/installments']); }

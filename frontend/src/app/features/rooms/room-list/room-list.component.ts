@@ -15,6 +15,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RoomService, Room, CreateRoomDto, UpdateRoomDto } from '../services/room.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
@@ -44,6 +45,7 @@ export class RoomListComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private fb = inject(FormBuilder);
+  protected branchState = inject(BranchStateService);
 
   rooms = signal<Room[]>([]);
   branches = signal<Branch[]>([]);
@@ -84,7 +86,13 @@ export class RoomListComponent implements OnInit {
 
   loadBranches() {
     this.branchService.getAllBranches().subscribe({
-      next: (b) => this.branches.set(b),
+      next: (b) => {
+        this.branches.set(b);
+        if (b.length === 1 && !this.editingRoom()) {
+          const c = this.roomForm.get('branchId');
+          if (c && !c.value) c.setValue(b[0].id);
+        }
+      },
     });
   }
 

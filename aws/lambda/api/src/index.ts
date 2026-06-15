@@ -22,6 +22,7 @@ import { masterEnrollmentsRoutes } from './routes/master-enrollments';
 import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments';
 import { eventsRoutes } from './routes/events';
 import { eventSubscriptionsRoutes } from './routes/event-subscriptions';
+import { examsRoutes } from './routes/exams';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
@@ -90,6 +91,20 @@ const router = {
     listExpenses: eventSubscriptionsRoutes.listExpenses,
     listRefunds: eventSubscriptionsRoutes.listRefunds,
     createRefund: eventSubscriptionsRoutes.createRefund,
+  },
+  // Order matters — itty-router matches in registration order, so the static
+  // `/student/:studentId` and `/:id/results*` paths are listed before `/:id`.
+  exams: {
+    create: examsRoutes.create,
+    list: examsRoutes.list,
+    getByStudent: examsRoutes.getByStudent,
+    results: examsRoutes.results,
+    recordByQr: examsRoutes.recordByQr,
+    saveResult: examsRoutes.saveResult,
+    deleteResult: examsRoutes.deleteResult,
+    getById: examsRoutes.getById,
+    update: examsRoutes.update,
+    delete: examsRoutes.delete,
   },
   classes: {
     create: classesRoutes.create,

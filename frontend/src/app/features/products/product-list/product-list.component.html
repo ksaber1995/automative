@@ -32,6 +32,7 @@
           }
         </select>
       </div>
+      @if (!branchState.isSingleBranch()) {
       <div class="flex-1 min-w-[200px]">
         <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.LIST.FILTER_BRANCH' | translate }}</label>
         <p-select
@@ -45,6 +46,7 @@
           [style]="{ width: '100%' }"
         ></p-select>
       </div>
+      }
       <div class="flex items-end">
         <p-button
           [label]="'PRODUCTS.LIST.CLEAR_FILTERS' | translate"

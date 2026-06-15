@@ -10,6 +10,7 @@
     <p-card>
       <form [formGroup]="form" (ngSubmit)="onSubmit()">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          @if (!branchState.isSingleBranch()) {
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'MASTER_COURSES.FORM.BRANCH' | translate }} <span class="text-red-500">*</span>
@@ -27,6 +28,7 @@
               <p class="text-xs text-gray-500 mt-1">{{ 'MASTER_COURSES.FORM.BRANCH_LOCKED_HINT' | translate }}</p>
             }
           </div>
+          }
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'MASTER_COURSES.FORM.NAME' | translate }} <span class="text-red-500">*</span>

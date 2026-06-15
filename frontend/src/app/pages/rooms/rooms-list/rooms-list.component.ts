@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RoomService, Room } from '../../../services/room.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 
 @Component({
   selector: 'app-rooms-list',
@@ -21,6 +22,7 @@ export class RoomsListComponent implements OnInit {
   deletingRoom: Room | null = null;
   branches: { id: string; name: string }[] = [];
   roomForm!: FormGroup;
+  branchState = inject(BranchStateService);
 
   get occupiedCount() { return this.rooms.filter(r => r.isOccupied).length; }
   get freeCount() { return this.rooms.filter(r => !r.isOccupied && r.isActive).length; }
@@ -40,6 +42,10 @@ export class RoomsListComponent implements OnInit {
     const user = this.authService.currentUser;
     if (user?.['branches']) {
       this.branches = user['branches'];
+      if (this.branches.length === 1 && !this.editingRoom) {
+        const c = this.roomForm?.get('branchId');
+        if (c && !c.value) c.setValue(this.branches[0].id);
+      }
     }
   }
 

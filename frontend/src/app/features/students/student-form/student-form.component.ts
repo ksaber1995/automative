@@ -12,6 +12,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 
@@ -40,6 +41,7 @@ export class StudentFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   studentForm: FormGroup;
   loading = signal(false);
@@ -90,6 +92,10 @@ export class StudentFormComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.studentForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
       },
       error: () => {
         // Interceptor toasted the translated error.

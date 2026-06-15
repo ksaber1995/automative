@@ -15,12 +15,14 @@
           class="w-full" />
       </div>
 
+      @if (!branchState.isSingleBranch()) {
       <div>
         <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_BRANCH' | translate }}</label>
         <p-select formControlName="branchId" [options]="branchOptions()" optionLabel="label" optionValue="value"
           [placeholder]="'INSTALLMENTS.FORM.PLACEHOLDER_BRANCH' | translate" [showClear]="true" styleClass="w-full">
         </p-select>
       </div>
+      }
 
       <div>
         <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.FORM.LABEL_CATEGORY' | translate }}</label>

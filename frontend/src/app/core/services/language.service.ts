@@ -10,7 +10,7 @@ export class LanguageService {
   private primeng = inject(PrimeNG);
 
   currentLang = signal<AppLanguage>(
-    (localStorage.getItem('app_lang') as AppLanguage) || 'en'
+    (localStorage.getItem('app_lang') as AppLanguage) || 'ar'
   );
 
   isRtl = computed(() => this.currentLang() === 'ar');

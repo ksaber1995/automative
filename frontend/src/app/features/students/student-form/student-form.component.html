@@ -102,6 +102,7 @@
           </div>
 
           <!-- Branch -->
+          @if (!branchState.isSingleBranch()) {
           <div class="field">
             <label for="branchId" class="block text-sm font-medium mb-2">
               {{ 'STUDENTS.FORM.BRANCH' | translate }} <span class="text-red-500">*</span>
@@ -120,6 +121,7 @@
               <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
           </div>
+          }
 
           <!-- Email (Optional) -->
           <div class="field">

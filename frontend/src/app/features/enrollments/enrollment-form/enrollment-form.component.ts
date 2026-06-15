@@ -26,6 +26,7 @@ import { MasterCourseService } from '../../master-courses/services/master-course
 import { MasterEnrollmentService, CoverageInfo } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EnrollmentStatus, PaymentMode } from '@shared/enums/enrollment-status.enum';
 import { Student } from '@shared/interfaces/student.interface';
 import { Course } from '@shared/interfaces/course.interface';
@@ -76,6 +77,7 @@ export class EnrollmentFormComponent implements OnInit {
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
   private courseProductService = inject(CourseProductService);
+  protected branchState = inject(BranchStateService);
 
   /** TEACHER companies don't use master courses, so hide the bundle toggle. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -288,7 +290,12 @@ export class EnrollmentFormComponent implements OnInit {
     return new Promise((resolve) => {
       let loaded = 0;
       const check = () => { if (++loaded === 5) resolve(); };
-      this.branchService.getActiveBranches().subscribe({ next: (b) => { this.branches.set(b); check(); }, error: () => check() });
+      this.branchService.getActiveBranches().subscribe({ next: (b) => { this.branches.set(b);
+        if (b.length === 1 && !this.isEditMode()) {
+          const ctrl = this.enrollmentForm.get('branchId');
+          if (ctrl && !ctrl.value) { ctrl.setValue(b[0].id); this.onBranchChange(); }
+        }
+        check(); }, error: () => check() });
       this.courseService.getAllCourses().subscribe({ next: (c) => { this.courses.set(c.filter(x => x.isActive)); check(); }, error: () => check() });
       this.classService.getAllClasses().subscribe({ next: (c) => { this.classes.set(c.filter(x => x.isActive)); check(); }, error: () => check() });
       this.masterCourseService.getAll().subscribe({ next: (m) => { this.masters.set(m); check(); }, error: () => check() });

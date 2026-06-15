@@ -7,6 +7,7 @@
   <p-card>
     <!-- Branch filter (status filter replaced by tabs below) -->
     <div class="flex flex-wrap gap-3 mb-4">
+      @if (!branchState.isSingleBranch()) {
       <p-select
         [options]="branchOptions()"
         [ngModel]="selectedBranchId()"
@@ -17,6 +18,7 @@
         [showClear]="true"
         [style]="{ minWidth: '200px' }"
       ></p-select>
+      }
 
       <p-select
         [options]="levelOptions()"

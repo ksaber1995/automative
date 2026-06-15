@@ -17,6 +17,7 @@ import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { SafeUser } from '@shared/interfaces/user.interface';
 import { UserRole, ROLE_LABELS, NEW_ROLES } from '@shared/enums/user-role.enum';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -41,6 +42,7 @@ export class UserListComponent implements OnInit {
   private confirmationService = inject(ConfirmationService);
   private authService = inject(AuthService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   currentUserId = computed(() => this.authService.currentUser()?.id);
 

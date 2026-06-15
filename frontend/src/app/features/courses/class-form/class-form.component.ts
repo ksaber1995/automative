@@ -16,6 +16,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
@@ -48,6 +49,7 @@ export class ClassFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   classForm: FormGroup;
   loading = signal(false);
@@ -306,6 +308,10 @@ export class ClassFormComponent implements OnInit {
           label: branch.name,
           value: branch.id
         })));
+        if (branches.length === 1 && this.isGlobalCreate() && !this.isEditMode()) {
+          const ctrl = this.classForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
         // If a course was loaded before branches resolved, resolve the branch name now.
         const branchId = this.classForm.get('branchId')?.value;
         if (branchId && !this.branchName()) {

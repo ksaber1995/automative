@@ -14,6 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ProductCategory } from '@shared/enums/product.enum';
 
 @Component({
@@ -59,6 +60,7 @@ export class ProductFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   productForm!: FormGroup;
   isEditMode = signal(false);
@@ -119,6 +121,10 @@ export class ProductFormComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({
       next: (branches) => {
         this.branches = branches;
+        if (branches.length === 1 && !this.isEditMode()) {
+          const c = this.productForm.get('branchId');
+          if (c && !c.value) c.setValue(branches[0].id);
+        }
       },
       error: (err) => {
         console.error('Error loading branches:', err);

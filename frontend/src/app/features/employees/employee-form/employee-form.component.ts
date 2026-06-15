@@ -12,6 +12,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
@@ -39,6 +40,7 @@ export class EmployeeFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   employeeForm: FormGroup;
   loading = signal(false);
@@ -88,6 +90,10 @@ export class EmployeeFormComponent implements OnInit {
     this.branchService.getActiveBranches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
+        if (branches.length === 1 && !this.isEditMode()) {
+          const ctrl = this.employeeForm.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+        }
       }
     });
   }

@@ -16,6 +16,7 @@ import { UserService } from '../services/user.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { SafeUser } from '@shared/interfaces/user.interface';
 import { UserRole, ROLE_LABELS, NEW_ROLES } from '@shared/enums/user-role.enum';
 import {
@@ -76,6 +77,7 @@ export class UserFormComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private authService = inject(AuthService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   UserRole = UserRole;
   isEdit = false;
@@ -137,7 +139,13 @@ export class UserFormComponent implements OnInit {
     // Load all branches (active + inactive) so admins can still manage
     // assignments on deactivated branches.
     this.branchService.getAllBranches().subscribe({
-      next: (branches) => this.branches.set(branches),
+      next: (branches) => {
+        this.branches.set(branches);
+        if (branches.length === 1 && !this.isEdit) {
+          const c = this.form.get('branchIds');
+          if (c && (!c.value || c.value.length === 0)) c.setValue([branches[0].id]);
+        }
+      },
     });
 
     this.initPermissionRows(UserRole.ACADEMIC_MANAGER);

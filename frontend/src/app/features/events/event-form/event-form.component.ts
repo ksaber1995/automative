@@ -13,6 +13,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EventService } from '../services/event.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
@@ -40,6 +41,7 @@ export class EventFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   form: FormGroup;
   loading = signal(false);
@@ -72,7 +74,13 @@ export class EventFormComponent implements OnInit {
 
   ngOnInit() {
     this.branchService.getActiveBranches().subscribe({
-      next: (rows) => this.branches.set(rows),
+      next: (rows) => {
+        this.branches.set(rows);
+        if (rows.length === 1 && !this.isEditMode()) {
+          const ctrl = this.form.get('branchId');
+          if (ctrl && !ctrl.value) ctrl.setValue(rows[0].id);
+        }
+      },
     });
 
     this.id = this.route.snapshot.paramMap.get('id');

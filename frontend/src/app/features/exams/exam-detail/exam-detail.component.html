@@ -1,0 +1,190 @@
+<div class="container-custom py-8">
+  <!-- Header -->
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <button class="text-sm text-gray-500 hover:text-gray-700 mb-2" (click)="back()">
+        <i class="pi pi-arrow-left mr-1"></i>{{ 'EXAMS.DETAIL.BACK' | translate }}
+      </button>
+      <h1 class="text-3xl font-bold text-gray-900">{{ exam()?.name }}</h1>
+      <p class="text-gray-600 mt-1">
+        {{ exam()?.courseName }} · {{ exam()?.examDate | date: 'mediumDate' }}
+        @if (exam()?.maxGrade != null) {
+          · {{ 'EXAMS.DETAIL.OUT_OF' | translate: { max: exam()?.maxGrade } }}
+        }
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <p-tag
+        [value]="('EXAMS.STATUS.' + (exam()?.status || 'SCHEDULED')) | translate"
+        [severity]="isDone() ? 'success' : 'info'"
+      ></p-tag>
+      @if (canWrite()) {
+        <p-button
+          [label]="(isDone() ? 'EXAMS.DETAIL.MARK_SCHEDULED' : 'EXAMS.DETAIL.MARK_DONE') | translate"
+          [icon]="isDone() ? 'pi pi-undo' : 'pi pi-check'"
+          [severity]="isDone() ? 'secondary' : 'success'"
+          [outlined]="isDone()"
+          [loading]="savingStatus()"
+          (onClick)="toggleStatus()"
+        ></p-button>
+        <p-button
+          icon="pi pi-cog"
+          severity="secondary"
+          [outlined]="true"
+          [pTooltip]="'EXAMS.DETAIL.EDIT' | translate"
+          (onClick)="edit()"
+        ></p-button>
+      }
+    </div>
+  </div>
+
+  <!-- QR recording panel -->
+  @if (canWrite()) {
+    <p-card styleClass="mb-6">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ 'EXAMS.DETAIL.GRADE_TO_APPLY' | translate }}
+              @if (exam()?.maxGrade != null) {
+                <span class="text-gray-400 font-normal">({{ 'EXAMS.DETAIL.OUT_OF' | translate: { max: exam()?.maxGrade } }})</span>
+              }
+            </label>
+            <input
+              type="text"
+              pInputText
+              class="w-full"
+              [ngModel]="currentGrade()"
+              (ngModelChange)="currentGrade.set($event)"
+              [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
+            />
+          </div>
+          <p-button
+            [label]="'EXAMS.DETAIL.SCAN_QR' | translate"
+            icon="pi pi-qrcode"
+            (onClick)="openScanner()"
+          ></p-button>
+        </div>
+        <p class="text-xs text-gray-500">{{ 'EXAMS.DETAIL.SCAN_HINT' | translate }}</p>
+
+        <!-- Manual token entry (USB scanner / fallback) -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ 'EXAMS.DETAIL.MANUAL_TOKEN' | translate }}
+            </label>
+            <input
+              type="text"
+              pInputText
+              class="w-full"
+              [ngModel]="manualToken()"
+              (ngModelChange)="manualToken.set($event)"
+              (keyup.enter)="submitManualToken()"
+              [placeholder]="'EXAMS.DETAIL.MANUAL_TOKEN_PLACEHOLDER' | translate"
+            />
+          </div>
+          <p-button
+            [label]="'EXAMS.DETAIL.RECORD' | translate"
+            icon="pi pi-check"
+            severity="secondary"
+            (onClick)="submitManualToken()"
+          ></p-button>
+        </div>
+
+        @if (scannerOpen()) {
+          <div class="border rounded-lg p-3 bg-gray-50">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-medium">{{ 'EXAMS.DETAIL.SCANNING' | translate }}</span>
+              <p-button
+                icon="pi pi-times"
+                [rounded]="true"
+                [text]="true"
+                (onClick)="closeScanner()"
+              ></p-button>
+            </div>
+            <div id="exam-qr-scanner-region" class="mx-auto" style="max-width: 320px;"></div>
+            @if (lastScanResult(); as r) {
+              <div class="mt-3 text-center text-green-700 font-medium">
+                <i class="pi pi-check-circle mr-1"></i>{{ r.name }} — {{ r.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }
+                @if (r.updated) { <span class="text-gray-500">({{ 'EXAMS.DETAIL.UPDATED' | translate }})</span> }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </p-card>
+  }
+
+  <!-- Roster -->
+  <p-card>
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <h2 class="text-lg font-semibold">
+        {{ 'EXAMS.DETAIL.ROSTER' | translate }}
+        <span class="text-sm font-normal text-gray-500 ml-2">
+          {{ 'EXAMS.DETAIL.GRADED_COUNT' | translate: { graded: gradedCount(), total: totalCount() } }}
+        </span>
+      </h2>
+      <input
+        type="text"
+        pInputText
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+        [placeholder]="'EXAMS.DETAIL.SEARCH' | translate"
+        class="w-full md:w-64"
+      />
+    </div>
+
+    <p-table [value]="filteredRoster()" [loading]="loading()" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>
+          <th style="width: 260px;">{{ 'EXAMS.DETAIL.COL_GRADE' | translate }}</th>
+          @if (canWrite()) { <th style="width: 70px;"></th> }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td class="font-medium">{{ row.firstName }} {{ row.lastName }}</td>
+          <td>
+            @if (canWrite()) {
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  pInputText
+                  class="w-full"
+                  [ngModel]="row.grade"
+                  (ngModelChange)="setRowGrade(row.studentId, $event)"
+                  [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
+                />
+                @if (exam()?.maxGrade != null) {
+                  <span class="text-gray-400 whitespace-nowrap">/ {{ exam()?.maxGrade }}</span>
+                }
+              </div>
+            } @else {
+              <span>{{ row.grade || '—' }}@if (row.grade && exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+            }
+          </td>
+          @if (canWrite()) {
+            <td class="text-center">
+              @switch (rowState()[row.studentId]) {
+                @case ('saving') { <i class="pi pi-spin pi-spinner text-gray-400" [pTooltip]="'EXAMS.DETAIL.SAVING' | translate"></i> }
+                @case ('saved') { <i class="pi pi-check text-green-500" [pTooltip]="'EXAMS.DETAIL.SAVED' | translate"></i> }
+                @case ('error') { <i class="pi pi-exclamation-triangle text-red-500" [pTooltip]="'EXAMS.DETAIL.SAVE_FAILED' | translate"></i> }
+              }
+            </td>
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td [attr.colspan]="canWrite() ? 3 : 2" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-users text-4xl mb-3"></i>
+              <p>{{ 'EXAMS.DETAIL.EMPTY' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+</div>

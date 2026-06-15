@@ -16,6 +16,7 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { RefundService, RefundSource } from '../services/refund.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { BranchStateService } from '../../../core/services/branch-state.service';
 import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
 
 @Component({
@@ -36,6 +37,7 @@ export class RefundListComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  protected branchState = inject(BranchStateService);
 
   refunds = signal<RefundWithDetails[]>([]);
   loading = signal(true);
