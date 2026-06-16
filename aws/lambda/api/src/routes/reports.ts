@@ -424,14 +424,17 @@ export const reportsRoutes = {
         countParams
       );
 
-      const total = parseInt(counts[0]?.total || '0', 10);
+      const allStudents = parseInt(counts[0]?.total || '0', 10);
       const active = parseInt(counts[0]?.active || '0', 10);
       const dormant = parseInt(counts[0]?.dormant || '0', 10);
       const inactive = parseInt(counts[0]?.inactive || '0', 10);
-      // Inactive rate: share of all students that have been deactivated.
-      const inactiveRate = total > 0 ? (inactive / total) * 100 : 0;
-      // Dormancy rate: share of still-active records that have no active enrollment.
-      const dormancyRate = active + dormant > 0 ? (dormant / (active + dormant)) * 100 : 0;
+      // totalStudents is the CURRENT body — active + dormant. Students who have
+      // left (inactive) are reported separately and excluded from the total.
+      const total = active + dormant;
+      // Leave rate: share of everyone who has left (relative to all-time students).
+      const inactiveRate = allStudents > 0 ? (inactive / allStudents) * 100 : 0;
+      // Dormancy rate: share of the current body that has no active enrollment.
+      const dormancyRate = total > 0 ? (dormant / total) * 100 : 0;
 
       return {
         status: 200 as const,

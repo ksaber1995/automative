@@ -770,8 +770,8 @@ export class ReportListComponent implements OnInit {
         { header: 'Total Students', value: r => r.churn?.totalStudents ?? 0 },
         { header: 'Active', value: r => r.churn?.activeStudents ?? 0 },
         { header: 'Dormant', value: r => r.churn?.dormantStudents ?? 0 },
-        { header: 'Inactive', value: r => r.churn?.inactiveStudents ?? 0 },
-        { header: 'Inactive Rate (%)', value: r => r.churn?.inactiveRate ?? 0 },
+        { header: 'Left', value: r => r.churn?.inactiveStudents ?? 0 },
+        { header: 'Leave Rate (%)', value: r => r.churn?.inactiveRate ?? 0 },
         { header: 'Dormancy Rate (%)', value: r => r.churn?.dormancyRate ?? 0 },
       ];
       downloadCsv(this.csvFile('churn'), rows, cols);
@@ -786,8 +786,8 @@ export class ReportListComponent implements OnInit {
       { metric: 'Total Students', value: c.totalStudents },
       { metric: 'Active', value: c.activeStudents },
       { metric: 'Dormant', value: c.dormantStudents },
-      { metric: 'Inactive', value: c.inactiveStudents },
-      { metric: 'Inactive Rate (%)', value: c.inactiveRate },
+      { metric: 'Left', value: c.inactiveStudents },
+      { metric: 'Leave Rate (%)', value: c.inactiveRate },
       { metric: 'Dormancy Rate (%)', value: c.dormancyRate },
     ];
     const cols: CsvColumn<typeof rows[number]>[] = [
