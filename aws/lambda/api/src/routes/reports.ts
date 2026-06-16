@@ -403,6 +403,11 @@ export const reportsRoutes = {
              SELECT 1 FROM enrollments e
              WHERE e.student_id = s.id
                AND e.enrollment_date >= (CURRENT_DATE - make_interval(months => $${monthsParamIdx}::int))
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM master_enrollments me
+             WHERE me.student_id = s.id
+               AND me.enrollment_date >= (CURRENT_DATE - make_interval(months => $${monthsParamIdx}::int))
            )`,
         inactiveParams
       );
