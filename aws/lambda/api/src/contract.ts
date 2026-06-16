@@ -3541,6 +3541,8 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/reports/student-churn',
       query: z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
         branchId: OptionalUUIDSchema,
       }),
       responses: { 200: z.any() },

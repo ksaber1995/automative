@@ -375,48 +375,58 @@ export const reportsRoutes = {
       const scope = resolveBranchScope(context, q.branchId);
       if (!scope.ok) return scope.error;
 
-      // The three student states (mutually exclusive):
-      //   inactive = the student record itself has been deactivated (s.is_active =
-      //              false — this is how the delete/deactivate flow records it;
-      //              formerly surfaced as "churned").
-      //   active   = record is active AND currently enrolled in a still-running
-      //              class (not finished). A finished class completes the
-      //              enrollment (see master-class-enrollments mapRow), so a student
-      //              in only finished classes is NOT active.
-      //   dormant  = record is active but has NO enrollment in a running class.
-      // A class is "running" when is_finished = false — that is the authoritative
-      // signal (see deriveStatus in classes.ts). NOTE: classes.is_active is not a
-      // reliable "running" flag (it is false even for in-progress classes), so it
-      // must NOT be part of this test. The test checks both the single-course
-      // (enrollments) and bundle (master_class_enrollments) tables.
+      // Snapshot the student body AS OF the end of the selected range ($3), with
+      // "left" measured within the range [$2, $3]. This makes the top date filter
+      // drive the report (e.g. picking an earlier end date shows who was active
+      // back then, before later classes finished).
+      //   active   = present as of $3 AND enrolled (by $3) in a class that was
+      //              running as of $3 — i.e. started by $3 and not yet finished
+      //              by $3 (finished_at is the authoritative finish time; a class
+      //              with no finished_at on/before $3 was still running).
+      //   dormant  = present as of $3 but in no running class.
+      //   left     = the student record was deactivated within the range — its
+      //              inactive_date falls in [$2, $3].
+      // NOTE: classes.is_active is unreliable (false even for in-progress classes),
+      // and enrollment status has no history, so current status is used as a
+      // best-effort proxy. Checks single-course (enrollments) and bundle
+      // (master_class_enrollments) tables.
+      const { startDate, endDate } = defaultRange(q);
       const activeEnrollmentExists = `(
         EXISTS (
           SELECT 1 FROM enrollments e
           INNER JOIN classes c ON c.id = e.class_id
           WHERE e.student_id = s.id
             AND e.status NOT IN ('DROPPED', 'CANCELLED')
-            AND COALESCE(c.is_finished, false) = false
+            AND e.enrollment_date <= $3::date
+            AND c.start_date <= $3::date
+            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
         )
         OR EXISTS (
           SELECT 1 FROM master_class_enrollments mce
           INNER JOIN classes c ON c.id = mce.class_id
           WHERE mce.student_id = s.id
             AND mce.status != 'DROPPED'
-            AND COALESCE(c.is_finished, false) = false
+            AND mce.enrolled_at <= $3::date
+            AND c.start_date <= $3::date
+            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
         )
       )`;
+      // Present as of the end date: joined by then and not yet left by then.
+      const presentAsOfEnd = `(s.enrollment_date <= $3::date
+        AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
+      const leftInRange = `(s.inactive_date IS NOT NULL
+        AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
 
-      const countParams: any[] = [context.companyId];
+      const countParams: any[] = [context.companyId, startDate, endDate];
       const branchClause = reportBranchClause('s.branch_id', countParams, scope.ids);
       const counts = await query(
         `SELECT
-           COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE s.is_active = false) AS inactive,
+           COUNT(*) FILTER (WHERE ${leftInRange}) AS inactive,
            COUNT(*) FILTER (
-             WHERE s.is_active = true AND ${activeEnrollmentExists}
+             WHERE ${presentAsOfEnd} AND ${activeEnrollmentExists}
            ) AS active,
            COUNT(*) FILTER (
-             WHERE s.is_active = true AND NOT ${activeEnrollmentExists}
+             WHERE ${presentAsOfEnd} AND NOT ${activeEnrollmentExists}
            ) AS dormant
          FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
@@ -424,16 +434,16 @@ export const reportsRoutes = {
         countParams
       );
 
-      const allStudents = parseInt(counts[0]?.total || '0', 10);
       const active = parseInt(counts[0]?.active || '0', 10);
       const dormant = parseInt(counts[0]?.dormant || '0', 10);
       const inactive = parseInt(counts[0]?.inactive || '0', 10);
-      // totalStudents is the CURRENT body — active + dormant. Students who have
-      // left (inactive) are reported separately and excluded from the total.
+      // totalStudents is the body present as of the end date — active + dormant.
+      // Students who left are reported separately and excluded from the total.
       const total = active + dormant;
-      // Leave rate: share of everyone who has left (relative to all-time students).
-      const inactiveRate = allStudents > 0 ? (inactive / allStudents) * 100 : 0;
-      // Dormancy rate: share of the current body that has no active enrollment.
+      const cohort = total + inactive;
+      // Leave rate: share of the period cohort (present + left) that left.
+      const inactiveRate = cohort > 0 ? (inactive / cohort) * 100 : 0;
+      // Dormancy rate: share of the present body that has no running-class enrollment.
       const dormancyRate = total > 0 ? (dormant / total) * 100 : 0;
 
       return {

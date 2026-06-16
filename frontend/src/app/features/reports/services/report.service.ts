@@ -139,8 +139,8 @@ export class ReportService {
     return this.api.get<StudentMonthRow[]>('reports/students-over-time', filters);
   }
 
-  studentChurn(branchId?: string): Observable<ChurnSummary> {
-    return this.api.get<ChurnSummary>('reports/student-churn', { branchId });
+  studentChurn(filters: ReportFilters = {}): Observable<ChurnSummary> {
+    return this.api.get<ChurnSummary>('reports/student-churn', filters);
   }
 
   profitByCourse(filters: ReportFilters = {}): Observable<ProfitByCourseRow[]> {

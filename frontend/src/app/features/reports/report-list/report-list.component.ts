@@ -530,7 +530,7 @@ export class ReportListComponent implements OnInit {
       salary: this.reportService.salaryGrowth({ ...range, branchId: aggregateBranchId }),
       topCourses: this.reportService.topCourses({ ...range }),
       studentsOT: this.reportService.studentsOverTime({ ...range, branchId: aggregateBranchId }),
-      churn: this.reportService.studentChurn(churnBranchId),
+      churn: this.reportService.studentChurn({ ...range, branchId: churnBranchId }),
       profitCourses: this.reportService.profitByCourse({ ...range }),
       profitBranches: this.reportService.profitByBranch({ ...range }),
       profitProducts: this.reportService.profitByProduct({ ...range }),
@@ -549,7 +549,7 @@ export class ReportListComponent implements OnInit {
                 monthlyPL: this.reportService.monthlyPL({ ...range, branchId: id }),
                 salary: this.reportService.salaryGrowth({ ...range, branchId: id }),
                 studentsOT: this.reportService.studentsOverTime({ ...range, branchId: id }),
-                churn: this.reportService.studentChurn(id),
+                churn: this.reportService.studentChurn({ ...range, branchId: id }),
                 expenseCats: this.reportService.expensesByCategory({ ...range, branchId: id }),
               }).pipe(map((v) => ({ branchId: id, idx, ...v }))),
             // Process branches one at a time so the aggregate calls above
