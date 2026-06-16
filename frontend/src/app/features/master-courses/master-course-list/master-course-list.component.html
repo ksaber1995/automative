@@ -66,10 +66,6 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th pSortableColumn="code">
-            {{ 'MASTER_COURSES.LIST.COL_CODE' | translate }}
-            <p-sortIcon field="code"></p-sortIcon>
-          </th>
           <th pSortableColumn="name">
             {{ 'MASTER_COURSES.LIST.COL_NAME' | translate }}
             <p-sortIcon field="name"></p-sortIcon>
@@ -91,7 +87,6 @@
       </ng-template>
       <ng-template pTemplate="body" let-item>
         <tr>
-          <td><span class="font-mono">{{ item.code }}</span></td>
           <td class="font-medium">{{ item.name }}</td>
           <td>{{ item.branchName || '—' }}</td>
           <td>{{ item.levelName || '—' }}</td>
@@ -203,7 +198,6 @@
         <li class="flex items-center justify-between px-3 py-2">
           <div>
             <div class="font-medium text-sm">{{ c.name }}</div>
-            <div class="text-xs text-gray-500 font-mono">{{ c.code }}</div>
           </div>
           <p-button
             icon="pi pi-external-link"

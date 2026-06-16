@@ -60,7 +60,7 @@ export class EmployeeListComponent implements OnInit {
 
   showAssignedClassesDialog = signal(false);
   blockedEmployee = signal<Employee | null>(null);
-  blockingClasses = signal<{ id: string; name: string; code: string }[]>([]);
+  blockingClasses = signal<{ id: string; name: string }[]>([]);
 
   filteredEmployees = computed(() => {
     const list = this.employees();

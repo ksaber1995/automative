@@ -90,7 +90,6 @@ export class ClassFormComponent implements OnInit {
     this.classForm = this.fb.group({
       courseId: [''],
       name: ['', [Validators.required, Validators.minLength(2)]],
-      code: ['', [Validators.required, Validators.minLength(2)]],
       // Branch is no longer stored on the class — it is derived from the course.
       // The form control acts purely as a UI filter for the course dropdown in global-create mode.
       branchId: [''],
@@ -341,7 +340,6 @@ export class ClassFormComponent implements OnInit {
         this.classForm.patchValue({
           courseId: classData.courseId,
           name: classData.name,
-          code: classData.code,
           branchId: classData.branchId,
           instructorId: classData.instructorId,
           type: classData.type || 'OFFLINE',
@@ -468,7 +466,6 @@ export class ClassFormComponent implements OnInit {
       courseId: targetCourseId,
       // branchId no longer sent — backend derives it from the course.
       name: formValue.name,
-      code: formValue.code,
       instructorId: formValue.instructorId || undefined,
       type: formValue.type || 'OFFLINE',
       startDate,

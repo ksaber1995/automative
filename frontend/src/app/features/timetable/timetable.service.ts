@@ -5,7 +5,6 @@ import { ApiService } from '../../core/services/api.service';
 export interface TimetableEntry {
   classId: string;
   className: string;
-  classCode: string;
   courseId: string;
   courseName: string | null;
   branchId: string;

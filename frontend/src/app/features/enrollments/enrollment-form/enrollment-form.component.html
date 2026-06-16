@@ -97,7 +97,7 @@
                 [disabled]="!f['branchId'].value">
                 <ng-template let-m pTemplate="item">
                   <div class="flex justify-between items-center gap-3">
-                    <span>{{ m.name }} <span class="text-xs text-gray-500 font-mono ml-2">{{ m.code }}</span></span>
+                    <span>{{ m.name }}</span>
                     <span class="text-sm text-gray-600">{{ m.defaultPrice | amount }}</span>
                   </div>
                 </ng-template>

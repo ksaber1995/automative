@@ -89,7 +89,6 @@ function mapSessionWithDetailsFromDB(row: any) {
     roomCode: row.room_code,
     roomDescription: row.room_description,
     className: row.class_name,
-    classCode: row.class_code,
     courseName: row.course_name,
     branchName: row.branch_name,
     durationMinutes,
@@ -301,7 +300,6 @@ export const sessionsRoutes = {
           r.code as room_code,
           r.description as room_description,
           cl.name as class_name,
-          cl.code as class_code,
           co.name as course_name,
           b.name as branch_name
         FROM sessions s
@@ -357,7 +355,6 @@ export const sessionsRoutes = {
           r.code as room_code,
           r.description as room_description,
           cl.name as class_name,
-          cl.code as class_code,
           co.name as course_name,
           b.name as branch_name
         FROM sessions s
@@ -403,7 +400,6 @@ export const sessionsRoutes = {
           r.code as room_code,
           r.description as room_description,
           cl.name as class_name,
-          cl.code as class_code,
           co.name as course_name,
           b.name as branch_name
         FROM sessions s

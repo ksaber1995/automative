@@ -61,7 +61,6 @@ export class EventFormComponent implements OnInit {
 
     this.form = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
-      code: [''],
       eventType: ['TRIP'],
       status: ['PLANNED'],
       branchId: [null],
@@ -96,7 +95,6 @@ export class EventFormComponent implements OnInit {
       next: (row) => {
         this.form.patchValue({
           name: row.name,
-          code: row.code || '',
           eventType: row.eventType,
           status: row.status,
           branchId: row.branchId,
@@ -123,7 +121,6 @@ export class EventFormComponent implements OnInit {
     const v = this.form.value;
     const payload: any = {
       name: v.name,
-      code: v.code?.trim() || undefined,
       eventType: v.eventType,
       status: v.status,
       branchId: v.branchId || undefined,

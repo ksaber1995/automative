@@ -8,7 +8,6 @@ export interface Class {
   branchId: string;
   instructorId?: string;
   name: string;
-  code: string;
   startDate: string;
   endDate: string;
   startTime?: string;
@@ -31,7 +30,6 @@ export interface ClassCreateDto {
   branchId: string;
   instructorId?: string;
   name: string;
-  code: string;
   startDate: string;
   endDate: string;
   startTime?: string;
@@ -47,7 +45,6 @@ export interface ClassUpdateDto {
   branchId?: string;
   instructorId?: string;
   name?: string;
-  code?: string;
   startDate?: string;
   endDate?: string;
   startTime?: string;

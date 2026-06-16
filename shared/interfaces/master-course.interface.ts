@@ -4,7 +4,6 @@ export interface MasterCourse {
   branchId: string;
   branchName?: string | null;
   name: string;
-  code: string;
   description: string | null;
   defaultPrice: number;
   defaultDuration: number;
@@ -21,7 +20,6 @@ export interface MasterCourse {
 export interface MasterCourseCreateDto {
   branchId: string;
   name: string;
-  code: string;
   description?: string;
   defaultPrice: number;
   defaultDuration: number;
@@ -31,7 +29,6 @@ export interface MasterCourseCreateDto {
 
 export interface MasterCourseUpdateDto {
   name?: string;
-  code?: string;
   description?: string;
   defaultPrice?: number;
   defaultDuration?: number;
@@ -45,7 +42,6 @@ export interface LinkedCourseSummary {
   branchId: string | null;
   branchName: string | null;
   name: string;
-  code: string;
   price: number;
   duration: number;
   maxStudents: number | null;

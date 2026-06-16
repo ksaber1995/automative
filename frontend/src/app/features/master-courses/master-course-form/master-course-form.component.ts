@@ -54,7 +54,6 @@ export class MasterCourseFormComponent implements OnInit {
     this.form = this.fb.group({
       branchId: [null, Validators.required],
       name: ['', [Validators.required, Validators.minLength(3)]],
-      code: ['', [Validators.required, Validators.minLength(2)]],
       description: [''],
       defaultPrice: [0, [Validators.required, Validators.min(0)]],
       defaultDuration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
@@ -90,7 +89,6 @@ export class MasterCourseFormComponent implements OnInit {
         this.form.patchValue({
           branchId: row.branchId,
           name: row.name,
-          code: row.code,
           description: row.description || '',
           defaultPrice: row.defaultPrice,
           defaultDuration: row.defaultDuration,
@@ -118,7 +116,6 @@ export class MasterCourseFormComponent implements OnInit {
     if (this.isEditMode() && this.id) {
       const updatePayload = {
         name: v.name,
-        code: v.code,
         description: v.description?.trim() || undefined,
         defaultPrice: v.defaultPrice,
         defaultDuration: v.defaultDuration,
@@ -139,7 +136,6 @@ export class MasterCourseFormComponent implements OnInit {
       const createPayload = {
         branchId: v.branchId,
         name: v.name,
-        code: v.code,
         description: v.description?.trim() || undefined,
         defaultPrice: v.defaultPrice,
         defaultDuration: v.defaultDuration,

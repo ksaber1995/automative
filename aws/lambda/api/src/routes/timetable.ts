@@ -46,7 +46,6 @@ function mapEntry(row: any, date: string) {
   return {
     classId: row.id,
     className: row.name,
-    classCode: row.code,
     courseId: row.course_id,
     courseName: row.course_name,
     branchId: row.branch_id,
@@ -95,7 +94,6 @@ export const timetableRoutes = {
         SELECT
           c.id,
           c.name,
-          c.code,
           c.course_id,
           co.branch_id,
           c.instructor_id,

@@ -114,10 +114,50 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Grade input validation ────────────────────────────────────────────────────
+  /**
+   * Clamp a numeric grade string to [0, maxGrade]. Returns the raw text for
+   * still-incomplete input (e.g. "8.") so decimal entry isn't interrupted; only
+   * rewrites the value when it's out of range.
+   */
+  private clampGrade(value: string): string {
+    const v = (value ?? '').trim();
+    if (v === '') return '';
+    const n = Number(v);
+    if (!isFinite(n)) return v; // intermediate state (e.g. "8.") — leave it alone
+    if (n < 0) return '0';
+    const max = this.exam()?.maxGrade;
+    if (max != null && n > max) return String(max);
+    return v;
+  }
+
+  /** Grade-to-apply field (QR/manual recording). */
+  onCurrentGradeInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const clean = this.clampGrade(input.value);
+    if (input.value !== clean) input.value = clean;
+    this.currentGrade.set(clean);
+  }
+
   // ── Manual per-row grade editing (debounced auto-save) ────────────────────────
-  setRowGrade(studentId: string, grade: string) {
-    this.roster.update((list) => list.map((s) => (s.studentId === studentId ? { ...s, grade } : s)));
+  // Typed values are held here (NOT in the roster signal) so each keystroke does
+  // not re-render the table and steal focus from the input.
+  private pendingGrades = new Map<string, string>();
+
+  onGradeInput(studentId: string, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const clean = this.clampGrade(input.value);
+    if (input.value !== clean) input.value = clean;
+    this.pendingGrades.set(studentId, clean);
     this.scheduleRowSave(studentId);
+  }
+
+  /** Save immediately on blur (cancels the pending debounce). */
+  flushRowSaveNow(studentId: string) {
+    if (!this.pendingGrades.has(studentId)) return;
+    const existing = this.rowSaveTimers.get(studentId);
+    if (existing) { clearTimeout(existing); this.rowSaveTimers.delete(studentId); }
+    this.flushRowSave(studentId);
   }
 
   private setRowState(studentId: string, state: 'saving' | 'saved' | 'error' | null) {
@@ -139,17 +179,19 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
 
   /** Save (or clear, when emptied) a single row. Auto-called after debounce. */
   private flushRowSave(studentId: string) {
-    const row = this.roster().find((s) => s.studentId === studentId);
-    if (!row) return;
-    const grade = (row.grade ?? '').toString().trim();
+    if (!this.pendingGrades.has(studentId)) return;
+    const grade = (this.pendingGrades.get(studentId) ?? '').toString().trim();
     this.setRowState(studentId, 'saving');
     const obs = grade
       ? this.service.saveResult(this.examId, studentId, grade)
       : this.service.deleteResult(this.examId, studentId);
     obs.subscribe({
       next: () => {
+        this.pendingGrades.delete(studentId);
+        // Commit to the signal only after a successful save (avoids re-rendering
+        // the table — and stealing input focus — on every keystroke).
         this.roster.update((list) => list.map((s) => (s.studentId === studentId
-          ? { ...s, recordedAt: grade ? new Date().toISOString() : null }
+          ? { ...s, grade, recordedAt: grade ? new Date().toISOString() : null }
           : s)));
         this.setRowState(studentId, 'saved');
         setTimeout(() => this.setRowState(studentId, null), 1500);

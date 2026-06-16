@@ -98,25 +98,6 @@
           }
         </div>
 
-        <!-- Class Code -->
-        <div class="field">
-          <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
-            {{ 'CLASSES.FORM.CODE_LABEL' | translate }} <span class="text-red-500">*</span>
-          </label>
-          <input
-            pInputText
-            type="text"
-            id="code"
-            formControlName="code"
-            [placeholder]="'CLASSES.FORM.CODE_PLACEHOLDER' | translate"
-            class="w-full"
-            [class.ng-invalid]="classForm.get('code')?.invalid && classForm.get('code')?.touched"
-            [class.ng-dirty]="classForm.get('code')?.touched" />
-          @if (classForm.get('code')?.invalid && classForm.get('code')?.touched) {
-            <small class="text-red-500">{{ 'CLASSES.FORM.CODE_REQUIRED' | translate }}</small>
-          }
-        </div>
-
         <!-- Class Type (Online / Offline) -->
         <div class="field">
           <label for="type" class="block text-sm font-medium text-gray-700 mb-2">
@@ -310,7 +291,7 @@
               <ul class="mt-2 list-disc ms-6 text-sm text-red-700">
                 @for (c of availabilityConflicts(); track c.id) {
                   <li>
-                    <strong>{{ c.name }}</strong> ({{ c.code }}) —
+                    <strong>{{ c.name }}</strong> —
                     {{ c.daysOfWeek }} {{ c.startTime }}–{{ c.endTime }}
                   </li>
                 }

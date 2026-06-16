@@ -51,11 +51,14 @@
               }
             </label>
             <input
-              type="text"
+              type="number"
               pInputText
               class="w-full"
-              [ngModel]="currentGrade()"
-              (ngModelChange)="currentGrade.set($event)"
+              inputmode="decimal"
+              min="0"
+              [attr.max]="exam()?.maxGrade"
+              [value]="currentGrade()"
+              (input)="onCurrentGradeInput($event)"
               [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
             />
           </div>
@@ -134,7 +137,7 @@
       />
     </div>
 
-    <p-table [value]="filteredRoster()" [loading]="loading()" responsiveLayout="scroll">
+    <p-table [value]="filteredRoster()" dataKey="studentId" [loading]="loading()" responsiveLayout="scroll">
       <ng-template pTemplate="header">
         <tr>
           <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>
@@ -149,11 +152,15 @@
             @if (canWrite()) {
               <div class="flex items-center gap-2">
                 <input
-                  type="text"
+                  type="number"
                   pInputText
                   class="w-full"
-                  [ngModel]="row.grade"
-                  (ngModelChange)="setRowGrade(row.studentId, $event)"
+                  inputmode="decimal"
+                  min="0"
+                  [attr.max]="exam()?.maxGrade"
+                  [value]="row.grade"
+                  (input)="onGradeInput(row.studentId, $event)"
+                  (blur)="flushRowSaveNow(row.studentId)"
                   [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
                 />
                 @if (exam()?.maxGrade != null) {

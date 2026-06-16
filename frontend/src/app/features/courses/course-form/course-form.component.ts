@@ -63,7 +63,6 @@ export class CourseFormComponent implements OnInit {
     this.courseForm = this.fb.group({
       branchId: ['', [Validators.required]],
       name: ['', [Validators.required, Validators.minLength(3)]],
-      code: ['', [Validators.required, Validators.minLength(2)]],
       description: [''],
       paymentType: ['ONE_TIME', Validators.required],
       price: [0, [Validators.required, Validators.min(0)]],
@@ -142,7 +141,6 @@ export class CourseFormComponent implements OnInit {
         this.courseForm.patchValue({
           branchId: course.branchId,
           name: course.name,
-          code: course.code,
           description: course.description || '',
           paymentType: (course as any).paymentType || 'ONE_TIME',
           price: course.price,
@@ -218,7 +216,6 @@ export class CourseFormComponent implements OnInit {
 
   get branchId() { return this.courseForm.get('branchId'); }
   get name() { return this.courseForm.get('name'); }
-  get code() { return this.courseForm.get('code'); }
   get price() { return this.courseForm.get('price'); }
   get duration() { return this.courseForm.get('duration'); }
 }

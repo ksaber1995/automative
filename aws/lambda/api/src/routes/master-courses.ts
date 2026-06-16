@@ -13,7 +13,6 @@ function mapMasterCourseFromDB(row: any) {
     branchId: row.branch_id,
     branchName: row.branch_name ?? null,
     name: row.name,
-    code: row.code,
     description: row.description,
     defaultPrice: parseFloat(row.default_price),
     defaultDuration: row.default_duration,
@@ -58,7 +57,6 @@ export const masterCoursesRoutes = {
         company_id: context.companyId,
         branch_id: body.branchId,
         name: body.name,
-        code: body.code,
         description: body.description || null,
         default_price: body.defaultPrice,
         default_duration: body.defaultDuration,
@@ -172,7 +170,6 @@ export const masterCoursesRoutes = {
           branchId: r.branch_id,
           branchName: r.branch_name,
           name: r.name,
-          code: r.code,
           price: parseFloat(r.price),
           duration: r.duration,
           maxStudents: r.max_students,
@@ -203,7 +200,6 @@ export const masterCoursesRoutes = {
 
       const updateData: any = {};
       if (body.name !== undefined) updateData.name = body.name;
-      if (body.code !== undefined) updateData.code = body.code;
       if (body.description !== undefined) updateData.description = body.description;
       if (body.defaultPrice !== undefined) updateData.default_price = body.defaultPrice;
       if (body.defaultDuration !== undefined) updateData.default_duration = body.defaultDuration;
@@ -294,13 +290,13 @@ export const masterCoursesRoutes = {
 
       // A linked course blocks deactivation if it is still active OR has an active/unfinished class.
       const blocking = await query(
-        `SELECT c.id, c.name, c.code, c.is_active,
+        `SELECT c.id, c.name, c.is_active,
                 COUNT(cl.id) FILTER (WHERE cl.is_active = true AND cl.is_finished = false) AS active_class_count
          FROM master_course_courses mcc
          JOIN courses c ON c.id = mcc.course_id
          LEFT JOIN classes cl ON cl.course_id = c.id
          WHERE mcc.master_course_id = $1
-         GROUP BY c.id, c.name, c.code, c.is_active
+         GROUP BY c.id, c.name, c.is_active
          HAVING c.is_active = true
              OR COUNT(cl.id) FILTER (WHERE cl.is_active = true AND cl.is_finished = false) > 0`,
         [params.id]
@@ -312,7 +308,7 @@ export const masterCoursesRoutes = {
           body: {
             message: 'Master course has active linked courses or running classes',
             code: 'ERRORS.MASTER_COURSES.HAS_ACTIVE_COURSES',
-            courses: blocking.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+            courses: blocking.map((c: any) => ({ id: c.id, name: c.name })),
           } as any,
         };
       }
@@ -440,7 +436,7 @@ export const masterCoursesRoutes = {
       }
 
       const rows = await query(
-        `SELECT id, name, code, price, duration
+        `SELECT id, name, price, duration
          FROM courses
          WHERE company_id = $1 AND branch_id = $2 AND is_active = true
            AND id NOT IN (
@@ -454,7 +450,6 @@ export const masterCoursesRoutes = {
         body: rows.map((r: any) => ({
           id: r.id,
           name: r.name,
-          code: r.code,
           price: parseFloat(r.price),
           duration: r.duration,
         })),

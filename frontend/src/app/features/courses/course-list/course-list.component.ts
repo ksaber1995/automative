@@ -74,7 +74,7 @@ export class CourseListComponent implements OnInit {
   showBlockerDialog = signal(false);
   blockerCourseName = signal('');
   blockerHasInProgress = signal(false);
-  blockerClasses = signal<{ id: string; name: string; code: string }[]>([]);
+  blockerClasses = signal<{ id: string; name: string }[]>([]);
 
   private translate = inject(TranslateService);
 

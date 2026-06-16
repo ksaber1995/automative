@@ -350,7 +350,7 @@ export class SessionsDashboardComponent implements OnInit {
       next: (classes: any[]) => {
         this.activeClasses.set(classes.map((c: any) => ({
           ...c,
-          displayName: `${c.name} (${c.code})`,
+          displayName: c.name,
         })));
       },
       error: () => {},
@@ -391,7 +391,7 @@ export class SessionsDashboardComponent implements OnInit {
             .filter((c: any) => (c.studentCount ?? 0) > 0)
             .map((c: any) => ({
               ...c,
-              displayName: `${c.name} (${c.code})`,
+              displayName: c.name,
             }))
         );
         this.loadingDialogClasses.set(false);

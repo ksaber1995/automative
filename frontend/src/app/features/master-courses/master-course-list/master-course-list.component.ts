@@ -73,7 +73,7 @@ export class MasterCourseListComponent implements OnInit {
   // Blocker dialog: server returns 409 with `courses` (linked courses still active).
   showBlockerDialog = signal(false);
   blockerName = signal('');
-  blockerCourses = signal<{ id: string; name: string; code: string }[]>([]);
+  blockerCourses = signal<{ id: string; name: string }[]>([]);
 
   levelOptions = computed(() => this.levels().map(l => ({ label: l.name, value: l.id })));
 

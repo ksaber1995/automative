@@ -251,7 +251,6 @@ export const reportsRoutes = {
              'COURSE' AS type,
              c.id AS course_id,
              c.name AS course_name,
-             c.code AS course_code,
              b.name AS branch_name,
              COUNT(e.id) AS enrollment_count,
              COUNT(e.id) FILTER (WHERE e.status = 'ACTIVE') AS active_count,
@@ -261,7 +260,7 @@ export const reportsRoutes = {
            INNER JOIN branches b ON b.id = e.branch_id
            WHERE e.company_id = $1
              AND e.enrollment_date >= $2 AND e.enrollment_date <= $3 ${courseBranchClause}
-           GROUP BY c.id, c.name, c.code, b.name
+           GROUP BY c.id, c.name, b.name
 
            UNION ALL
 
@@ -269,7 +268,6 @@ export const reportsRoutes = {
              'MASTER' AS type,
              mc.id AS course_id,
              mc.name AS course_name,
-             mc.code AS course_code,
              b.name AS branch_name,
              COUNT(me.id) AS enrollment_count,
              COUNT(me.id) FILTER (WHERE me.status = 'ACTIVE') AS active_count,
@@ -279,7 +277,7 @@ export const reportsRoutes = {
            INNER JOIN branches b ON b.id = me.branch_id
            WHERE me.company_id = $1
              AND me.enrollment_date >= $2 AND me.enrollment_date <= $3 ${masterBranchClause}
-           GROUP BY mc.id, mc.name, mc.code, b.name
+           GROUP BY mc.id, mc.name, b.name
          ) combined
          ORDER BY enrollment_count DESC, revenue DESC
          LIMIT 20`,
@@ -291,7 +289,6 @@ export const reportsRoutes = {
           type: r.type,
           courseId: r.course_id,
           courseName: r.course_name,
-          courseCode: r.course_code,
           branchName: r.branch_name,
           enrollmentCount: parseInt(r.enrollment_count, 10),
           activeCount: parseInt(r.active_count, 10),
@@ -455,7 +452,6 @@ export const reportsRoutes = {
              'COURSE' AS type,
              c.id AS course_id,
              c.name AS course_name,
-             c.code AS course_code,
              b.name AS branch_name,
              COUNT(e.id) AS enrollments,
              COALESCE(SUM(e.amount_paid), 0) AS revenue,
@@ -466,7 +462,7 @@ export const reportsRoutes = {
              AND e.company_id = $1
              AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
            WHERE b.company_id = $1 ${courseBranchClause}
-           GROUP BY c.id, c.name, c.code, b.name
+           GROUP BY c.id, c.name, b.name
            HAVING COUNT(e.id) > 0
 
            UNION ALL
@@ -475,7 +471,6 @@ export const reportsRoutes = {
              'MASTER' AS type,
              mc.id AS course_id,
              mc.name AS course_name,
-             mc.code AS course_code,
              b.name AS branch_name,
              COUNT(me.id) AS enrollments,
              COALESCE(SUM(me.amount_paid), 0) AS revenue,
@@ -486,7 +481,7 @@ export const reportsRoutes = {
              AND me.company_id = $1
              AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            WHERE b.company_id = $1 ${masterBranchClause}
-           GROUP BY mc.id, mc.name, mc.code, b.name
+           GROUP BY mc.id, mc.name, b.name
            HAVING COUNT(me.id) > 0
          ) combined
          ORDER BY revenue DESC
@@ -499,7 +494,6 @@ export const reportsRoutes = {
           type: r.type,
           courseId: r.course_id,
           courseName: r.course_name,
-          courseCode: r.course_code,
           branchName: r.branch_name,
           enrollments: parseInt(r.enrollments, 10),
           revenue: parseFloat(r.revenue),
@@ -723,7 +717,6 @@ export const reportsRoutes = {
         `SELECT
            e.id,
            e.name,
-           e.code,
            e.event_type,
            e.status,
            e.start_date,
@@ -803,7 +796,6 @@ export const reportsRoutes = {
           return {
             eventId: r.id,
             name: r.name,
-            code: r.code,
             eventType: r.event_type,
             status: r.status,
             startDate: r.start_date,

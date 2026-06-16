@@ -8,7 +8,6 @@ function mapCourseFromDB(row: any) {
     companyId: row.company_id,
     branchId: row.branch_id,
     name: row.name,
-    code: row.code,
     description: row.description,
     price: parseFloat(row.price),
     duration: row.duration,
@@ -50,7 +49,6 @@ export const coursesRoutes = {
         company_id: context.companyId,
         branch_id: body.branchId,
         name: body.name,
-        code: body.code,
         description: body.description || null,
         price: body.price,
         duration: body.duration,
@@ -212,7 +210,6 @@ export const coursesRoutes = {
         updateData.branch_id = body.branchId;
       }
       if (body.name !== undefined) updateData.name = body.name;
-      if (body.code !== undefined) updateData.code = body.code;
       if (body.description !== undefined) updateData.description = body.description;
       if (body.price !== undefined) updateData.price = body.price;
       if (body.duration !== undefined) updateData.duration = body.duration;
@@ -392,7 +389,7 @@ export const coursesRoutes = {
       // A class blocks deactivation if it is still active AND not finished.
       // The caller must either finish the class (status DONE) or deactivate it first.
       const blockingClasses = await query(
-        `SELECT id, name, code, start_date
+        `SELECT id, name, start_date
          FROM classes
          WHERE course_id = $1 AND is_active = true AND is_finished = false`,
         [params.id]
@@ -413,7 +410,7 @@ export const coursesRoutes = {
           body: {
             message: 'Course has classes that must be finished or deactivated first',
             code: codeKey,
-            classes: blockingClasses.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+            classes: blockingClasses.map((c: any) => ({ id: c.id, name: c.name })),
           } as any,
         };
       }

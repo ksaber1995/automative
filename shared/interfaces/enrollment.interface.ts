@@ -96,7 +96,6 @@ export interface CreateRefundDto {
 export interface EnrollmentWithDetails extends Enrollment {
   studentName?: string;
   courseName?: string;
-  courseCode?: string;
   branchName?: string;
 }
 

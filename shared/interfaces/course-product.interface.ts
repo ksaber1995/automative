@@ -38,7 +38,6 @@ export interface CourseProductUpdateDto {
 export interface EducationalBooksCourseSummary {
   courseId: string;
   courseName: string;
-  courseCode?: string | null;
   branchId: string | null;
   branchName: string | null;
   linkedProductCount: number;
@@ -79,7 +78,6 @@ export interface EducationalBooksProductDetail {
 export interface EducationalBooksCourseDetail {
   courseId: string;
   courseName: string;
-  courseCode?: string | null;
   branchId: string | null;
   enrolledCount: number;
   products: EducationalBooksProductDetail[];

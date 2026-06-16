@@ -9,7 +9,6 @@ export interface MasterEnrollment {
   studentName?: string;
   masterCourseId: string;
   masterCourseName?: string;
-  masterCourseCode?: string;
   masterCoursePrice?: number;
   branchId: string;
   branchName?: string;

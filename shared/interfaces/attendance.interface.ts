@@ -25,7 +25,6 @@ export interface StudentAttendanceRecord {
   sessionEndDate?: string | null;
   classId: string;
   className: string;
-  classCode: string;
   roomCode?: string | null;
   isPresent: boolean;
 }

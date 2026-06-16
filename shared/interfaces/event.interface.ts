@@ -6,7 +6,6 @@ export interface EventModel {
   companyId: string;
   branchId: string | null;
   name: string;
-  code: string | null;
   eventType: EventType | string;
   description: string | null;
   location: string | null;
@@ -22,7 +21,6 @@ export interface EventModel {
 export interface EventCreateDto {
   branchId?: string | null;
   name: string;
-  code?: string;
   eventType?: EventType;
   description?: string;
   location?: string;

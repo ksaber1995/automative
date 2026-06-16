@@ -23,7 +23,6 @@ export const educationalBooksRoutes = {
         `SELECT
            c.id            AS course_id,
            c.name          AS course_name,
-           c.code          AS course_code,
            c.branch_id     AS branch_id,
            b.name          AS branch_name,
            COUNT(DISTINCT cp.id)                                          AS linked_product_count,
@@ -44,7 +43,7 @@ export const educationalBooksRoutes = {
            LIMIT 1
          ) ps ON true
          WHERE cp.company_id = $1${branchSql}
-         GROUP BY c.id, c.name, c.code, c.branch_id, b.name
+         GROUP BY c.id, c.name, c.branch_id, b.name
          ORDER BY c.name ASC`,
         params
       );
@@ -57,7 +56,6 @@ export const educationalBooksRoutes = {
           return {
             courseId: r.course_id,
             courseName: r.course_name,
-            courseCode: r.course_code,
             branchId: r.branch_id || null,
             branchName: r.branch_name || null,
             linkedProductCount: parseInt(r.linked_product_count) || 0,
@@ -169,7 +167,6 @@ export const educationalBooksRoutes = {
         body: {
           courseId: course.id,
           courseName: course.name,
-          courseCode: course.code,
           branchId: course.branch_id || null,
           enrolledCount: roster.length,
           products,

@@ -149,7 +149,6 @@
               </td>
               <td>
                 <div class="font-medium">{{ me.masterCourseName }}</div>
-                <div class="text-xs text-gray-500 font-mono">{{ me.masterCourseCode }}</div>
               </td>
               <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
               <td class="text-right">
@@ -305,7 +304,6 @@
                             </div>
                             <div class="min-w-0">
                               <div class="font-medium text-sm text-gray-900 truncate">{{ course.name }}</div>
-                              <div class="text-xs text-gray-400 font-mono">{{ course.code }}</div>
 
                               @let className = getBundleClassName(me.id, course.id);
                               @if (className) {
@@ -375,7 +373,6 @@
                     <tr>
                       <td>
                         <div class="font-medium">{{ me.masterCourseName }}</div>
-                        <div class="text-xs text-gray-500 font-mono">{{ me.masterCourseCode }}</div>
                       </td>
                       <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
                       <td class="text-right">
@@ -463,7 +460,6 @@
             </td>
             <td>
               <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
-              <div class="text-sm text-gray-500">{{ getCourseCode(enrollment.courseId) }}</div>
             </td>
             <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
             <td>
@@ -740,7 +736,6 @@
                   <tr>
                     <td>
                       <div class="font-medium">{{ getCourseName(enrollment.courseId) }}</div>
-                      <div class="text-sm text-gray-500">{{ getCourseCode(enrollment.courseId) }}</div>
                     </td>
                     <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
                     <td class="text-sm">
@@ -843,7 +838,6 @@
                     <span class="ml-1 text-xs font-semibold text-indigo-600">{{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: rec.sessionNumber } }}</span>
                   }
                 </div>
-                <div class="text-xs text-gray-400 font-mono">{{ rec.classCode }}</div>
               </td>
               <td class="text-gray-600 text-sm">{{ rec.roomCode || '—' }}</td>
               <td>
@@ -1226,7 +1220,6 @@
           ></p-radiobutton>
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-sm text-gray-900">{{ cls.name }}</div>
-            <div class="text-xs text-gray-400 font-mono mt-0.5">{{ cls.code }}</div>
             <div class="text-xs text-gray-500 mt-1 flex gap-3 flex-wrap">
               <span><i class="pi pi-calendar mr-1"></i>{{ cls.startDate | date:'mediumDate' }} – {{ cls.endDate | date:'mediumDate' }}</span>
               @if (cls.daysOfWeek) {

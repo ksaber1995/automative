@@ -80,7 +80,6 @@ export class ClassService {
 export interface TeacherAvailabilityConflict {
   id: string;
   name: string;
-  code: string;
   daysOfWeek: string | null;
   startTime: string | null;
   endTime: string | null;

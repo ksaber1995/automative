@@ -824,7 +824,6 @@ export class ReportListComponent implements OnInit {
     const cols: CsvColumn<TopCourseRow>[] = [
       { header: 'Type', value: r => r.type },
       { header: 'Course', value: r => r.courseName },
-      { header: 'Code', value: r => r.courseCode },
       { header: 'Branch', value: r => r.branchName },
       { header: 'Enrollments', value: r => r.enrollmentCount },
       { header: 'Revenue', value: r => r.revenue },
@@ -836,7 +835,6 @@ export class ReportListComponent implements OnInit {
     const cols: CsvColumn<ProfitByCourseRow>[] = [
       { header: 'Type', value: r => r.type },
       { header: 'Course', value: r => r.courseName },
-      { header: 'Code', value: r => r.courseCode },
       { header: 'Branch', value: r => r.branchName },
       { header: 'Enrollments', value: r => r.enrollments },
       { header: 'Revenue', value: r => r.revenue },
@@ -874,7 +872,6 @@ export class ReportListComponent implements OnInit {
   exportProfitByEvent() {
     const cols: CsvColumn<ProfitByEventRow>[] = [
       { header: 'Event', value: r => r.name },
-      { header: 'Code', value: r => r.code },
       { header: 'Type', value: r => r.eventType },
       { header: 'Branch', value: r => r.branchName },
       { header: 'Status', value: r => r.status },

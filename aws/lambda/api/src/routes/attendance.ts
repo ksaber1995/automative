@@ -325,7 +325,6 @@ export const attendanceRoutes = {
           s.session_number AS session_number,
           cl.id AS class_id,
           cl.name AS class_name,
-          cl.code AS class_code,
           r.code AS room_code,
           CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
           sub.sub_class_name AS substituted_in_class_name
@@ -370,7 +369,6 @@ export const attendanceRoutes = {
           s2.session_number AS session_number,
           c2.id AS class_id,
           c2.name AS class_name,
-          c2.code AS class_code,
           r2.code AS room_code,
           hc.name AS home_class_name
         FROM session_attendance sub
@@ -413,7 +411,6 @@ export const attendanceRoutes = {
             : parseInt(row.session_number, 10),
           classId: row.class_id,
           className: row.class_name,
-          classCode: row.class_code,
           roomCode: row.room_code,
           status,
           substitutedInClassName: row.substituted_in_class_name || null,
@@ -432,7 +429,6 @@ export const attendanceRoutes = {
         classId: row.class_id,
         // The class the student physically attended as a substitute.
         className: row.class_name,
-        classCode: row.class_code,
         roomCode: row.room_code,
         status: 'SUBSTITUTED' as const,
         substitutedInClassName: row.class_name,
@@ -669,7 +665,6 @@ export const attendanceRoutes = {
           s.branch_id,
           s.class_id,
           cl.name AS class_name,
-          cl.code AS class_code,
           co.name AS course_name,
           b.name AS branch_name,
           r.code AS room_code,
@@ -744,7 +739,6 @@ export const attendanceRoutes = {
             branchName: row.branch_name,
             classId: row.class_id,
             className: row.class_name,
-            classCode: row.class_code,
             courseName: row.course_name,
             roomCode: row.room_code,
             paid: row.paid === true,

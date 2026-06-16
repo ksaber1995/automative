@@ -23,7 +23,6 @@ export interface StudentAttendanceRecord {
   sessionNumber?: number | null;
   classId: string;
   className: string;
-  classCode: string;
   roomCode?: string | null;
   isPresent: boolean;
   status?: AttendanceStatus;

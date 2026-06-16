@@ -17,6 +17,10 @@ async function ensureClassStatusColumns(): Promise<void> {
         await query(`DROP INDEX IF EXISTS idx_classes_company_id`);
         await query(`ALTER TABLE classes DROP COLUMN IF EXISTS branch_id`);
         await query(`ALTER TABLE classes DROP COLUMN IF EXISTS company_id`);
+        // Drop the unused per-class code column (migration 039).
+        await query(`ALTER TABLE classes DROP CONSTRAINT IF EXISTS unique_class_code`);
+        await query(`DROP INDEX IF EXISTS idx_classes_code`);
+        await query(`ALTER TABLE classes DROP COLUMN IF EXISTS code`);
       } catch (e) {
         classSchemaInitPromise = null;
         throw e;
@@ -52,20 +56,16 @@ function deriveStatus(row: any): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
  * for so the caller can fall through to its generic fallback.
  *
  * Known cases:
- *   23505 unique_class_code  → another class already uses this code
- *   23505 (other unique)     → duplicate value, less specific
- *   22001                    → a field is longer than the column allows (e.g. name/code > 50 chars)
+ *   23505 (unique)           → duplicate value
+ *   22001                    → a field is longer than the column allows (e.g. name)
  */
 function mapClassDbError(error: any) {
   if (!error || typeof error !== 'object') return null;
   if (error.code === '23505') {
-    if (error.constraint === 'unique_class_code') {
-      return apiError(409, 'ERRORS.CLASSES.DUPLICATE_CODE', 'A class with this code already exists');
-    }
     return apiError(409, 'ERRORS.CLASSES.DUPLICATE', 'A class with these details already exists');
   }
   if (error.code === '22001') {
-    return apiError(400, 'ERRORS.CLASSES.VALUE_TOO_LONG', 'One of the fields (name or code) is too long. Keep it under 50 characters.');
+    return apiError(400, 'ERRORS.CLASSES.VALUE_TOO_LONG', 'The class name is too long.');
   }
   return null;
 }
@@ -93,7 +93,6 @@ function mapClassFromDB(row: any) {
     branchId: row.branch_id,
     instructorId: row.instructor_id,
     name: row.name,
-    code: row.code,
     startDate: row.start_date,
     endDate: row.end_date,
     startTime: row.start_time,
@@ -152,7 +151,6 @@ export const classesRoutes = {
         course_id: body.courseId,
         instructor_id: body.instructorId || null,
         name: body.name,
-        code: body.code,
         start_date: body.startDate,
         end_date: body.endDate,
         start_time: body.startTime || null,
@@ -333,7 +331,7 @@ export const classesRoutes = {
 
       const params: any[] = [context.companyId, instructorId, endDate, startDate];
       let sql = `
-        SELECT c.id, c.name, c.code, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date
+        SELECT c.id, c.name, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         WHERE co.company_id = $1
@@ -371,7 +369,6 @@ export const classesRoutes = {
         .map((row: any) => ({
           id: row.id,
           name: row.name,
-          code: row.code,
           daysOfWeek: row.days_of_week,
           startTime: row.start_time,
           endTime: row.end_time,
@@ -472,7 +469,6 @@ export const classesRoutes = {
       }
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.name !== undefined) updateData.name = body.name;
-      if (body.code !== undefined) updateData.code = body.code;
       if (body.startDate !== undefined) updateData.start_date = body.startDate;
       if (body.endDate !== undefined) updateData.end_date = body.endDate;
       if (body.startTime !== undefined) updateData.start_time = body.startTime;

@@ -768,10 +768,6 @@ export class StudentDetailComponent implements OnInit {
     return this.courses.get(courseId)?.name || 'Unknown Course';
   }
 
-  getCourseCode(courseId: string): string {
-    return this.courses.get(courseId)?.code || 'N/A';
-  }
-
   formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',

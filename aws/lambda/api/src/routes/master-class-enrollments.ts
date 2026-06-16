@@ -26,7 +26,6 @@ function mapRow(row: any) {
     status: effectiveStatus,
     notes: row.notes,
     className: row.class_name ?? null,
-    classCode: row.class_code ?? null,
     courseName: row.course_name ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -113,7 +112,7 @@ export const masterClassEnrollmentsRoutes = {
 
       const rows = await query(
         `SELECT mce.*,
-           cl.name AS class_name, cl.code AS class_code,
+           cl.name AS class_name,
            cl.is_finished AS class_is_finished,
            co.name AS course_name
          FROM master_class_enrollments mce

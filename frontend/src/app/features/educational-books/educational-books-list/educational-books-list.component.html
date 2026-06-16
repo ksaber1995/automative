@@ -40,9 +40,6 @@
             <div class="flex justify-between items-start gap-2">
               <div>
                 <div class="font-bold text-lg">{{ course.courseName }}</div>
-                @if (course.courseCode) {
-                  <div class="text-sm text-gray-500 font-mono">{{ course.courseCode }}</div>
-                }
               </div>
               <p-tag
                 [value]="course.branchName || ('EDUCATIONAL_BOOKS.GLOBAL' | translate)"

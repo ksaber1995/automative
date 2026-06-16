@@ -43,13 +43,6 @@
             ></p-select>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'EVENTS.FORM.CODE' | translate }}
-            </label>
-            <input pInputText formControlName="code" class="w-full" />
-          </div>
-
           @if (!branchState.isSingleBranch()) {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">

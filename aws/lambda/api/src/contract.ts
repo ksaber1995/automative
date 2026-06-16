@@ -376,7 +376,6 @@ const LevelSchema = z.object({
 const CreateCourseSchema = z.object({
   branchId: UUIDSchema,
   name: z.string(),
-  code: z.string(),
   description: z.string().optional(),
   price: z.number(),
   duration: z.number(),
@@ -398,7 +397,6 @@ const UpdateCourseSchema = CreateCourseSchema.partial();
 const CreateMasterCourseSchema = z.object({
   branchId: UUIDSchema,
   name: z.string(),
-  code: z.string(),
   description: z.string().optional(),
   defaultPrice: z.number(),
   defaultDuration: z.number(),
@@ -408,7 +406,6 @@ const CreateMasterCourseSchema = z.object({
 
 const UpdateMasterCourseSchema = z.object({
   name: z.string().optional(),
-  code: z.string().optional(),
   description: z.string().optional(),
   defaultPrice: z.number().optional(),
   defaultDuration: z.number().optional(),
@@ -423,7 +420,6 @@ const MasterCourseSchema = z.object({
   branchId: UUIDSchema,
   branchName: z.string().nullable().optional(),
   name: z.string(),
-  code: z.string(),
   description: z.string().nullable(),
   defaultPrice: z.number(),
   defaultDuration: z.number(),
@@ -446,7 +442,6 @@ const EventStatusSchema = z.enum(['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED']
 const CreateEventSchema = z.object({
   branchId: OptionalUUIDSchema,
   name: z.string(),
-  code: z.string().optional(),
   eventType: EventTypeSchema.optional(),
   description: z.string().optional(),
   location: z.string().optional(),
@@ -465,7 +460,6 @@ const EventSchema = z.object({
   companyId: UUIDSchema,
   branchId: UUIDSchema.nullable(),
   name: z.string(),
-  code: z.string().nullable(),
   eventType: z.string(),
   description: z.string().nullable(),
   location: z.string().nullable(),
@@ -570,7 +564,6 @@ const CourseSchema = z.object({
   branchId: UUIDSchema.nullable(),
   masterCourseId: UUIDSchema.nullable().optional(),
   name: z.string(),
-  code: z.string(),
   description: z.string().nullable(),
   price: z.number(),
   duration: z.number(),
@@ -654,7 +647,6 @@ const CreateClassSchema = z.object({
   branchId: OptionalUUIDSchema,
   instructorId: OptionalUUIDSchema,
   name: z.string(),
-  code: z.string(),
   startDate: z.string(),
   endDate: z.string(),
   startTime: z.string().optional(),
@@ -668,7 +660,6 @@ const CreateClassSchema = z.object({
 const UpdateClassSchema = z.object({
   instructorId: OptionalUUIDSchema,
   name: z.string().optional(),
-  code: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   startTime: z.string().optional(),
@@ -689,7 +680,6 @@ const ClassSchema = z.object({
   branchId: UUIDSchema,
   instructorId: UUIDSchema.nullable(),
   name: z.string(),
-  code: z.string(),
   startDate: z.string(),
   endDate: z.string(),
   startTime: z.string().nullable(),
@@ -976,7 +966,7 @@ const CreateEmployeeSchema = z.object({
   phone: z.string().optional(),
   department: z.string().optional(),
   position: z.string().optional(),
-  salary: z.number().optional(),
+  salary: z.number().nullable().optional(),
   salaryType: z.enum(['MONTHLY', 'SESSION_BASED']).optional(),
   sessionRate: z.number().nullable().optional(),
   hireDate: z.string().optional(),
@@ -1216,7 +1206,6 @@ const UpdateCourseProductSchema = z.object({
 const EducationalBooksCourseSummarySchema = z.object({
   courseId: UUIDSchema,
   courseName: z.string(),
-  courseCode: z.string().nullable().optional(),
   branchId: UUIDSchema.nullable(),
   branchName: z.string().nullable(),
   linkedProductCount: z.number(),
@@ -1228,7 +1217,6 @@ const EducationalBooksCourseSummarySchema = z.object({
 const EducationalBooksCourseDetailSchema = z.object({
   courseId: UUIDSchema,
   courseName: z.string(),
-  courseCode: z.string().nullable().optional(),
   branchId: UUIDSchema.nullable(),
   enrolledCount: z.number(),
   products: z.array(z.object({
@@ -1611,7 +1599,7 @@ export const contract = c.router({
         409: z.object({
           message: z.string(),
           code: z.string().optional(),
-          classes: z.array(z.object({ id: z.string(), name: z.string(), code: z.string() })).optional(),
+          classes: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
         }),
       },
     },
@@ -2019,7 +2007,7 @@ export const contract = c.router({
         409: z.object({
           message: z.string(),
           code: z.string().optional(),
-          courses: z.array(z.object({ id: z.string(), name: z.string(), code: z.string() })).optional(),
+          courses: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
         }),
       },
     },
@@ -3000,7 +2988,6 @@ export const contract = c.router({
           assignedClasses: z.array(z.object({
             id: UUIDSchema,
             name: z.string(),
-            code: z.string(),
           })).optional(),
         }),
         404: ApiErrorSchema,
@@ -4332,7 +4319,6 @@ export const contract = c.router({
           sessionNumber: z.number().nullable().optional(),
           classId: UUIDSchema,
           className: z.string(),
-          classCode: z.string(),
           roomCode: z.string().nullable(),
           isPresent: z.boolean(),
           status: z.enum(['PRESENT', 'ABSENT', 'SUBSTITUTED']).optional(),
@@ -4439,7 +4425,6 @@ export const contract = c.router({
           branchName: z.string().nullable(),
           classId: UUIDSchema.nullable(),
           className: z.string().nullable(),
-          classCode: z.string().nullable(),
           courseName: z.string().nullable(),
           roomCode: z.string().nullable(),
           paid: z.boolean().optional(),

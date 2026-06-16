@@ -33,7 +33,6 @@ export interface TeacherAttendanceHistoryRow extends Omit<SessionTeacherAttendan
   branchName: string | null;
   classId: string | null;
   className: string | null;
-  classCode: string | null;
   courseName: string | null;
   roomCode: string | null;
   /** True when this session has been covered by a salary payment. */

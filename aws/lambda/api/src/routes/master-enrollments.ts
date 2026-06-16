@@ -34,7 +34,6 @@ function mapRow(row: any) {
     studentName: row.student_name ?? null,
     masterCourseId: row.master_course_id,
     masterCourseName: row.master_course_name ?? null,
-    masterCourseCode: row.master_course_code ?? null,
     masterCoursePrice: row.master_course_price !== undefined && row.master_course_price !== null
       ? parseFloat(row.master_course_price) : null,
     branchId: row.branch_id,
@@ -78,7 +77,6 @@ const SELECT_WITH_PROGRESS = `
     me.*,
     CONCAT(s.first_name, ' ', s.last_name) AS student_name,
     mc.name AS master_course_name,
-    mc.code AS master_course_code,
     mc.default_price AS master_course_price,
     b.name AS branch_name,
     (SELECT COUNT(*) FROM master_course_courses mcc WHERE mcc.master_course_id = me.master_course_id) AS total_courses,

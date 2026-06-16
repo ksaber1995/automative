@@ -14,7 +14,6 @@ function mapEventFromDB(row: any) {
     companyId: row.company_id,
     branchId: row.branch_id,
     name: row.name,
-    code: row.code,
     eventType: row.event_type,
     description: row.description,
     location: row.location,
@@ -45,7 +44,6 @@ export const eventsRoutes = {
         company_id: context.companyId,
         branch_id: body.branchId || null,
         name: body.name,
-        code: body.code || null,
         event_type: body.eventType || 'OTHER',
         description: body.description || null,
         location: body.location || null,
@@ -145,7 +143,6 @@ export const eventsRoutes = {
         updateData.branch_id = body.branchId || null;
       }
       if (body.name !== undefined) updateData.name = body.name;
-      if (body.code !== undefined) updateData.code = body.code;
       if (body.eventType !== undefined) updateData.event_type = body.eventType;
       if (body.description !== undefined) updateData.description = body.description;
       if (body.location !== undefined) updateData.location = body.location;

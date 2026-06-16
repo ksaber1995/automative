@@ -314,7 +314,7 @@
                       [value]="row.type === 'MASTER' ? ('REPORTS.TYPE_BUNDLE' | translate) : ('REPORTS.TYPE_COURSE' | translate)"
                       [severity]="row.type === 'MASTER' ? 'warn' : 'info'"></p-tag>
                   </td>
-                  <td class="font-medium">{{ row.courseName }} <span class="text-xs text-gray-500 font-mono">{{ row.courseCode }}</span></td>
+                  <td class="font-medium">{{ row.courseName }}</td>
                   <td>{{ row.branchName }}</td>
                   <td class="text-right">{{ row.enrollments }}</td>
                   <td class="text-right font-semibold text-green-700">{{ row.revenue | number:'1.2-2' }}</td>
@@ -489,9 +489,6 @@
               <tr>
                 <td class="font-medium">
                   {{ row.name }}
-                  @if (row.code) {
-                    <span class="text-xs text-gray-500 font-mono">{{ row.code }}</span>
-                  }
                 </td>
                 <td>
                   <p-tag [value]="('EVENTS.TYPE.' + row.eventType) | translate" severity="info"></p-tag>

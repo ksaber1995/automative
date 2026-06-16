@@ -25,7 +25,6 @@ export interface TopCourseRow {
   type: CourseRowType;
   courseId: string;
   courseName: string;
-  courseCode: string;
   branchName: string;
   enrollmentCount: number;
   activeCount: number;
@@ -53,7 +52,6 @@ export interface ProfitByCourseRow {
   type: CourseRowType;
   courseId: string;
   courseName: string;
-  courseCode: string;
   branchName: string;
   enrollments: number;
   revenue: number;
@@ -95,7 +93,6 @@ export interface ExpenseCategoryRow {
 export interface ProfitByEventRow {
   eventId: string;
   name: string;
-  code: string | null;
   eventType: string;
   status: string;
   startDate: string | null;

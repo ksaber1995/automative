@@ -271,7 +271,7 @@ export const employeesRoutes = {
       // Block termination if the employee is still assigned as instructor on any non-finished class.
       // (company_id is derived from the linked course.)
       const assignedClasses = await query(
-        `SELECT c.id, c.name, c.code
+        `SELECT c.id, c.name
          FROM classes c
          INNER JOIN courses co ON c.course_id = co.id
          WHERE c.instructor_id = $1
@@ -286,7 +286,7 @@ export const employeesRoutes = {
           body: {
             message: 'Cannot terminate this employee while they are assigned to active classes. Please unassign them from these classes first.',
             code: 'ERRORS.EMPLOYEES.ASSIGNED_TO_ACTIVE_CLASSES',
-            assignedClasses: assignedClasses.map((c: any) => ({ id: c.id, name: c.name, code: c.code })),
+            assignedClasses: assignedClasses.map((c: any) => ({ id: c.id, name: c.name })),
           },
         };
       }

@@ -82,7 +82,6 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th pSortableColumn="code">{{ 'COURSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
@@ -95,7 +94,6 @@
       </ng-template>
       <ng-template pTemplate="body" let-course>
         <tr>
-          <td>{{ course.code }}</td>
           <td>
             {{ course.name }}
             @if (course.paymentType === 'MONTHLY_SUBSCRIPTION') {
@@ -221,7 +219,6 @@
         <li class="flex items-center justify-between px-3 py-2">
           <div>
             <div class="font-medium text-sm">{{ c.name }}</div>
-            <div class="text-xs text-gray-500 font-mono">{{ c.code }}</div>
           </div>
           <p-button
             icon="pi pi-external-link"

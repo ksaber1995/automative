@@ -17,7 +17,6 @@ export interface Session {
   roomCode?: string | null;
   roomDescription?: string | null;
   className?: string;
-  classCode?: string;
   courseName?: string;
   branchName?: string;
   durationMinutes?: number | null;

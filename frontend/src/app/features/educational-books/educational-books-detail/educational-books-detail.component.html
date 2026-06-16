@@ -13,9 +13,6 @@
           <div>
             <h2 class="text-2xl font-bold">{{ courseDetail()?.courseName }}</h2>
             <div class="text-sm text-gray-500">
-              @if (courseDetail()?.courseCode) {
-                <span class="font-mono mr-3">{{ courseDetail()!.courseCode }}</span>
-              }
               <span>
                 {{ 'EDUCATIONAL_BOOKS.ENROLLED' | translate }}: {{ courseDetail()?.enrolledCount || 0 }}
               </span>

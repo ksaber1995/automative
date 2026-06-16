@@ -79,7 +79,6 @@
         <tr>
           <td class="font-medium">
             {{ item.name }}
-            @if (item.code) { <span class="text-gray-500 text-sm ml-1">({{ item.code }})</span> }
           </td>
           <td>
             <p-tag [value]="('EVENTS.TYPE.' + item.eventType) | translate" severity="info"></p-tag>

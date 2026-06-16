@@ -38,13 +38,6 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'MASTER_COURSES.FORM.CODE' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input pInputText formControlName="code" class="w-full" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'MASTER_COURSES.FORM.DEFAULT_PRICE' | translate }} <span class="text-red-500">*</span>
             </label>
             <p-inputnumber formControlName="defaultPrice" mode="currency" currency="USD" [min]="0" [style]="{ width: '100%' }"></p-inputnumber>

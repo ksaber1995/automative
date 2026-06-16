@@ -20,7 +20,6 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 interface EnrollmentDisplay extends Enrollment {
   studentName: string;
   courseName: string;
-  courseCode: string;
 }
 
 @Component({
@@ -95,7 +94,6 @@ export class EnrollmentListComponent implements OnInit {
             ...e,
             studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
             courseName: course?.name || 'Unknown',
-            courseCode: course?.code || 'N/A'
           };
         });
 

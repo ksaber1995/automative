@@ -142,7 +142,6 @@ async function updateClassesTableStructure() {
     await query(`
       ALTER TABLE classes
       ADD COLUMN IF NOT EXISTS name VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS code VARCHAR(50),
       ADD COLUMN IF NOT EXISTS start_date DATE,
       ADD COLUMN IF NOT EXISTS end_date DATE,
       ADD COLUMN IF NOT EXISTS start_time TIME,
@@ -159,21 +158,8 @@ async function updateClassesTableStructure() {
       WHERE name IS NULL;
     `);
 
-    await query(`
-      UPDATE classes
-      SET code = 'CLS-' || SUBSTRING(id::text FROM 1 FOR 6)
-      WHERE code IS NULL;
-    `);
-
     // Make columns NOT NULL
     await query(`ALTER TABLE classes ALTER COLUMN name SET NOT NULL;`);
-    await query(`ALTER TABLE classes ALTER COLUMN code SET NOT NULL;`);
-
-    // Add unique constraint on code
-    await query(`
-      ALTER TABLE classes
-      ADD CONSTRAINT unique_class_code UNIQUE (code);
-    `);
 
     console.log('✅ Migration completed successfully!');
 
@@ -182,7 +168,7 @@ async function updateClassesTableStructure() {
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'classes'
-      AND column_name IN ('name', 'code', 'start_date', 'end_date', 'start_time', 'end_time', 'days_of_week', 'current_enrollment', 'notes')
+      AND column_name IN ('name', 'start_date', 'end_date', 'start_time', 'end_time', 'days_of_week', 'current_enrollment', 'notes')
       ORDER BY column_name;
     `);
 

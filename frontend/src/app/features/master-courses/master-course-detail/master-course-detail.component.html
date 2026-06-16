@@ -8,7 +8,6 @@
         (onClick)="back()"
       ></p-button>
       <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ master()?.name }}</h1>
-      <p class="text-gray-600 font-mono">{{ master()?.code }}</p>
       @if (master()?.branchName) {
         <p class="text-sm text-gray-500 mt-1">
           <i class="pi pi-building mr-1"></i>{{ master()?.branchName }}
@@ -107,7 +106,6 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'MASTER_COURSES.DETAIL.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="code">{{ 'MASTER_COURSES.DETAIL.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
           <th pSortableColumn="price" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
           <th pSortableColumn="duration" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="duration"></p-sortIcon></th>
           <th pSortableColumn="isActive">{{ 'MASTER_COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
@@ -119,7 +117,6 @@
       <ng-template pTemplate="body" let-row>
         <tr>
           <td class="font-medium">{{ row.name }}</td>
-          <td><span class="font-mono">{{ row.code }}</span></td>
           <td class="text-right">{{ row.price | amount }}</td>
           <td class="text-right">{{ row.duration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
           <td>
@@ -235,7 +232,7 @@
       >
         <ng-template let-c pTemplate="item">
           <div class="flex justify-between items-center gap-3">
-            <span>{{ c.name }} <span class="text-xs text-gray-500 font-mono ml-2">{{ c.code }}</span></span>
+            <span>{{ c.name }}</span>
             <span class="text-sm text-gray-600">{{ c.price | amount }}</span>
           </div>
         </ng-template>

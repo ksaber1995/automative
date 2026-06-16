@@ -9,7 +9,6 @@
           <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
         }
       </div>
-      <p class="text-gray-500 mt-1">{{ classDetail()?.code }}</p>
     </div>
     <p-button [label]="'CLASSES.DETAIL.EDIT' | translate" icon="pi pi-pencil" severity="info" [outlined]="true" (onClick)="editClass()"></p-button>
     @if (!isFinished()) {

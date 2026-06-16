@@ -91,7 +91,6 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th pSortableColumn="code">{{ 'CLASSES.LIST.COL_CODE' | translate }} <p-sortIcon field="code"></p-sortIcon></th>
           <th pSortableColumn="name">{{ 'CLASSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="courseName">{{ 'CLASSES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
           <th pSortableColumn="branchName">{{ 'CLASSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
@@ -105,7 +104,6 @@
       </ng-template>
       <ng-template pTemplate="body" let-classItem>
         <tr>
-          <td>{{ classItem.code }}</td>
           <td>{{ classItem.name }}</td>
           <td>{{ classItem.courseName || 'N/A' }}</td>
           <td>{{ classItem.branchName || 'N/A' }}</td>

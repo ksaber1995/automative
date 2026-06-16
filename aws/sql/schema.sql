@@ -181,7 +181,6 @@ CREATE TABLE master_courses (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) NOT NULL,
     description TEXT,
     default_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
     default_duration INTEGER NOT NULL DEFAULT 8,
@@ -189,8 +188,7 @@ CREATE TABLE master_courses (
     level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (branch_id, code)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_master_courses_company ON master_courses(company_id);
@@ -278,7 +276,6 @@ CREATE TABLE courses (
     branch_id UUID NOT NULL,
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) NOT NULL,
     description TEXT,
     price DECIMAL(10, 2) NOT NULL,
     duration INTEGER NOT NULL,
@@ -293,13 +290,11 @@ CREATE TABLE courses (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL,
-    CONSTRAINT courses_company_id_code_key UNIQUE(company_id, code)
+    FOREIGN KEY (instructor_id) REFERENCES employees(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX idx_courses_company_id ON courses(company_id);
-CREATE INDEX idx_courses_code ON courses(code);
 CREATE INDEX idx_courses_level_id ON courses(level_id);
 
 CREATE TABLE master_course_courses (
@@ -322,7 +317,6 @@ CREATE TABLE classes (
     -- branch_id / company_id were removed: both are derivable from courses.
     instructor_id UUID,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     start_time TIME,
@@ -458,7 +452,6 @@ CREATE TABLE events (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     branch_id UUID,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50),
     event_type VARCHAR(32) NOT NULL DEFAULT 'OTHER',
     description TEXT,
     location VARCHAR(255),
