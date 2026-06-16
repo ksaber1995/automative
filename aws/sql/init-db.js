@@ -290,8 +290,8 @@ CREATE TABLE IF NOT EXISTS students (
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT true,
     enrollment_date DATE NOT NULL,
-    churn_date DATE,
-    churn_reason TEXT,
+    inactive_date DATE,
+    inactive_reason TEXT,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -300,11 +300,26 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE INDEX IF NOT EXISTS idx_students_branch_id ON students(branch_id);
 CREATE INDEX IF NOT EXISTS idx_students_enrollment_date ON students(enrollment_date);
-CREATE INDEX IF NOT EXISTS idx_students_churn_date ON students(churn_date);
+CREATE INDEX IF NOT EXISTS idx_students_inactive_date ON students(inactive_date);
 CREATE INDEX IF NOT EXISTS idx_students_email ON students(email);
 CREATE INDEX IF NOT EXISTS idx_students_company_id ON students(company_id);
 
 CREATE OR REPLACE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Stamp/clear students.inactive_date when is_active flips.
+CREATE OR REPLACE FUNCTION set_student_inactive_date()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.is_active = false AND COALESCE(OLD.is_active, true) = true AND NEW.inactive_date IS NULL THEN
+        NEW.inactive_date = CURRENT_DATE;
+    ELSIF NEW.is_active = true AND COALESCE(OLD.is_active, true) = false THEN
+        NEW.inactive_date = NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE OR REPLACE TRIGGER trg_student_inactive_date BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION set_student_inactive_date();
 
 -- ENROLLMENTS TABLE
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -591,7 +606,7 @@ CREATE VIEW student_enrollment_stats AS
 SELECT b.id as branch_id, b.name as branch_name,
     COUNT(DISTINCT s.id) as total_students,
     COUNT(DISTINCT CASE WHEN s.is_active = true THEN s.id END) as active_students,
-    COUNT(DISTINCT CASE WHEN s.churn_date IS NOT NULL THEN s.id END) as churned_students
+    COUNT(DISTINCT CASE WHEN s.inactive_date IS NOT NULL THEN s.id END) as inactive_students
 FROM branches b LEFT JOIN students s ON b.id = s.branch_id
 GROUP BY b.id, b.name;
 `;

@@ -1035,6 +1035,67 @@ async function addAcquisitionChannelToStudents() {
   return { success: true, message: 'acquisition_channel column ensured on students' };
 }
 
+async function renameChurnToInactive() {
+  console.log('Starting migration: rename students.churn_date/churn_reason -> inactive_date/inactive_reason');
+  // Idempotent: only rename if the old column still exists and the new one does
+  // not. A view (student_enrollment_stats) references churn_date, but Postgres
+  // tracks the dependency by column number, so the rename propagates cleanly.
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'students' AND column_name = 'churn_date')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'students' AND column_name = 'inactive_date') THEN
+        ALTER TABLE students RENAME COLUMN churn_date TO inactive_date;
+      END IF;
+
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'students' AND column_name = 'churn_reason')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'students' AND column_name = 'inactive_reason') THEN
+        ALTER TABLE students RENAME COLUMN churn_reason TO inactive_reason;
+      END IF;
+    END $$;
+  `);
+  await query(`ALTER INDEX IF EXISTS idx_students_churn_date RENAME TO idx_students_inactive_date`);
+  console.log('✅ students churn columns renamed to inactive_date / inactive_reason');
+  return { success: true, message: 'Renamed students.churn_date->inactive_date, churn_reason->inactive_reason' };
+}
+
+async function addStudentInactiveDateTrigger() {
+  console.log('Starting migration: students inactive_date deactivation trigger + backfill');
+  // Trigger: stamp inactive_date when is_active flips true->false, clear on reactivation.
+  await query(`
+    CREATE OR REPLACE FUNCTION set_student_inactive_date()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      IF NEW.is_active = false AND COALESCE(OLD.is_active, true) = true AND NEW.inactive_date IS NULL THEN
+        NEW.inactive_date = CURRENT_DATE;
+      ELSIF NEW.is_active = true AND COALESCE(OLD.is_active, true) = false THEN
+        NEW.inactive_date = NULL;
+      END IF;
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+  `);
+  await query(`DROP TRIGGER IF EXISTS trg_student_inactive_date ON students`);
+  await query(`
+    CREATE TRIGGER trg_student_inactive_date
+      BEFORE UPDATE ON students
+      FOR EACH ROW EXECUTE FUNCTION set_student_inactive_date()
+  `);
+  // Backfill: existing deactivated students with no date get their last-update date.
+  const backfilled = await query(`
+    UPDATE students
+      SET inactive_date = updated_at::date
+      WHERE is_active = false AND inactive_date IS NULL
+      RETURNING id
+  `);
+  console.log(`✅ inactive_date trigger installed; backfilled ${backfilled.length} deactivated students`);
+  return { success: true, message: `inactive_date trigger installed; backfilled ${backfilled.length} students` };
+}
+
 async function createLevelsFeature() {
   console.log('Starting migration: levels table + course/master_course level_id');
 
@@ -1193,6 +1254,36 @@ export const migrationsRoutes = {
   createLevelsFeature: async () => {
     try {
       const result = await createLevelsFeature();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  renameChurnToInactive: async () => {
+    try {
+      const result = await renameChurnToInactive();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addStudentInactiveDateTrigger: async () => {
+    try {
+      const result = await addStudentInactiveDateTrigger();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

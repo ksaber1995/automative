@@ -306,8 +306,8 @@ const StudentSchema = z.object({
   branchId: UUIDSchema,
   isActive: z.boolean(),
   enrollmentDate: z.string(),
-  churnDate: z.string().nullable(),
-  churnReason: z.string().nullable(),
+  inactiveDate: z.string().nullable(),
+  inactiveReason: z.string().nullable(),
   notes: z.string().nullable(),
   acquisitionChannel: AcquisitionChannelSchema.nullable(),
   qrToken: z.string().nullable().optional(),
@@ -3542,7 +3542,6 @@ export const contract = c.router({
       path: '/api/reports/student-churn',
       query: z.object({
         branchId: OptionalUUIDSchema,
-        inactiveMonths: z.string().optional(),
       }),
       responses: { 200: z.any() },
     },
@@ -4023,6 +4022,24 @@ export const contract = c.router({
     addAcquisitionChannelToStudents: {
       method: 'POST',
       path: '/api/migrations/add-acquisition-channel-to-students',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    renameChurnToInactive: {
+      method: 'POST',
+      path: '/api/migrations/rename-churn-to-inactive',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addStudentInactiveDateTrigger: {
+      method: 'POST',
+      path: '/api/migrations/add-student-inactive-date-trigger',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

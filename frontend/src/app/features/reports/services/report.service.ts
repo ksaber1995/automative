@@ -40,12 +40,14 @@ export interface StudentMonthRow {
 
 export interface ChurnSummary {
   totalStudents: number;
+  // Enrolled in at least one still-running course/class.
   activeStudents: number;
-  churnedStudents: number;
+  // Record still active but with no active enrollment.
+  dormantStudents: number;
+  // Student record itself deactivated (formerly "churned").
   inactiveStudents: number;
-  inactiveMonths: number;
-  churnRate: number;
-  inactivityRate: number;
+  inactiveRate: number;
+  dormancyRate: number;
 }
 
 export interface ProfitByCourseRow {
@@ -137,8 +139,8 @@ export class ReportService {
     return this.api.get<StudentMonthRow[]>('reports/students-over-time', filters);
   }
 
-  studentChurn(branchId?: string, inactiveMonths: number = 3): Observable<ChurnSummary> {
-    return this.api.get<ChurnSummary>('reports/student-churn', { branchId, inactiveMonths: String(inactiveMonths) });
+  studentChurn(branchId?: string): Observable<ChurnSummary> {
+    return this.api.get<ChurnSummary>('reports/student-churn', { branchId });
   }
 
   profitByCourse(filters: ReportFilters = {}): Observable<ProfitByCourseRow[]> {

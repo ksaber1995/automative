@@ -330,12 +330,12 @@ export const reportsRoutes = {
            GROUP BY 1
          ),
          churned AS (
-           SELECT date_trunc('month', s.churn_date)::date AS m, COUNT(*) AS cnt
+           SELECT date_trunc('month', s.inactive_date)::date AS m, COUNT(*) AS cnt
            FROM students s
            INNER JOIN branches b ON b.id = s.branch_id
            WHERE b.company_id = $1
-             AND s.churn_date IS NOT NULL
-             AND s.churn_date >= $2 AND s.churn_date <= $3 ${branchClause}
+             AND s.inactive_date IS NOT NULL
+             AND s.inactive_date >= $2 AND s.inactive_date <= $3 ${branchClause}
            GROUP BY 1
          )
          SELECT TO_CHAR(m.month_start, 'YYYY-MM') AS month,
@@ -366,69 +366,82 @@ export const reportsRoutes = {
   },
 
   // Churn: % of active students with no enrollment activity in the last N months.
-  studentChurn: async ({ query: q, headers }: { query: RangeQuery & { inactiveMonths?: string }; headers: AuthHeaders }) => {
+  studentChurn: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
-      const inactiveMonths = Math.min(Math.max(parseInt(q.inactiveMonths || '3', 10) || 3, 1), 24);
       const scope = resolveBranchScope(context, q.branchId);
       if (!scope.ok) return scope.error;
 
-      const totalsParams: any[] = [context.companyId];
-      const totalsBranchClause = reportBranchClause('s.branch_id', totalsParams, scope.ids);
+      // The three student states (mutually exclusive):
+      //   inactive = the student record itself has been deactivated (s.is_active =
+      //              false — this is how the delete/deactivate flow records it;
+      //              formerly surfaced as "churned").
+      //   active   = record is active AND currently enrolled in a still-running
+      //              class (not finished). A finished class completes the
+      //              enrollment (see master-class-enrollments mapRow), so a student
+      //              in only finished classes is NOT active.
+      //   dormant  = record is active but has NO enrollment in a running class.
+      // A class is "running" when is_finished = false — that is the authoritative
+      // signal (see deriveStatus in classes.ts). NOTE: classes.is_active is not a
+      // reliable "running" flag (it is false even for in-progress classes), so it
+      // must NOT be part of this test. The test checks both the single-course
+      // (enrollments) and bundle (master_class_enrollments) tables.
+      const activeEnrollmentExists = `(
+        EXISTS (
+          SELECT 1 FROM enrollments e
+          INNER JOIN classes c ON c.id = e.class_id
+          WHERE e.student_id = s.id
+            AND e.status NOT IN ('DROPPED', 'CANCELLED')
+            AND COALESCE(c.is_finished, false) = false
+        )
+        OR EXISTS (
+          SELECT 1 FROM master_class_enrollments mce
+          INNER JOIN classes c ON c.id = mce.class_id
+          WHERE mce.student_id = s.id
+            AND mce.status != 'DROPPED'
+            AND COALESCE(c.is_finished, false) = false
+        )
+      )`;
 
-      const totals = await query(
+      const countParams: any[] = [context.companyId];
+      const branchClause = reportBranchClause('s.branch_id', countParams, scope.ids);
+      const counts = await query(
         `SELECT
-           COUNT(*) FILTER (WHERE s.is_active = true) AS active,
-           COUNT(*) FILTER (WHERE s.churn_date IS NOT NULL) AS churned,
-           COUNT(*) AS total
+           COUNT(*) AS total,
+           COUNT(*) FILTER (WHERE s.is_active = false) AS inactive,
+           COUNT(*) FILTER (
+             WHERE s.is_active = true AND ${activeEnrollmentExists}
+           ) AS active,
+           COUNT(*) FILTER (
+             WHERE s.is_active = true AND NOT ${activeEnrollmentExists}
+           ) AS dormant
          FROM students s
          INNER JOIN branches b ON b.id = s.branch_id
-         WHERE b.company_id = $1 ${totalsBranchClause}`,
-        totalsParams
+         WHERE b.company_id = $1 ${branchClause}`,
+        countParams
       );
 
-      const inactiveParams: any[] = [context.companyId];
-      const inactiveBranchClause = reportBranchClause('s.branch_id', inactiveParams, scope.ids);
-      inactiveParams.push(inactiveMonths);
-      const monthsParamIdx = inactiveParams.length;
-      const inactive = await query(
-        `SELECT COUNT(*) AS c FROM students s
-         INNER JOIN branches b ON b.id = s.branch_id
-         WHERE b.company_id = $1 ${inactiveBranchClause}
-           AND s.is_active = true
-           AND NOT EXISTS (
-             SELECT 1 FROM enrollments e
-             WHERE e.student_id = s.id
-               AND e.enrollment_date >= (CURRENT_DATE - make_interval(months => $${monthsParamIdx}::int))
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM master_enrollments me
-             WHERE me.student_id = s.id
-               AND me.enrollment_date >= (CURRENT_DATE - make_interval(months => $${monthsParamIdx}::int))
-           )`,
-        inactiveParams
-      );
-
-      const total = parseInt(totals[0]?.total || '0', 10);
-      const active = parseInt(totals[0]?.active || '0', 10);
-      const churned = parseInt(totals[0]?.churned || '0', 10);
-      const inactiveCount = parseInt(inactive[0]?.c || '0', 10);
-      const churnRate = total > 0 ? (churned / total) * 100 : 0;
-      const inactivityRate = active > 0 ? (inactiveCount / active) * 100 : 0;
+      const total = parseInt(counts[0]?.total || '0', 10);
+      const active = parseInt(counts[0]?.active || '0', 10);
+      const dormant = parseInt(counts[0]?.dormant || '0', 10);
+      const inactive = parseInt(counts[0]?.inactive || '0', 10);
+      // Inactive rate: share of all students that have been deactivated.
+      const inactiveRate = total > 0 ? (inactive / total) * 100 : 0;
+      // Dormancy rate: share of still-active records that have no active enrollment.
+      const dormancyRate = active + dormant > 0 ? (dormant / (active + dormant)) * 100 : 0;
 
       return {
         status: 200 as const,
         body: {
           totalStudents: total,
           activeStudents: active,
-          churnedStudents: churned,
-          inactiveStudents: inactiveCount,
-          inactiveMonths,
-          churnRate: Math.round(churnRate * 100) / 100,
-          inactivityRate: Math.round(inactivityRate * 100) / 100,
+          dormantStudents: dormant,
+          inactiveStudents: inactive,
+          inactiveRate: Math.round(inactiveRate * 100) / 100,
+          dormancyRate: Math.round(dormancyRate * 100) / 100,
         },
       };
     } catch (error) {

@@ -121,7 +121,7 @@ BEGIN
     INSERT INTO students (id, company_id, branch_id, first_name, last_name, date_of_birth,
                           parent_name, parent_phone, parent_email,
                           enrollment_date, is_active,
-                          churn_date, churn_reason, notes)
+                          inactive_date, inactive_reason, notes)
     VALUES (
       v_student_id, v_company_id, v_branch_id,
       v_first, v_last, v_dob,

@@ -72,7 +72,6 @@ export class ReportListComponent implements OnInit {
    *            tables/aggregates filter to the selected set.
    */
   branchIds: string[] = [];
-  inactiveMonths = 3;
   branches = signal<Branch[]>([]);
   // Mirror of branchIds usable from reactive computeds.
   branchIdsSignal = signal<string[]>([]);
@@ -531,7 +530,7 @@ export class ReportListComponent implements OnInit {
       salary: this.reportService.salaryGrowth({ ...range, branchId: aggregateBranchId }),
       topCourses: this.reportService.topCourses({ ...range }),
       studentsOT: this.reportService.studentsOverTime({ ...range, branchId: aggregateBranchId }),
-      churn: this.reportService.studentChurn(churnBranchId, this.inactiveMonths),
+      churn: this.reportService.studentChurn(churnBranchId),
       profitCourses: this.reportService.profitByCourse({ ...range }),
       profitBranches: this.reportService.profitByBranch({ ...range }),
       profitProducts: this.reportService.profitByProduct({ ...range }),
@@ -550,7 +549,7 @@ export class ReportListComponent implements OnInit {
                 monthlyPL: this.reportService.monthlyPL({ ...range, branchId: id }),
                 salary: this.reportService.salaryGrowth({ ...range, branchId: id }),
                 studentsOT: this.reportService.studentsOverTime({ ...range, branchId: id }),
-                churn: this.reportService.studentChurn(id, this.inactiveMonths),
+                churn: this.reportService.studentChurn(id),
                 expenseCats: this.reportService.expensesByCategory({ ...range, branchId: id }),
               }).pipe(map((v) => ({ branchId: id, idx, ...v }))),
             // Process branches one at a time so the aggregate calls above
@@ -601,25 +600,6 @@ export class ReportListComponent implements OnInit {
     });
   }
 
-  onChurnWindowChange() {
-    const ids = this.branchIdsSignal();
-    if (ids.length >= 2) {
-      forkJoin(
-        ids.map((id) => this.reportService.studentChurn(id, this.inactiveMonths)),
-      ).subscribe({
-        next: (results) => {
-          this.compareSeries.update((curr) =>
-            curr.map((b, i) => ({ ...b, churn: results[i] })),
-          );
-        },
-      });
-    } else {
-      this.reportService
-        .studentChurn(ids[0] || undefined, this.inactiveMonths)
-        .subscribe({ next: (c) => this.churn.set(c) });
-    }
-  }
-
   resetFilters() {
     const end = new Date();
     const start = new Date();
@@ -629,7 +609,6 @@ export class ReportListComponent implements OnInit {
     this.endDate = end;
     this.branchIds = [];
     this.branchIdsSignal.set([]);
-    this.inactiveMonths = 3;
     this.reload();
   }
 
@@ -790,11 +769,10 @@ export class ReportListComponent implements OnInit {
         { header: 'Branch', value: r => r.branchName },
         { header: 'Total Students', value: r => r.churn?.totalStudents ?? 0 },
         { header: 'Active', value: r => r.churn?.activeStudents ?? 0 },
-        { header: 'Churned', value: r => r.churn?.churnedStudents ?? 0 },
+        { header: 'Dormant', value: r => r.churn?.dormantStudents ?? 0 },
         { header: 'Inactive', value: r => r.churn?.inactiveStudents ?? 0 },
-        { header: 'Churn Rate (%)', value: r => r.churn?.churnRate ?? 0 },
-        { header: 'Inactivity Rate (%)', value: r => r.churn?.inactivityRate ?? 0 },
-        { header: 'Inactive Months Window', value: r => r.churn?.inactiveMonths ?? this.inactiveMonths },
+        { header: 'Inactive Rate (%)', value: r => r.churn?.inactiveRate ?? 0 },
+        { header: 'Dormancy Rate (%)', value: r => r.churn?.dormancyRate ?? 0 },
       ];
       downloadCsv(this.csvFile('churn'), rows, cols);
       return;
@@ -807,11 +785,10 @@ export class ReportListComponent implements OnInit {
     const rows = [
       { metric: 'Total Students', value: c.totalStudents },
       { metric: 'Active', value: c.activeStudents },
-      { metric: 'Churned', value: c.churnedStudents },
+      { metric: 'Dormant', value: c.dormantStudents },
       { metric: 'Inactive', value: c.inactiveStudents },
-      { metric: 'Churn Rate (%)', value: c.churnRate },
-      { metric: 'Inactivity Rate (%)', value: c.inactivityRate },
-      { metric: 'Inactive Months Window', value: c.inactiveMonths },
+      { metric: 'Inactive Rate (%)', value: c.inactiveRate },
+      { metric: 'Dormancy Rate (%)', value: c.dormancyRate },
     ];
     const cols: CsvColumn<typeof rows[number]>[] = [
       { header: 'Metric', value: r => r.metric },

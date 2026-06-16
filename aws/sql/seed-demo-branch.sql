@@ -117,7 +117,7 @@ BEGIN
   WITH ins AS (
     INSERT INTO students (first_name, last_name, date_of_birth, email, phone,
                           parent_name, parent_phone, parent_email, address,
-                          branch_id, company_id, is_active, enrollment_date, churn_date)
+                          branch_id, company_id, is_active, enrollment_date, inactive_date)
     SELECT
       (ARRAY['Ali','Mariam','Youssef','Habiba','Adam','Lina','Zeyad','Jana','Malak','Selim',
              'Farida','Karim','Nour','Hassan','Salma','Mostafa','Yara','Hossam','Dina','Tamer'])[((g - 1) % 20) + 1],
@@ -176,7 +176,7 @@ BEGIN
     v_courses[((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 8) + 1)],
     v_branch,
     s.enrollment_date,
-    CASE WHEN s.churn_date IS NOT NULL THEN 'DROPPED'
+    CASE WHEN s.inactive_date IS NOT NULL THEN 'DROPPED'
          WHEN s.enrollment_date + 90 < v_today THEN 'COMPLETED'
          ELSE 'ACTIVE' END,
     (ARRAY[1200,1800,1000,1600,2000,2200,1400,1500])[

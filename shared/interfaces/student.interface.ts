@@ -35,8 +35,8 @@ export interface Student {
   branchId: string;
   isActive: boolean;
   enrollmentDate: string;
-  churnDate?: string;
-  churnReason?: string;
+  inactiveDate?: string;
+  inactiveReason?: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel | null;
   /** Random token encoded in the student's QR code (public profile + check-in). */
