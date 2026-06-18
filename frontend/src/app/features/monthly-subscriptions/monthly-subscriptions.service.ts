@@ -7,6 +7,8 @@ import {
   MonthlyPaymentSummary,
   RecordMonthlyPaymentDto,
   GenerateMonthlyBillsDto,
+  CourseMonthlyPriceOverride,
+  SetPriceOverrideDto,
 } from '@shared/interfaces/monthly-subscription.interface';
 
 @Injectable({ providedIn: 'root' })
@@ -88,5 +90,26 @@ export class MonthlySubscriptionsService {
   /** Every monthly bill for one student (newest month first). */
   listByStudent(studentId: string): Observable<MonthlyPaymentWithDetails[]> {
     return this.http.get<MonthlyPaymentWithDetails[]>(`${this.base}/student/${studentId}`);
+  }
+
+  /** Set or update a monthly price override for a course. Recalculates all unpaid bills. */
+  setPriceOverride(dto: SetPriceOverrideDto): Observable<{ override: CourseMonthlyPriceOverride; updatedBills: number }> {
+    return this.http.post<{ override: CourseMonthlyPriceOverride; updatedBills: number }>(
+      `${this.base}/price-override`, dto
+    );
+  }
+
+  /** Get the current price override for a course+month (returns null if none). */
+  getPriceOverride(courseId: string, billingYear: number, billingMonth: number): Observable<CourseMonthlyPriceOverride | null> {
+    const params = new HttpParams()
+      .set('courseId', courseId)
+      .set('billingYear', billingYear.toString())
+      .set('billingMonth', billingMonth.toString());
+    return this.http.get<CourseMonthlyPriceOverride | null>(`${this.base}/price-override`, { params });
+  }
+
+  /** Delete a price override and revert bills to normal pricing. */
+  deletePriceOverride(id: string): Observable<{ deleted: boolean; updatedBills: number }> {
+    return this.http.delete<{ deleted: boolean; updatedBills: number }>(`${this.base}/price-override/${id}`);
   }
 }

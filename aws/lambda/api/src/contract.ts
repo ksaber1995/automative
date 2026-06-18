@@ -311,6 +311,10 @@ const StudentSchema = z.object({
   notes: z.string().nullable(),
   acquisitionChannel: AcquisitionChannelSchema.nullable(),
   qrToken: z.string().nullable().optional(),
+  qrActivated: z.boolean().optional(),
+  qrExpiration: z.string().nullable().optional(),
+  qrPrice: z.number().nullable().optional(),
+  qrPaid: z.boolean().optional(),
   hasSubscriptions: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -633,6 +637,24 @@ const GenerateMonthlyBillsSchema = z.object({
   branchId: OptionalUUIDSchema,
   billingYear: z.number().int().min(2020).max(2100),
   billingMonth: z.number().int().min(1).max(12),
+});
+
+const CourseMonthlyPriceOverrideSchema = z.object({
+  id: UUIDSchema,
+  courseId: UUIDSchema,
+  companyId: UUIDSchema,
+  billingYear: z.number(),
+  billingMonth: z.number(),
+  overridePrice: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const SetPriceOverrideSchema = z.object({
+  courseId: UUIDSchema,
+  billingYear: z.number().int().min(2020).max(2100),
+  billingMonth: z.number().int().min(1).max(12),
+  overridePrice: z.number().positive(),
 });
 
 // =============================================
@@ -1405,6 +1427,20 @@ export const contract = c.router({
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
+      },
+    },
+    // Paid QR activation (TEACHER companies). ONE_YEAR = 25 EGP, LIFELONG = 40 EGP.
+    activateQr: {
+      method: 'POST',
+      path: '/api/students/:id/activate-qr',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ plan: z.enum(['ONE_YEAR', 'LIFELONG']) }),
+      responses: {
+        200: StudentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
       },
     },
   },
@@ -2900,6 +2936,16 @@ export const contract = c.router({
             subscriptionStartDate: z.string().nullable(),
             subscriptionEndDate: z.string().nullable(),
           }).nullable(),
+          qr: z.object({
+            studentCount: z.number(),
+            activatedCount: z.number(),
+            oneYearCount: z.number(),
+            lifelongCount: z.number(),
+            totalCost: z.number(),
+            paidCost: z.number(),
+            unpaidCost: z.number(),
+            currency: z.string(),
+          }).optional(),
         }),
         401: ApiErrorSchema,
         404: ApiErrorSchema,
@@ -3695,6 +3741,9 @@ export const contract = c.router({
             employee_count: z.number(),
             branch_count: z.number(),
             student_count: z.number(),
+            qr_activated_count: z.number(),
+            qr_total_cost: z.number(),
+            qr_unpaid_cost: z.number(),
           })
         ),
         500: z.object({ message: z.string() }),
@@ -3739,6 +3788,18 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    // Mark a company's QR activations as paid / unpaid.
+    setQrPaid: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-paid',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ paid: z.boolean() }),
+      responses: {
+        200: z.object({ success: z.boolean(), paid: z.boolean(), updated_count: z.number() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     // Permanently delete a company and ALL its data (FK cascade). Irreversible.
     deleteCompany: {
       method: 'DELETE',
@@ -3754,6 +3815,31 @@ export const contract = c.router({
 
   // Migration routes (one-time use)
   migrations: {
+    addCourseMonthlyPriceOverrides: {
+      method: 'POST',
+      path: '/api/migrations/add-course-monthly-price-overrides',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addQrActivationToStudents: {
+      method: 'POST',
+      path: '/api/migrations/add-qr-activation-to-students',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
     addCompanyType: {
       method: 'POST',
       path: '/api/migrations/add-company-type',
@@ -4669,6 +4755,45 @@ export const contract = c.router({
           studentLastName: z.string(),
           dueMonths: z.array(MonthlyPaymentWithDetailsSchema),
         }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Monthly price overrides: let teachers change the course price for a
+    // specific month. All student bills scale proportionally.
+    setPriceOverride: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/price-override',
+      body: SetPriceOverrideSchema,
+      responses: {
+        200: z.object({
+          override: CourseMonthlyPriceOverrideSchema,
+          updatedBills: z.number(),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    getPriceOverride: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/price-override',
+      query: z.object({
+        courseId: z.string(),
+        billingYear: z.string(),
+        billingMonth: z.string(),
+      }),
+      responses: {
+        200: CourseMonthlyPriceOverrideSchema.nullable(),
+        403: ApiErrorSchema,
+      },
+    },
+    deletePriceOverride: {
+      method: 'DELETE' as const,
+      path: '/api/monthly-subscriptions/price-override/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ deleted: z.boolean(), updatedBills: z.number() }),
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },

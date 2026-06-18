@@ -65,6 +65,7 @@ export class StudentListComponent implements OnInit {
   searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
   activeTab = signal<'active' | 'inactive'>('active');
+  qrFilter = signal<'ALL' | 'ACTIVATED' | 'NOT_ACTIVATED'>('ALL');
 
   branches = computed(() => {
     const all = this.allBranches();
@@ -85,12 +86,15 @@ export class StudentListComponent implements OnInit {
 
   filteredStudents = computed(() => {
     const list = this.students();
-    const byTab = this.activeTab() === 'active'
+    let filtered = this.activeTab() === 'active'
       ? list.filter(s => s.isActive)
       : list.filter(s => !s.isActive);
+    const qr = this.qrFilter();
+    if (qr === 'ACTIVATED') filtered = filtered.filter(s => s.qrActivated);
+    else if (qr === 'NOT_ACTIVATED') filtered = filtered.filter(s => !s.qrActivated);
     const term = this.searchTerm().trim().toLowerCase();
-    if (!term) return byTab;
-    return byTab.filter(s => {
+    if (!term) return filtered;
+    return filtered.filter(s => {
       const full = `${s.firstName ?? ''} ${s.lastName ?? ''}`.toLowerCase();
       return full.includes(term)
         || (s.firstName ?? '').toLowerCase().includes(term)
@@ -101,6 +105,19 @@ export class StudentListComponent implements OnInit {
 
   activeCount = computed(() => this.students().filter(s => s.isActive).length);
   inactiveCount = computed(() => this.students().filter(s => !s.isActive).length);
+
+  qrActivatedCount = computed(() => {
+    const list = this.activeTab() === 'active'
+      ? this.students().filter(s => s.isActive)
+      : this.students().filter(s => !s.isActive);
+    return list.filter(s => s.qrActivated).length;
+  });
+  qrNotActivatedCount = computed(() => {
+    const list = this.activeTab() === 'active'
+      ? this.students().filter(s => s.isActive)
+      : this.students().filter(s => !s.isActive);
+    return list.filter(s => !s.qrActivated).length;
+  });
 
   onSearchChange(value: string) {
     this.searchTerm.set(value);

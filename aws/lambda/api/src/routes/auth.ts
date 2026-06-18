@@ -306,7 +306,8 @@ export const authRoutes = {
 
       const trialStart = new Date();
       const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
+      // Teacher tenants get a shorter 7-day trial; academies keep 14 days.
+      trialEnd.setDate(trialEnd.getDate() + (companyType === 'TEACHER' ? 7 : 14));
       await client.query(
         `INSERT INTO subscriptions (company_id, status, price, trial_start_date, trial_end_date)
          VALUES ($1,$2,$3,$4,$5)`,

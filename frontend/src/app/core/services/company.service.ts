@@ -41,9 +41,21 @@ export interface CompanyProfileSubscription {
   subscriptionEndDate: string | null;
 }
 
+export interface CompanyQrSummary {
+  studentCount: number;
+  activatedCount: number;
+  oneYearCount: number;
+  lifelongCount: number;
+  totalCost: number;
+  paidCost: number;
+  unpaidCost: number;
+  currency: string;
+}
+
 export interface CompanyProfile {
   company: CompanyProfileData;
   subscription: CompanyProfileSubscription | null;
+  qr?: CompanyQrSummary;
 }
 
 @Injectable({ providedIn: 'root' })

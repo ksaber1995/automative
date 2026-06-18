@@ -27,6 +27,7 @@
           styleClass="w-full"
         ></p-datepicker>
       </div>
+      @if (!authService.isTeacher()) {
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'REPORTS.BRANCH' | translate }}</label>
         <p-multiSelect
@@ -53,6 +54,7 @@
           }
         </small>
       </div>
+      }
       <div class="flex items-center justify-center gap-2 self-center">
         <p-button
           icon="pi pi-refresh"
@@ -101,7 +103,9 @@
       <p-tab value="0"><i class="pi pi-chart-line mr-2"></i>{{ 'REPORTS.TAB_FINANCIAL' | translate }}</p-tab>
       <p-tab value="1"><i class="pi pi-users mr-2"></i>{{ 'REPORTS.TAB_STUDENTS' | translate }}</p-tab>
       <p-tab value="2"><i class="pi pi-book mr-2"></i>{{ 'REPORTS.TAB_COURSES' | translate }}</p-tab>
-      <p-tab value="3"><i class="pi pi-building mr-2"></i>{{ 'REPORTS.TAB_BRANCHES' | translate }}</p-tab>
+      @if (!authService.isTeacher()) {
+        <p-tab value="3"><i class="pi pi-building mr-2"></i>{{ 'REPORTS.TAB_BRANCHES' | translate }}</p-tab>
+      }
       <p-tab value="4"><i class="pi pi-box mr-2"></i>{{ 'REPORTS.TAB_PRODUCTS' | translate }}</p-tab>
       <p-tab value="5"><i class="pi pi-flag mr-2"></i>{{ 'REPORTS.TAB_EVENTS' | translate }}</p-tab>
     </p-tablist>
@@ -303,7 +307,9 @@
                 <tr>
                   <th pSortableColumn="type">{{ 'REPORTS.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
                   <th pSortableColumn="courseName">{{ 'REPORTS.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
-                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  @if (!authService.isTeacher()) {
+                    <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  }
                   <th class="text-right" pSortableColumn="enrollments">{{ 'REPORTS.COL_ENROLLMENTS' | translate }} <p-sortIcon field="enrollments"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="avgPrice">{{ 'REPORTS.COL_AVG_PRICE' | translate }} <p-sortIcon field="avgPrice"></p-sortIcon></th>
@@ -317,14 +323,16 @@
                       [severity]="row.type === 'MASTER' ? 'warn' : 'info'"></p-tag>
                   </td>
                   <td class="font-medium">{{ row.courseName }}</td>
-                  <td>{{ row.branchName }}</td>
+                  @if (!authService.isTeacher()) {
+                    <td>{{ row.branchName }}</td>
+                  }
                   <td class="text-right">{{ row.enrollments }}</td>
                   <td class="text-right font-semibold text-green-700">{{ row.revenue | number:'1.2-2' }}</td>
                   <td class="text-right">{{ row.avgPrice | number:'1.2-2' }}</td>
                 </tr>
               </ng-template>
               <ng-template pTemplate="emptymessage">
-                <tr><td colspan="6" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+                <tr><td [attr.colspan]="authService.isTeacher() ? 5 : 6" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
               </ng-template>
             </p-table>
           </p-card>
@@ -332,6 +340,7 @@
       </p-tabpanel>
 
       <!-- ── BRANCHES ───────────────────────────────────────── -->
+      @if (!authService.isTeacher()) {
       <p-tabpanel value="3">
         <div class="grid grid-cols-1 gap-4 pt-4">
           <p-card>
@@ -378,6 +387,7 @@
           </p-card>
         </div>
       </p-tabpanel>
+      }
 
       <!-- ── PRODUCTS ───────────────────────────────────────── -->
       <p-tabpanel value="4">
@@ -396,7 +406,9 @@
               <ng-template pTemplate="header">
                 <tr>
                   <th pSortableColumn="productName">{{ 'REPORTS.COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
-                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  @if (!authService.isTeacher()) {
+                    <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                  }
                   <th class="text-right" pSortableColumn="unitsSold">{{ 'REPORTS.COL_UNITS' | translate }} <p-sortIcon field="unitsSold"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="cost">{{ 'REPORTS.COL_COST' | translate }} <p-sortIcon field="cost"></p-sortIcon></th>
@@ -407,7 +419,9 @@
               <ng-template pTemplate="body" let-row>
                 <tr>
                   <td class="font-medium">{{ row.productName }} <span class="text-xs text-gray-500 font-mono">{{ row.productCode }}</span></td>
-                  <td>{{ row.branchName }}</td>
+                  @if (!authService.isTeacher()) {
+                    <td>{{ row.branchName }}</td>
+                  }
                   <td class="text-right">{{ row.unitsSold }}</td>
                   <td class="text-right text-green-700">{{ row.revenue | number:'1.2-2' }}</td>
                   <td class="text-right text-red-700">{{ row.cost | number:'1.2-2' }}</td>
@@ -420,7 +434,7 @@
                 </tr>
               </ng-template>
               <ng-template pTemplate="emptymessage">
-                <tr><td colspan="7" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+                <tr><td [attr.colspan]="authService.isTeacher() ? 6 : 7" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
               </ng-template>
             </p-table>
           </p-card>
@@ -477,7 +491,9 @@
               <tr>
                 <th pSortableColumn="name">{{ 'REPORTS.COL_EVENT' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
                 <th pSortableColumn="eventType">{{ 'REPORTS.COL_TYPE' | translate }} <p-sortIcon field="eventType"></p-sortIcon></th>
-                <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                @if (!authService.isTeacher()) {
+                  <th pSortableColumn="branchName">{{ 'REPORTS.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                }
                 <th pSortableColumn="status">{{ 'REPORTS.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                 <th class="text-right" pSortableColumn="subscriberCount">{{ 'REPORTS.COL_SUBSCRIBERS' | translate }} <p-sortIcon field="subscriberCount"></p-sortIcon></th>
                 <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
@@ -495,7 +511,9 @@
                 <td>
                   <p-tag [value]="('EVENTS.TYPE.' + row.eventType) | translate" severity="info"></p-tag>
                 </td>
-                <td>{{ row.branchName || '—' }}</td>
+                @if (!authService.isTeacher()) {
+                  <td>{{ row.branchName || '—' }}</td>
+                }
                 <td>
                   <p-tag [value]="('EVENTS.STATUS.' + row.status) | translate"
                     [severity]="eventStatusSeverity(row.status)"></p-tag>
@@ -517,7 +535,7 @@
               </tr>
             </ng-template>
             <ng-template pTemplate="emptymessage">
-              <tr><td colspan="10" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+              <tr><td [attr.colspan]="authService.isTeacher() ? 9 : 10" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
             </ng-template>
           </p-table>
         </p-card>

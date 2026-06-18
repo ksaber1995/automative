@@ -29,6 +29,7 @@ import {
 } from '../services/report.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
 
@@ -61,6 +62,7 @@ export class ReportListComponent implements OnInit {
   private branchService = inject(BranchService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
+  protected authService = inject(AuthService);
 
   // Filters
   startDate: Date;

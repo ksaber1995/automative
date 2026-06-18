@@ -1220,7 +1220,94 @@ async function addCompanyType() {
   return { success: true, message: `companies.type ready; ${backfilled.length} existing row(s) set to ACADEMY` };
 }
 
+async function addQrActivationToStudents() {
+  console.log('Starting migration: add QR activation columns to students');
+
+  await query(`
+    ALTER TABLE students
+      ADD COLUMN IF NOT EXISTS qr_activated BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS qr_expiration DATE,
+      ADD COLUMN IF NOT EXISTS qr_price DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS qr_paid BOOLEAN DEFAULT false
+  `);
+
+  // Booleans must never be NULL — backfill pre-existing rows.
+  const a = await query(`UPDATE students SET qr_activated = false WHERE qr_activated IS NULL RETURNING id`);
+  const p = await query(`UPDATE students SET qr_paid = false WHERE qr_paid IS NULL RETURNING id`);
+
+  console.log('✅ students QR-activation migration completed!');
+  return {
+    success: true,
+    message: `students QR-activation columns ready; backfilled qr_activated=${a.length}, qr_paid=${p.length}`,
+  };
+}
+
+async function addCourseMonthlyPriceOverrides() {
+  console.log('Starting migration: course_monthly_price_overrides');
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS course_monthly_price_overrides (
+        id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        course_id        UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        company_id       UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        billing_year     INTEGER NOT NULL,
+        billing_month    INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
+        override_price   DECIMAL(10, 2) NOT NULL,
+        created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (course_id, billing_year, billing_month)
+    )
+  `);
+
+  await query(`CREATE INDEX IF NOT EXISTS idx_cmpo_course_id  ON course_monthly_price_overrides(course_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_cmpo_company_id ON course_monthly_price_overrides(company_id)`);
+
+  // Trigger — ignore "already exists" errors
+  try {
+    await query(`
+      CREATE TRIGGER update_course_monthly_price_overrides_updated_at
+          BEFORE UPDATE ON course_monthly_price_overrides
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+    `);
+  } catch (e: any) {
+    if (!e.message?.includes('already exists')) throw e;
+  }
+
+  console.log('✅ course_monthly_price_overrides migration completed!');
+  return { success: true, message: 'course_monthly_price_overrides table ready' };
+}
+
 export const migrationsRoutes = {
+  addCourseMonthlyPriceOverrides: async () => {
+    try {
+      const result = await addCourseMonthlyPriceOverrides();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addQrActivationToStudents: async () => {
+    try {
+      const result = await addQrActivationToStudents();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   addCompanyType: async () => {
     try {
       const result = await addCompanyType();

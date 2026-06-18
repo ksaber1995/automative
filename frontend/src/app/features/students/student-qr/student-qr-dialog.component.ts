@@ -1,4 +1,4 @@
-import { Component, inject, input, model, output, signal, effect } from '@angular/core';
+import { Component, inject, input, model, output, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
@@ -6,7 +6,12 @@ import { TranslateModule } from '@ngx-translate/core';
 import QRCode from 'qrcode';
 import { StudentService } from '../services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Student } from '@shared/interfaces/student.interface';
+
+/** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
+export const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
+type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 /**
  * Dialog that renders a student's QR code (encoding the public profile URL),
@@ -24,6 +29,7 @@ import { Student } from '@shared/interfaces/student.interface';
 export class StudentQrDialogComponent {
   private studentService = inject(StudentService);
   private notification = inject(NotificationService);
+  private authService = inject(AuthService);
 
   /** Two-way bound visibility, driven by the parent. */
   visible = model<boolean>(false);
@@ -31,19 +37,81 @@ export class StudentQrDialogComponent {
   student = input<Student | null>(null);
   /** Emitted after a successful regenerate so the parent can refresh its copy. */
   regenerated = output<Student>();
+  /** Emitted after a successful paid activation so the parent can refresh. */
+  activated = output<Student>();
 
   dataUrl = signal<string>('');
   regenerating = signal(false);
+  activating = signal(false);
+  /** Plan awaiting confirmation in the inline warning step (null = none). */
+  pendingPlan = signal<QrPlan | null>(null);
+
+  readonly prices = QR_PLAN_PRICES;
+
+  /** TEACHER companies pay per QR; academies get it free. */
+  isTeacher = (): boolean => this.authService.isTeacher();
+
+  /** Is the current student's QR paid-activated and not expired? */
+  qrLive = computed<boolean>(() => {
+    const s = this.student();
+    if (!s?.qrActivated) return false;
+    if (!s.qrExpiration) return true; // lifelong
+    return new Date(s.qrExpiration) >= new Date(new Date().toISOString().slice(0, 10));
+  });
+
+  /** Show the QR itself only when free (academy) or paid-activated (teacher). */
+  showQr = computed<boolean>(() => !this.isTeacher() || this.qrLive());
 
   constructor() {
-    // Re-render the QR whenever the dialog opens or the token changes.
+    // Re-render the QR whenever the dialog opens or the token changes — but only
+    // when the QR is actually usable (free, or paid-activated for teachers).
     effect(() => {
       const s = this.student();
       const open = this.visible();
-      if (open && s?.qrToken) {
+      if (open && s?.qrToken && this.showQr()) {
         this.render(s.qrToken);
       }
     });
+  }
+
+  planPrice(plan: QrPlan): number {
+    return QR_PLAN_PRICES[plan];
+  }
+
+  /** Step 1: user picks a plan → show the cost warning. */
+  choosePlan(plan: QrPlan): void {
+    if (this.activating()) return;
+    this.pendingPlan.set(plan);
+  }
+
+  cancelPlan(): void {
+    this.pendingPlan.set(null);
+  }
+
+  /** Step 2: user confirms the warning → bill + activate. */
+  confirmActivate(): void {
+    const s = this.student();
+    const plan = this.pendingPlan();
+    if (!s || !plan || this.activating()) return;
+    this.activating.set(true);
+    this.studentService.activateQr(s.id, plan).subscribe({
+      next: (updated) => {
+        this.activating.set(false);
+        this.pendingPlan.set(null);
+        this.activated.emit(updated);
+        if (updated.qrToken) this.render(updated.qrToken);
+      },
+      error: () => {
+        this.activating.set(false);
+      },
+    });
+  }
+
+  /** Friendly expiry label for the activated badge ('' = lifelong). */
+  expiryLabel(): string {
+    const exp = this.student()?.qrExpiration;
+    if (!exp) return '';
+    return new Date(exp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   private profileUrl(token: string): string {

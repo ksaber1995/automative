@@ -58,6 +58,36 @@
       </p-tablist>
     </p-tabs>
 
+    <!-- QR Activation Filter (teacher companies only) -->
+    @if (authService.isTeacher()) {
+      <div class="flex gap-2 my-3 flex-wrap">
+        <button
+          pButton
+          size="small"
+          [label]="('STUDENTS.LIST.QR_ALL' | translate) + ' (' + (qrActivatedCount() + qrNotActivatedCount()) + ')'"
+          [outlined]="qrFilter() !== 'ALL'"
+          severity="secondary"
+          (click)="qrFilter.set('ALL')"
+        ></button>
+        <button
+          pButton
+          size="small"
+          [label]="('STUDENTS.LIST.QR_ACTIVATED' | translate) + ' (' + qrActivatedCount() + ')'"
+          [outlined]="qrFilter() !== 'ACTIVATED'"
+          severity="success"
+          (click)="qrFilter.set('ACTIVATED')"
+        ></button>
+        <button
+          pButton
+          size="small"
+          [label]="('STUDENTS.LIST.QR_NOT_ACTIVATED' | translate) + ' (' + qrNotActivatedCount() + ')'"
+          [outlined]="qrFilter() !== 'NOT_ACTIVATED'"
+          severity="danger"
+          (click)="qrFilter.set('NOT_ACTIVATED')"
+        ></button>
+      </div>
+    }
+
     <!-- Students Table -->
     <p-table
       [value]="filteredStudents()"
@@ -75,7 +105,9 @@
           <th pSortableColumn="parentName">{{ 'STUDENTS.LIST.COL_PARENT' | translate }} <p-sortIcon field="parentName"></p-sortIcon></th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
           <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
-          <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          @if (!authService.isTeacher()) {
+            <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
           <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
           <th pSortableColumn="acquisitionChannel">{{ 'STUDENTS.LIST.COL_CHANNEL' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
@@ -95,7 +127,9 @@
             </div>
           </td>
           <td>{{ student.enrollmentDate | date: 'MMM d, y' }}</td>
-          <td>{{ getBranchName(student.branchId) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ getBranchName(student.branchId) }}</td>
+          }
           <td>
             <div class="flex justify-center gap-2">
               <p-tag
@@ -170,7 +204,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td [attr.colspan]="authService.isTeacher() ? 8 : 9" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

@@ -51,6 +51,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 <th class="num">Students</th>
                 <th class="num">Employees</th>
                 <th class="num">Branches</th>
+                <th class="num">QR</th>
                 <th>Start</th>
                 <th>End</th>
                 <th>Status</th>
@@ -82,6 +83,18 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                   <td class="num">{{ r.student_count }}</td>
                   <td class="num">{{ r.employee_count }}</td>
                   <td class="num">{{ r.branch_count }}</td>
+                  <td class="num">
+                    @if (r.qr_activated_count > 0) {
+                      <span>{{ r.qr_activated_count }}</span>
+                      @if (r.qr_unpaid_cost > 0) {
+                        <span class="qr-due">· {{ r.qr_unpaid_cost }} {{ r.currency }} due</span>
+                      } @else {
+                        <span class="qr-paid">· paid</span>
+                      }
+                    } @else {
+                      —
+                    }
+                  </td>
                   <td>{{ formatDate(r.start_date) }}</td>
                   <td>{{ formatDate(r.end_date) }}</td>
                   <td>
@@ -103,6 +116,11 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                           Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
                         </button>
                       }
+                      @if (r.qr_activated_count > 0) {
+                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openQr(r)">
+                          QR billing
+                        </button>
+                      }
                       <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
                         Delete
                       </button>
@@ -111,7 +129,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 </tr>
               }
               @if (filtered().length === 0) {
-                <tr><td colspan="12" class="state">No matches.</td></tr>
+                <tr><td colspan="13" class="state">No matches.</td></tr>
               }
             </tbody>
           </table>
@@ -197,6 +215,33 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
           </div>
         </div>
       }
+
+      <!-- QR billing dialog -->
+      @if (qrRow(); as row) {
+        <div class="overlay" (click)="closeQr()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>QR activation billing</h2>
+            <p class="modal-sub">
+              <strong>{{ row.company_name }}</strong> has
+              <strong>{{ row.qr_activated_count }}</strong> activated QR code(s),
+              total <strong>{{ row.qr_total_cost }} {{ row.currency }}</strong>,
+              of which <strong>{{ row.qr_unpaid_cost }} {{ row.currency }}</strong> is outstanding.
+            </p>
+            <p class="modal-sub">
+              Mark this company's activations as paid once they settle the bill, or revert to unpaid.
+            </p>
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="closeQr()">Cancel</button>
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="doSetQrPaid(row, false)">
+                {{ busyId() === row.company_id ? '…' : 'Mark unpaid' }}
+              </button>
+              <button class="act activate" [disabled]="busyId() === row.company_id" (click)="doSetQrPaid(row, true)">
+                {{ busyId() === row.company_id ? 'Saving…' : 'Mark paid' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -239,6 +284,8 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
     }
     .reg.teacher { background: #ede9fe; color: #6d28d9; }
     .reg.academy { background: #dbeafe; color: #1d4ed8; }
+    .qr-due { color: #b45309; font-size: 12px; }
+    .qr-paid { color: #16a34a; font-size: 12px; }
     .dot {
       display: inline-block; width: 8px; height: 8px; border-radius: 999px;
       background: #22c55e; margin-right: 6px; vertical-align: middle;
@@ -297,6 +344,7 @@ export class AppComponent implements OnInit {
   private flashTimer?: ReturnType<typeof setTimeout>;
   extendRow = signal<CompanySubscription | null>(null);
   typeRow = signal<CompanySubscription | null>(null);
+  qrRow = signal<CompanySubscription | null>(null);
   deleteRow = signal<CompanySubscription | null>(null);
   deleteConfirmText = signal('');
   readonly extendPresets = [1, 3, 6, 12];
@@ -422,6 +470,32 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Change type failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  // ── QR activation billing (mark paid / unpaid) ───────────────────────────────
+  openQr(r: CompanySubscription) {
+    this.qrRow.set(r);
+  }
+
+  closeQr() {
+    if (this.busyId()) return;
+    this.qrRow.set(null);
+  }
+
+  doSetQrPaid(r: CompanySubscription, paid: boolean) {
+    this.busyId.set(r.company_id);
+    this.service.setQrPaid(r.company_id, paid).subscribe({
+      next: (res) => {
+        this.busyId.set(null);
+        this.qrRow.set(null);
+        this.showFlash(`${r.company_name}: ${res.updated_count} activation(s) marked ${paid ? 'paid' : 'unpaid'}.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`QR billing update failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

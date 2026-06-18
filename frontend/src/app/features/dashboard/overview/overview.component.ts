@@ -16,6 +16,7 @@ import { AnalyticsService } from '../services/analytics.service';
 import { ExpenseService } from '../../expenses/services/expense.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { CashService, CurrentCashResponse } from '../../../core/services/cash.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { DashboardMetrics } from '@shared/interfaces/analytics.interface';
 
 @Component({
@@ -32,6 +33,9 @@ export class OverviewComponent implements OnInit {
   private cashService = inject(CashService);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  private authService = inject(AuthService);
+
+  isTeacher = (): boolean => this.authService.isTeacher();
 
   // Date range filter — mirrors the Reports page (default: last 12 months) so
   // the two screens reconcile out of the box. Without an explicit range the
@@ -236,7 +240,7 @@ export class OverviewComponent implements OnInit {
 
     // Expense Breakdown Chart
     this.expenseChartData = {
-      labels: data.expensesByCategory.map(e => e.category),
+      labels: data.expensesByCategory.map(e => this.translate.instant('EXPENSES.CATEGORY_VALUES.' + e.category) || e.category),
       datasets: [{
         data: data.expensesByCategory.map(e => e.amount),
         backgroundColor: [

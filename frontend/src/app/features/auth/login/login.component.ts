@@ -75,7 +75,14 @@ export class LoginComponent {
           });
           return;
         }
-        const msg = error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED');
+        const code = error.error?.code;
+        let msg: string;
+        if (code) {
+          const translated = this.translate.instant(code);
+          msg = translated !== code ? translated : (error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED'));
+        } else {
+          msg = error.error?.message || this.translate.instant('AUTH.LOGIN.FAILED');
+        }
         this.serverError.set(msg);
         this.notificationService.error(msg);
       },

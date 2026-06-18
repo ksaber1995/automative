@@ -1,7 +1,7 @@
 <div class="container mx-auto p-6">
   @if (student(); as s) {
     <!-- QR code dialog -->
-    <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)"></app-student-qr-dialog>
+    <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)" (activated)="onQrRegenerated($event)"></app-student-qr-dialog>
 
     <!-- Student Information Card -->
     <p-card>

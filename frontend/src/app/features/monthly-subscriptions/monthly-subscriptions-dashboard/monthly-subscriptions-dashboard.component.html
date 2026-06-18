@@ -7,18 +7,18 @@
     </div>
     <div class="flex items-center gap-2">
       <p-button
+        [label]="'MONTHLY_SUBSCRIPTIONS.UPDATE_MONTH_BUTTON' | translate"
+        icon="pi pi-dollar"
+        severity="warn"
+        [outlined]="true"
+        (onClick)="openOverrideDialog()"
+      ></p-button>
+      <p-button
         [label]="'MONTHLY_SUBSCRIPTIONS.SCAN_BUTTON' | translate"
         icon="pi pi-qrcode"
         severity="info"
         [outlined]="true"
         (onClick)="openScanner()"
-      ></p-button>
-      <p-button
-        [label]="'MONTHLY_SUBSCRIPTIONS.GENERATE' | translate"
-        icon="pi pi-bolt"
-        severity="success"
-        [loading]="generating()"
-        (onClick)="generateBills()"
       ></p-button>
     </div>
   </div>
@@ -424,6 +424,134 @@
       severity="secondary"
       [outlined]="true"
       (onClick)="closeMonthPicker()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Monthly Price Override Dialog -->
+<p-dialog
+  [visible]="showOverrideDialog()"
+  (visibleChange)="$event ? null : closeOverrideDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '440px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.OVERRIDE_TITLE' | translate"
+>
+  <div class="flex flex-col gap-4 pt-2">
+    <div class="text-sm text-gray-600">
+      {{ 'MONTHLY_SUBSCRIPTIONS.OVERRIDE_DESCRIPTION' | translate }}
+    </div>
+
+    <!-- Course -->
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.COURSE' | translate }}</label>
+      <p-select
+        [options]="courses()"
+        [(ngModel)]="overrideCourseId"
+        optionLabel="name"
+        optionValue="id"
+        [filter]="true"
+        filterBy="name"
+        [placeholder]="'MONTHLY_SUBSCRIPTIONS.SELECT_COURSE' | translate"
+        (onChange)="onOverrideSelectionChange()"
+        [style]="{ width: '100%' }"
+        appendTo="body"
+      ></p-select>
+    </div>
+
+    <!-- Year + Month -->
+    <div class="flex gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.YEAR' | translate }}</label>
+        <p-select
+          [options]="yearOptions"
+          [(ngModel)]="overrideYear"
+          optionLabel="label"
+          optionValue="value"
+          (onChange)="onOverrideSelectionChange()"
+          [style]="{ width: '100%' }"
+          appendTo="body"
+        ></p-select>
+      </div>
+      <div class="flex flex-col gap-1 flex-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.MONTH' | translate }}</label>
+        <p-select
+          [options]="monthOptions"
+          [(ngModel)]="overrideMonth"
+          optionLabel="label"
+          optionValue="value"
+          (onChange)="onOverrideSelectionChange()"
+          [style]="{ width: '100%' }"
+          appendTo="body"
+        ></p-select>
+      </div>
+    </div>
+
+    @if (!overrideCourseId) {
+      <div class="text-xs text-gray-400">
+        <i class="pi pi-info-circle mr-1"></i>
+        {{ 'MONTHLY_SUBSCRIPTIONS.SELECT_COURSE_FIRST' | translate }}
+      </div>
+    } @else if (overrideLoading()) {
+      <p class="text-center text-sm text-gray-400">
+        <i class="pi pi-spin pi-spinner"></i> {{ 'MONTHLY_SUBSCRIPTIONS.LOADING' | translate }}
+      </p>
+    } @else {
+      @if (overrideCoursePrice(); as basePrice) {
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div class="text-xs text-gray-500 mb-1">{{ 'MONTHLY_SUBSCRIPTIONS.OVERRIDE_CURRENT_PRICE' | translate }}</div>
+          <div class="text-lg font-bold text-gray-700">{{ basePrice | amount }}</div>
+        </div>
+      }
+
+      @if (currentOverride(); as ov) {
+        <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+          <div class="text-xs text-yellow-700 mb-1">{{ 'MONTHLY_SUBSCRIPTIONS.OVERRIDE_ACTIVE' | translate }}</div>
+          <div class="text-lg font-bold text-yellow-600">{{ ov.overridePrice | amount }}</div>
+        </div>
+      }
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.OVERRIDE_NEW_PRICE' | translate }}</label>
+        <p-inputnumber
+          [(ngModel)]="overridePrice"
+          mode="decimal"
+          [min]="0"
+          [minFractionDigits]="0"
+          [maxFractionDigits]="2"
+          [style]="{ width: '100%' }"
+        ></p-inputnumber>
+      </div>
+
+      <div class="text-xs text-gray-500">
+        <i class="pi pi-info-circle mr-1"></i>
+        {{ 'MONTHLY_SUBSCRIPTIONS.OVERRIDE_HINT' | translate }}
+      </div>
+    }
+  </div>
+  <ng-template pTemplate="footer">
+    @if (currentOverride()) {
+      <p-button
+        [label]="'MONTHLY_SUBSCRIPTIONS.OVERRIDE_REMOVE' | translate"
+        severity="danger"
+        [outlined]="true"
+        icon="pi pi-trash"
+        [loading]="overrideSaving()"
+        (onClick)="removeOverride()"
+      ></p-button>
+    }
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeOverrideDialog()"
+    ></p-button>
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.OVERRIDE_SAVE' | translate"
+      icon="pi pi-check"
+      [loading]="overrideSaving()"
+      [disabled]="!overrideCourseId || !overridePrice || overridePrice <= 0"
+      (onClick)="saveOverride()"
     ></p-button>
   </ng-template>
 </p-dialog>

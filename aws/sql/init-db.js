@@ -293,6 +293,10 @@ CREATE TABLE IF NOT EXISTS students (
     inactive_date DATE,
     inactive_reason TEXT,
     notes TEXT,
+    qr_activated BOOLEAN DEFAULT false,
+    qr_expiration DATE,
+    qr_price DECIMAL(10, 2),
+    qr_paid BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE

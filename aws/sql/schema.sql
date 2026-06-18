@@ -367,6 +367,14 @@ CREATE TABLE students (
     -- public read-only profile page and QR-based attendance check-in. See
     -- migration 029. Not the UUID, so the public page can't be enumerated.
     qr_token VARCHAR(32),
+    -- Paid QR activation (TEACHER-type companies only). For academies the QR is
+    -- free and these stay at their defaults. qr_expiration NULL + qr_activated
+    -- true = lifelong. qr_paid is toggled by the owner once the teacher settles
+    -- the activation bill. See migration 041.
+    qr_activated BOOLEAN DEFAULT false,
+    qr_expiration DATE,
+    qr_price DECIMAL(10, 2),
+    qr_paid BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
@@ -1249,6 +1257,30 @@ CREATE INDEX idx_msp_due_date        ON monthly_subscription_payments(due_date);
 
 CREATE TRIGGER update_monthly_subscription_payments_updated_at
     BEFORE UPDATE ON monthly_subscription_payments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- COURSE MONTHLY PRICE OVERRIDES TABLE  (migration 042)
+-- Allows teachers to override the price of a monthly-subscription course
+-- for a specific month. Student amounts scale proportionally.
+-- =============================================
+CREATE TABLE course_monthly_price_overrides (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id        UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    company_id       UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    billing_year     INTEGER NOT NULL,
+    billing_month    INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
+    override_price   DECIMAL(10, 2) NOT NULL,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (course_id, billing_year, billing_month)
+);
+
+CREATE INDEX idx_cmpo_course_id   ON course_monthly_price_overrides(course_id);
+CREATE INDEX idx_cmpo_company_id  ON course_monthly_price_overrides(company_id);
+
+CREATE TRIGGER update_course_monthly_price_overrides_updated_at
+    BEFORE UPDATE ON course_monthly_price_overrides
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================

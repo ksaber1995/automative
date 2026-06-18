@@ -1,0 +1,13 @@
+{
+  "name": "netrofit-teacher-seed",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed:students": "node generate-students.js --email=karimali201094@gmail.com --count=1000",
+    "seed:students:dry": "node generate-students.js --dry-run --count=1000"
+  },
+  "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.0.0",
+    "@aws-sdk/credential-providers": "^3.0.0"
+  }
+}

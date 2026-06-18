@@ -25,6 +25,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface DialogTeacherRow {
@@ -90,6 +91,10 @@ export class SessionsDashboardComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private notificationService = inject(NotificationService);
   private fb = inject(FormBuilder);
+  private authService = inject(AuthService);
+
+  /** Teacher-type companies have no rooms/co-teachers — hide those UI bits. */
+  isTeacher = (): boolean => this.authService.isTeacher();
 
   // ── Teacher attendance in Start dialog ─────────────────────────────────────
   dialogTeachers = signal<DialogTeacherRow[]>([]);
@@ -163,12 +168,13 @@ export class SessionsDashboardComponent implements OnInit {
     const classId = this.sessionForm.get('classId')?.value;
     if (!classId) return;
 
-    // Toggle room validator based on class type (online classes don't require a room)
+    // Toggle room validator based on class type (online classes don't require a
+    // room). Teacher-type companies have no rooms at all, so never require one.
     const cls = this.dialogActiveClasses().find((c) => c.id === classId);
     const isOnline = (cls?.type || '').toUpperCase() === 'ONLINE';
     const roomCtrl = this.sessionForm.get('roomId');
     if (roomCtrl) {
-      if (isOnline) {
+      if (isOnline || this.isTeacher()) {
         roomCtrl.clearValidators();
         roomCtrl.setValue('');
       } else {
@@ -403,7 +409,8 @@ export class SessionsDashboardComponent implements OnInit {
   buildSessionForm(roomId?: string, branchId?: string) {
     this.sessionForm = this.fb.group({
       branchId: [branchId || '', Validators.required],
-      roomId: [roomId || '', Validators.required],
+      // Teacher-type companies have no rooms, so the room is never required.
+      roomId: [roomId || '', this.isTeacher() ? [] : Validators.required],
       classId: ['', Validators.required],
       sessionNumber: [null as number | null],
       notes: [''],

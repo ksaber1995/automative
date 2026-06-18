@@ -23,7 +23,10 @@ const SUBSCRIPTIONS_SQL = `
     COALESCE(s.subscription_end_date,   s.trial_end_date)      AS end_date,
     (SELECT COUNT(*) FROM employees e WHERE e.company_id = c.id) AS employee_count,
     (SELECT COUNT(*) FROM branches  b WHERE b.company_id = c.id) AS branch_count,
-    (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id) AS student_count
+    (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id) AS student_count,
+    (SELECT COUNT(*) FROM students st WHERE st.company_id = c.id AND st.qr_activated) AS qr_activated_count,
+    (SELECT COALESCE(SUM(st.qr_price),0) FROM students st WHERE st.company_id = c.id AND st.qr_activated) AS qr_total_cost,
+    (SELECT COALESCE(SUM(st.qr_price),0) FROM students st WHERE st.company_id = c.id AND st.qr_activated AND NOT st.qr_paid) AS qr_unpaid_cost
   FROM companies c
   LEFT JOIN subscriptions s ON s.company_id = c.id
   LEFT JOIN users u ON u.id = c.created_by
@@ -55,6 +58,9 @@ export const adminSecretRoutes = {
         employee_count: Number(r.employee_count ?? 0),
         branch_count: Number(r.branch_count ?? 0),
         student_count: Number(r.student_count ?? 0),
+        qr_activated_count: Number(r.qr_activated_count ?? 0),
+        qr_total_cost: Number(r.qr_total_cost ?? 0),
+        qr_unpaid_cost: Number(r.qr_unpaid_cost ?? 0),
       }));
       return { status: 200 as const, body };
     } catch (error: any) {
@@ -113,16 +119,32 @@ export const adminSecretRoutes = {
       const sub = await queryOne<any>('SELECT id FROM subscriptions WHERE company_id = $1', [params.companyId]);
       if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this company' } };
 
+      const company = await queryOne<any>('SELECT type FROM companies WHERE id = $1', [params.companyId]);
+      const isTeacher = company?.type === 'TEACHER';
+
       const today = new Date().toISOString().split('T')[0];
-      await query(
-        `UPDATE subscriptions
-           SET status = 'ACTIVE',
-               subscription_start_date = COALESCE(subscription_start_date, $2),
-               subscription_end_date   = COALESCE(subscription_end_date, trial_end_date),
-               updated_at = NOW()
-         WHERE id = $1`,
-        [sub.id, today]
-      );
+      if (isTeacher) {
+        // Teacher activation is forever — no end date (ACTIVE is never expiry-gated).
+        await query(
+          `UPDATE subscriptions
+             SET status = 'ACTIVE',
+                 subscription_start_date = COALESCE(subscription_start_date, $2),
+                 subscription_end_date   = NULL,
+                 updated_at = NOW()
+           WHERE id = $1`,
+          [sub.id, today]
+        );
+      } else {
+        await query(
+          `UPDATE subscriptions
+             SET status = 'ACTIVE',
+                 subscription_start_date = COALESCE(subscription_start_date, $2),
+                 subscription_end_date   = COALESCE(subscription_end_date, trial_end_date),
+                 updated_at = NOW()
+           WHERE id = $1`,
+          [sub.id, today]
+        );
+      }
 
       return { status: 200 as const, body: { success: true, subscription_type: 'ACTIVE' } };
     } catch (error: any) {
@@ -153,6 +175,31 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set company type failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set type failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/qr-paid
+   * Mark a company's QR activations as paid (or unpaid). Toggled by the owner
+   * once the teacher settles the activation bill. Affects every activated
+   * student of the company; returns how many rows were updated.
+   */
+  setQrPaid: async ({ params, body }: { params: { companyId: string }; body: { paid: boolean } }) => {
+    try {
+      const paid = body?.paid === true;
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const updated = await query<any>(
+        `UPDATE students SET qr_paid = $2, updated_at = NOW()
+         WHERE company_id = $1 AND qr_activated = true RETURNING id`,
+        [params.companyId, paid]
+      );
+
+      return { status: 200 as const, body: { success: true, paid, updated_count: updated.length } };
+    } catch (error: any) {
+      console.error('karim-admin-secret set qr paid failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set QR paid failed' } };
     }
   },
 

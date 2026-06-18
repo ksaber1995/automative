@@ -29,7 +29,7 @@ export class RevenueListComponent implements OnInit {
   private branchService = inject(BranchService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
-  private authService = inject(AuthService);
+  protected authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
   revenues = signal<RevenueItem[]>([]);

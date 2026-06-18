@@ -167,6 +167,9 @@ const router = {
     listByCourse: monthlySubscriptionsRoutes.listByCourse,
     listByStudent: monthlySubscriptionsRoutes.listByStudent,
     byToken: monthlySubscriptionsRoutes.byToken,
+    setPriceOverride: monthlySubscriptionsRoutes.setPriceOverride,
+    getPriceOverride: monthlySubscriptionsRoutes.getPriceOverride,
+    deletePriceOverride: monthlySubscriptionsRoutes.deletePriceOverride,
   },
 };
 

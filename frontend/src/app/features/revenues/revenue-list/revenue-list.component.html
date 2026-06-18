@@ -50,7 +50,9 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="date">{{ 'REVENUES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
-          <th pSortableColumn="branchId">{{ 'REVENUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          @if (!authService.isTeacher()) {
+            <th pSortableColumn="branchId">{{ 'REVENUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
           <th pSortableColumn="source">{{ 'REVENUES.LIST.COL_SOURCE' | translate }} <p-sortIcon field="source"></p-sortIcon></th>
           <th pSortableColumn="description">{{ 'REVENUES.LIST.COL_DESC' | translate }} <p-sortIcon field="description"></p-sortIcon></th>
           <th pSortableColumn="amount">{{ 'REVENUES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
@@ -62,7 +64,9 @@
       <ng-template pTemplate="body" let-revenue>
         <tr>
           <td>{{ revenue.date | date: 'MMM d, y' }}</td>
-          <td>{{ getBranchName(revenue.branchId) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ getBranchName(revenue.branchId) }}</td>
+          }
           <td>
             <p-tag
               [value]="('REVENUES.LIST.SOURCE_' + revenue.source) | translate"
@@ -120,7 +124,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="text-center py-8">
+          <td [attr.colspan]="authService.isTeacher() ? 7 : 8" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'REVENUES.LIST.NO_DATA' | translate }}</p>

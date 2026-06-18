@@ -10,6 +10,18 @@ function generateQrToken(): string {
   return randomBytes(16).toString('hex');
 }
 
+// Paid QR activation pricing (EGP), TEACHER-type companies only.
+const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
+type QrPlan = keyof typeof QR_PLAN_PRICES;
+
+// A student's QR is "live" when activated and not expired (NULL expiration =
+// lifelong). Used to gate scan/check-in/public-profile for teacher tenants.
+function isQrLive(row: any): boolean {
+  if (!row?.qr_activated) return false;
+  if (!row.qr_expiration) return true;
+  return new Date(row.qr_expiration) >= new Date(new Date().toISOString().slice(0, 10));
+}
+
 function mapStudentFromDB(row: any) {
   return {
     id: row.id,
@@ -32,6 +44,10 @@ function mapStudentFromDB(row: any) {
     notes: row.notes,
     acquisitionChannel: row.acquisition_channel,
     qrToken: row.qr_token,
+    qrActivated: row.qr_activated === true,
+    qrExpiration: row.qr_expiration ?? null,
+    qrPrice: row.qr_price === null || row.qr_price === undefined ? null : parseFloat(row.qr_price),
+    qrPaid: row.qr_paid === true,
     hasSubscriptions: row.has_subscriptions === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -370,6 +386,76 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Regenerate student QR error:', error);
       return mapThrownError(error, 'ERRORS.STUDENTS.QR_REGENERATE_FAILED', 'Failed to regenerate QR code', 400);
+    }
+  },
+
+  // Paid QR activation for TEACHER-type companies. ONE_YEAR (25 EGP) sets a
+  // one-year expiry; LIFELONG (40 EGP) never expires. The charge is recorded on
+  // the student (qr_price) and starts unpaid (qr_paid = false) — the owner marks
+  // it paid from the admin console once the teacher settles the bill.
+  activateQr: async ({ params, body, headers }: { params: { id: string }; body: { plan: QrPlan }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const plan = body?.plan;
+      if (plan !== 'ONE_YEAR' && plan !== 'LIFELONG') {
+        return apiError(400, 'ERRORS.STUDENTS.QR_PLAN_INVALID', 'Invalid activation plan');
+      }
+
+      const existing = await queryOne<any>(
+        'SELECT * FROM students WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_UPDATE', 'Access denied to update this student');
+      }
+
+      // Don't double-charge: if the QR is already live, refuse re-activation.
+      if (isQrLive(existing)) {
+        return apiError(409, 'ERRORS.STUDENTS.QR_ALREADY_ACTIVE', 'QR is already activated for this student');
+      }
+
+      const price = QR_PLAN_PRICES[plan];
+      const expiration =
+        plan === 'ONE_YEAR'
+          ? (() => {
+              const d = new Date();
+              d.setFullYear(d.getFullYear() + 1);
+              return d.toISOString().slice(0, 10);
+            })()
+          : null;
+
+      const updateData: Record<string, any> = {
+        qr_activated: true,
+        qr_expiration: expiration,
+        qr_price: price,
+        qr_paid: false,
+      };
+      // Self-heal: some students (e.g. bulk-imported) may have no QR token yet.
+      // Without one the QR can't render or be scanned, so provision it on
+      // activation — that's exactly the moment the code starts being used.
+      if (!existing.qr_token) {
+        updateData.qr_token = generateQrToken();
+      }
+
+      const student = await update('students', params.id, updateData);
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+
+      return {
+        status: 200 as const,
+        body: mapStudentFromDB(student),
+      };
+    } catch (error) {
+      console.error('Activate student QR error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.QR_ACTIVATE_FAILED', 'Failed to activate QR code', 400);
     }
   },
 };

@@ -135,7 +135,8 @@
       </p-card>
     </div>
 
-    <!-- Current Cash Card -->
+    <!-- Current Cash Card (hidden for teacher-type companies) -->
+    @if (!isTeacher()) {
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <p-card
         class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200 cursor-pointer hover:shadow-md transition-shadow"
@@ -171,6 +172,7 @@
         </div>
       </p-card>
     </div>
+    }
 
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -196,6 +198,7 @@
     </div>
 
     <!-- Branch Performance -->
+    @if (!isTeacher()) {
     <p-card>
       <ng-template pTemplate="header">
         <div class="p-4 flex items-center justify-between flex-wrap gap-3">
@@ -332,6 +335,7 @@
         </ng-template>
       </p-table>
     </p-card>
+    }
 
     <!-- Due This Month -->
     <div class="mt-8">
@@ -415,6 +419,7 @@
     </div>
 
     <!-- Top Performing Branches -->
+    @if (!isTeacher()) {
     <div class="mt-8">
       <p-card>
         <ng-template pTemplate="header">
@@ -437,5 +442,6 @@
         </div>
       </p-card>
     </div>
+    }
   </div>
   }

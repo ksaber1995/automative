@@ -91,7 +91,9 @@
         <tr>
           <th pSortableColumn="saleDate">{{ 'PRODUCTS.SALES.COL_DATE' | translate }} <p-sortIcon field="saleDate"></p-sortIcon></th>
           <th pSortableColumn="productName">{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
-          <th pSortableColumn="branchId">{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          @if (!authService.isTeacher()) {
+            <th pSortableColumn="branchId">{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
           <th pSortableColumn="quantity">{{ 'PRODUCTS.SALES.COL_QTY' | translate }} <p-sortIcon field="quantity"></p-sortIcon></th>
           <th pSortableColumn="unitPrice">{{ 'PRODUCTS.SALES.COL_UNIT_PRICE' | translate }} <p-sortIcon field="unitPrice"></p-sortIcon></th>
           <th pSortableColumn="discountAmount">{{ 'PRODUCTS.SALES.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
@@ -111,7 +113,9 @@
               <div class="text-sm text-gray-500">{{ 'PRODUCTS.SALES.RECEIPT' | translate }} {{ sale.receiptNumber }}</div>
             }
           </td>
-          <td>{{ getBranchName(sale.branchId) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ getBranchName(sale.branchId) }}</td>
+          }
           <td>{{ sale.quantity | amount:0 }}</td>
           <td>{{ sale.unitPrice | amount }}</td>
           <td>
@@ -158,7 +162,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="10" class="text-center py-8 text-gray-500">
+          <td [attr.colspan]="authService.isTeacher() ? 9 : 10" class="text-center py-8 text-gray-500">
             {{ 'PRODUCTS.SALES.NO_SALES' | translate }}
           </td>
         </tr>

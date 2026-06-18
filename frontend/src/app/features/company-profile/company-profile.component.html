@@ -37,7 +37,12 @@
               [severity]="registrationType() === 'TRIAL' ? 'info' : 'success'"></p-tag>
             <span class="text-sm text-gray-600">{{ 'COMPANY_PROFILE.STATUS_' + p.subscription.status | translate }}</span>
           </div>
-          @if (expirationDate()) {
+          @if (foreverActive()) {
+            <div class="text-sm font-semibold text-green-700 flex items-center gap-1">
+              <i class="pi pi-infinity"></i>
+              {{ 'COMPANY_PROFILE.ACTIVATED_FOREVER' | translate }}
+            </div>
+          } @else if (expirationDate()) {
             <div class="text-sm">
               <span class="text-gray-700">{{ 'COMPANY_PROFILE.EXPIRES_ON' | translate }}:</span>
               <span class="font-semibold ml-1">{{ expirationDate() | date: 'mediumDate' }}</span>
@@ -127,7 +132,7 @@
     </p-card>
 
     <!-- Preferences -->
-    <p-card>
+    <p-card styleClass="mb-6">
       <ng-template pTemplate="header">
         <div class="px-5 pt-4 flex items-center gap-2">
           <i class="pi pi-cog text-gray-600"></i>
@@ -149,5 +154,53 @@
         </div>
       </dl>
     </p-card>
+
+    <!-- QR cost (TEACHER companies only) -->
+    @if (isTeacher() && qr(); as q) {
+      <p-card>
+        <ng-template pTemplate="header">
+          <div class="px-5 pt-4 flex items-center gap-2">
+            <i class="pi pi-qrcode text-gray-600"></i>
+            <h2 class="text-lg font-semibold m-0">{{ 'COMPANY_PROFILE.QR_COST' | translate }}</h2>
+          </div>
+        </ng-template>
+        <!-- Counts -->
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_STUDENTS' | translate }}</dt>
+            <dd class="text-2xl font-bold text-gray-900 mt-0.5">{{ q.studentCount }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_ACTIVATIONS' | translate }}</dt>
+            <dd class="text-2xl font-bold text-gray-900 mt-0.5">{{ q.activatedCount }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_ONE_YEAR' | translate }}</dt>
+            <dd class="text-2xl font-bold text-blue-600 mt-0.5">{{ q.oneYearCount }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_LIFELONG' | translate }}</dt>
+            <dd class="text-2xl font-bold text-emerald-600 mt-0.5">{{ q.lifelongCount }}</dd>
+          </div>
+        </dl>
+
+        <!-- Cost -->
+        <dl class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 mt-6 pt-6 border-t border-gray-100">
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_TOTAL_COST' | translate }}</dt>
+            <dd class="text-2xl font-bold text-gray-900 mt-0.5">{{ q.totalCost }} {{ q.currency }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_PAID' | translate }}</dt>
+            <dd class="text-2xl font-bold text-green-600 mt-0.5">{{ q.paidCost }} {{ q.currency }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.QR_UNPAID' | translate }}</dt>
+            <dd class="text-2xl font-bold mt-0.5" [class.text-amber-600]="q.unpaidCost > 0" [class.text-gray-900]="q.unpaidCost === 0">{{ q.unpaidCost }} {{ q.currency }}</dd>
+          </div>
+        </dl>
+        <p class="text-xs text-gray-400 mt-4">{{ 'COMPANY_PROFILE.QR_NOTE' | translate }}</p>
+      </p-card>
+    }
   }
 </div>

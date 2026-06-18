@@ -4,7 +4,8 @@ import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TranslateModule } from '@ngx-translate/core';
-import { CompanyProfile, CompanyService } from '../../core/services/company.service';
+import { CompanyProfile, CompanyQrSummary, CompanyService } from '../../core/services/company.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-company-profile',
@@ -14,9 +15,21 @@ import { CompanyProfile, CompanyService } from '../../core/services/company.serv
 })
 export class CompanyProfileComponent implements OnInit {
   private companyService = inject(CompanyService);
+  private authService = inject(AuthService);
 
   loading = signal(true);
   profile = signal<CompanyProfile | null>(null);
+
+  /** QR billing panel is only meaningful for TEACHER-type companies. */
+  isTeacher = (): boolean => this.authService.isTeacher();
+
+  qr = computed<CompanyQrSummary | null>(() => this.profile()?.qr ?? null);
+
+  /** A teacher tenant, once activated (non-TRIAL), is active forever. */
+  foreverActive = computed<boolean>(() => {
+    const sub = this.profile()?.subscription;
+    return this.isTeacher() && !!sub && sub.status !== 'TRIAL';
+  });
 
   registrationType = computed<'TRIAL' | 'SUBSCRIPTION' | null>(() => {
     const sub = this.profile()?.subscription;

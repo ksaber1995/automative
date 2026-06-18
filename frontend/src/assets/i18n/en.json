@@ -547,7 +547,22 @@
       "PARTIAL": "Partial",
       "PAID": "Paid",
       "OVERDUE": "Overdue"
-    }
+    },
+    "OVERRIDE_PRICE_BUTTON": "Monthly Price",
+    "OVERRIDE_TITLE": "Monthly Price Override",
+    "OVERRIDE_DESCRIPTION": "Override the course price for this month. All student bills will scale proportionally — discounted students keep their discount ratio.",
+    "OVERRIDE_CURRENT_PRICE": "Normal course price",
+    "OVERRIDE_ACTIVE": "Current override for this month",
+    "OVERRIDE_NEW_PRICE": "New monthly price",
+    "OVERRIDE_HINT": "Example: if the normal price is 500 and a student pays 400 (80%), setting the override to 1000 will make that student's bill 800.",
+    "OVERRIDE_SAVE": "Save & Recalculate",
+    "OVERRIDE_REMOVE": "Remove Override",
+    "OVERRIDE_SAVED": "Price override saved. {{count}} bill(s) recalculated.",
+    "OVERRIDE_REMOVED": "Price override removed. {{count}} bill(s) reverted to normal pricing.",
+    "OVERRIDE_ERROR": "Failed to update price override",
+    "UPDATE_MONTH_BUTTON": "Update Specific Month",
+    "SELECT_COURSE": "Select a course",
+    "SELECT_COURSE_FIRST": "Select a course, year and month to set the price."
   },
   "NAV": {
     "DASHBOARD": "Dashboard",
@@ -2439,7 +2454,10 @@
       "ACTIVE_ENROLLMENTS": "{{count}} active",
       "COMPLETED_ENROLLMENTS": "{{count}} done",
       "ACTIVE_ENROLLMENTS_TOOLTIP": "Active enrollments",
-      "COMPLETED_ENROLLMENTS_TOOLTIP": "Completed enrollments"
+      "COMPLETED_ENROLLMENTS_TOOLTIP": "Completed enrollments",
+      "QR_ALL": "All",
+      "QR_ACTIVATED": "QR Activated",
+      "QR_NOT_ACTIVATED": "QR Not Activated"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Student",
@@ -3421,7 +3439,17 @@
     "SCAN_HINT": "Scan to open this student's profile",
     "PRINT": "Print",
     "DOWNLOAD": "Download",
-    "REGENERATE": "Regenerate"
+    "REGENERATE": "Regenerate",
+    "LOCKED_HINT": "Activate this student's QR code to print, share, and scan it.",
+    "ACTIVATE_ONE_YEAR": "Activate for 1 year — {{price}} EGP",
+    "ACTIVATE_LIFELONG": "Activate lifelong — {{price}} EGP",
+    "CONFIRM_TITLE": "Confirm QR activation",
+    "CONFIRM_ONE_YEAR": "You will be billed {{price}} EGP to activate this QR code for one year. Continue?",
+    "CONFIRM_LIFELONG": "You will be billed {{price}} EGP to activate this QR code for life. Continue?",
+    "CONFIRM_ACTIVATE": "Activate",
+    "CANCEL": "Cancel",
+    "ACTIVE_UNTIL": "Active until {{date}}",
+    "ACTIVE_LIFELONG": "Active — lifelong"
   },
   "SESSION_QR": {
     "SCAN_BUTTON": "Scan QR to check in",
@@ -3750,11 +3778,22 @@
     "STATUS_TRIAL": "Trial period",
     "STATUS_MONTHLY": "Monthly plan",
     "STATUS_ANNUAL": "Annual plan",
+    "STATUS_ACTIVE": "Active",
     "STATUS_EXPIRED": "Expired",
+    "ACTIVATED_FOREVER": "Activated forever",
     "EXPIRES_ON": "Expires on",
     "DAYS_REMAINING": "{{days}} days remaining",
     "EXPIRED_AGO": "expired {{days}} days ago",
-    "PRICE": "Price"
+    "PRICE": "Price",
+    "QR_COST": "QR Activations",
+    "QR_STUDENTS": "Students",
+    "QR_ACTIVATIONS": "Activated codes",
+    "QR_ONE_YEAR": "1-year",
+    "QR_LIFELONG": "Lifelong",
+    "QR_TOTAL_COST": "Total cost",
+    "QR_PAID": "Paid",
+    "QR_UNPAID": "Outstanding",
+    "QR_NOTE": "QR activation is billed per student. Outstanding amounts are settled with Netrofit."
   },
   "EDUCATIONAL_BOOKS": {
     "TITLE": "Educational Books",

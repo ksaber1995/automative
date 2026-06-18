@@ -35,7 +35,8 @@ export const publicStudentsRoutes = {
 
       const student = await queryOne<any>(
         `SELECT s.id, s.first_name, s.last_name, s.company_id, s.branch_id,
-                b.name AS branch_name, co.name AS academy_name
+                s.qr_activated, s.qr_expiration,
+                b.name AS branch_name, co.name AS academy_name, co.type AS company_type
          FROM students s
          JOIN branches b ON b.id = s.branch_id
          JOIN companies co ON co.id = s.company_id
@@ -46,6 +47,16 @@ export const publicStudentsRoutes = {
       // Generic 404 — never reveal whether a token is unknown vs inactive.
       if (!student) {
         return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+      }
+
+      // TEACHER tenants pay per QR. An unactivated/expired QR resolves to the
+      // same generic 404 as an unknown token — the code only "works" once paid.
+      if (student.company_type === 'TEACHER') {
+        const live = student.qr_activated === true &&
+          (!student.qr_expiration || new Date(student.qr_expiration) >= new Date(new Date().toISOString().slice(0, 10)));
+        if (!live) {
+          return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+        }
       }
 
       // Courses the student is enrolled in (regular enrollments). Coarse

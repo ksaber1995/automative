@@ -26,7 +26,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
-import { MonthlyPaymentWithDetails, MonthlyPaymentSummary } from '@shared/interfaces/monthly-subscription.interface';
+import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride } from '@shared/interfaces/monthly-subscription.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
 
@@ -82,6 +82,19 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   // Status filter
   statusFilter = signal('ALL');
   readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE'];
+
+  // ── Monthly price override ──────────────────────────────────────────────────
+  // The dialog is self-contained: the user picks course + year + month inside
+  // it (not from the page filter), then sets the price for that month.
+  showOverrideDialog = signal(false);
+  currentOverride = signal<CourseMonthlyPriceOverride | null>(null);
+  overridePrice: number | null = null;
+  overrideSaving = signal(false);
+  overrideLoading = signal(false);
+  overrideCoursePrice = signal<number | null>(null);
+  overrideCourseId: string | null = null;
+  overrideYear = new Date().getFullYear();
+  overrideMonth = new Date().getMonth() + 1;
 
   // ── Barcode scan → collect payment ──────────────────────────────────────────
   // Scan a student's barcode, pick one of their due months, then drop into the
@@ -402,6 +415,8 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       header: this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_TITLE'),
       icon: 'pi pi-exclamation-triangle',
       acceptButtonStyleClass: 'p-button-danger',
+      acceptLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CONFIRM'),
+      rejectLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CANCEL'),
       accept: () => {
         this.voidingId.set(payment.id);
         this.svc.voidPayment(payment.id).pipe(takeUntil(this.destroy$)).subscribe({
@@ -415,6 +430,105 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
             this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_ERROR'));
           },
         });
+      },
+    });
+  }
+
+  // ── Price Override methods ──────────────────────────────────────────────────
+
+  openOverrideDialog(): void {
+    const now = new Date();
+    this.overrideCourseId = null;
+    this.overrideYear = now.getFullYear();
+    this.overrideMonth = now.getMonth() + 1;
+    this.overridePrice = null;
+    this.currentOverride.set(null);
+    this.overrideCoursePrice.set(null);
+    this.showOverrideDialog.set(true);
+  }
+
+  /**
+   * Once a course + year + month are all chosen in the dialog, load the
+   * course's base price and any existing override so the price field is
+   * pre-filled and an active override can be shown / removed.
+   */
+  onOverrideSelectionChange(): void {
+    const courseId = this.overrideCourseId;
+    if (!courseId || !this.overrideYear || !this.overrideMonth) {
+      this.overrideCoursePrice.set(null);
+      this.currentOverride.set(null);
+      this.overridePrice = null;
+      return;
+    }
+    const course = this.courses().find(c => c.id === courseId);
+    this.overrideCoursePrice.set(course ? course.price : null);
+    this.overrideLoading.set(true);
+    this.svc.getPriceOverride(courseId, this.overrideYear, this.overrideMonth)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (ov) => {
+          this.currentOverride.set(ov);
+          this.overridePrice = ov ? ov.overridePrice : (course ? course.price : null);
+          this.overrideLoading.set(false);
+        },
+        error: () => {
+          this.overrideLoading.set(false);
+          this.currentOverride.set(null);
+          this.overridePrice = course ? course.price : null;
+        },
+      });
+  }
+
+  closeOverrideDialog(): void {
+    this.showOverrideDialog.set(false);
+    this.currentOverride.set(null);
+    this.overridePrice = null;
+    this.overrideCourseId = null;
+  }
+
+  saveOverride(): void {
+    const courseId = this.overrideCourseId;
+    if (!courseId || !this.overrideYear || !this.overrideMonth || !this.overridePrice || this.overridePrice <= 0) return;
+
+    this.overrideSaving.set(true);
+    this.svc.setPriceOverride({
+      courseId,
+      billingYear: this.overrideYear,
+      billingMonth: this.overrideMonth,
+      overridePrice: this.overridePrice,
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        this.overrideSaving.set(false);
+        this.closeOverrideDialog();
+        this.notify.success(
+          this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_SAVED', { count: res.updatedBills })
+        );
+        this.loadData();
+      },
+      error: () => {
+        this.overrideSaving.set(false);
+        this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_ERROR'));
+      },
+    });
+  }
+
+  removeOverride(): void {
+    const ov = this.currentOverride();
+    if (!ov) return;
+
+    this.overrideSaving.set(true);
+    this.svc.deletePriceOverride(ov.id).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        this.overrideSaving.set(false);
+        this.closeOverrideDialog();
+        this.notify.success(
+          this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_REMOVED', { count: res.updatedBills })
+        );
+        this.loadData();
+      },
+      error: () => {
+        this.overrideSaving.set(false);
+        this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_ERROR'));
       },
     });
   }

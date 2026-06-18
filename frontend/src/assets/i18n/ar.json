@@ -547,7 +547,22 @@
       "PARTIAL": "جزئي",
       "PAID": "مدفوع",
       "OVERDUE": "متأخر"
-    }
+    },
+    "OVERRIDE_PRICE_BUTTON": "سعر الشهر",
+    "OVERRIDE_TITLE": "تعديل سعر الشهر",
+    "OVERRIDE_DESCRIPTION": "تعديل سعر الكورس لهذا الشهر. سيتم تعديل فواتير جميع الطلاب بنفس النسبة — الطلاب الحاصلون على خصم يحتفظون بنسبة خصمهم.",
+    "OVERRIDE_CURRENT_PRICE": "سعر الكورس الأصلي",
+    "OVERRIDE_ACTIVE": "السعر المعدّل لهذا الشهر",
+    "OVERRIDE_NEW_PRICE": "السعر الشهري الجديد",
+    "OVERRIDE_HINT": "مثال: إذا كان السعر الأصلي 500 وطالب يدفع 400 (80%)، عند تعديل السعر إلى 1000 ستصبح فاتورة الطالب 800.",
+    "OVERRIDE_SAVE": "حفظ وإعادة حساب",
+    "OVERRIDE_REMOVE": "إزالة التعديل",
+    "OVERRIDE_SAVED": "تم حفظ تعديل السعر. تم إعادة حساب {{count}} فاتورة.",
+    "OVERRIDE_REMOVED": "تم إزالة تعديل السعر. تم إرجاع {{count}} فاتورة للسعر الأصلي.",
+    "OVERRIDE_ERROR": "فشل تحديث تعديل السعر",
+    "UPDATE_MONTH_BUTTON": "تحديث شهر محدد",
+    "SELECT_COURSE": "اختر الكورس",
+    "SELECT_COURSE_FIRST": "اختر الكورس والسنة والشهر لتحديد السعر."
   },
   "NAV": {
     "DASHBOARD": "لوحة التحكم",
@@ -2563,7 +2578,10 @@
       "ACTIVE_ENROLLMENTS": "{{count}} نشط",
       "COMPLETED_ENROLLMENTS": "{{count}} منتهي",
       "ACTIVE_ENROLLMENTS_TOOLTIP": "التسجيلات النشطة",
-      "COMPLETED_ENROLLMENTS_TOOLTIP": "التسجيلات المكتملة"
+      "COMPLETED_ENROLLMENTS_TOOLTIP": "التسجيلات المكتملة",
+      "QR_ALL": "الكل",
+      "QR_ACTIVATED": "QR مفعّل",
+      "QR_NOT_ACTIVATED": "QR غير مفعّل"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل بيانات الطالب",
@@ -3545,7 +3563,17 @@
     "SCAN_HINT": "امسح الرمز لعرض ملف الطالب",
     "PRINT": "طباعة",
     "DOWNLOAD": "تحميل",
-    "REGENERATE": "إعادة إنشاء"
+    "REGENERATE": "إعادة إنشاء",
+    "LOCKED_HINT": "فعّل رمز QR لهذا الطالب لطباعته ومشاركته ومسحه.",
+    "ACTIVATE_ONE_YEAR": "تفعيل لمدة سنة — {{price}} ج.م",
+    "ACTIVATE_LIFELONG": "تفعيل مدى الحياة — {{price}} ج.م",
+    "CONFIRM_TITLE": "تأكيد تفعيل رمز QR",
+    "CONFIRM_ONE_YEAR": "سيتم احتساب {{price}} ج.م لتفعيل رمز QR لمدة سنة. هل تريد المتابعة؟",
+    "CONFIRM_LIFELONG": "سيتم احتساب {{price}} ج.م لتفعيل رمز QR مدى الحياة. هل تريد المتابعة؟",
+    "CONFIRM_ACTIVATE": "تفعيل",
+    "CANCEL": "إلغاء",
+    "ACTIVE_UNTIL": "مفعّل حتى {{date}}",
+    "ACTIVE_LIFELONG": "مفعّل — مدى الحياة"
   },
   "SESSION_QR": {
     "SCAN_BUTTON": "امسح رمز QR لتسجيل الحضور",
@@ -3750,11 +3778,22 @@
     "STATUS_TRIAL": "فترة تجريبية",
     "STATUS_MONTHLY": "اشتراك شهري",
     "STATUS_ANNUAL": "اشتراك سنوي",
+    "STATUS_ACTIVE": "نشط",
     "STATUS_EXPIRED": "منتهي",
+    "ACTIVATED_FOREVER": "مفعّل مدى الحياة",
     "EXPIRES_ON": "تاريخ الانتهاء",
     "DAYS_REMAINING": "متبقي {{days}} يوم",
     "EXPIRED_AGO": "انتهى منذ {{days}} يوم",
-    "PRICE": "السعر"
+    "PRICE": "السعر",
+    "QR_COST": "تفعيلات رمز QR",
+    "QR_STUDENTS": "الطلاب",
+    "QR_ACTIVATIONS": "الأكواد المفعّلة",
+    "QR_ONE_YEAR": "سنة واحدة",
+    "QR_LIFELONG": "مدى الحياة",
+    "QR_TOTAL_COST": "إجمالي التكلفة",
+    "QR_PAID": "المدفوع",
+    "QR_UNPAID": "المستحق",
+    "QR_NOTE": "يتم احتساب تفعيل رمز QR لكل طالب. تتم تسوية المبالغ المستحقة مع Netrofit."
   },
   "EDUCATIONAL_BOOKS": {
     "TITLE": "الكتب التعليمية",

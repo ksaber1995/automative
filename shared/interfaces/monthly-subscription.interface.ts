@@ -51,3 +51,21 @@ export interface GenerateMonthlyBillsDto {
   billingYear: number;
   billingMonth: number;
 }
+
+export interface CourseMonthlyPriceOverride {
+  id: string;
+  courseId: string;
+  companyId: string;
+  billingYear: number;
+  billingMonth: number;
+  overridePrice: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SetPriceOverrideDto {
+  courseId: string;
+  billingYear: number;
+  billingMonth: number;
+  overridePrice: number;
+}

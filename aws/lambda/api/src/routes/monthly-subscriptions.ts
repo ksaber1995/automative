@@ -34,6 +34,19 @@ function mapPaymentWithDetailsFromDB(row: any) {
   };
 }
 
+function mapOverrideFromDB(row: any) {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    companyId: row.company_id,
+    billingYear: parseInt(row.billing_year, 10),
+    billingMonth: parseInt(row.billing_month, 10),
+    overridePrice: parseFloat(row.override_price),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 /** Resolve overdue status on-read: any PENDING row past its due_date becomes OVERDUE */
 function resolveStatus(row: any): string {
   if (row.payment_status === 'PAID' || row.payment_status === 'PARTIAL') return row.payment_status;
@@ -44,10 +57,77 @@ function resolveStatus(row: any): string {
   return row.payment_status;
 }
 
+/**
+ * Recalculate amount_due for all non-PAID bills of a course+month based on a
+ * new effective price. Each student's amount scales proportionally:
+ *   new_amount = effectivePrice * (enrollment.final_price / course.price)
+ * Returns the number of bills updated.
+ */
+async function recalcBillsForCourseMonth(
+  companyId: string,
+  courseId: string,
+  billingYear: number,
+  billingMonth: number,
+  effectivePrice: number,
+): Promise<number> {
+  // Get the course base price for ratio calculation
+  const course = await queryOne<any>(
+    'SELECT price FROM courses WHERE id = $1 AND company_id = $2',
+    [courseId, companyId]
+  );
+  if (!course) return 0;
+  const basePrice = parseFloat(course.price);
+  if (basePrice <= 0) return 0;
+
+  // Find all non-fully-paid bills for this course+month
+  const bills = await query(
+    `SELECT msp.id, msp.amount_paid,
+            COALESCE(NULLIF(e.final_price, 0), $5) AS enrollment_fee
+     FROM monthly_subscription_payments msp
+     JOIN enrollments e ON msp.enrollment_id = e.id
+     WHERE msp.company_id = $1
+       AND msp.course_id = $2
+       AND msp.billing_year = $3
+       AND msp.billing_month = $4
+       AND msp.payment_status <> 'PAID'`,
+    [companyId, courseId, billingYear, billingMonth, basePrice]
+  );
+
+  let updated = 0;
+  for (const bill of bills) {
+    const enrollmentFee = parseFloat(bill.enrollment_fee);
+    const ratio = enrollmentFee / basePrice;
+    const newAmountDue = Math.round(effectivePrice * ratio * 100) / 100;
+    const amountPaid = parseFloat(bill.amount_paid || 0);
+
+    // Determine new status based on recalculated amount
+    let newStatus: string;
+    let paidDate: string | null = null;
+    if (amountPaid >= newAmountDue && newAmountDue > 0) {
+      newStatus = 'PAID';
+      paidDate = new Date().toISOString().split('T')[0];
+    } else if (amountPaid > 0) {
+      newStatus = 'PARTIAL';
+    } else {
+      newStatus = 'PENDING';
+    }
+
+    await query(
+      `UPDATE monthly_subscription_payments
+       SET amount_due = $1, payment_status = $2, paid_date = COALESCE($3, paid_date), updated_at = NOW()
+       WHERE id = $4`,
+      [newAmountDue, newStatus, paidDate, bill.id]
+    );
+    updated++;
+  }
+  return updated;
+}
+
 export const monthlySubscriptionsRoutes = {
   /** POST /api/monthly-subscriptions/generate
    *  Idempotent: creates one row per active enrollment in monthly courses for the given month.
    *  Uses ON CONFLICT DO NOTHING so running twice is safe.
+   *  Respects course_monthly_price_overrides when computing amount_due.
    */
   generate: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -62,10 +142,9 @@ export const monthlySubscriptionsRoutes = {
       const dueDate = new Date(billingYear, billingMonth, 0); // day 0 = last day of prev month
       const dueDateStr = dueDate.toISOString().split('T')[0];
 
-      // Build query to find active enrollments in monthly-subscription courses
-      // The monthly fee is the enrollment's discounted fee (final_price), so the
-      // per-subscription discount carries forward to every month. Falls back to the
-      // course price for legacy rows whose final_price wasn't set.
+      // Build query to find active enrollments in monthly-subscription courses.
+      // If a price override exists for this course+month, scale the enrollment fee
+      // proportionally: override_price * (enrollment.final_price / course.price).
       let sql = `
         SELECT
           e.id AS enrollment_id,
@@ -73,15 +152,21 @@ export const monthlySubscriptionsRoutes = {
           e.course_id,
           e.branch_id,
           e.company_id,
-          COALESCE(NULLIF(e.final_price, 0), c.price) AS monthly_fee
+          COALESCE(NULLIF(e.final_price, 0), c.price) AS enrollment_fee,
+          c.price AS course_price,
+          ov.override_price
         FROM enrollments e
         JOIN courses c ON e.course_id = c.id
+        LEFT JOIN course_monthly_price_overrides ov
+          ON ov.course_id = e.course_id
+         AND ov.billing_year = $2
+         AND ov.billing_month = $3
         WHERE e.company_id = $1
           AND e.status = 'ACTIVE'
           AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
           AND c.is_active = true
       `;
-      const params: any[] = [context.companyId];
+      const params: any[] = [context.companyId, billingYear, billingMonth];
 
       if (courseId) {
         params.push(courseId);
@@ -102,7 +187,17 @@ export const monthlySubscriptionsRoutes = {
 
       let generated = 0;
       for (const enr of enrollments) {
-        const monthlyFee = parseFloat(enr.monthly_fee);
+        const enrollmentFee = parseFloat(enr.enrollment_fee);
+        const coursePrice = parseFloat(enr.course_price);
+        let monthlyFee = enrollmentFee;
+
+        // If an override exists, scale proportionally
+        if (enr.override_price != null && coursePrice > 0) {
+          const overridePrice = parseFloat(enr.override_price);
+          const ratio = enrollmentFee / coursePrice;
+          monthlyFee = Math.round(overridePrice * ratio * 100) / 100;
+        }
+
         // ON CONFLICT DO NOTHING — idempotent
         const result = await query(
           `INSERT INTO monthly_subscription_payments
@@ -539,6 +634,129 @@ export const monthlySubscriptionsRoutes = {
     } catch (error) {
       console.error('List by student error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list payments by student');
+    }
+  },
+
+  // ── Monthly Price Overrides ─────────────────────────────────────────────────
+
+  /** POST /api/monthly-subscriptions/price-override
+   *  Upsert an override price for a course+month. Recalculates all non-PAID
+   *  bills proportionally: new_amount = override_price * (student_fee / course_price).
+   */
+  setPriceOverride: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const { courseId, billingYear, billingMonth, overridePrice } = body;
+
+      // Verify course exists and belongs to this company
+      const course = await queryOne<any>(
+        'SELECT id, price FROM courses WHERE id = $1 AND company_id = $2',
+        [courseId, context.companyId]
+      );
+      if (!course) {
+        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      }
+
+      // Upsert the override
+      const row = await queryOne<any>(
+        `INSERT INTO course_monthly_price_overrides
+           (course_id, company_id, billing_year, billing_month, override_price)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (course_id, billing_year, billing_month)
+         DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()
+         RETURNING *`,
+        [courseId, context.companyId, billingYear, billingMonth, overridePrice]
+      );
+
+      // Recalculate all non-PAID bills for this course+month
+      const updatedBills = await recalcBillsForCourseMonth(
+        context.companyId, courseId, billingYear, billingMonth, overridePrice
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          override: mapOverrideFromDB(row),
+          updatedBills,
+        },
+      };
+    } catch (error) {
+      console.error('Set price override error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to set price override', 400);
+    }
+  },
+
+  /** GET /api/monthly-subscriptions/price-override?courseId=&billingYear=&billingMonth= */
+  getPriceOverride: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const row = await queryOne<any>(
+        `SELECT * FROM course_monthly_price_overrides
+         WHERE course_id = $1 AND company_id = $2
+           AND billing_year = $3 AND billing_month = $4`,
+        [q.courseId, context.companyId, parseInt(q.billingYear, 10), parseInt(q.billingMonth, 10)]
+      );
+
+      return {
+        status: 200 as const,
+        body: row ? mapOverrideFromDB(row) : null,
+      };
+    } catch (error) {
+      console.error('Get price override error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to get price override');
+    }
+  },
+
+  /** DELETE /api/monthly-subscriptions/price-override/:id
+   *  Remove an override and revert all non-PAID bills back to the normal course price.
+   */
+  deletePriceOverride: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const row = await queryOne<any>(
+        'SELECT * FROM course_monthly_price_overrides WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!row) {
+        return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_NOT_FOUND', 'Price override not found');
+      }
+
+      // Delete the override
+      await query('DELETE FROM course_monthly_price_overrides WHERE id = $1', [params.id]);
+
+      // Get the course base price to revert bills
+      const course = await queryOne<any>('SELECT price FROM courses WHERE id = $1', [row.course_id]);
+      const basePrice = course ? parseFloat(course.price) : 0;
+
+      // Revert non-PAID bills back to normal pricing
+      let updatedBills = 0;
+      if (basePrice > 0) {
+        updatedBills = await recalcBillsForCourseMonth(
+          context.companyId, row.course_id,
+          parseInt(row.billing_year, 10), parseInt(row.billing_month, 10),
+          basePrice
+        );
+      }
+
+      return {
+        status: 200 as const,
+        body: { deleted: true, updatedBills },
+      };
+    } catch (error) {
+      console.error('Delete price override error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to delete price override', 400);
     }
   },
 };
