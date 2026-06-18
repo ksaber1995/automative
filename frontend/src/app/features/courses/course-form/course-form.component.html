@@ -132,7 +132,8 @@
             />
           </div>
 
-          <!-- Instructor -->
+          <!-- Instructor (hidden for teacher companies) -->
+          @if (!authService.isTeacher()) {
           <div class="col-span-2">
             <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'COURSES.FORM.INSTRUCTOR_LABEL' | translate }}
@@ -148,8 +149,10 @@
               [showClear]="true"
             ></p-select>
           </div>
+          }
 
-          <!-- Default Room -->
+          <!-- Default Room (hidden for teacher companies) -->
+          @if (!authService.isTeacher()) {
           <div class="col-span-2">
             <label for="defaultRoomId" class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'COURSES.FORM.DEFAULT_ROOM_LABEL' | translate }}
@@ -166,6 +169,7 @@
             ></p-select>
             <small class="text-gray-400">{{ 'COURSES.FORM.DEFAULT_ROOM_HINT' | translate }}</small>
           </div>
+          }
 
           <!-- Level -->
           <div class="col-span-2">

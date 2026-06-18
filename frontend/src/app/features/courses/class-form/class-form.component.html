@@ -12,7 +12,7 @@
             <div class="flex-1">
               <div class="text-xs uppercase tracking-wider text-blue-600 font-semibold">{{ 'CLASSES.FORM.CONTEXT_LABEL' | translate }}</div>
               <div class="text-base font-semibold text-blue-900">{{ courseName() }}</div>
-              @if (branchName()) {
+              @if (branchName() && !authService.isTeacher()) {
                 <div class="text-sm text-blue-700">
                   <i class="pi pi-building text-xs mr-1"></i>{{ branchName() }}
                 </div>
@@ -115,7 +115,8 @@
           <small class="text-gray-500">{{ 'CLASSES.FORM.TYPE_HINT' | translate }}</small>
         </div>
 
-        <!-- Instructor -->
+        <!-- Instructor (hidden for teacher companies) -->
+        @if (!authService.isTeacher()) {
         <div class="field">
           <label for="instructorId" class="block text-sm font-medium text-gray-700 mb-2">
             {{ 'CLASSES.FORM.INSTRUCTOR_LABEL' | translate }}
@@ -134,6 +135,7 @@
           </p-select>
           <small class="text-gray-500">{{ 'CLASSES.FORM.INSTRUCTOR_HINT' | translate }}</small>
         </div>
+        }
 
         <!-- Days of Week -->
         <div class="field md:col-span-2">

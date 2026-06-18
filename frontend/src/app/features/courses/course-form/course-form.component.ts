@@ -15,6 +15,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
 import { LevelService } from '../../levels/services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Course } from '@shared/interfaces/course.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
@@ -46,6 +47,7 @@ export class CourseFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
   courseForm: FormGroup;

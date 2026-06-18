@@ -16,6 +16,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
@@ -49,6 +50,7 @@ export class ClassFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
   classForm: FormGroup;

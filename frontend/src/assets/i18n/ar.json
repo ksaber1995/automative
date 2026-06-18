@@ -2581,7 +2581,16 @@
       "COMPLETED_ENROLLMENTS_TOOLTIP": "التسجيلات المكتملة",
       "QR_ALL": "الكل",
       "QR_ACTIVATED": "QR مفعّل",
-      "QR_NOT_ACTIVATED": "QR غير مفعّل"
+      "QR_NOT_ACTIVATED": "QR غير مفعّل",
+      "QR_DOWNLOAD": "تحميل أكواد QR",
+      "QR_DOWNLOAD_TITLE": "تحميل أكواد QR",
+      "QR_DOWNLOAD_DESC": "تحميل أكواد QR لجميع الطلاب المفعّلين كملف ZIP. اختر هيكل المجلدات:",
+      "QR_MODE_BY_COURSE": "مجلدات حسب الكورس",
+      "QR_MODE_BY_COURSE_CLASS": "مجلدات حسب الكورس، ثم حسب المجموعة",
+      "QR_DOWNLOAD_BTN": "تحميل",
+      "QR_DOWNLOAD_SUCCESS": "تم تحميل {{count}} كود QR بنجاح",
+      "QR_DOWNLOAD_ERROR": "فشل تحميل أكواد QR",
+      "QR_NO_ACTIVATED": "لا توجد أكواد QR مفعّلة للتحميل"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل بيانات الطالب",

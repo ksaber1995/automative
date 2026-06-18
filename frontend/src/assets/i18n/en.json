@@ -2457,7 +2457,16 @@
       "COMPLETED_ENROLLMENTS_TOOLTIP": "Completed enrollments",
       "QR_ALL": "All",
       "QR_ACTIVATED": "QR Activated",
-      "QR_NOT_ACTIVATED": "QR Not Activated"
+      "QR_NOT_ACTIVATED": "QR Not Activated",
+      "QR_DOWNLOAD": "Download QR Codes",
+      "QR_DOWNLOAD_TITLE": "Download QR Codes",
+      "QR_DOWNLOAD_DESC": "Download QR codes for all activated students as a ZIP file. Choose the folder structure:",
+      "QR_MODE_BY_COURSE": "Folders by course",
+      "QR_MODE_BY_COURSE_CLASS": "Folders by course, then by class",
+      "QR_DOWNLOAD_BTN": "Download",
+      "QR_DOWNLOAD_SUCCESS": "Downloaded {{count}} QR codes successfully",
+      "QR_DOWNLOAD_ERROR": "Failed to download QR codes",
+      "QR_NO_ACTIVATED": "No activated QR codes to download"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Student",

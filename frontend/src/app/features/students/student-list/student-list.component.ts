@@ -6,15 +6,22 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
+import { RadioButtonModule } from 'primeng/radiobutton';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { forkJoin } from 'rxjs';
+import QRCode from 'qrcode';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { ClassService } from '../../courses/services/class.service';
+import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -38,8 +45,10 @@ interface EnrollmentCounts {
     ButtonModule,
     TagModule,
     ConfirmDialogModule,
+    DialogModule,
     TooltipModule,
     TabsModule,
+    RadioButtonModule,
     TranslateModule
   ],
   providers: [ConfirmationService],
@@ -51,6 +60,7 @@ export class StudentListComponent implements OnInit {
   private branchService = inject(BranchService);
   private enrollmentService = inject(EnrollmentService);
   private classService = inject(ClassService);
+  private courseService = inject(CourseService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -303,5 +313,108 @@ export class StudentListComponent implements OnInit {
       age--;
     }
     return age;
+  }
+
+  // --- Download QR Codes ---
+  showDownloadDialog = signal(false);
+  downloadMode: 'by-course' | 'by-course-class' = 'by-course';
+  downloading = signal(false);
+
+  openDownloadDialog() {
+    this.showDownloadDialog.set(true);
+  }
+
+  closeDownloadDialog() {
+    this.showDownloadDialog.set(false);
+  }
+
+  async downloadQrCodes() {
+    this.downloading.set(true);
+    try {
+      const activatedStudents = this.students().filter(s => s.isActive && s.qrActivated && s.qrToken);
+      if (activatedStudents.length === 0) {
+        this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
+        this.downloading.set(false);
+        return;
+      }
+
+      // Load enrollments, classes, courses in parallel
+      const [enrollments, classes, courses] = await new Promise<[any[], Class[], any[]]>((resolve, reject) => {
+        forkJoin({
+          enrollments: this.enrollmentService.getAllEnrollments(),
+          classes: this.classService.getAllClasses(),
+          courses: this.courseService.getAllCourses(),
+        }).subscribe({
+          next: (res) => resolve([res.enrollments, res.classes, res.courses]),
+          error: reject,
+        });
+      });
+
+      const courseMap = new Map(courses.map((c: any) => [c.id, c.name]));
+      const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
+      const studentIdSet = new Set(activatedStudents.map(s => s.id));
+
+      // Build student -> enrollments mapping
+      const studentEnrollments = new Map<string, { courseId: string; classId: string }[]>();
+      for (const e of enrollments) {
+        if (studentIdSet.has(e.studentId)) {
+          if (!studentEnrollments.has(e.studentId)) studentEnrollments.set(e.studentId, []);
+          studentEnrollments.get(e.studentId)!.push({ courseId: e.courseId, classId: e.classId });
+        }
+      }
+
+      const zip = new JSZip();
+      const mode = this.downloadMode;
+      const origin = window.location.origin;
+
+      for (const student of activatedStudents) {
+        const url = `${origin}/p/s/${student.qrToken}`;
+        const dataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2 });
+        const base64 = dataUrl.split(',')[1];
+        const fileName = this.buildQrFileName(student);
+
+        const enrs = studentEnrollments.get(student.id) || [];
+        if (enrs.length === 0) {
+          // No enrollments — put in "Uncategorized" folder
+          zip.file(`Uncategorized/${fileName}`, base64, { base64: true });
+        } else {
+          const addedPaths = new Set<string>();
+          for (const enr of enrs) {
+            const courseName = this.sanitizeName(courseMap.get(enr.courseId) || 'Unknown Course');
+            let path: string;
+            if (mode === 'by-course') {
+              path = `${courseName}/${fileName}`;
+            } else {
+              const classInfo = classMap.get(enr.classId);
+              const className = this.sanitizeName(classInfo?.name || 'Unknown Class');
+              path = `${courseName}/${className}/${fileName}`;
+            }
+            if (!addedPaths.has(path)) {
+              zip.file(path, base64, { base64: true });
+              addedPaths.add(path);
+            }
+          }
+        }
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, 'qr-codes.zip');
+      this.showDownloadDialog.set(false);
+      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
+    } finally {
+      this.downloading.set(false);
+    }
+  }
+
+  private buildQrFileName(student: Student): string {
+    const name = `${student.firstName} ${student.lastName}`.trim();
+    const phone = student.phone ? ` (${student.phone})` : '';
+    return this.sanitizeName(`${name}${phone}`) + '.png';
+  }
+
+  private sanitizeName(name: string): string {
+    return name.replace(/[\\/:*?"<>|]/g, '_').trim();
   }
 }
