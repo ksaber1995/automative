@@ -395,7 +395,7 @@
                     <div>
                       <div class="font-medium text-gray-800">{{ item.type === 'salary' ? ('DASHBOARD.DUE_TYPE_SALARY' | translate) + ': ' + item.label.replace('Salary: ', '') : item.label }}</div>
                       <div class="text-xs text-gray-500 flex items-center gap-2">
-                        <span class="capitalize">{{ 'DASHBOARD.DUE_TYPE_' + item.type.toUpperCase() | translate }}</span>
+                        <span class="capitalize">{{ ('DASHBOARD.DUE_TYPE_' + item.type.toUpperCase()) | translate }}</span>
                         @if (item.branchName) {
                           <span>• {{ item.branchName }}</span>
                         }

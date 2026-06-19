@@ -302,11 +302,13 @@ export class CoreStack extends cdk.Stack {
     // When API Gateway itself returns an error (Lambda throttle → 5xx,
     // integration timeout → 504, default 4xx, etc.) it does NOT invoke our
     // Lambda response handler, so the response is missing CORS headers and
-    // the browser masks the real status as a CORS error. We attach the same
-    // CORS headers to the gateway-generated error responses so the browser
-    // surfaces the underlying 4xx/5xx instead of a misleading CORS failure.
+    // the browser masks the real status as a CORS error. Gateway responses
+    // only support static values (no request-header echoing), so we use the
+    // primary frontend origin for the stage.
+    const gatewayOrigin = stage === 'prod' ? 'https://app.netrofit.com' : 'https://dev.netrofit.com';
     const corsErrorHeaders = {
-      'Access-Control-Allow-Origin': "'*'",
+      'Access-Control-Allow-Origin': `'${gatewayOrigin}'`,
+      'Access-Control-Allow-Credentials': "'true'",
       'Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Accept-Language'",
       'Access-Control-Allow-Methods': "'GET,POST,PUT,PATCH,DELETE,OPTIONS'",
     };

@@ -185,11 +185,21 @@ const router = {
   },
 };
 
+// Allowed CORS origins — keep in sync with CDK defaultCorsPreflightOptions.
+const ALLOWED_ORIGINS = [
+  'https://app.netrofit.com',   // prod frontend
+  'https://dev.netrofit.com',   // dev frontend
+  'http://localhost:4200',      // local Angular dev server
+  'http://localhost:4300',      // local admin console
+];
+
+function getAllowedOrigin(requestOrigin: string | null | undefined): string | null {
+  if (!requestOrigin) return null;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : null;
+}
+
 // Create the Lambda handler
 // @ts-expect-error - Type mismatch with ts-rest router implementation
-// Echo the request Origin back rather than using '*'. The previous '*' +
-// 'Allow-Credentials: true' combo is invalid per CORS spec — browsers reject
-// the response whenever the request runs in credentials mode 'include'.
 const lambdaHandler = createLambdaHandler(contract, router, {
   // ts-rest's default body-validation failure returns `{ message: 'Request
   // validation failed', bodyErrors: { issues: [...] } }` with no `code`, so the
@@ -205,9 +215,6 @@ const lambdaHandler = createLambdaHandler(contract, router, {
         err.pathParamsError?.issues?.[0] ||
         err.headersError?.issues?.[0];
       if (firstIssue) {
-        // The field+message tells the user exactly what's wrong (e.g.
-        // "email: Invalid email"). Omit `code` so the frontend interceptor
-        // uses this specific message instead of a generic translated string.
         const field =
           firstIssue.path && firstIssue.path.length > 0
             ? firstIssue.path.join('.')
@@ -225,15 +232,13 @@ const lambdaHandler = createLambdaHandler(contract, router, {
     return undefined;
   },
   responseHandlers: [
-    (response, request, args) => {
-      const origin = request.headers.get('origin');
+    (response, request) => {
+      const origin = getAllowedOrigin(request.headers.get('origin'));
       if (origin) {
         response.headers.set('Access-Control-Allow-Origin', origin);
+        response.headers.set('Access-Control-Allow-Credentials', 'true');
         response.headers.set('Vary', 'Origin');
-      } else {
-        response.headers.set('Access-Control-Allow-Origin', '*');
       }
-      response.headers.set('Access-Control-Allow-Credentials', 'true');
     },
   ],
 });
@@ -277,15 +282,16 @@ export const handler = async (
     return await runWithRequestContext({ ip }, () => lambdaHandler(event, context));
   } catch (error) {
     console.error('Handler error:', error);
-    const reqOrigin =
-      (event.headers?.['origin'] ?? event.headers?.['Origin']) as string | undefined;
+    const reqOrigin = (event.headers?.['origin'] ?? event.headers?.['Origin']) as string | undefined;
+    const origin = getAllowedOrigin(reqOrigin);
+    const corsHeaders: Record<string, string> = origin
+      ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' }
+      : {};
     return {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': reqOrigin || '*',
-        'Access-Control-Allow-Credentials': 'true',
-        ...(reqOrigin ? { Vary: 'Origin' } : {}),
+        ...corsHeaders,
       },
       body: JSON.stringify({
         message: 'Internal server error',
