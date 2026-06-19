@@ -162,7 +162,7 @@
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-3 gap-2">
                   <p-button
                     [label]="(upcomingAttendanceClassId() === entry.classId ? 'SESSIONS_DASHBOARD.HIDE_ATTENDANCE' : 'SESSIONS_DASHBOARD.UPCOMING_ATTENDANCE') | translate"
                     [icon]="upcomingAttendanceClassId() === entry.classId ? 'pi pi-chevron-up' : 'pi pi-check-square'"
@@ -172,6 +172,16 @@
                     styleClass="w-full"
                     [loading]="upcomingAutoStarting() === entry.classId"
                     (onClick)="toggleUpcomingAttendance(entry)"
+                  ></p-button>
+                  <p-button
+                    [label]="'SESSIONS_DASHBOARD.OPEN_FULL_PAGE' | translate"
+                    icon="pi pi-external-link"
+                    severity="secondary"
+                    [outlined]="true"
+                    size="small"
+                    styleClass="w-full"
+                    [loading]="upcomingOpeningTab() === entry.classId"
+                    (onClick)="openUpcomingInNewTab(entry)"
                   ></p-button>
                   <p-button
                     [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"

@@ -114,6 +114,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   /** True while the session is still running (no end date yet). */
   isActive = computed(() => !!this.session() && !this.session()!.endDate);
 
+  /** True when the session is prepared but not formally started. */
+  isPrepared = computed(() => !!this.session() && this.session()!.started === false);
+  startingSession = signal(false);
+
   // ── Teacher management ──────────────────────────────────────────────────────
   teacherPanelOpen = signal(false);
   loadingTeachers = signal(false);
@@ -295,6 +299,28 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_TEACHERS_SAVED', { count: res.count }));
       },
       error: () => this.savingTeachers.set(false),
+    });
+  }
+
+  // ============================================================
+  // Start session (upgrade from prepared → started)
+  // ============================================================
+
+  startSessionFromPrepared() {
+    const s = this.session();
+    if (!s) return;
+    this.startingSession.set(true);
+    this.sessionService.start({
+      classId: s.classId,
+      branchId: s.branchId,
+      roomId: s.roomId || undefined,
+    }).subscribe({
+      next: (updated) => {
+        this.session.set(updated);
+        this.startingSession.set(false);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
+      },
+      error: () => this.startingSession.set(false),
     });
   }
 

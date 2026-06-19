@@ -25,14 +25,27 @@
         <p class="text-sm text-gray-500">
           {{ s.courseName }}
           @if (s.roomCode) { · {{ 'SESSIONS_DASHBOARD.ROOM' | translate }} {{ s.roomCode }} }
-          @if (s.startDate) { · {{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(s.startDate) } }} }
+          @if (s.startDate && !isPrepared()) { · {{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(s.startDate) } }} }
+          @if (isPrepared()) {
+            <span class="ml-1 inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+              <i class="pi pi-clock text-xs"></i>
+              {{ 'SESSIONS_DASHBOARD.UPCOMING_PRE_ATTENDANCE' | translate }}
+            </span>
+          }
         </p>
       } @else {
         <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.ATTENDANCE_TITLE' | translate }}</h1>
       }
     </div>
     <div class="flex items-center gap-2 text-sm flex-wrap">
-      @if (isActive()) {
+      @if (isPrepared()) {
+        <p-button icon="pi pi-play" severity="success" size="small"
+          [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
+          [loading]="startingSession()"
+          (onClick)="startSessionFromPrepared()"></p-button>
+        <span class="text-gray-300">·</span>
+      }
+      @if (isActive() && !isPrepared()) {
         <p-button icon="pi pi-user-edit" severity="warn" [outlined]="true" size="small"
           [label]="(teacherPanelOpen() ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
           (onClick)="toggleTeacherPanel()"></p-button>

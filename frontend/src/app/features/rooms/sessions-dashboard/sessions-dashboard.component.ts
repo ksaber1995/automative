@@ -219,7 +219,7 @@ export class SessionsDashboardComponent implements OnInit {
   /** Ticks every minute to re-evaluate which entries are "upcoming" */
   private upcomingTick = signal<number>(Date.now());
 
-  /** Entries whose start time is within 15 min from now and don't have an active session yet */
+  /** Entries whose start time is within 30 min from now; stay 30 min after start if not started */
   filteredUpcoming = computed(() => {
     this.upcomingTick(); // re-trigger every minute
     const now = new Date();
@@ -227,25 +227,18 @@ export class SessionsDashboardComponent implements OnInit {
     const branchId = this.selectedBranchId();
     return this.upcomingEntries()
       .filter(e => {
-        // Skip entries that already have an active session
+        // Skip entries that already have an active (started) session
         if (e.sessionId && !e.sessionEnd) return false;
         if (!e.startTime) return false;
         const [h, m] = e.startTime.split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return false;
         const entryMinutes = h * 60 + m;
-        // Show 15 min before start time, up to end time
         const diff = entryMinutes - nowMinutes;
-        if (diff > 15) return false; // too early
-        // If end time exists, hide after it passed
-        if (e.endTime) {
-          const [eh, em] = e.endTime.split(':').map(Number);
-          if (!isNaN(eh) && !isNaN(em)) {
-            const endMinutes = eh * 60 + em;
-            if (nowMinutes > endMinutes) return false; // already over
-          }
-        }
-        // Show if within 15 min before start or already started (diff <= 0)
-        return diff >= -120; // up to 2 hours into the class
+        // Show 30 min before start time
+        if (diff > 30) return false;
+        // Stay 30 min after start time if no one started it
+        if (diff < -30) return false;
+        return true;
       })
       .filter(e => !branchId || e.branchId === branchId)
       .sort((a, b) => {
@@ -579,6 +572,7 @@ export class SessionsDashboardComponent implements OnInit {
   /** Which upcoming card has the attendance panel open? (by classId) */
   upcomingAttendanceClassId = signal<string | null>(null);
   upcomingAutoStarting = signal<string | null>(null);
+  upcomingOpeningTab = signal<string | null>(null);
 
   loadUpcoming() {
     this.loadingUpcoming.set(true);
@@ -624,6 +618,35 @@ export class SessionsDashboardComponent implements OnInit {
       },
       error: () => {
         this.saving.set(false);
+      },
+    });
+  }
+
+  /** Open an upcoming entry's attendance page in a new tab (prepare first if needed) */
+  openUpcomingInNewTab(entry: TimetableEntry) {
+    const existing = this.upcomingSessionByClass()[entry.classId];
+    if (existing) {
+      window.open(`/sessions/${existing.id}/attendance`, '_blank');
+      return;
+    }
+    if (entry.sessionId) {
+      window.open(`/sessions/${entry.sessionId}/attendance`, '_blank');
+      return;
+    }
+    // Prepare the session first, then open
+    this.upcomingOpeningTab.set(entry.classId);
+    this.sessionService.prepare(entry.classId, entry.branchId).subscribe({
+      next: (session) => {
+        this.upcomingSessionByClass.set({
+          ...this.upcomingSessionByClass(),
+          [entry.classId]: session,
+        });
+        this.upcomingOpeningTab.set(null);
+        window.open(`/sessions/${session.id}/attendance`, '_blank');
+      },
+      error: () => {
+        this.upcomingOpeningTab.set(null);
+        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_START_FAILED'));
       },
     });
   }
