@@ -458,4 +458,24 @@ export const studentsRoutes = {
       return mapThrownError(error, 'ERRORS.STUDENTS.QR_ACTIVATE_FAILED', 'Failed to activate QR code', 400);
     }
   },
+
+  lookupByQr: async ({ params, headers }: { params: { qrToken: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const student = await queryOne(
+        `SELECT id FROM students WHERE qr_token = $1 AND company_id = $2`,
+        [params.qrToken, context.companyId]
+      );
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      }
+      return { status: 200 as const, body: { id: student.id } };
+    } catch (error) {
+      console.error('Lookup student by QR error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.LOOKUP_QR_FAILED', 'Failed to lookup student by QR');
+    }
+  },
 };

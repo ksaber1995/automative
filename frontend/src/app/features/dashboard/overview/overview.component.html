@@ -3,6 +3,26 @@
 
   <!-- Date range filter -->
   <p-card styleClass="mb-6">
+    <div class="flex flex-wrap gap-2 mb-4">
+      <p-button
+        [label]="'DASHBOARD.PRESET_MONTH' | translate"
+        size="small"
+        [outlined]="activePreset() !== 'month'"
+        (onClick)="setPreset('month')"
+      ></p-button>
+      <p-button
+        [label]="'DASHBOARD.PRESET_YEAR' | translate"
+        size="small"
+        [outlined]="activePreset() !== 'year'"
+        (onClick)="setPreset('year')"
+      ></p-button>
+      <p-button
+        [label]="'DASHBOARD.PRESET_12MONTHS' | translate"
+        size="small"
+        [outlined]="activePreset() !== '12months'"
+        (onClick)="setPreset('12months')"
+      ></p-button>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'DASHBOARD.START_DATE' | translate }}</label>
@@ -29,14 +49,7 @@
           icon="pi pi-refresh"
           [label]="'DASHBOARD.APPLY' | translate"
           [loading]="loading()"
-          (onClick)="applyFilters()"
-        ></p-button>
-        <p-button
-          icon="pi pi-filter-slash"
-          severity="secondary"
-          [outlined]="true"
-          [label]="'DASHBOARD.RESET' | translate"
-          (onClick)="resetFilters()"
+          (onClick)="activePreset.set(''); applyFilters()"
         ></p-button>
       </div>
     </div>
@@ -380,9 +393,9 @@
                       [class.text-green-500]="item.type === 'salary'">
                     </i>
                     <div>
-                      <div class="font-medium text-gray-800">{{ item.label }}</div>
+                      <div class="font-medium text-gray-800">{{ item.type === 'salary' ? ('DASHBOARD.DUE_TYPE_SALARY' | translate) + ': ' + item.label.replace('Salary: ', '') : item.label }}</div>
                       <div class="text-xs text-gray-500 flex items-center gap-2">
-                        <span class="capitalize">{{ item.type }}</span>
+                        <span class="capitalize">{{ 'DASHBOARD.DUE_TYPE_' + item.type.toUpperCase() | translate }}</span>
                         @if (item.branchName) {
                           <span>• {{ item.branchName }}</span>
                         }

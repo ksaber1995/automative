@@ -57,7 +57,10 @@
         @if (salaryType?.value !== 'SESSION_BASED') {
           <div class="field">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
-            <p-inputnumber formControlName="salary" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+            <p-inputnumber formControlName="salary" [min]="1" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+            @if (salary?.invalid && salary?.touched) {
+              <small class="text-red-500">{{ 'EMPLOYEES.FORM.SALARY_REQUIRED' | translate }}</small>
+            }
           </div>
         }
 
@@ -65,8 +68,11 @@
         @if (salaryType?.value === 'SESSION_BASED') {
           <div class="field">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SESSION_RATE' | translate }} <span class="text-red-500">*</span></label>
-            <p-inputnumber formControlName="sessionRate" [min]="0" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
+            <p-inputnumber formControlName="sessionRate" [min]="1" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
             <small class="text-gray-400">{{ 'EMPLOYEES.FORM.SESSION_RATE_HINT' | translate }}</small>
+            @if (sessionRate?.invalid && sessionRate?.touched) {
+              <small class="text-red-500 block">{{ 'EMPLOYEES.FORM.SESSION_RATE_REQUIRED' | translate }}</small>
+            }
           </div>
         }
 

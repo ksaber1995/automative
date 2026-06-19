@@ -64,7 +64,7 @@ export class EmployeeFormComponent implements OnInit {
       isGlobal: [false],
       branchId: [''],
       salaryType: ['MONTHLY', [Validators.required]],
-      salary: [0, [Validators.required, Validators.min(0)]],
+      salary: [null, [Validators.required, Validators.min(1)]],
       sessionRate: [null],
       hireDate: [today, [Validators.required]],
       notes: ['']
@@ -88,9 +88,9 @@ export class EmployeeFormComponent implements OnInit {
       const rateCtrl = this.employeeForm.get('sessionRate');
       if (type === 'SESSION_BASED') {
         salaryCtrl?.clearValidators();
-        rateCtrl?.setValidators([Validators.required, Validators.min(0)]);
+        rateCtrl?.setValidators([Validators.required, Validators.min(1)]);
       } else {
-        salaryCtrl?.setValidators([Validators.required, Validators.min(0)]);
+        salaryCtrl?.setValidators([Validators.required, Validators.min(1)]);
         rateCtrl?.clearValidators();
       }
       salaryCtrl?.updateValueAndValidity();

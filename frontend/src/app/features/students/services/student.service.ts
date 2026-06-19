@@ -76,6 +76,11 @@ export class StudentService {
     return this.api.post<Student>(`students/${id}/activate-qr`, { plan });
   }
 
+  /** Lookup a student by their QR token. Returns just the student ID. */
+  lookupByQr(qrToken: string): Observable<{ id: string }> {
+    return this.api.get<{ id: string }>(`students/lookup-by-qr/${encodeURIComponent(qrToken)}`);
+  }
+
   enrollStudent(studentId: string, enrollment: EnrollmentDto): Observable<Enrollment> {
     return this.api.post<Enrollment>(`students/${studentId}/enroll`, enrollment);
   }

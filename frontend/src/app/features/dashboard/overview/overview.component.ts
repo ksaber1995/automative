@@ -37,12 +37,9 @@ export class OverviewComponent implements OnInit {
 
   isTeacher = (): boolean => this.authService.isTeacher();
 
-  // Date range filter — mirrors the Reports page (default: last 12 months) so
-  // the two screens reconcile out of the box. Without an explicit range the
-  // dashboard previously defaulted to year-to-date server-side while Reports
-  // used a rolling 12 months, which is why their totals didn't match.
   startDate: Date;
   endDate: Date;
+  activePreset = signal<string>('month');
 
   dashboardData = signal<DashboardMetrics | null>(null);
   loading = signal(true);
@@ -68,12 +65,9 @@ export class OverviewComponent implements OnInit {
   expenseChartOptions: any;
 
   constructor() {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - 11);
-    start.setDate(1);
-    this.startDate = start;
-    this.endDate = end;
+    const now = new Date();
+    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.endDate = now;
   }
 
   ngOnInit() {
@@ -130,14 +124,24 @@ export class OverviewComponent implements OnInit {
     this.loadDashboard();
   }
 
-  /** Reset the range to the default rolling 12 months and reload. */
-  resetFilters() {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - 11);
-    start.setDate(1);
-    this.startDate = start;
-    this.endDate = end;
+  setPreset(preset: string) {
+    const now = new Date();
+    this.activePreset.set(preset);
+    this.endDate = now;
+    switch (preset) {
+      case 'month':
+        this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        this.startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      case '12months':
+        const start = new Date();
+        start.setMonth(start.getMonth() - 11);
+        start.setDate(1);
+        this.startDate = start;
+        break;
+    }
     this.applyFilters();
   }
 

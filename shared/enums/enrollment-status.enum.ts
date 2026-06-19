@@ -3,6 +3,7 @@ export enum EnrollmentStatus {
   COMPLETED = 'COMPLETED',
   DROPPED = 'DROPPED',
   PENDING = 'PENDING',
+  ON_HOLD = 'ON_HOLD',
 }
 
 export enum PaymentStatus {

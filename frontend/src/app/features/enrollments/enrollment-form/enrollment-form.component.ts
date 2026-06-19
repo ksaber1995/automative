@@ -139,10 +139,8 @@ export class EnrollmentFormComponent implements OnInit {
     { label: 'ENROLLMENT_FORM.BOOK_DISCOUNT_FIXED', value: DiscountType.FIXED_AMOUNT },
   ];
 
-  // Books are hidden for monthly-subscription courses (backend ignores products there).
   showBooksSection = computed(() =>
     this.enrollmentType() === 'COURSE' &&
-    !this.isMonthly() &&
     this.courseBooks().length > 0
   );
 
@@ -484,7 +482,11 @@ export class EnrollmentFormComponent implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     classStart.setHours(0, 0, 0, 0);
-    const enrollDate = classStart > today ? classStart : today;
+    // For monthly subscriptions, default to today so the start date can be
+    // before the class start date (billing begins from this date).
+    const enrollDate = this.isMonthly()
+      ? today
+      : (classStart > today ? classStart : today);
     this.enrollmentForm.patchValue({ enrollmentDate: enrollDate });
     this.checkMonthlyPriceOverride(enrollDate);
   }
@@ -692,11 +694,11 @@ export class EnrollmentFormComponent implements OnInit {
         }
       });
     } else {
-      // Educational Books: attach selected linked products (COURSE mode, non-monthly only).
+      // Educational Books: attach selected linked products.
       const createData: typeof enrollmentData & {
         products?: Array<{ productId: string; quantity: number; discountType: DiscountType; discountValue: number }>;
       } = { ...enrollmentData };
-      if (this.enrollmentType() === 'COURSE' && !monthly) {
+      if (this.enrollmentType() === 'COURSE') {
         const selected = this.selectedBookIds();
         const overrides = this.bookOverrides();
         const products = this.courseBooks()

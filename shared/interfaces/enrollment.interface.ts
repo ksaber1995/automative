@@ -21,6 +21,9 @@ export interface Enrollment {
   paymentStatus: PaymentStatus;
   completionDate: string | null;
   notes: string | null;
+  holdStartMonth?: number | null;
+  holdStartYear?: number | null;
+  holdMonths?: number | null;
   createdAt: string;
   updatedAt: string;
 }

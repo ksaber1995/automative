@@ -461,7 +461,8 @@
     "COMPANY_PROFILE": "Company Profile",
     "EXAMS": "Exams",
     "EDUCATIONAL_BOOKS": "Educational Books",
-    "EDUCATIONAL_BOOKS_DETAIL": "Course Books"
+    "EDUCATIONAL_BOOKS_DETAIL": "Course Books",
+    "MESSAGING": "Messages"
   },
   "MONTHLY_SUBSCRIPTIONS": {
     "TITLE": "Monthly Subscriptions",
@@ -606,7 +607,13 @@
     },
     "EXAMS": "Exams",
     "EDUCATIONAL_BOOKS": "Educational Books",
-    "MESSAGING": "Messages"
+    "MESSAGING": "Messages",
+    "FIND_STUDENT": "Find Student",
+    "QR_CAMERA_FAILED": "Could not start the camera. Please check permissions.",
+    "QR_STUDENT_NOT_FOUND": "Student not found for this QR code.",
+    "QR_STARTING_CAMERA": "Starting camera...",
+    "QR_LOOKING_UP": "Looking up student...",
+    "QR_SCAN_INSTRUCTION": "Point your camera at a student's QR code to find them."
   },
   "HEADER": {
     "LOGOUT": "Logout",
@@ -1852,6 +1859,9 @@
     "END_DATE": "End Date",
     "APPLY": "Apply",
     "RESET": "Reset",
+    "PRESET_MONTH": "This Month",
+    "PRESET_YEAR": "This Year",
+    "PRESET_12MONTHS": "Last 12 Months",
     "TOTAL_REVENUE": "Total Revenue",
     "AFTER_REFUNDS": "After refunds",
     "TOTAL_REFUNDS": "Total Refunds",
@@ -1951,6 +1961,8 @@
       "SALARY_TYPE_SESSION": "Per session",
       "SESSION_RATE": "Rate per session",
       "SESSION_RATE_HINT": "Monthly pay = sessions taught × this rate.",
+      "SALARY_REQUIRED": "Monthly salary is required and must be greater than 0.",
+      "SESSION_RATE_REQUIRED": "Session rate is required and must be greater than 0.",
       "HIRE_DATE": "Hire Date",
       "GLOBAL_EMPLOYEE": "Global Employee (works across all branches)",
       "BRANCH": "Branch",
@@ -2613,6 +2625,7 @@
       "STATUS_ACTIVE": "Active",
       "STATUS_COMPLETED": "Completed",
       "STATUS_DROPPED": "Dropped",
+      "STATUS_ON_HOLD": "On Hold",
       "STATUS_CANCELLED": "Cancelled",
       "PAYMENT_PAID": "Paid",
       "PAYMENT_PARTIAL": "Partial",
@@ -2714,7 +2727,18 @@
       "BOOK_COL_UNIT_PRICE": "Unit price",
       "BOOK_COL_TOTAL": "Total",
       "BOOK_COL_DATE": "Date",
-      "BOOK_REFUNDED": "Refunded: {{amount}}"
+      "BOOK_REFUNDED": "Refunded: {{amount}}",
+      "HOLD_SUBSCRIPTION": "Hold Subscription",
+      "HOLD_DESCRIPTION": "Hold this subscription for a specific number of months. No bills will be generated during the hold period.",
+      "HOLD_MONTHS": "Number of months to hold",
+      "HOLD_CONFIRM": "Hold Subscription",
+      "SUBSCRIPTION_HELD": "Subscription placed on hold successfully.",
+      "RESUME_SUBSCRIPTION": "Resume Subscription",
+      "RESUME_CONFIRM": "Are you sure you want to resume this subscription?",
+      "SUBSCRIPTION_RESUMED": "Subscription resumed successfully.",
+      "DELETE_SUBSCRIPTION": "Delete Subscription",
+      "DELETE_SUBSCRIPTION_CONFIRM": "Are you sure you want to delete this subscription? This action cannot be undone.",
+      "SUBSCRIPTION_DELETED": "Subscription deleted successfully."
     },
     "CREATED": "Student created successfully",
     "UPDATED": "Student updated successfully",
@@ -3974,9 +3998,6 @@
     "SEND_FAILED": "Failed to send messages",
     "SELECTED_COUNT": "{{count}} selected",
     "CLEAR_SELECTION": "Clear"
-  },
-  "BREADCRUMBS": {
-    "MESSAGING": "Messages"
   },
   "MONTHS": {
     "JAN": "January",

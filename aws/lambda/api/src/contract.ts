@@ -65,7 +65,7 @@ const SubscriptionTierSchema = z.enum(['BASIC', 'PROFESSIONAL', 'ENTERPRISE']);
 const SubscriptionStatusSchema = z.enum(['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED']);
 
 // Enrollment Status
-const EnrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'DROPPED', 'PENDING']);
+const EnrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'DROPPED', 'PENDING', 'ON_HOLD']);
 
 // Payment Status
 const PaymentStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
@@ -773,6 +773,9 @@ const EnrollmentSchema = z.object({
   paymentStatus: PaymentStatusSchema,
   completionDate: z.string().nullable(),
   notes: z.string().nullable(),
+  holdStartMonth: z.number().nullable().optional(),
+  holdStartYear: z.number().nullable().optional(),
+  holdMonths: z.number().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1441,6 +1444,16 @@ export const contract = c.router({
         403: ApiErrorSchema,
         404: ApiErrorSchema,
         409: ApiErrorSchema,
+      },
+    },
+    lookupByQr: {
+      method: 'GET',
+      path: '/api/students/lookup-by-qr/:qrToken',
+      pathParams: z.object({ qrToken: z.string().min(1).max(64) }),
+      responses: {
+        200: z.object({ id: UUIDSchema }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },
@@ -2503,6 +2516,28 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: {
         200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    holdSubscription: {
+      method: 'POST',
+      path: '/api/enrollments/:id/hold',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ months: z.number().int().min(1).max(12) }),
+      responses: {
+        200: EnrollmentSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    resumeSubscription: {
+      method: 'POST',
+      path: '/api/enrollments/:id/resume',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: EnrollmentSchema,
+        400: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },
@@ -4140,6 +4175,15 @@ export const contract = c.router({
     addStudentInactiveDateTrigger: {
       method: 'POST',
       path: '/api/migrations/add-student-inactive-date-trigger',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addSubscriptionHold: {
+      method: 'POST',
+      path: '/api/migrations/add-subscription-hold',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

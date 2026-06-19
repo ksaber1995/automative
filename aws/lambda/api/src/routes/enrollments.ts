@@ -25,6 +25,9 @@ function mapEnrollmentFromDB(row: any) {
     paymentStatus: row.payment_status,
     completionDate: row.completion_date,
     notes: row.notes,
+    holdStartMonth: row.hold_start_month != null ? Number(row.hold_start_month) : null,
+    holdStartYear: row.hold_start_year != null ? Number(row.hold_start_year) : null,
+    holdMonths: row.hold_months != null ? Number(row.hold_months) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -55,80 +58,134 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
   const monthlyFee = body.finalPrice != null ? body.finalPrice : originalPrice;
   const payFirstMonth = !!body.payFirstMonth;
   const notes = body.notes || null;
+  const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
 
-  // The enrollment row itself carries no collected money for monthly subscriptions
-  // (amount_paid stays 0 / PENDING). Each month's payment lives in
-  // monthly_subscription_payments, which is the single source of truth for both
-  // status and revenue — this keeps monthly revenue out of the enrollment-based
-  // revenue sums (which only count PAID/PARTIAL enrollments) so nothing is
-  // double-counted.
-  const enrollment = await insert('enrollments', {
-    company_id: context.companyId,
-    student_id: body.studentId,
-    class_id: body.classId,
-    course_id: body.courseId,
-    branch_id: body.branchId,
-    enrollment_date: body.enrollmentDate,
-    status: body.status,
-    original_price: originalPrice,
-    discount_percent: discountPercent,
-    discount_amount: discountAmount,
-    final_price: monthlyFee,
-    payment_mode: 'FULL',
-    down_payment: 0,
-    amount_paid: 0,
-    payment_status: 'PENDING',
-    payment_type: 'MONTHLY_SUBSCRIPTION',
-    completion_date: null,
-    notes,
-  });
+  // Use a transaction when products are involved (atomic enrollment + product sales).
+  const client = buyProducts.length > 0 ? await getClient() : null;
+  try {
+    if (client) await client.query('BEGIN');
 
-  // Generate one bill per calendar month from the start month → current month.
-  const start = new Date(body.enrollmentDate);
-  const startY = start.getFullYear();
-  const startM = start.getMonth() + 1; // 1-based
-  const now = new Date();
-  const endY = now.getFullYear();
-  const endM = now.getMonth() + 1;
+    const queryFn = client ? (sql: string, params: any[]) => client.query(sql, params) : null;
 
-  let y = startY;
-  let m = startM;
-  let firstBillId: string | null = null;
-  let guard = 0; // safety bound: never loop more than 120 months
-  while ((y < endY || (y === endY && m <= endM)) && guard < 120) {
-    const due = new Date(y, m, 0); // day 0 of next month = last day of month m
-    const dueStr = due.toISOString().split('T')[0];
-    const row = await queryOne(
-      `INSERT INTO monthly_subscription_payments
-         (enrollment_id, company_id, student_id, course_id, branch_id,
-          billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'PENDING',$9)
-       ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
-       RETURNING id`,
-      [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId, y, m, monthlyFee, dueStr]
-    );
-    if (y === startY && m === startM) firstBillId = row?.id || null;
-    m++;
-    if (m > 12) { m = 1; y++; }
-    guard++;
-  }
+    // The enrollment row itself carries no collected money for monthly subscriptions
+    // (amount_paid stays 0 / PENDING). Each month's payment lives in
+    // monthly_subscription_payments, which is the single source of truth for both
+    // status and revenue.
+    let enrollment: any;
+    if (client) {
+      const enrRes = await client.query(
+        `INSERT INTO enrollments
+           (company_id, student_id, class_id, course_id, branch_id, enrollment_date, status,
+            original_price, discount_percent, discount_amount, final_price, payment_mode,
+            down_payment, amount_paid, payment_status, payment_type, completion_date, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'FULL',0,0,'PENDING','MONTHLY_SUBSCRIPTION',NULL,$12) RETURNING *`,
+        [context.companyId, body.studentId, body.classId, body.courseId, body.branchId,
+         body.enrollmentDate, body.status, originalPrice, discountPercent, discountAmount,
+         monthlyFee, notes]
+      );
+      enrollment = enrRes.rows[0];
+    } else {
+      enrollment = await insert('enrollments', {
+        company_id: context.companyId,
+        student_id: body.studentId,
+        class_id: body.classId,
+        course_id: body.courseId,
+        branch_id: body.branchId,
+        enrollment_date: body.enrollmentDate,
+        status: body.status,
+        original_price: originalPrice,
+        discount_percent: discountPercent,
+        discount_amount: discountAmount,
+        final_price: monthlyFee,
+        payment_mode: 'FULL',
+        down_payment: 0,
+        amount_paid: 0,
+        payment_status: 'PENDING',
+        payment_type: 'MONTHLY_SUBSCRIPTION',
+        completion_date: null,
+        notes,
+      });
+    }
 
-  // Collect the first month up-front if requested. The payment (and its revenue)
-  // lives entirely in the monthly_subscription_payments row.
-  if (payFirstMonth && monthlyFee > 0 && firstBillId) {
-    await query(
-      `UPDATE monthly_subscription_payments
+    // Process linked products (books) if any.
+    if (client) {
+      for (const p of buyProducts) {
+        await insertProductSaleWithClient(client, context.companyId, {
+          productId: p.productId,
+          branchId: body.branchId,
+          quantity: p.quantity ?? 1,
+          discountType: p.discountType,
+          discountValue: p.discountValue,
+          date: body.enrollmentDate,
+          paymentMethod: p.paymentMethod || null,
+          studentId: body.studentId,
+          courseId: body.courseId,
+          enrollmentId: enrollment.id,
+        });
+      }
+    }
+
+    // Generate one bill per calendar month from the start month → current month.
+    const start = new Date(body.enrollmentDate);
+    const startY = start.getFullYear();
+    const startM = start.getMonth() + 1; // 1-based
+    const now = new Date();
+    const endY = now.getFullYear();
+    const endM = now.getMonth() + 1;
+
+    let y = startY;
+    let m = startM;
+    let firstBillId: string | null = null;
+    let guard = 0; // safety bound: never loop more than 120 months
+    while ((y < endY || (y === endY && m <= endM)) && guard < 120) {
+      const due = new Date(y, m, 0); // day 0 of next month = last day of month m
+      const dueStr = due.toISOString().split('T')[0];
+      const qFn = client || { query: (s: string, p: any[]) => query(s, p).then(r => ({ rows: r })) };
+      const billRes = await (qFn as any).query(
+        `INSERT INTO monthly_subscription_payments
+           (enrollment_id, company_id, student_id, course_id, branch_id,
+            billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'PENDING',$9)
+         ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
+         RETURNING id`,
+        [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId, y, m, monthlyFee, dueStr]
+      );
+      const billRow = billRes?.rows?.[0] || null;
+      if (y === startY && m === startM) firstBillId = billRow?.id || null;
+      m++;
+      if (m > 12) { m = 1; y++; }
+      guard++;
+    }
+
+    // Collect the first month up-front if requested.
+    if (payFirstMonth && monthlyFee > 0 && firstBillId) {
+      const payQuery = `UPDATE monthly_subscription_payments
        SET amount_paid = $1, payment_status = 'PAID', paid_date = $2,
            notes = 'First month paid at enrollment', updated_at = NOW()
-       WHERE id = $3`,
-      [monthlyFee, body.enrollmentDate, firstBillId]
-    );
-  }
+       WHERE id = $3`;
+      if (client) {
+        await client.query(payQuery, [monthlyFee, body.enrollmentDate, firstBillId]);
+      } else {
+        await query(payQuery, [monthlyFee, body.enrollmentDate, firstBillId]);
+      }
+    }
 
-  return {
-    status: 201 as const,
-    body: mapEnrollmentFromDB(enrollment),
-  };
+    if (client) await client.query('COMMIT');
+
+    return {
+      status: 201 as const,
+      body: mapEnrollmentFromDB(enrollment),
+    };
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Create monthly subscription enrollment error:', error);
+    if (error?.statusCode && error?.code) {
+      return apiError(error.statusCode, error.code, error.message);
+    }
+    return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_FAILED', 'Failed to create enrollment', 400);
+  } finally {
+    if (client) client.release();
+  }
 }
 
 export const enrollmentsRoutes = {
@@ -830,6 +887,73 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Delete enrollment error:', error);
       return mapThrownError(error, 'ERRORS.ENROLLMENTS.DELETE_FAILED', 'Failed to delete enrollment', 404);
+    }
+  },
+
+  holdSubscription: async ({ params, body, headers }: { params: { id: string }; body: { months: number }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const enrollment = await queryOne(
+        `SELECT * FROM enrollments WHERE id = $1 AND company_id = $2`,
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (enrollment.payment_type !== 'MONTHLY_SUBSCRIPTION') {
+        return apiError(400, 'ERRORS.ENROLLMENTS.NOT_MONTHLY', 'Only monthly subscriptions can be held');
+      }
+      if (enrollment.status === 'ON_HOLD') {
+        return apiError(400, 'ERRORS.ENROLLMENTS.ALREADY_ON_HOLD', 'Subscription is already on hold');
+      }
+      if (enrollment.status !== 'ACTIVE') {
+        return apiError(400, 'ERRORS.ENROLLMENTS.NOT_ACTIVE', 'Only active subscriptions can be held');
+      }
+
+      const now = new Date();
+      const updated = await update('enrollments', params.id, {
+        status: 'ON_HOLD',
+        hold_start_month: now.getMonth() + 1,
+        hold_start_year: now.getFullYear(),
+        hold_months: body.months,
+      });
+
+      return { status: 200 as const, body: mapEnrollmentFromDB(updated) };
+    } catch (error) {
+      console.error('Hold subscription error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.HOLD_FAILED', 'Failed to hold subscription');
+    }
+  },
+
+  resumeSubscription: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const enrollment = await queryOne(
+        `SELECT * FROM enrollments WHERE id = $1 AND company_id = $2`,
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (enrollment.status !== 'ON_HOLD') {
+        return apiError(400, 'ERRORS.ENROLLMENTS.NOT_ON_HOLD', 'Subscription is not on hold');
+      }
+
+      const updated = await update('enrollments', params.id, {
+        status: 'ACTIVE',
+        hold_start_month: null,
+        hold_start_year: null,
+        hold_months: null,
+      });
+
+      return { status: 200 as const, body: mapEnrollmentFromDB(updated) };
+    } catch (error) {
+      console.error('Resume subscription error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.RESUME_FAILED', 'Failed to resume subscription');
     }
   },
 };

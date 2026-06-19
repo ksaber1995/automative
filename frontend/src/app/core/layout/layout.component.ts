@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, inject, computed, effect } from '@angular/core';
+import { Component, signal, OnInit, OnDestroy, inject, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -8,10 +8,13 @@ import { MenuModule } from 'primeng/menu';
 import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import type { Html5Qrcode } from 'html5-qrcode';
 import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
 import { LanguageService } from '../services/language.service';
+import { NotificationService } from '../services/notification.service';
+import { StudentService } from '../../features/students/services/student.service';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 
 interface NavLeaf {
@@ -48,12 +51,21 @@ type NavEntry =
   ],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss'})
-export class LayoutComponent implements OnInit {
+export class LayoutComponent implements OnInit, OnDestroy {
   sidebarVisible = signal(true);
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
   languageService = inject(LanguageService);
   private translate = inject(TranslateService);
+  private notifications = inject(NotificationService);
+  private studentService = inject(StudentService);
+
+  // QR Scanner
+  qrDialogVisible = signal(false);
+  qrScanning = signal(false);
+  qrLookingUp = signal(false);
+  private html5Qr?: Html5Qrcode;
+  private readonly QR_SCANNER_ID = 'navbar-qr-scanner-region';
 
   constructor(
     private authService: AuthService,
@@ -231,6 +243,74 @@ export class LayoutComponent implements OnInit {
 
   formatRole(role: string): string {
     return ROLE_LABELS[role as UserRole] || role;
+  }
+
+  // ─── QR Scanner ──────────────────────────────────────────────────────────
+
+  openQrScanner() {
+    this.qrDialogVisible.set(true);
+    setTimeout(() => this.startQrCamera(), 300);
+  }
+
+  closeQrScanner() {
+    this.stopQrCamera();
+    this.qrDialogVisible.set(false);
+  }
+
+  private async startQrCamera() {
+    if (this.html5Qr) return;
+    this.qrScanning.set(true);
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      this.html5Qr = new Html5Qrcode(this.QR_SCANNER_ID);
+      await this.html5Qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => this.handleQrScan(decodedText),
+        () => {},
+      );
+    } catch {
+      this.notifications.error(this.translate.instant('NAV.QR_CAMERA_FAILED'));
+      this.html5Qr = undefined;
+    } finally {
+      this.qrScanning.set(false);
+    }
+  }
+
+  private stopQrCamera() {
+    const qr = this.html5Qr;
+    this.html5Qr = undefined;
+    if (!qr) return;
+    qr.stop().then(() => qr.clear()).catch(() => {});
+  }
+
+  private handleQrScan(decodedText: string) {
+    const token = this.extractQrToken(decodedText);
+    if (!token || this.qrLookingUp()) return;
+    this.qrLookingUp.set(true);
+    this.studentService.lookupByQr(token).subscribe({
+      next: (result) => {
+        this.closeQrScanner();
+        this.qrLookingUp.set(false);
+        this.router.navigate(['/students', result.id]);
+      },
+      error: () => {
+        this.notifications.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND'));
+        this.qrLookingUp.set(false);
+      },
+    });
+  }
+
+  private extractQrToken(text: string): string {
+    const raw = (text || '').trim();
+    const marker = '/p/s/';
+    const idx = raw.indexOf(marker);
+    if (idx >= 0) return raw.slice(idx + marker.length).split(/[/?#]/)[0];
+    return raw;
+  }
+
+  ngOnDestroy() {
+    this.stopQrCamera();
   }
 
   logout() {

@@ -10,6 +10,14 @@
       </div>
 
       <div class="flex items-center gap-4">
+        <!-- Find Student (QR Scanner) -->
+        <button pButton
+          icon="pi pi-qrcode"
+          class="p-button-text p-button-rounded"
+          [pTooltip]="'NAV.FIND_STUDENT' | translate"
+          (click)="openQrScanner()">
+        </button>
+
         @if (currentUser(); as user) {
           <!-- Company Badge -->
           <a routerLink="/company-profile"
@@ -144,6 +152,32 @@
     </div>
   </main>
 </div>
+
+<!-- QR Scanner Dialog -->
+<p-dialog
+  [visible]="qrDialogVisible()"
+  (visibleChange)="$event ? null : closeQrScanner()"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '400px' }"
+  [header]="'NAV.FIND_STUDENT' | translate">
+  <div class="text-center">
+    <div id="navbar-qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
+    @if (qrScanning()) {
+      <div class="mt-4">
+        <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+        <p class="text-sm text-gray-500 mt-2">{{ 'NAV.QR_STARTING_CAMERA' | translate }}</p>
+      </div>
+    }
+    @if (qrLookingUp()) {
+      <div class="mt-4">
+        <i class="pi pi-spin pi-spinner text-2xl text-blue-500"></i>
+        <p class="text-sm text-blue-600 mt-2">{{ 'NAV.QR_LOOKING_UP' | translate }}</p>
+      </div>
+    }
+    <p class="text-sm text-gray-500 mt-4">{{ 'NAV.QR_SCAN_INSTRUCTION' | translate }}</p>
+  </div>
+</p-dialog>
 
 <!-- Trial Expired Dialog -->
 <p-dialog [visible]="subscriptionService.isTrialExpired()" [modal]="true"

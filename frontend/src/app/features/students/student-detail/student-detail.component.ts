@@ -418,6 +418,73 @@ export class StudentDetailComponent implements OnInit {
     });
   }
 
+  // ─── Subscription hold / resume / delete ───────────────────────────────────
+
+  showHoldDialog = false;
+  holdEnrollment = signal<Enrollment | null>(null);
+  holdMonths = 1;
+
+  openHoldDialog(enrollment: Enrollment) {
+    this.holdEnrollment.set(enrollment);
+    this.holdMonths = 1;
+    this.showHoldDialog = true;
+  }
+
+  submitHold() {
+    const enrollment = this.holdEnrollment();
+    if (!enrollment) return;
+    this.actionLoading.set(true);
+    this.enrollmentService.holdSubscription(enrollment.id, this.holdMonths).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_HELD'));
+        this.showHoldDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadEnrollments(this.studentId);
+      },
+      error: () => {
+        this.actionLoading.set(false);
+      },
+    });
+  }
+
+  resumeSubscription(enrollment: Enrollment) {
+    if (!confirm(this.translate.instant('STUDENTS.DETAIL.RESUME_CONFIRM'))) return;
+    this.actionLoading.set(true);
+    this.enrollmentService.resumeSubscription(enrollment.id).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_RESUMED'));
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadEnrollments(this.studentId);
+      },
+      error: () => {
+        this.actionLoading.set(false);
+      },
+    });
+  }
+
+  hasAnyMonthlyPayment(enrollmentId: string): boolean {
+    const payments = this.monthlyByEnrollment().get(enrollmentId) || [];
+    return payments.some(p => (p.amountPaid || 0) > 0);
+  }
+
+  deleteMonthlyEnrollment(enrollment: Enrollment) {
+    if (!confirm(this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION_CONFIRM'))) return;
+    this.actionLoading.set(true);
+    this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_DELETED'));
+        this.actionLoading.set(false);
+        if (this.studentId) {
+          this.loadEnrollments(this.studentId);
+          this.loadMonthlySubscriptions(this.studentId);
+        }
+      },
+      error: () => {
+        this.actionLoading.set(false);
+      },
+    });
+  }
+
   // ─── Expandable rows ────────────────────────────────────────────────────────
 
   toggleRow(enrollment: Enrollment) {
@@ -781,6 +848,7 @@ export class StudentDetailComponent implements OnInit {
       case 'ACTIVE': return 'success';
       case 'COMPLETED': return 'info';
       case 'DROPPED': return 'danger';
+      case 'ON_HOLD': return 'warn';
       default: return 'warn';
     }
   }

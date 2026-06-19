@@ -545,7 +545,38 @@
             </td>
             <td>
               @if (isMonthly(enrollment)) {
-                <span class="text-gray-300">—</span>
+                <div class="flex gap-1">
+                  @if (enrollment.status === 'ACTIVE') {
+                    <p-button
+                      icon="pi pi-pause"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="openHoldDialog(enrollment)"
+                      [pTooltip]="'STUDENTS.DETAIL.HOLD_SUBSCRIPTION' | translate"
+                    ></p-button>
+                  }
+                  @if (enrollment.status === 'ON_HOLD') {
+                    <p-button
+                      icon="pi pi-play"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="success"
+                      (onClick)="resumeSubscription(enrollment)"
+                      [pTooltip]="'STUDENTS.DETAIL.RESUME_SUBSCRIPTION' | translate"
+                    ></p-button>
+                  }
+                  @if (getMonthlyPayments(enrollment.id).length === 0 || !hasAnyMonthlyPayment(enrollment.id)) {
+                    <p-button
+                      icon="pi pi-trash"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="danger"
+                      (onClick)="deleteMonthlyEnrollment(enrollment)"
+                      [pTooltip]="'STUDENTS.DETAIL.DELETE_SUBSCRIPTION' | translate"
+                    ></p-button>
+                  }
+                </div>
               } @else {
               <div class="flex gap-1">
                 <!-- Pay button (any enrollment with remaining balance and no refund) -->
@@ -1243,6 +1274,32 @@
       [loading]="actionLoading()"
       [disabled]="!selectedJoinClass()"
       (onClick)="submitJoinBundleCourse()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Hold Subscription Dialog -->
+<p-dialog
+  [header]="'STUDENTS.DETAIL.HOLD_SUBSCRIPTION' | translate"
+  [(visible)]="showHoldDialog"
+  [modal]="true"
+  [style]="{ width: '400px' }"
+>
+  <div class="space-y-4">
+    <p class="text-gray-600 text-sm">{{ 'STUDENTS.DETAIL.HOLD_DESCRIPTION' | translate }}</p>
+    <div class="field">
+      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.HOLD_MONTHS' | translate }}</label>
+      <p-inputnumber [(ngModel)]="holdMonths" [min]="1" [max]="12" [showButtons]="true" class="w-full"></p-inputnumber>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showHoldDialog = false"></p-button>
+    <p-button
+      [label]="'STUDENTS.DETAIL.HOLD_CONFIRM' | translate"
+      icon="pi pi-pause"
+      severity="warn"
+      [loading]="actionLoading()"
+      (onClick)="submitHold()"
     ></p-button>
   </ng-template>
 </p-dialog>

@@ -48,4 +48,12 @@ export class EnrollmentService {
   createRefund(enrollmentId: string, refund: CreateRefundDto): Observable<Refund> {
     return this.api.post<Refund>(`enrollments/${enrollmentId}/refunds`, refund);
   }
+
+  holdSubscription(enrollmentId: string, months: number): Observable<Enrollment> {
+    return this.api.post<Enrollment>(`enrollments/${enrollmentId}/hold`, { months });
+  }
+
+  resumeSubscription(enrollmentId: string): Observable<Enrollment> {
+    return this.api.post<Enrollment>(`enrollments/${enrollmentId}/resume`, {});
+  }
 }

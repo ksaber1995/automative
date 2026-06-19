@@ -1277,6 +1277,23 @@ async function addCourseMonthlyPriceOverrides() {
   return { success: true, message: 'course_monthly_price_overrides table ready' };
 }
 
+async function addSubscriptionHold() {
+  console.log('Starting migration: subscription hold');
+
+  // Add ON_HOLD to enrollment status constraint
+  await query(`ALTER TABLE enrollments DROP CONSTRAINT IF EXISTS enrollments_status_check`);
+  await query(`ALTER TABLE enrollments ADD CONSTRAINT enrollments_status_check
+    CHECK (status IN ('ACTIVE', 'COMPLETED', 'DROPPED', 'PENDING', 'ON_HOLD'))`);
+
+  // Add hold tracking columns
+  await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS hold_start_month INTEGER`);
+  await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS hold_start_year INTEGER`);
+  await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS hold_months INTEGER`);
+
+  console.log('✅ subscription hold migration completed!');
+  return { success: true, message: 'Subscription hold migration ready' };
+}
+
 export const migrationsRoutes = {
   addCourseMonthlyPriceOverrides: async () => {
     try {
@@ -1775,6 +1792,21 @@ export const migrationsRoutes = {
         body: {
           success: false,
           message: 'Permission merge failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  addSubscriptionHold: async () => {
+    try {
+      const result = await addSubscriptionHold();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

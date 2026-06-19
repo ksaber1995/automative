@@ -19,7 +19,10 @@ bootstrapApplication(AppComponent, {
     provideHttpClient(
       withInterceptors([authInterceptor, errorInterceptor])
     ),
-    provideTranslateService({ fallbackLang: 'en' }),
+    provideTranslateService({
+      defaultLanguage: (typeof localStorage !== 'undefined' && localStorage.getItem('app_lang')) || 'ar',
+      fallbackLang: 'en',
+    }),
     ...provideTranslateHttpLoader({ prefix: './assets/i18n/', suffix: '.json' }),
     providePrimeNG({
       theme: {

@@ -313,6 +313,7 @@ export const expensesRoutes = {
          FROM employees e
          LEFT JOIN branches b ON e.branch_id = b.id
          WHERE e.company_id = $1 AND e.is_active = true${employeeScope}
+           AND (e.hire_date IS NULL OR e.hire_date <= $3)
            AND (
              (COALESCE(e.salary_type, 'MONTHLY') = 'MONTHLY' AND e.salary > 0
               AND NOT EXISTS (

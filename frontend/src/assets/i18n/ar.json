@@ -461,7 +461,8 @@
     "COMPANY_PROFILE": "ملف الشركة",
     "EXAMS": "الامتحانات",
     "EDUCATIONAL_BOOKS": "الكتب التعليمية",
-    "EDUCATIONAL_BOOKS_DETAIL": "كتب الكورس"
+    "EDUCATIONAL_BOOKS_DETAIL": "كتب الكورس",
+    "MESSAGING": "الرسائل"
   },
   "MONTHLY_SUBSCRIPTIONS": {
     "TITLE": "الاشتراكات الشهرية",
@@ -606,7 +607,13 @@
     },
     "EXAMS": "الامتحانات",
     "EDUCATIONAL_BOOKS": "الكتب التعليمية",
-    "MESSAGING": "الرسائل"
+    "MESSAGING": "الرسائل",
+    "FIND_STUDENT": "بحث عن طالب",
+    "QR_CAMERA_FAILED": "لم نتمكن من تشغيل الكاميرا. يرجى التحقق من الأذونات.",
+    "QR_STUDENT_NOT_FOUND": "لم يتم العثور على طالب لهذا الرمز.",
+    "QR_STARTING_CAMERA": "جاري تشغيل الكاميرا...",
+    "QR_LOOKING_UP": "جاري البحث عن الطالب...",
+    "QR_SCAN_INSTRUCTION": "وجّه الكاميرا على رمز QR الخاص بالطالب للبحث عنه."
   },
   "HEADER": {
     "LOGOUT": "تسجيل الخروج",
@@ -1852,6 +1859,9 @@
     "END_DATE": "تاريخ النهاية",
     "APPLY": "تطبيق",
     "RESET": "إعادة تعيين",
+    "PRESET_MONTH": "هذا الشهر",
+    "PRESET_YEAR": "هذه السنة",
+    "PRESET_12MONTHS": "آخر 12 شهر",
     "TOTAL_REVENUE": "إجمالي الإيرادات",
     "AFTER_REFUNDS": "بعد الاسترداد",
     "TOTAL_REFUNDS": "إجمالي المستردات",
@@ -1951,6 +1961,8 @@
       "SALARY_TYPE_SESSION": "محاسبة بالحصة",
       "SESSION_RATE": "سعر الحصة",
       "SESSION_RATE_HINT": "الراتب الشهري = عدد الحصص × هذا السعر.",
+      "SALARY_REQUIRED": "الراتب الشهري مطلوب ويجب أن يكون أكبر من 0.",
+      "SESSION_RATE_REQUIRED": "سعر الحصة مطلوب ويجب أن يكون أكبر من 0.",
       "HIRE_DATE": "تاريخ التعيين",
       "GLOBAL_EMPLOYEE": "موظف عام (يعمل في جميع الفروع)",
       "BRANCH": "الفرع",
@@ -2737,6 +2749,7 @@
       "STATUS_ACTIVE": "نشط",
       "STATUS_COMPLETED": "مكتمل",
       "STATUS_DROPPED": "منسحب",
+      "STATUS_ON_HOLD": "موقوف مؤقتاً",
       "STATUS_CANCELLED": "ملغي",
       "PAYMENT_PAID": "مدفوع",
       "PAYMENT_PARTIAL": "جزئي",
@@ -2838,7 +2851,18 @@
       "BOOK_COL_UNIT_PRICE": "سعر الوحدة",
       "BOOK_COL_TOTAL": "الإجمالي",
       "BOOK_COL_DATE": "التاريخ",
-      "BOOK_REFUNDED": "مسترد: {{amount}}"
+      "BOOK_REFUNDED": "مسترد: {{amount}}",
+      "HOLD_SUBSCRIPTION": "إيقاف الاشتراك مؤقتاً",
+      "HOLD_DESCRIPTION": "إيقاف هذا الاشتراك لعدد معين من الأشهر. لن يتم إنشاء فواتير خلال فترة الإيقاف.",
+      "HOLD_MONTHS": "عدد أشهر الإيقاف",
+      "HOLD_CONFIRM": "إيقاف الاشتراك",
+      "SUBSCRIPTION_HELD": "تم إيقاف الاشتراك مؤقتاً بنجاح.",
+      "RESUME_SUBSCRIPTION": "استئناف الاشتراك",
+      "RESUME_CONFIRM": "هل أنت متأكد من استئناف هذا الاشتراك؟",
+      "SUBSCRIPTION_RESUMED": "تم استئناف الاشتراك بنجاح.",
+      "DELETE_SUBSCRIPTION": "حذف الاشتراك",
+      "DELETE_SUBSCRIPTION_CONFIRM": "هل أنت متأكد من حذف هذا الاشتراك؟ لا يمكن التراجع عن هذا الإجراء.",
+      "SUBSCRIPTION_DELETED": "تم حذف الاشتراك بنجاح."
     },
     "CREATED": "تم إنشاء الطالب بنجاح",
     "UPDATED": "تم تحديث الطالب بنجاح",
@@ -3974,9 +3998,6 @@
     "SEND_FAILED": "فشل إرسال الرسائل",
     "SELECTED_COUNT": "{{count}} محدد",
     "CLEAR_SELECTION": "مسح"
-  },
-  "BREADCRUMBS": {
-    "MESSAGING": "الرسائل"
   },
   "MONTHS": {
     "JAN": "يناير",

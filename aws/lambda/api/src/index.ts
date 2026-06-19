@@ -181,6 +181,7 @@ const router = {
     setPriceOverride: monthlySubscriptionsRoutes.setPriceOverride,
     getPriceOverride: monthlySubscriptionsRoutes.getPriceOverride,
     deletePriceOverride: monthlySubscriptionsRoutes.deletePriceOverride,
+    listPriceOverrides: monthlySubscriptionsRoutes.listPriceOverrides,
   },
 };
 
