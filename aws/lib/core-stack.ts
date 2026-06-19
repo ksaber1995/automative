@@ -306,9 +306,9 @@ export class CoreStack extends cdk.Stack {
     // CORS headers to the gateway-generated error responses so the browser
     // surfaces the underlying 4xx/5xx instead of a misleading CORS failure.
     const corsErrorHeaders = {
-      'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-      'gatewayresponse.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Accept-Language'",
-      'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,PATCH,DELETE,OPTIONS'",
+      'Access-Control-Allow-Origin': "'*'",
+      'Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Accept-Language'",
+      'Access-Control-Allow-Methods': "'GET,POST,PUT,PATCH,DELETE,OPTIONS'",
     };
     for (const type of [
       apigateway.ResponseType.DEFAULT_4XX,

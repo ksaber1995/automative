@@ -54,6 +54,45 @@ export class MessagingPageComponent implements OnInit {
     return Math.round((q.messagesSent / q.quotaLimit) * 100);
   });
 
+  templates = [
+    {
+      type: 'ABSENCE',
+      icon: 'pi pi-calendar-times',
+      color: '#3B82F6',
+      titleKey: 'MESSAGING.TEMPLATE_ABSENCE_TITLE',
+      bodyKey: 'MESSAGING.TEMPLATE_ABSENCE_BODY',
+      varsKey: 'MESSAGING.TEMPLATE_ABSENCE_VARS',
+      sentToKey: 'MESSAGING.TEMPLATE_SENT_TO_PARENT',
+    },
+    {
+      type: 'PAYMENT_DELAY',
+      icon: 'pi pi-wallet',
+      color: '#EAB308',
+      titleKey: 'MESSAGING.TEMPLATE_PAYMENT_DELAY_TITLE',
+      bodyKey: 'MESSAGING.TEMPLATE_PAYMENT_DELAY_BODY',
+      varsKey: 'MESSAGING.TEMPLATE_PAYMENT_DELAY_VARS',
+      sentToKey: 'MESSAGING.TEMPLATE_SENT_TO_STUDENT',
+    },
+    {
+      type: 'ABSENCE_WARNING',
+      icon: 'pi pi-exclamation-triangle',
+      color: '#EF4444',
+      titleKey: 'MESSAGING.TEMPLATE_ABSENCE_WARNING_TITLE',
+      bodyKey: 'MESSAGING.TEMPLATE_ABSENCE_WARNING_BODY',
+      varsKey: 'MESSAGING.TEMPLATE_ABSENCE_WARNING_VARS',
+      sentToKey: 'MESSAGING.TEMPLATE_SENT_TO_PARENT',
+    },
+    {
+      type: 'EXAM_RESULTS',
+      icon: 'pi pi-file-check',
+      color: '#22C55E',
+      titleKey: 'MESSAGING.TEMPLATE_EXAM_RESULTS_TITLE',
+      bodyKey: 'MESSAGING.TEMPLATE_EXAM_RESULTS_BODY',
+      varsKey: 'MESSAGING.TEMPLATE_EXAM_RESULTS_VARS',
+      sentToKey: 'MESSAGING.TEMPLATE_SENT_TO_PARENT',
+    },
+  ];
+
   typeFilterOptions: { label: string; value: string | null }[] = [];
 
   private initFilterOptions() {

@@ -14,6 +14,10 @@
         <i class="pi pi-cog mr-2"></i>
         {{ 'MESSAGING.TAB_SETTINGS' | translate }}
       </p-tab>
+      <p-tab value="templates">
+        <i class="pi pi-file-edit mr-2"></i>
+        {{ 'MESSAGING.TAB_TEMPLATES' | translate }}
+      </p-tab>
       <p-tab value="usage">
         <i class="pi pi-chart-bar mr-2"></i>
         {{ 'MESSAGING.TAB_USAGE' | translate }}
@@ -138,6 +142,42 @@
             </div>
           </div>
         }
+      </p-tabpanel>
+
+      <!-- Templates Tab -->
+      <p-tabpanel value="templates">
+        <div class="mt-4 max-w-3xl space-y-4">
+          <div class="mb-2">
+            <h3 class="font-bold text-gray-900 text-lg">{{ 'MESSAGING.TEMPLATES_TITLE' | translate }}</h3>
+            <p class="text-sm text-gray-500 mt-1">{{ 'MESSAGING.TEMPLATES_DESC' | translate }}</p>
+          </div>
+
+          @for (tpl of templates; track tpl.type) {
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <i [class]="tpl.icon + ' text-lg'" [style.color]="tpl.color"></i>
+                  <h4 class="font-bold text-gray-900">{{ tpl.titleKey | translate }}</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500">{{ 'MESSAGING.TEMPLATE_SENT_TO' | translate }}:</span>
+                  <p-tag [value]="(tpl.sentToKey | translate)" [severity]="tpl.type === 'PAYMENT_DELAY' ? 'info' : 'success'" [style]="{ 'font-size': '0.7rem' }"></p-tag>
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <pre class="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed m-0">{{ tpl.bodyKey | translate }}</pre>
+              </div>
+              <div class="mt-3 flex items-start gap-2">
+                <span class="text-xs font-medium text-gray-500 mt-0.5">{{ 'MESSAGING.TEMPLATE_VARIABLES' | translate }}:</span>
+                <div class="flex flex-wrap gap-1">
+                  @for (v of (tpl.varsKey | translate).split(', '); track v) {
+                    <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-mono">{{"{"}}{{ v }}{{"}"}}</span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
       </p-tabpanel>
 
       <!-- Usage Tab -->
