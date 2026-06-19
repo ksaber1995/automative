@@ -23,6 +23,7 @@ aws/cdk-outputs.json
 aws/lambda/api/dist/
 aws/lambda/api/lambda.zip
 aws/lambda/**/*.zip
+aws/*.zip
 
 # Shared compiled output (tsc artifacts — source of truth is .ts files)
 shared/**/*.js
