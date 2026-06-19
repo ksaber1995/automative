@@ -61,6 +61,22 @@ export async function ensureAttendanceMagicColumns(): Promise<void> {
   return attendanceMagicInitPromise;
 }
 
+// Ensure 'started' column exists (migration 043).
+let startedColumnInitPromise: Promise<void> | null = null;
+async function ensureStartedColumn(): Promise<void> {
+  if (!startedColumnInitPromise) {
+    startedColumnInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS started BOOLEAN NOT NULL DEFAULT TRUE`);
+      } catch (e) {
+        startedColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return startedColumnInitPromise;
+}
+
 function mapSessionFromDB(row: any) {
   return {
     id: row.id,
@@ -73,6 +89,7 @@ function mapSessionFromDB(row: any) {
       : parseInt(row.session_number, 10),
     startDate: row.start_date,
     endDate: row.end_date,
+    started: row.started !== false,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -100,6 +117,7 @@ export const sessionsRoutes = {
     try {
       await ensureSessionRoomNullable();
       await ensureAttendanceMagicColumns();
+      await ensureStartedColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -110,10 +128,11 @@ export const sessionsRoutes = {
       }
 
       // Verify class exists and belongs to company (branch/company come from the linked course)
-      const cls = await queryOne(
-        `SELECT c.*, co.company_id, co.branch_id
+      const cls = await queryOne<any>(
+        `SELECT c.*, co.company_id, co.branch_id, comp.type AS company_type
          FROM classes c
          INNER JOIN courses co ON c.course_id = co.id
+         INNER JOIN companies comp ON comp.id = co.company_id
          WHERE c.id = $1 AND co.company_id = $2`,
         [body.classId, context.companyId]
       );
@@ -125,9 +144,44 @@ export const sessionsRoutes = {
         return apiError(400, 'ERRORS.SESSIONS.CLASS_FINISHED', 'This class is finished. Sessions cannot be started.');
       }
 
+      const isTeacherCompany = cls.company_type === 'TEACHER';
       const isOnlineClass = typeof cls.type === 'string' && cls.type.toUpperCase() === 'ONLINE';
 
-      // Verify room only if provided (online classes don't require a room)
+      // If a prepared (started=false) session already exists for this class,
+      // just mark it as started and update with any provided room/notes/teachers.
+      const prepared = await queryOne<any>(
+        `SELECT * FROM sessions WHERE class_id = $1 AND company_id = $2 AND end_date IS NULL AND started = false`,
+        [body.classId, context.companyId]
+      );
+      if (prepared) {
+        const updateFields: any = { started: true };
+        if (body.roomId) updateFields.room_id = body.roomId;
+        if (body.notes) updateFields.notes = body.notes;
+        if (body.sessionNumber !== undefined && body.sessionNumber !== null && body.sessionNumber !== '') {
+          updateFields.session_number = parseInt(body.sessionNumber, 10);
+        }
+        const session = await update('sessions', prepared.id, updateFields);
+
+        // Teacher attendance for the formally-started session
+        const teachers: Array<{ employeeId: string; role?: string; status?: string; notes?: string }> =
+          Array.isArray(body.teachers) ? body.teachers : [];
+        if (teachers.length === 0 && cls.instructor_id) {
+          teachers.push({ employeeId: cls.instructor_id, role: 'PRIMARY', status: 'PRESENT' });
+        }
+        for (const t of teachers) {
+          if (!t.employeeId) continue;
+          await query(
+            `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (session_id, employee_id) DO NOTHING`,
+            [session.id, t.employeeId, t.role || 'PRIMARY', t.status || 'PRESENT', t.notes || null]
+          );
+        }
+
+        return { status: 201 as const, body: mapSessionFromDB(session) };
+      }
+
+      // Verify room only if provided (online classes & teacher companies don't require a room)
       let room: any = null;
       if (body.roomId) {
         room = await queryOne(
@@ -146,7 +200,7 @@ export const sessionsRoutes = {
         if (activeSession) {
           return apiError(400, 'ERRORS.SESSIONS.ROOM_OCCUPIED', 'Room is already occupied. End the current session first.');
         }
-      } else if (!isOnlineClass) {
+      } else if (!isOnlineClass && !isTeacherCompany) {
         return apiError(400, 'ERRORS.SESSIONS.ROOM_REQUIRED', 'Room is required for offline classes.');
       }
 
@@ -187,6 +241,7 @@ export const sessionsRoutes = {
         session_number: sessionNumber,
         start_date: new Date().toISOString(),
         end_date: null,
+        started: true,
         notes: body.notes || null,
       });
 
@@ -220,6 +275,74 @@ export const sessionsRoutes = {
     } catch (error) {
       console.error('Start session error:', error);
       return mapThrownError(error, 'ERRORS.SESSIONS.START_FAILED', 'Failed to start session', 400);
+    }
+  },
+
+  /**
+   * POST /api/sessions/prepare
+   * Creates a session with started=false for pre-attendance.
+   * No room required. No teacher attendance created.
+   */
+  prepare: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      await ensureSessionRoomNullable();
+      await ensureAttendanceMagicColumns();
+      await ensureStartedColumn();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const cls = await queryOne<any>(
+        `SELECT c.*, co.company_id, co.branch_id
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.id = $1 AND co.company_id = $2`,
+        [body.classId, context.companyId]
+      );
+      if (!cls) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+
+      // If a session (prepared or started) already exists for this class today, return it
+      const existing = await queryOne<any>(
+        `SELECT * FROM sessions WHERE class_id = $1 AND company_id = $2 AND end_date IS NULL`,
+        [body.classId, context.companyId]
+      );
+      if (existing) {
+        return { status: 200 as const, body: mapSessionFromDB(existing) };
+      }
+
+      // Auto session number
+      const nextRow = await queryOne<any>(
+        `SELECT COALESCE(MAX(s.session_number), 0) + 1 AS next
+         FROM sessions s
+         JOIN classes c ON c.id = s.class_id
+         WHERE c.course_id = $1`,
+        [cls.course_id]
+      );
+      const sessionNumber = parseInt(nextRow?.next ?? '1', 10);
+
+      const session = await insert('sessions', {
+        company_id: context.companyId,
+        branch_id: body.branchId || cls.branch_id,
+        room_id: null,
+        class_id: body.classId,
+        session_number: sessionNumber,
+        start_date: new Date().toISOString(),
+        end_date: null,
+        started: false,
+        notes: null,
+      });
+
+      return { status: 201 as const, body: mapSessionFromDB(session) };
+    } catch (error) {
+      console.error('Prepare session error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.PREPARE_FAILED', 'Failed to prepare session', 400);
     }
   },
 
@@ -344,6 +467,7 @@ export const sessionsRoutes = {
 
   listActive: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureStartedColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -362,7 +486,7 @@ export const sessionsRoutes = {
         LEFT JOIN classes cl ON s.class_id = cl.id
         LEFT JOIN courses co ON cl.course_id = co.id
         LEFT JOIN branches b ON s.branch_id = b.id
-        WHERE s.company_id = $1 AND s.end_date IS NULL
+        WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
       `;
       const params: any[] = [context.companyId];
 

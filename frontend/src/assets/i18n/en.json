@@ -1809,7 +1809,14 @@
     "BOOK_INCLUDE": "Include",
     "BOOKS_SELECTED": "{{count}} book(s) selected",
     "BOOKS_TOTAL": "Books total",
-    "GRAND_TOTAL": "Grand total"
+    "GRAND_TOTAL": "Grand total",
+    "BOOK_PRICE": "Price",
+    "BOOK_DISCOUNT_TYPE": "Discount",
+    "BOOK_DISCOUNT_NONE": "No discount",
+    "BOOK_DISCOUNT_PERCENTAGE": "Percentage",
+    "BOOK_DISCOUNT_FIXED": "Fixed amount",
+    "BOOK_DISCOUNT_PCT": "Discount %",
+    "BOOK_DISCOUNT_AMT": "Discount amount"
   },
   "DASHBOARD": {
     "TITLE": "Dashboard",
@@ -2458,12 +2465,8 @@
       "QR_ALL": "All",
       "QR_ACTIVATED": "QR Activated",
       "QR_NOT_ACTIVATED": "QR Not Activated",
-      "QR_DOWNLOAD": "Download QR Codes",
-      "QR_DOWNLOAD_TITLE": "Download QR Codes",
-      "QR_DOWNLOAD_DESC": "Download QR codes for all activated students as a ZIP file. Choose the folder structure:",
-      "QR_MODE_BY_COURSE": "Folders by course",
-      "QR_MODE_BY_COURSE_CLASS": "Folders by course, then by class",
-      "QR_DOWNLOAD_BTN": "Download",
+      "QR_PRINT_PDF": "Print PDF",
+      "QR_DOWNLOAD_ZIP": "Download ZIP",
       "QR_DOWNLOAD_SUCCESS": "Downloaded {{count}} QR codes successfully",
       "QR_DOWNLOAD_ERROR": "Failed to download QR codes",
       "QR_NO_ACTIVATED": "No activated QR codes to download"
@@ -3588,7 +3591,18 @@
     "SAVE_TEACHERS": "Save Teachers",
     "MSG_LOAD_TEACHERS_FAILED": "Failed to load teacher attendance",
     "MSG_TEACHERS_SAVED": "Teacher attendance saved ({{count}})",
-    "MSG_TEACHERS_SAVE_FAILED": "Failed to save teacher attendance"
+    "MSG_TEACHERS_SAVE_FAILED": "Failed to save teacher attendance",
+    "TAB_UPCOMING": "Coming Sessions",
+    "LOADING_UPCOMING": "Loading upcoming sessions...",
+    "NO_UPCOMING_TITLE": "No upcoming sessions",
+    "NO_UPCOMING_HINT": "Sessions will appear here 15 minutes before their scheduled time",
+    "UPCOMING_STARTED": "Started",
+    "UPCOMING_1MIN": "In 1 min",
+    "UPCOMING_MINS": "In {{count}} min",
+    "UPCOMING_STUDENTS": "students",
+    "UPCOMING_ATTENDANCE": "Take Attendance",
+    "UPCOMING_PRE_ATTENDANCE": "Pre-attendance",
+    "UPCOMING_SESSION_STARTED": "Session Started"
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "Teacher Attendance",
@@ -3849,6 +3863,8 @@
     "METHOD_DEBIT_CARD": "Debit card",
     "METHOD_BANK_TRANSFER": "Bank transfer",
     "METHOD_CHECK": "Check",
-    "METHOD_OTHER": "Other"
+    "METHOD_OTHER": "Other",
+    "COURSE": "Course",
+    "ALL_COURSES": "All courses"
   }
 }

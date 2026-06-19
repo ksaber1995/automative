@@ -9,6 +9,7 @@ import { SelectModule } from 'primeng/select';
 import { TranslateModule } from '@ngx-translate/core';
 import { EducationalBooksService } from '../services/educational-books.service';
 import { BranchService } from '../../branches/services/branch.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { EducationalBooksCourseSummary } from '@shared/interfaces/course-product.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 
@@ -25,21 +26,34 @@ export class EducationalBooksListComponent implements OnInit {
   private educationalBooksService = inject(EducationalBooksService);
   private branchService = inject(BranchService);
   private router = inject(Router);
+  authService = inject(AuthService);
 
   courses = signal<EducationalBooksCourseSummary[]>([]);
   branches = signal<Branch[]>([]);
   loading = signal(false);
   selectedBranchId = signal<string | null>(null);
+  selectedCourseName = signal<string | null>(null);
 
   branchOptions = computed(() =>
     this.branches().map((b) => ({ label: b.name, value: b.id })),
   );
 
+  courseNameOptions = computed(() => {
+    const names = new Set(this.courses().map(c => c.courseName));
+    return Array.from(names).sort().map(n => ({ label: n, value: n }));
+  });
+
   filteredCourses = computed(() => {
+    let result = this.courses();
     const branch = this.selectedBranchId();
-    if (!branch) return this.courses();
-    // Global courses (null branchId) are always shown alongside branch matches.
-    return this.courses().filter((c) => c.branchId === branch || c.branchId === null);
+    if (branch) {
+      result = result.filter((c) => c.branchId === branch || c.branchId === null);
+    }
+    const courseName = this.selectedCourseName();
+    if (courseName) {
+      result = result.filter((c) => c.courseName === courseName);
+    }
+    return result;
   });
 
   ngOnInit() {

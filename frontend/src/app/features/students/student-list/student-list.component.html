@@ -89,10 +89,20 @@
         <button
           pButton
           size="small"
-          icon="pi pi-download"
-          [label]="'STUDENTS.LIST.QR_DOWNLOAD' | translate"
+          icon="pi pi-print"
+          [label]="'STUDENTS.LIST.QR_PRINT_PDF' | translate"
           severity="info"
-          (click)="openDownloadDialog()"
+          [loading]="downloading()"
+          (click)="printQrPdf()"
+        ></button>
+        <button
+          pButton
+          size="small"
+          icon="pi pi-download"
+          [label]="'STUDENTS.LIST.QR_DOWNLOAD_ZIP' | translate"
+          severity="secondary"
+          [loading]="downloadingZip()"
+          (click)="downloadQrZip()"
         ></button>
       </div>
     }
@@ -218,56 +228,6 @@
       </ng-template>
     </p-table>
   </p-card>
-
-  <!-- Download QR Codes Dialog -->
-  <p-dialog
-    [header]="'STUDENTS.LIST.QR_DOWNLOAD_TITLE' | translate"
-    [visible]="showDownloadDialog()"
-    (visibleChange)="showDownloadDialog.set($event)"
-    [modal]="true"
-    [style]="{ width: '450px' }"
-  >
-    <div class="flex flex-col gap-4">
-      <p class="text-sm text-gray-600">{{ 'STUDENTS.LIST.QR_DOWNLOAD_DESC' | translate }}</p>
-      <div class="flex flex-col gap-3">
-        <div class="flex items-center gap-2">
-          <p-radioButton
-            name="downloadMode"
-            value="by-course"
-            [(ngModel)]="downloadMode"
-            inputId="modeByCourse"
-          ></p-radioButton>
-          <label for="modeByCourse">{{ 'STUDENTS.LIST.QR_MODE_BY_COURSE' | translate }}</label>
-        </div>
-        <div class="flex items-center gap-2">
-          <p-radioButton
-            name="downloadMode"
-            value="by-course-class"
-            [(ngModel)]="downloadMode"
-            inputId="modeByCourseClass"
-          ></p-radioButton>
-          <label for="modeByCourseClass">{{ 'STUDENTS.LIST.QR_MODE_BY_COURSE_CLASS' | translate }}</label>
-        </div>
-      </div>
-    </div>
-    <ng-template pTemplate="footer">
-      <button
-        pButton
-        [label]="'COMMON.CANCEL' | translate"
-        icon="pi pi-times"
-        class="p-button-text"
-        (click)="closeDownloadDialog()"
-        [disabled]="downloading()"
-      ></button>
-      <button
-        pButton
-        [label]="'STUDENTS.LIST.QR_DOWNLOAD_BTN' | translate"
-        icon="pi pi-download"
-        (click)="downloadQrCodes()"
-        [loading]="downloading()"
-      ></button>
-    </ng-template>
-  </p-dialog>
 
   <p-confirmDialog></p-confirmDialog>
 </div>

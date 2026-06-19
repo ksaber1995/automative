@@ -126,6 +126,13 @@ export class EnrollmentFormComponent implements OnInit {
   courseBooks = signal<CourseProduct[]>([]);
   // Set of selected (to-be-bought) courseProduct ids.
   selectedBookIds = signal<Set<string>>(new Set());
+  // Per-book discount overrides (bookId → { discountType, discountValue }).
+  bookOverrides = signal<Map<string, { discountType: DiscountType; discountValue: number }>>(new Map());
+  discountTypeOptions = [
+    { label: 'ENROLLMENT_FORM.BOOK_DISCOUNT_NONE', value: DiscountType.NONE },
+    { label: 'ENROLLMENT_FORM.BOOK_DISCOUNT_PERCENTAGE', value: DiscountType.PERCENTAGE },
+    { label: 'ENROLLMENT_FORM.BOOK_DISCOUNT_FIXED', value: DiscountType.FIXED_AMOUNT },
+  ];
 
   // Books are hidden for monthly-subscription courses (backend ignores products there).
   showBooksSection = computed(() =>
@@ -134,12 +141,13 @@ export class EnrollmentFormComponent implements OnInit {
     this.courseBooks().length > 0
   );
 
-  // Net total of the currently selected books (selling price minus default discount).
+  // Net total of the currently selected books (selling price minus discount).
   booksNetTotal = computed(() => {
     const selected = this.selectedBookIds();
+    const overrides = this.bookOverrides();
     return this.courseBooks()
       .filter(b => selected.has(b.id))
-      .reduce((sum, b) => sum + this.bookNetPrice(b), 0);
+      .reduce((sum, b) => sum + this.bookNetPrice(b, overrides.get(b.id)), 0);
   });
 
   selectedBooksCount = computed(() => {
@@ -367,6 +375,7 @@ export class EnrollmentFormComponent implements OnInit {
     // Course was cleared — drop any linked books.
     this.courseBooks.set([]);
     this.selectedBookIds.set(new Set());
+    this.bookOverrides.set(new Map());
   }
 
   setEnrollmentType(t: EnrollmentType) {
@@ -389,6 +398,7 @@ export class EnrollmentFormComponent implements OnInit {
       // MASTER mode has no per-course books.
       this.courseBooks.set([]);
       this.selectedBookIds.set(new Set());
+      this.bookOverrides.set(new Map());
     } else {
       masterCtl?.clearValidators();
       this.enrollmentForm.patchValue({ masterCourseId: '' });
@@ -620,14 +630,18 @@ export class EnrollmentFormComponent implements OnInit {
       } = { ...enrollmentData };
       if (this.enrollmentType() === 'COURSE' && !monthly) {
         const selected = this.selectedBookIds();
+        const overrides = this.bookOverrides();
         const products = this.courseBooks()
           .filter(b => selected.has(b.id))
-          .map(b => ({
-            productId: b.productId,
-            quantity: 1,
-            discountType: b.defaultDiscountType,
-            discountValue: b.defaultDiscountValue,
-          }));
+          .map(b => {
+            const o = overrides.get(b.id);
+            return {
+              productId: b.productId,
+              quantity: 1,
+              discountType: o?.discountType ?? b.defaultDiscountType,
+              discountValue: o?.discountValue ?? b.defaultDiscountValue,
+            };
+          });
         if (products.length > 0) createData.products = products;
       }
       this.enrollmentService.createEnrollment(createData).subscribe({
@@ -646,6 +660,7 @@ export class EnrollmentFormComponent implements OnInit {
   loadCourseBooks(courseId: string | null | undefined) {
     this.courseBooks.set([]);
     this.selectedBookIds.set(new Set());
+    this.bookOverrides.set(new Map());
     if (!courseId || this.enrollmentType() !== 'COURSE') return;
     this.courseProductService.list(courseId).subscribe({
       next: (books) => {
@@ -653,10 +668,20 @@ export class EnrollmentFormComponent implements OnInit {
         // Pre-check required items by default (still toggleable).
         const preChecked = new Set(books.filter(b => b.isRequired).map(b => b.id));
         this.selectedBookIds.set(preChecked);
+        // Initialize overrides from default discounts.
+        const overrides = new Map<string, { discountType: DiscountType; discountValue: number }>();
+        for (const b of books) {
+          overrides.set(b.id, {
+            discountType: b.defaultDiscountType || DiscountType.NONE,
+            discountValue: b.defaultDiscountValue || 0,
+          });
+        }
+        this.bookOverrides.set(overrides);
       },
       error: () => {
         this.courseBooks.set([]);
         this.selectedBookIds.set(new Set());
+        this.bookOverrides.set(new Map());
       },
     });
   }
@@ -672,25 +697,38 @@ export class EnrollmentFormComponent implements OnInit {
     return this.selectedBookIds().has(book.id);
   }
 
-  /** Net unit price after applying the linked product's default discount. */
-  bookNetPrice(book: CourseProduct): number {
+  /** Net unit price after applying the discount (override or default). */
+  bookNetPrice(book: CourseProduct, override?: { discountType: DiscountType; discountValue: number }): number {
     const price = book.sellingPrice || 0;
-    const value = book.defaultDiscountValue || 0;
-    if (book.defaultDiscountType === DiscountType.PERCENTAGE) {
+    const o = override || this.bookOverrides().get(book.id);
+    const type = o?.discountType ?? book.defaultDiscountType;
+    const value = o?.discountValue ?? book.defaultDiscountValue ?? 0;
+    if (type === DiscountType.PERCENTAGE) {
       return Math.max(0, price - (price * value) / 100);
     }
-    if (book.defaultDiscountType === DiscountType.FIXED_AMOUNT) {
+    if (type === DiscountType.FIXED_AMOUNT) {
       return Math.max(0, price - value);
     }
     return price;
   }
 
-  /** Human-readable default discount, or null when there's none. */
-  bookDiscountLabel(book: CourseProduct): string | null {
-    const value = book.defaultDiscountValue || 0;
-    if (!value || book.defaultDiscountType === DiscountType.NONE) return null;
-    if (book.defaultDiscountType === DiscountType.PERCENTAGE) return `-${value}%`;
-    return `-${value}`;
+  /** Update discount override for a book. */
+  setBookDiscountType(bookId: string, type: DiscountType) {
+    const next = new Map(this.bookOverrides());
+    const existing = next.get(bookId) || { discountType: DiscountType.NONE, discountValue: 0 };
+    next.set(bookId, { ...existing, discountType: type, discountValue: type === DiscountType.NONE ? 0 : existing.discountValue });
+    this.bookOverrides.set(next);
+  }
+
+  setBookDiscountValue(bookId: string, value: number) {
+    const next = new Map(this.bookOverrides());
+    const existing = next.get(bookId) || { discountType: DiscountType.NONE, discountValue: 0 };
+    next.set(bookId, { ...existing, discountValue: value || 0 });
+    this.bookOverrides.set(next);
+  }
+
+  getBookOverride(bookId: string): { discountType: DiscountType; discountValue: number } {
+    return this.bookOverrides().get(bookId) || { discountType: DiscountType.NONE, discountValue: 0 };
   }
 
   formatDate(date: Date): string {

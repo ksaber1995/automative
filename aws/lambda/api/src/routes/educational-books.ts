@@ -80,7 +80,7 @@ export const educationalBooksRoutes = {
       }
 
       const course = await queryOne<any>(
-        'SELECT id, name, code, branch_id FROM courses WHERE id = $1 AND company_id = $2',
+        'SELECT id, name, branch_id FROM courses WHERE id = $1 AND company_id = $2',
         [params.courseId, context.companyId]
       );
       if (!course) return apiError(404, 'ERRORS.EDUCATIONAL_BOOKS.COURSE_NOT_FOUND', 'Course not found');

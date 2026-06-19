@@ -4569,6 +4569,21 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    prepare: {
+      method: 'POST' as const,
+      path: '/api/sessions/prepare',
+      body: z.object({
+        classId: UUIDSchema,
+        branchId: UUIDSchema,
+      }),
+      responses: {
+        200: z.any(),
+        201: z.any(),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     nextNumber: {
       method: 'GET' as const,
       path: '/api/sessions/next-number',

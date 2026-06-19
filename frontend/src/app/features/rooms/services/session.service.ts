@@ -11,6 +11,7 @@ export interface Session {
   sessionNumber: number | null;
   startDate: string;
   endDate: string | null;
+  started: boolean;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +57,11 @@ export class SessionService {
 
   start(dto: StartSessionDto): Observable<Session> {
     return this.api.post<Session>('sessions/start', dto);
+  }
+
+  /** Create a session with started=false for pre-attendance */
+  prepare(classId: string, branchId: string): Observable<Session> {
+    return this.api.post<Session>('sessions/prepare', { classId, branchId });
   }
 
   end(id: string, notes?: string, endDate?: string): Observable<Session> {

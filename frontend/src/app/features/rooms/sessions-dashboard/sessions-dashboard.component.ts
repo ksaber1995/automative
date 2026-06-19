@@ -26,6 +26,7 @@ import { BranchStateService } from '../../../core/services/branch-state.service'
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { TimetableService, TimetableEntry } from '../../timetable/timetable.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface DialogTeacherRow {
@@ -92,6 +93,7 @@ export class SessionsDashboardComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
+  private timetableService = inject(TimetableService);
 
   /** Teacher-type companies have no rooms/co-teachers — hide those UI bits. */
   isTeacher = (): boolean => this.authService.isTeacher();
@@ -211,12 +213,54 @@ export class SessionsDashboardComponent implements OnInit {
   branches = signal<Branch[]>([]);
   activeClasses = signal<any[]>([]);
 
+  // ── Upcoming sessions (from timetable) ──────────────────────────────────────
+  upcomingEntries = signal<TimetableEntry[]>([]);
+  loadingUpcoming = signal(false);
+  /** Ticks every minute to re-evaluate which entries are "upcoming" */
+  private upcomingTick = signal<number>(Date.now());
+
+  /** Entries whose start time is within 15 min from now and don't have an active session yet */
+  filteredUpcoming = computed(() => {
+    this.upcomingTick(); // re-trigger every minute
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const branchId = this.selectedBranchId();
+    return this.upcomingEntries()
+      .filter(e => {
+        // Skip entries that already have an active session
+        if (e.sessionId && !e.sessionEnd) return false;
+        if (!e.startTime) return false;
+        const [h, m] = e.startTime.split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return false;
+        const entryMinutes = h * 60 + m;
+        // Show 15 min before start time, up to end time
+        const diff = entryMinutes - nowMinutes;
+        if (diff > 15) return false; // too early
+        // If end time exists, hide after it passed
+        if (e.endTime) {
+          const [eh, em] = e.endTime.split(':').map(Number);
+          if (!isNaN(eh) && !isNaN(em)) {
+            const endMinutes = eh * 60 + em;
+            if (nowMinutes > endMinutes) return false; // already over
+          }
+        }
+        // Show if within 15 min before start or already started (diff <= 0)
+        return diff >= -120; // up to 2 hours into the class
+      })
+      .filter(e => !branchId || e.branchId === branchId)
+      .sort((a, b) => {
+        const [ah, am] = (a.startTime || '00:00').split(':').map(Number);
+        const [bh, bm] = (b.startTime || '00:00').split(':').map(Number);
+        return (ah * 60 + am) - (bh * 60 + bm);
+      });
+  });
+
   loadingActive = signal(true);
   loadingHistory = signal(true);
   loadingRooms = signal(true);
   saving = signal(false);
 
-  activeTab = 'active';
+  activeTab = 'upcoming';
   showStartDialog = false;
   showEndDialog = false;
   endingSession = signal<Session | null>(null);
@@ -298,6 +342,11 @@ export class SessionsDashboardComponent implements OnInit {
   ngOnInit() {
     this.loadBranches();
     this.loadAll();
+    this.loadUpcoming();
+    // Refresh upcoming entries every minute
+    setInterval(() => {
+      this.upcomingTick.set(Date.now());
+    }, 60000);
   }
 
   loadBranches() {
@@ -455,6 +504,7 @@ export class SessionsDashboardComponent implements OnInit {
         this.showStartDialog = false;
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
         this.loadAll();
+        this.loadUpcoming();
       },
       error: () => {
         // Interceptor toasted the translated error.
@@ -520,6 +570,151 @@ export class SessionsDashboardComponent implements OnInit {
         this.saving.set(false);
       },
     });
+  }
+
+  // ── Upcoming sessions ────────────────────────────────────────────────────────
+
+  /** Maps classId → session that was auto-started for pre-attendance */
+  upcomingSessionByClass = signal<Record<string, Session>>({});
+  /** Which upcoming card has the attendance panel open? (by classId) */
+  upcomingAttendanceClassId = signal<string | null>(null);
+  upcomingAutoStarting = signal<string | null>(null);
+
+  loadUpcoming() {
+    this.loadingUpcoming.set(true);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+
+    this.timetableService.getDay({ date: dateStr }).subscribe({
+      next: (res) => {
+        this.upcomingEntries.set(res.entries || []);
+        this.loadingUpcoming.set(false);
+      },
+      error: () => {
+        this.upcomingEntries.set([]);
+        this.loadingUpcoming.set(false);
+      },
+    });
+  }
+
+  /** Directly start a session from an upcoming entry (no dialog needed for teacher companies) */
+  startUpcomingSession(entry: TimetableEntry) {
+    // If there's already a prepared (started=false) session, just mark it as started
+    const prepared = this.upcomingSessionByClass()[entry.classId];
+
+    this.saving.set(true);
+    this.sessionService.start({
+      classId: entry.classId,
+      branchId: entry.branchId,
+      roomId: entry.roomId || undefined,
+    }).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
+        // Remove from upcoming map
+        const next = { ...this.upcomingSessionByClass() };
+        delete next[entry.classId];
+        this.upcomingSessionByClass.set(next);
+        this.upcomingAttendanceClassId.set(null);
+        this.loadAll();
+        this.loadUpcoming();
+      },
+      error: () => {
+        this.saving.set(false);
+      },
+    });
+  }
+
+  /** Time until the entry starts, as a human-readable string */
+  timeUntilStart(entry: TimetableEntry): string {
+    if (!entry.startTime) return '';
+    const [h, m] = entry.startTime.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return '';
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const entryMinutes = h * 60 + m;
+    const diff = entryMinutes - nowMinutes;
+    if (diff <= 0) return this.translate.instant('SESSIONS_DASHBOARD.UPCOMING_STARTED');
+    if (diff === 1) return this.translate.instant('SESSIONS_DASHBOARD.UPCOMING_1MIN');
+    return this.translate.instant('SESSIONS_DASHBOARD.UPCOMING_MINS', { count: diff });
+  }
+
+  isEntryStarted(entry: TimetableEntry): boolean {
+    if (!entry.startTime) return false;
+    const [h, m] = entry.startTime.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return false;
+    const now = new Date();
+    return (now.getHours() * 60 + now.getMinutes()) >= (h * 60 + m);
+  }
+
+  formatEntryTime(time: string | null): string {
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return time;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    const lang = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-US';
+    return d.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /** Toggle pre-attendance on an upcoming entry. Auto-starts the session if needed. */
+  toggleUpcomingAttendance(entry: TimetableEntry) {
+    // If already open, close it
+    if (this.upcomingAttendanceClassId() === entry.classId) {
+      this.upcomingAttendanceClassId.set(null);
+      return;
+    }
+
+    // If this class already has a session (auto-started or from timetable), just open attendance
+    const existingSession = this.upcomingSessionByClass()[entry.classId];
+    if (existingSession) {
+      this.upcomingAttendanceClassId.set(entry.classId);
+      if (!this.attendanceBySession()[existingSession.id]) {
+        this.loadAttendanceForSession(existingSession.id);
+      }
+      return;
+    }
+
+    // If the timetable entry already has an active session
+    if (entry.sessionId) {
+      // Load the session and store it
+      this.sessionService.getById(entry.sessionId).subscribe({
+        next: (session) => {
+          this.upcomingSessionByClass.set({
+            ...this.upcomingSessionByClass(),
+            [entry.classId]: session,
+          });
+          this.upcomingAttendanceClassId.set(entry.classId);
+          this.loadAttendanceForSession(session.id);
+        },
+      });
+      return;
+    }
+
+    // Prepare the session (started=false) for pre-attendance — does NOT formally start it
+    this.upcomingAutoStarting.set(entry.classId);
+    this.sessionService.prepare(entry.classId, entry.branchId).subscribe({
+      next: (session) => {
+        this.upcomingSessionByClass.set({
+          ...this.upcomingSessionByClass(),
+          [entry.classId]: session,
+        });
+        this.upcomingAttendanceClassId.set(entry.classId);
+        this.upcomingAutoStarting.set(null);
+        this.loadAttendanceForSession(session.id);
+      },
+      error: () => {
+        this.upcomingAutoStarting.set(null);
+        this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.MSG_START_FAILED'));
+      },
+    });
+  }
+
+  getUpcomingSessionId(classId: string): string | null {
+    return this.upcomingSessionByClass()[classId]?.id || null;
   }
 
   formatTime(dateStr: string): string {

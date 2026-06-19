@@ -144,6 +144,7 @@ const router = {
   attendance: attendanceRoutes,
   sessions: {
     start: sessionsRoutes.start,
+    prepare: sessionsRoutes.prepare,
     end: sessionsRoutes.end,
     list: sessionsRoutes.list,
     listActive: sessionsRoutes.listActive,

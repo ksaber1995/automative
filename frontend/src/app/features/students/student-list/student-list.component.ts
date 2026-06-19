@@ -6,15 +6,14 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
-import { RadioButtonModule } from 'primeng/radiobutton';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
 import QRCode from 'qrcode';
+import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
@@ -45,10 +44,8 @@ interface EnrollmentCounts {
     ButtonModule,
     TagModule,
     ConfirmDialogModule,
-    DialogModule,
     TooltipModule,
     TabsModule,
-    RadioButtonModule,
     TranslateModule
   ],
   providers: [ConfirmationService],
@@ -315,20 +312,10 @@ export class StudentListComponent implements OnInit {
     return age;
   }
 
-  // --- Download QR Codes ---
-  showDownloadDialog = signal(false);
-  downloadMode: 'by-course' | 'by-course-class' = 'by-course';
+  // --- Print QR Codes as PDF ---
   downloading = signal(false);
 
-  openDownloadDialog() {
-    this.showDownloadDialog.set(true);
-  }
-
-  closeDownloadDialog() {
-    this.showDownloadDialog.set(false);
-  }
-
-  async downloadQrCodes() {
+  async printQrPdf() {
     this.downloading.set(true);
     try {
       const activatedStudents = this.students().filter(s => s.isActive && s.qrActivated && s.qrToken);
@@ -354,7 +341,139 @@ export class StudentListComponent implements OnInit {
       const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
       const studentIdSet = new Set(activatedStudents.map(s => s.id));
 
-      // Build student -> enrollments mapping
+      // Build student -> class names mapping
+      const studentGroups = new Map<string, string[]>();
+      for (const e of enrollments) {
+        if (studentIdSet.has(e.studentId)) {
+          if (!studentGroups.has(e.studentId)) studentGroups.set(e.studentId, []);
+          const cls = classMap.get(e.classId);
+          if (cls) {
+            const courseName = courseMap.get(cls.courseId) || '';
+            const label = courseName ? `${courseName} - ${cls.name}` : cls.name;
+            const list = studentGroups.get(e.studentId)!;
+            if (!list.includes(label)) list.push(label);
+          }
+        }
+      }
+
+      // A4 PDF in mm
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pw = 210; // page width
+      const ph = 297; // page height
+      const origin = window.location.origin;
+
+      for (let i = 0; i < activatedStudents.length; i++) {
+        const student = activatedStudents[i];
+
+        // --- Odd page: QR code ---
+        if (i > 0) pdf.addPage();
+        const url = `${origin}/p/s/${student.qrToken}`;
+        const dataUrl = await QRCode.toDataURL(url, { width: 800, margin: 2 });
+        const qrSize = 140;
+        const qrX = (pw - qrSize) / 2;
+        const qrY = (ph - qrSize) / 2;
+        pdf.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+        // --- Even page: student info ---
+        pdf.addPage();
+        const name = `${student.firstName} ${student.lastName}`.trim();
+        const phone = student.phone || '';
+        const groups = studentGroups.get(student.id) || [];
+
+        // Centered card design
+        const cardW = 160;
+        const cardX = (pw - cardW) / 2;
+        let cardH = 90 + groups.length * 10;
+        if (cardH < 100) cardH = 100;
+        const cardY = (ph - cardH) / 2;
+
+        // Card background
+        pdf.setFillColor(245, 247, 250);
+        pdf.roundedRect(cardX, cardY, cardW, cardH, 6, 6, 'F');
+
+        // Top accent bar
+        pdf.setFillColor(59, 130, 246);
+        // Draw a rect clipped to top rounded corners
+        pdf.roundedRect(cardX, cardY, cardW, 14, 6, 6, 'F');
+        pdf.setFillColor(245, 247, 250);
+        pdf.rect(cardX, cardY + 8, cardW, 6, 'F');
+
+        // Student name
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(28);
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(name, pw / 2, cardY + 36, { align: 'center' });
+
+        // Phone
+        let yPos = cardY + 50;
+        if (phone) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(16);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(phone, pw / 2, yPos, { align: 'center' });
+          yPos += 14;
+        }
+
+        // Divider
+        pdf.setDrawColor(203, 213, 225);
+        pdf.setLineWidth(0.5);
+        pdf.line(cardX + 20, yPos, cardX + cardW - 20, yPos);
+        yPos += 10;
+
+        // Groups
+        if (groups.length > 0) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(13);
+          pdf.setTextColor(71, 85, 105);
+          for (const g of groups) {
+            pdf.text(g, pw / 2, yPos, { align: 'center' });
+            yPos += 10;
+          }
+        } else {
+          pdf.setFont('helvetica', 'italic');
+          pdf.setFontSize(13);
+          pdf.setTextColor(148, 163, 184);
+          pdf.text('—', pw / 2, yPos, { align: 'center' });
+        }
+      }
+
+      pdf.save('qr-codes.pdf');
+      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
+    } finally {
+      this.downloading.set(false);
+    }
+  }
+
+  // --- Download QR Codes as ZIP ---
+  downloadingZip = signal(false);
+
+  async downloadQrZip() {
+    this.downloadingZip.set(true);
+    try {
+      const activatedStudents = this.students().filter(s => s.isActive && s.qrActivated && s.qrToken);
+      if (activatedStudents.length === 0) {
+        this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
+        this.downloadingZip.set(false);
+        return;
+      }
+
+      const [enrollments, classes, courses] = await new Promise<[any[], Class[], any[]]>((resolve, reject) => {
+        forkJoin({
+          enrollments: this.enrollmentService.getAllEnrollments(),
+          classes: this.classService.getAllClasses(),
+          courses: this.courseService.getAllCourses(),
+        }).subscribe({
+          next: (res) => resolve([res.enrollments, res.classes, res.courses]),
+          error: reject,
+        });
+      });
+
+      const courseMap = new Map(courses.map((c: any) => [c.id, c.name]));
+      const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
+      const studentIdSet = new Set(activatedStudents.map(s => s.id));
+
       const studentEnrollments = new Map<string, { courseId: string; classId: string }[]>();
       for (const e of enrollments) {
         if (studentIdSet.has(e.studentId)) {
@@ -364,31 +483,26 @@ export class StudentListComponent implements OnInit {
       }
 
       const zip = new JSZip();
-      const mode = this.downloadMode;
       const origin = window.location.origin;
 
       for (const student of activatedStudents) {
         const url = `${origin}/p/s/${student.qrToken}`;
         const dataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2 });
         const base64 = dataUrl.split(',')[1];
-        const fileName = this.buildQrFileName(student);
+        const name = `${student.firstName} ${student.lastName}`.trim();
+        const phone = student.phone ? ` (${student.phone})` : '';
+        const fileName = this.sanitizeName(`${name}${phone}`) + '.png';
 
         const enrs = studentEnrollments.get(student.id) || [];
         if (enrs.length === 0) {
-          // No enrollments — put in "Uncategorized" folder
           zip.file(`Uncategorized/${fileName}`, base64, { base64: true });
         } else {
           const addedPaths = new Set<string>();
           for (const enr of enrs) {
             const courseName = this.sanitizeName(courseMap.get(enr.courseId) || 'Unknown Course');
-            let path: string;
-            if (mode === 'by-course') {
-              path = `${courseName}/${fileName}`;
-            } else {
-              const classInfo = classMap.get(enr.classId);
-              const className = this.sanitizeName(classInfo?.name || 'Unknown Class');
-              path = `${courseName}/${className}/${fileName}`;
-            }
+            const classInfo = classMap.get(enr.classId);
+            const className = this.sanitizeName(classInfo?.name || 'Unknown Class');
+            const path = `${courseName}/${className}/${fileName}`;
             if (!addedPaths.has(path)) {
               zip.file(path, base64, { base64: true });
               addedPaths.add(path);
@@ -399,19 +513,12 @@ export class StudentListComponent implements OnInit {
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, 'qr-codes.zip');
-      this.showDownloadDialog.set(false);
       this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
     } catch {
       this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
     } finally {
-      this.downloading.set(false);
+      this.downloadingZip.set(false);
     }
-  }
-
-  private buildQrFileName(student: Student): string {
-    const name = `${student.firstName} ${student.lastName}`.trim();
-    const phone = student.phone ? ` (${student.phone})` : '';
-    return this.sanitizeName(`${name}${phone}`) + '.png';
   }
 
   private sanitizeName(name: string): string {

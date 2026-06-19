@@ -49,7 +49,7 @@
           </div>
         }
 
-        @if (studentLocked() && studentBranchName()) {
+        @if (studentLocked() && studentBranchName() && !isTeacher()) {
           <div class="mb-4 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm">
             <span class="text-gray-500">{{ 'ENROLLMENT_FORM.BRANCH_PREFIX' | translate }}</span>
             <span class="ml-2 font-semibold text-gray-900">{{ studentBranchName() }}</span>
@@ -60,7 +60,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           <!-- Branch (only shown when not locked to a student) -->
-          @if (!studentLocked() && !branchState.isSingleBranch()) {
+          @if (!studentLocked() && !branchState.isSingleBranch() && !isTeacher()) {
             <div class="col-span-2">
               <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_BRANCH' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
@@ -362,32 +362,73 @@
 
           <div class="flex flex-col gap-3">
             @for (book of courseBooks(); track book.id) {
-              <div class="flex items-center gap-3 p-3 border rounded-lg transition-colors"
+              <div class="p-3 border rounded-lg transition-colors"
                 [class.border-blue-400]="isBookSelected(book)"
                 [class.bg-blue-50]="isBookSelected(book)">
-                <p-checkbox [binary]="true" [ngModel]="isBookSelected(book)" [ngModelOptions]="{ standalone: true }"
-                  (onChange)="toggleBook(book, $event.checked)"
-                  [inputId]="'book-' + book.id"></p-checkbox>
-                <label [for]="'book-' + book.id" class="flex-1 cursor-pointer">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-medium text-gray-900">{{ book.productName }}</span>
-                    @if (book.productCode) {
-                      <span class="text-xs text-gray-500 font-mono">{{ book.productCode }}</span>
-                    }
-                    @if (book.isRequired) {
-                      <p-tag severity="danger" [value]="'ENROLLMENT_FORM.REQUIRED' | translate"></p-tag>
-                    } @else {
-                      <p-tag severity="secondary" [value]="'ENROLLMENT_FORM.OPTIONAL' | translate"></p-tag>
+                <div class="flex items-center gap-3">
+                  <p-checkbox [binary]="true" [ngModel]="isBookSelected(book)" [ngModelOptions]="{ standalone: true }"
+                    (onChange)="toggleBook(book, $event.checked)"
+                    [inputId]="'book-' + book.id"></p-checkbox>
+                  <label [for]="'book-' + book.id" class="flex-1 cursor-pointer">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-medium text-gray-900">{{ book.productName }}</span>
+                      @if (book.productCode) {
+                        <span class="text-xs text-gray-500 font-mono">{{ book.productCode }}</span>
+                      }
+                      @if (book.isRequired) {
+                        <p-tag severity="danger" [value]="'ENROLLMENT_FORM.REQUIRED' | translate"></p-tag>
+                      } @else {
+                        <p-tag severity="secondary" [value]="'ENROLLMENT_FORM.OPTIONAL' | translate"></p-tag>
+                      }
+                    </div>
+                    <div class="text-sm text-gray-600 mt-1">
+                      {{ 'ENROLLMENT_FORM.BOOK_PRICE' | translate }}: {{ book.sellingPrice | amount }}
+                    </div>
+                  </label>
+                  <div class="text-right">
+                    <span class="font-bold text-green-700">{{ bookNetPrice(book) | amount }}</span>
+                  </div>
+                </div>
+
+                <!-- Per-book discount controls (shown when selected) -->
+                @if (isBookSelected(book)) {
+                  <div class="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-end gap-3">
+                    <div class="min-w-[150px]">
+                      <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'ENROLLMENT_FORM.BOOK_DISCOUNT_TYPE' | translate }}</label>
+                      <p-select
+                        [options]="discountTypeOptions"
+                        [ngModel]="getBookOverride(book.id).discountType"
+                        (ngModelChange)="setBookDiscountType(book.id, $event)"
+                        [ngModelOptions]="{ standalone: true }"
+                        optionValue="value"
+                        [style]="{ width: '100%' }"
+                      >
+                        <ng-template let-item pTemplate="selectedItem">
+                          {{ item.label | translate }}
+                        </ng-template>
+                        <ng-template let-item pTemplate="item">
+                          {{ item.label | translate }}
+                        </ng-template>
+                      </p-select>
+                    </div>
+                    @if (getBookOverride(book.id).discountType !== 'NONE') {
+                      <div class="min-w-[120px]">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">
+                          {{ (getBookOverride(book.id).discountType === 'PERCENTAGE' ? 'ENROLLMENT_FORM.BOOK_DISCOUNT_PCT' : 'ENROLLMENT_FORM.BOOK_DISCOUNT_AMT') | translate }}
+                        </label>
+                        <p-inputnumber
+                          [ngModel]="getBookOverride(book.id).discountValue"
+                          (onInput)="setBookDiscountValue(book.id, $event.value || 0)"
+                          [ngModelOptions]="{ standalone: true }"
+                          [min]="0"
+                          [max]="getBookOverride(book.id).discountType === 'PERCENTAGE' ? 100 : book.sellingPrice"
+                          [suffix]="getBookOverride(book.id).discountType === 'PERCENTAGE' ? '%' : ''"
+                          [style]="{ width: '100%' }"
+                        ></p-inputnumber>
+                      </div>
                     }
                   </div>
-                  <div class="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                    <span>{{ book.sellingPrice | amount }}</span>
-                    @if (bookDiscountLabel(book); as disc) {
-                      <span class="text-orange-600">{{ disc }}</span>
-                      <span class="text-green-700 font-medium">{{ bookNetPrice(book) | amount }}</span>
-                    }
-                  </div>
-                </label>
+                }
               </div>
             }
           </div>

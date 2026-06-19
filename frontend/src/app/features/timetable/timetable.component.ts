@@ -12,6 +12,7 @@ import { BranchService } from '../branches/services/branch.service';
 import { CourseService } from '../courses/services/course.service';
 import { EmployeeService } from '../employees/services/employee.service';
 import { LanguageService } from '../../core/services/language.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 
 interface PositionedEntry extends TimetableEntry {
@@ -79,6 +80,7 @@ export class TimetableComponent implements OnInit {
   private courseService = inject(CourseService);
   private employeeService = inject(EmployeeService);
   languageService = inject(LanguageService);
+  authService = inject(AuthService);
 
   hours = HOURS;
   hourHeight = HOUR_HEIGHT_PX;

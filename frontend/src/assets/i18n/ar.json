@@ -1809,7 +1809,14 @@
     "BOOK_INCLUDE": "تضمين",
     "BOOKS_SELECTED": "{{count}} كتاب محدد",
     "BOOKS_TOTAL": "إجمالي الكتب",
-    "GRAND_TOTAL": "الإجمالي الكلي"
+    "GRAND_TOTAL": "الإجمالي الكلي",
+    "BOOK_PRICE": "السعر",
+    "BOOK_DISCOUNT_TYPE": "الخصم",
+    "BOOK_DISCOUNT_NONE": "بدون خصم",
+    "BOOK_DISCOUNT_PERCENTAGE": "نسبة مئوية",
+    "BOOK_DISCOUNT_FIXED": "مبلغ ثابت",
+    "BOOK_DISCOUNT_PCT": "نسبة الخصم %",
+    "BOOK_DISCOUNT_AMT": "مبلغ الخصم"
   },
   "DASHBOARD": {
     "TITLE": "لوحة التحكم",
@@ -2582,12 +2589,8 @@
       "QR_ALL": "الكل",
       "QR_ACTIVATED": "QR مفعّل",
       "QR_NOT_ACTIVATED": "QR غير مفعّل",
-      "QR_DOWNLOAD": "تحميل أكواد QR",
-      "QR_DOWNLOAD_TITLE": "تحميل أكواد QR",
-      "QR_DOWNLOAD_DESC": "تحميل أكواد QR لجميع الطلاب المفعّلين كملف ZIP. اختر هيكل المجلدات:",
-      "QR_MODE_BY_COURSE": "مجلدات حسب الكورس",
-      "QR_MODE_BY_COURSE_CLASS": "مجلدات حسب الكورس، ثم حسب المجموعة",
-      "QR_DOWNLOAD_BTN": "تحميل",
+      "QR_PRINT_PDF": "طباعة PDF",
+      "QR_DOWNLOAD_ZIP": "تحميل ZIP",
       "QR_DOWNLOAD_SUCCESS": "تم تحميل {{count}} كود QR بنجاح",
       "QR_DOWNLOAD_ERROR": "فشل تحميل أكواد QR",
       "QR_NO_ACTIVATED": "لا توجد أكواد QR مفعّلة للتحميل"
@@ -3712,7 +3715,18 @@
     "SAVE_TEACHERS": "حفظ المعلمين",
     "MSG_LOAD_TEACHERS_FAILED": "فشل تحميل حضور المعلمين",
     "MSG_TEACHERS_SAVED": "تم حفظ حضور المعلمين ({{count}})",
-    "MSG_TEACHERS_SAVE_FAILED": "فشل حفظ حضور المعلمين"
+    "MSG_TEACHERS_SAVE_FAILED": "فشل حفظ حضور المعلمين",
+    "TAB_UPCOMING": "الحصص القادمة",
+    "LOADING_UPCOMING": "جاري تحميل الحصص القادمة...",
+    "NO_UPCOMING_TITLE": "لا توجد حصص قادمة",
+    "NO_UPCOMING_HINT": "ستظهر الحصص هنا قبل 15 دقيقة من موعدها",
+    "UPCOMING_STARTED": "بدأت",
+    "UPCOMING_1MIN": "بعد دقيقة",
+    "UPCOMING_MINS": "بعد {{count}} دقيقة",
+    "UPCOMING_STUDENTS": "طالب",
+    "UPCOMING_ATTENDANCE": "تسجيل الحضور",
+    "UPCOMING_PRE_ATTENDANCE": "حضور مسبق",
+    "UPCOMING_SESSION_STARTED": "تم بدء الحصة"
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "حضور المعلمين",
@@ -3849,6 +3863,8 @@
     "METHOD_DEBIT_CARD": "بطاقة خصم",
     "METHOD_BANK_TRANSFER": "تحويل بنكي",
     "METHOD_CHECK": "شيك",
-    "METHOD_OTHER": "أخرى"
+    "METHOD_OTHER": "أخرى",
+    "COURSE": "الكورس",
+    "ALL_COURSES": "جميع الكورسات"
   }
 }

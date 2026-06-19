@@ -55,8 +55,15 @@
   </div>
 
   <!-- Tabs -->
-  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'active'">
+  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'upcoming'">
     <p-tablist>
+      <p-tab value="upcoming">
+        <i class="pi pi-clock text-blue-500 mr-2"></i>
+        {{ 'SESSIONS_DASHBOARD.TAB_UPCOMING' | translate }}
+        @if (filteredUpcoming().length > 0) {
+          <span class="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ filteredUpcoming().length }}</span>
+        }
+      </p-tab>
       <p-tab value="active">
         <i class="pi pi-circle-fill text-green-500 mr-2"></i>
         {{ 'SESSIONS_DASHBOARD.TAB_ACTIVE' | translate }}
@@ -77,6 +84,191 @@
     </p-tablist>
 
     <p-tabpanels>
+      <!-- Upcoming Sessions Tab -->
+      <p-tabpanel value="upcoming">
+        @if (loadingUpcoming()) {
+          <div class="text-center py-12 text-gray-400">
+            <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+            <p>{{ 'SESSIONS_DASHBOARD.LOADING_UPCOMING' | translate }}</p>
+          </div>
+        }
+        @if (!loadingUpcoming() && filteredUpcoming().length === 0) {
+          <div class="text-center py-12 text-gray-400">
+            <i class="pi pi-clock text-5xl text-gray-300 mb-3"></i>
+            <p class="text-lg font-medium text-gray-600">{{ 'SESSIONS_DASHBOARD.NO_UPCOMING_TITLE' | translate }}</p>
+            <p class="text-sm">{{ 'SESSIONS_DASHBOARD.NO_UPCOMING_HINT' | translate }}</p>
+          </div>
+        }
+        @if (!loadingUpcoming() && filteredUpcoming().length > 0) {
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            @for (entry of filteredUpcoming(); track entry.classId) {
+              <div class="bg-white border rounded-xl p-5 shadow-sm transition-shadow hover:shadow-md"
+                [class.border-blue-300]="!isEntryStarted(entry)"
+                [class.border-orange-300]="isEntryStarted(entry)">
+                <!-- Header -->
+                <div class="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 class="font-bold text-gray-900 text-lg">{{ entry.className }}</h3>
+                    @if (entry.courseName) {
+                      <p class="text-sm text-gray-500 flex items-center gap-1">
+                        <i class="pi pi-book text-xs"></i>
+                        {{ entry.courseName }}
+                      </p>
+                    }
+                  </div>
+                  <div>
+                    @if (isEntryStarted(entry)) {
+                      <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                        <span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                        {{ 'SESSIONS_DASHBOARD.UPCOMING_STARTED' | translate }}
+                      </span>
+                    } @else {
+                      <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                        <i class="pi pi-clock text-xs"></i>
+                        {{ timeUntilStart(entry) }}
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <!-- Info -->
+                <div class="space-y-1.5 text-sm text-gray-600 mb-4">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-clock text-gray-400 text-xs"></i>
+                    <span>{{ formatEntryTime(entry.startTime) }} – {{ formatEntryTime(entry.endTime) }}</span>
+                  </div>
+                  @if (entry.instructorName) {
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-user text-gray-400 text-xs"></i>
+                      <span>{{ entry.instructorName }}</span>
+                    </div>
+                  }
+                  @if (entry.branchName) {
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-building text-gray-400 text-xs"></i>
+                      <span>{{ entry.branchName }}</span>
+                    </div>
+                  }
+                  @if (entry.roomCode) {
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-map-marker text-gray-400 text-xs"></i>
+                      <span>{{ entry.roomCode }}</span>
+                    </div>
+                  }
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-users text-gray-400 text-xs"></i>
+                    <span>{{ entry.studentCount }}{{ entry.maxStudents ? '/' + entry.maxStudents : '' }} {{ 'SESSIONS_DASHBOARD.UPCOMING_STUDENTS' | translate }}</span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-2">
+                  <p-button
+                    [label]="(upcomingAttendanceClassId() === entry.classId ? 'SESSIONS_DASHBOARD.HIDE_ATTENDANCE' : 'SESSIONS_DASHBOARD.UPCOMING_ATTENDANCE') | translate"
+                    [icon]="upcomingAttendanceClassId() === entry.classId ? 'pi pi-chevron-up' : 'pi pi-check-square'"
+                    severity="info"
+                    [outlined]="true"
+                    size="small"
+                    styleClass="w-full"
+                    [loading]="upcomingAutoStarting() === entry.classId"
+                    (onClick)="toggleUpcomingAttendance(entry)"
+                  ></p-button>
+                  <p-button
+                    [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
+                    icon="pi pi-play"
+                    styleClass="w-full"
+                    size="small"
+                    [severity]="isEntryStarted(entry) ? 'warn' : 'primary'"
+                    [loading]="saving()"
+                    (onClick)="startUpcomingSession(entry)"
+                  ></p-button>
+                </div>
+
+                <!-- Pre-attendance accordion -->
+                @if (upcomingAttendanceClassId() === entry.classId && getUpcomingSessionId(entry.classId); as sessionId) {
+                  <div class="mt-4 pt-4 border-t border-gray-200">
+                    @if (loadingAttendanceFor() === sessionId) {
+                      <div class="text-center py-6 text-gray-400">
+                        <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+                        <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_STUDENTS' | translate }}</p>
+                      </div>
+                    } @else {
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-gray-700">
+                          {{ 'SESSIONS_DASHBOARD.STUDENT_COUNT' | translate: { count: getAttendanceStudents(sessionId).length } }}
+                        </span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                          {{ 'SESSIONS_DASHBOARD.UPCOMING_PRE_ATTENDANCE' | translate }}
+                        </span>
+                      </div>
+                      @if (getAttendanceStudents(sessionId).length === 0) {
+                        <div class="text-center py-6 text-gray-400 text-sm">
+                          <i class="pi pi-users text-3xl mb-2 text-gray-300"></i>
+                          <p>{{ 'SESSIONS_DASHBOARD.NO_STUDENTS_ENROLLED' | translate }}</p>
+                        </div>
+                      } @else {
+                        <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          @for (student of getAttendanceStudents(sessionId); track student.studentId) {
+                            <div class="flex items-center justify-between p-2 rounded-lg border"
+                              [class.border-green-200]="student.isPresent"
+                              [class.bg-green-50]="student.isPresent"
+                              [class.border-gray-200]="!student.isPresent">
+                              <div class="flex items-center gap-3">
+                                <p-checkbox
+                                  [ngModel]="student.isPresent"
+                                  (ngModelChange)="toggleStudentPresence(sessionId, student, $event)"
+                                  [binary]="true"
+                                  [inputId]="'uatt-' + sessionId + '-' + student.studentId"
+                                ></p-checkbox>
+                                <label [for]="'uatt-' + sessionId + '-' + student.studentId"
+                                  class="cursor-pointer text-sm font-medium text-gray-800">
+                                  {{ student.studentFirstName }} {{ student.studentLastName }}
+                                </label>
+                              </div>
+                              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                [class.bg-green-100]="student.isPresent"
+                                [class.text-green-700]="student.isPresent"
+                                [class.bg-gray-100]="!student.isPresent"
+                                [class.text-gray-500]="!student.isPresent">
+                                {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
+                              </span>
+                            </div>
+                          }
+                        </div>
+                        <div class="mt-3 pt-3 border-t flex items-center justify-between">
+                          <span class="text-xs text-gray-500">
+                            <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCountForSession(sessionId) } }}</span>
+                            ·
+                            <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCountForSession(sessionId) } }}</span>
+                          </span>
+                          <span class="text-xs flex items-center gap-1"
+                            [class.text-gray-400]="attendanceSaveState()[sessionId] !== 'saving' && attendanceSaveState()[sessionId] !== 'error'"
+                            [class.text-blue-500]="attendanceSaveState()[sessionId] === 'saving'"
+                            [class.text-red-500]="attendanceSaveState()[sessionId] === 'error'">
+                            @if (attendanceSaveState()[sessionId] === 'saving') {
+                              <i class="pi pi-spin pi-spinner"></i>
+                              {{ 'SESSIONS_DASHBOARD.SAVING' | translate }}
+                            } @else if (attendanceSaveState()[sessionId] === 'saved') {
+                              <i class="pi pi-check"></i>
+                              {{ 'SESSIONS_DASHBOARD.SAVED' | translate }}
+                            } @else if (attendanceSaveState()[sessionId] === 'error') {
+                              <i class="pi pi-times"></i>
+                              {{ 'SESSIONS_DASHBOARD.SAVE_FAILED' | translate }}
+                            } @else {
+                              {{ 'SESSIONS_DASHBOARD.AUTOSAVES' | translate }}
+                            }
+                          </span>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </p-tabpanel>
+
       <!-- Active Sessions Tab -->
       <p-tabpanel value="active">
         @if (loadingActive()) {
