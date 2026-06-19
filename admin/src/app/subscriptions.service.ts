@@ -26,6 +26,8 @@ export interface CompanySubscription {
   qr_total_cost: number;
   /** Billed-but-unpaid QR activation amount. */
   qr_unpaid_cost: number;
+  /** WhatsApp messaging status: DISABLED, PENDING, ACTIVE, REJECTED, REVOKED, or null. */
+  messaging_status: string | null;
 }
 
 // Obscure, unauthenticated endpoint on the production API. The path is the only
@@ -77,6 +79,17 @@ export class SubscriptionsService {
     return this.http.post<{ success: boolean; subscription_type: string | null }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/activate`,
       {},
+    );
+  }
+
+  /** Set a company's messaging status (ACTIVE, DISABLED, REJECTED, REVOKED). */
+  setMessagingStatus(
+    companyId: string,
+    status: string,
+  ): Observable<{ success: boolean; messaging_status: string }> {
+    return this.http.post<{ success: boolean; messaging_status: string }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/messaging-status`,
+      { status },
     );
   }
 

@@ -8,11 +8,14 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ExamService } from '../services/exam.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { MessagingService } from '../../messaging/services/messaging.service';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
 @Component({
@@ -28,6 +31,8 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
     TableModule,
     TagModule,
     TooltipModule,
+    DialogModule,
+    CheckboxModule,
     TranslateModule,
   ],
   templateUrl: './exam-detail.component.html',
@@ -39,6 +44,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  private messagingService = inject(MessagingService);
 
   examId = '';
   exam = signal<ExamModel | null>(null);
@@ -79,6 +85,11 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   gradedCount = computed(() => this.roster().filter((s) => s.grade != null && s.grade !== '').length);
   totalCount = computed(() => this.roster().length);
   isDone = computed(() => this.exam()?.status === 'DONE');
+
+  // ── Send exam results messaging ──────────────────────────────────────────
+  showResultsDialog = signal(false);
+  resultsStudents = signal<{ studentId: string; name: string; grade: string; selected: boolean }[]>([]);
+  sendingResults = signal(false);
 
   ngOnInit() {
     this.examId = this.route.snapshot.paramMap.get('id') || '';
@@ -323,6 +334,69 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
         this.lastScanResult.set(null);
       },
     });
+  }
+
+  // ── Send exam results to parents ──────────────────────────────────────────
+
+  openResultsDialog() {
+    const graded = this.roster().filter(s => s.grade != null && s.grade !== '');
+    if (graded.length === 0) {
+      this.notifications.info(this.translate.instant('MESSAGING.NO_GRADED_STUDENTS'));
+      return;
+    }
+    this.resultsStudents.set(graded.map(s => ({
+      studentId: s.studentId,
+      name: `${s.firstName} ${s.lastName}`,
+      grade: s.grade!,
+      selected: true,
+    })));
+    this.showResultsDialog.set(true);
+  }
+
+  toggleResultStudent(studentId: string, selected: boolean) {
+    this.resultsStudents.update(list => list.map(s => s.studentId === studentId ? { ...s, selected } : s));
+  }
+
+  toggleAllResults(selected: boolean) {
+    this.resultsStudents.update(list => list.map(s => ({ ...s, selected })));
+  }
+
+  sendExamResults() {
+    const e = this.exam();
+    if (!e) return;
+    const selected = this.resultsStudents().filter(s => s.selected);
+    if (selected.length === 0) {
+      this.notifications.info(this.translate.instant('MESSAGING.NO_STUDENTS_SELECTED'));
+      return;
+    }
+    this.sendingResults.set(true);
+    let sent = 0, skipped = 0, failed = 0;
+    let completed = 0;
+    const total = selected.length;
+    for (const s of selected) {
+      const gradeNum = parseFloat(s.grade);
+      const maxGrade = e.maxGrade ?? 0;
+      const percentage = maxGrade > 0 ? Math.round((gradeNum / maxGrade) * 100) : 0;
+      this.messagingService.send('EXAM_RESULTS', s.studentId, {
+        examName: e.name,
+        grade: s.grade,
+        maxGrade: String(maxGrade),
+        percentage: String(percentage),
+        courseName: e.courseName || '',
+      }).subscribe({
+        next: () => { sent++; completed++; this.checkResultsDone(completed, total, sent, skipped, failed); },
+        error: () => { failed++; completed++; this.checkResultsDone(completed, total, sent, skipped, failed); },
+      });
+    }
+  }
+
+  private checkResultsDone(completed: number, total: number, sent: number, skipped: number, failed: number) {
+    if (completed < total) return;
+    this.sendingResults.set(false);
+    this.showResultsDialog.set(false);
+    this.notifications.success(
+      this.translate.instant('MESSAGING.BULK_SENT_RESULT', { sent, skipped: skipped + failed }),
+    );
   }
 
   edit() { this.router.navigate(['/exams', this.examId, 'edit']); }

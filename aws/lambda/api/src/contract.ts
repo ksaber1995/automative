@@ -3800,6 +3800,18 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    setMessagingStatus: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/messaging-status',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ status: z.string() }),
+      responses: {
+        200: z.object({ success: z.boolean(), messaging_status: z.string() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     // Permanently delete a company and ALL its data (FK cascade). Irreversible.
     deleteCompany: {
       method: 'DELETE',
@@ -4813,10 +4825,135 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    listPriceOverrides: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/price-overrides/:courseId',
+      pathParams: z.object({ courseId: UUIDSchema }),
+      responses: {
+        200: z.array(CourseMonthlyPriceOverrideSchema),
+        403: ApiErrorSchema,
+      },
+    },
   },
 
   // ============================================================
   // Timetable
+  // ============================================================
+  // MESSAGING
+  // ============================================================
+  messaging: {
+    getSettings: {
+      method: 'GET' as const,
+      path: '/api/messaging/settings',
+      responses: {
+        200: z.object({
+          messagingStatus: z.enum(['DISABLED', 'PENDING', 'ACTIVE', 'REJECTED', 'REVOKED']),
+          absenceWarningThreshold: z.number(),
+          autoSendAbsence: z.boolean(),
+          autoSendPaymentDelay: z.boolean(),
+          autoSendAbsenceWarning: z.boolean(),
+          autoSendExamResults: z.boolean(),
+        }),
+        401: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    updateSettings: {
+      method: 'PUT' as const,
+      path: '/api/messaging/settings',
+      body: z.object({
+        absenceWarningThreshold: z.number().min(2).max(10).optional(),
+        autoSendAbsence: z.boolean().optional(),
+        autoSendPaymentDelay: z.boolean().optional(),
+        autoSendAbsenceWarning: z.boolean().optional(),
+        autoSendExamResults: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    requestActivation: {
+      method: 'POST' as const,
+      path: '/api/messaging/request',
+      body: z.object({}),
+      responses: {
+        200: z.object({ messagingStatus: z.string() }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    getQuota: {
+      method: 'GET' as const,
+      path: '/api/messaging/quota',
+      responses: {
+        200: z.object({
+          month: z.string(),
+          messagesSent: z.number(),
+          quotaLimit: z.number(),
+          activatedStudents: z.number(),
+        }),
+        401: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    send: {
+      method: 'POST' as const,
+      path: '/api/messaging/send',
+      body: z.object({
+        type: z.enum(['ABSENCE', 'PAYMENT_DELAY', 'ABSENCE_WARNING', 'EXAM_RESULTS']),
+        studentId: z.string().uuid(),
+        variables: z.record(z.string()).optional(),
+      }),
+      responses: {
+        200: z.object({ message: z.string(), logId: z.string() }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    sendBulk: {
+      method: 'POST' as const,
+      path: '/api/messaging/send-bulk',
+      body: z.object({
+        type: z.enum(['ABSENCE', 'PAYMENT_DELAY', 'ABSENCE_WARNING', 'EXAM_RESULTS']),
+        studentIds: z.array(z.string().uuid()),
+        variables: z.record(z.string()).optional(),
+      }),
+      responses: {
+        200: z.object({ sent: z.number(), skipped: z.number(), failed: z.number() }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    listLog: {
+      method: 'GET' as const,
+      path: '/api/messaging/log',
+      query: z.object({
+        type: z.string().optional(),
+        status: z.string().optional(),
+        limit: z.coerce.number().optional(),
+        offset: z.coerce.number().optional(),
+      }).optional(),
+      responses: {
+        200: z.object({
+          items: z.array(z.any()),
+          total: z.number(),
+        }),
+        401: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+  },
+
   // ============================================================
   timetable: {
     getDay: {

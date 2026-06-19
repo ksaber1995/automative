@@ -209,6 +209,11 @@ export const routes: Routes = [
         path: 'company-profile',
         data: { breadcrumb: 'BREADCRUMBS.COMPANY_PROFILE' },
         loadComponent: () => import('./features/company-profile/company-profile.component').then(m => m.CompanyProfileComponent)
+      },
+      {
+        path: 'messaging',
+        data: { breadcrumb: 'BREADCRUMBS.MESSAGING' },
+        loadComponent: () => import('./features/messaging/messaging-page/messaging-page.component').then(m => m.MessagingPageComponent)
       }
     ]
   },

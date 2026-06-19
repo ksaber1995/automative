@@ -138,7 +138,7 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_CLASS' | translate }} <span class="text-red-500">*</span></label>
               <p-select formControlName="classId" [options]="filteredClasses()" optionLabel="name" optionValue="id"
-                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_CLASS' | translate" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value"></p-select>
+                [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_CLASS' | translate" [style]="{ width: '100%' }" [disabled]="!f['courseId'].value" (onChange)="onClassChange()"></p-select>
               @if (f['classId'].invalid && f['classId'].touched) {
                 <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_CLASS_REQUIRED' | translate }}</small>
               }
@@ -152,7 +152,7 @@
               <span class="text-red-500">*</span>
             </label>
             <p-datepicker formControlName="enrollmentDate" [showIcon]="true" dateFormat="yy-mm-dd"
-              [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_DATE' | translate" [style]="{ width: '100%' }"></p-datepicker>
+              [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_DATE' | translate" [style]="{ width: '100%' }" (onSelect)="onEnrollmentDateChange()"></p-datepicker>
             @if (isMonthly()) {
               <small class="text-gray-500 block mt-1">{{ 'ENROLLMENT_FORM.START_DATE_HINT' | translate }}</small>
             }
@@ -198,6 +198,17 @@
         @if (showPricingBlock()) {
         <p-divider></p-divider>
         <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PRICING' | translate }}</h3>
+
+        <!-- Monthly price override hint -->
+        @if (monthlyOverridePrice() !== null) {
+          <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+            <i class="pi pi-info-circle text-amber-600 mt-0.5"></i>
+            <div class="text-sm text-amber-800">
+              <strong>{{ 'ENROLLMENT_FORM.PRICE_OVERRIDE_HINT' | translate: { month: monthlyOverrideMonth() } }}</strong>
+              <span class="block mt-0.5">{{ 'ENROLLMENT_FORM.PRICE_OVERRIDE_DESC' | translate: { basePrice: (selectedCourse()?.price | amount), overridePrice: (monthlyOverridePrice() | amount) } }}</span>
+            </div>
+          </div>
+        }
 
         <!-- Pricing summary card -->
         <div class="grid grid-cols-3 gap-4 mb-6">

@@ -18,6 +18,7 @@ import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../att
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { MessagingService } from '../../messaging/services/messaging.service';
 
 interface TeacherRow {
   employeeId: string;
@@ -67,6 +68,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private fb = inject(FormBuilder);
+  private messagingService = inject(MessagingService);
 
   sessionId = '';
   session = signal<Session | null>(null);
@@ -156,6 +158,11 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     endTime: ['', Validators.required],
     notes: [''],
   });
+
+  // ── Post-session messaging ──────────────────────────────────────────────
+  showAbsenceMessageDialog = signal(false);
+  absentStudentsForMessage = signal<{ studentId: string; name: string; selected: boolean }[]>([]);
+  sendingMessages = signal(false);
 
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
@@ -361,11 +368,72 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.endingSession.set(false);
         this.showEndDialog = false;
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_ENDED'));
-        // Redirect back to the sessions dashboard after ending.
-        this.router.navigate(['/sessions']);
+        // Show absence message dialog if there are absent students
+        const absent = this.students().filter(st => !st.isPresent);
+        if (absent.length > 0) {
+          this.absentStudentsForMessage.set(
+            absent.map(st => ({
+              studentId: st.studentId,
+              name: `${st.studentFirstName} ${st.studentLastName}`,
+              selected: true,
+            })),
+          );
+          this.showAbsenceMessageDialog.set(true);
+        } else {
+          this.router.navigate(['/sessions']);
+        }
       },
       error: () => this.endingSession.set(false),
     });
+  }
+
+  // ── Absence messaging after session end ─────────────────────────────────
+
+  toggleAbsentStudent(studentId: string, selected: boolean) {
+    this.absentStudentsForMessage.update(list =>
+      list.map(s => s.studentId === studentId ? { ...s, selected } : s),
+    );
+  }
+
+  toggleAllAbsent(selected: boolean) {
+    this.absentStudentsForMessage.update(list => list.map(s => ({ ...s, selected })));
+  }
+
+  sendAbsenceMessages() {
+    const s = this.session();
+    if (!s) return;
+    const selectedIds = this.absentStudentsForMessage().filter(st => st.selected).map(st => st.studentId);
+    if (selectedIds.length === 0) {
+      this.notificationService.info(this.translate.instant('MESSAGING.NO_STUDENTS_SELECTED'));
+      return;
+    }
+    this.sendingMessages.set(true);
+    const sessionDate = new Date(s.startDate);
+    const dateStr = sessionDate.toLocaleDateString('en-GB');
+    this.messagingService.sendBulk('ABSENCE', selectedIds, {
+      className: s.className || '',
+      courseName: s.courseName || '',
+      sessionNumber: String(s.sessionNumber ?? ''),
+      date: dateStr,
+    }).subscribe({
+      next: (res) => {
+        this.sendingMessages.set(false);
+        this.notificationService.success(
+          this.translate.instant('MESSAGING.BULK_SENT_RESULT', { sent: res.sent, skipped: res.skipped }),
+        );
+        this.showAbsenceMessageDialog.set(false);
+        this.router.navigate(['/sessions']);
+      },
+      error: () => {
+        this.sendingMessages.set(false);
+        this.notificationService.error(this.translate.instant('MESSAGING.SEND_FAILED'));
+      },
+    });
+  }
+
+  skipAbsenceMessages() {
+    this.showAbsenceMessageDialog.set(false);
+    this.router.navigate(['/sessions']);
   }
 
   // ============================================================

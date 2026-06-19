@@ -92,6 +92,11 @@ export class MonthlySubscriptionsService {
     return this.http.get<MonthlyPaymentWithDetails[]>(`${this.base}/student/${studentId}`);
   }
 
+  /** List all price overrides for a course. */
+  listPriceOverrides(courseId: string): Observable<CourseMonthlyPriceOverride[]> {
+    return this.http.get<CourseMonthlyPriceOverride[]>(`${this.base}/price-overrides/${courseId}`);
+  }
+
   /** Set or update a monthly price override for a course. Recalculates all unpaid bills. */
   setPriceOverride(dto: SetPriceOverrideDto): Observable<{ override: CourseMonthlyPriceOverride; updatedBills: number }> {
     return this.http.post<{ override: CourseMonthlyPriceOverride; updatedBills: number }>(

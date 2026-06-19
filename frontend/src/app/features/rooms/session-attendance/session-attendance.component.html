@@ -359,3 +359,40 @@
     ></p-button>
   </ng-template>
 </p-dialog>
+
+<!-- Absence Message Dialog (shown after ending a session) -->
+<p-dialog
+  [visible]="showAbsenceMessageDialog()"
+  (visibleChange)="$event ? null : skipAbsenceMessages()"
+  [header]="'MESSAGING.ABSENCE_DIALOG_TITLE' | translate"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+  [closable]="true"
+>
+  <div class="pt-2 space-y-4">
+    <p class="text-sm text-gray-600">{{ 'MESSAGING.ABSENCE_DIALOG_DESC' | translate }}</p>
+
+    <div class="flex items-center gap-2 mb-2">
+      <p-button size="small" [outlined]="true" [label]="'MESSAGING.SELECT_ALL' | translate" (onClick)="toggleAllAbsent(true)"></p-button>
+      <p-button size="small" [outlined]="true" severity="secondary" [label]="'MESSAGING.DESELECT_ALL' | translate" (onClick)="toggleAllAbsent(false)"></p-button>
+    </div>
+
+    <div class="max-h-64 overflow-y-auto space-y-1">
+      @for (st of absentStudentsForMessage(); track st.studentId) {
+        <div class="flex items-center gap-3 p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+          <p-checkbox [ngModel]="st.selected" (ngModelChange)="toggleAbsentStudent(st.studentId, $event)" [binary]="true" [inputId]="'msg-' + st.studentId"></p-checkbox>
+          <label [for]="'msg-' + st.studentId" class="cursor-pointer text-sm font-medium text-gray-800">{{ st.name }}</label>
+        </div>
+      }
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'MESSAGING.SKIP' | translate" severity="secondary" [outlined]="true" (onClick)="skipAbsenceMessages()"></p-button>
+    <p-button
+      [label]="'MESSAGING.SEND_ABSENCE_MSG' | translate"
+      icon="pi pi-send"
+      [loading]="sendingMessages()"
+      (onClick)="sendAbsenceMessages()"
+    ></p-button>
+  </ng-template>
+</p-dialog>

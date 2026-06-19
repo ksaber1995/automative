@@ -52,6 +52,7 @@ import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
 import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
+import { messagingRoutes } from './routes/messaging';
 
 // Create the router implementation
 const router = {
@@ -155,6 +156,15 @@ const router = {
     nextNumber: sessionsRoutes.nextNumber,
     getById: sessionsRoutes.getById,
     update: sessionsRoutes.update,
+  },
+  messaging: {
+    getSettings: messagingRoutes.getSettings,
+    updateSettings: messagingRoutes.updateSettings,
+    requestActivation: messagingRoutes.requestActivation,
+    getQuota: messagingRoutes.getQuota,
+    send: messagingRoutes.send,
+    sendBulk: messagingRoutes.sendBulk,
+    listLog: messagingRoutes.listLog,
   },
   timetable: {
     getDay: timetableRoutes.getDay,

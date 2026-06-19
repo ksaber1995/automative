@@ -48,6 +48,81 @@
       </div>
     </p-card>
 
+    <!-- Monthly Price Overrides (only for MONTHLY_SUBSCRIPTION courses) -->
+    @if (c.paymentType === 'MONTHLY_SUBSCRIPTION') {
+      <p-card class="mt-6">
+        <ng-template pTemplate="header">
+          <div class="flex justify-between items-center p-4">
+            <div>
+              <h3 class="text-xl font-bold">{{ 'COURSES.PRICE_OVERRIDES.TITLE' | translate }}</h3>
+              <p class="text-sm text-gray-500 mt-0.5">{{ 'COURSES.PRICE_OVERRIDES.SUBTITLE' | translate }}</p>
+            </div>
+            <p-button
+              [label]="'COURSES.PRICE_OVERRIDES.ADD' | translate"
+              icon="pi pi-plus"
+              (onClick)="openOverrideDialog()"
+            ></p-button>
+          </div>
+        </ng-template>
+
+        <p-table
+          [value]="priceOverrides()"
+          [loading]="loadingOverrides()"
+          responsiveLayout="scroll"
+        >
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'COURSES.PRICE_OVERRIDES.COL_MONTH' | translate }}</th>
+              <th>{{ 'COURSES.PRICE_OVERRIDES.COL_BASE_PRICE' | translate }}</th>
+              <th>{{ 'COURSES.PRICE_OVERRIDES.COL_OVERRIDE_PRICE' | translate }}</th>
+              <th>{{ 'COURSES.PRICE_OVERRIDES.COL_ACTIONS' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-ov>
+            <tr>
+              <td class="font-medium">{{ monthName(ov.billingMonth) }} {{ ov.billingYear }}</td>
+              <td class="text-gray-500">{{ c.price | amount }}</td>
+              <td>
+                <span class="font-semibold" [class]="ov.overridePrice < c.price ? 'text-green-600' : 'text-red-600'">
+                  {{ ov.overridePrice | amount }}
+                </span>
+              </td>
+              <td>
+                <div class="flex gap-1">
+                  <p-button
+                    icon="pi pi-pencil"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="info"
+                    (onClick)="openOverrideDialog(ov)"
+                    [pTooltip]="'COURSES.PRICE_OVERRIDES.EDIT' | translate"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="confirmDeleteOverride(ov)"
+                    [pTooltip]="'COURSES.PRICE_OVERRIDES.DELETE' | translate"
+                  ></p-button>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="4" class="text-center py-8">
+                <div class="text-gray-500">
+                  <i class="pi pi-calendar text-4xl mb-3 block"></i>
+                  <p>{{ 'COURSES.PRICE_OVERRIDES.EMPTY' | translate }}</p>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    }
+
     <!-- Enrolled Students & Payments -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">
@@ -618,6 +693,66 @@
       [loading]="refundLoading()"
       [disabled]="!refundAmount || !refundDate"
       (onClick)="submitRefund()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Price Override Dialog -->
+<p-dialog
+  [(visible)]="showOverrideDialog"
+  [header]="(editingOverrideId ? 'COURSES.PRICE_OVERRIDES.EDIT_TITLE' : 'COURSES.PRICE_OVERRIDES.ADD_TITLE') | translate"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+  [closable]="true"
+>
+  <div class="grid gap-4">
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.PRICE_OVERRIDES.MONTH' | translate }}</label>
+        <p-select
+          [(ngModel)]="overrideMonth"
+          [options]="monthOptions()"
+          optionLabel="label"
+          optionValue="value"
+          appendTo="body"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.PRICE_OVERRIDES.YEAR' | translate }}</label>
+        <p-inputnumber
+          [(ngModel)]="overrideYear"
+          [useGrouping]="false"
+          [min]="2020"
+          [max]="2100"
+          [style]="{ width: '100%' }"
+        />
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'COURSES.PRICE_OVERRIDES.PRICE' | translate }}</label>
+      <p-inputnumber
+        [(ngModel)]="overridePrice"
+        [min]="0"
+        [placeholder]="'COURSES.PRICE_OVERRIDES.PRICE_PLACEHOLDER' | translate"
+        [style]="{ width: '100%' }"
+      />
+    </div>
+    @if (course(); as c) {
+      <div class="text-sm text-gray-500">
+        {{ 'COURSES.PRICE_OVERRIDES.BASE_PRICE_HINT' | translate: { price: (c.price | amount) } }}
+      </div>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'COURSES.PRICE_OVERRIDES.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeOverrideDialog()"></p-button>
+    <p-button
+      [label]="'COURSES.PRICE_OVERRIDES.SAVE' | translate"
+      icon="pi pi-check"
+      [loading]="overrideSaving()"
+      [disabled]="overridePrice == null"
+      (onClick)="saveOverride()"
     ></p-button>
   </ng-template>
 </p-dialog>

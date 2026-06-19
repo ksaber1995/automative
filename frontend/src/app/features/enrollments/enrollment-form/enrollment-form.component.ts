@@ -24,6 +24,7 @@ import { ClassService } from '../../courses/services/class.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterEnrollmentService, CoverageInfo } from '../../master-courses/services/master-enrollment.service';
+import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -78,6 +79,7 @@ export class EnrollmentFormComponent implements OnInit {
   private authService = inject(AuthService);
   private courseProductService = inject(CourseProductService);
   protected branchState = inject(BranchStateService);
+  private monthlySubService = inject(MonthlySubscriptionsService);
 
   /** TEACHER companies don't use master courses, so hide the bundle toggle. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -114,6 +116,9 @@ export class EnrollmentFormComponent implements OnInit {
   coverage = signal<CoverageInfo | null>(null);
   // Monthly-subscription enrollment: pay the start month now or defer it.
   monthlyPayOptionSig = signal<'PAY_NOW' | 'PAY_LATER'>('PAY_LATER');
+  // Monthly price override info for display hint
+  monthlyOverridePrice = signal<number | null>(null);
+  monthlyOverrideMonth = signal<string>(''); // e.g. "June 2026"
 
   // True when the selected single course is billed as a monthly subscription.
   isMonthly = computed(() =>
@@ -454,6 +459,8 @@ export class EnrollmentFormComponent implements OnInit {
   onCourseChange() {
     const courseId = this.enrollmentForm.get('courseId')?.value;
     this.selectedCourseId.set(courseId || null);
+    this.monthlyOverridePrice.set(null);
+    this.monthlyOverrideMonth.set('');
     if (courseId) {
       const course = this.courses().find(c => c.id === courseId);
       if (course) {
@@ -466,6 +473,67 @@ export class EnrollmentFormComponent implements OnInit {
     // Refresh the linked-books list for the newly selected course.
     this.loadCourseBooks(courseId || null);
     this.checkCoverage();
+  }
+
+  onClassChange() {
+    const classId = this.enrollmentForm.get('classId')?.value;
+    if (!classId) return;
+    const cls = this.classes().find(c => c.id === classId);
+    if (!cls) return;
+    const classStart = new Date(cls.startDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    classStart.setHours(0, 0, 0, 0);
+    const enrollDate = classStart > today ? classStart : today;
+    this.enrollmentForm.patchValue({ enrollmentDate: enrollDate });
+    this.checkMonthlyPriceOverride(enrollDate);
+  }
+
+  /** When enrollment date changes manually via the date picker. */
+  onEnrollmentDateChange() {
+    const d = this.enrollmentForm.get('enrollmentDate')?.value;
+    if (d instanceof Date) {
+      this.checkMonthlyPriceOverride(d);
+    }
+  }
+
+  /**
+   * For monthly-subscription courses, check if the enrollment start month has a
+   * price override. If so, update the displayed price and show a hint.
+   */
+  private checkMonthlyPriceOverride(enrollDate: Date) {
+    const course = this.selectedCourse();
+    if (!course || course.paymentType !== 'MONTHLY_SUBSCRIPTION') {
+      this.monthlyOverridePrice.set(null);
+      this.monthlyOverrideMonth.set('');
+      return;
+    }
+    const year = enrollDate.getFullYear();
+    const month = enrollDate.getMonth() + 1;
+    this.monthlySubService.getPriceOverride(course.id, year, month).subscribe({
+      next: (ov) => {
+        if (ov && ov.overridePrice !== course.price) {
+          this.monthlyOverridePrice.set(ov.overridePrice);
+          const monthName = enrollDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          this.monthlyOverrideMonth.set(monthName);
+          // Update the price to the override
+          this.setPrices(ov.overridePrice, 0, 0, ov.overridePrice);
+          this.discountTypeSig.set('none');
+          this.enrollmentForm.patchValue({ discountType: 'none' });
+        } else {
+          this.monthlyOverridePrice.set(null);
+          this.monthlyOverrideMonth.set('');
+          // Reset to base course price
+          this.setPrices(course.price, 0, 0, course.price);
+          this.discountTypeSig.set('none');
+          this.enrollmentForm.patchValue({ discountType: 'none' });
+        }
+      },
+      error: () => {
+        this.monthlyOverridePrice.set(null);
+        this.monthlyOverrideMonth.set('');
+      },
+    });
   }
 
   onStudentChange() {

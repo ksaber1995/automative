@@ -33,6 +33,8 @@ import { Product } from '@shared/interfaces/product.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
+import { CourseMonthlyPriceOverride } from '@shared/interfaces/monthly-subscription.interface';
 
 @Component({
   selector: 'app-course-detail',
@@ -75,6 +77,7 @@ export class CourseDetailComponent implements OnInit {
   private productService = inject(ProductService);
   protected auth = inject(AuthService);
   private translate = inject(TranslateService);
+  private monthlySubService = inject(MonthlySubscriptionsService);
 
   course = signal<Course | null>(null);
   classes = signal<ClassWithDetails[]>([]);
@@ -128,6 +131,31 @@ export class CourseDetailComponent implements OnInit {
     { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_NONE'), value: DiscountType.NONE },
     { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_PERCENTAGE'), value: DiscountType.PERCENTAGE },
     { label: this.translate.instant('COURSES.LINKED_PRODUCTS.DISCOUNT_FIXED'), value: DiscountType.FIXED_AMOUNT },
+  ]);
+
+  // ─── Monthly price overrides ─────────────────────────────────────────────
+  priceOverrides = signal<CourseMonthlyPriceOverride[]>([]);
+  loadingOverrides = signal(false);
+  showOverrideDialog = false;
+  overrideYear: number = new Date().getFullYear();
+  overrideMonth: number = new Date().getMonth() + 1;
+  overridePrice: number | null = null;
+  overrideSaving = signal(false);
+  editingOverrideId: string | null = null;
+
+  monthOptions = computed(() => [
+    { label: this.translate.instant('MONTHS.JAN'), value: 1 },
+    { label: this.translate.instant('MONTHS.FEB'), value: 2 },
+    { label: this.translate.instant('MONTHS.MAR'), value: 3 },
+    { label: this.translate.instant('MONTHS.APR'), value: 4 },
+    { label: this.translate.instant('MONTHS.MAY'), value: 5 },
+    { label: this.translate.instant('MONTHS.JUN'), value: 6 },
+    { label: this.translate.instant('MONTHS.JUL'), value: 7 },
+    { label: this.translate.instant('MONTHS.AUG'), value: 8 },
+    { label: this.translate.instant('MONTHS.SEP'), value: 9 },
+    { label: this.translate.instant('MONTHS.OCT'), value: 10 },
+    { label: this.translate.instant('MONTHS.NOV'), value: 11 },
+    { label: this.translate.instant('MONTHS.DEC'), value: 12 },
   ]);
 
   // Products not yet linked, for the add-product select.
@@ -209,6 +237,87 @@ export class CourseDetailComponent implements OnInit {
         // Interceptor toasted the translated error.
       }
     });
+  }
+
+  // ─── Price overrides ───────────────────────────────────────────────────────
+  loadPriceOverrides(courseId: string) {
+    this.loadingOverrides.set(true);
+    this.monthlySubService.listPriceOverrides(courseId).subscribe({
+      next: (data) => {
+        this.priceOverrides.set(data);
+        this.loadingOverrides.set(false);
+      },
+      error: () => this.loadingOverrides.set(false),
+    });
+  }
+
+  openOverrideDialog(ov?: CourseMonthlyPriceOverride) {
+    if (ov) {
+      this.editingOverrideId = ov.id;
+      this.overrideYear = ov.billingYear;
+      this.overrideMonth = ov.billingMonth;
+      this.overridePrice = ov.overridePrice;
+    } else {
+      this.editingOverrideId = null;
+      this.overrideYear = new Date().getFullYear();
+      this.overrideMonth = new Date().getMonth() + 1;
+      this.overridePrice = null;
+    }
+    this.showOverrideDialog = true;
+  }
+
+  closeOverrideDialog() {
+    this.showOverrideDialog = false;
+    this.editingOverrideId = null;
+  }
+
+  saveOverride() {
+    if (!this.courseId || this.overridePrice == null || this.overrideSaving()) return;
+    this.overrideSaving.set(true);
+    this.monthlySubService.setPriceOverride({
+      courseId: this.courseId,
+      billingYear: this.overrideYear,
+      billingMonth: this.overrideMonth,
+      overridePrice: this.overridePrice,
+    }).subscribe({
+      next: (res) => {
+        this.notificationService.success(
+          this.translate.instant('COURSES.PRICE_OVERRIDES.SAVED', { bills: res.updatedBills })
+        );
+        this.overrideSaving.set(false);
+        this.closeOverrideDialog();
+        if (this.courseId) this.loadPriceOverrides(this.courseId);
+      },
+      error: () => this.overrideSaving.set(false),
+    });
+  }
+
+  confirmDeleteOverride(ov: CourseMonthlyPriceOverride) {
+    const monthLabel = this.monthOptions().find(m => m.value === ov.billingMonth)?.label || '';
+    this.confirmationService.confirm({
+      header: this.translate.instant('COURSES.PRICE_OVERRIDES.DELETE_TITLE'),
+      message: this.translate.instant('COURSES.PRICE_OVERRIDES.DELETE_MSG', { month: monthLabel, year: ov.billingYear }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('COURSES.PRICE_OVERRIDES.DELETE'),
+      rejectLabel: this.translate.instant('COURSES.PRICE_OVERRIDES.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.deleteOverride(ov),
+    });
+  }
+
+  deleteOverride(ov: CourseMonthlyPriceOverride) {
+    this.monthlySubService.deletePriceOverride(ov.id).subscribe({
+      next: (res) => {
+        this.notificationService.success(
+          this.translate.instant('COURSES.PRICE_OVERRIDES.DELETED', { bills: res.updatedBills })
+        );
+        if (this.courseId) this.loadPriceOverrides(this.courseId);
+      },
+    });
+  }
+
+  monthName(month: number): string {
+    return this.monthOptions().find(m => m.value === month)?.label || '';
   }
 
   addLinkedProduct() {
@@ -316,6 +425,9 @@ export class CourseDetailComponent implements OnInit {
       next: (course) => {
         this.course.set(course);
         this.loading.set(false);
+        if (course.paymentType === 'MONTHLY_SUBSCRIPTION') {
+          this.loadPriceOverrides(id);
+        }
       },
       error: () => {
         // Interceptor toasted the translated error.

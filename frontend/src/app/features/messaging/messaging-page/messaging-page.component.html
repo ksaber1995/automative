@@ -1,0 +1,231 @@
+<div class="container-custom py-8">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ 'MESSAGING.TITLE' | translate }}</h1>
+      <p class="text-gray-600 mt-1">{{ 'MESSAGING.SUBTITLE' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'settings'">
+    <p-tablist>
+      <p-tab value="settings">
+        <i class="pi pi-cog mr-2"></i>
+        {{ 'MESSAGING.TAB_SETTINGS' | translate }}
+      </p-tab>
+      <p-tab value="usage">
+        <i class="pi pi-chart-bar mr-2"></i>
+        {{ 'MESSAGING.TAB_USAGE' | translate }}
+      </p-tab>
+    </p-tablist>
+
+    <p-tabpanels>
+      <!-- Settings Tab -->
+      <p-tabpanel value="settings">
+        @if (loadingSettings()) {
+          <div class="text-center py-12 text-gray-400">
+            <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+          </div>
+        } @else if (settings(); as s) {
+          <div class="mt-4 max-w-2xl space-y-6">
+            <!-- Status Banner -->
+            <div class="rounded-xl border p-5"
+              [class.border-gray-200]="s.messagingStatus === 'DISABLED'"
+              [class.bg-gray-50]="s.messagingStatus === 'DISABLED'"
+              [class.border-yellow-200]="s.messagingStatus === 'PENDING'"
+              [class.bg-yellow-50]="s.messagingStatus === 'PENDING'"
+              [class.border-green-200]="s.messagingStatus === 'ACTIVE'"
+              [class.bg-green-50]="s.messagingStatus === 'ACTIVE'"
+              [class.border-red-200]="s.messagingStatus === 'REJECTED' || s.messagingStatus === 'REVOKED'"
+              [class.bg-red-50]="s.messagingStatus === 'REJECTED' || s.messagingStatus === 'REVOKED'">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="font-bold text-gray-900 text-lg">{{ 'MESSAGING.STATUS_TITLE' | translate }}</h3>
+                  @switch (s.messagingStatus) {
+                    @case ('DISABLED') {
+                      <p class="text-sm text-gray-600 mt-1">{{ 'MESSAGING.STATUS_DISABLED_DESC' | translate }}</p>
+                    }
+                    @case ('PENDING') {
+                      <p class="text-sm text-yellow-700 mt-1">{{ 'MESSAGING.STATUS_PENDING_DESC' | translate }}</p>
+                    }
+                    @case ('ACTIVE') {
+                      <p class="text-sm text-green-700 mt-1">{{ 'MESSAGING.STATUS_ACTIVE_DESC' | translate }}</p>
+                    }
+                    @case ('REJECTED') {
+                      <p class="text-sm text-red-700 mt-1">{{ 'MESSAGING.STATUS_REJECTED_DESC' | translate }}</p>
+                    }
+                    @case ('REVOKED') {
+                      <p class="text-sm text-red-700 mt-1">{{ 'MESSAGING.STATUS_REVOKED_DESC' | translate }}</p>
+                    }
+                  }
+                </div>
+                <div>
+                  @if (s.messagingStatus === 'DISABLED' || s.messagingStatus === 'REJECTED') {
+                    <p-button
+                      [label]="'MESSAGING.REQUEST_ACTIVATION' | translate"
+                      icon="pi pi-send"
+                      [loading]="requestingActivation()"
+                      (onClick)="requestActivation()"
+                    ></p-button>
+                  }
+                  @if (s.messagingStatus === 'PENDING') {
+                    <span class="inline-flex items-center gap-1.5 bg-yellow-100 text-yellow-800 text-sm font-bold px-3 py-1.5 rounded-full">
+                      <i class="pi pi-clock"></i>
+                      {{ 'MESSAGING.AWAITING_APPROVAL' | translate }}
+                    </span>
+                  }
+                  @if (s.messagingStatus === 'ACTIVE') {
+                    <span class="inline-flex items-center gap-1.5 bg-green-100 text-green-800 text-sm font-bold px-3 py-1.5 rounded-full">
+                      <i class="pi pi-check-circle"></i>
+                      {{ 'MESSAGING.ACTIVE' | translate }}
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual Messaging Info -->
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 class="font-bold text-gray-900 mb-3">{{ 'MESSAGING.MANUAL_SEND_TITLE' | translate }}</h3>
+              <p class="text-sm text-gray-600 mb-4">{{ 'MESSAGING.MANUAL_SEND_DESC' | translate }}</p>
+              <div class="space-y-3">
+                <div class="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                  <i class="pi pi-calendar-times text-blue-600 mt-0.5"></i>
+                  <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ 'MESSAGING.MANUAL_ABSENCE' | translate }}</p>
+                    <p class="text-xs text-gray-500">{{ 'MESSAGING.MANUAL_ABSENCE_DESC' | translate }}</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                  <i class="pi pi-file-check text-green-600 mt-0.5"></i>
+                  <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ 'MESSAGING.MANUAL_EXAM' | translate }}</p>
+                    <p class="text-xs text-gray-500">{{ 'MESSAGING.MANUAL_EXAM_DESC' | translate }}</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
+                  <i class="pi pi-wallet text-yellow-600 mt-0.5"></i>
+                  <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ 'MESSAGING.MANUAL_PAYMENT' | translate }}</p>
+                    <p class="text-xs text-gray-500">{{ 'MESSAGING.MANUAL_PAYMENT_DESC' | translate }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Absence Warning Threshold -->
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 class="font-bold text-gray-900 mb-2">{{ 'MESSAGING.THRESHOLD_TITLE' | translate }}</h3>
+              <p class="text-xs text-gray-500 mb-3">{{ 'MESSAGING.THRESHOLD_DESC' | translate }}</p>
+              <div class="flex items-center gap-3">
+                <p-inputNumber [ngModel]="absenceWarningThreshold()" (ngModelChange)="absenceWarningThreshold.set($event)"
+                  [min]="2" [max]="10" [showButtons]="true" [disabled]="s.messagingStatus !== 'ACTIVE'"
+                  [style]="{ width: '120px' }"></p-inputNumber>
+                <span class="text-sm text-gray-600">{{ 'MESSAGING.CONSECUTIVE_ABSENCES' | translate }}</span>
+              </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end">
+              <p-button
+                [label]="'MESSAGING.SAVE_SETTINGS' | translate"
+                icon="pi pi-check"
+                [loading]="savingSettings()"
+                [disabled]="s.messagingStatus !== 'ACTIVE'"
+                (onClick)="saveSettings()"
+              ></p-button>
+            </div>
+          </div>
+        }
+      </p-tabpanel>
+
+      <!-- Usage Tab -->
+      <p-tabpanel value="usage">
+        <div class="mt-4 space-y-6">
+          <!-- Quota -->
+          @if (loadingQuota()) {
+            <div class="text-center py-6 text-gray-400">
+              <i class="pi pi-spin pi-spinner text-2xl"></i>
+            </div>
+          } @else if (quota(); as q) {
+            <div class="bg-white rounded-xl border border-gray-200 p-5 max-w-2xl">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-900">{{ 'MESSAGING.QUOTA_TITLE' | translate }}</h3>
+                <span class="text-sm text-gray-500">{{ q.month }}</span>
+              </div>
+              <p-progressBar [value]="quotaPercentage()" [showValue]="false"
+                [style]="{ height: '12px' }"></p-progressBar>
+              <div class="flex items-center justify-between mt-2 text-sm">
+                <span class="text-gray-600">
+                  {{ 'MESSAGING.QUOTA_USED' | translate: { sent: q.messagesSent, limit: q.quotaLimit } }}
+                </span>
+                <span class="text-gray-500">
+                  {{ 'MESSAGING.ACTIVATED_STUDENTS' | translate: { count: q.activatedStudents } }}
+                </span>
+              </div>
+            </div>
+          }
+
+          <!-- Log -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-gray-900">{{ 'MESSAGING.LOG_TITLE' | translate }}</h3>
+              <p-select
+                [options]="typeFilterOptions"
+                [ngModel]="logTypeFilter()"
+                (ngModelChange)="logTypeFilter.set($event); onLogFilterChange()"
+                optionLabel="label"
+                optionValue="value"
+                [placeholder]="'MESSAGING.FILTER_TYPE' | translate"
+                [showClear]="true"
+                [style]="{ width: '200px' }"
+              ></p-select>
+            </div>
+
+            @if (loadingLog()) {
+              <div class="text-center py-8 text-gray-400">
+                <i class="pi pi-spin pi-spinner text-2xl"></i>
+              </div>
+            } @else if (logItems().length === 0) {
+              <div class="text-center py-8 text-gray-400">
+                <i class="pi pi-inbox text-4xl mb-2 text-gray-300"></i>
+                <p>{{ 'MESSAGING.NO_MESSAGES_YET' | translate }}</p>
+              </div>
+            } @else {
+              <p-table [value]="logItems()" [paginator]="true" [rows]="20"
+                [totalRecords]="logTotal()" [lazy]="true" (onLazyLoad)="onLogPageChange($event)"
+                [tableStyle]="{ 'min-width': '50rem' }">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>{{ 'MESSAGING.COL_DATE' | translate }}</th>
+                    <th>{{ 'MESSAGING.COL_TYPE' | translate }}</th>
+                    <th>{{ 'MESSAGING.COL_RECIPIENT' | translate }}</th>
+                    <th>{{ 'MESSAGING.COL_STATUS' | translate }}</th>
+                    <th>{{ 'MESSAGING.COL_BODY' | translate }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-item>
+                  <tr>
+                    <td class="text-sm">{{ item.createdAt | date:'short' }}</td>
+                    <td>
+                      <p-tag [value]="item.type" [severity]="getTypeSeverity(item.type)" [style]="{ 'font-size': '0.7rem' }"></p-tag>
+                    </td>
+                    <td class="text-sm">
+                      <div>{{ item.recipientName }}</div>
+                      <div class="text-xs text-gray-400">{{ item.recipientPhone }}</div>
+                    </td>
+                    <td>
+                      <p-tag [value]="item.status" [severity]="getStatusSeverity(item.status)" [style]="{ 'font-size': '0.7rem' }"></p-tag>
+                    </td>
+                    <td class="text-xs text-gray-600 max-w-xs truncate" [title]="item.body">{{ item.body }}</td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            }
+          </div>
+        </div>
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>

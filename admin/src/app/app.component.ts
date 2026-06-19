@@ -52,6 +52,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 <th class="num">Employees</th>
                 <th class="num">Branches</th>
                 <th class="num">QR</th>
+                <th>Msgs</th>
                 <th>Start</th>
                 <th>End</th>
                 <th>Status</th>
@@ -95,6 +96,17 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                       —
                     }
                   </td>
+                  <td>
+                    @if (r.messaging_status === 'PENDING') {
+                      <span class="msg-badge pending">PENDING</span>
+                    } @else if (r.messaging_status === 'ACTIVE') {
+                      <span class="msg-badge active">ACTIVE</span>
+                    } @else if (r.messaging_status === 'REJECTED' || r.messaging_status === 'REVOKED') {
+                      <span class="msg-badge off">{{ r.messaging_status }}</span>
+                    } @else {
+                      <span class="msg-badge disabled">OFF</span>
+                    }
+                  </td>
                   <td>{{ formatDate(r.start_date) }}</td>
                   <td>{{ formatDate(r.end_date) }}</td>
                   <td>
@@ -121,6 +133,24 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                           QR billing
                         </button>
                       }
+                      @if (r.messaging_status === 'PENDING') {
+                        <button class="act activate" [disabled]="busyId() === r.company_id" (click)="approveMessaging(r)">
+                          Approve Msgs
+                        </button>
+                        <button class="act danger" [disabled]="busyId() === r.company_id" (click)="rejectMessaging(r)">
+                          Reject Msgs
+                        </button>
+                      }
+                      @if (r.messaging_status === 'ACTIVE') {
+                        <button class="act danger" [disabled]="busyId() === r.company_id" (click)="revokeMessaging(r)">
+                          Revoke Msgs
+                        </button>
+                      }
+                      @if (r.messaging_status === 'REJECTED' || r.messaging_status === 'REVOKED' || r.messaging_status === 'DISABLED') {
+                        <button class="act activate" [disabled]="busyId() === r.company_id" (click)="approveMessaging(r)">
+                          Enable Msgs
+                        </button>
+                      }
                       <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
                         Delete
                       </button>
@@ -129,7 +159,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
                 </tr>
               }
               @if (filtered().length === 0) {
-                <tr><td colspan="13" class="state">No matches.</td></tr>
+                <tr><td colspan="14" class="state">No matches.</td></tr>
               }
             </tbody>
           </table>
@@ -286,6 +316,14 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
     .reg.academy { background: #dbeafe; color: #1d4ed8; }
     .qr-due { color: #b45309; font-size: 12px; }
     .qr-paid { color: #16a34a; font-size: 12px; }
+    .msg-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      font-weight: 700; letter-spacing: .3px;
+    }
+    .msg-badge.pending { background: #fef9c3; color: #854d0e; }
+    .msg-badge.active { background: #dcfce7; color: #166534; }
+    .msg-badge.off { background: #fee2e2; color: #b91c1c; }
+    .msg-badge.disabled { background: #f1f5f9; color: #94a3b8; }
     .dot {
       display: inline-block; width: 8px; height: 8px; border-radius: 999px;
       background: #22c55e; margin-right: 6px; vertical-align: middle;
@@ -496,6 +534,52 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`QR billing update failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  // ── Messaging status ────────────────────────────────────────────────────────
+  approveMessaging(r: CompanySubscription) {
+    this.busyId.set(r.company_id);
+    this.service.setMessagingStatus(r.company_id, 'ACTIVE').subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`${r.company_name}: messaging approved.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Messaging approve failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  rejectMessaging(r: CompanySubscription) {
+    this.busyId.set(r.company_id);
+    this.service.setMessagingStatus(r.company_id, 'REJECTED').subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`${r.company_name}: messaging rejected.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Messaging reject failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  revokeMessaging(r: CompanySubscription) {
+    this.busyId.set(r.company_id);
+    this.service.setMessagingStatus(r.company_id, 'REVOKED').subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`${r.company_name}: messaging revoked.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Messaging revoke failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

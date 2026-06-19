@@ -17,6 +17,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
@@ -24,6 +25,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { MessagingService } from '../../messaging/services/messaging.service';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride } from '@shared/interfaces/monthly-subscription.interface';
@@ -51,6 +53,7 @@ import { Course } from '@shared/interfaces/course.interface';
     ConfirmDialogModule,
     InputTextModule,
     AmountPipe,
+    CheckboxModule,
   ],
   providers: [ConfirmationService],
   templateUrl: './monthly-subscriptions-dashboard.component.html',
@@ -96,6 +99,10 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   overrideYear = new Date().getFullYear();
   overrideMonth = new Date().getMonth() + 1;
 
+  // ── Payment reminder messaging ──────────────────────────────────────────────
+  selectedPaymentIds = signal<Set<string>>(new Set());
+  sendingReminders = signal(false);
+
   // ── Barcode scan → collect payment ──────────────────────────────────────────
   // Scan a student's barcode, pick one of their due months, then drop into the
   // existing Record Payment dialog for that month.
@@ -127,6 +134,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private auth: AuthService,
     private translate: TranslateService,
     private confirm: ConfirmationService,
+    private messagingService: MessagingService,
   ) {}
 
   ngOnInit(): void {
@@ -531,6 +539,66 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_ERROR'));
       },
     });
+  }
+
+  // ── Payment reminder messaging methods ────────────────────────────────────
+
+  togglePaymentSelection(paymentId: string, selected: boolean) {
+    this.selectedPaymentIds.update(s => {
+      const next = new Set(s);
+      if (selected) next.add(paymentId); else next.delete(paymentId);
+      return next;
+    });
+  }
+
+  isPaymentSelected(paymentId: string): boolean {
+    return this.selectedPaymentIds().has(paymentId);
+  }
+
+  get selectedUnpaidPayments(): MonthlyPaymentWithDetails[] {
+    const ids = this.selectedPaymentIds();
+    return this.filteredPayments().filter(p => ids.has(p.id) && p.paymentStatus !== 'PAID');
+  }
+
+  selectAllUnpaid() {
+    const unpaid = this.filteredPayments().filter(p => p.paymentStatus !== 'PAID');
+    this.selectedPaymentIds.set(new Set(unpaid.map(p => p.id)));
+  }
+
+  clearSelection() {
+    this.selectedPaymentIds.set(new Set());
+  }
+
+  sendPaymentReminders() {
+    const selected = this.selectedUnpaidPayments;
+    if (selected.length === 0) {
+      this.notify.info(this.translate.instant('MESSAGING.NO_STUDENTS_SELECTED'));
+      return;
+    }
+    this.sendingReminders.set(true);
+    let sent = 0, failed = 0, completed = 0;
+    const total = selected.length;
+    for (const p of selected) {
+      const remaining = p.amountDue - p.amountPaid;
+      this.messagingService.send('PAYMENT_DELAY', p.studentId, {
+        amount: String(remaining),
+        currency: '',
+        courseName: p.courseName,
+        dueDate: new Date(p.dueDate).toLocaleDateString('en-GB'),
+      }).subscribe({
+        next: () => { sent++; completed++; this.checkRemindersDone(completed, total, sent, failed); },
+        error: () => { failed++; completed++; this.checkRemindersDone(completed, total, sent, failed); },
+      });
+    }
+  }
+
+  private checkRemindersDone(completed: number, total: number, sent: number, failed: number) {
+    if (completed < total) return;
+    this.sendingReminders.set(false);
+    this.clearSelection();
+    this.notify.success(
+      this.translate.instant('MESSAGING.BULK_SENT_RESULT', { sent, skipped: failed }),
+    );
   }
 
   private formatDate(d: Date): string {

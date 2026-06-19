@@ -759,4 +759,29 @@ export const monthlySubscriptionsRoutes = {
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to delete price override', 400);
     }
   },
+
+  /** GET /api/monthly-subscriptions/price-overrides/:courseId — list all overrides for a course */
+  listPriceOverrides: async ({ params, headers }: { params: { courseId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const rows = await query(
+        `SELECT * FROM course_monthly_price_overrides
+         WHERE course_id = $1 AND company_id = $2
+         ORDER BY billing_year DESC, billing_month DESC`,
+        [params.courseId, context.companyId]
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map(mapOverrideFromDB),
+      };
+    } catch (error) {
+      console.error('List price overrides error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to list price overrides');
+    }
+  },
 };
