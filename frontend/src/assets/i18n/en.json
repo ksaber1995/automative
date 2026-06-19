@@ -1912,7 +1912,10 @@
     "ALL_CAUGHT_UP": "All caught up! No due expenses for this month.",
     "PAY_NOW": "Pay Now",
     "TOP_BRANCHES": "Top Performing Branches",
-    "ITEM_PAID": "{{label}} paid successfully"
+    "ITEM_PAID": "{{label}} paid successfully",
+    "DUE_TYPE_RECURRING": "Recurring",
+    "DUE_TYPE_SALARY": "Salary",
+    "DUE_TYPE_INSTALLMENT": "Installment"
   },
   "EMPLOYEES": {
     "LIST": {

@@ -1912,7 +1912,10 @@
     "ALL_CAUGHT_UP": "ممتاز! لا توجد مصروفات مستحقة هذا الشهر.",
     "PAY_NOW": "ادفع الآن",
     "TOP_BRANCHES": "أفضل الفروع أداءً",
-    "ITEM_PAID": "تم دفع {{label}} بنجاح"
+    "ITEM_PAID": "تم دفع {{label}} بنجاح",
+    "DUE_TYPE_RECURRING": "متكرر",
+    "DUE_TYPE_SALARY": "راتب",
+    "DUE_TYPE_INSTALLMENT": "قسط"
   },
   "EMPLOYEES": {
     "LIST": {
