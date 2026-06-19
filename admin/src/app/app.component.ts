@@ -275,7 +275,7 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
     </div>
   `,
   styles: [`
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 60px; }
+    .wrap {  margin: 0 auto; padding: 32px 20px 60px; }
     header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { margin: 0; font-size: 24px; }
     .sub { margin: 4px 0 0; color: #64748b; font-size: 14px; }
