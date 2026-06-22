@@ -1,0 +1,165 @@
+<div class="p-6">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_HISTORY.TITLE' | translate }}</h1>
+    <p class="text-gray-500 mt-1">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex items-end gap-3 mb-6 flex-wrap">
+    @if (!isTeacher()) {
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500">{{ 'SESSION_HISTORY.FILTER_BRANCH' | translate }}</label>
+        <p-select
+          [options]="branches()"
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="onBranchChange($event)"
+          optionLabel="name"
+          optionValue="id"
+          appendTo="body"
+          [filter]="true"
+          filterBy="name"
+          [placeholder]="'SESSION_HISTORY.ALL_BRANCHES' | translate"
+          [showClear]="true"
+          [style]="{ width: '200px' }"
+        ></p-select>
+      </div>
+    }
+
+    <div class="flex flex-col gap-1">
+      <label class="text-xs text-gray-500">{{ 'SESSION_HISTORY.FILTER_COURSE' | translate }}</label>
+      <p-select
+        [options]="courses()"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseChange($event)"
+        optionLabel="name"
+        optionValue="id"
+        appendTo="body"
+        [filter]="true"
+        filterBy="name"
+        [placeholder]="'SESSION_HISTORY.ALL_COURSES' | translate"
+        [showClear]="true"
+        [style]="{ width: '200px' }"
+      ></p-select>
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-xs text-gray-500">{{ 'SESSION_HISTORY.FILTER_CLASS' | translate }}</label>
+      <p-select
+        [options]="filteredClasses()"
+        [ngModel]="selectedClassId()"
+        (ngModelChange)="onClassChange($event)"
+        optionLabel="name"
+        optionValue="id"
+        appendTo="body"
+        [filter]="true"
+        filterBy="name"
+        [placeholder]="'SESSION_HISTORY.ALL_CLASSES' | translate"
+        [showClear]="true"
+        [style]="{ width: '200px' }"
+      ></p-select>
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-xs text-gray-500">{{ 'SESSION_HISTORY.FILTER_STUDENT' | translate }}</label>
+      <p-select
+        [options]="studentOptions()"
+        [ngModel]="selectedStudentId()"
+        (ngModelChange)="onStudentChange($event)"
+        optionLabel="name"
+        optionValue="id"
+        appendTo="body"
+        [filter]="true"
+        filterBy="name"
+        [placeholder]="'SESSION_HISTORY.ALL_STUDENTS' | translate"
+        [showClear]="true"
+        [style]="{ width: '220px' }"
+      ></p-select>
+    </div>
+
+    @if (selectedStudentId()) {
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500">{{ 'SESSION_HISTORY.FILTER_ATTENDANCE' | translate }}</label>
+        <p-select
+          [options]="attendanceOptions"
+          [ngModel]="selectedAttendance()"
+          (ngModelChange)="onAttendanceChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          appendTo="body"
+          [style]="{ width: '160px' }"
+        ></p-select>
+      </div>
+    }
+
+    @if (hasFilters()) {
+      <p-button
+        [label]="'SESSION_HISTORY.CLEAR_FILTERS' | translate"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        size="small"
+        (onClick)="clearFilters()"
+      ></p-button>
+    }
+  </div>
+
+  <!-- History table -->
+  <p-table
+    [value]="sessions()"
+    [loading]="loading()"
+    [paginator]="true"
+    [rows]="15"
+    [rowsPerPageOptions]="[15, 30, 50]"
+    responsiveLayout="scroll"
+    styleClass="mt-2"
+  >
+    <ng-template pTemplate="header">
+      <tr>
+        @if (!isTeacher()) {
+          <th pSortableColumn="roomCode">{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+        }
+        <th pSortableColumn="className">{{ 'SESSIONS_DASHBOARD.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
+        <th pSortableColumn="courseName">{{ 'SESSIONS_DASHBOARD.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+        <th pSortableColumn="startDate">{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
+        <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
+        <th pSortableColumn="durationMinutes">{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
+        @if (showAttendanceCol()) {
+          <th pSortableColumn="studentPresent">{{ 'SESSION_HISTORY.COL_ATTENDANCE' | translate }} <p-sortIcon field="studentPresent"></p-sortIcon></th>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-session>
+      <tr>
+        @if (!isTeacher()) {
+          <td class="font-semibold text-indigo-700">{{ session.roomCode }}</td>
+        }
+        <td>{{ session.className }}</td>
+        <td class="text-sm text-gray-500">{{ session.courseName }}</td>
+        <td class="text-sm">{{ formatDateTime(session.startDate) }}</td>
+        <td class="text-sm">{{ session.endDate ? formatDateTime(session.endDate) : '—' }}</td>
+        <td class="text-sm">
+          @if (session.durationMinutes) {
+            {{ formatDuration(session.durationMinutes) }}
+          } @else if (!session.endDate) {
+            <span class="text-orange-600">{{ getDuration(session.startDate) }}</span>
+          } @else {
+            —
+          }
+        </td>
+        @if (showAttendanceCol()) {
+          <td>
+            <p-tag
+              [value]="(session.studentPresent ? 'SESSION_HISTORY.PRESENT' : 'SESSION_HISTORY.ABSENT') | translate"
+              [severity]="session.studentPresent ? 'success' : 'danger'"
+            ></p-tag>
+          </td>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td [attr.colspan]="historyColspan()" class="text-center py-8 text-gray-400">{{ 'SESSIONS_DASHBOARD.NO_SESSIONS' | translate }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

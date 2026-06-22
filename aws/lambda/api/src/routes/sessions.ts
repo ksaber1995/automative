@@ -109,6 +109,7 @@ function mapSessionWithDetailsFromDB(row: any) {
     courseName: row.course_name,
     branchName: row.branch_name,
     durationMinutes,
+    studentPresent: row.student_present === null || row.student_present === undefined ? null : !!row.student_present,
   };
 }
 
@@ -410,12 +411,26 @@ export const sessionsRoutes = {
     }
   },
 
-  list: async ({ query: queryParams, headers }: { query: { branchId?: string; classId?: string; roomId?: string }; headers: { authorization: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; classId?: string; roomId?: string; courseId?: string; studentId?: string; attendance?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+
+      const params: any[] = [context.companyId];
+
+      // When filtering by student, expose whether that student was present
+      // (has an attendance row) for each session. Reserve the param slot up
+      // front so it can be reused in SELECT and WHERE.
+      let studentIdx: number | null = null;
+      if (queryParams.studentId) {
+        params.push(queryParams.studentId);
+        studentIdx = params.length;
+      }
+      const presentExpr = studentIdx
+        ? `EXISTS (SELECT 1 FROM session_attendance sa WHERE sa.session_id = s.id AND sa.student_id = $${studentIdx}) AS student_present`
+        : `NULL::boolean AS student_present`;
 
       let sql = `
         SELECT
@@ -424,7 +439,8 @@ export const sessionsRoutes = {
           r.description as room_description,
           cl.name as class_name,
           co.name as course_name,
-          b.name as branch_name
+          b.name as branch_name,
+          ${presentExpr}
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN classes cl ON s.class_id = cl.id
@@ -432,7 +448,6 @@ export const sessionsRoutes = {
         LEFT JOIN branches b ON s.branch_id = b.id
         WHERE s.company_id = $1
       `;
-      const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
@@ -450,9 +465,30 @@ export const sessionsRoutes = {
         sql += ` AND s.class_id = $${params.length}`;
       }
 
+      if (queryParams.courseId) {
+        params.push(queryParams.courseId);
+        sql += ` AND cl.course_id = $${params.length}`;
+      }
+
       if (queryParams.roomId) {
         params.push(queryParams.roomId);
         sql += ` AND s.room_id = $${params.length}`;
+      }
+
+      if (studentIdx) {
+        // Sessions of classes the student is enrolled in (direct or via a bundle),
+        // so sessions where the student was ABSENT are still included.
+        sql += ` AND EXISTS (
+            SELECT 1 FROM enrollments en WHERE en.class_id = s.class_id AND en.student_id = $${studentIdx}
+            UNION ALL
+            SELECT 1 FROM master_class_enrollments mce WHERE mce.class_id = s.class_id AND mce.student_id = $${studentIdx}
+          )`;
+        // Present/Absent filter for that student.
+        if (queryParams.attendance === 'PRESENT') {
+          sql += ` AND EXISTS (SELECT 1 FROM session_attendance sa2 WHERE sa2.session_id = s.id AND sa2.student_id = $${studentIdx})`;
+        } else if (queryParams.attendance === 'ABSENT') {
+          sql += ` AND NOT EXISTS (SELECT 1 FROM session_attendance sa2 WHERE sa2.session_id = s.id AND sa2.student_id = $${studentIdx})`;
+        }
       }
 
       sql += ' ORDER BY s.start_date DESC';

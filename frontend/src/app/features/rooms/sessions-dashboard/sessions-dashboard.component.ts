@@ -208,7 +208,6 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   activeSessions = signal<Session[]>([]);
-  allSessions = signal<Session[]>([]);
   rooms = signal<Room[]>([]);
   branches = signal<Branch[]>([]);
   activeClasses = signal<any[]>([]);
@@ -249,11 +248,10 @@ export class SessionsDashboardComponent implements OnInit {
   });
 
   loadingActive = signal(true);
-  loadingHistory = signal(true);
   loadingRooms = signal(true);
   saving = signal(false);
 
-  activeTab = 'upcoming';
+  activeTab = 'active';
   showStartDialog = false;
   showEndDialog = false;
   endingSession = signal<Session | null>(null);
@@ -314,12 +312,6 @@ export class SessionsDashboardComponent implements OnInit {
     return this.activeSessions().filter((s: Session) => s.branchId === branchId);
   });
 
-  filteredAllSessions = computed(() => {
-    const branchId = this.selectedBranchId();
-    if (!branchId) return this.allSessions();
-    return this.allSessions().filter((s: Session) => s.branchId === branchId);
-  });
-
   filteredOccupiedRooms = computed(() => this.filteredRooms().filter((r: Room) => r.isOccupied));
   filteredFreeRooms = computed(() => this.filteredRooms().filter((r: Room) => !r.isOccupied && r.isActive));
 
@@ -351,7 +343,6 @@ export class SessionsDashboardComponent implements OnInit {
   loadAll() {
     this.loadActiveSessions();
     this.loadRooms();
-    this.loadHistory();
     this.loadClasses();
     this.loadEmployees();
   }
@@ -382,14 +373,6 @@ export class SessionsDashboardComponent implements OnInit {
     this.roomService.list().subscribe({
       next: (r: Room[]) => { this.rooms.set(r); this.loadingRooms.set(false); },
       error: () => this.loadingRooms.set(false),
-    });
-  }
-
-  loadHistory() {
-    this.loadingHistory.set(true);
-    this.sessionService.list().subscribe({
-      next: (s: Session[]) => { this.allSessions.set(s); this.loadingHistory.set(false); },
-      error: () => this.loadingHistory.set(false),
     });
   }
 

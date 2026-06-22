@@ -55,20 +55,20 @@
   </div>
 
   <!-- Tabs -->
-  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'upcoming'">
+  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'active'">
     <p-tablist>
-      <p-tab value="upcoming">
-        <i class="pi pi-clock text-blue-500 mr-2"></i>
-        {{ 'SESSIONS_DASHBOARD.TAB_UPCOMING' | translate }}
-        @if (filteredUpcoming().length > 0) {
-          <span class="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ filteredUpcoming().length }}</span>
-        }
-      </p-tab>
       <p-tab value="active">
         <i class="pi pi-circle-fill text-green-500 mr-2"></i>
         {{ 'SESSIONS_DASHBOARD.TAB_ACTIVE' | translate }}
         @if (filteredActiveSessions().length > 0) {
           <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ filteredActiveSessions().length }}</span>
+        }
+      </p-tab>
+      <p-tab value="upcoming">
+        <i class="pi pi-clock text-blue-500 mr-2"></i>
+        {{ 'SESSIONS_DASHBOARD.TAB_UPCOMING' | translate }}
+        @if (filteredUpcoming().length > 0) {
+          <span class="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ filteredUpcoming().length }}</span>
         }
       </p-tab>
       @if (!isTeacher()) {
@@ -77,10 +77,6 @@
           {{ 'SESSIONS_DASHBOARD.TAB_ROOMS' | translate }}
         </p-tab>
       }
-      <p-tab value="history">
-        <i class="pi pi-history mr-2"></i>
-        {{ 'SESSIONS_DASHBOARD.TAB_HISTORY' | translate }}
-      </p-tab>
     </p-tablist>
 
     <p-tabpanels>
@@ -617,58 +613,6 @@
       </p-tabpanel>
       }
 
-      <!-- History Tab -->
-      <p-tabpanel value="history">
-        <p-table
-          [value]="filteredAllSessions()"
-          [loading]="loadingHistory()"
-          [paginator]="true"
-          [rows]="15"
-          responsiveLayout="scroll"
-          styleClass="mt-4"
-        >
-          <ng-template pTemplate="header">
-            <tr>
-              <th pSortableColumn="roomCode">{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
-              <th pSortableColumn="className">{{ 'SESSIONS_DASHBOARD.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
-              <th pSortableColumn="courseName">{{ 'SESSIONS_DASHBOARD.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
-              <th pSortableColumn="startDate">{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
-              <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
-              <th pSortableColumn="durationMinutes">{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
-              <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_STATUS' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-session>
-            <tr>
-              <td class="font-semibold text-indigo-700">{{ session.roomCode }}</td>
-              <td>{{ session.className }}</td>
-              <td class="text-sm text-gray-500">{{ session.courseName }}</td>
-              <td class="text-sm">{{ formatDateTime(session.startDate) }}</td>
-              <td class="text-sm">{{ session.endDate ? formatDateTime(session.endDate) : '—' }}</td>
-              <td class="text-sm">
-                @if (session.durationMinutes) {
-                  {{ formatDuration(session.durationMinutes) }}
-                } @else if (!session.endDate) {
-                  <span class="text-orange-600">{{ getDuration(session.startDate) }}</span>
-                } @else {
-                  —
-                }
-              </td>
-              <td>
-                <p-tag
-                  [value]="(session.endDate ? 'SESSIONS_DASHBOARD.STATUS_ENDED' : 'SESSIONS_DASHBOARD.STATUS_ACTIVE') | translate"
-                  [severity]="session.endDate ? 'secondary' : 'success'"
-                ></p-tag>
-              </td>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="emptymessage">
-            <tr>
-              <td colspan="7" class="text-center py-8 text-gray-400">{{ 'SESSIONS_DASHBOARD.NO_SESSIONS' | translate }}</td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </p-tabpanel>
     </p-tabpanels>
   </p-tabs>
 </div>

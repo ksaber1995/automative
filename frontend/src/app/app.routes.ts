@@ -182,6 +182,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/rooms/session-attendance/session-attendance.component').then(m => m.SessionAttendanceComponent)
       },
       {
+        path: 'session-history',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.SESSION_HISTORY' },
+        loadComponent: () => import('./features/rooms/session-history/session-history.component').then(m => m.SessionHistoryComponent)
+      },
+      {
         path: 'timetable',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.TIMETABLE' },

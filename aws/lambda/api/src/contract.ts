@@ -4709,6 +4709,9 @@ export const contract = c.router({
         branchId: z.string().optional(),
         classId: z.string().optional(),
         roomId: z.string().optional(),
+        courseId: z.string().optional(),
+        studentId: z.string().optional(),
+        attendance: z.enum(['PRESENT', 'ABSENT']).optional(),
       }),
       responses: {
         200: z.array(z.any()),

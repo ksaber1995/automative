@@ -21,6 +21,8 @@ export interface Session {
   courseName?: string;
   branchName?: string;
   durationMinutes?: number | null;
+  /** When filtering history by a student: was that student present this session? (null otherwise) */
+  studentPresent?: boolean | null;
 }
 
 export interface StartSessionTeacher {
@@ -43,7 +45,7 @@ export interface StartSessionDto {
 export class SessionService {
   private api = inject(ApiService);
 
-  list(filters?: { branchId?: string; classId?: string; roomId?: string }): Observable<Session[]> {
+  list(filters?: { branchId?: string; classId?: string; roomId?: string; courseId?: string; studentId?: string; attendance?: string }): Observable<Session[]> {
     return this.api.get<Session[]>('sessions', filters);
   }
 
