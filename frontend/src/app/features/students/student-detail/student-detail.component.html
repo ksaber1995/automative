@@ -1,5 +1,70 @@
 <div class="container mx-auto p-6">
   <p-confirmDialog></p-confirmDialog>
+
+  <!-- Change Class Dialog -->
+  <p-dialog
+    [header]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
+    [(visible)]="showChangeClassDialog"
+    [modal]="true"
+    [style]="{ width: '460px' }"
+  >
+    @if (changeClassCurrentName()) {
+      <p class="text-sm text-gray-500 mb-3">
+        {{ 'STUDENTS.DETAIL.CHANGE_CLASS_CURRENT' | translate }}:
+        <span class="font-medium text-gray-700">{{ changeClassCurrentName() }}</span>
+      </p>
+    }
+
+    @if (changeClassLoading()) {
+      <div class="flex items-center justify-center py-8 text-gray-300"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
+    } @else if (changeClassOptions().length === 0) {
+      <p class="text-sm text-gray-400 py-6 text-center">{{ 'STUDENTS.DETAIL.CHANGE_CLASS_NONE' | translate }}</p>
+    } @else {
+      <div class="flex flex-col gap-2 max-h-80 overflow-auto">
+        @for (cls of changeClassOptions(); track cls.id) {
+          <button
+            type="button"
+            class="flex items-center justify-between border rounded-lg px-3 py-2 text-left transition"
+            [class.border-indigo-400]="selectedChangeClass()?.id === cls.id"
+            [class.bg-indigo-50]="selectedChangeClass()?.id === cls.id"
+            [class.border-gray-200]="selectedChangeClass()?.id !== cls.id"
+            (click)="selectedChangeClass.set(cls)"
+          >
+            <span class="font-medium text-gray-800">{{ cls.name }}</span>
+            <span class="text-xs flex items-center gap-2">
+              @if (cls.maxStudents) {
+                <span [class.text-red-600]="isClassFull(cls)" [class.text-gray-500]="!isClassFull(cls)">
+                  <i class="pi pi-users mr-1"></i>{{ classCount(cls) }}/{{ cls.maxStudents }}
+                </span>
+                @if (isClassFull(cls)) {
+                  <span class="text-red-600 font-medium">{{ 'STUDENTS.DETAIL.CHANGE_CLASS_FULL' | translate }}</span>
+                }
+              }
+            </span>
+          </button>
+        }
+      </div>
+
+      @if (isClassFull(selectedChangeClass())) {
+        <div class="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5"></i>
+          <p class="text-sm text-amber-700">{{ 'STUDENTS.DETAIL.CHANGE_CLASS_FULL_WARNING' | translate }}</p>
+        </div>
+      }
+    }
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showChangeClassDialog = false"></p-button>
+      <p-button
+        [label]="'STUDENTS.DETAIL.CHANGE_CLASS_CONFIRM' | translate"
+        icon="pi pi-arrow-right-arrow-left"
+        [disabled]="!selectedChangeClass()"
+        [loading]="changeClassSubmitting()"
+        (onClick)="submitChangeClass()"
+      ></p-button>
+    </ng-template>
+  </p-dialog>
+
   @if (student(); as s) {
     <!-- QR code dialog -->
     <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)" (activated)="onQrRegenerated($event)"></app-student-qr-dialog>
@@ -577,6 +642,14 @@
                       [pTooltip]="'STUDENTS.DETAIL.DELETE_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
+                  <p-button
+                    icon="pi pi-arrow-right-arrow-left"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="info"
+                    (onClick)="openChangeClassDialog(enrollment)"
+                    [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
+                  ></p-button>
                 </div>
               } @else {
               <div class="flex gap-1">
@@ -609,6 +682,14 @@
                   severity="secondary"
                   (onClick)="editEnrollment(enrollment)"
                   [pTooltip]="'STUDENTS.DETAIL.EDIT_ENROLLMENT' | translate"
+                ></p-button>
+                <p-button
+                  icon="pi pi-arrow-right-arrow-left"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="info"
+                  (onClick)="openChangeClassDialog(enrollment)"
+                  [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
                 ></p-button>
               </div>
               }

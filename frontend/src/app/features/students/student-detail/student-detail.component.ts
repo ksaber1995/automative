@@ -36,7 +36,7 @@ import { Student } from '@shared/interfaces/student.interface';
 import { StudentExamResult } from '@shared/interfaces/exam.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
-import { Class } from '@shared/interfaces/class.interface';
+import { Class, ClassWithDetails } from '@shared/interfaces/class.interface';
 import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
 import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
@@ -196,6 +196,25 @@ export class StudentDetailComponent implements OnInit {
   selectedJoinClass = signal<Class | null>(null);
   private joinBundleCourseId: string | null = null;
   private joinBundleMasterEnrollmentId: string | null = null;
+
+  // ── Change-class dialog ─────────────────────────────────────────────────────
+  showChangeClassDialog = false;
+  changeClassEnrollment = signal<Enrollment | null>(null);
+  changeClassCurrentName = signal<string>('');
+  changeClassOptions = signal<ClassWithDetails[]>([]);
+  changeClassLoading = signal(false);
+  changeClassSubmitting = signal(false);
+  selectedChangeClass = signal<ClassWithDetails | null>(null);
+
+  /** Live student count for a class (live COUNT, falling back to the stored counter). */
+  classCount(cls: ClassWithDetails): number {
+    return cls.studentCount ?? cls.currentEnrollment ?? 0;
+  }
+
+  /** Is a class at or over its max capacity? (warn-but-allow) */
+  isClassFull(cls: ClassWithDetails | null): boolean {
+    return !!cls && cls.maxStudents != null && this.classCount(cls) >= cls.maxStudents;
+  }
 
   // Books & Products purchases attributed to this student.
   bookPurchases = signal<ProductSale[]>([]);
@@ -478,6 +497,48 @@ export class StudentDetailComponent implements OnInit {
   hasAnyMonthlyPayment(enrollmentId: string): boolean {
     const payments = this.monthlyByEnrollment().get(enrollmentId) || [];
     return payments.some(p => (p.amountPaid || 0) > 0);
+  }
+
+  /** Open the change-class dialog: load the OTHER active classes of this course. */
+  openChangeClassDialog(enrollment: Enrollment) {
+    this.changeClassEnrollment.set(enrollment);
+    this.selectedChangeClass.set(null);
+    this.changeClassCurrentName.set('');
+    this.changeClassOptions.set([]);
+    this.changeClassLoading.set(true);
+    this.showChangeClassDialog = true;
+    this.classService.getClassesByCourse(enrollment.courseId).subscribe({
+      next: (classes) => {
+        const all = classes as ClassWithDetails[];
+        const current = all.find(c => c.id === enrollment.classId);
+        this.changeClassCurrentName.set(current?.name ?? '');
+        // Other classes only: active, not finished/done, and not the current one.
+        this.changeClassOptions.set(
+          all.filter(c => c.id !== enrollment.classId && c.isActive && c.status !== 'DONE' && c.isFinished !== true),
+        );
+        this.changeClassLoading.set(false);
+      },
+      error: () => this.changeClassLoading.set(false),
+    });
+  }
+
+  submitChangeClass() {
+    const enrollment = this.changeClassEnrollment();
+    const target = this.selectedChangeClass();
+    if (!enrollment || !target) return;
+    this.changeClassSubmitting.set(true);
+    this.enrollmentService.changeClass(enrollment.id, target.id).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.CLASS_CHANGED'));
+        this.changeClassSubmitting.set(false);
+        this.showChangeClassDialog = false;
+        if (this.studentId) this.loadEnrollments(this.studentId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.changeClassSubmitting.set(false);
+      },
+    });
   }
 
   deleteMonthlyEnrollment(enrollment: Enrollment) {

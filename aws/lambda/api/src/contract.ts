@@ -2563,6 +2563,17 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    changeClass: {
+      method: 'POST',
+      path: '/api/enrollments/:id/change-class',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ classId: UUIDSchema }),
+      responses: {
+        200: EnrollmentSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
   },
 
   // Revenues routes (Read-only - calculated from enrollments and product sales)

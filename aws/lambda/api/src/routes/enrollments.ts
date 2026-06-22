@@ -959,4 +959,46 @@ export const enrollmentsRoutes = {
       return mapThrownError(error, 'ERRORS.ENROLLMENTS.RESUME_FAILED', 'Failed to resume subscription');
     }
   },
+
+  /**
+   * POST /api/enrollments/:id/change-class
+   * Move a student to a DIFFERENT class of the SAME course. Capacity is not
+   * enforced here (the UI warns when the target is full but allows the move).
+   */
+  changeClass: async ({ params, body, headers }: { params: { id: string }; body: { classId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const enrollment = await queryOne(
+        `SELECT * FROM enrollments WHERE id = $1 AND company_id = $2`,
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+
+      // Target class must exist in this company, belong to the SAME course, and not be finished.
+      const targetClass = await queryOne(
+        `SELECT c.id, c.course_id, c.is_finished
+           FROM classes c
+           INNER JOIN courses co ON c.course_id = co.id
+          WHERE c.id = $1 AND co.company_id = $2`,
+        [body.classId, context.companyId]
+      );
+      if (!targetClass) return apiError(404, 'ERRORS.ENROLLMENTS.CLASS_NOT_FOUND', 'Class not found');
+      if (targetClass.course_id !== enrollment.course_id) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.CLASS_DIFFERENT_COURSE', 'You can only move to a class in the same course');
+      }
+      if (targetClass.is_finished) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.CLASS_FINISHED', 'This class is finished. Enrollment is closed.');
+      }
+
+      const updated = await update('enrollments', params.id, { class_id: body.classId });
+      return { status: 200 as const, body: mapEnrollmentFromDB(updated) };
+    } catch (error) {
+      console.error('Change class error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.CHANGE_CLASS_FAILED', 'Failed to change class');
+    }
+  },
 };

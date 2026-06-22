@@ -57,4 +57,9 @@ export class EnrollmentService {
   resumeSubscription(enrollmentId: string): Observable<Enrollment> {
     return this.api.post<Enrollment>(`enrollments/${enrollmentId}/resume`, {});
   }
+
+  /** Move the enrollment to a different class of the same course. */
+  changeClass(enrollmentId: string, classId: string): Observable<Enrollment> {
+    return this.api.post<Enrollment>(`enrollments/${enrollmentId}/change-class`, { classId });
+  }
 }
