@@ -532,6 +532,8 @@
     "SCAN_PICK_MONTH": "اختر شهرًا للدفع",
     "SCAN_PICK_MONTH_HINT": "اختر شهرًا مستحقًا لتسجيل الدفعة",
     "SCAN_NO_DUE": "لا توجد أشهر مستحقة على {{name}}.",
+    "MARK_PRESENT_OPTION": "تسجيل الحضور أيضًا في {{class}} (الحصة جارية)",
+    "ATTENDANCE_MARKED": "تم تسجيل حضور {{name}} في {{class}}",
     "MONTHS": {
       "1": "يناير",
       "2": "فبراير",
@@ -1682,6 +1684,7 @@
       "COL_ACTIONS": "الإجراءات",
       "BUNDLE_PREFIX": "الباقة:",
       "VIEW_STUDENT": "عرض الطالب",
+      "SEARCH_STUDENTS": "ابحث عن طالب بالاسم…",
       "NO_STUDENTS_ENROLLED": "لا يوجد طلاب مسجلون",
       "ENR_STATUS_ACTIVE": "نشط",
       "ENR_STATUS_COMPLETED": "مكتمل",
@@ -3697,8 +3700,12 @@
     "ATT_PRESENT": "الحاضرون فقط",
     "ATT_ABSENT": "الغائبون فقط",
     "COL_ATTENDANCE": "الحضور",
+    "COL_PRESENT_ABSENT": "حاضر / غائب",
     "PRESENT": "حاضر",
     "ABSENT": "غائب",
+    "PRESENT_LIST": "الطلاب الحاضرون",
+    "ABSENT_LIST": "الطلاب الغائبون",
+    "LOADING_ATTENDANCE": "جارٍ تحميل الحضور…",
     "CLEAR_FILTERS": "مسح الفلاتر"
   },
   "SESSIONS_DASHBOARD": {

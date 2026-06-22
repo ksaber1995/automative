@@ -18,6 +18,7 @@ import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../att
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
@@ -72,6 +73,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
+  private globalScan = inject(GlobalScanService);
+  // Stable reference so the app-wide scan handler can be unregistered on destroy.
+  private readonly scanHandler = (token: string) => this.checkin(token);
 
   sessionId = '';
   session = signal<Session | null>(null);
@@ -184,6 +188,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.loadEmployees();
     // Warm the click-to-chat templates cache (fire-and-forget).
     this.templatesSvc.load().subscribe({ error: () => {} });
+
+    // Take over the app-wide scanner while this page is open: a scan checks the
+    // student into THIS session instead of navigating to their detail page.
+    this.globalScan.register(this.scanHandler);
   }
 
   loadStudents() {
@@ -580,6 +588,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.globalScan.unregister(this.scanHandler);
     this.stopCamera();
     this.audioCtx?.close().catch(() => {});
     if (this.saveTimer) clearTimeout(this.saveTimer);

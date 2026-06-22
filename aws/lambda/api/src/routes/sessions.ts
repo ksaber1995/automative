@@ -547,6 +547,66 @@ export const sessionsRoutes = {
     }
   },
 
+  /**
+   * GET /api/sessions/active-for-student/:studentId
+   * The student's currently-running session (end_date IS NULL AND started),
+   * for a class they're enrolled in, scoped to the caller's branches. Returns
+   * the session info or null. Used so collecting a monthly payment by scan can
+   * offer to mark the student present at the same time.
+   */
+  activeForStudent: async ({ params, headers }: { params: { studentId: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureStartedColumn();
+      await ensureAttendanceMagicColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const sqlParams: any[] = [context.companyId, params.studentId];
+      let sql = `
+        SELECT s.id, s.class_id, s.session_number,
+               cl.name AS class_name, co.name AS course_name, r.code AS room_code
+        FROM sessions s
+        JOIN classes cl ON cl.id = s.class_id
+        LEFT JOIN courses co ON co.id = cl.course_id
+        LEFT JOIN rooms r ON r.id = s.room_id
+        WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+          AND s.class_id IN (
+            SELECT class_id FROM enrollments
+            WHERE company_id = $1 AND student_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT class_id FROM master_class_enrollments
+            WHERE company_id = $1 AND student_id = $2 AND status != 'DROPPED'
+          )
+      `;
+      const branchClause = appendBranchSqlFilter(context, sqlParams, 's.branch_id');
+      if (branchClause) sql += ` AND ${branchClause}`;
+      sql += ' ORDER BY s.start_date DESC LIMIT 1';
+
+      const row = await queryOne<any>(sql, sqlParams);
+      if (!row) {
+        return { status: 200 as const, body: null };
+      }
+      return {
+        status: 200 as const,
+        body: {
+          sessionId: row.id,
+          classId: row.class_id,
+          className: row.class_name,
+          courseName: row.course_name,
+          roomCode: row.room_code ?? null,
+          sessionNumber: row.session_number === null || row.session_number === undefined
+            ? null
+            : parseInt(row.session_number, 10),
+        },
+      };
+    } catch (error) {
+      console.error('Active session for student error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.LIST_FAILED', 'Failed to find active session');
+    }
+  },
+
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

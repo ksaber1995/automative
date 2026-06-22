@@ -404,6 +404,16 @@
         <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.NOTES' | translate }}</label>
         <textarea pTextarea [(ngModel)]="payNotes" rows="2" class="w-full"></textarea>
       </div>
+
+      <!-- Offered only when the scanned student has a session in progress. -->
+      @if (scanActiveSession(); as sess) {
+        <div class="flex items-start gap-2 rounded-md bg-blue-50 p-3">
+          <p-checkbox [ngModel]="markAttendance()" (ngModelChange)="markAttendance.set($event)" [binary]="true" inputId="markAttendance"></p-checkbox>
+          <label for="markAttendance" class="text-sm text-gray-700 cursor-pointer">
+            {{ 'MONTHLY_SUBSCRIPTIONS.MARK_PRESENT_OPTION' | translate: { class: sess.className } }}
+          </label>
+        </div>
+      }
     </div>
   }
   <ng-template pTemplate="footer">

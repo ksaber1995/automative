@@ -17,9 +17,13 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { SessionService, ActiveSessionInfo } from '../../rooms/services/session.service';
+import { AttendanceService } from '../../rooms/services/attendance.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -52,6 +56,7 @@ import { Course } from '@shared/interfaces/course.interface';
     DatePickerModule,
     TextareaModule,
     ConfirmDialogModule,
+    CheckboxModule,
     InputTextModule,
     AmountPipe,
   ],
@@ -118,6 +123,16 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   private lastTokenAt = 0;
   private readonly SCAN_DEDUP_MS = 2500;
 
+  // ── Scan-to-pay + same-time attendance ───────────────────────────────────
+  // The token of the student resolved by the most recent scan, and their
+  // currently-running session (if any) so we can offer to mark them present
+  // while collecting payment. Set on scan; cleared when the pay dialog closes.
+  private scannedToken = signal('');
+  scanActiveSession = signal<ActiveSessionInfo | null>(null);
+  markAttendance = signal(true);
+  // Stable reference so the global scan handler can be unregistered on destroy.
+  private readonly scanHandler = (token: string) => this.resolveToken(token);
+
   get isRtl(): boolean {
     return document.documentElement.dir === 'rtl';
   }
@@ -133,6 +148,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private translate: TranslateService,
     private confirm: ConfirmationService,
     private templatesSvc: WhatsappTemplatesService,
+    private globalScan: GlobalScanService,
+    private sessionService: SessionService,
+    private attendanceService: AttendanceService,
   ) {}
 
   ngOnInit(): void {
@@ -151,6 +169,10 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     // Warm the click-to-chat template cache (fire-and-forget).
     this.templatesSvc.load().subscribe({ error: () => {} });
 
+    // Take over the app-wide scanner while this page is open: a scan runs the
+    // pay flow here instead of navigating to the student's detail page.
+    this.globalScan.register(this.scanHandler);
+
     forkJoin({
       branches: this.branchSvc.getAllBranches(),
       courses: this.courseSvc.getAllCourses(),
@@ -163,6 +185,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.globalScan.unregister(this.scanHandler);
     this.stopCamera();
     this.destroy$.next();
     this.destroy$.complete();
@@ -246,11 +269,19 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   private resolveToken(token: string): void {
     if (this.resolvingToken()) return;
     this.resolvingToken.set(true);
+    this.scannedToken.set(token);
+    this.scanActiveSession.set(null);
     this.svc.getDueByToken(token).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.resolvingToken.set(false);
         this.scannedStudentName.set(`${res.studentFirstName} ${res.studentLastName}`.trim());
         this.dueMonths.set(res.dueMonths);
+        // Find an in-progress session for this student so the pay dialog can
+        // offer to mark them present at the same time (default checked).
+        this.sessionService.activeForStudent(res.studentId).pipe(takeUntil(this.destroy$)).subscribe({
+          next: (sess) => this.scanActiveSession.set(sess),
+          error: () => this.scanActiveSession.set(null),
+        });
         // Stop the camera and swap the scanner dialog for the month picker.
         this.closeScanner();
         if (res.dueMonths.length === 0) {
@@ -276,7 +307,8 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   /** A due month was picked — hand off to the existing Record Payment dialog. */
   selectDueMonth(payment: MonthlyPaymentWithDetails): void {
     this.closeMonthPicker();
-    this.openPayDialog(payment);
+    // fromScan: keep the scanned-student context so the attendance option shows.
+    this.openPayDialog(payment, true);
   }
 
   /** Inclusive (from..to) month range for the active filter mode. */
@@ -382,7 +414,14 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     });
   }
 
-  openPayDialog(payment: MonthlyPaymentWithDetails): void {
+  openPayDialog(payment: MonthlyPaymentWithDetails, fromScan = false): void {
+    // A manual row-pay has no scanned-student context — clear any stale one so
+    // the attendance option only appears for a scan-to-pay.
+    if (!fromScan) {
+      this.scannedToken.set('');
+      this.scanActiveSession.set(null);
+    }
+    this.markAttendance.set(true);
     this.selectedPayment.set(payment);
     this.payAmount = payment.amountDue - payment.amountPaid;
     this.payDate = new Date();
@@ -393,11 +432,17 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   closePayDialog(): void {
     this.showPayDialog.set(false);
     this.selectedPayment.set(null);
+    this.scannedToken.set('');
+    this.scanActiveSession.set(null);
   }
 
   confirmPayment(): void {
     const sel = this.selectedPayment();
     if (!sel || this.payAmount <= 0) return;
+    // Capture before closePayDialog() clears the scan context.
+    const session = this.scanActiveSession();
+    const token = this.scannedToken();
+    const alsoMarkPresent = this.markAttendance() && !!session && !!token;
     this.payingId.set(sel.id);
     this.svc.recordPayment(sel.id, {
       amount: this.payAmount,
@@ -408,12 +453,27 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         this.payingId.set(null);
         this.closePayDialog();
         this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_RECORDED'));
+        if (alsoMarkPresent) this.markPresentForSession(session!, token);
         this.loadData();
       },
       error: () => {
         this.payingId.set(null);
         this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_ERROR'));
       },
+    });
+  }
+
+  /** Mark the just-paid student present in their currently-running session. */
+  private markPresentForSession(session: ActiveSessionInfo, token: string): void {
+    this.attendanceService.checkinByQr(session.sessionId, token).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        const name = `${res.studentFirstName} ${res.studentLastName}`.trim();
+        this.notify.success(
+          this.translate.instant('MONTHLY_SUBSCRIPTIONS.ATTENDANCE_MARKED', { name, class: session.className })
+        );
+      },
+      // Interceptor toasts the translated server error (e.g. not enrolled).
+      error: () => {},
     });
   }
 

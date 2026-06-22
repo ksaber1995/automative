@@ -8,6 +8,7 @@ import { TableModule } from 'primeng/table';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
+import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -31,6 +32,7 @@ import { Student } from '@shared/interfaces/student.interface';
 })
 export class SessionHistoryComponent implements OnInit {
   private sessionService = inject(SessionService);
+  private attendanceService = inject(AttendanceService);
   private branchService = inject(BranchService);
   private courseService = inject(CourseService);
   private classService = inject(ClassService);
@@ -67,8 +69,21 @@ export class SessionHistoryComponent implements OnInit {
   /** Whether the per-student attendance column is shown. */
   showAttendanceCol = computed<boolean>(() => !!this.selectedStudentId());
 
-  /** Column count for the empty-state row: class/course/started/ended/duration (5) + room + attendance. */
-  historyColspan = computed<number>(() => 5 + (this.isTeacher() ? 0 : 1) + (this.showAttendanceCol() ? 1 : 0));
+  /** Present/absent counts per session id (server-computed via class summaries). */
+  attCounts = signal<Map<string, { present: number; absent: number; total: number }>>(new Map());
+  /** Lazily-loaded present/absent student lists per session id (loaded on expand). */
+  attDetail = signal<Map<string, { loading: boolean; present: SessionAttendanceStudent[]; absent: SessionAttendanceStudent[] }>>(new Map());
+
+  counts(sessionId: string) {
+    return this.attCounts().get(sessionId) ?? null;
+  }
+  detail(sessionId: string) {
+    return this.attDetail().get(sessionId) ?? null;
+  }
+
+  /** Column count for the empty-state row: expander (1) + class/course/started/ended/duration (5)
+   *  + present-absent (1) + room + per-student attendance. */
+  historyColspan = computed<number>(() => 1 + 5 + 1 + (this.isTeacher() ? 0 : 1) + (this.showAttendanceCol() ? 1 : 0));
 
   hasFilters = computed<boolean>(
     () =>
@@ -112,8 +127,46 @@ export class SessionHistoryComponent implements OnInit {
       next: (s) => {
         this.sessions.set(s);
         this.loading.set(false);
+        this.attDetail.set(new Map());
+        this.loadAttendanceCounts(s);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /** Fetch present/absent counts for every listed session, one request per distinct
+   *  class (class summaries already carry per-session present/absent counts). */
+  private loadAttendanceCounts(sessions: Session[]): void {
+    this.attCounts.set(new Map());
+    const classIds = Array.from(new Set(sessions.map((s) => s.classId).filter(Boolean)));
+    for (const classId of classIds) {
+      this.attendanceService.getByClass(classId).subscribe({
+        next: (summaries) => {
+          this.attCounts.update((m) => {
+            const next = new Map(m);
+            for (const su of summaries) {
+              next.set(su.sessionId, { present: su.presentCount, absent: su.absentCount, total: su.totalStudents });
+            }
+            return next;
+          });
+        },
+        error: () => {},
+      });
+    }
+  }
+
+  /** PrimeNG row-expand hook: lazily load the present/absent student names. */
+  onRowExpand(event: { data: Session }): void {
+    const id = event.data.id;
+    if (this.attDetail().get(id)) return; // already loaded / loading
+    this.attDetail.update((m) => new Map(m).set(id, { loading: true, present: [], absent: [] }));
+    this.attendanceService.getBySession(id).subscribe({
+      next: (rows) => {
+        const present = rows.filter((r) => r.isPresent);
+        const absent = rows.filter((r) => !r.isPresent);
+        this.attDetail.update((m) => new Map(m).set(id, { loading: false, present, absent }));
+      },
+      error: () => this.attDetail.update((m) => new Map(m).set(id, { loading: false, present: [], absent: [] })),
     });
   }
 

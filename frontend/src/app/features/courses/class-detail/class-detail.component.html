@@ -94,7 +94,18 @@
       <p-tabpanels>
         <!-- Students Tab -->
         <p-tabpanel value="students">
-          <div class="flex justify-end mb-3 mt-2">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-3 mt-2">
+            <span class="p-input-icon-left w-full sm:w-80 block relative">
+              <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+              <input
+                type="text"
+                pInputText
+                [ngModel]="studentFilter()"
+                (ngModelChange)="studentFilter.set($event)"
+                [placeholder]="'CLASSES.DETAIL.SEARCH_STUDENTS' | translate"
+                class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </span>
             <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" [disabled]="isFinished()" (onClick)="addStudent()"></p-button>
           </div>
           @if (isFinished()) {
@@ -103,7 +114,7 @@
             </div>
           }
           <p-table
-            [value]="enrollments()"
+            [value]="filteredEnrollments()"
             [loading]="loadingEnrollments()"
             [paginator]="true"
             [rows]="10"

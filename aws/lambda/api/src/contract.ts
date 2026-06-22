@@ -4740,6 +4740,18 @@ export const contract = c.router({
         403: ApiErrorSchema,
       },
     },
+    // The student's currently-running session (started, not yet ended), if any —
+    // used to offer "mark present" when collecting a monthly payment by scan.
+    // Returns the session info object, or null when none is in progress.
+    activeForStudent: {
+      method: 'GET' as const,
+      path: '/api/sessions/active-for-student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.any(),
+        403: ApiErrorSchema,
+      },
+    },
     getById: {
       method: 'GET' as const,
       path: '/api/sessions/:id',

@@ -25,6 +25,16 @@ export interface Session {
   studentPresent?: boolean | null;
 }
 
+/** A student's currently-running session, returned by activeForStudent (or null). */
+export interface ActiveSessionInfo {
+  sessionId: string;
+  classId: string;
+  className: string;
+  courseName: string;
+  roomCode?: string | null;
+  sessionNumber?: number | null;
+}
+
 export interface StartSessionTeacher {
   employeeId: string;
   role?: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT';
@@ -51,6 +61,11 @@ export class SessionService {
 
   listActive(branchId?: string): Observable<Session[]> {
     return this.api.get<Session[]>('sessions/active', branchId ? { branchId } : undefined);
+  }
+
+  /** The student's currently-running session, or null if none is in progress. */
+  activeForStudent(studentId: string): Observable<ActiveSessionInfo | null> {
+    return this.api.get<ActiveSessionInfo | null>(`sessions/active-for-student/${studentId}`);
   }
 
   getById(id: string): Observable<Session> {

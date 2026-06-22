@@ -532,6 +532,8 @@
     "SCAN_PICK_MONTH": "Select a Month to Pay",
     "SCAN_PICK_MONTH_HINT": "choose a due month to record a payment",
     "SCAN_NO_DUE": "{{name}} has no outstanding months — nothing due.",
+    "MARK_PRESENT_OPTION": "Also mark present in {{class}} (session in progress)",
+    "ATTENDANCE_MARKED": "{{name}} marked present in {{class}}",
     "MONTHS": {
       "1": "January",
       "2": "February",
@@ -1682,6 +1684,7 @@
       "COL_ACTIONS": "Actions",
       "BUNDLE_PREFIX": "Bundle:",
       "VIEW_STUDENT": "View Student",
+      "SEARCH_STUDENTS": "Search students by name…",
       "NO_STUDENTS_ENROLLED": "No students enrolled",
       "ENR_STATUS_ACTIVE": "Active",
       "ENR_STATUS_COMPLETED": "Completed",
@@ -3573,8 +3576,12 @@
     "ATT_PRESENT": "Present only",
     "ATT_ABSENT": "Absent only",
     "COL_ATTENDANCE": "Attendance",
+    "COL_PRESENT_ABSENT": "Present / Absent",
     "PRESENT": "Present",
     "ABSENT": "Absent",
+    "PRESENT_LIST": "Present students",
+    "ABSENT_LIST": "Absent students",
+    "LOADING_ATTENDANCE": "Loading attendance…",
     "CLEAR_FILTERS": "Clear filters"
   },
   "SESSIONS_DASHBOARD": {

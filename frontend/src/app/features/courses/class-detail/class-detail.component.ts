@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
+import { InputTextModule } from 'primeng/inputtext';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
@@ -30,6 +31,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     TranslateModule,
     CardModule,
     TableModule,
+    InputTextModule,
     ButtonModule,
     TagModule,
     TooltipModule,
@@ -58,6 +60,15 @@ export class ClassDetailComponent implements OnInit {
   classId = '';
   classDetail = signal<ClassWithDetails | null>(null);
   enrollments = signal<any[]>([]);
+  // Free-text filter for the enrolled-students table (by student name).
+  studentFilter = signal('');
+  filteredEnrollments = computed(() => {
+    const term = this.studentFilter().trim().toLowerCase();
+    if (!term) return this.enrollments();
+    return this.enrollments().filter(e =>
+      `${e.studentFirstName ?? ''} ${e.studentLastName ?? ''}`.toLowerCase().includes(term)
+    );
+  });
   sessions = signal<Session[]>([]);
   freeRooms = signal<Room[]>([]);
   loadingClass = signal(true);
@@ -281,7 +292,8 @@ export class ClassDetailComponent implements OnInit {
   editClass() {
     const cls = this.classDetail();
     if (!cls?.courseId || !this.classId) return;
-    this.router.navigate(['/courses', cls.courseId, 'classes', this.classId, 'edit']);
+    // Tell the edit page we came from the class, so Cancel/Update return here.
+    this.router.navigate(['/courses', cls.courseId, 'classes', this.classId, 'edit'], { queryParams: { from: 'class' } });
   }
 
   confirmFinishCourse() {

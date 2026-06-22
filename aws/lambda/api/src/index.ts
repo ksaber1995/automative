@@ -154,6 +154,7 @@ const router = {
     // route MUST be registered before the `/:id` route, or `next-number` is
     // captured as `:id` and fails "id: Invalid uuid".
     nextNumber: sessionsRoutes.nextNumber,
+    activeForStudent: sessionsRoutes.activeForStudent,
     getById: sessionsRoutes.getById,
     update: sessionsRoutes.update,
   },

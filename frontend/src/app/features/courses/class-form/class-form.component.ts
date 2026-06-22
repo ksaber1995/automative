@@ -58,6 +58,8 @@ export class ClassFormComponent implements OnInit {
   isEditMode = signal(false);
   courseId: string | null = null;
   classId: string | null = null;
+  // Where the user opened the edit page from ('class' | 'course'), so Cancel/Update return there.
+  fromOrigin: string | null = null;
   instructors = signal<any[]>([]);
   branches = signal<any[]>([]);
   // All active courses fetched once; the dropdown shown to the user is `filteredCourses`,
@@ -121,6 +123,7 @@ export class ClassFormComponent implements OnInit {
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('courseId');
     this.classId = this.route.snapshot.paramMap.get('id');
+    this.fromOrigin = this.route.snapshot.queryParamMap.get('from');
 
     // Check if creating from global classes list (no courseId in route)
     if (!this.courseId && !this.classId) {
@@ -483,7 +486,7 @@ export class ClassFormComponent implements OnInit {
       this.classService.updateClass(this.classId, classData).subscribe({
         next: () => {
           this.notificationService.success(this.translate.instant('CLASSES.UPDATED'));
-          this.router.navigate(['/classes', this.classId]);
+          this.returnFromEdit();
         },
         error: (error) => {
           // Interceptor toasted the translated error.
@@ -511,8 +514,32 @@ export class ClassFormComponent implements OnInit {
   }
 
   cancel() {
+    // When editing, go back to wherever the user came from (class or course).
+    if (this.isEditMode()) {
+      this.returnFromEdit();
+      return;
+    }
     if (this.isGlobalCreate() && !this.isEditMode()) {
       this.router.navigate(['/classes']);
+    } else if (this.courseId) {
+      this.router.navigate(['/courses', this.courseId]);
+    } else {
+      this.router.navigate(['/classes']);
+    }
+  }
+
+  /**
+   * After editing a class, return to the origin the user came from:
+   * the class detail (from=class) or the course detail (from=course).
+   * Falls back to the class detail when no origin hint is present.
+   */
+  private returnFromEdit() {
+    if (this.fromOrigin === 'course' && this.courseId) {
+      this.router.navigate(['/courses', this.courseId]);
+    } else if (this.fromOrigin === 'class' && this.classId) {
+      this.router.navigate(['/classes', this.classId]);
+    } else if (this.classId) {
+      this.router.navigate(['/classes', this.classId]);
     } else if (this.courseId) {
       this.router.navigate(['/courses', this.courseId]);
     } else {

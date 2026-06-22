@@ -632,7 +632,7 @@
                       [pTooltip]="'STUDENTS.DETAIL.RESUME_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
-                  @if (getMonthlyPayments(enrollment.id).length === 0 || !hasAnyMonthlyPayment(enrollment.id)) {
+                  @if (enrollment.status !== 'DROPPED' && (getMonthlyPayments(enrollment.id).length === 0 || !hasAnyMonthlyPayment(enrollment.id))) {
                     <p-button
                       icon="pi pi-trash"
                       [rounded]="true"
@@ -642,14 +642,16 @@
                       [pTooltip]="'STUDENTS.DETAIL.DELETE_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
-                  <p-button
-                    icon="pi pi-arrow-right-arrow-left"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="info"
-                    (onClick)="openChangeClassDialog(enrollment)"
-                    [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
-                  ></p-button>
+                  @if (enrollment.status !== 'DROPPED') {
+                    <p-button
+                      icon="pi pi-arrow-right-arrow-left"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="info"
+                      (onClick)="openChangeClassDialog(enrollment)"
+                      [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
+                    ></p-button>
+                  }
                 </div>
               } @else {
               <div class="flex gap-1">

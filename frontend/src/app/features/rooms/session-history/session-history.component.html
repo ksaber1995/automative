@@ -111,10 +111,13 @@
     [rows]="15"
     [rowsPerPageOptions]="[15, 30, 50]"
     responsiveLayout="scroll"
+    dataKey="id"
+    (onRowExpand)="onRowExpand($event)"
     styleClass="mt-2"
   >
     <ng-template pTemplate="header">
       <tr>
+        <th style="width: 3rem"></th>
         @if (!isTeacher()) {
           <th pSortableColumn="roomCode">{{ 'SESSIONS_DASHBOARD.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
         }
@@ -123,13 +126,24 @@
         <th pSortableColumn="startDate">{{ 'SESSIONS_DASHBOARD.COL_STARTED' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
         <th pSortableColumn="endDate">{{ 'SESSIONS_DASHBOARD.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
         <th pSortableColumn="durationMinutes">{{ 'SESSIONS_DASHBOARD.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
+        <th>{{ 'SESSION_HISTORY.COL_PRESENT_ABSENT' | translate }}</th>
         @if (showAttendanceCol()) {
           <th pSortableColumn="studentPresent">{{ 'SESSION_HISTORY.COL_ATTENDANCE' | translate }} <p-sortIcon field="studentPresent"></p-sortIcon></th>
         }
       </tr>
     </ng-template>
-    <ng-template pTemplate="body" let-session>
+    <ng-template pTemplate="body" let-session let-expanded="expanded">
       <tr>
+        <td>
+          <button
+            type="button"
+            [pRowToggler]="session"
+            class="p-link"
+            [attr.aria-label]="'SESSION_HISTORY.COL_PRESENT_ABSENT' | translate"
+          >
+            <i [class]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-gray-600"></i>
+          </button>
+        </td>
         @if (!isTeacher()) {
           <td class="font-semibold text-indigo-700">{{ session.roomCode }}</td>
         }
@@ -146,6 +160,15 @@
             —
           }
         </td>
+        <td>
+          @if (counts(session.id); as c) {
+            <span class="font-semibold text-green-600">{{ c.present }}</span>
+            <span class="text-gray-400"> / </span>
+            <span class="font-semibold text-red-600">{{ c.absent }}</span>
+          } @else {
+            <span class="text-gray-300">—</span>
+          }
+        </td>
         @if (showAttendanceCol()) {
           <td>
             <p-tag
@@ -154,6 +177,50 @@
             ></p-tag>
           </td>
         }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="rowexpansion" let-session>
+      <tr>
+        <td [attr.colspan]="historyColspan()" class="bg-gray-50">
+          @if (detail(session.id); as d) {
+            @if (d.loading) {
+              <div class="p-4 text-gray-400">{{ 'SESSION_HISTORY.LOADING_ATTENDANCE' | translate }}</div>
+            } @else {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                <div>
+                  <div class="font-semibold text-green-700 mb-2">
+                    {{ 'SESSION_HISTORY.PRESENT_LIST' | translate }} ({{ d.present.length }})
+                  </div>
+                  @if (d.present.length) {
+                    <ul class="list-disc ms-5 text-sm text-gray-700">
+                      @for (s of d.present; track s.studentId) {
+                        <li>{{ s.studentFirstName }} {{ s.studentLastName }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <div class="text-sm text-gray-400">—</div>
+                  }
+                </div>
+                <div>
+                  <div class="font-semibold text-red-700 mb-2">
+                    {{ 'SESSION_HISTORY.ABSENT_LIST' | translate }} ({{ d.absent.length }})
+                  </div>
+                  @if (d.absent.length) {
+                    <ul class="list-disc ms-5 text-sm text-gray-700">
+                      @for (s of d.absent; track s.studentId) {
+                        <li>{{ s.studentFirstName }} {{ s.studentLastName }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <div class="text-sm text-gray-400">—</div>
+                  }
+                </div>
+              </div>
+            }
+          } @else {
+            <div class="p-4 text-gray-400">{{ 'SESSION_HISTORY.LOADING_ATTENDANCE' | translate }}</div>
+          }
+        </td>
       </tr>
     </ng-template>
     <ng-template pTemplate="emptymessage">

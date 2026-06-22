@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, OnDestroy, inject, computed, effect } from '@angular/core';
+import { Component, signal, OnInit, OnDestroy, HostListener, inject, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -15,6 +15,7 @@ import { SubscriptionService } from '../services/subscription.service';
 import { LanguageService } from '../services/language.service';
 import { NotificationService } from '../services/notification.service';
 import { StudentService } from '../../features/students/services/student.service';
+import { GlobalScanService } from '../services/global-scan.service';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 
 interface NavLeaf {
@@ -59,6 +60,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private translate = inject(TranslateService);
   private notifications = inject(NotificationService);
   private studentService = inject(StudentService);
+  private globalScan = inject(GlobalScanService);
 
   // QR Scanner
   qrDialogVisible = signal(false);
@@ -66,6 +68,38 @@ export class LayoutComponent implements OnInit, OnDestroy {
   qrLookingUp = signal(false);
   private html5Qr?: Html5Qrcode;
   private readonly QR_SCANNER_ID = 'navbar-qr-scanner-region';
+
+  // ── Always-on USB scanner (keyboard-wedge) ────────────────────────────────
+  // A handheld scanner "types" the token as a fast keystroke burst ending with
+  // Enter; we capture it app-wide (no field focus, no button) and dispatch it.
+  // The camera button above remains a deliberate, click-to-open "find student".
+  private scanBuffer = '';
+  private scanBufferAt = 0;
+  // A gap longer than this between keystrokes is a human typing, not a scanner.
+  private readonly SCAN_KEY_GAP_MS = 100;
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(e: KeyboardEvent): void {
+    const el = e.target as HTMLElement | null;
+    const tag = el?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+    const now = Date.now();
+    if (now - this.scanBufferAt > this.SCAN_KEY_GAP_MS) this.scanBuffer = '';
+    this.scanBufferAt = now;
+
+    if (e.key === 'Enter') {
+      const buf = this.scanBuffer;
+      this.scanBuffer = '';
+      if (buf) {
+        e.preventDefault();
+        this.globalScan.dispatch(buf);
+      }
+      return;
+    }
+    if (e.key.length === 1) this.scanBuffer += e.key;
+  }
 
   constructor(
     private authService: AuthService,
