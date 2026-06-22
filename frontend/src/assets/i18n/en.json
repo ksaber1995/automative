@@ -3582,7 +3582,15 @@
     "PRESENT_LIST": "Present students",
     "ABSENT_LIST": "Absent students",
     "LOADING_ATTENDANCE": "Loading attendance…",
-    "CLEAR_FILTERS": "Clear filters"
+    "CLEAR_FILTERS": "Clear filters",
+    "VIEW_GRID": "Grid view",
+    "VIEW_LIST": "List view",
+    "COL_STUDENT": "Student",
+    "SESSION_ABBR": "S",
+    "MATRIX_SELECT_CLASS": "Select a class to view the attendance grid.",
+    "SCAN_FILTER": "Showing scanned student:",
+    "SCAN_UNKNOWN": "Unknown student",
+    "SCAN_CLEAR": "Clear"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
@@ -14,6 +14,8 @@ import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
 import { StudentService } from '../../students/services/student.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Class } from '@shared/interfaces/class.interface';
 import { Student } from '@shared/interfaces/student.interface';
@@ -30,7 +32,7 @@ import { Student } from '@shared/interfaces/student.interface';
   imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, TranslateModule],
   templateUrl: './session-history.component.html',
 })
-export class SessionHistoryComponent implements OnInit {
+export class SessionHistoryComponent implements OnInit, OnDestroy {
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
   private branchService = inject(BranchService);
@@ -39,6 +41,10 @@ export class SessionHistoryComponent implements OnInit {
   private studentService = inject(StudentService);
   private authService = inject(AuthService);
   private translate = inject(TranslateService);
+  private globalScan = inject(GlobalScanService);
+  private notify = inject(NotificationService);
+  // Stable reference so the app-wide scan handler can be unregistered on destroy.
+  private readonly scanHandler = (token: string) => this.onScan(token);
 
   /** Teacher-type companies have no rooms/branches — hide those UI bits. */
   isTeacher = (): boolean => this.authService.isTeacher();
@@ -91,6 +97,33 @@ export class SessionHistoryComponent implements OnInit {
       this.selectedAttendance() !== 'ALL',
   );
 
+  // ── Matrix (Excel-style) view ───────────────────────────────────────────────
+  /** Toggle between the chronological list and the student × session grid. */
+  matrixView = signal(false);
+  matrixLoading = signal(false);
+  /** Sessions for the selected class, ordered by session number — the grid columns. */
+  matrixSessions = signal<Session[]>([]);
+  /** Distinct students across those sessions — the grid rows. */
+  matrixStudents = signal<{ studentId: string; name: string }[]>([]);
+  /** Present/absent per cell, keyed `${studentId}|${sessionId}`. */
+  matrixAtt = signal<Map<string, boolean>>(new Map());
+  /** When a QR is scanned, narrow the grid to that single student. */
+  scanFilterStudentId = signal<string | null>(null);
+  scanFilterName = signal<string>('');
+
+  /** Grid rows after applying the scan filter. */
+  matrixFilteredStudents = computed<{ studentId: string; name: string }[]>(() => {
+    const id = this.scanFilterStudentId();
+    const list = this.matrixStudents();
+    return id ? list.filter((s) => s.studentId === id) : list;
+  });
+
+  /** Cell value: true = present, false = absent, null = not enrolled/no record. */
+  cellState(studentId: string, sessionId: string): boolean | null {
+    const v = this.matrixAtt().get(`${studentId}|${sessionId}`);
+    return v === undefined ? null : v;
+  }
+
   ngOnInit(): void {
     this.attendanceOptions = [
       { label: this.translate.instant('SESSION_HISTORY.ATT_ALL'), value: 'ALL' },
@@ -110,6 +143,14 @@ export class SessionHistoryComponent implements OnInit {
       error: () => {},
     });
     this.load();
+
+    // Take over the app-wide scanner while this page is open: a scan filters the
+    // grid down to the scanned student (and switches into grid view).
+    this.globalScan.register(this.scanHandler);
+  }
+
+  ngOnDestroy(): void {
+    this.globalScan.unregister(this.scanHandler);
   }
 
   load(): void {
@@ -183,11 +224,13 @@ export class SessionHistoryComponent implements OnInit {
       this.selectedClassId.set(null);
     }
     this.load();
+    if (this.matrixView()) this.loadMatrix();
   }
 
   onClassChange(classId: string | null): void {
     this.selectedClassId.set(classId);
     this.load();
+    if (this.matrixView()) this.loadMatrix();
   }
 
   onStudentChange(studentId: string | null): void {
@@ -208,7 +251,96 @@ export class SessionHistoryComponent implements OnInit {
     this.selectedClassId.set(null);
     this.selectedStudentId.set(null);
     this.selectedAttendance.set('ALL');
+    this.clearScanFilter();
     this.load();
+    if (this.matrixView()) this.loadMatrix();
+  }
+
+  // ── Matrix view ─────────────────────────────────────────────────────────────
+
+  /** Flip between the list and the student × session grid. */
+  toggleView(): void {
+    const next = !this.matrixView();
+    this.matrixView.set(next);
+    if (next) this.loadMatrix();
+  }
+
+  /** Build the grid for the selected class: sessions as columns, students as rows. */
+  loadMatrix(): void {
+    const classId = this.selectedClassId();
+    this.matrixSessions.set([]);
+    this.matrixStudents.set([]);
+    this.matrixAtt.set(new Map());
+    if (!classId) return;
+
+    this.matrixLoading.set(true);
+    this.sessionService.list({ classId }).subscribe({
+      next: (sessions) => {
+        const sorted = [...sessions].sort(
+          (a, b) =>
+            (a.sessionNumber ?? Number.MAX_SAFE_INTEGER) - (b.sessionNumber ?? Number.MAX_SAFE_INTEGER) ||
+            new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+        );
+        this.matrixSessions.set(sorted);
+        if (sorted.length === 0) {
+          this.matrixLoading.set(false);
+          return;
+        }
+
+        // Pull each session's roster (with present/absent) and fold into the grid.
+        const studentMap = new Map<string, string>();
+        const att = new Map<string, boolean>();
+        let remaining = sorted.length;
+        const done = () => {
+          if (--remaining > 0) return;
+          const students = Array.from(studentMap, ([studentId, name]) => ({ studentId, name })).sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+          this.matrixStudents.set(students);
+          this.matrixAtt.set(att);
+          this.matrixLoading.set(false);
+        };
+        for (const sess of sorted) {
+          this.attendanceService.getBySession(sess.id).subscribe({
+            next: (rows) => {
+              for (const r of rows) {
+                if (!studentMap.has(r.studentId)) studentMap.set(r.studentId, `${r.studentFirstName} ${r.studentLastName}`);
+                att.set(`${r.studentId}|${sess.id}`, r.isPresent);
+              }
+            },
+            error: () => {},
+            complete: done,
+          });
+        }
+      },
+      error: () => this.matrixLoading.set(false),
+    });
+  }
+
+  /** App-wide scan handler: resolve the QR to a student and filter the grid to them. */
+  private onScan(token: string): void {
+    this.studentService.lookupByQr(token).subscribe({
+      next: (res) => {
+        this.scanFilterStudentId.set(res.id);
+        const opt = this.studentOptions().find((o) => o.id === res.id);
+        this.scanFilterName.set(opt?.name ?? '');
+        // A scan is only meaningful in the grid — switch to it if needed.
+        if (!this.matrixView()) {
+          this.matrixView.set(true);
+          this.loadMatrix();
+        }
+      },
+      error: () => this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND')),
+    });
+  }
+
+  clearScanFilter(): void {
+    this.scanFilterStudentId.set(null);
+    this.scanFilterName.set('');
+  }
+
+  formatDateShort(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   formatDateTime(dateStr: string): string {

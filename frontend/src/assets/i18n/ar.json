@@ -3706,7 +3706,15 @@
     "PRESENT_LIST": "الطلاب الحاضرون",
     "ABSENT_LIST": "الطلاب الغائبون",
     "LOADING_ATTENDANCE": "جارٍ تحميل الحضور…",
-    "CLEAR_FILTERS": "مسح الفلاتر"
+    "CLEAR_FILTERS": "مسح الفلاتر",
+    "VIEW_GRID": "عرض الجدول",
+    "VIEW_LIST": "عرض القائمة",
+    "COL_STUDENT": "الطالب",
+    "SESSION_ABBR": "ح",
+    "MATRIX_SELECT_CLASS": "اختر فصلاً لعرض جدول الحضور.",
+    "SCAN_FILTER": "عرض الطالب الممسوح:",
+    "SCAN_UNKNOWN": "طالب غير معروف",
+    "SCAN_CLEAR": "مسح"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الحصص",

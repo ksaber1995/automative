@@ -264,6 +264,12 @@ export class SessionsDashboardComponent implements OnInit {
     branchId: ['', Validators.required],
     roomId: ['', Validators.required],
     classId: ['', Validators.required],
+    // Must exist on the initial group too: the dialog template binds
+    // formControlName="sessionNumber", and the dialog content is in the DOM
+    // before openStartDialog() rebuilds the form. A missing control makes
+    // Angular call setUpControl(null) → "Cannot read properties of null
+    // (reading '_rawValidators')".
+    sessionNumber: [null as number | null],
     notes: [''],
   });
 

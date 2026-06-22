@@ -214,9 +214,9 @@ export const sessionsRoutes = {
         return apiError(400, 'ERRORS.SESSIONS.CLASS_HAS_ACTIVE', 'This class already has an active session running.');
       }
 
-      // Session number: auto = MAX(session_number)+1 across ALL sessions of any
-      // class in the same course, so number N is shared across the course's
-      // classes. The teacher may override it (and may reuse a number on purpose).
+      // Session number: auto = MAX(session_number)+1 for THIS class only, so each
+      // class keeps its own 1,2,3,… sequence independent of sibling classes in the
+      // same course. The teacher may override it (and may reuse a number on purpose).
       let sessionNumber: number;
       if (body.sessionNumber !== undefined && body.sessionNumber !== null && body.sessionNumber !== '') {
         sessionNumber = parseInt(body.sessionNumber, 10);
@@ -225,11 +225,10 @@ export const sessionsRoutes = {
         }
       } else {
         const nextRow = await queryOne<any>(
-          `SELECT COALESCE(MAX(s.session_number), 0) + 1 AS next
-           FROM sessions s
-           JOIN classes c ON c.id = s.class_id
-           WHERE c.course_id = $1`,
-          [cls.course_id]
+          `SELECT COALESCE(MAX(session_number), 0) + 1 AS next
+           FROM sessions
+           WHERE class_id = $1`,
+          [body.classId]
         );
         sessionNumber = parseInt(nextRow?.next ?? '1', 10);
       }
@@ -318,13 +317,12 @@ export const sessionsRoutes = {
         return { status: 200 as const, body: mapSessionFromDB(existing) };
       }
 
-      // Auto session number
+      // Auto session number — per class (each class keeps its own 1,2,3,… sequence).
       const nextRow = await queryOne<any>(
-        `SELECT COALESCE(MAX(s.session_number), 0) + 1 AS next
-         FROM sessions s
-         JOIN classes c ON c.id = s.class_id
-         WHERE c.course_id = $1`,
-        [cls.course_id]
+        `SELECT COALESCE(MAX(session_number), 0) + 1 AS next
+         FROM sessions
+         WHERE class_id = $1`,
+        [body.classId]
       );
       const sessionNumber = parseInt(nextRow?.next ?? '1', 10);
 
@@ -649,7 +647,7 @@ export const sessionsRoutes = {
 
   /**
    * GET /api/sessions/next-number?classId=…
-   * Suggested next session number for a class's course (max+1 across the course).
+   * Suggested next session number for a class (max+1 for that class only).
    * Used to prefill the Start dialog; the teacher can still edit it.
    */
   nextNumber: async ({ query: queryParams, headers }: { query: { classId?: string }; headers: { authorization: string } }) => {
@@ -676,11 +674,10 @@ export const sessionsRoutes = {
       }
 
       const nextRow = await queryOne<any>(
-        `SELECT COALESCE(MAX(s.session_number), 0) + 1 AS next
-         FROM sessions s
-         JOIN classes c ON c.id = s.class_id
-         WHERE c.course_id = $1`,
-        [cls.course_id]
+        `SELECT COALESCE(MAX(session_number), 0) + 1 AS next
+         FROM sessions
+         WHERE class_id = $1`,
+        [cls.id]
       );
 
       return { status: 200 as const, body: { sessionNumber: parseInt(nextRow?.next ?? '1', 10) } };

@@ -1,7 +1,16 @@
 <div class="p-6">
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_HISTORY.TITLE' | translate }}</h1>
-    <p class="text-gray-500 mt-1">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
+  <div class="mb-6 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_HISTORY.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
+    </div>
+    <p-button
+      [label]="(matrixView() ? 'SESSION_HISTORY.VIEW_LIST' : 'SESSION_HISTORY.VIEW_GRID') | translate"
+      [icon]="matrixView() ? 'pi pi-list' : 'pi pi-table'"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="toggleView()"
+    ></p-button>
   </div>
 
   <!-- Filters -->
@@ -102,6 +111,74 @@
       ></p-button>
     }
   </div>
+
+  <!-- Scan filter banner (grid view) -->
+  @if (scanFilterStudentId()) {
+    <div class="flex items-center gap-2 mb-4 px-3 py-2 rounded bg-indigo-50 border border-indigo-200 text-indigo-800 text-sm">
+      <i class="pi pi-qrcode"></i>
+      <span>{{ 'SESSION_HISTORY.SCAN_FILTER' | translate }}</span>
+      <span class="font-semibold">{{ scanFilterName() || ('SESSION_HISTORY.SCAN_UNKNOWN' | translate) }}</span>
+      <button type="button" class="ms-2 underline" (click)="clearScanFilter()">{{ 'SESSION_HISTORY.SCAN_CLEAR' | translate }}</button>
+    </div>
+  }
+
+  @if (matrixView()) {
+    <!-- Excel-style attendance grid: students × sessions -->
+    @if (!selectedClassId()) {
+      <div class="p-10 text-center text-gray-400 border border-dashed rounded">
+        {{ 'SESSION_HISTORY.MATRIX_SELECT_CLASS' | translate }}
+      </div>
+    } @else if (matrixLoading()) {
+      <div class="p-10 text-center text-gray-400">{{ 'SESSION_HISTORY.LOADING_ATTENDANCE' | translate }}</div>
+    } @else if (matrixSessions().length === 0) {
+      <div class="p-10 text-center text-gray-400">{{ 'SESSIONS_DASHBOARD.NO_SESSIONS' | translate }}</div>
+    } @else {
+      <div class="overflow-x-auto border border-gray-200 rounded">
+        <table class="min-w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="sticky start-0 z-10 bg-gray-50 px-3 py-2 text-start font-semibold text-gray-700 border-b border-e border-gray-200 whitespace-nowrap">
+                {{ 'SESSION_HISTORY.COL_STUDENT' | translate }}
+              </th>
+              @for (s of matrixSessions(); track s.id) {
+                <th class="px-3 py-2 text-center font-semibold text-gray-700 border-b border-gray-200 whitespace-nowrap">
+                  @if (s.sessionNumber) {
+                    {{ 'SESSION_HISTORY.SESSION_ABBR' | translate }}{{ s.sessionNumber }}
+                  } @else {
+                    {{ formatDateShort(s.startDate) }}
+                  }
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (st of matrixFilteredStudents(); track st.studentId) {
+              <tr class="hover:bg-gray-50">
+                <td class="sticky start-0 z-10 bg-white px-3 py-2 font-medium text-gray-900 border-b border-e border-gray-200 whitespace-nowrap">
+                  {{ st.name }}
+                </td>
+                @for (s of matrixSessions(); track s.id) {
+                  <td class="px-3 py-2 text-center border-b border-gray-100">
+                    @switch (cellState(st.studentId, s.id)) {
+                      @case (true) { <i class="pi pi-check text-green-600 font-bold"></i> }
+                      @case (false) { <i class="pi pi-times text-red-500 font-bold"></i> }
+                      @default { <span class="text-gray-300">—</span> }
+                    }
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr>
+                <td [attr.colspan]="matrixSessions().length + 1" class="text-center py-8 text-gray-400">
+                  {{ 'SESSIONS_DASHBOARD.NO_SESSIONS' | translate }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else {
 
   <!-- History table -->
   <p-table
@@ -229,4 +306,5 @@
       </tr>
     </ng-template>
   </p-table>
+  }
 </div>
