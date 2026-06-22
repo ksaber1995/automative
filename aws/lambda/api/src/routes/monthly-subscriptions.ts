@@ -34,6 +34,7 @@ function mapPaymentWithDetailsFromDB(row: any) {
     studentPhone: row.student_phone || null,
     parentPhone: row.parent_phone || null,
     parentName: row.parent_name || null,
+    enrollmentStatus: row.enrollment_status || null,
   };
 }
 
@@ -273,7 +274,8 @@ export const monthlySubscriptionsRoutes = {
            s.parent_name  AS parent_name,
            c.name       AS course_name,
            b.name       AS branch_name,
-           cl.name      AS class_name
+           cl.name      AS class_name,
+           e.status     AS enrollment_status
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
          JOIN courses  c  ON msp.course_id  = c.id
@@ -299,6 +301,80 @@ export const monthlySubscriptionsRoutes = {
     } catch (error) {
       console.error('List monthly payments error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list monthly payments');
+    }
+  },
+
+  /**
+   * GET /api/monthly-subscriptions/held?branchId=
+   * Held (ON_HOLD) monthly subscriptions. These generate no bills, so they
+   * never appear in `list`; this surfaces them for the dashboard's On-Hold view.
+   */
+  listHeld: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const conditions: string[] = [
+        'e.company_id = $1',
+        `e.status = 'ON_HOLD'`,
+        `e.payment_type = 'MONTHLY_SUBSCRIPTION'`,
+      ];
+      const params: any[] = [context.companyId];
+
+      if (q?.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        conditions.push(`e.branch_id = $${params.length}`);
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'e.branch_id');
+        if (branchClause) conditions.push(branchClause);
+      }
+
+      const rows = await query(
+        `SELECT
+           e.id           AS enrollment_id,
+           e.student_id,
+           e.course_id,
+           e.branch_id,
+           e.hold_start_month,
+           e.hold_start_year,
+           s.first_name   AS student_first_name,
+           s.last_name    AS student_last_name,
+           c.name         AS course_name,
+           b.name         AS branch_name,
+           cl.name        AS class_name
+         FROM enrollments e
+         JOIN students s ON e.student_id = s.id
+         JOIN courses  c ON e.course_id  = c.id
+         JOIN branches b ON e.branch_id  = b.id
+         LEFT JOIN classes cl ON e.class_id = cl.id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY s.first_name, s.last_name`,
+        params
+      );
+
+      const result = rows.map((r: any) => ({
+        enrollmentId: r.enrollment_id,
+        studentId: r.student_id,
+        courseId: r.course_id,
+        branchId: r.branch_id,
+        studentFirstName: r.student_first_name,
+        studentLastName: r.student_last_name,
+        courseName: r.course_name,
+        branchName: r.branch_name,
+        className: r.class_name || null,
+        holdStartMonth: r.hold_start_month != null ? Number(r.hold_start_month) : null,
+        holdStartYear: r.hold_start_year != null ? Number(r.hold_start_year) : null,
+      }));
+
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      console.error('List held subscriptions error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to list held subscriptions');
     }
   },
 

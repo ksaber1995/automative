@@ -167,6 +167,7 @@ const router = {
   monthlySubscriptions: {
     generate: monthlySubscriptionsRoutes.generate,
     list: monthlySubscriptionsRoutes.list,
+    listHeld: monthlySubscriptionsRoutes.listHeld,
     summary: monthlySubscriptionsRoutes.summary,
     recordPayment: monthlySubscriptionsRoutes.recordPayment,
     voidPayment: monthlySubscriptionsRoutes.voidPayment,

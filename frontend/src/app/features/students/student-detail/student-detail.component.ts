@@ -8,6 +8,8 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
@@ -53,6 +55,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     TagModule,
     TooltipModule,
     DialogModule,
+    ConfirmDialogModule,
     InputNumberModule,
     DatePickerModule,
     TextareaModule,
@@ -68,7 +71,8 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     StudentQrDialogComponent,
   ],
   templateUrl: './student-detail.component.html',
-  styleUrl: './student-detail.component.scss'
+  styleUrl: './student-detail.component.scss',
+  providers: [ConfirmationService],
 })
 export class StudentDetailComponent implements OnInit {
   private studentService = inject(StudentService);
@@ -87,6 +91,7 @@ export class StudentDetailComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
+  private confirmationService = inject(ConfirmationService);
 
   /** TEACHER companies don't use master courses, so hide that whole section. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -278,14 +283,21 @@ export class StudentDetailComponent implements OnInit {
   }
 
   cancelMasterEnrollment(me: MasterEnrollmentProgress) {
-    if (!confirm(this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCEL_CONFIRM'))) return;
-    this.masterEnrollmentService.cancel(me.id).subscribe({
-      next: () => {
-        this.notificationService.success(this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCELLED'));
-        if (this.studentId) this.loadMasterEnrollments(this.studentId);
-      },
-      error: () => {
-        // Interceptor toasted the translated error.
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCEL_TITLE'),
+      message: this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCEL_CONFIRM'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.masterEnrollmentService.cancel(me.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.MASTER_ENROLLMENT_CANCELLED'));
+            if (this.studentId) this.loadMasterEnrollments(this.studentId);
+          },
+          error: () => {
+            // Interceptor toasted the translated error.
+          },
+        });
       },
     });
   }
@@ -420,44 +432,45 @@ export class StudentDetailComponent implements OnInit {
 
   // ─── Subscription hold / resume / delete ───────────────────────────────────
 
-  showHoldDialog = false;
-  holdEnrollment = signal<Enrollment | null>(null);
-  holdMonths = 1;
-
-  openHoldDialog(enrollment: Enrollment) {
-    this.holdEnrollment.set(enrollment);
-    this.holdMonths = 1;
-    this.showHoldDialog = true;
-  }
-
-  submitHold() {
-    const enrollment = this.holdEnrollment();
-    if (!enrollment) return;
-    this.actionLoading.set(true);
-    this.enrollmentService.holdSubscription(enrollment.id, this.holdMonths).subscribe({
-      next: () => {
-        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_HELD'));
-        this.showHoldDialog = false;
-        this.actionLoading.set(false);
-        if (this.studentId) this.loadEnrollments(this.studentId);
-      },
-      error: () => {
-        this.actionLoading.set(false);
+  holdSubscription(enrollment: Enrollment) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.DETAIL.HOLD_SUBSCRIPTION'),
+      message: this.translate.instant('STUDENTS.DETAIL.HOLD_CONFIRM'),
+      icon: 'pi pi-pause',
+      acceptButtonStyleClass: 'p-button-warning',
+      accept: () => {
+        this.actionLoading.set(true);
+        this.enrollmentService.holdSubscription(enrollment.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_HELD'));
+            this.actionLoading.set(false);
+            if (this.studentId) this.loadEnrollments(this.studentId);
+          },
+          error: () => {
+            this.actionLoading.set(false);
+          },
+        });
       },
     });
   }
 
   resumeSubscription(enrollment: Enrollment) {
-    if (!confirm(this.translate.instant('STUDENTS.DETAIL.RESUME_CONFIRM'))) return;
-    this.actionLoading.set(true);
-    this.enrollmentService.resumeSubscription(enrollment.id).subscribe({
-      next: () => {
-        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_RESUMED'));
-        this.actionLoading.set(false);
-        if (this.studentId) this.loadEnrollments(this.studentId);
-      },
-      error: () => {
-        this.actionLoading.set(false);
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.DETAIL.RESUME_SUBSCRIPTION'),
+      message: this.translate.instant('STUDENTS.DETAIL.RESUME_CONFIRM'),
+      icon: 'pi pi-refresh',
+      accept: () => {
+        this.actionLoading.set(true);
+        this.enrollmentService.resumeSubscription(enrollment.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_RESUMED'));
+            this.actionLoading.set(false);
+            if (this.studentId) this.loadEnrollments(this.studentId);
+          },
+          error: () => {
+            this.actionLoading.set(false);
+          },
+        });
       },
     });
   }
@@ -468,19 +481,26 @@ export class StudentDetailComponent implements OnInit {
   }
 
   deleteMonthlyEnrollment(enrollment: Enrollment) {
-    if (!confirm(this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION_CONFIRM'))) return;
-    this.actionLoading.set(true);
-    this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
-      next: () => {
-        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_DELETED'));
-        this.actionLoading.set(false);
-        if (this.studentId) {
-          this.loadEnrollments(this.studentId);
-          this.loadMonthlySubscriptions(this.studentId);
-        }
-      },
-      error: () => {
-        this.actionLoading.set(false);
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION'),
+      message: this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION_CONFIRM'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.actionLoading.set(true);
+        this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_DELETED'));
+            this.actionLoading.set(false);
+            if (this.studentId) {
+              this.loadEnrollments(this.studentId);
+              this.loadMonthlySubscriptions(this.studentId);
+            }
+          },
+          error: () => {
+            this.actionLoading.set(false);
+          },
+        });
       },
     });
   }

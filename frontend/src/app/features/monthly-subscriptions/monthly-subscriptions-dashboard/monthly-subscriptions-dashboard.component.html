@@ -153,6 +153,61 @@
       }
     </div>
 
+    @if (statusFilter() === 'ON_HOLD') {
+    <!-- On-Hold Subscriptions Table -->
+    <p-table
+      [value]="heldSubscriptions()"
+      [loading]="loading()"
+      dataKey="enrollmentId"
+      [paginator]="heldSubscriptions().length > 10"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 20, 50]"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.STUDENT' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.COURSE' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.BRANCH' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.HELD_SINCE' | translate }}</th>
+          <th>{{ 'MONTHLY_SUBSCRIPTIONS.ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-h>
+        <tr>
+          <td class="font-medium">{{ h.studentFirstName }} {{ h.studentLastName }}</td>
+          <td>{{ h.courseName }}</td>
+          <td>{{ h.branchName }}</td>
+          <td>
+            @if (h.holdStartMonth) {
+              {{ h.holdStartMonth }}/{{ h.holdStartYear }}
+            } @else {
+              -
+            }
+          </td>
+          <td>
+            <p-button
+              icon="pi pi-play"
+              size="small"
+              severity="success"
+              [label]="'MONTHLY_SUBSCRIPTIONS.RESUME' | translate"
+              (onClick)="resumeSubscription(h.enrollmentId)"
+            ></p-button>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="5" class="text-center py-10">
+            <div class="text-gray-500">
+              <i class="pi pi-pause-circle text-4xl mb-3 block"></i>
+              <p class="mb-1">{{ 'MONTHLY_SUBSCRIPTIONS.NO_HELD' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+    } @else {
     <!-- Payments Table -->
     <p-table
       [value]="filteredPayments()"
@@ -202,10 +257,18 @@
             {{ (p.amountDue - p.amountPaid) | amount }}
           </td>
           <td>
-            <p-tag
-              [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate"
-              [severity]="getStatusSeverity(p.paymentStatus)"
-            ></p-tag>
+            <div class="flex items-center gap-1">
+              <p-tag
+                [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate"
+                [severity]="getStatusSeverity(p.paymentStatus)"
+              ></p-tag>
+              @if (p.enrollmentStatus === 'ON_HOLD') {
+                <p-tag
+                  [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.ON_HOLD' | translate"
+                  severity="warn"
+                ></p-tag>
+              }
+            </div>
           </td>
           <td>
             <div class="flex items-center gap-1">
@@ -236,6 +299,25 @@
                   [disabled]="voidingId() === p.id"
                   [pTooltip]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate"
                   (onClick)="voidPayment(p, $event)"
+                ></p-button>
+              }
+              @if (p.enrollmentStatus === 'ON_HOLD') {
+                <p-button
+                  icon="pi pi-play"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="success"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.RESUME' | translate"
+                  (onClick)="resumeSubscription(p.enrollmentId)"
+                ></p-button>
+              } @else {
+                <p-button
+                  icon="pi pi-pause"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="warn"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.HOLD' | translate"
+                  (onClick)="holdSubscription(p)"
                 ></p-button>
               }
             </div>
@@ -275,6 +357,7 @@
         </tr>
       </ng-template>
     </p-table>
+    }
   </p-card>
 </div>
 

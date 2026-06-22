@@ -890,7 +890,7 @@ export const enrollmentsRoutes = {
     }
   },
 
-  holdSubscription: async ({ params, body, headers }: { params: { id: string }; body: { months: number }; headers: { authorization: string } }) => {
+  holdSubscription: async ({ params, headers }: { params: { id: string }; body?: { months?: number }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
@@ -912,12 +912,15 @@ export const enrollmentsRoutes = {
         return apiError(400, 'ERRORS.ENROLLMENTS.NOT_ACTIVE', 'Only active subscriptions can be held');
       }
 
+      // Indefinite hold: billing skips ON_HOLD enrollments every month until
+      // resumed. We record when the hold started (informational); hold_months
+      // stays null — the hold has no fixed end.
       const now = new Date();
       const updated = await update('enrollments', params.id, {
         status: 'ON_HOLD',
         hold_start_month: now.getMonth() + 1,
         hold_start_year: now.getFullYear(),
-        hold_months: body.months,
+        hold_months: null,
       });
 
       return { status: 200 as const, body: mapEnrollmentFromDB(updated) };

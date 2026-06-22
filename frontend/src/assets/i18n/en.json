@@ -547,8 +547,19 @@
       "PENDING": "Pending",
       "PARTIAL": "Partial",
       "PAID": "Paid",
-      "OVERDUE": "Overdue"
+      "OVERDUE": "Overdue",
+      "ON_HOLD": "On Hold"
     },
+    "RESUME": "Resume",
+    "HOLD": "Hold",
+    "NO_HELD": "No subscriptions on hold",
+    "HELD_SINCE": "On hold since",
+    "SUBSCRIPTION_HELD": "Subscription placed on hold",
+    "SUBSCRIPTION_RESUMED": "Subscription resumed",
+    "HOLD_CONFIRM": "Pause this subscription until you resume it? No bills will be generated while it is on hold.",
+    "RESUME_CONFIRM": "Resume this subscription? Billing will continue from the current month.",
+    "HOLD_TITLE": "Hold Subscription",
+    "RESUME_TITLE": "Resume Subscription",
     "OVERRIDE_PRICE_BUTTON": "Monthly Price",
     "OVERRIDE_TITLE": "Monthly Price Override",
     "OVERRIDE_DESCRIPTION": "Override the course price for this month. All student bills will scale proportionally — discounted students keep their discount ratio.",
@@ -2734,7 +2745,7 @@
       "HOLD_SUBSCRIPTION": "Hold Subscription",
       "HOLD_DESCRIPTION": "Hold this subscription for a specific number of months. No bills will be generated during the hold period.",
       "HOLD_MONTHS": "Number of months to hold",
-      "HOLD_CONFIRM": "Hold Subscription",
+      "HOLD_CONFIRM": "Pause this subscription until you resume it? No bills will be generated while it is on hold.",
       "SUBSCRIPTION_HELD": "Subscription placed on hold successfully.",
       "RESUME_SUBSCRIPTION": "Resume Subscription",
       "RESUME_CONFIRM": "Are you sure you want to resume this subscription?",
@@ -2760,6 +2771,7 @@
     "NOTHING_TO_REFUND": "Nothing left to refund on this enrollment",
     "ENROLLED_IN_CLASS": "Student enrolled in class",
     "MASTER_ENROLLMENT_CANCELLED": "Master enrollment cancelled",
+    "MASTER_ENROLLMENT_CANCEL_TITLE": "Cancel Master Enrollment",
     "MASTER_ENROLLMENT_CANCEL_CONFIRM": "Cancel this master enrollment? The student will lose coverage for linked courses."
   },
   "USERS": {

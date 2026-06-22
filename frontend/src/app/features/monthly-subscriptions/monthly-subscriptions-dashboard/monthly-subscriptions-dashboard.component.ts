@@ -20,6 +20,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
+import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -28,7 +29,7 @@ import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templa
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
-import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride } from '@shared/interfaces/monthly-subscription.interface';
+import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription } from '@shared/interfaces/monthly-subscription.interface';
 import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
 
@@ -68,6 +69,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   // Data — signals so async-loaded data renders without needing a user interaction.
   payments = signal<MonthlyPaymentWithDetails[]>([]);
   filteredPayments = signal<MonthlyPaymentWithDetails[]>([]);
+  heldSubscriptions = signal<HeldSubscription[]>([]);
   summary = signal<MonthlyPaymentSummary | null>(null);
 
   // UI state
@@ -83,7 +85,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // Status filter
   statusFilter = signal('ALL');
-  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE'];
+  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD'];
 
   // ── Monthly price override ──────────────────────────────────────────────────
   // The dialog is self-contained: the user picks course + year + month inside
@@ -123,6 +125,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   constructor(
     private fb: FormBuilder,
     private svc: MonthlySubscriptionsService,
+    private enrollmentService: EnrollmentService,
     private branchSvc: BranchService,
     private courseSvc: CourseService,
     private notify: NotificationService,
@@ -320,10 +323,12 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     forkJoin({
       payments: this.svc.list({ ...r, branchId: branchId || undefined, courseId: courseId || undefined }),
       summary: this.svc.summary({ ...r, branchId: branchId || undefined }),
+      held: this.svc.listHeld(branchId || undefined),
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ payments, summary }) => {
+      next: ({ payments, summary, held }) => {
         this.payments.set(payments);
         this.summary.set(summary);
+        this.heldSubscriptions.set(held);
         this.applyStatusFilter();
         this.loading.set(false);
       },
@@ -346,6 +351,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   statusCount(status: string): number {
+    if (status === 'ON_HOLD') return this.heldSubscriptions().length;
     const all = this.payments();
     if (status === 'ALL') return all.length;
     return all.filter(p => p.paymentStatus === status).length;
@@ -434,6 +440,47 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
           error: () => {
             this.voidingId.set(null);
             this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_ERROR'));
+          },
+        });
+      },
+    });
+  }
+
+  // ── Hold / Resume subscription ──────────────────────────────────────────────
+
+  /** Pause a subscription after confirmation — no bills are generated while on hold. */
+  holdSubscription(p: MonthlyPaymentWithDetails): void {
+    this.confirm.confirm({
+      message: this.translate.instant('MONTHLY_SUBSCRIPTIONS.HOLD_CONFIRM'),
+      header: this.translate.instant('MONTHLY_SUBSCRIPTIONS.HOLD_TITLE'),
+      icon: 'pi pi-pause',
+      acceptButtonStyleClass: 'p-button-warning',
+      acceptLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.HOLD'),
+      rejectLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CANCEL'),
+      accept: () => {
+        this.enrollmentService.holdSubscription(p.enrollmentId).pipe(takeUntil(this.destroy$)).subscribe({
+          next: () => {
+            this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.SUBSCRIPTION_HELD'));
+            this.loadData();
+          },
+        });
+      },
+    });
+  }
+
+  /** Resume a held subscription after confirmation — billing continues from the current month. */
+  resumeSubscription(enrollmentId: string): void {
+    this.confirm.confirm({
+      message: this.translate.instant('MONTHLY_SUBSCRIPTIONS.RESUME_CONFIRM'),
+      header: this.translate.instant('MONTHLY_SUBSCRIPTIONS.RESUME_TITLE'),
+      icon: 'pi pi-play',
+      acceptLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.RESUME'),
+      rejectLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CANCEL'),
+      accept: () => {
+        this.enrollmentService.resumeSubscription(enrollmentId).pipe(takeUntil(this.destroy$)).subscribe({
+          next: () => {
+            this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.SUBSCRIPTION_RESUMED'));
+            this.loadData();
           },
         });
       },
@@ -574,6 +621,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       case 'PENDING': return 'warn';
       case 'OVERDUE': return 'danger';
       case 'PARTIAL': return 'info';
+      case 'ON_HOLD': return 'warn';
       default: return 'secondary';
     }
   }

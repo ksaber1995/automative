@@ -9,6 +9,7 @@ import {
   GenerateMonthlyBillsDto,
   CourseMonthlyPriceOverride,
   SetPriceOverrideDto,
+  HeldSubscription,
 } from '@shared/interfaces/monthly-subscription.interface';
 
 @Injectable({ providedIn: 'root' })
@@ -116,5 +117,12 @@ export class MonthlySubscriptionsService {
   /** Delete a price override and revert bills to normal pricing. */
   deletePriceOverride(id: string): Observable<{ deleted: boolean; updatedBills: number }> {
     return this.http.delete<{ deleted: boolean; updatedBills: number }>(`${this.base}/price-override/${id}`);
+  }
+
+  /** List subscriptions currently on hold (generate no bills until resumed). */
+  listHeld(branchId?: string): Observable<HeldSubscription[]> {
+    let httpParams = new HttpParams();
+    if (branchId) httpParams = httpParams.set('branchId', branchId);
+    return this.http.get<HeldSubscription[]>(`${this.base}/held`, { params: httpParams });
   }
 }

@@ -28,6 +28,23 @@ export interface MonthlyPaymentWithDetails extends MonthlySubscriptionPayment {
   studentPhone?: string | null;
   parentPhone?: string | null;
   parentName?: string | null;
+  /** Current status of the underlying enrollment (e.g. ACTIVE, ON_HOLD). */
+  enrollmentStatus?: string | null;
+}
+
+/** A monthly subscription currently on hold (generates no bills until resumed). */
+export interface HeldSubscription {
+  enrollmentId: string;
+  studentId: string;
+  courseId: string;
+  branchId: string;
+  studentFirstName: string;
+  studentLastName: string;
+  courseName: string;
+  branchName: string;
+  className?: string | null;
+  holdStartMonth?: number | null;
+  holdStartYear?: number | null;
 }
 
 export interface MonthlyPaymentSummary {

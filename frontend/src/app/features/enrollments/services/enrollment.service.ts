@@ -49,8 +49,9 @@ export class EnrollmentService {
     return this.api.post<Refund>(`enrollments/${enrollmentId}/refunds`, refund);
   }
 
-  holdSubscription(enrollmentId: string, months: number): Observable<Enrollment> {
-    return this.api.post<Enrollment>(`enrollments/${enrollmentId}/hold`, { months });
+  /** Hold a monthly subscription indefinitely (paused until resumed). */
+  holdSubscription(enrollmentId: string): Observable<Enrollment> {
+    return this.api.post<Enrollment>(`enrollments/${enrollmentId}/hold`, {});
   }
 
   resumeSubscription(enrollmentId: string): Observable<Enrollment> {

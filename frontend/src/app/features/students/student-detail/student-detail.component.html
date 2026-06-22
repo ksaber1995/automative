@@ -1,4 +1,5 @@
 <div class="container mx-auto p-6">
+  <p-confirmDialog></p-confirmDialog>
   @if (student(); as s) {
     <!-- QR code dialog -->
     <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)" (activated)="onQrRegenerated($event)"></app-student-qr-dialog>
@@ -552,7 +553,7 @@
                       [rounded]="true"
                       [text]="true"
                       severity="warn"
-                      (onClick)="openHoldDialog(enrollment)"
+                      (onClick)="holdSubscription(enrollment)"
                       [pTooltip]="'STUDENTS.DETAIL.HOLD_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
@@ -1274,32 +1275,6 @@
       [loading]="actionLoading()"
       [disabled]="!selectedJoinClass()"
       (onClick)="submitJoinBundleCourse()"
-    ></p-button>
-  </ng-template>
-</p-dialog>
-
-<!-- Hold Subscription Dialog -->
-<p-dialog
-  [header]="'STUDENTS.DETAIL.HOLD_SUBSCRIPTION' | translate"
-  [(visible)]="showHoldDialog"
-  [modal]="true"
-  [style]="{ width: '400px' }"
->
-  <div class="space-y-4">
-    <p class="text-gray-600 text-sm">{{ 'STUDENTS.DETAIL.HOLD_DESCRIPTION' | translate }}</p>
-    <div class="field">
-      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.HOLD_MONTHS' | translate }}</label>
-      <p-inputnumber [(ngModel)]="holdMonths" [min]="1" [max]="12" [showButtons]="true" class="w-full"></p-inputnumber>
-    </div>
-  </div>
-  <ng-template pTemplate="footer">
-    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showHoldDialog = false"></p-button>
-    <p-button
-      [label]="'STUDENTS.DETAIL.HOLD_CONFIRM' | translate"
-      icon="pi pi-pause"
-      severity="warn"
-      [loading]="actionLoading()"
-      (onClick)="submitHold()"
     ></p-button>
   </ng-template>
 </p-dialog>

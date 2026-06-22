@@ -618,6 +618,21 @@ const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend(
   studentPhone: z.string().nullable().optional(),
   parentPhone: z.string().nullable().optional(),
   parentName: z.string().nullable().optional(),
+  enrollmentStatus: z.string().nullable().optional(),
+});
+
+const HeldSubscriptionSchema = z.object({
+  enrollmentId: z.string(),
+  studentId: z.string(),
+  courseId: z.string(),
+  branchId: z.string(),
+  studentFirstName: z.string(),
+  studentLastName: z.string(),
+  courseName: z.string(),
+  branchName: z.string(),
+  className: z.string().nullable().optional(),
+  holdStartMonth: z.number().nullable().optional(),
+  holdStartYear: z.number().nullable().optional(),
 });
 
 const MonthlyPaymentSummarySchema = z.object({
@@ -2529,7 +2544,8 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/enrollments/:id/hold',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ months: z.number().int().min(1).max(12) }),
+      // Hold is indefinite ("until resumed"). `months` is optional/legacy and unused for billing.
+      body: z.object({ months: z.number().int().min(1).max(12).optional() }).optional(),
       responses: {
         200: EnrollmentSchema,
         400: ApiErrorSchema,
@@ -4753,6 +4769,17 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(MonthlyPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    listHeld: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/held',
+      query: z.object({
+        branchId: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(HeldSubscriptionSchema),
         403: ApiErrorSchema,
       },
     },
