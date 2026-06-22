@@ -211,9 +211,9 @@ export const routes: Routes = [
         loadComponent: () => import('./features/company-profile/company-profile.component').then(m => m.CompanyProfileComponent)
       },
       {
-        path: 'messaging',
-        data: { breadcrumb: 'BREADCRUMBS.MESSAGING' },
-        loadComponent: () => import('./features/messaging/messaging-page/messaging-page.component').then(m => m.MessagingPageComponent)
+        path: 'whatsapp-templates',
+        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP_TEMPLATES' },
+        loadComponent: () => import('./features/whatsapp-templates/whatsapp-templates.component').then(m => m.WhatsappTemplatesComponent)
       }
     ]
   },

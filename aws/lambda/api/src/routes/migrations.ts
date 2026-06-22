@@ -1294,6 +1294,42 @@ async function addSubscriptionHold() {
   return { success: true, message: 'Subscription hold migration ready' };
 }
 
+async function setupWhatsappTemplates() {
+  console.log('Starting migration: whatsapp_templates (click-to-chat) + drop legacy messaging tables');
+
+  // 1) Drop the legacy Meta-Cloud-API messaging tables — replaced by per-staff
+  //    click-to-chat (wa.me) which needs no server-side sending, quota, or logs.
+  await query(`DROP TABLE IF EXISTS message_log CASCADE`);
+  await query(`DROP TABLE IF EXISTS messaging_quota CASCADE`);
+  await query(`DROP TABLE IF EXISTS message_settings CASCADE`);
+  await query(`DROP TABLE IF EXISTS message_templates CASCADE`);
+  console.log('✓ Dropped legacy messaging tables');
+
+  // 2) Create the editable click-to-chat template store. One body per type per
+  //    company; the app fills defaults for any type a company hasn't customized.
+  await query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_templates (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      type        VARCHAR(30) NOT NULL
+                    CHECK (type IN ('QR_STUDENT', 'FOLLOWUP_PARENT', 'ABSENCE', 'PAYMENT_DELAY', 'EXAM_RESULTS')),
+      body        TEXT NOT NULL,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (company_id, type)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_templates_company ON whatsapp_templates(company_id)`);
+  await query(`DROP TRIGGER IF EXISTS update_whatsapp_templates_updated_at ON whatsapp_templates`);
+  await query(`
+    CREATE TRIGGER update_whatsapp_templates_updated_at
+      BEFORE UPDATE ON whatsapp_templates
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+  `);
+  console.log('✅ whatsapp_templates migration completed!');
+  return { success: true, message: 'whatsapp_templates ready; legacy messaging tables dropped' };
+}
+
 export const migrationsRoutes = {
   addCourseMonthlyPriceOverrides: async () => {
     try {
@@ -1800,6 +1836,21 @@ export const migrationsRoutes = {
   addSubscriptionHold: async () => {
     try {
       const result = await addSubscriptionHold();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  setupWhatsappTemplates: async () => {
+    try {
+      const result = await setupWhatsappTemplates();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

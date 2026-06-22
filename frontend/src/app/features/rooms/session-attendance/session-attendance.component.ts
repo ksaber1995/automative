@@ -18,7 +18,9 @@ import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../att
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { MessagingService } from '../../messaging/services/messaging.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
+import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 
 interface TeacherRow {
   employeeId: string;
@@ -68,7 +70,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private fb = inject(FormBuilder);
-  private messagingService = inject(MessagingService);
+  private auth = inject(AuthService);
+  private templatesSvc = inject(WhatsappTemplatesService);
 
   sessionId = '';
   session = signal<Session | null>(null);
@@ -159,10 +162,11 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     notes: [''],
   });
 
-  // ── Post-session messaging ──────────────────────────────────────────────
+  // ── Post-session messaging (per-staff click-to-chat) ────────────────────
   showAbsenceMessageDialog = signal(false);
-  absentStudentsForMessage = signal<{ studentId: string; name: string; selected: boolean }[]>([]);
-  sendingMessages = signal(false);
+  absentStudentsForMessage = signal<
+    { studentId: string; name: string; parentName: string | null; parentPhone: string | null; studentPhone: string | null }[]
+  >([]);
 
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
@@ -178,6 +182,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
     this.loadStudents();
     this.loadEmployees();
+    // Warm the click-to-chat templates cache (fire-and-forget).
+    this.templatesSvc.load().subscribe({ error: () => {} });
   }
 
   loadStudents() {
@@ -374,8 +380,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
           this.absentStudentsForMessage.set(
             absent.map(st => ({
               studentId: st.studentId,
-              name: `${st.studentFirstName} ${st.studentLastName}`,
-              selected: true,
+              name: `${st.studentFirstName} ${st.studentLastName}`.trim(),
+              parentName: st.parentName ?? null,
+              parentPhone: st.parentPhone ?? null,
+              studentPhone: st.studentPhone ?? null,
             })),
           );
           this.showAbsenceMessageDialog.set(true);
@@ -387,48 +395,31 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Absence messaging after session end ─────────────────────────────────
+  // ── Absence messaging after session end (per-staff click-to-chat) ───────
 
-  toggleAbsentStudent(studentId: string, selected: boolean) {
-    this.absentStudentsForMessage.update(list =>
-      list.map(s => s.studentId === studentId ? { ...s, selected } : s),
-    );
-  }
-
-  toggleAllAbsent(selected: boolean) {
-    this.absentStudentsForMessage.update(list => list.map(s => ({ ...s, selected })));
-  }
-
-  sendAbsenceMessages() {
+  /**
+   * Open the parent's WhatsApp chat pre-filled with the ABSENCE template,
+   * sent from the staff member's own number. Does NOT navigate away — staff
+   * may send to several parents from the same dialog.
+   */
+  sendAbsenceMessage(stu: { studentId: string; name: string; parentName: string | null; parentPhone: string | null; studentPhone: string | null }) {
     const s = this.session();
     if (!s) return;
-    const selectedIds = this.absentStudentsForMessage().filter(st => st.selected).map(st => st.studentId);
-    if (selectedIds.length === 0) {
-      this.notificationService.info(this.translate.instant('MESSAGING.NO_STUDENTS_SELECTED'));
-      return;
-    }
-    this.sendingMessages.set(true);
-    const sessionDate = new Date(s.startDate);
-    const dateStr = sessionDate.toLocaleDateString('en-GB');
-    this.messagingService.sendBulk('ABSENCE', selectedIds, {
+    const studentName = stu.name;
+    const vars = {
+      studentName,
+      parentName: stu.parentName || studentName,
+      academyName: this.auth.getCompanyName(),
       className: s.className || '',
       courseName: s.courseName || '',
       sessionNumber: String(s.sessionNumber ?? ''),
-      date: dateStr,
-    }).subscribe({
-      next: (res) => {
-        this.sendingMessages.set(false);
-        this.notificationService.success(
-          this.translate.instant('MESSAGING.BULK_SENT_RESULT', { sent: res.sent, skipped: res.skipped }),
-        );
-        this.showAbsenceMessageDialog.set(false);
-        this.router.navigate(['/sessions']);
-      },
-      error: () => {
-        this.sendingMessages.set(false);
-        this.notificationService.error(this.translate.instant('MESSAGING.SEND_FAILED'));
-      },
-    });
+      date: new Date(s.startDate).toLocaleDateString('en-GB'),
+    };
+    const text = renderWhatsappTemplate(this.templatesSvc.get('ABSENCE'), vars);
+    const opened = openWhatsappChat(stu.parentPhone, text);
+    if (!opened) {
+      this.notificationService.info(this.translate.instant('WHATSAPP.NO_PHONE'));
+    }
   }
 
   skipAbsenceMessages() {

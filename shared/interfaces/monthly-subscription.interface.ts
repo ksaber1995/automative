@@ -25,6 +25,9 @@ export interface MonthlyPaymentWithDetails extends MonthlySubscriptionPayment {
   courseName: string;
   branchName: string;
   className?: string | null;
+  studentPhone?: string | null;
+  parentPhone?: string | null;
+  parentName?: string | null;
 }
 
 export interface MonthlyPaymentSummary {

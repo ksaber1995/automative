@@ -528,6 +528,9 @@ const ExamResultRowSchema = z.object({
   studentId: UUIDSchema,
   firstName: z.string(),
   lastName: z.string(),
+  parentName: z.string().nullable().optional(),
+  parentPhone: z.string().nullable().optional(),
+  studentPhone: z.string().nullable().optional(),
   grade: z.string().nullable(),
   recordedAt: z.string().nullable(),
 });
@@ -612,6 +615,9 @@ const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend(
   courseName: z.string(),
   branchName: z.string(),
   className: z.string().nullable().optional(),
+  studentPhone: z.string().nullable().optional(),
+  parentPhone: z.string().nullable().optional(),
+  parentName: z.string().nullable().optional(),
 });
 
 const MonthlyPaymentSummarySchema = z.object({
@@ -3835,18 +3841,6 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
-    setMessagingStatus: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/companies/:companyId/messaging-status',
-      pathParams: z.object({ companyId: UUIDSchema }),
-      body: z.object({ status: z.string() }),
-      responses: {
-        200: z.object({ success: z.boolean(), messaging_status: z.string() }),
-        400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
-      },
-    },
     // Permanently delete a company and ALL its data (FK cascade). Irreversible.
     deleteCompany: {
       method: 'DELETE',
@@ -4190,6 +4184,15 @@ export const contract = c.router({
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
+    setupWhatsappTemplates: {
+      method: 'POST',
+      path: '/api/migrations/setup-whatsapp-templates',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
   },
 
   // ============================================================
@@ -4415,6 +4418,9 @@ export const contract = c.router({
           studentId: UUIDSchema,
           studentFirstName: z.string(),
           studentLastName: z.string(),
+          parentName: z.string().nullable().optional(),
+          parentPhone: z.string().nullable().optional(),
+          studentPhone: z.string().nullable().optional(),
           isPresent: z.boolean(),
           attendanceId: UUIDSchema.nullable().optional(),
           attendanceType: z.enum(['NORMAL', 'SUBSTITUTION']).nullable().optional(),
@@ -4883,115 +4889,25 @@ export const contract = c.router({
   // ============================================================
   // Timetable
   // ============================================================
-  // MESSAGING
+  // WHATSAPP TEMPLATES (click-to-chat)
   // ============================================================
-  messaging: {
-    getSettings: {
+  whatsappTemplates: {
+    getTemplates: {
       method: 'GET' as const,
-      path: '/api/messaging/settings',
+      path: '/api/whatsapp/templates',
       responses: {
-        200: z.object({
-          messagingStatus: z.enum(['DISABLED', 'PENDING', 'ACTIVE', 'REJECTED', 'REVOKED']),
-          absenceWarningThreshold: z.number(),
-          autoSendAbsence: z.boolean(),
-          autoSendPaymentDelay: z.boolean(),
-          autoSendAbsenceWarning: z.boolean(),
-          autoSendExamResults: z.boolean(),
-        }),
+        200: z.object({ templates: z.record(z.string()) }),
         401: ApiErrorSchema,
         500: ApiErrorSchema,
       },
     },
-    updateSettings: {
+    updateTemplates: {
       method: 'PUT' as const,
-      path: '/api/messaging/settings',
-      body: z.object({
-        absenceWarningThreshold: z.number().min(2).max(10).optional(),
-        autoSendAbsence: z.boolean().optional(),
-        autoSendPaymentDelay: z.boolean().optional(),
-        autoSendAbsenceWarning: z.boolean().optional(),
-        autoSendExamResults: z.boolean().optional(),
-      }),
+      path: '/api/whatsapp/templates',
+      body: z.object({ templates: z.record(z.string()) }),
       responses: {
-        200: z.object({ message: z.string() }),
-        401: ApiErrorSchema,
-        403: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    requestActivation: {
-      method: 'POST' as const,
-      path: '/api/messaging/request',
-      body: z.object({}),
-      responses: {
-        200: z.object({ messagingStatus: z.string() }),
+        200: z.object({ templates: z.record(z.string()) }),
         400: ApiErrorSchema,
-        401: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    getQuota: {
-      method: 'GET' as const,
-      path: '/api/messaging/quota',
-      responses: {
-        200: z.object({
-          month: z.string(),
-          messagesSent: z.number(),
-          quotaLimit: z.number(),
-          activatedStudents: z.number(),
-        }),
-        401: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    send: {
-      method: 'POST' as const,
-      path: '/api/messaging/send',
-      body: z.object({
-        type: z.enum(['ABSENCE', 'PAYMENT_DELAY', 'ABSENCE_WARNING', 'EXAM_RESULTS']),
-        studentId: z.string().uuid(),
-        variables: z.record(z.string()).optional(),
-      }),
-      responses: {
-        200: z.object({ message: z.string(), logId: z.string() }),
-        400: ApiErrorSchema,
-        401: ApiErrorSchema,
-        403: ApiErrorSchema,
-        429: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    sendBulk: {
-      method: 'POST' as const,
-      path: '/api/messaging/send-bulk',
-      body: z.object({
-        type: z.enum(['ABSENCE', 'PAYMENT_DELAY', 'ABSENCE_WARNING', 'EXAM_RESULTS']),
-        studentIds: z.array(z.string().uuid()),
-        variables: z.record(z.string()).optional(),
-      }),
-      responses: {
-        200: z.object({ sent: z.number(), skipped: z.number(), failed: z.number() }),
-        400: ApiErrorSchema,
-        401: ApiErrorSchema,
-        403: ApiErrorSchema,
-        429: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    listLog: {
-      method: 'GET' as const,
-      path: '/api/messaging/log',
-      query: z.object({
-        type: z.string().optional(),
-        status: z.string().optional(),
-        limit: z.coerce.number().optional(),
-        offset: z.coerce.number().optional(),
-      }).optional(),
-      responses: {
-        200: z.object({
-          items: z.array(z.any()),
-          total: z.number(),
-        }),
         401: ApiErrorSchema,
         500: ApiErrorSchema,
       },

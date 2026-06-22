@@ -35,6 +35,9 @@ export interface ExamResultRow {
   studentId: string;
   firstName: string;
   lastName: string;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  studentPhone?: string | null;
   grade: string | null;
   recordedAt: string | null;
 }

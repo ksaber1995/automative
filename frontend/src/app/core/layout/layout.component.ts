@@ -108,7 +108,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
-      { labelKey: 'NAV.MESSAGING', icon: 'pi pi-comments', routerLink: ['/messaging'], visible: true },
+      { labelKey: 'NAV.WHATSAPP_TEMPLATES', icon: 'pi pi-whatsapp', routerLink: ['/whatsapp-templates'], visible: auth.canRead('academy') },
     ].filter(c => c.visible);
     if (academic.length) {
       entries.push({ kind: 'group', group: {

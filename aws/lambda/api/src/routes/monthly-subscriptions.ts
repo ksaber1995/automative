@@ -31,6 +31,9 @@ function mapPaymentWithDetailsFromDB(row: any) {
     courseName: row.course_name,
     branchName: row.branch_name,
     className: row.class_name || null,
+    studentPhone: row.student_phone || null,
+    parentPhone: row.parent_phone || null,
+    parentName: row.parent_name || null,
   };
 }
 
@@ -263,8 +266,11 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query(
         `SELECT
            msp.*,
-           s.first_name AS student_first_name,
-           s.last_name  AS student_last_name,
+           s.first_name   AS student_first_name,
+           s.last_name    AS student_last_name,
+           s.phone        AS student_phone,
+           s.parent_phone AS parent_phone,
+           s.parent_name  AS parent_name,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name

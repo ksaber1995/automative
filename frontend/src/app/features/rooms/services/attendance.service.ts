@@ -9,6 +9,9 @@ export interface SessionAttendanceStudent {
   studentId: string;
   studentFirstName: string;
   studentLastName: string;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  studentPhone?: string | null;
   isPresent: boolean;
   attendanceId?: string | null;
   attendanceType?: AttendanceType | null;

@@ -20,9 +20,9 @@
       ></p-tag>
       @if (canWrite()) {
         <p-button
-          [label]="'MESSAGING.SEND_EXAM_RESULTS' | translate"
-          icon="pi pi-send"
-          severity="info"
+          [label]="'WHATSAPP.EXAM_RESULTS_DIALOG_TITLE' | translate"
+          icon="pi pi-whatsapp"
+          severity="success"
           [outlined]="true"
           (onClick)="openResultsDialog()"
         ></p-button>
@@ -207,37 +207,23 @@
 <p-dialog
   [visible]="showResultsDialog()"
   (visibleChange)="showResultsDialog.set($event)"
-  [header]="'MESSAGING.EXAM_RESULTS_DIALOG_TITLE' | translate"
+  [header]="'WHATSAPP.EXAM_RESULTS_DIALOG_TITLE' | translate"
   [modal]="true"
   [style]="{ width: '520px' }"
 >
   <div class="pt-2 space-y-4">
-    <p class="text-sm text-gray-600">{{ 'MESSAGING.EXAM_RESULTS_DIALOG_DESC' | translate }}</p>
-
-    <div class="flex items-center gap-2 mb-2">
-      <p-button size="small" [outlined]="true" [label]="'MESSAGING.SELECT_ALL' | translate" (onClick)="toggleAllResults(true)"></p-button>
-      <p-button size="small" [outlined]="true" severity="secondary" [label]="'MESSAGING.DESELECT_ALL' | translate" (onClick)="toggleAllResults(false)"></p-button>
-    </div>
+    <p class="text-sm text-gray-600">{{ 'WHATSAPP.EXAM_RESULTS_DIALOG_DESC' | translate }}</p>
 
     <div class="max-h-64 overflow-y-auto space-y-1">
-      @for (st of resultsStudents(); track st.studentId) {
+      @for (row of resultsStudents(); track row.studentId) {
         <div class="flex items-center justify-between p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
           <div class="flex items-center gap-3">
-            <p-checkbox [ngModel]="st.selected" (ngModelChange)="toggleResultStudent(st.studentId, $event)" [binary]="true" [inputId]="'res-' + st.studentId"></p-checkbox>
-            <label [for]="'res-' + st.studentId" class="cursor-pointer text-sm font-medium text-gray-800">{{ st.name }}</label>
+            <span class="text-sm font-medium text-gray-800">{{ row.name }}</span>
+            <span class="text-sm font-semibold text-gray-500">{{ row.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
           </div>
-          <span class="text-sm font-semibold text-gray-600">{{ st.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+          <p-button icon="pi pi-whatsapp" severity="success" size="small" [label]="'WHATSAPP.SEND' | translate" (onClick)="sendExamResult(row)"></p-button>
         </div>
       }
     </div>
   </div>
-  <ng-template pTemplate="footer">
-    <p-button [label]="'MESSAGING.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showResultsDialog.set(false)"></p-button>
-    <p-button
-      [label]="'MESSAGING.SEND_EXAM_RESULTS' | translate"
-      icon="pi pi-send"
-      [loading]="sendingResults()"
-      (onClick)="sendExamResults()"
-    ></p-button>
-  </ng-template>
 </p-dialog>

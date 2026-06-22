@@ -26,8 +26,7 @@ const SUBSCRIPTIONS_SQL = `
     (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id) AS student_count,
     (SELECT COUNT(*) FROM students st WHERE st.company_id = c.id AND st.qr_activated) AS qr_activated_count,
     (SELECT COALESCE(SUM(st.qr_price),0) FROM students st WHERE st.company_id = c.id AND st.qr_activated) AS qr_total_cost,
-    (SELECT COALESCE(SUM(st.qr_price),0) FROM students st WHERE st.company_id = c.id AND st.qr_activated AND NOT st.qr_paid) AS qr_unpaid_cost,
-    (SELECT ms.messaging_status FROM message_settings ms WHERE ms.company_id = c.id) AS messaging_status
+    (SELECT COALESCE(SUM(st.qr_price),0) FROM students st WHERE st.company_id = c.id AND st.qr_activated AND NOT st.qr_paid) AS qr_unpaid_cost
   FROM companies c
   LEFT JOIN subscriptions s ON s.company_id = c.id
   LEFT JOIN users u ON u.id = c.created_by
@@ -62,7 +61,6 @@ export const adminSecretRoutes = {
         qr_activated_count: Number(r.qr_activated_count ?? 0),
         qr_total_cost: Number(r.qr_total_cost ?? 0),
         qr_unpaid_cost: Number(r.qr_unpaid_cost ?? 0),
-        messaging_status: r.messaging_status ?? null,
       }));
       return { status: 200 as const, body };
     } catch (error: any) {
@@ -202,34 +200,6 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set qr paid failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set QR paid failed' } };
-    }
-  },
-
-  /**
-   * POST /api/karim-admin-secret/companies/:companyId/messaging-status
-   * Set a company's messaging status (ACTIVE, REJECTED, REVOKED, DISABLED).
-   */
-  setMessagingStatus: async ({ params, body }: { params: { companyId: string }; body: { status: string } }) => {
-    try {
-      const allowed = ['DISABLED', 'ACTIVE', 'REJECTED', 'REVOKED'];
-      const status = body?.status;
-      if (!status || !allowed.includes(status)) {
-        return { status: 400 as const, body: { message: `status must be one of: ${allowed.join(', ')}` } };
-      }
-      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
-      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
-
-      const existing = await queryOne<any>('SELECT id FROM message_settings WHERE company_id = $1', [params.companyId]);
-      if (existing) {
-        await query('UPDATE message_settings SET messaging_status = $2, updated_at = NOW() WHERE company_id = $1', [params.companyId, status]);
-      } else {
-        await query('INSERT INTO message_settings (company_id, messaging_status) VALUES ($1, $2)', [params.companyId, status]);
-      }
-
-      return { status: 200 as const, body: { success: true, messaging_status: status } };
-    } catch (error: any) {
-      console.error('karim-admin-secret set messaging status failed:', error);
-      return { status: 500 as const, body: { message: error?.message || 'Set messaging status failed' } };
     }
   },
 

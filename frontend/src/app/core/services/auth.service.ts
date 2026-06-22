@@ -120,6 +120,11 @@ export class AuthService {
     return localStorage.getItem(environment.jwtTokenKey);
   }
 
+  /** The signed-in user's company/academy display name (cached at login). */
+  getCompanyName(): string {
+    return localStorage.getItem('company_name') || '';
+  }
+
   getRefreshToken(): string | null {
     return localStorage.getItem(environment.refreshTokenKey);
   }

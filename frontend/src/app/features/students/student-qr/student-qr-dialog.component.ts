@@ -4,9 +4,12 @@ import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
 import { TranslateModule } from '@ngx-translate/core';
 import QRCode from 'qrcode';
+import { TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
+import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { Student } from '@shared/interfaces/student.interface';
 
 /** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
@@ -30,6 +33,8 @@ export class StudentQrDialogComponent {
   private studentService = inject(StudentService);
   private notification = inject(NotificationService);
   private authService = inject(AuthService);
+  private translate = inject(TranslateService);
+  private templatesSvc = inject(WhatsappTemplatesService);
 
   /** Two-way bound visibility, driven by the parent. */
   visible = model<boolean>(false);
@@ -63,6 +68,9 @@ export class StudentQrDialogComponent {
   showQr = computed<boolean>(() => !this.isTeacher() || this.qrLive());
 
   constructor() {
+    // Warm the click-to-chat templates so the send buttons have bodies ready.
+    this.templatesSvc.load().subscribe({ error: () => {} });
+
     // Re-render the QR whenever the dialog opens or the token changes — but only
     // when the QR is actually usable (free, or paid-activated for teachers).
     effect(() => {
@@ -116,6 +124,35 @@ export class StudentQrDialogComponent {
 
   private profileUrl(token: string): string {
     return `${window.location.origin}/p/s/${token}`;
+  }
+
+  /** Click-to-chat: open WhatsApp to the STUDENT with the QR/profile link. */
+  sendQrToStudent(): void {
+    const s = this.student();
+    if (!s?.qrToken) return;
+    const text = renderWhatsappTemplate(this.templatesSvc.get('QR_STUDENT'), {
+      studentName: this.studentName(),
+      academyName: this.authService.getCompanyName(),
+      link: this.profileUrl(s.qrToken),
+    });
+    if (!openWhatsappChat(s.phone, text)) {
+      this.notification.error(this.translate.instant('STUDENT_QR.NO_STUDENT_PHONE'));
+    }
+  }
+
+  /** Click-to-chat: open WhatsApp to the PARENT with the follow-up link. */
+  sendFollowupToParent(): void {
+    const s = this.student();
+    if (!s?.qrToken) return;
+    const text = renderWhatsappTemplate(this.templatesSvc.get('FOLLOWUP_PARENT'), {
+      studentName: this.studentName(),
+      parentName: s.parentName || this.studentName(),
+      academyName: this.authService.getCompanyName(),
+      link: this.profileUrl(s.qrToken),
+    });
+    if (!openWhatsappChat(s.parentPhone, text)) {
+      this.notification.error(this.translate.instant('STUDENT_QR.NO_PARENT_PHONE'));
+    }
   }
 
   private async render(token: string): Promise<void> {

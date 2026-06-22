@@ -37,6 +37,12 @@
         <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [disabled]="!dataUrl()"></p-button>
         <p-button icon="pi pi-refresh" [label]="'STUDENT_QR.REGENERATE' | translate" size="small" severity="danger" [outlined]="true" (onClick)="regenerate()" [loading]="regenerating()"></p-button>
       </div>
+
+      <!-- Click-to-chat: send from the staff member's own WhatsApp number -->
+      <div class="flex items-center justify-center gap-2 mt-2 flex-wrap">
+        <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_QR_STUDENT' | translate" size="small" severity="success" (onClick)="sendQrToStudent()" [disabled]="!dataUrl()"></p-button>
+        <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_FOLLOWUP_PARENT' | translate" size="small" severity="success" [outlined]="true" (onClick)="sendFollowupToParent()" [disabled]="!dataUrl()"></p-button>
+      </div>
     } @else {
       <!-- TEACHER company, QR not yet activated -->
       @if (pendingPlan(); as plan) {
