@@ -32,7 +32,7 @@
       <p-select
         [options]="branchFilterOptions()"
         [ngModel]="selectedBranchId()" (ngModelChange)="selectedBranchId.set($event)"
-        optionLabel="name"
+        optionLabel="label"
         optionValue="id"
         appendTo="body"
         [placeholder]="'ROOMS.ALL_BRANCHES' | translate"
@@ -181,7 +181,7 @@
         <p-select
           formControlName="branchId"
           [options]="branches()"
-          optionLabel="name"
+          optionLabel="label"
           optionValue="id"
           appendTo="body"
           [placeholder]="'ROOMS.FIELD_BRANCH_PLACEHOLDER' | translate"

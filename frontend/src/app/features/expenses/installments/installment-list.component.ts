@@ -9,11 +9,10 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { InstallmentPlan } from '@shared/interfaces/installment.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -27,14 +26,14 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class InstallmentListComponent implements OnInit {
   private installmentService = inject(InstallmentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   plans = signal<InstallmentPlan[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
 
   selectedBranchId = '';
@@ -49,7 +48,7 @@ export class InstallmentListComponent implements OnInit {
   remainingTotal = computed(() => this.plans().reduce((s, p) => s + (p.financedAmount - (p.paidAmount ?? 0)), 0));
 
   ngOnInit() {
-    this.branchService.getAllBranches().subscribe({ next: bs => this.branches.set(bs) });
+    this.lookupService.branches().subscribe({ next: bs => this.branches.set(bs) });
     this.load();
   }
 
@@ -92,7 +91,7 @@ export class InstallmentListComponent implements OnInit {
 
   getBranchName(branchId?: string | null): string {
     if (!branchId) return this.translate.instant('INSTALLMENTS.LIST.GLOBAL');
-    return this.branches().find(b => b.id === branchId)?.name || '—';
+    return this.branches().find(b => b.id === branchId)?.label || '—';
   }
 
   progressPct(plan: InstallmentPlan): number {

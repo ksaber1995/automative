@@ -7,11 +7,10 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { RevenueService, RevenueItem } from '../services/revenue.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { TranslateModule } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
@@ -26,14 +25,14 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 })
 export class RevenueListComponent implements OnInit {
   private revenueService = inject(RevenueService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   protected authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
   revenues = signal<RevenueItem[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
   selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'ALL' = 'ALL';
@@ -47,7 +46,7 @@ export class RevenueListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => this.branches.set(branches)
     });
   }
@@ -101,7 +100,7 @@ export class RevenueListComponent implements OnInit {
   getBranchName(branchId: string | null | undefined): string {
     if (!branchId) return 'Company-level';
     const branch = this.branches().find(b => b.id === branchId);
-    return branch ? branch.name : 'Unknown';
+    return branch ? branch.label : 'Unknown';
   }
 
   canSeeCompanyLevel(): boolean {

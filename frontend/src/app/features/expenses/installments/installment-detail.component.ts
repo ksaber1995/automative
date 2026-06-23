@@ -14,7 +14,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { TextareaModule } from 'primeng/textarea';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import {
@@ -22,7 +22,6 @@ import {
   InstallmentScheduleItem,
 } from '@shared/interfaces/installment.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -37,7 +36,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class InstallmentDetailComponent implements OnInit {
   private installmentService = inject(InstallmentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -47,7 +46,7 @@ export class InstallmentDetailComponent implements OnInit {
   plan = signal<InstallmentPlan | null>(null);
   schedule = signal<InstallmentScheduleItem[]>([]);
   downpaymentPayment = signal<ExpensePayment | null>(null);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   planId = '';
 
@@ -65,7 +64,7 @@ export class InstallmentDetailComponent implements OnInit {
   branchName = computed(() => {
     const p = this.plan();
     if (!p?.branchId) return this.translate.instant('INSTALLMENTS.DETAIL.GLOBAL');
-    return this.branches().find(b => b.id === p.branchId)?.name || '—';
+    return this.branches().find(b => b.id === p.branchId)?.label || '—';
   });
 
   showPayDialog = false;
@@ -82,7 +81,7 @@ export class InstallmentDetailComponent implements OnInit {
 
   ngOnInit() {
     this.planId = this.route.snapshot.paramMap.get('id') || '';
-    this.branchService.getActiveBranches().subscribe({ next: bs => this.branches.set(bs) });
+    this.lookupService.branches().subscribe({ next: bs => this.branches.set(bs) });
     this.load();
   }
 

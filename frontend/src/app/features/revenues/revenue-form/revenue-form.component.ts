@@ -10,14 +10,11 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { RevenueService } from '../services/revenue.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { CourseService } from '../../courses/services/course.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Revenue } from '@shared/interfaces/revenue.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
-import { Course } from '@shared/interfaces/course.interface';
 import { Student } from '@shared/interfaces/student.interface';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -43,8 +40,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 export class RevenueFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private revenueService = inject(RevenueService);
-  private branchService = inject(BranchService);
-  private courseService = inject(CourseService);
+  private lookupService = inject(LookupService);
   private studentService = inject(StudentService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -56,8 +52,8 @@ export class RevenueFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   revenueId: string | null = null;
-  branches = signal<Branch[]>([]);
-  courses = signal<Course[]>([]);
+  branches = signal<LookupOption[]>([]);
+  courses = signal<LookupOption[]>([]);
   students = signal<Student[]>([]);
   paymentMethods = Object.values(PaymentMethod);
 
@@ -89,7 +85,7 @@ export class RevenueFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
         if (branches.length === 1 && !this.isEditMode()) {
@@ -101,7 +97,7 @@ export class RevenueFormComponent implements OnInit {
   }
 
   loadCourses() {
-    this.courseService.getActiveCourses().subscribe({
+    this.lookupService.courses().subscribe({
       next: (courses) => this.courses.set(courses)
     });
   }

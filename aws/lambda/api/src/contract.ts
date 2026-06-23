@@ -1292,9 +1292,59 @@ const EducationalBooksCourseDetailSchema = z.object({
 });
 
 // =============================================
+// Lookups — permission-free {id, label} lists for dropdowns
+// =============================================
+const LookupOptionSchema = z.object({ id: z.string(), label: z.string() });
+const LookupListSchema = z.array(LookupOptionSchema);
+
+// =============================================
 // API Contract
 // =============================================
 export const contract = c.router({
+  // Lookups (auth-only, no granular permission) — see routes/lookups.ts
+  lookups: {
+    branches: {
+      method: 'GET', path: '/api/lookups/branches',
+      responses: { 200: LookupListSchema },
+    },
+    employees: {
+      method: 'GET', path: '/api/lookups/employees',
+      responses: { 200: LookupListSchema },
+    },
+    courses: {
+      method: 'GET', path: '/api/lookups/courses',
+      query: z.object({ branchId: OptionalUUIDSchema }),
+      responses: { 200: LookupListSchema },
+    },
+    classes: {
+      method: 'GET', path: '/api/lookups/classes',
+      query: z.object({ courseId: OptionalUUIDSchema, branchId: OptionalUUIDSchema }),
+      responses: { 200: LookupListSchema },
+    },
+    levels: {
+      method: 'GET', path: '/api/lookups/levels',
+      responses: { 200: LookupListSchema },
+    },
+    rooms: {
+      method: 'GET', path: '/api/lookups/rooms',
+      query: z.object({ branchId: OptionalUUIDSchema }),
+      responses: { 200: LookupListSchema },
+    },
+    masterCourses: {
+      method: 'GET', path: '/api/lookups/master-courses',
+      responses: { 200: LookupListSchema },
+    },
+    students: {
+      method: 'GET', path: '/api/lookups/students',
+      query: z.object({ branchId: OptionalUUIDSchema }),
+      responses: { 200: LookupListSchema },
+    },
+    products: {
+      method: 'GET', path: '/api/lookups/products',
+      query: z.object({ branchId: OptionalUUIDSchema }),
+      responses: { 200: LookupListSchema },
+    },
+  },
   // Auth routes
   auth: {
     login: {

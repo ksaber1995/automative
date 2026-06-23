@@ -10,10 +10,9 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-employee-form',
@@ -35,7 +34,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 export class EmployeeFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private employeeService = inject(EmployeeService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -46,7 +45,7 @@ export class EmployeeFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   employeeId: string | null = null;
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   salaryTypeOptions = signal<{ label: string; value: string }[]>([]);
 
   constructor() {
@@ -115,7 +114,7 @@ export class EmployeeFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
         if (branches.length === 1 && !this.isEditMode()) {

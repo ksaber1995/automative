@@ -19,7 +19,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService } from '../services/expense.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -58,7 +58,7 @@ interface SalaryAdjustment {
 })
 export class SalariesComponent implements OnInit {
   private expenseService = inject(ExpenseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private employeeService = inject(EmployeeService);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -70,7 +70,7 @@ export class SalariesComponent implements OnInit {
   loading = signal(false);
   paying = signal(false);
   salaryItems = signal<any[]>([]);
-  branches = signal<any[]>([]);
+  branches = signal<LookupOption[]>([]);
   employees = signal<Employee[]>([]);
   selectedMonth: Date = new Date();
   paymentDate: Date = new Date();
@@ -90,7 +90,7 @@ export class SalariesComponent implements OnInit {
 
   branchOptions = computed(() => [
     { label: this.translate.instant('EXPENSES.SALARIES.ALL_BRANCHES'), value: null },
-    ...this.branches().map(b => ({ label: b.name, value: b.id }))
+    ...this.branches().map(b => ({ label: b.label, value: b.id }))
   ]);
 
   employeeOptions = computed(() => [
@@ -160,7 +160,7 @@ export class SalariesComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b)
     });
     this.employeeService.getAllEmployees().subscribe({
@@ -203,7 +203,7 @@ export class SalariesComponent implements OnInit {
 
   getBranchName(branchId?: string | null): string {
     if (!branchId) return '';
-    return this.branches().find(b => b.id === branchId)?.name || '';
+    return this.branches().find(b => b.id === branchId)?.label || '';
   }
 
   getBasePaid(p: ExpensePayment): number {

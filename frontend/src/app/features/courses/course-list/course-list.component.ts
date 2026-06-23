@@ -15,14 +15,11 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { CourseService } from '../services/course.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { LevelService } from '../../levels/services/level.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
-import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-course-list',
@@ -51,8 +48,7 @@ import { Level } from '@shared/interfaces/level.interface';
 })
 export class CourseListComponent implements OnInit {
   private courseService = inject(CourseService);
-  private branchService = inject(BranchService);
-  private levelService = inject(LevelService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -60,8 +56,8 @@ export class CourseListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   courses = signal<CourseWithEnrollmentCount[]>([]);
-  branches = signal<Branch[]>([]);
-  levels = signal<Level[]>([]);
+  branches = signal<LookupOption[]>([]);
+  levels = signal<LookupOption[]>([]);
   loading = signal(true);
 
   selectedBranchId = signal<string | null>(null);
@@ -80,10 +76,10 @@ export class CourseListComponent implements OnInit {
 
   branchOptions = computed(() => [
     { label: this.translate.instant('COURSES.LIST.GLOBAL_NO_BRANCH'), value: '__global__' },
-    ...this.branches().map(b => ({ label: b.name, value: b.id })),
+    ...this.branches().map(b => ({ label: b.label, value: b.id })),
   ]);
 
-  levelOptions = computed(() => this.levels().map(l => ({ label: l.name, value: l.id })));
+  levelOptions = computed(() => this.levels().map(l => ({ label: l.label, value: l.id })));
 
   paymentTypeOptions = computed(() => [
     { label: this.translate.instant('COURSES.LIST.TYPE_ONE_TIME'), value: 'ONE_TIME' },
@@ -116,10 +112,10 @@ export class CourseListComponent implements OnInit {
 
   ngOnInit() {
     this.loadCourses();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => this.branches.set(branches),
     });
-    this.levelService.getAllLevels().subscribe({
+    this.lookupService.levels().subscribe({
       next: (levels) => this.levels.set(levels),
     });
   }
@@ -140,7 +136,7 @@ export class CourseListComponent implements OnInit {
 
   getBranchName(branchId: string | null): string {
     if (!branchId) return this.translate.instant('COURSES.LIST.GLOBAL');
-    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
   }
 
   clearFilters() {

@@ -63,7 +63,7 @@
           @if (!studentLocked() && !branchState.isSingleBranch() && !isTeacher()) {
             <div class="col-span-2">
               <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.LABEL_BRANCH' | translate }} <span class="text-red-500">*</span></label>
-              <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id"
+              <p-select formControlName="branchId" [options]="branches()" optionLabel="label" optionValue="id"
                 [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_BRANCH' | translate" (onChange)="onBranchChange()" [style]="{ width: '100%' }"></p-select>
               @if (f['branchId'].invalid && f['branchId'].touched) {
                 <small class="text-red-500">{{ 'ENROLLMENT_FORM.ERR_BRANCH_REQUIRED' | translate }}</small>

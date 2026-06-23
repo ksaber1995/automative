@@ -17,7 +17,7 @@ import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -25,7 +25,6 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { Class } from '@shared/interfaces/class.interface';
 
 interface EnrollmentCounts {
@@ -54,7 +53,7 @@ interface EnrollmentCounts {
 })
 export class StudentListComponent implements OnInit {
   private studentService = inject(StudentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private enrollmentService = inject(EnrollmentService);
   private classService = inject(ClassService);
   private courseService = inject(CourseService);
@@ -66,7 +65,7 @@ export class StudentListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   students = signal<Student[]>([]);
-  allBranches = signal<Branch[]>([]);
+  allBranches = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
   searchTerm = signal('');
@@ -74,20 +73,20 @@ export class StudentListComponent implements OnInit {
   activeTab = signal<'active' | 'inactive'>('active');
   qrFilter = signal<'ALL' | 'ACTIVATED' | 'NOT_ACTIVATED'>('ALL');
 
-  branches = computed(() => {
-    const all = this.allBranches();
-    return this.activeTab() === 'inactive' ? all : all.filter(b => b.isActive);
-  });
+  // The lookup returns active branches only, so all entries are selectable/active.
+  branches = computed(() => this.allBranches());
 
   branchNameById = computed(() => {
     const map = new Map<string, string>();
-    for (const b of this.allBranches()) map.set(b.id, b.name);
+    for (const b of this.allBranches()) map.set(b.id, b.label);
     return map;
   });
 
+  // A branch present in the active-only lookup is active; anything else (a student
+  // on a since-deactivated branch) resolves to inactive.
   branchActiveById = computed(() => {
     const map = new Map<string, boolean>();
-    for (const b of this.allBranches()) map.set(b.id, b.isActive);
+    for (const b of this.allBranches()) map.set(b.id, true);
     return map;
   });
 
@@ -169,7 +168,7 @@ export class StudentListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.allBranches.set(branches);
       }

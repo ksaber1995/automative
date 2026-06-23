@@ -14,7 +14,7 @@ import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { RefundService, RefundSource } from '../services/refund.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
@@ -33,7 +33,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
 })
 export class RefundListComponent implements OnInit {
   private refundService = inject(RefundService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
@@ -64,9 +64,9 @@ export class RefundListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
-        this.branchOptions = branches.map(b => ({ label: b.name, value: b.id }));
+        this.branchOptions = branches.map(b => ({ label: b.label, value: b.id }));
       },
       error: () => {}
     });

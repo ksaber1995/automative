@@ -15,13 +15,12 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { TooltipModule } from 'primeng/tooltip';
 import { ProductService } from '../services/product.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { ProductCategory } from '@shared/enums/product.enum';
 
 @Component({
@@ -48,7 +47,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 })
 export class ProductListComponent implements OnInit {
   private productService = inject(ProductService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
@@ -58,13 +57,13 @@ export class ProductListComponent implements OnInit {
   readonly Math = Math;
 
   products = signal<Product[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(false);
   selectedCategory = '';
   selectedBranchId = signal<string | null>(null);
 
   branchOptions = computed(() =>
-    this.branches().map(b => ({ label: b.name, value: b.id })),
+    this.branches().map(b => ({ label: b.label, value: b.id })),
   );
 
   filteredProducts = computed(() => {
@@ -106,14 +105,14 @@ export class ProductListComponent implements OnInit {
       { value: ProductCategory.OTHER, label: this.translate.instant('PRODUCTS.LIST.CAT_OTHER') },
     ];
     this.loadProducts();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }
 
   getBranchName(branchId: string | null | undefined): string {
     if (!branchId) return '—';
-    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
   }
 
   clearBranchFilter() { this.selectedBranchId.set(null); }

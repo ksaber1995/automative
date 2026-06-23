@@ -17,7 +17,7 @@ import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -26,7 +26,6 @@ import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../att
 import { Employee } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-employee-detail',
@@ -41,7 +40,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 })
 export class EmployeeDetailComponent implements OnInit {
   private employeeService = inject(EmployeeService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private userService = inject(UserService);
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
@@ -55,7 +54,7 @@ export class EmployeeDetailComponent implements OnInit {
   employee = signal<Employee | null>(null);
   loading = signal(true);
   branchName = signal('—');
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   converting = signal(false);
   removingUser = signal(false);
 
@@ -107,7 +106,7 @@ export class EmployeeDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.params['id'];
-    this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
+    this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.employeeService.getEmployeeById(id).subscribe({
       next: (emp) => {
         this.employee.set(emp);
@@ -115,10 +114,10 @@ export class EmployeeDetailComponent implements OnInit {
         if (emp.email) this.convertForm.email = emp.email;
         if (emp.branchId) this.convertForm.branchIds = [emp.branchId];
         if (emp.branchId) {
-          this.branchService.getActiveBranches().subscribe({
+          this.lookupService.branches().subscribe({
             next: (branches) => {
               const branch = branches.find(b => b.id === emp.branchId);
-              this.branchName.set(branch?.name || this.translate.instant('EMPLOYEES.DETAIL.UNKNOWN_BRANCH'));
+              this.branchName.set(branch?.label || this.translate.instant('EMPLOYEES.DETAIL.UNKNOWN_BRANCH'));
             }
           });
         } else {

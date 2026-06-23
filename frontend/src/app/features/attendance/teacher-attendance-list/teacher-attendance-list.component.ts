@@ -8,15 +8,8 @@ import { SelectModule } from 'primeng/select';
 import { ButtonModule } from 'primeng/button';
 import { TranslateModule } from '@ngx-translate/core';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../services/teacher-attendance.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { EmployeeService } from '../../employees/services/employee.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
-
-interface TeacherOption {
-  id: string;
-  displayName: string;
-}
 
 @Component({
   selector: 'app-teacher-attendance-list',
@@ -35,13 +28,12 @@ interface TeacherOption {
 })
 export class TeacherAttendanceListComponent implements OnInit {
   private attendanceService = inject(TeacherAttendanceService);
-  private branchService = inject(BranchService);
-  private employeeService = inject(EmployeeService);
+  private lookupService = inject(LookupService);
   protected branchState = inject(BranchStateService);
 
   rows = signal<TeacherAttendanceHistoryRow[]>([]);
-  branches = signal<Branch[]>([]);
-  teachers = signal<TeacherOption[]>([]);
+  branches = signal<LookupOption[]>([]);
+  teachers = signal<LookupOption[]>([]);
   loading = signal(false);
 
   selectedBranchId: string | null = null;
@@ -72,17 +64,11 @@ export class TeacherAttendanceListComponent implements OnInit {
   );
 
   ngOnInit() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
-    this.employeeService.getAllEmployees().subscribe({
-      next: (employees) => {
-        const list = employees.map((e: any) => ({
-          id: e.id,
-          displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
-        }));
-        this.teachers.set(list);
-      },
+    this.lookupService.employees().subscribe({
+      next: (employees) => this.teachers.set(employees),
     });
     this.load();
   }

@@ -17,11 +17,11 @@
     <div class="flex flex-wrap gap-3 mb-4">
       @if (!branchState.isSingleBranch()) {
         <p-select
-          [options]="branchOptions()"
+          [options]="branches()"
           [ngModel]="selectedBranchId()"
           (ngModelChange)="selectedBranchId.set($event)"
           optionLabel="label"
-          optionValue="value"
+          optionValue="id"
           [placeholder]="'EXAMS.LIST.ALL_BRANCHES' | translate"
           [showClear]="true"
           [style]="{ minWidth: '200px' }"
@@ -29,11 +29,11 @@
       }
 
       <p-select
-        [options]="courseOptions()"
+        [options]="courses()"
         [ngModel]="selectedCourseId()"
         (ngModelChange)="selectedCourseId.set($event)"
         optionLabel="label"
-        optionValue="value"
+        optionValue="id"
         [placeholder]="'EXAMS.LIST.ALL_COURSES' | translate"
         [showClear]="true"
         [filter]="true"

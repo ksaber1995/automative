@@ -15,14 +15,13 @@ import { TextareaModule } from 'primeng/textarea';
 import { TabsModule } from 'primeng/tabs';
 import { ExpenseService } from '../services/expense.service';
 import { InstallmentService } from '../services/installment.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { InstallmentPlan } from '@shared/interfaces/installment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -43,7 +42,7 @@ type ExpenseTab = 'all' | 'due' | 'direct' | 'salaries' | 'installments' | 'even
 export class ExpenseListComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private installmentService = inject(InstallmentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
@@ -52,7 +51,7 @@ export class ExpenseListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   expenses = signal<Expense[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   employees = signal<Employee[]>([]);
   loading = signal(true);
 
@@ -139,7 +138,7 @@ export class ExpenseListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => this.branches.set(branches)
     });
   }
@@ -383,7 +382,7 @@ export class ExpenseListComponent implements OnInit {
 
   getBranchName(branchId?: string | null): string {
     if (!branchId) return 'Global/Shared';
-    return this.branches().find(b => b.id === branchId)?.name || 'Unknown';
+    return this.branches().find(b => b.id === branchId)?.label || 'Unknown';
   }
 
   getTypeColor(type: string): 'success' | 'info' | 'warn' | 'danger' {

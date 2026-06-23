@@ -10,10 +10,9 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../services/student.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 
 @Component({
@@ -36,7 +35,7 @@ import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 export class StudentFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private studentService = inject(StudentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -47,7 +46,7 @@ export class StudentFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   studentId: string | null = null;
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   acquisitionChannelOptions = ACQUISITION_CHANNELS.map(value => ({
     value,
@@ -89,7 +88,7 @@ export class StudentFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
         if (branches.length === 1 && !this.isEditMode()) {

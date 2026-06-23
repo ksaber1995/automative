@@ -94,7 +94,7 @@
         @if (!isGlobal?.value && !branchState.isSingleBranch()) {
           <div class="field col-span-2">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.BRANCH' | translate }} <span class="text-red-500">*</span></label>
-            <p-select formControlName="branchId" [options]="branches()" optionLabel="name" optionValue="id" [placeholder]="'EMPLOYEES.FORM.BRANCH_PLACEHOLDER' | translate" class="w-full"></p-select>
+            <p-select formControlName="branchId" [options]="branches()" optionLabel="label" optionValue="id" [placeholder]="'EMPLOYEES.FORM.BRANCH_PLACEHOLDER' | translate" class="w-full"></p-select>
             @if (branchId?.invalid && branchId?.touched) {
               <small class="text-red-500">{{ 'EMPLOYEES.FORM.BRANCH_REQUIRED' | translate }}</small>
             }

@@ -21,13 +21,12 @@ import { AttendanceService, SessionAttendanceStudent } from '../services/attenda
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { TimetableService, TimetableEntry } from '../../timetable/timetable.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 interface DialogTeacherRow {
   employeeId: string;
@@ -85,7 +84,7 @@ export class SessionsDashboardComponent implements OnInit {
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   protected branchState = inject(BranchStateService);
   private attendanceService = inject(AttendanceService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
@@ -209,7 +208,7 @@ export class SessionsDashboardComponent implements OnInit {
 
   activeSessions = signal<Session[]>([]);
   rooms = signal<Room[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   activeClasses = signal<any[]>([]);
 
   // ── Upcoming sessions (from timetable) ──────────────────────────────────────
@@ -341,8 +340,8 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
-      next: (b: Branch[]) => this.branches.set(b),
+    this.lookupService.branches().subscribe({
+      next: (b) => this.branches.set(b),
     });
   }
 

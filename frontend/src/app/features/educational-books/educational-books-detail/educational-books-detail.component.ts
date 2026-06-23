@@ -16,13 +16,12 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { NotificationService } from '../../../core/services/notification.service';
 import { EducationalBooksService } from '../services/educational-books.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import {
   EducationalBooksCourseDetail,
   EducationalBooksProductDetail,
   BookNonBuyer,
 } from '@shared/interfaces/course-product.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 
@@ -39,7 +38,7 @@ import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 export class EducationalBooksDetailComponent implements OnInit {
   private educationalBooksService = inject(EducationalBooksService);
   private productSaleService = inject(ProductSaleService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private router = inject(Router);
@@ -49,11 +48,11 @@ export class EducationalBooksDetailComponent implements OnInit {
 
   courseId = '';
   courseDetail = signal<EducationalBooksCourseDetail | null>(null);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(false);
 
   branchOptions = computed(() =>
-    this.branches().map((b) => ({ label: b.name, value: b.id })),
+    this.branches().map((b) => ({ label: b.label, value: b.id })),
   );
 
   paymentMethodOptions = [
@@ -104,7 +103,7 @@ export class EducationalBooksDetailComponent implements OnInit {
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('courseId') || '';
     this.loadDetail();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }

@@ -8,12 +8,11 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
 import { TimetableService, TimetableEntry } from './timetable.service';
-import { BranchService } from '../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../core/services/lookup.service';
 import { CourseService } from '../courses/services/course.service';
 import { EmployeeService } from '../employees/services/employee.service';
 import { LanguageService } from '../../core/services/language.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 interface PositionedEntry extends TimetableEntry {
   topPx: number;
@@ -76,7 +75,7 @@ function toLocalISODate(d: Date): string {
   styleUrl: './timetable.component.scss'})
 export class TimetableComponent implements OnInit {
   private timetableService = inject(TimetableService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private courseService = inject(CourseService);
   private employeeService = inject(EmployeeService);
   languageService = inject(LanguageService);
@@ -94,7 +93,7 @@ export class TimetableComponent implements OnInit {
 
   loading = signal(false);
   entries = signal<TimetableEntry[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   teachers = signal<any[]>([]);
   courses = signal<any[]>([]);
 
@@ -246,7 +245,7 @@ export class TimetableComponent implements OnInit {
   }
 
   loadFilters() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
     this.courseService.getActiveCourses().subscribe({

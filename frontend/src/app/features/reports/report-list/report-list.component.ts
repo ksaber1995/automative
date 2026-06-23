@@ -27,8 +27,7 @@ import {
   ExpenseCategoryRow,
   ProfitByEventRow,
 } from '../services/report.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { Branch } from '@shared/interfaces/branch.interface';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
@@ -59,7 +58,7 @@ import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
 })
 export class ReportListComponent implements OnInit {
   private reportService = inject(ReportService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   protected authService = inject(AuthService);
@@ -74,7 +73,7 @@ export class ReportListComponent implements OnInit {
    *            tables/aggregates filter to the selected set.
    */
   branchIds: string[] = [];
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   // Mirror of branchIds usable from reactive computeds.
   branchIdsSignal = signal<string[]>([]);
 
@@ -145,7 +144,7 @@ export class ReportListComponent implements OnInit {
   });
 
   branchOptions = computed(() =>
-    this.branches().map((b) => ({ label: b.name, value: b.id }))
+    this.branches().map((b) => ({ label: b.label, value: b.id }))
   );
 
   // Chart options
@@ -473,7 +472,7 @@ export class ReportListComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (rows) => this.branches.set(rows),
     });
     this.reload();
@@ -495,7 +494,7 @@ export class ReportListComponent implements OnInit {
 
   /** Resolve a branch's display name from the loaded branch list (fallback: id). */
   private branchNameFor(id: string): string {
-    return this.branches().find((b) => b.id === id)?.name || id;
+    return this.branches().find((b) => b.id === id)?.label || id;
   }
 
   reload() {

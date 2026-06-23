@@ -13,8 +13,7 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CashService, CurrentCashResponse, CashAdjustmentRecord, CashAdjustmentType, BranchCash } from '../../../core/services/cash.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { Branch } from '@shared/interfaces/branch.interface';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { AuthService } from '../../../core/services/auth.service';
@@ -34,7 +33,7 @@ const COMPANY = '__COMPANY__';
 })
 export class CashManagementComponent implements OnInit {
   private cashService = inject(CashService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
@@ -43,7 +42,7 @@ export class CashManagementComponent implements OnInit {
   loading = signal(true);
   adjustments = signal<CashAdjustmentRecord[]>([]);
   adjustmentsLoading = signal(true);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   // Filter on the page (special values: ALL, COMPANY, or a branch UUID)
   filterValue: string = ALL;
@@ -81,7 +80,7 @@ export class CashManagementComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => this.branches.set(branches),
     });
   }
@@ -97,7 +96,7 @@ export class CashManagementComponent implements OnInit {
       opts.push({ label: this.translate.instant('CASH.FILTER_COMPANY'), value: COMPANY });
     }
     for (const b of this.branches()) {
-      opts.push({ label: b.name, value: b.id });
+      opts.push({ label: b.label, value: b.id });
     }
     return opts;
   });
@@ -111,7 +110,7 @@ export class CashManagementComponent implements OnInit {
       opts.push({ label: this.translate.instant('CASH.SCOPE_COMPANY'), value: null });
     }
     for (const b of this.branches()) {
-      opts.push({ label: b.name, value: b.id });
+      opts.push({ label: b.label, value: b.id });
     }
     return opts;
   });

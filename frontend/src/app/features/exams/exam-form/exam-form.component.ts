@@ -10,7 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../services/exam.service';
-import { CourseService } from '../../courses/services/course.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
@@ -32,7 +32,7 @@ import { NotificationService } from '../../../core/services/notification.service
 export class ExamFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(ExamService);
-  private courseService = inject(CourseService);
+  private lookup = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
@@ -42,7 +42,7 @@ export class ExamFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   id: string | null = null;
-  courses = signal<{ id: string; name: string }[]>([]);
+  courses = signal<LookupOption[]>([]);
 
   statusOptions = signal<{ label: string; value: string }[]>([]);
 
@@ -60,8 +60,8 @@ export class ExamFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.courseService.getAllCourses().subscribe({
-      next: (c) => this.courses.set(c.map((x) => ({ id: x.id, name: x.name }))),
+    this.lookup.courses().subscribe({
+      next: (c) => this.courses.set(c),
     });
 
     this.id = this.route.snapshot.paramMap.get('id');

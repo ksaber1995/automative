@@ -34,7 +34,7 @@
         [options]="branches()"
         [ngModel]="selectedBranchId()"
         (ngModelChange)="selectedBranchId.set($event)"
-        optionLabel="name"
+        optionLabel="label"
         optionValue="id"
         appendTo="body"
         [placeholder]="'SESSIONS_DASHBOARD.ALL_BRANCHES' | translate"
@@ -633,7 +633,7 @@
         <p-select
           formControlName="branchId"
           [options]="branches()"
-          optionLabel="name"
+          optionLabel="label"
           optionValue="id"
           appendTo="body"
           [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_BRANCH' | translate"

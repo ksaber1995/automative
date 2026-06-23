@@ -11,10 +11,9 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InstallmentService } from '../services/installment.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseCategory } from '@shared/enums/expense-type.enum';
 
 @Component({
@@ -30,15 +29,15 @@ import { ExpenseCategory } from '@shared/enums/expense-type.enum';
 export class InstallmentFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private installmentService = inject(InstallmentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
 
   form: FormGroup;
-  branches = signal<Branch[]>([]);
-  branchOptions = computed(() => this.branches().map(b => ({ label: b.name, value: b.id })));
+  branches = signal<LookupOption[]>([]);
+  branchOptions = computed(() => this.branches().map(b => ({ label: b.label, value: b.id })));
   submitting = signal(false);
 
   categoryOptions = Object.values(ExpenseCategory).map(c => ({ label: c, value: c }));
@@ -78,7 +77,7 @@ export class InstallmentFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({ next: bs => {
+    this.lookupService.branches().subscribe({ next: bs => {
       this.branches.set(bs);
       if (bs.length === 1) {
         const ctrl = this.form.get('branchId');

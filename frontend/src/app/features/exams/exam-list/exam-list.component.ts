@@ -10,13 +10,11 @@ import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../services/exam.service';
-import { CourseService } from '../../courses/services/course.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ExamModel } from '@shared/interfaces/exam.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -38,8 +36,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class ExamListComponent implements OnInit {
   private service = inject(ExamService);
-  private courseService = inject(CourseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
@@ -47,8 +44,8 @@ export class ExamListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   items = signal<ExamModel[]>([]);
-  branches = signal<Branch[]>([]);
-  courses = signal<{ id: string; name: string }[]>([]);
+  branches = signal<LookupOption[]>([]);
+  courses = signal<LookupOption[]>([]);
   loading = signal(true);
   showDeleteDialog = false;
   toDelete = signal<ExamModel | null>(null);
@@ -57,8 +54,6 @@ export class ExamListComponent implements OnInit {
   selectedCourseId = signal<string | null>(null);
   selectedStatus = signal<'SCHEDULED' | 'DONE' | null>(null);
 
-  branchOptions = computed(() => this.branches().map(b => ({ label: b.name, value: b.id })));
-  courseOptions = computed(() => this.courses().map(c => ({ label: c.name, value: c.id })));
   statusOptions = computed(() => [
     { label: this.translate.instant('EXAMS.STATUS.SCHEDULED'), value: 'SCHEDULED' },
     { label: this.translate.instant('EXAMS.STATUS.DONE'), value: 'DONE' },
@@ -78,10 +73,8 @@ export class ExamListComponent implements OnInit {
 
   ngOnInit() {
     this.load();
-    this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b) });
-    this.courseService.getAllCourses().subscribe({
-      next: (c) => this.courses.set(c.map((x) => ({ id: x.id, name: x.name }))),
-    });
+    this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });
+    this.lookupService.courses().subscribe({ next: (c) => this.courses.set(c) });
   }
 
   load() {
@@ -94,7 +87,7 @@ export class ExamListComponent implements OnInit {
 
   getBranchName(branchId: string | null): string {
     if (!branchId) return '—';
-    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
   }
 
   clearFilters() {

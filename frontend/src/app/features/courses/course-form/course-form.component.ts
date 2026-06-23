@@ -10,17 +10,11 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { EmployeeService } from '../../employees/services/employee.service';
-import { RoomService, Room } from '../../rooms/services/room.service';
-import { LevelService } from '../../levels/services/level.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Course } from '@shared/interfaces/course.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
-import { Employee } from '@shared/interfaces/employee.interface';
-import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-course-form',
@@ -41,8 +35,7 @@ import { Level } from '@shared/interfaces/level.interface';
 export class CourseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private courseService = inject(CourseService);
-  private branchService = inject(BranchService);
-  private employeeService = inject(EmployeeService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -54,12 +47,10 @@ export class CourseFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   courseId: string | null = null;
-  branches = signal<Branch[]>([]);
-  employees = signal<any[]>([]);
-  rooms = signal<Room[]>([]);
-  levels = signal<Level[]>([]);
-  private roomService = inject(RoomService);
-  private levelService = inject(LevelService);
+  branches = signal<LookupOption[]>([]);
+  employees = signal<LookupOption[]>([]);
+  rooms = signal<LookupOption[]>([]);
+  levels = signal<LookupOption[]>([]);
 
   constructor() {
     this.courseForm = this.fb.group({
@@ -92,21 +83,21 @@ export class CourseFormComponent implements OnInit {
   }
 
   loadRooms(branchId: string) {
-    this.roomService.listActive(branchId).subscribe({
+    this.lookupService.rooms(branchId).subscribe({
       next: (r) => this.rooms.set(r),
       error: () => {},
     });
   }
 
   loadLevels() {
-    this.levelService.getAllLevels().subscribe({
+    this.lookupService.levels().subscribe({
       next: (l) => this.levels.set(l),
       error: () => {},
     });
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
         if (branches.length === 1 && !this.isEditMode()) {
@@ -121,14 +112,9 @@ export class CourseFormComponent implements OnInit {
   }
 
   loadEmployees() {
-    this.employeeService.getAllEmployees().subscribe({
-      next: (employees: Employee[]) => {
-        // Map employees to include full name for display
-        const mappedEmployees = employees.map((emp: Employee) => ({
-          ...emp,
-          fullName: `${emp.firstName} ${emp.lastName}`
-        }));
-        this.employees.set(mappedEmployees);
+    this.lookupService.employees().subscribe({
+      next: (employees) => {
+        this.employees.set(employees);
       },
       error: () => {
         // Interceptor toasted the translated error.

@@ -12,7 +12,7 @@ import { DividerModule } from 'primeng/divider';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { InputTextModule } from 'primeng/inputtext';
 import { ExpenseService } from '../services/expense.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
@@ -30,7 +30,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class ExpenseDetailComponent implements OnInit {
   private expenseService = inject(ExpenseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private router = inject(Router);
@@ -39,7 +39,7 @@ export class ExpenseDetailComponent implements OnInit {
 
   expense = signal<Expense | null>(null);
   payments = signal<ExpensePayment[]>([]);
-  branches = signal<any[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   paymentsLoading = signal(false);
 
@@ -52,7 +52,7 @@ export class ExpenseDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = this.route.snapshot.params['id'];
-    this.branchService.getActiveBranches().subscribe({ next: (b) => this.branches.set(b) });
+    this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.loadExpense(id);
     this.loadPayments(id);
   }
@@ -139,7 +139,7 @@ export class ExpenseDetailComponent implements OnInit {
 
   getBranchName(branchId?: string | null): string {
     if (!branchId) return this.translate.instant('EXPENSES.DETAIL.GLOBAL_SHARED');
-    return this.branches().find(b => b.id === branchId)?.name || this.translate.instant('EXPENSES.DETAIL.UNKNOWN');
+    return this.branches().find(b => b.id === branchId)?.label || this.translate.instant('EXPENSES.DETAIL.UNKNOWN');
   }
 
   getTypeColor(type: string): 'success' | 'info' | 'warn' | 'danger' {

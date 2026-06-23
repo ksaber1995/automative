@@ -16,7 +16,7 @@ import { forkJoin } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ExpenseService } from '../services/expense.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
 
@@ -41,7 +41,7 @@ interface RecurringRow {
 })
 export class ManageRecurringComponent implements OnInit {
   private expenseService = inject(ExpenseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private router = inject(Router);
@@ -50,7 +50,7 @@ export class ManageRecurringComponent implements OnInit {
   paying = signal(false);
 
   allRows = signal<RecurringRow[]>([]);
-  branches = signal<any[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   selectedMonth: Date = new Date();
   paymentDate: Date = new Date();
@@ -59,7 +59,7 @@ export class ManageRecurringComponent implements OnInit {
 
   branchOptions = computed(() => [
     { label: this.translate.instant('EXPENSES.MANAGE_RECURRING.ALL_BRANCHES'), value: null },
-    ...this.branches().map(b => ({ label: b.name, value: b.id }))
+    ...this.branches().map(b => ({ label: b.label, value: b.id }))
   ]);
 
   filteredRows = computed(() => {
@@ -94,7 +94,7 @@ export class ManageRecurringComponent implements OnInit {
   );
 
   ngOnInit() {
-    this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b) });
+    this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.loadData();
   }
 
@@ -207,7 +207,7 @@ export class ManageRecurringComponent implements OnInit {
 
   getBranchName(branchId?: string | null): string {
     if (!branchId) return this.translate.instant('EXPENSES.MANAGE_RECURRING.GLOBAL_BRANCH');
-    return this.branches().find(b => b.id === branchId)?.name || this.translate.instant('EXPENSES.MANAGE_RECURRING.UNKNOWN_BRANCH');
+    return this.branches().find(b => b.id === branchId)?.label || this.translate.instant('EXPENSES.MANAGE_RECURRING.UNKNOWN_BRANCH');
   }
 
   formatMonth(date: Date): string {

@@ -199,11 +199,15 @@ export class UserFormComponent implements OnInit {
   }
 
   buildSections() {
+    // Teacher-type companies have no branches and no cash drawer — hide those
+    // permission rows entirely (mirrors the sidebar hiding for those features).
+    const hidden = this.isTeacher() ? ['branches', 'cash'] : [];
+    const show = (r: PermissionRow) => !hidden.includes(r.resource);
     const academic = this.permissionRows.filter(r =>
-      ['dashboard','branches','academy','students','enrollments','employees'].includes(r.resource)
+      ['dashboard','branches','academy','students','enrollments','employees'].includes(r.resource) && show(r)
     );
     const financial = this.permissionRows.filter(r =>
-      ['revenues','expenses','cash','refunds','debts','reports'].includes(r.resource)
+      ['revenues','expenses','cash','refunds','debts','reports'].includes(r.resource) && show(r)
     );
     const inventory = this.permissionRows.filter(r =>
       ['products','product_sales'].includes(r.resource)
@@ -257,6 +261,11 @@ export class UserFormComponent implements OnInit {
 
   isAdminRoleSelected(): boolean {
     return this.selectedRole === UserRole.GLOBAL_ADMIN || this.selectedRole === UserRole.ADMIN;
+  }
+
+  /** Teacher-type companies don't use branches or a cash drawer. */
+  isTeacher(): boolean {
+    return this.authService.isTeacher();
   }
 
   isPermissionsLocked(): boolean {

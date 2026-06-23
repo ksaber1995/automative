@@ -19,7 +19,7 @@
               <option value="NULL">{{ 'REVENUES.LIST.COMPANY_LEVEL_ONLY' | translate }}</option>
             }
             @for (branch of branches(); track branch.id) {
-              <option [value]="branch.id">{{ branch.name }}</option>
+              <option [value]="branch.id">{{ branch.label }}</option>
             }
           </select>
         </div>

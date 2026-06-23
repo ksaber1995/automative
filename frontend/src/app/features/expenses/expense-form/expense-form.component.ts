@@ -13,11 +13,10 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
 import { ExpenseService } from '../services/expense.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Expense } from '@shared/interfaces/expense.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
@@ -45,7 +44,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 export class ExpenseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private expenseService = inject(ExpenseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -56,7 +55,7 @@ export class ExpenseFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   expenseId: string | null = null;
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   expenseTypes = Object.values(ExpenseType);
   expenseCategories = Object.values(ExpenseCategory);
@@ -152,10 +151,10 @@ export class ExpenseFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
-        this.branchOptions.set(branches.map(branch => ({ label: branch.name, value: branch.id })));
+        this.branchOptions.set(branches.map(branch => ({ label: branch.label, value: branch.id })));
         if (branches.length === 1 && !this.isEditMode()) {
           const ctrl = this.expenseForm.get('branchId');
           if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);

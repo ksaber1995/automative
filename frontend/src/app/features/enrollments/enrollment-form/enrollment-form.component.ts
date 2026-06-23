@@ -21,7 +21,6 @@ import { EnrollmentService } from '../services/enrollment.service';
 import { StudentService } from '../../students/services/student.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
-import { BranchService } from '../../branches/services/branch.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterEnrollmentService, CoverageInfo } from '../../master-courses/services/master-enrollment.service';
 import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
@@ -32,8 +31,8 @@ import { EnrollmentStatus, PaymentMode } from '@shared/enums/enrollment-status.e
 import { Student } from '@shared/interfaces/student.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Class } from '@shared/interfaces/class.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { MasterCourse } from '@shared/interfaces/master-course.interface';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { CourseProductService } from '../../educational-books/services/course-product.service';
 import { CourseProduct } from '@shared/interfaces/course-product.interface';
 import { DiscountType } from '@shared/enums/product.enum';
@@ -69,7 +68,7 @@ export class EnrollmentFormComponent implements OnInit {
   private studentService = inject(StudentService);
   private courseService = inject(CourseService);
   private classService = inject(ClassService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -90,7 +89,7 @@ export class EnrollmentFormComponent implements OnInit {
   enrollmentId: string | null = null;
 
   students = signal<(Student & { fullName: string })[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   courses = signal<Course[]>([]);
   classes = signal<Class[]>([]);
   masters = signal<MasterCourse[]>([]);
@@ -289,7 +288,7 @@ export class EnrollmentFormComponent implements OnInit {
           this.enrollmentForm.patchValue({ branchId: student.branchId });
           this.selectedBranchId.set(student.branchId);
           if (lock) {
-            this.studentBranchName.set(this.branches().find(b => b.id === student.branchId)?.name || '');
+            this.studentBranchName.set(this.branches().find(b => b.id === student.branchId)?.label || '');
             this.enrollmentForm.get('branchId')?.disable({ emitEvent: false });
           }
         }
@@ -301,7 +300,7 @@ export class EnrollmentFormComponent implements OnInit {
     return new Promise((resolve) => {
       let loaded = 0;
       const check = () => { if (++loaded === 5) resolve(); };
-      this.branchService.getActiveBranches().subscribe({ next: (b) => { this.branches.set(b);
+      this.lookupService.branches().subscribe({ next: (b) => { this.branches.set(b);
         if (b.length === 1 && !this.isEditMode()) {
           const ctrl = this.enrollmentForm.get('branchId');
           if (ctrl && !ctrl.value) { ctrl.setValue(b[0].id); this.onBranchChange(); }

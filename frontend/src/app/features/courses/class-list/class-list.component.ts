@@ -11,8 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ClassService } from '../services/class.service';
-import { CourseService } from '../services/course.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ClassStatus, ClassWithDetails } from '@shared/interfaces/class.interface';
@@ -38,8 +37,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class ClassListComponent implements OnInit {
   private classService = inject(ClassService);
-  private courseService = inject(CourseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -108,11 +106,11 @@ export class ClassListComponent implements OnInit {
   }
 
   loadCourses() {
-    this.courseService.getActiveCourses().subscribe({
+    this.lookupService.courses().subscribe({
       next: (courses) => {
         this.courses.set([
           { label: this.translate.instant('CLASSES.LIST.ALL_COURSES'), value: null },
-          ...courses.map(c => ({ label: c.name, value: c.id }))
+          ...courses.map(c => ({ label: c.label, value: c.id }))
         ]);
       }
     });
@@ -122,11 +120,11 @@ export class ClassListComponent implements OnInit {
     // Filter dropdowns: show every branch the user can access (active and
     // inactive). Hiding inactive branches here would prevent admins from
     // filtering existing data in a branch they've since deactivated.
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set([
           { label: this.translate.instant('CLASSES.LIST.ALL_BRANCHES'), value: null },
-          ...branches.map(b => ({ label: b.name, value: b.id }))
+          ...branches.map(b => ({ label: b.label, value: b.id }))
         ]);
       }
     });

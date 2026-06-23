@@ -10,12 +10,11 @@ import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EventService } from '../services/event.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EventModel } from '@shared/interfaces/event.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 
 @Component({
@@ -37,7 +36,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
 })
 export class EventListComponent implements OnInit {
   private service = inject(EventService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
@@ -45,7 +44,7 @@ export class EventListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   items = signal<EventModel[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   showDeleteDialog = false;
   toDelete = signal<EventModel | null>(null);
@@ -61,7 +60,7 @@ export class EventListComponent implements OnInit {
   // and selectable via the dedicated __global__ option.
   branchOptions = computed(() => [
     { label: this.translate.instant('EVENTS.LIST.GLOBAL_NO_BRANCH'), value: '__global__' },
-    ...this.branches().map(b => ({ label: b.name, value: b.id })),
+    ...this.branches().map(b => ({ label: b.label, value: b.id })),
   ]);
 
   statusOptions = computed(() => [
@@ -96,7 +95,7 @@ export class EventListComponent implements OnInit {
 
   ngOnInit() {
     this.load();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }
@@ -111,7 +110,7 @@ export class EventListComponent implements OnInit {
 
   getBranchName(branchId: string | null): string {
     if (!branchId) return this.translate.instant('EVENTS.LIST.GLOBAL');
-    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
   }
 
   clearFilters() {

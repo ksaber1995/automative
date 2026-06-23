@@ -11,10 +11,9 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EventService } from '../services/event.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-event-form',
@@ -36,7 +35,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 export class EventFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(EventService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
@@ -47,7 +46,7 @@ export class EventFormComponent implements OnInit {
   loading = signal(false);
   isEditMode = signal(false);
   id: string | null = null;
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   private readonly typeValues = ['TRIP', 'COMPETITION', 'WORKSHOP', 'SEMINAR', 'CAMP', 'OTHER'] as const;
   private readonly statusValues = ['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const;
@@ -72,7 +71,7 @@ export class EventFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (rows) => {
         this.branches.set(rows);
         if (rows.length === 1 && !this.isEditMode()) {

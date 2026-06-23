@@ -53,6 +53,7 @@ import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
 import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
 import { whatsappTemplatesRoutes } from './routes/whatsappTemplates';
+import { lookupsRoutes } from './routes/lookups';
 
 // Create the router implementation
 const router = {
@@ -179,6 +180,17 @@ const router = {
     getPriceOverride: monthlySubscriptionsRoutes.getPriceOverride,
     deletePriceOverride: monthlySubscriptionsRoutes.deletePriceOverride,
     listPriceOverrides: monthlySubscriptionsRoutes.listPriceOverrides,
+  },
+  lookups: {
+    branches: lookupsRoutes.branches,
+    employees: lookupsRoutes.employees,
+    courses: lookupsRoutes.courses,
+    classes: lookupsRoutes.classes,
+    levels: lookupsRoutes.levels,
+    rooms: lookupsRoutes.rooms,
+    masterCourses: lookupsRoutes.masterCourses,
+    students: lookupsRoutes.students,
+    products: lookupsRoutes.products,
   },
 };
 

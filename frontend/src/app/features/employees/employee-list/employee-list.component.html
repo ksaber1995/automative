@@ -20,7 +20,7 @@
         >
           <option [value]="null">{{ 'EMPLOYEES.LIST.ALL' | translate }}</option>
           @for (branch of branches(); track branch.id) {
-            <option [value]="branch.id">{{ branch.name }}</option>
+            <option [value]="branch.id">{{ branch.label }}</option>
           }
         </select>
       </div>

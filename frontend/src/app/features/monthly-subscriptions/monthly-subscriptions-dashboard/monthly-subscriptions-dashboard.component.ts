@@ -25,7 +25,7 @@ import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { SessionService, ActiveSessionInfo } from '../../rooms/services/session.service';
 import { AttendanceService } from '../../rooms/services/attendance.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -34,7 +34,6 @@ import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/wh
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription } from '@shared/interfaces/monthly-subscription.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 import { Course } from '@shared/interfaces/course.interface';
 
 @Component({
@@ -68,7 +67,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // Filter state
   filterForm!: FormGroup;
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   courses = signal<Course[]>([]);
 
   // Data — signals so async-loaded data renders without needing a user interaction.
@@ -141,7 +140,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private fb: FormBuilder,
     private svc: MonthlySubscriptionsService,
     private enrollmentService: EnrollmentService,
-    private branchSvc: BranchService,
+    private lookupService: LookupService,
     private courseSvc: CourseService,
     private notify: NotificationService,
     private auth: AuthService,
@@ -174,7 +173,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.globalScan.register(this.scanHandler);
 
     forkJoin({
-      branches: this.branchSvc.getAllBranches(),
+      branches: this.lookupService.branches(),
       courses: this.courseSvc.getAllCourses(),
     }).pipe(takeUntil(this.destroy$)).subscribe(({ branches, courses }) => {
       this.branches.set(branches);

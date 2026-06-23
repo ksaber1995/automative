@@ -107,7 +107,9 @@
         <p-tab value="3"><i class="pi pi-building mr-2"></i>{{ 'REPORTS.TAB_BRANCHES' | translate }}</p-tab>
       }
       <p-tab value="4"><i class="pi pi-box mr-2"></i>{{ 'REPORTS.TAB_PRODUCTS' | translate }}</p-tab>
-      <p-tab value="5"><i class="pi pi-flag mr-2"></i>{{ 'REPORTS.TAB_EVENTS' | translate }}</p-tab>
+      @if (!authService.isTeacher()) {
+        <p-tab value="5"><i class="pi pi-flag mr-2"></i>{{ 'REPORTS.TAB_EVENTS' | translate }}</p-tab>
+      }
     </p-tablist>
 
     <p-tabpanels>
@@ -441,7 +443,8 @@
         </div>
       </p-tabpanel>
 
-      <!-- ── EVENTS ─────────────────────────────────────────── -->
+      <!-- ── EVENTS (hidden for teacher-type companies) ──────── -->
+      @if (!authService.isTeacher()) {
       <p-tabpanel value="5">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-4">
           <p-card>
@@ -540,6 +543,7 @@
           </p-table>
         </p-card>
       </p-tabpanel>
+      }
     </p-tabpanels>
   </p-tabs>
 </div>

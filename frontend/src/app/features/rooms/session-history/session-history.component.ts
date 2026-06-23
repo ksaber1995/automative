@@ -9,16 +9,14 @@ import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
-import { BranchService } from '../../branches/services/branch.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
 import { StudentService } from '../../students/services/student.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { Branch } from '@shared/interfaces/branch.interface';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { Class } from '@shared/interfaces/class.interface';
-import { Student } from '@shared/interfaces/student.interface';
 
 /**
  * Standalone "Session History" page (moved out of the Sessions dashboard tab).
@@ -35,7 +33,7 @@ import { Student } from '@shared/interfaces/student.interface';
 export class SessionHistoryComponent implements OnInit, OnDestroy {
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private courseService = inject(CourseService);
   private classService = inject(ClassService);
   private studentService = inject(StudentService);
@@ -52,10 +50,10 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   loading = signal(false);
   sessions = signal<Session[]>([]);
 
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   courses = signal<{ id: string; name: string }[]>([]);
   classes = signal<Class[]>([]);
-  studentOptions = signal<{ id: string; name: string }[]>([]);
+  studentOptions = signal<LookupOption[]>([]);
 
   selectedBranchId = signal<string | null>(null);
   selectedCourseId = signal<string | null>(null);
@@ -131,15 +129,15 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
       { label: this.translate.instant('SESSION_HISTORY.ATT_ABSENT'), value: 'ABSENT' },
     ];
     if (!this.isTeacher()) {
-      this.branchService.getAllBranches().subscribe({ next: (b) => this.branches.set(b), error: () => {} });
+      this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b), error: () => {} });
     }
     this.courseService.getAllCourses().subscribe({
       next: (c) => this.courses.set(c.map((x) => ({ id: x.id, name: x.name }))),
       error: () => {},
     });
     this.classService.getAllClasses().subscribe({ next: (c) => this.classes.set(c), error: () => {} });
-    this.studentService.getAllStudents().subscribe({
-      next: (s) => this.studentOptions.set(s.map((x) => ({ id: x.id, name: `${x.firstName} ${x.lastName}` }))),
+    this.lookupService.students().subscribe({
+      next: (s) => this.studentOptions.set(s),
       error: () => {},
     });
     this.load();
@@ -323,7 +321,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.scanFilterStudentId.set(res.id);
         const opt = this.studentOptions().find((o) => o.id === res.id);
-        this.scanFilterName.set(opt?.name ?? '');
+        this.scanFilterName.set(opt?.label ?? '');
         // A scan is only meaningful in the grid — switch to it if needed.
         if (!this.matrixView()) {
           this.matrixView.set(true);

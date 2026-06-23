@@ -109,7 +109,7 @@
             </div>
 
             <!-- Branches -->
-            @if (!branchState.isSingleBranch()) {
+            @if (!branchState.isSingleBranch() && !isTeacher()) {
             <div class="field">
               <label class="block text-sm font-medium text-gray-700 mb-1">
                 {{ 'USERS.FORM.BRANCH_LABEL' | translate }}

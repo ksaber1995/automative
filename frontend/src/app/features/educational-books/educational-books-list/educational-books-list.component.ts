@@ -8,10 +8,9 @@ import { TagModule } from 'primeng/tag';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule } from '@ngx-translate/core';
 import { EducationalBooksService } from '../services/educational-books.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { EducationalBooksCourseSummary } from '@shared/interfaces/course-product.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-educational-books-list',
@@ -24,18 +23,18 @@ import { Branch } from '@shared/interfaces/branch.interface';
 })
 export class EducationalBooksListComponent implements OnInit {
   private educationalBooksService = inject(EducationalBooksService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   authService = inject(AuthService);
 
   courses = signal<EducationalBooksCourseSummary[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(false);
   selectedBranchId = signal<string | null>(null);
   selectedCourseName = signal<string | null>(null);
 
   branchOptions = computed(() =>
-    this.branches().map((b) => ({ label: b.name, value: b.id })),
+    this.branches().map((b) => ({ label: b.label, value: b.id })),
   );
 
   courseNameOptions = computed(() => {
@@ -58,7 +57,7 @@ export class EducationalBooksListComponent implements OnInit {
 
   ngOnInit() {
     this.loadCourses();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }

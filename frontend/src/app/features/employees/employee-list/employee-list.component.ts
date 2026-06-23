@@ -14,12 +14,11 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { EmployeeService } from '../services/employee.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Employee } from '@shared/interfaces/employee.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-employee-list',
@@ -44,7 +43,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
 })
 export class EmployeeListComponent implements OnInit {
   private employeeService = inject(EmployeeService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -53,7 +52,7 @@ export class EmployeeListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   employees = signal<Employee[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string | null = null;
   statusFilter = signal<'active' | 'inactive'>('active');
@@ -78,7 +77,7 @@ export class EmployeeListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches.set(branches);
       }
@@ -182,6 +181,6 @@ export class EmployeeListComponent implements OnInit {
   getBranchName(branchId: string | null): string {
     if (!branchId) return 'Global';
     const branch = this.branches().find(b => b.id === branchId);
-    return branch ? branch.name : 'Unknown';
+    return branch ? branch.label : 'Unknown';
   }
 }

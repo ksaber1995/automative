@@ -10,12 +10,9 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { TranslateModule } from '@ngx-translate/core';
 import { MasterCourseService } from '../services/master-course.service';
-import { BranchService } from '../../branches/services/branch.service';
-import { LevelService } from '../../levels/services/level.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
-import { Level } from '@shared/interfaces/level.interface';
 
 @Component({
   selector: 'app-master-course-form',
@@ -36,8 +33,7 @@ import { Level } from '@shared/interfaces/level.interface';
 export class MasterCourseFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(MasterCourseService);
-  private branchService = inject(BranchService);
-  private levelService = inject(LevelService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
@@ -46,8 +42,8 @@ export class MasterCourseFormComponent implements OnInit {
   form: FormGroup;
   loading = signal(false);
   isEditMode = signal(false);
-  branches = signal<Branch[]>([]);
-  levels = signal<Level[]>([]);
+  branches = signal<LookupOption[]>([]);
+  levels = signal<LookupOption[]>([]);
   id: string | null = null;
 
   constructor() {
@@ -63,7 +59,7 @@ export class MasterCourseFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (rows) => {
         this.branches.set(rows);
         if (rows.length === 1 && !this.isEditMode()) {
@@ -72,7 +68,7 @@ export class MasterCourseFormComponent implements OnInit {
         }
       },
     });
-    this.levelService.getAllLevels().subscribe({
+    this.lookupService.levels().subscribe({
       next: (rows) => this.levels.set(rows),
     });
     this.id = this.route.snapshot.paramMap.get('id');

@@ -12,7 +12,7 @@ import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../services/product.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ProductCategory } from '@shared/enums/product.enum';
@@ -55,7 +55,7 @@ import { ProductCategory } from '@shared/enums/product.enum';
 export class ProductFormComponent implements OnInit {
   private fb = inject(FormBuilder);
   private productService = inject(ProductService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -66,7 +66,7 @@ export class ProductFormComponent implements OnInit {
   isEditMode = signal(false);
   productId = signal<string | null>(null);
   submitting = signal(false);
-  branches: any[] = [];
+  branches: LookupOption[] = [];
 
   categories: { value: ProductCategory; label: string }[] = [];
   units: { value: string; label: string }[] = [];
@@ -118,7 +118,7 @@ export class ProductFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
         this.branches = branches;
         if (branches.length === 1 && !this.isEditMode()) {

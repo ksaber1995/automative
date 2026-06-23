@@ -16,11 +16,10 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ProductSaleService, SalesSummary } from '../services/product-sale.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProductSale } from '@shared/interfaces/product-sale.interface';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-sales-history',
@@ -34,14 +33,14 @@ import { Branch } from '@shared/interfaces/branch.interface';
 })
 export class SalesHistoryComponent implements OnInit {
   private productSaleService = inject(ProductSaleService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
 
   sales = signal<ProductSale[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   summary = signal<SalesSummary | null>(null);
   loading = signal(false);
   startDate = '';
@@ -49,7 +48,7 @@ export class SalesHistoryComponent implements OnInit {
   selectedBranchId = signal<string | null>(null);
 
   branchOptions = computed(() =>
-    this.branches().map(b => ({ label: b.name, value: b.id })),
+    this.branches().map(b => ({ label: b.label, value: b.id })),
   );
 
   filteredSales = computed(() => {
@@ -60,7 +59,7 @@ export class SalesHistoryComponent implements OnInit {
 
   getBranchName(branchId: string | null | undefined): string {
     if (!branchId) return '—';
-    return this.branches().find(b => b.id === branchId)?.name ?? branchId;
+    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
   }
 
   // Refund dialog state
@@ -84,7 +83,7 @@ export class SalesHistoryComponent implements OnInit {
   ngOnInit() {
     this.loadSales();
     this.loadSummary();
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
   }

@@ -13,10 +13,9 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RoomService, Room, CreateRoomDto, UpdateRoomDto } from '../services/room.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Branch } from '@shared/interfaces/branch.interface';
 
 @Component({
   selector: 'app-room-list',
@@ -41,14 +40,14 @@ import { Branch } from '@shared/interfaces/branch.interface';
 })
 export class RoomListComponent implements OnInit {
   private roomService = inject(RoomService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private fb = inject(FormBuilder);
   protected branchState = inject(BranchStateService);
 
   rooms = signal<Room[]>([]);
-  branches = signal<Branch[]>([]);
+  branches = signal<LookupOption[]>([]);
   loading = signal(true);
   saving = signal(false);
   editingRoom = signal<Room | null>(null);
@@ -85,7 +84,7 @@ export class RoomListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (b) => {
         this.branches.set(b);
         if (b.length === 1 && !this.editingRoom()) {

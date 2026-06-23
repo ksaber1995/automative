@@ -15,7 +15,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DuesService } from '../services/dues.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -38,7 +38,7 @@ export class DuesListComponent implements OnInit {
   private duesService = inject(DuesService);
   private enrollmentService = inject(EnrollmentService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private translate = inject(TranslateService);
@@ -68,9 +68,9 @@ export class DuesListComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getAllBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
-        this.branchOptions = branches.map(b => ({ label: b.name, value: b.id }));
+        this.branchOptions = branches.map(b => ({ label: b.label, value: b.id }));
       },
       error: () => {}
     });

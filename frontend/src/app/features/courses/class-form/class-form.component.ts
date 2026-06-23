@@ -14,7 +14,7 @@ import { ClassService, TeacherAvailabilityConflict } from '../services/class.ser
 import { debounceTime } from 'rxjs/operators';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
-import { BranchService } from '../../branches/services/branch.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -45,7 +45,7 @@ export class ClassFormComponent implements OnInit {
   private classService = inject(ClassService);
   private employeeService = inject(EmployeeService);
   private courseService = inject(CourseService);
-  private branchService = inject(BranchService);
+  private lookupService = inject(LookupService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
@@ -61,7 +61,7 @@ export class ClassFormComponent implements OnInit {
   // Where the user opened the edit page from ('class' | 'course'), so Cancel/Update return there.
   fromOrigin: string | null = null;
   instructors = signal<any[]>([]);
-  branches = signal<any[]>([]);
+  branches = signal<LookupOption[]>([]);
   // All active courses fetched once; the dropdown shown to the user is `filteredCourses`,
   // which narrows them down to those belonging to the currently-selected branch.
   allCourses = signal<Array<{ id: string; name: string; branchId: string | null }>>([]);
@@ -263,7 +263,7 @@ export class ClassFormComponent implements OnInit {
 
         // Look up the branch name to show alongside the course in the header.
         if (course.branchId) {
-          const found = this.branches().find(b => b.value === course.branchId);
+          const found = this.branches().find(b => b.id === course.branchId);
           this.branchName.set(found?.label || '');
         }
 
@@ -306,12 +306,9 @@ export class ClassFormComponent implements OnInit {
   }
 
   loadBranches() {
-    this.branchService.getActiveBranches().subscribe({
+    this.lookupService.branches().subscribe({
       next: (branches) => {
-        this.branches.set(branches.map(branch => ({
-          label: branch.name,
-          value: branch.id
-        })));
+        this.branches.set(branches);
         if (branches.length === 1 && this.isGlobalCreate() && !this.isEditMode()) {
           const ctrl = this.classForm.get('branchId');
           if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
@@ -319,7 +316,7 @@ export class ClassFormComponent implements OnInit {
         // If a course was loaded before branches resolved, resolve the branch name now.
         const branchId = this.classForm.get('branchId')?.value;
         if (branchId && !this.branchName()) {
-          const found = this.branches().find(b => b.value === branchId);
+          const found = this.branches().find(b => b.id === branchId);
           if (found) this.branchName.set(found.label);
         }
       },

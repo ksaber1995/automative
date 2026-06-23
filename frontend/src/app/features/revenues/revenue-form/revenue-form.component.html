@@ -17,7 +17,7 @@
             <p-select
               formControlName="branchId"
               [options]="branches()"
-              optionLabel="name"
+              optionLabel="label"
               optionValue="id"
               [placeholder]="'REVENUES.FORM.BRANCH_PLACEHOLDER' | translate"
               styleClass="w-full"
@@ -105,7 +105,7 @@
           <p-select
             formControlName="courseId"
             [options]="courses()"
-            optionLabel="name"
+            optionLabel="label"
             optionValue="id"
             placeholder="None"
             styleClass="w-full"></p-select>
