@@ -27,6 +27,12 @@ export interface CoreStackProps extends cdk.StackProps {
    * (localhost) produces dead links once mail leaves the developer's laptop.
    */
   frontendBaseUrl?: string;
+  /**
+   * Absolute public base URL of this stage's API (e.g. "https://prod.api.netrofit.net").
+   * Used to register the Telegram bot webhook. When unset, Telegram bot setup
+   * will report a configuration error rather than registering a bad webhook.
+   */
+  apiBaseUrl?: string;
 }
 
 export class CoreStack extends cdk.Stack {
@@ -235,6 +241,8 @@ export class CoreStack extends cdk.Stack {
         // developer running `ng serve` against this Lambda still gets working
         // links during local end-to-end testing.
         FRONTEND_BASE_URL: props?.frontendBaseUrl ?? 'http://localhost:4200',
+        // Public API base, used to register the Telegram bot webhook.
+        API_BASE_URL: props?.apiBaseUrl ?? '',
       },
       vpc,
       vpcSubnets: {

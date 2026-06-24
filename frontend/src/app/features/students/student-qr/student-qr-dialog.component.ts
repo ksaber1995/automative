@@ -10,6 +10,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { TelegramService } from '../../telegram/telegram.service';
 import { Student } from '@shared/interfaces/student.interface';
 
 /** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
@@ -35,6 +36,7 @@ export class StudentQrDialogComponent {
   private authService = inject(AuthService);
   private translate = inject(TranslateService);
   private templatesSvc = inject(WhatsappTemplatesService);
+  private telegramSvc = inject(TelegramService);
 
   /** Two-way bound visibility, driven by the parent. */
   visible = model<boolean>(false);
@@ -46,6 +48,11 @@ export class StudentQrDialogComponent {
   activated = output<Student>();
 
   dataUrl = signal<string>('');
+  // Telegram connect links (parent/student deep links), fetched when the dialog
+  // opens so the WhatsApp send stays inside the click gesture (no popup block).
+  telegramParentUrl = signal<string | null>(null);
+  telegramStudentUrl = signal<string | null>(null);
+  private tgFetchedForId: string | null = null;
   regenerating = signal(false);
   activating = signal(false);
   /** Plan awaiting confirmation in the inline warning step (null = none). */
@@ -78,6 +85,21 @@ export class StudentQrDialogComponent {
       const open = this.visible();
       if (open && s?.qrToken && this.showQr()) {
         this.render(s.qrToken);
+      }
+      // Fetch Telegram connect links once per student when the dialog opens, so
+      // the parent/student message can include a tappable bot link.
+      if (open && s?.id && this.tgFetchedForId !== s.id) {
+        this.tgFetchedForId = s.id;
+        this.telegramSvc.getStudentLink(s.id).subscribe({
+          next: (r) => {
+            this.telegramParentUrl.set(r.botConfigured ? r.parentUrl : null);
+            this.telegramStudentUrl.set(r.botConfigured ? r.studentUrl : null);
+          },
+          error: () => {
+            this.telegramParentUrl.set(null);
+            this.telegramStudentUrl.set(null);
+          },
+        });
       }
     });
   }
@@ -126,30 +148,42 @@ export class StudentQrDialogComponent {
     return `${window.location.origin}/p/s/${token}`;
   }
 
-  /** Click-to-chat: open WhatsApp to the STUDENT with the QR/profile link. */
+  /** Append a "connect Telegram" line with the deep link, when one is available. */
+  private withTelegram(text: string, telegramUrl: string | null): string {
+    if (!telegramUrl) return text;
+    return text + '\n\n' + this.translate.instant('WHATSAPP.TELEGRAM_CONNECT_LINE', { link: telegramUrl });
+  }
+
+  /** Click-to-chat: open WhatsApp to the STUDENT with the profile + Telegram links. */
   sendQrToStudent(): void {
     const s = this.student();
     if (!s?.qrToken) return;
-    const text = renderWhatsappTemplate(this.templatesSvc.get('QR_STUDENT'), {
+    let text = renderWhatsappTemplate(this.templatesSvc.get('QR_STUDENT'), {
       studentName: this.studentName(),
       academyName: this.authService.getCompanyName(),
       link: this.profileUrl(s.qrToken),
     });
+    text = this.withTelegram(text, this.telegramStudentUrl());
     if (!openWhatsappChat(s.phone, text)) {
       this.notification.error(this.translate.instant('STUDENT_QR.NO_STUDENT_PHONE'));
     }
   }
 
-  /** Click-to-chat: open WhatsApp to the PARENT with the follow-up link. */
+  /**
+   * Click-to-chat: open WhatsApp to the PARENT with two links — the student
+   * details (profile) link from the template, plus the Telegram bot connect
+   * link (when Telegram is set up) so the parent can tap to subscribe.
+   */
   sendFollowupToParent(): void {
     const s = this.student();
     if (!s?.qrToken) return;
-    const text = renderWhatsappTemplate(this.templatesSvc.get('FOLLOWUP_PARENT'), {
+    let text = renderWhatsappTemplate(this.templatesSvc.get('FOLLOWUP_PARENT'), {
       studentName: this.studentName(),
       parentName: s.parentName || this.studentName(),
       academyName: this.authService.getCompanyName(),
       link: this.profileUrl(s.qrToken),
     });
+    text = this.withTelegram(text, this.telegramParentUrl());
     if (!openWhatsappChat(s.parentPhone, text)) {
       this.notification.error(this.translate.instant('STUDENT_QR.NO_PARENT_PHONE'));
     }
@@ -191,7 +225,7 @@ export class StudentQrDialogComponent {
         <head><title>QR - ${s.firstName} ${s.lastName}</title></head>
         <body style="font-family: sans-serif; text-align: center; padding: 32px;">
           <h2 style="margin: 0 0 4px;">${s.firstName} ${s.lastName}</h2>
-          ${s.studentCode != null ? `<p style="margin: 0 0 12px; font-size: 18px; color: #4338ca;">${this.translate.instant('STUDENT_QR.CODE_LABEL')} <strong>#${s.studentCode}</strong></p>` : ''}
+          ${this.showQr() && s.studentCode != null ? `<p style="margin: 0 0 12px; font-size: 18px; color: #4338ca;">${this.translate.instant('STUDENT_QR.CODE_LABEL')} <strong>#${s.studentCode}</strong></p>` : ''}
           <img src="${data}" style="width: 320px; height: 320px;" />
         </body>
       </html>

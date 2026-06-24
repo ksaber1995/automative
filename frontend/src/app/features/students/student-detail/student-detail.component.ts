@@ -19,7 +19,9 @@ import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
+import { TelegramConnectDialogComponent } from '../../telegram/telegram-connect-dialog.component';
 import { StudentService } from '../services/student.service';
+import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -69,6 +71,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     TranslateModule,
     AmountPipe,
     StudentQrDialogComponent,
+    TelegramConnectDialogComponent,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss',
@@ -96,8 +99,12 @@ export class StudentDetailComponent implements OnInit {
   /** TEACHER companies don't use master courses, so hide that whole section. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
 
+  /** Show the student code only once the QR is active (see student-code.util). */
+  showCode = (s: any) => shouldShowStudentCode(s, this.isTeacher());
+
   student = signal<Student | null>(null);
   showQrDialog = signal(false);
+  showTelegramDialog = signal(false);
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   classDoneMap = signal<Map<string, boolean>>(new Map());

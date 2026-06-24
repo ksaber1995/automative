@@ -16,6 +16,7 @@ import { LanguageService } from '../services/language.service';
 import { NotificationService } from '../services/notification.service';
 import { StudentService } from '../../features/students/services/student.service';
 import { GlobalScanService } from '../services/global-scan.service';
+import { ScanPreferenceService } from '../services/scan-preference.service';
 import { UserRole, ROLE_LABELS } from '@shared/enums/user-role.enum';
 
 interface NavLeaf {
@@ -61,11 +62,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private notifications = inject(NotificationService);
   private studentService = inject(StudentService);
   private globalScan = inject(GlobalScanService);
+  private scanPref = inject(ScanPreferenceService);
 
   // QR Scanner
   qrDialogVisible = signal(false);
   qrScanning = signal(false);
   qrLookingUp = signal(false);
+  cameraStarted = signal(false);
+  // Expose the per-device USB-scanner flag to the template.
+  usbDetected = () => this.scanPref.usbDetected();
   private html5Qr?: Html5Qrcode;
   private readonly QR_SCANNER_ID = 'navbar-qr-scanner-region';
 
@@ -94,6 +99,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       this.scanBuffer = '';
       if (buf) {
         e.preventDefault();
+        // A no-focus keystroke burst ending in Enter is a USB scanner — remember
+        // it so the scan button stops defaulting to the camera on this device.
+        this.scanPref.markUsbDetected();
         this.globalScan.dispatch(buf);
       }
       return;
@@ -144,6 +152,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
       { labelKey: 'NAV.WHATSAPP_TEMPLATES', icon: 'pi pi-whatsapp', routerLink: ['/whatsapp-templates'], visible: auth.canRead('academy') },
+      { labelKey: 'NAV.TELEGRAM', icon: 'pi pi-telegram', routerLink: ['/telegram'], visible: auth.canWrite('academy') },
     ].filter(c => c.visible);
     if (academic.length) {
       entries.push({ kind: 'group', group: {
@@ -284,7 +293,18 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   openQrScanner() {
     this.qrDialogVisible.set(true);
+    // USB scanner is first priority: if one is known on this device, don't start
+    // the camera (the always-on wedge handles scans). Camera is the explicit
+    // fallback (see useCamera) for devices with no scanner.
+    if (this.usbDetected()) return;
+    this.cameraStarted.set(true);
     setTimeout(() => this.startQrCamera(), 300);
+  }
+
+  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  useCamera() {
+    this.cameraStarted.set(true);
+    setTimeout(() => this.startQrCamera(), 100);
   }
 
   closeQrScanner() {
@@ -313,6 +333,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   private stopQrCamera() {
+    this.cameraStarted.set(false);
     const qr = this.html5Qr;
     this.html5Qr = undefined;
     if (!qr) return;

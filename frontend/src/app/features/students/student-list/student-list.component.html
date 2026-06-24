@@ -26,6 +26,20 @@
       </div>
       }
       <div class="flex-1">
+        <label for="courseFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.COURSE_FILTER' | translate }}</label>
+        <select
+          id="courseFilter"
+          [ngModel]="selectedCourseId()"
+          (ngModelChange)="selectedCourseId.set($event)"
+          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">{{ 'STUDENTS.LIST.ALL_COURSES' | translate }}</option>
+          @for (course of allCourses(); track course.id) {
+            <option [value]="course.id">{{ course.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex-1">
         <label for="studentSearch" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SEARCH' | translate }}</label>
         <span class="p-input-icon-left w-full md:w-80 block relative">
           <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
@@ -134,7 +148,13 @@
       </ng-template>
       <ng-template pTemplate="body" let-student>
         <tr>
-          <td><span class="font-semibold text-indigo-700">#{{ student.studentCode ?? '—' }}</span></td>
+          <td>
+            @if (showCode(student)) {
+              <span class="font-semibold text-indigo-700">#{{ student.studentCode }}</span>
+            } @else {
+              <span class="text-gray-300">—</span>
+            }
+          </td>
           <td>{{ student.firstName }} {{ student.lastName }}</td>
           <td>{{ getAge(student.dateOfBirth) }} {{ 'STUDENTS.LIST.YEARS' | translate }}</td>
           <td>

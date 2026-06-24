@@ -39,6 +39,8 @@ export interface ExamResultRow {
   parentPhone?: string | null;
   studentPhone?: string | null;
   grade: string | null;
+  /** True when the student was marked absent for this exam (no grade). */
+  isAbsent?: boolean;
   recordedAt: string | null;
 }
 

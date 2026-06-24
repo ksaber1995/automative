@@ -53,6 +53,21 @@ export class ExamService {
     return this.api.delete<{ success: boolean }>(`exams/${id}/results/${studentId}`);
   }
 
+  /** Mark a student absent for the exam (absent=true) or clear it (absent=false). */
+  markAbsent(id: string, studentId: string, absent: boolean): Observable<{ success: boolean }> {
+    return this.api.post<{ success: boolean }>(`exams/${id}/absent`, { studentId, absent });
+  }
+
+  /** Send every graded/absent student's result to their Telegram chats. */
+  sendTelegramResults(id: string): Observable<{ success: boolean; sent: number }> {
+    return this.api.post<{ success: boolean; sent: number }>(`exams/${id}/send-telegram`, {});
+  }
+
+  /** Mark every still-unmarked enrolled student as absent. */
+  markRemainingAbsent(id: string): Observable<{ success: boolean; count: number }> {
+    return this.api.post<{ success: boolean; count: number }>(`exams/${id}/mark-remaining-absent`, {});
+  }
+
   /** All of a student's recorded grades (student-detail page). */
   getByStudent(studentId: string): Observable<StudentExamResult[]> {
     return this.api.get<StudentExamResult[]>(`exams/student/${studentId}`);

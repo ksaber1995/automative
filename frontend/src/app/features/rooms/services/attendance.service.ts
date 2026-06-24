@@ -9,6 +9,7 @@ export interface SessionAttendanceStudent {
   studentId: string;
   studentFirstName: string;
   studentLastName: string;
+  studentCode?: number | null;
   parentName?: string | null;
   parentPhone?: string | null;
   studentPhone?: string | null;
@@ -70,6 +71,11 @@ export class AttendanceService {
       `attendance/session/${sessionId}`,
       { presentStudentIds }
     );
+  }
+
+  /** Remove a single attendance record (e.g. undo a wrong substitution scan). */
+  removeAttendee(sessionId: string, studentId: string): Observable<{ message: string; code: string }> {
+    return this.api.delete<{ message: string; code: string }>(`attendance/session/${sessionId}/student/${studentId}`);
   }
 
   /** Mark a single student present by scanning their QR token. Idempotent. */

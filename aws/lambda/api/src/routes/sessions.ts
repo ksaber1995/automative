@@ -1,6 +1,7 @@
 import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { notifySessionAttendance } from './telegram';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -410,6 +411,9 @@ export const sessionsRoutes = {
       if (body?.notes !== undefined) updateData.notes = body.notes;
 
       const session = await update('sessions', params.id, updateData);
+
+      // Best-effort Telegram present/absent notifications (no-op unless enabled).
+      await notifySessionAttendance(context.companyId, params.id);
 
       return { status: 200 as const, body: mapSessionFromDB(session) };
     } catch (error) {

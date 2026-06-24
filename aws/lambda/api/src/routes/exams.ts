@@ -7,6 +7,7 @@ import {
   appendBranchSqlFilter,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { sendExamResultNotifications } from './telegram';
 
 type AuthHeaders = { authorization: string };
 
@@ -308,7 +309,7 @@ export const examsRoutes = {
       const rows = await query<any>(
         `SELECT s.id AS student_id, s.first_name, s.last_name,
                 s.parent_name, s.parent_phone, s.phone,
-                r.grade, r.recorded_at
+                r.grade, r.is_absent, r.recorded_at
          FROM students s
          JOIN (
                SELECT student_id FROM enrollments
@@ -333,6 +334,7 @@ export const examsRoutes = {
           parentPhone: row.parent_phone ?? null,
           studentPhone: row.phone ?? null,
           grade: row.grade ?? null,
+          isAbsent: row.is_absent === true,
           recordedAt: row.recorded_at ?? null,
         })),
       };
@@ -382,10 +384,10 @@ export const examsRoutes = {
       }
 
       const upserted = await queryOne<any>(
-        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
+         VALUES ($1, $2, $3, $4, $5, false)
          ON CONFLICT (exam_id, student_id)
-         DO UPDATE SET grade = EXCLUDED.grade, recorded_at = NOW(), updated_at = NOW()
+         DO UPDATE SET grade = EXCLUDED.grade, is_absent = false, recorded_at = NOW(), updated_at = NOW()
          RETURNING (xmax = 0) AS inserted`,
         [params.id, context.companyId, exam.course_id, student.id, grade],
       );
@@ -437,10 +439,10 @@ export const examsRoutes = {
       }
 
       await query(
-        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
+         VALUES ($1, $2, $3, $4, $5, false)
          ON CONFLICT (exam_id, student_id)
-         DO UPDATE SET grade = EXCLUDED.grade, recorded_at = NOW(), updated_at = NOW()`,
+         DO UPDATE SET grade = EXCLUDED.grade, is_absent = false, recorded_at = NOW(), updated_at = NOW()`,
         [params.id, context.companyId, exam.course_id, body.studentId, grade],
       );
       return { status: 200 as const, body: { success: true, code: 'EXAMS.GRADE_SAVED', message: 'Grade saved' } };
@@ -475,6 +477,127 @@ export const examsRoutes = {
     } catch (error: any) {
       console.error('Exam delete-result error:', error);
       return mapThrownError(error, 'ERRORS.EXAMS.RECORD_FAILED', 'Failed to clear grade');
+    }
+  },
+
+  /**
+   * POST /api/exams/:id/absent  { studentId, absent }
+   * Mark a student absent for the exam (absent=true → no grade), or clear the
+   * absent flag (absent=false → removes the row, back to "not recorded").
+   */
+  markAbsent: async ({ params, body, headers }: { params: { id: string }; body: { studentId: string; absent: boolean }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const exam = await queryOne<any>(
+        'SELECT * FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
+      }
+
+      if (body?.absent) {
+        if (!(await isEnrolledInCourse(context.companyId, exam.course_id, body.studentId))) {
+          return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
+        }
+        await query(
+          `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
+           VALUES ($1, $2, $3, $4, NULL, true)
+           ON CONFLICT (exam_id, student_id)
+           DO UPDATE SET grade = NULL, is_absent = true, recorded_at = NOW(), updated_at = NOW()`,
+          [params.id, context.companyId, exam.course_id, body.studentId],
+        );
+      } else {
+        await query(
+          'DELETE FROM exam_results WHERE exam_id = $1 AND student_id = $2 AND company_id = $3',
+          [params.id, body.studentId, context.companyId],
+        );
+      }
+      return { status: 200 as const, body: { success: true, code: 'EXAMS.ABSENCE_SAVED', message: 'Absence updated' } };
+    } catch (error: any) {
+      console.error('Exam mark-absent error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.RECORD_FAILED', 'Failed to update absence');
+    }
+  },
+
+  /**
+   * POST /api/exams/:id/mark-remaining-absent
+   * Mark every enrolled student who has NO result yet (not graded, not already
+   * absent) as absent in one go. Returns how many were newly marked.
+   */
+  markRemainingAbsent: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const exam = await queryOne<any>(
+        'SELECT * FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
+      }
+
+      const inserted = await query<any>(
+        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
+         SELECT $1, $2, $3, en.student_id, NULL, true
+         FROM (
+               SELECT student_id FROM enrollments
+                 WHERE course_id = $3 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+               UNION
+               SELECT student_id FROM master_class_enrollments
+                 WHERE course_id = $3 AND company_id = $2 AND status != 'DROPPED'
+              ) en
+         JOIN students s ON s.id = en.student_id AND s.company_id = $2 AND s.is_active = true
+         WHERE NOT EXISTS (SELECT 1 FROM exam_results r WHERE r.exam_id = $1 AND r.student_id = en.student_id)
+         ON CONFLICT (exam_id, student_id) DO NOTHING
+         RETURNING student_id`,
+        [params.id, context.companyId, exam.course_id],
+      );
+      return { status: 200 as const, body: { success: true, count: inserted.length } };
+    } catch (error: any) {
+      console.error('Exam mark-remaining-absent error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.RECORD_FAILED', 'Failed to mark remaining absent');
+    }
+  },
+
+  /**
+   * POST /api/exams/:id/send-telegram
+   * Push every graded/absent student's result to their linked Telegram chats
+   * via the company bot. Returns how many messages were sent.
+   */
+  sendTelegramResults: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const exam = await queryOne<any>(
+        'SELECT id, branch_id FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
+      }
+
+      const res = await sendExamResultNotifications(context.companyId, params.id);
+      if (!res.configured) {
+        return apiError(400, 'ERRORS.TELEGRAM.NOT_CONFIGURED', 'Telegram is not set up for this academy');
+      }
+      return { status: 200 as const, body: { success: true, sent: res.sent } };
+    } catch (error: any) {
+      console.error('Exam send-telegram error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.SEND_FAILED', 'Failed to send results');
     }
   },
 

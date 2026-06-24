@@ -9,8 +9,9 @@
   <div class="text-center">
     <p class="text-sm text-gray-500 mb-2">{{ studentName() }}</p>
 
-    <!-- Short student code — the QR-less fallback for attendance / payment. -->
-    @if (student()?.studentCode != null) {
+    <!-- Short student code — the QR-less fallback for attendance / payment.
+         Only revealed once the QR is active (same gate as showing the QR). -->
+    @if (showQr() && student()?.studentCode != null) {
       <div class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">
         <i class="pi pi-hashtag"></i>
         <span>{{ 'STUDENT_QR.CODE_LABEL' | translate }} <strong>{{ student()?.studentCode }}</strong></span>

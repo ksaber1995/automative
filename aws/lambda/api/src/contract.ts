@@ -534,6 +534,7 @@ const ExamResultRowSchema = z.object({
   parentPhone: z.string().nullable().optional(),
   studentPhone: z.string().nullable().optional(),
   grade: z.string().nullable(),
+  isAbsent: z.boolean().optional(),
   recordedAt: z.string().nullable(),
 });
 
@@ -1299,6 +1300,16 @@ const EducationalBooksCourseDetailSchema = z.object({
 const LookupOptionSchema = z.object({ id: z.string(), label: z.string() });
 const LookupListSchema = z.array(LookupOptionSchema);
 
+// Telegram
+const TelegramSettingsSchema = z.object({
+  enabled: z.boolean(),
+  botConfigured: z.boolean(),
+  botUsername: z.string().nullable(),
+  notifyOnPresent: z.boolean(),
+  notifyOnAbsent: z.boolean(),
+  notifyTarget: z.enum(['STUDENT', 'PARENT', 'BOTH']),
+});
+
 // =============================================
 // API Contract
 // =============================================
@@ -1967,6 +1978,33 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema, studentId: UUIDSchema }),
       body: z.object({}).optional(),
       responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    markAbsent: {
+      method: 'POST',
+      path: '/api/exams/:id/absent',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ studentId: UUIDSchema, absent: z.boolean() }),
+      responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+    },
+    sendTelegramResults: {
+      method: 'POST',
+      path: '/api/exams/:id/send-telegram',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), sent: z.number() }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    markRemainingAbsent: {
+      method: 'POST',
+      path: '/api/exams/:id/mark-remaining-absent',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), count: z.number() }),
+        403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
     },
     getById: {
       method: 'GET',
@@ -3944,6 +3982,36 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    // Platform-owned Telegram bot pool — list bots and which company claimed each.
+    listTelegramBots: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/telegram-bots',
+      responses: {
+        200: z.object({
+          bots: z.array(z.object({
+            id: z.string(),
+            bot_username: z.string(),
+            assigned_company_id: z.string().nullable(),
+            company_name: z.string().nullable(),
+            assigned_at: z.string().nullable(),
+          })),
+          total: z.number(),
+          available: z.number(),
+        }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Add a bot (created in @BotFather) to the pool.
+    addTelegramBot: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/telegram-bots',
+      body: z.object({ botToken: z.string() }),
+      responses: {
+        200: z.object({ success: z.boolean(), bot_username: z.string(), total: z.number(), available: z.number() }),
+        400: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
   },
 
   // Migration routes (one-time use)
@@ -4294,6 +4362,33 @@ export const contract = c.router({
         500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
       },
     },
+    setupTelegram: {
+      method: 'POST',
+      path: '/api/migrations/setup-telegram',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    setupTelegramBotPool: {
+      method: 'POST',
+      path: '/api/migrations/setup-telegram-bot-pool',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    setupExamAbsenceAndTelegramTemplates: {
+      method: 'POST',
+      path: '/api/migrations/setup-exam-absence',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
   },
 
   // ============================================================
@@ -4510,6 +4605,15 @@ export const contract = c.router({
   // Attendance Management
   // ============================================================
   attendance: {
+    removeAttendee: {
+      method: 'DELETE' as const,
+      path: '/api/attendance/session/:sessionId/student/:studentId',
+      pathParams: z.object({ sessionId: UUIDSchema, studentId: UUIDSchema }),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string() }),
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
     getBySession: {
       method: 'GET' as const,
       path: '/api/attendance/session/:sessionId',
@@ -4519,6 +4623,7 @@ export const contract = c.router({
           studentId: UUIDSchema,
           studentFirstName: z.string(),
           studentLastName: z.string(),
+          studentCode: z.number().nullable().optional(),
           parentName: z.string().nullable().optional(),
           parentPhone: z.string().nullable().optional(),
           studentPhone: z.string().nullable().optional(),
@@ -5038,6 +5143,91 @@ export const contract = c.router({
         401: ApiErrorSchema,
         500: ApiErrorSchema,
       },
+    },
+  },
+
+  // ============================================================
+  // Telegram attendance bot + auto-notifications. The webhook is PUBLIC
+  // (no authorization header) — see routes/telegram.ts.
+  telegram: {
+    getSettings: {
+      method: 'GET' as const,
+      path: '/api/telegram/settings',
+      responses: {
+        200: TelegramSettingsSchema.extend({ templates: z.record(z.string()) }),
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    updateSettings: {
+      method: 'PATCH' as const,
+      path: '/api/telegram/settings',
+      body: z.object({
+        enabled: z.boolean().optional(),
+        notifyOnPresent: z.boolean().optional(),
+        notifyOnAbsent: z.boolean().optional(),
+        notifyTarget: z.enum(['STUDENT', 'PARENT', 'BOTH']).optional(),
+      }),
+      responses: { 200: TelegramSettingsSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    updateTemplates: {
+      method: 'PUT' as const,
+      path: '/api/telegram/templates',
+      body: z.object({ templates: z.record(z.string()) }),
+      responses: {
+        200: z.object({ templates: z.record(z.string()) }),
+        400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    setBot: {
+      method: 'POST' as const,
+      path: '/api/telegram/bot',
+      body: z.object({ botToken: z.string() }),
+      responses: { 200: TelegramSettingsSchema, 400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    enableWithPooledBot: {
+      method: 'POST' as const,
+      path: '/api/telegram/enable',
+      body: z.object({}).optional(),
+      responses: { 200: TelegramSettingsSchema, 400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 409: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    disconnectBot: {
+      method: 'POST' as const,
+      path: '/api/telegram/disconnect',
+      body: z.object({}).optional(),
+      responses: { 200: TelegramSettingsSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    getStudentLink: {
+      method: 'GET' as const,
+      path: '/api/telegram/link/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          botConfigured: z.boolean(),
+          studentUrl: z.string().nullable(),
+          parentUrl: z.string().nullable(),
+          studentLinked: z.boolean(),
+          parentLinked: z.boolean(),
+        }),
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    getStaffLink: {
+      method: 'GET' as const,
+      path: '/api/telegram/link/staff/:employeeId',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      responses: {
+        200: z.object({ botConfigured: z.boolean(), url: z.string().nullable(), linked: z.boolean() }),
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    webhook: {
+      method: 'POST' as const,
+      path: '/api/telegram/webhook/:companyKey',
+      pathParams: z.object({ companyKey: z.string() }),
+      body: z.any(),
+      responses: { 200: z.object({ ok: z.boolean() }) },
     },
   },
 

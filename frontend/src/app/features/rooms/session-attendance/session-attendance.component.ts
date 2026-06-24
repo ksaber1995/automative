@@ -20,6 +20,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
@@ -76,6 +77,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
+  private scanPref = inject(ScanPreferenceService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   private readonly scanHandler = (token: string) => this.checkin(token);
 
@@ -89,9 +91,11 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // QR check-in
   scannerOpen = signal(false);
   scannerStarting = signal(false);
+  cameraStarted = signal(false);
+  // Per-device USB-scanner flag (exposed to the template).
+  usbDetected = () => this.scanPref.usbDetected();
   manualToken = signal('');
-  // QR-less check-in: staff types the student's short sequential code + Enter.
-  manualCode = signal('');
+  // QR-less check-in: the unified search box resolves a typed code on Enter.
   resolvingCode = signal(false);
   lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: 'NORMAL' | 'SUBSTITUTION'; homeClassName?: string | null } | null>(null);
 
@@ -117,13 +121,18 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     const q = this.search().trim().toLowerCase();
     const list = this.students();
     if (!q) return list;
-    return list.filter((s) =>
-      `${s.studentFirstName} ${s.studentLastName}`.toLowerCase().includes(q),
-    );
+    return list.filter((s) => {
+      const name = `${s.studentFirstName} ${s.studentLastName}`.toLowerCase();
+      const code = s.studentCode != null ? String(s.studentCode) : '';
+      return name.includes(q) || (code !== '' && code.includes(q));
+    });
   });
 
   presentCount = computed(() => this.students().filter((s) => s.isPresent).length);
   absentCount = computed(() => this.students().filter((s) => !s.isPresent).length);
+
+  /** TEACHER-type company — used to hide staff/teacher management. */
+  isTeacherCompany = computed(() => this.auth.isTeacher());
 
   /** True while the session is still running (no end date yet). */
   isActive = computed(() => !!this.session() && !this.session()!.endDate);
@@ -211,10 +220,30 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   }
 
   togglePresence(student: SessionAttendanceStudent, value: boolean) {
+    // SUBSTITUTION attendees aren't part of the enrolled roster the checkbox save
+    // manages, so unchecking one removes their attendance row outright (undo a
+    // wrong scan). They can't be toggled back on here — re-scan to re-add.
+    if (student.attendanceType === 'SUBSTITUTION') {
+      if (!value) this.removeAttendee(student);
+      return;
+    }
     this.students.update((list) =>
       list.map((s) => (s.studentId === student.studentId ? { ...s, isPresent: value } : s)),
     );
     this.scheduleSave();
+  }
+
+  /** Remove a (substitution) attendee from the session — undoes a wrong scan. */
+  private removeAttendee(student: SessionAttendanceStudent) {
+    this.attendanceService.removeAttendee(this.sessionId, student.studentId).subscribe({
+      next: () => {
+        this.students.update((list) => list.filter((s) => s.studentId !== student.studentId));
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.ATTENDEE_REMOVED', { name: `${student.studentFirstName} ${student.studentLastName}`.trim() }));
+      },
+      error: () => {
+        // Interceptor toasts the translated error.
+      },
+    });
   }
 
   /** Bulk-set every student currently matching the search filter. */
@@ -444,14 +473,26 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // QR check-in
   // ============================================================
 
-  /** Open the scanner panel and start the camera. */
+  /**
+   * Open the scanner panel. USB scanner is first priority: if one is known on
+   * this device, we don't start the camera (the always-on wedge handles scans);
+   * the camera is an explicit fallback (useCamera) for devices with no scanner.
+   */
   async openScanner() {
     this.scannerOpen.set(true);
     this.lastScanResult.set(null);
     // This click is the user gesture browsers require before audio can play.
     this.ensureAudio();
+    if (this.usbDetected()) return;
+    this.cameraStarted.set(true);
     // Wait a tick so the #qr-scanner-region element exists in the DOM.
     setTimeout(() => this.startCamera(), 0);
+  }
+
+  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  useCamera() {
+    this.cameraStarted.set(true);
+    setTimeout(() => this.startCamera(), 50);
   }
 
   private ensureAudio() {
@@ -514,6 +555,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   }
 
   private stopCamera() {
+    this.cameraStarted.set(false);
     const qr = this.html5Qr;
     this.html5Qr = undefined;
     if (!qr) return;
@@ -552,27 +594,40 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * QR-less check-in by short student code (Enter key). Resolves the code to the
-   * student's QR token, then reuses the normal check-in path. A non-existent
-   * code surfaces a "no student with this code" warning (toasted by the HTTP
-   * error interceptor from the server's translation key).
+   * Unified search box submit (Enter). One input searches the roster by name OR
+   * student code, and pressing Enter "takes attendance":
+   *  - a numeric value → treated as a student code: resolve it and check the
+   *    student in (works even if they're not in the current filter). A missing
+   *    code surfaces the translated "no student with this code" warning.
+   *  - otherwise, if the name filter narrows to exactly one student → mark that
+   *    student present.
    */
-  submitManualCode() {
-    const code = this.manualCode().trim();
-    this.manualCode.set('');
-    if (!code) return;
-    this.resolvingCode.set(true);
-    this.studentService.lookupByCode(code).subscribe({
-      next: ({ qrToken }) => {
-        this.resolvingCode.set(false);
-        this.checkin(qrToken);
-      },
-      error: () => {
-        // Interceptor toasts the translated "no student with this code" message.
-        this.resolvingCode.set(false);
-        this.lastScanResult.set(null);
-      },
-    });
+  submitSearch() {
+    const q = this.search().trim();
+    if (!q) return;
+
+    if (/^\d+$/.test(q)) {
+      this.resolvingCode.set(true);
+      this.studentService.lookupByCode(q).subscribe({
+        next: ({ qrToken }) => {
+          this.resolvingCode.set(false);
+          this.checkin(qrToken);
+          this.search.set('');
+        },
+        error: () => {
+          // Interceptor toasts the translated "no student with this code" message.
+          this.resolvingCode.set(false);
+          this.lastScanResult.set(null);
+        },
+      });
+      return;
+    }
+
+    const matches = this.filteredStudents();
+    if (matches.length === 1) {
+      this.togglePresence(matches[0], true);
+      this.search.set('');
+    }
   }
 
   private checkin(token: string) {

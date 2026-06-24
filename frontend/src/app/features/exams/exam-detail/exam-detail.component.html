@@ -27,6 +27,14 @@
           (onClick)="openResultsDialog()"
         ></p-button>
         <p-button
+          [label]="'EXAMS.DETAIL.SEND_TELEGRAM' | translate"
+          icon="pi pi-telegram"
+          severity="info"
+          [outlined]="true"
+          [loading]="sendingTelegram()"
+          (onClick)="sendResultsViaTelegram()"
+        ></p-button>
+        <p-button
           [label]="(isDone() ? 'EXAMS.DETAIL.MARK_SCHEDULED' : 'EXAMS.DETAIL.MARK_DONE') | translate"
           [icon]="isDone() ? 'pi pi-undo' : 'pi pi-check'"
           [severity]="isDone() ? 'secondary' : 'success'"
@@ -101,6 +109,33 @@
           ></p-button>
         </div>
 
+        <!-- Record by student code (enter the grade above first). -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ 'EXAMS.DETAIL.BY_CODE' | translate }}
+            </label>
+            <input
+              type="text"
+              pInputText
+              class="w-full"
+              inputmode="numeric"
+              [ngModel]="manualCode()"
+              (ngModelChange)="manualCode.set($event)"
+              (keyup.enter)="submitManualCode()"
+              [disabled]="resolvingCode()"
+              [placeholder]="'EXAMS.DETAIL.BY_CODE_PLACEHOLDER' | translate"
+            />
+          </div>
+          <p-button
+            [label]="'EXAMS.DETAIL.RECORD' | translate"
+            icon="pi pi-check"
+            severity="secondary"
+            [loading]="resolvingCode()"
+            (onClick)="submitManualCode()"
+          ></p-button>
+        </div>
+
         @if (scannerOpen()) {
           <div class="border rounded-lg p-3 bg-gray-50">
             <div class="flex justify-between items-center mb-2">
@@ -134,14 +169,27 @@
           {{ 'EXAMS.DETAIL.GRADED_COUNT' | translate: { graded: gradedCount(), total: totalCount() } }}
         </span>
       </h2>
-      <input
-        type="text"
-        pInputText
-        [ngModel]="search()"
-        (ngModelChange)="search.set($event)"
-        [placeholder]="'EXAMS.DETAIL.SEARCH' | translate"
-        class="w-full md:w-64"
-      />
+      <div class="flex items-center gap-2 flex-wrap">
+        @if (canWrite()) {
+          <p-button
+            [label]="'EXAMS.DETAIL.MARK_REMAINING_ABSENT' | translate"
+            icon="pi pi-user-minus"
+            severity="danger"
+            [outlined]="true"
+            size="small"
+            [loading]="markingAbsent()"
+            (onClick)="markRemainingAbsent()"
+          ></p-button>
+        }
+        <input
+          type="text"
+          pInputText
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+          [placeholder]="'EXAMS.DETAIL.SEARCH' | translate"
+          class="w-full md:w-64"
+        />
+      </div>
     </div>
 
     <p-table [value]="filteredRoster()" dataKey="studentId" [loading]="loading()" responsiveLayout="scroll">
@@ -158,24 +206,37 @@
           <td>
             @if (canWrite()) {
               <div class="flex items-center gap-2">
-                <input
-                  type="number"
-                  pInputText
-                  class="w-full"
-                  inputmode="decimal"
-                  min="0"
-                  [attr.max]="exam()?.maxGrade"
-                  [value]="row.grade"
-                  (input)="onGradeInput(row.studentId, $event)"
-                  (blur)="flushRowSaveNow(row.studentId)"
-                  [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
-                />
-                @if (exam()?.maxGrade != null) {
-                  <span class="text-gray-400 whitespace-nowrap">/ {{ exam()?.maxGrade }}</span>
+                @if (row.isAbsent) {
+                  <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate" class="flex-1"></p-tag>
+                } @else {
+                  <input
+                    type="number"
+                    pInputText
+                    class="w-full"
+                    inputmode="decimal"
+                    min="0"
+                    [attr.max]="exam()?.maxGrade"
+                    [value]="row.grade"
+                    (input)="onGradeInput(row.studentId, $event)"
+                    (blur)="flushRowSaveNow(row.studentId)"
+                    [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
+                  />
+                  @if (exam()?.maxGrade != null) {
+                    <span class="text-gray-400 whitespace-nowrap">/ {{ exam()?.maxGrade }}</span>
+                  }
                 }
+                <p-button [text]="true" size="small" [rounded]="true"
+                  [icon]="row.isAbsent ? 'pi pi-undo' : 'pi pi-user-minus'"
+                  [severity]="row.isAbsent ? 'secondary' : 'danger'"
+                  [pTooltip]="(row.isAbsent ? 'EXAMS.DETAIL.UNMARK_ABSENT' : 'EXAMS.DETAIL.MARK_ABSENT') | translate"
+                  (onClick)="toggleAbsent(row)"></p-button>
               </div>
             } @else {
-              <span>{{ row.grade || '—' }}@if (row.grade && exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+              @if (row.isAbsent) {
+                <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate"></p-tag>
+              } @else {
+                <span>{{ row.grade || '—' }}@if (row.grade && exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+              }
             }
           </td>
           @if (canWrite()) {

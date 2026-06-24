@@ -220,6 +220,11 @@ export const routes: Routes = [
         path: 'whatsapp-templates',
         data: { breadcrumb: 'BREADCRUMBS.WHATSAPP_TEMPLATES' },
         loadComponent: () => import('./features/whatsapp-templates/whatsapp-templates.component').then(m => m.WhatsappTemplatesComponent)
+      },
+      {
+        path: 'telegram',
+        data: { breadcrumb: 'BREADCRUMBS.TELEGRAM' },
+        loadComponent: () => import('./features/telegram/telegram-settings.component').then(m => m.TelegramSettingsComponent)
       }
     ]
   },

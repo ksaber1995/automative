@@ -12,6 +12,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ExamService } from '../services/exam.service';
+import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
@@ -40,6 +41,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private service = inject(ExamService);
+  private studentService = inject(StudentService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
@@ -56,6 +58,9 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   scannerOpen = signal(false);
   scannerStarting = signal(false);
   manualToken = signal('');
+  // Record by short student code (resolves the code → student, then grades them).
+  manualCode = signal('');
+  resolvingCode = signal(false);
   /** Grade applied to the next scanned/entered student. */
   currentGrade = signal('');
   lastScanResult = signal<{ name: string; grade: string; updated: boolean } | null>(null);
@@ -316,6 +321,34 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.record(token);
   }
 
+  /**
+   * Record the current grade for a student by their short code: resolve the code
+   * to the student's QR token, then reuse the normal record flow. Requires a
+   * grade to be entered first (same as scanning).
+   */
+  submitManualCode() {
+    const code = this.manualCode().trim();
+    this.manualCode.set('');
+    if (!code) return;
+    if (!this.currentGrade().trim()) {
+      this.notifications.error(this.translate.instant('EXAMS.DETAIL.ENTER_GRADE_FIRST'));
+      return;
+    }
+    this.resolvingCode.set(true);
+    this.studentService.lookupByCode(code).subscribe({
+      next: ({ qrToken }) => {
+        this.resolvingCode.set(false);
+        this.record(qrToken);
+      },
+      error: () => {
+        // Interceptor toasts the translated "no student with this code" message.
+        this.resolvingCode.set(false);
+        this.playBeep(false);
+        this.lastScanResult.set(null);
+      },
+    });
+  }
+
   private record(token: string) {
     const grade = this.currentGrade().trim();
     if (!grade) {
@@ -391,6 +424,56 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     });
     const ok = openWhatsappChat(row.parentPhone || row.studentPhone, text);
     if (!ok) this.notifications.info(this.translate.instant('WHATSAPP.NO_PHONE'));
+  }
+
+  // ── Absence ───────────────────────────────────────────────────────────────
+  /** Toggle a student's exam absence. Absent clears any grade; un-absent un-records. */
+  toggleAbsent(row: ExamResultRow) {
+    const absent = !row.isAbsent;
+    this.setRowState(row.studentId, 'saving');
+    this.service.markAbsent(this.examId, row.studentId, absent).subscribe({
+      next: () => {
+        this.roster.update((list) => list.map((s) => (s.studentId === row.studentId
+          ? { ...s, isAbsent: absent, grade: absent ? null : null, recordedAt: absent ? new Date().toISOString() : null }
+          : s)));
+        this.pendingGrades.delete(row.studentId);
+        this.setRowState(row.studentId, 'saved');
+        setTimeout(() => this.setRowState(row.studentId, null), 1500);
+      },
+      error: () => this.setRowState(row.studentId, 'error'),
+    });
+  }
+
+  // ── Mark all remaining (ungraded, not-yet-absent) students absent ───────────
+  markingAbsent = signal(false);
+
+  markRemainingAbsent() {
+    this.markingAbsent.set(true);
+    this.service.markRemainingAbsent(this.examId).subscribe({
+      next: (res) => {
+        this.markingAbsent.set(false);
+        this.notifications.success(this.translate.instant('EXAMS.DETAIL.MARKED_ABSENT_COUNT', { count: res.count }));
+        this.loadRoster();
+      },
+      error: () => this.markingAbsent.set(false),
+    });
+  }
+
+  // ── Send results via Telegram ───────────────────────────────────────────────
+  sendingTelegram = signal(false);
+
+  sendResultsViaTelegram() {
+    this.sendingTelegram.set(true);
+    this.service.sendTelegramResults(this.examId).subscribe({
+      next: (res) => {
+        this.sendingTelegram.set(false);
+        this.notifications.success(this.translate.instant('EXAMS.DETAIL.TELEGRAM_SENT', { count: res.sent }));
+      },
+      error: () => {
+        // Interceptor toasts the translated error (e.g. Telegram not configured).
+        this.sendingTelegram.set(false);
+      },
+    });
   }
 
   edit() { this.router.navigate(['/exams', this.examId, 'edit']); }

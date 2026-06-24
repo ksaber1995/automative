@@ -222,4 +222,83 @@ export const adminSecretRoutes = {
       return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
     }
   },
+
+  /**
+   * GET /api/karim-admin-secret/telegram-bots
+   * Platform-owned Telegram bot pool: one row per bot, with which company (if any)
+   * has claimed it. Academies auto-claim a free bot when they enable Telegram.
+   */
+  listTelegramBots: async () => {
+    try {
+      const rows = await query<any>(
+        `SELECT p.id, p.bot_username, p.assigned_company_id, p.assigned_at, c.name AS company_name
+         FROM telegram_bot_pool p
+         LEFT JOIN companies c ON c.id = p.assigned_company_id
+         ORDER BY p.created_at ASC`
+      );
+      const bots = rows.map((r) => ({
+        id: r.id,
+        bot_username: r.bot_username,
+        assigned_company_id: r.assigned_company_id ?? null,
+        company_name: r.company_name ?? null,
+        assigned_at: toIso(r.assigned_at),
+      }));
+      return {
+        status: 200 as const,
+        body: {
+          bots,
+          total: bots.length,
+          available: bots.filter((b) => !b.assigned_company_id).length,
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret list telegram bots failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/telegram-bots  body: { botToken }
+   * Add a bot (created in @BotFather) to the pool. Validates the token via getMe
+   * and stores its username. Idempotent on the token.
+   */
+  addTelegramBot: async ({ body }: { body: { botToken: string } }) => {
+    try {
+      const botToken = (body?.botToken || '').trim();
+      if (!botToken) return { status: 400 as const, body: { message: 'botToken is required' } };
+
+      let me: any;
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`, { method: 'POST' });
+        me = await res.json();
+      } catch (e: any) {
+        return { status: 400 as const, body: { message: 'Could not reach Telegram to validate the token' } };
+      }
+      if (!me?.ok) return { status: 400 as const, body: { message: 'Bot token is invalid' } };
+
+      await query(
+        `INSERT INTO telegram_bot_pool (bot_token, bot_username) VALUES ($1, $2)
+         ON CONFLICT (bot_token) DO NOTHING`,
+        [botToken, me.result?.username]
+      );
+
+      const counts = await queryOne<any>(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE assigned_company_id IS NULL)::int AS available
+         FROM telegram_bot_pool`
+      );
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          bot_username: me.result?.username as string,
+          total: counts?.total ?? 0,
+          available: counts?.available ?? 0,
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret add telegram bot failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Add bot failed' } };
+    }
+  },
 };

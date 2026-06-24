@@ -86,4 +86,28 @@ export class SubscriptionsService {
       `${ADMIN_ENDPOINT}/companies/${companyId}`,
     );
   }
+
+  /** Platform-owned Telegram bot pool: list bots + which company claimed each. */
+  listTelegramBots(): Observable<{ bots: PoolBot[]; total: number; available: number }> {
+    return this.http.get<{ bots: PoolBot[]; total: number; available: number }>(
+      `${ADMIN_ENDPOINT}/telegram-bots`,
+    );
+  }
+
+  /** Add a bot (created in @BotFather) to the pool. */
+  addTelegramBot(botToken: string): Observable<{ success: boolean; bot_username: string; total: number; available: number }> {
+    return this.http.post<{ success: boolean; bot_username: string; total: number; available: number }>(
+      `${ADMIN_ENDPOINT}/telegram-bots`,
+      { botToken },
+    );
+  }
+}
+
+/** One bot in the platform-owned Telegram pool. */
+export interface PoolBot {
+  id: string;
+  bot_username: string;
+  assigned_company_id: string | null;
+  company_name: string | null;
+  assigned_at: string | null;
 }

@@ -46,9 +46,11 @@
         <span class="text-gray-300">·</span>
       }
       @if (isActive() && !isPrepared()) {
-        <p-button icon="pi pi-user-edit" severity="warn" [outlined]="true" size="small"
-          [label]="(teacherPanelOpen() ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
-          (onClick)="toggleTeacherPanel()"></p-button>
+        @if (!isTeacherCompany()) {
+          <p-button icon="pi pi-user-edit" severity="warn" [outlined]="true" size="small"
+            [label]="(teacherPanelOpen() ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
+            (onClick)="toggleTeacherPanel()"></p-button>
+        }
         <p-button icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
           [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
           (onClick)="confirmEndSession()"></p-button>
@@ -74,19 +76,6 @@
     </div>
   </div>
 
-  <!-- QR-less check-in: type the student's short code and press Enter. Always
-       visible so staff can use it whether or not the camera scanner is open. -->
-  <div class="flex items-center gap-2 mb-3" style="max-width: 360px;">
-    <input pInputText type="text" inputmode="numeric" class="flex-1"
-      [ngModel]="manualCode()" (ngModelChange)="manualCode.set($event)"
-      (keyup.enter)="submitManualCode()"
-      [disabled]="resolvingCode()"
-      [placeholder]="'SESSION_QR.CODE_PLACEHOLDER' | translate" />
-    <p-button icon="pi pi-check" [label]="'SESSION_QR.CODE_SUBMIT' | translate"
-      severity="success" [outlined]="true" [loading]="resolvingCode()"
-      (onClick)="submitManualCode()"></p-button>
-  </div>
-
   <!-- QR check-in -->
   <div class="mb-4">
     @if (!scannerOpen()) {
@@ -99,10 +88,20 @@
           <p-button icon="pi pi-times" [label]="'SESSION_QR.CLOSE' | translate" severity="secondary" [text]="true" size="small" (onClick)="closeScanner()"></p-button>
         </div>
 
-        <!-- Camera region (html5-qrcode renders the video here) -->
-        <div id="qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
-        @if (scannerStarting()) {
-          <p class="text-center text-sm text-gray-400 mt-2"><i class="pi pi-spin pi-spinner"></i> {{ 'SESSION_QR.STARTING_CAMERA' | translate }}</p>
+        @if (cameraStarted()) {
+          <!-- Camera region (html5-qrcode renders the video here) -->
+          <div id="qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
+          @if (scannerStarting()) {
+            <p class="text-center text-sm text-gray-400 mt-2"><i class="pi pi-spin pi-spinner"></i> {{ 'SESSION_QR.STARTING_CAMERA' | translate }}</p>
+          }
+        } @else {
+          <!-- USB scanner is the default: wait for the wedge, offer camera fallback. -->
+          <div class="text-center py-4">
+            <i class="pi pi-qrcode text-3xl text-gray-300"></i>
+            <p class="text-sm text-gray-600 mt-2">{{ 'SESSION_QR.USB_READY' | translate }}</p>
+            <p-button class="inline-block mt-3" icon="pi pi-camera" [label]="'SESSION_QR.USE_CAMERA' | translate"
+              severity="secondary" [outlined]="true" size="small" (onClick)="useCamera()"></p-button>
+          </div>
         }
 
         <!-- USB scanner / manual entry: a keyboard-wedge scanner "types" the code and presses Enter. -->
@@ -238,9 +237,10 @@
       <!-- Search + bulk actions -->
       <div class="flex items-center gap-2 mb-4 flex-wrap">
         <span class="p-input-icon-left flex-1 min-w-[200px]">
-          <i class="pi pi-search"></i>
+          <i class="pi" [class.pi-search]="!resolvingCode()" [class.pi-spin]="resolvingCode()" [class.pi-spinner]="resolvingCode()"></i>
           <input pInputText type="text" [ngModel]="search()" (ngModelChange)="search.set($event)"
-            [placeholder]="'SESSIONS_DASHBOARD.SEARCH_STUDENTS' | translate"
+            (keyup.enter)="submitSearch()"
+            [placeholder]="'SESSIONS_DASHBOARD.SEARCH_OR_CODE' | translate"
             class="w-full" />
         </span>
         <p-button icon="pi pi-check-circle" severity="success" [outlined]="true" size="small"
@@ -272,11 +272,14 @@
                   [ngModel]="student.isPresent"
                   (ngModelChange)="togglePresence(student, $event)"
                   [binary]="true"
-                  [disabled]="student.attendanceType === 'SUBSTITUTION'"
+                  [pTooltip]="student.attendanceType === 'SUBSTITUTION' ? ('SESSIONS_DASHBOARD.UNCHECK_TO_REMOVE' | translate) : null"
                   [inputId]="'att-' + student.studentId"
                 ></p-checkbox>
                 <label [for]="'att-' + student.studentId"
                   class="cursor-pointer text-sm font-medium text-gray-800">
+                  @if (student.studentCode != null) {
+                    <span class="inline-block text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 me-2">#{{ student.studentCode }}</span>
+                  }
                   {{ student.studentFirstName }} {{ student.studentLastName }}
                   @if (student.attendanceType === 'SUBSTITUTION') {
                     <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">

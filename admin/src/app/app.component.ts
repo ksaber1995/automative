@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CompanySubscription, SubscriptionsService } from './subscriptions.service';
+import { CompanySubscription, PoolBot, SubscriptionsService } from './subscriptions.service';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +18,35 @@ import { CompanySubscription, SubscriptionsService } from './subscriptions.servi
           {{ loading() ? 'Loading…' : 'Refresh' }}
         </button>
       </header>
+
+      <!-- Telegram bot pool (platform-owned; academies auto-claim a free bot on enable) -->
+      <div class="card" style="margin: 20px 0; padding: 16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0; font-size:16px;">Telegram bot pool</h2>
+            <p class="sub" style="margin-top:4px;">
+              {{ poolAvailable() }} available · {{ poolTotal() }} total — create bots in &#64;BotFather, paste each token here.
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; flex:1; min-width:280px; max-width:560px;">
+            <input class="search" type="text"
+              [ngModel]="poolToken()" (ngModelChange)="poolToken.set($event)"
+              placeholder="Paste a bot token from @BotFather…" />
+            <button class="act activate" [disabled]="addingBot() || !poolToken().trim()" (click)="addBot()">
+              {{ addingBot() ? 'Adding…' : 'Add bot' }}
+            </button>
+          </div>
+        </div>
+        @if (bots().length) {
+          <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
+            @for (b of bots(); track b.id) {
+              <span class="reg" [class.academy]="!b.assigned_company_id" [class.teacher]="b.assigned_company_id">
+                {{ '@' + b.bot_username }} · {{ b.company_name || 'available' }}
+              </span>
+            }
+          </div>
+        }
+      </div>
 
       <div class="toolbar">
         <input
@@ -349,6 +378,13 @@ export class AppComponent implements OnInit {
   deleteConfirmText = signal('');
   readonly extendPresets = [1, 3, 6, 12];
 
+  // Telegram bot pool
+  bots = signal<PoolBot[]>([]);
+  poolTotal = signal(0);
+  poolAvailable = signal(0);
+  poolToken = signal('');
+  addingBot = signal(false);
+
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
     const list = this.rows();
@@ -364,6 +400,36 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {
     this.load();
+    this.loadBots();
+  }
+
+  loadBots() {
+    this.service.listTelegramBots().subscribe({
+      next: (res) => {
+        this.bots.set(res.bots);
+        this.poolTotal.set(res.total);
+        this.poolAvailable.set(res.available);
+      },
+      error: () => {},
+    });
+  }
+
+  addBot() {
+    const token = this.poolToken().trim();
+    if (!token || this.addingBot()) return;
+    this.addingBot.set(true);
+    this.service.addTelegramBot(token).subscribe({
+      next: (res) => {
+        this.addingBot.set(false);
+        this.poolToken.set('');
+        this.showFlash(`Added @${res.bot_username} · ${res.available} available`);
+        this.loadBots();
+      },
+      error: (err) => {
+        this.addingBot.set(false);
+        this.showFlash(err?.error?.message || 'Could not add bot');
+      },
+    });
   }
 
   load() {

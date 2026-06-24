@@ -1369,7 +1369,173 @@ async function addStudentCodeToStudents() {
   };
 }
 
+async function setupTelegram() {
+  console.log('Starting migration: telegram tables (settings/links/templates/outbox)');
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_settings (
+      company_id        UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+      bot_token         VARCHAR(255),
+      bot_username      VARCHAR(64),
+      webhook_secret    VARCHAR(64),
+      enabled           BOOLEAN NOT NULL DEFAULT false,
+      notify_on_present BOOLEAN NOT NULL DEFAULT true,
+      notify_on_absent  BOOLEAN NOT NULL DEFAULT true,
+      notify_target     VARCHAR(16) NOT NULL DEFAULT 'BOTH'
+                          CHECK (notify_target IN ('STUDENT','PARENT','BOTH')),
+      created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_links (
+      id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id        UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      role              VARCHAR(16) NOT NULL CHECK (role IN ('STUDENT','PARENT','STAFF')),
+      student_id        UUID REFERENCES students(id)  ON DELETE CASCADE,
+      employee_id       UUID REFERENCES employees(id) ON DELETE CASCADE,
+      chat_id           BIGINT NOT NULL,
+      telegram_username VARCHAR(64),
+      linked_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (company_id, role, chat_id),
+      CHECK ( (role IN ('STUDENT','PARENT') AND student_id IS NOT NULL)
+           OR (role = 'STAFF' AND employee_id IS NOT NULL) )
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_links_student  ON telegram_links(student_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_links_employee ON telegram_links(employee_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_links_chat     ON telegram_links(company_id, chat_id)`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_templates (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      type        VARCHAR(30) NOT NULL CHECK (type IN ('PRESENT','ABSENT','LINK_WELCOME')),
+      body        TEXT NOT NULL,
+      created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (company_id, type)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_outbox (
+      id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      chat_id      BIGINT NOT NULL,
+      student_id   UUID REFERENCES students(id) ON DELETE SET NULL,
+      session_id   UUID REFERENCES sessions(id) ON DELETE SET NULL,
+      kind         VARCHAR(16) NOT NULL CHECK (kind IN ('PRESENT','ABSENT')),
+      body         TEXT NOT NULL,
+      status       VARCHAR(12) NOT NULL DEFAULT 'PENDING'
+                     CHECK (status IN ('PENDING','SENT','FAILED','SKIPPED')),
+      error        TEXT,
+      attempts     INT NOT NULL DEFAULT 0,
+      created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      sent_at      TIMESTAMPTZ,
+      UNIQUE (session_id, student_id, chat_id, kind)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_outbox_company ON telegram_outbox(company_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_outbox_status  ON telegram_outbox(status)`);
+
+  // Staff deep-link token (for the attendance bot operators).
+  await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS telegram_link_token VARCHAR(32)`);
+
+  // updated_at triggers (ignore "already exists").
+  for (const t of ['telegram_settings', 'telegram_templates']) {
+    try {
+      await query(`
+        CREATE TRIGGER update_${t}_updated_at
+          BEFORE UPDATE ON ${t}
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      `);
+    } catch (e: any) {
+      if (!e.message?.includes('already exists')) throw e;
+    }
+  }
+
+  console.log('✅ telegram migration completed!');
+  return { success: true, message: 'telegram tables ready (settings/links/templates/outbox)' };
+}
+
+async function setupTelegramBotPool() {
+  console.log('Starting migration: telegram_bot_pool');
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_bot_pool (
+      id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      bot_token           VARCHAR(255) NOT NULL UNIQUE,
+      bot_username        VARCHAR(64) NOT NULL,
+      assigned_company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+      assigned_at         TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tg_pool_assigned ON telegram_bot_pool(assigned_company_id)`);
+  console.log('✅ telegram_bot_pool migration completed!');
+  return { success: true, message: 'telegram_bot_pool ready' };
+}
+
+async function setupExamAbsenceAndTelegramTemplates() {
+  console.log('Starting migration: exam absence + telegram exam templates');
+  // Exam absence: grade nullable + is_absent flag.
+  await query(`ALTER TABLE exam_results ALTER COLUMN grade DROP NOT NULL`);
+  await query(`ALTER TABLE exam_results ADD COLUMN IF NOT EXISTS is_absent BOOLEAN NOT NULL DEFAULT false`);
+  // Widen the telegram_templates type CHECK to allow exam message types.
+  await query(`ALTER TABLE telegram_templates DROP CONSTRAINT IF EXISTS telegram_templates_type_check`);
+  await query(`ALTER TABLE telegram_templates ADD CONSTRAINT telegram_templates_type_check
+    CHECK (type IN ('PRESENT','ABSENT','LINK_WELCOME','EXAM_RESULT','EXAM_ABSENT'))`);
+  console.log('✅ exam absence + telegram exam templates migration completed!');
+  return { success: true, message: 'exam_results.is_absent + telegram exam template types ready' };
+}
+
 export const migrationsRoutes = {
+  setupExamAbsenceAndTelegramTemplates: async () => {
+    try {
+      const result = await setupExamAbsenceAndTelegramTemplates();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  setupTelegramBotPool: async () => {
+    try {
+      const result = await setupTelegramBotPool();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  setupTelegram: async () => {
+    try {
+      const result = await setupTelegram();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   addStudentCodeToStudents: async () => {
     try {
       const result = await addStudentCodeToStudents();

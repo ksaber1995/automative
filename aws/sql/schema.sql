@@ -589,6 +589,8 @@ CREATE TABLE employees (
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_global BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
+    -- Unguessable token for the staff Telegram attendance-bot deep link (migration 046).
+    telegram_link_token VARCHAR(32),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
@@ -1325,7 +1327,9 @@ CREATE TABLE exam_results (
     company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     course_id   UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
     student_id  UUID NOT NULL REFERENCES students(id)  ON DELETE CASCADE,
-    grade       VARCHAR(50) NOT NULL,
+    -- NULL grade is allowed when the student was absent (is_absent = true).
+    grade       VARCHAR(50),
+    is_absent   BOOLEAN NOT NULL DEFAULT false,
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1386,6 +1390,91 @@ CREATE INDEX idx_whatsapp_templates_company ON whatsapp_templates(company_id);
 CREATE TRIGGER update_whatsapp_templates_updated_at
     BEFORE UPDATE ON whatsapp_templates
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- TELEGRAM (attendance bot + auto-notifications) — see migration 046
+-- =============================================
+-- Per-company bot config + notification toggles. bot_token is server-only.
+CREATE TABLE telegram_settings (
+    company_id        UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    bot_token         VARCHAR(255),
+    bot_username      VARCHAR(64),
+    webhook_secret    VARCHAR(64),
+    enabled           BOOLEAN NOT NULL DEFAULT false,
+    notify_on_present BOOLEAN NOT NULL DEFAULT true,
+    notify_on_absent  BOOLEAN NOT NULL DEFAULT true,
+    notify_target     VARCHAR(16) NOT NULL DEFAULT 'BOTH'
+                        CHECK (notify_target IN ('STUDENT','PARENT','BOTH')),
+    created_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Maps a student/parent/staff to the Telegram chat we can message (captured on /start).
+CREATE TABLE telegram_links (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id        UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    role              VARCHAR(16) NOT NULL CHECK (role IN ('STUDENT','PARENT','STAFF')),
+    student_id        UUID REFERENCES students(id)  ON DELETE CASCADE,
+    employee_id       UUID REFERENCES employees(id) ON DELETE CASCADE,
+    chat_id           BIGINT NOT NULL,
+    telegram_username VARCHAR(64),
+    linked_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id, role, chat_id),
+    CHECK ( (role IN ('STUDENT','PARENT') AND student_id IS NOT NULL)
+         OR (role = 'STAFF' AND employee_id IS NOT NULL) )
+);
+CREATE INDEX idx_tg_links_student  ON telegram_links(student_id);
+CREATE INDEX idx_tg_links_employee ON telegram_links(employee_id);
+CREATE INDEX idx_tg_links_chat     ON telegram_links(company_id, chat_id);
+
+-- Editable PRESENT/ABSENT/LINK_WELCOME message bodies (defaults filled in app code).
+CREATE TABLE telegram_templates (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    type        VARCHAR(30) NOT NULL CHECK (type IN ('PRESENT','ABSENT','LINK_WELCOME','EXAM_RESULT','EXAM_ABSENT')),
+    body        TEXT NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id, type)
+);
+
+-- Delivery log + idempotency guard for auto-notify.
+CREATE TABLE telegram_outbox (
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    chat_id      BIGINT NOT NULL,
+    student_id   UUID REFERENCES students(id) ON DELETE SET NULL,
+    session_id   UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    kind         VARCHAR(16) NOT NULL CHECK (kind IN ('PRESENT','ABSENT')),
+    body         TEXT NOT NULL,
+    status       VARCHAR(12) NOT NULL DEFAULT 'PENDING'
+                   CHECK (status IN ('PENDING','SENT','FAILED','SKIPPED')),
+    error        TEXT,
+    attempts     INT NOT NULL DEFAULT 0,
+    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    sent_at      TIMESTAMP WITH TIME ZONE,
+    UNIQUE (session_id, student_id, chat_id, kind)
+);
+CREATE INDEX idx_tg_outbox_company ON telegram_outbox(company_id);
+CREATE INDEX idx_tg_outbox_status  ON telegram_outbox(status);
+
+CREATE TRIGGER update_telegram_settings_updated_at
+    BEFORE UPDATE ON telegram_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_telegram_templates_updated_at
+    BEFORE UPDATE ON telegram_templates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Pool of platform-owned bots auto-assigned to academies on enable (migration 047).
+CREATE TABLE telegram_bot_pool (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    bot_token           VARCHAR(255) NOT NULL UNIQUE,
+    bot_username        VARCHAR(64) NOT NULL,
+    assigned_company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+    assigned_at         TIMESTAMP WITH TIME ZONE,
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_tg_pool_assigned ON telegram_bot_pool(assigned_company_id);
 
 -- Grant permissions (adjust as needed for your specific AWS RDS setup)
 -- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automative_user;

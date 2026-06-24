@@ -23,6 +23,7 @@ import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
 import { Class } from '@shared/interfaces/class.interface';
@@ -64,12 +65,19 @@ export class StudentListComponent implements OnInit {
   authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
+  /** Show the student code only once the QR is active (see student-code.util). */
+  showCode = (s: Student) => shouldShowStudentCode(s, this.authService.isTeacher());
+
   students = signal<Student[]>([]);
   allBranches = signal<LookupOption[]>([]);
+  allCourses = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
+  selectedCourseId = signal('');
   searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
+  // studentId → set of courseIds the student is enrolled in (drives the course filter).
+  studentCourseMap = signal<Map<string, Set<string>>>(new Map());
   activeTab = signal<'active' | 'inactive'>('active');
   qrFilter = signal<'ALL' | 'ACTIVATED' | 'NOT_ACTIVATED'>('ALL');
 
@@ -98,6 +106,11 @@ export class StudentListComponent implements OnInit {
     const qr = this.qrFilter();
     if (qr === 'ACTIVATED') filtered = filtered.filter(s => s.qrActivated);
     else if (qr === 'NOT_ACTIVATED') filtered = filtered.filter(s => !s.qrActivated);
+    const courseId = this.selectedCourseId();
+    if (courseId) {
+      const map = this.studentCourseMap();
+      filtered = filtered.filter(s => map.get(s.id)?.has(courseId));
+    }
     const term = this.searchTerm().trim().toLowerCase();
     if (!term) return filtered;
     return filtered.filter(s => {
@@ -105,7 +118,11 @@ export class StudentListComponent implements OnInit {
       return full.includes(term)
         || (s.firstName ?? '').toLowerCase().includes(term)
         || (s.lastName ?? '').toLowerCase().includes(term)
-        || (s.parentName ?? '').toLowerCase().includes(term);
+        || (s.parentName ?? '').toLowerCase().includes(term)
+        // Also match by student code and phone numbers (student / parent).
+        || String(s.studentCode ?? '').includes(term)
+        || (s.phone ?? '').toLowerCase().includes(term)
+        || (s.parentPhone ?? '').toLowerCase().includes(term);
     });
   });
 
@@ -131,12 +148,21 @@ export class StudentListComponent implements OnInit {
 
   ngOnInit() {
     this.loadBranches();
+    this.loadCourses();
     this.loadStudents();
     this.loadEnrollmentCounts();
   }
 
+  loadCourses() {
+    // Permission-free courses lookup (lookups.courses is auth-only, no granular
+    // permission) so the filter works even for users without course-read access.
+    this.lookupService.courses().subscribe({
+      next: (courses) => this.allCourses.set(courses),
+    });
+  }
+
   loadEnrollmentCounts() {
-    let enrollments: { studentId: string; classId: string }[] = [];
+    let enrollments: { studentId: string; classId: string; courseId?: string }[] = [];
     let classes: Class[] = [];
     let pending = 2;
     const finalize = () => {
@@ -145,13 +171,23 @@ export class StudentListComponent implements OnInit {
       const classDoneById = new Map(
         classes.map(c => [c.id, c.status === 'DONE' || c.isFinished === true])
       );
+      const classCourseById = new Map(classes.map(c => [c.id, c.courseId]));
       const map: Record<string, EnrollmentCounts> = {};
+      const courseMap = new Map<string, Set<string>>();
       for (const e of enrollments) {
         if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
         if (classDoneById.get(e.classId)) map[e.studentId].completed++;
         else map[e.studentId].active++;
+        // Build the student → courses set for the course filter (courseId comes
+        // from the enrollment, falling back to the enrollment's class).
+        const courseId = e.courseId || classCourseById.get(e.classId);
+        if (courseId) {
+          if (!courseMap.has(e.studentId)) courseMap.set(e.studentId, new Set());
+          courseMap.get(e.studentId)!.add(courseId);
+        }
       }
       this.enrollmentCounts.set(map);
+      this.studentCourseMap.set(courseMap);
     };
     this.enrollmentService.getAllEnrollments().subscribe({
       next: (list) => { enrollments = list; finalize(); },

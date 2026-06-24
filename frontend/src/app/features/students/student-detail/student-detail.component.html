@@ -69,6 +69,9 @@
     <!-- QR code dialog -->
     <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)" (activated)="onQrRegenerated($event)"></app-student-qr-dialog>
 
+    <!-- Telegram connect dialog -->
+    <app-telegram-connect-dialog [(visible)]="showTelegramDialog" [studentId]="s.id"></app-telegram-connect-dialog>
+
     <!-- Student Information Card -->
     <p-card>
       <ng-template pTemplate="header">
@@ -76,7 +79,7 @@
           <div>
             <div class="flex items-center gap-3">
               <h2 class="text-2xl font-bold">{{ s.firstName }} {{ s.lastName }}</h2>
-              @if (s.studentCode != null) {
+              @if (showCode(s)) {
                 <span class="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1"
                   [pTooltip]="'STUDENTS.DETAIL.CODE_TOOLTIP' | translate">
                   <i class="pi pi-hashtag"></i>{{ s.studentCode }}
@@ -87,6 +90,7 @@
           </div>
           <div class="flex gap-2">
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
+            <button pButton [label]="'TELEGRAM_CONNECT.BUTTON' | translate" icon="pi pi-telegram" class="p-button-outlined" (click)="showTelegramDialog.set(true)"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>

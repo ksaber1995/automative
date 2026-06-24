@@ -22,6 +22,7 @@ import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { SessionService, ActiveSessionInfo } from '../../rooms/services/session.service';
 import { AttendanceService } from '../../rooms/services/attendance.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -110,6 +111,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   // existing Record Payment dialog for that month.
   scannerOpen = signal(false);
   scannerStarting = signal(false);
+  cameraStarted = signal(false);
   resolvingToken = signal(false);
   manualToken = signal('');
   // QR-less scan-to-pay: staff types the student's short sequential code + Enter.
@@ -155,7 +157,11 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private globalScan: GlobalScanService,
     private sessionService: SessionService,
     private attendanceService: AttendanceService,
+    private scanPref: ScanPreferenceService,
   ) {}
+
+  // Per-device USB-scanner flag (exposed to the template).
+  usbDetected = () => this.scanPref.usbDetected();
 
   ngOnInit(): void {
     const now = new Date();
@@ -202,8 +208,18 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.scannerOpen.set(true);
     this.manualToken.set('');
     this.lastToken = '';
+    // USB scanner is first priority: skip the camera when one is known on this
+    // device (the always-on wedge handles scans). Camera is the explicit fallback.
+    if (this.usbDetected()) return;
+    this.cameraStarted.set(true);
     // Wait a tick so the scanner region element exists in the DOM.
     setTimeout(() => this.startCamera(), 0);
+  }
+
+  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  useCamera(): void {
+    this.cameraStarted.set(true);
+    setTimeout(() => this.startCamera(), 50);
   }
 
   closeScanner(): void {
@@ -232,6 +248,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   private stopCamera(): void {
+    this.cameraStarted.set(false);
     const qr = this.html5Qr;
     this.html5Qr = undefined;
     if (!qr) return;

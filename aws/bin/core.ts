@@ -73,6 +73,11 @@ new CoreStack(app, `AutomateMagicStack-prod`, {
   apiCustomDomain: 'prod.api.netrofit.net',
   createSesIdentity: false,
   frontendBaseUrl: 'https://app.netrofit.com',
+  // Public API base for the Telegram webhook. Use the execute-api URL directly:
+  // the prod.api.netrofit.net custom domain isn't wired in DNS (the Route 53 zone
+  // is netrofit.com, not netrofit.net), so Telegram can't reach it. The
+  // execute-api hostname resolves with a valid cert and Telegram accepts it.
+  apiBaseUrl: 'https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod',
   env: { account, region: apiRegion },
   description: `Netrofit Application Stack (prod)`,
   tags: {

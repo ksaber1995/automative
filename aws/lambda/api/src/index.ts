@@ -53,6 +53,7 @@ import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
 import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
 import { whatsappTemplatesRoutes } from './routes/whatsappTemplates';
+import { telegramRoutes } from './routes/telegram';
 import { lookupsRoutes } from './routes/lookups';
 
 // Create the router implementation
@@ -104,6 +105,9 @@ const router = {
     recordByQr: examsRoutes.recordByQr,
     saveResult: examsRoutes.saveResult,
     deleteResult: examsRoutes.deleteResult,
+    markAbsent: examsRoutes.markAbsent,
+    markRemainingAbsent: examsRoutes.markRemainingAbsent,
+    sendTelegramResults: examsRoutes.sendTelegramResults,
     getById: examsRoutes.getById,
     update: examsRoutes.update,
     delete: examsRoutes.delete,
@@ -162,6 +166,18 @@ const router = {
   whatsappTemplates: {
     getTemplates: whatsappTemplatesRoutes.getTemplates,
     updateTemplates: whatsappTemplatesRoutes.updateTemplates,
+  },
+  telegram: {
+    // Static paths before param paths (itty-router matches in registration order).
+    getSettings: telegramRoutes.getSettings,
+    updateSettings: telegramRoutes.updateSettings,
+    updateTemplates: telegramRoutes.updateTemplates,
+    setBot: telegramRoutes.setBot,
+    enableWithPooledBot: telegramRoutes.enableWithPooledBot,
+    disconnectBot: telegramRoutes.disconnectBot,
+    getStudentLink: telegramRoutes.getStudentLink,
+    getStaffLink: telegramRoutes.getStaffLink,
+    webhook: telegramRoutes.webhook,
   },
   timetable: {
     getDay: timetableRoutes.getDay,

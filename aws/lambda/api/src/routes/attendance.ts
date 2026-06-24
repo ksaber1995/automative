@@ -2,6 +2,7 @@ import { query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
+import { notifyCheckin } from './telegram';
 
 export const attendanceRoutes = {
   /**
@@ -36,6 +37,7 @@ export const attendanceRoutes = {
             s.id AS student_id,
             s.first_name AS student_first_name,
             s.last_name AS student_last_name,
+            s.student_code AS student_code,
             s.parent_name AS parent_name,
             s.parent_phone AS parent_phone,
             s.phone AS student_phone,
@@ -60,6 +62,7 @@ export const attendanceRoutes = {
             s.id AS student_id,
             s.first_name AS student_first_name,
             s.last_name AS student_last_name,
+            s.student_code AS student_code,
             s.parent_name AS parent_name,
             s.parent_phone AS parent_phone,
             s.phone AS student_phone,
@@ -88,6 +91,7 @@ export const attendanceRoutes = {
           studentId: row.student_id,
           studentFirstName: row.student_first_name,
           studentLastName: row.student_last_name,
+          studentCode: row.student_code ?? null,
           parentName: row.parent_name || null,
           parentPhone: row.parent_phone || null,
           studentPhone: row.student_phone || null,
@@ -158,6 +162,36 @@ export const attendanceRoutes = {
     } catch (error) {
       console.error('Save session attendance error:', error);
       return mapThrownError(error, 'ERRORS.ATTENDANCE.SAVE_FAILED', 'Failed to save attendance');
+    }
+  },
+
+  /**
+   * DELETE /api/attendance/session/:sessionId/student/:studentId
+   * Remove a single attendance record (any type) — used to undo a wrong QR
+   * check-in, including SUBSTITUTION attendees the checkbox editor can't manage.
+   */
+  removeAttendee: async ({ params, headers }: { params: { sessionId: string; studentId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const session = await queryOne(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      if (!canAccessBranch(context, session.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+      await query(
+        'DELETE FROM session_attendance WHERE session_id = $1 AND student_id = $2',
+        [params.sessionId, params.studentId]
+      );
+      return { status: 200 as const, body: { message: 'Attendee removed', code: 'ATTENDANCE.REMOVED' } };
+    } catch (error) {
+      console.error('Remove attendee error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.REMOVE_FAILED', 'Failed to remove attendee');
     }
   },
 
@@ -241,6 +275,9 @@ export const attendanceRoutes = {
         );
         const alreadyPresent = inserted.length === 0;
 
+        // Best-effort Telegram present notification (no-op unless enabled).
+        await notifyCheckin(context.companyId, params.sessionId, student.id);
+
         return {
           status: 200 as const,
           body: {
@@ -298,6 +335,9 @@ export const attendanceRoutes = {
         [params.sessionId, student.id, siblingClass.id]
       );
       const alreadyPresentSub = insertedSub.length === 0;
+
+      // Best-effort Telegram present notification (no-op unless enabled).
+      await notifyCheckin(context.companyId, params.sessionId, student.id);
 
       return {
         status: 200 as const,

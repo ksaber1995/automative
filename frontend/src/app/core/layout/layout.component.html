@@ -162,11 +162,21 @@
   [style]="{ width: '400px' }"
   [header]="'NAV.FIND_STUDENT' | translate">
   <div class="text-center">
-    <div id="navbar-qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
-    @if (qrScanning()) {
-      <div class="mt-4">
-        <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
-        <p class="text-sm text-gray-500 mt-2">{{ 'NAV.QR_STARTING_CAMERA' | translate }}</p>
+    @if (cameraStarted()) {
+      <div id="navbar-qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
+      @if (qrScanning()) {
+        <div class="mt-4">
+          <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+          <p class="text-sm text-gray-500 mt-2">{{ 'NAV.QR_STARTING_CAMERA' | translate }}</p>
+        </div>
+      }
+    } @else {
+      <!-- USB scanner is the default: wait for the wedge, offer camera fallback. -->
+      <div class="py-6">
+        <i class="pi pi-qrcode text-4xl text-gray-300"></i>
+        <p class="text-sm text-gray-600 mt-3">{{ 'NAV.QR_USB_READY' | translate }}</p>
+        <p-button class="inline-block mt-4" [label]="'NAV.QR_USE_CAMERA' | translate" icon="pi pi-camera"
+          [outlined]="true" size="small" (onClick)="useCamera()"></p-button>
       </div>
     }
     @if (qrLookingUp()) {
