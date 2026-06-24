@@ -74,7 +74,15 @@
       <ng-template pTemplate="header">
         <div class="flex justify-between items-center p-4">
           <div>
-            <h2 class="text-2xl font-bold">{{ s.firstName }} {{ s.lastName }}</h2>
+            <div class="flex items-center gap-3">
+              <h2 class="text-2xl font-bold">{{ s.firstName }} {{ s.lastName }}</h2>
+              @if (s.studentCode != null) {
+                <span class="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1"
+                  [pTooltip]="'STUDENTS.DETAIL.CODE_TOOLTIP' | translate">
+                  <i class="pi pi-hashtag"></i>{{ s.studentCode }}
+                </span>
+              }
+            </div>
             <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
           </div>
           <div class="flex gap-2">

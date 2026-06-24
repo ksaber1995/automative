@@ -27,6 +27,7 @@ import { AttendanceService } from '../../rooms/services/attendance.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { CourseService } from '../../courses/services/course.service';
+import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
@@ -111,6 +112,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   scannerStarting = signal(false);
   resolvingToken = signal(false);
   manualToken = signal('');
+  // QR-less scan-to-pay: staff types the student's short sequential code + Enter.
+  manualCode = signal('');
+  resolvingCode = signal(false);
   // The due-month picker shown after a successful scan.
   showMonthPicker = signal(false);
   scannedStudentName = signal('');
@@ -142,6 +146,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private enrollmentService: EnrollmentService,
     private lookupService: LookupService,
     private courseSvc: CourseService,
+    private studentSvc: StudentService,
     private notify: NotificationService,
     private auth: AuthService,
     private translate: TranslateService,
@@ -262,6 +267,29 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.manualToken.set('');
     if (!token) return;
     this.resolveToken(token);
+  }
+
+  /**
+   * QR-less scan-to-pay by short student code (Enter key). Resolves the code to
+   * the student's QR token, then reuses the normal scan-to-pay flow. A
+   * non-existent code surfaces a "no student with this code" warning (toasted by
+   * the HTTP error interceptor from the server's translation key).
+   */
+  submitManualCode(): void {
+    const code = this.manualCode().trim();
+    this.manualCode.set('');
+    if (!code || this.resolvingCode()) return;
+    this.resolvingCode.set(true);
+    this.studentSvc.lookupByCode(code).pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ qrToken }) => {
+        this.resolvingCode.set(false);
+        this.resolveToken(qrToken);
+      },
+      error: () => {
+        // Interceptor toasts the translated "no student with this code" message.
+        this.resolvingCode.set(false);
+      },
+    });
   }
 
   /** Look up the scanned student's due months and open the month picker. */

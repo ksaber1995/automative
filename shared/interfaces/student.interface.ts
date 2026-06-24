@@ -39,6 +39,8 @@ export interface Student {
   inactiveReason?: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel | null;
+  /** Short sequential per-company number (1, 2, 3…) for QR-less attendance/payment lookup. */
+  studentCode?: number | null;
   /** Random token encoded in the student's QR code (public profile + check-in). */
   qrToken?: string | null;
   /** Paid QR activation (TEACHER companies). For academies the QR is free. */

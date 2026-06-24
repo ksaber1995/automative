@@ -7,7 +7,15 @@
   [header]="'STUDENT_QR.TITLE' | translate"
 >
   <div class="text-center">
-    <p class="text-sm text-gray-500 mb-3">{{ studentName() }}</p>
+    <p class="text-sm text-gray-500 mb-2">{{ studentName() }}</p>
+
+    <!-- Short student code — the QR-less fallback for attendance / payment. -->
+    @if (student()?.studentCode != null) {
+      <div class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">
+        <i class="pi pi-hashtag"></i>
+        <span>{{ 'STUDENT_QR.CODE_LABEL' | translate }} <strong>{{ student()?.studentCode }}</strong></span>
+      </div>
+    }
 
     @if (showQr()) {
       <!-- QR is free (academy) or paid-activated (teacher) -->

@@ -14,6 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode } from 'html5-qrcode';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
+import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
@@ -65,6 +66,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
+  private studentService = inject(StudentService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
   private employeeService = inject(EmployeeService);
   private languageService = inject(LanguageService);
@@ -88,6 +90,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   scannerOpen = signal(false);
   scannerStarting = signal(false);
   manualToken = signal('');
+  // QR-less check-in: staff types the student's short sequential code + Enter.
+  manualCode = signal('');
+  resolvingCode = signal(false);
   lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: 'NORMAL' | 'SUBSTITUTION'; homeClassName?: string | null } | null>(null);
 
   // Session number inline edit
@@ -544,6 +549,30 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.manualToken.set('');
     if (!token) return;
     this.checkin(token);
+  }
+
+  /**
+   * QR-less check-in by short student code (Enter key). Resolves the code to the
+   * student's QR token, then reuses the normal check-in path. A non-existent
+   * code surfaces a "no student with this code" warning (toasted by the HTTP
+   * error interceptor from the server's translation key).
+   */
+  submitManualCode() {
+    const code = this.manualCode().trim();
+    this.manualCode.set('');
+    if (!code) return;
+    this.resolvingCode.set(true);
+    this.studentService.lookupByCode(code).subscribe({
+      next: ({ qrToken }) => {
+        this.resolvingCode.set(false);
+        this.checkin(qrToken);
+      },
+      error: () => {
+        // Interceptor toasts the translated "no student with this code" message.
+        this.resolvingCode.set(false);
+        this.lastScanResult.set(null);
+      },
+    });
   }
 
   private checkin(token: string) {

@@ -20,6 +20,12 @@
         [outlined]="true"
         (onClick)="openScanner()"
       ></p-button>
+      <!-- QR-less scan-to-pay: type the student's short code, press Enter. -->
+      <input pInputText type="text" inputmode="numeric" style="width: 150px;"
+        [ngModel]="manualCode()" (ngModelChange)="manualCode.set($event)"
+        (keyup.enter)="submitManualCode()"
+        [disabled]="resolvingCode()"
+        [placeholder]="'MONTHLY_SUBSCRIPTIONS.CODE_PLACEHOLDER' | translate" />
     </div>
   </div>
 

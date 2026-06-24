@@ -1330,7 +1330,61 @@ async function setupWhatsappTemplates() {
   return { success: true, message: 'whatsapp_templates ready; legacy messaging tables dropped' };
 }
 
+async function addStudentCodeToStudents() {
+  console.log('Starting migration: add sequential student_code to students');
+
+  // 1) Add the column (idempotent).
+  await query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS student_code INTEGER`);
+
+  // 2) Backfill per-company sequential codes in enrollment/creation order so the
+  //    earliest student in each company is #1. Only fills rows that lack a code,
+  //    so re-running never renumbers already-coded students.
+  const backfilled = await query(`
+    WITH numbered AS (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY company_id
+               ORDER BY created_at ASC, id ASC
+             ) AS seq
+      FROM students
+    )
+    UPDATE students s
+    SET student_code = n.seq
+    FROM numbered n
+    WHERE s.id = n.id
+      AND s.student_code IS NULL
+    RETURNING s.id
+  `);
+
+  // 3) One code per company (NULLs never trip the unique index).
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_students_company_code
+      ON students(company_id, student_code)
+  `);
+
+  console.log(`✅ student_code migration completed; backfilled ${backfilled.length} student(s)`);
+  return {
+    success: true,
+    message: `students.student_code ready; backfilled ${backfilled.length} existing student(s)`,
+  };
+}
+
 export const migrationsRoutes = {
+  addStudentCodeToStudents: async () => {
+    try {
+      const result = await addStudentCodeToStudents();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   addCourseMonthlyPriceOverrides: async () => {
     try {
       const result = await addCourseMonthlyPriceOverrides();

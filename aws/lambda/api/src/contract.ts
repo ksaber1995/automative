@@ -310,6 +310,8 @@ const StudentSchema = z.object({
   inactiveReason: z.string().nullable(),
   notes: z.string().nullable(),
   acquisitionChannel: AcquisitionChannelSchema.nullable(),
+  // Short sequential per-company number for QR-less attendance / payment lookup.
+  studentCode: z.number().nullable().optional(),
   qrToken: z.string().nullable().optional(),
   qrActivated: z.boolean().optional(),
   qrExpiration: z.string().nullable().optional(),
@@ -1523,6 +1525,19 @@ export const contract = c.router({
       pathParams: z.object({ qrToken: z.string().min(1).max(64) }),
       responses: {
         200: z.object({ id: UUIDSchema }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Resolve a student by their short sequential code (QR-less fallback). Returns
+    // the student's qrToken too so callers can reuse the existing QR check-in /
+    // payment flows without a second round trip.
+    lookupByCode: {
+      method: 'GET',
+      path: '/api/students/lookup-by-code/:code',
+      pathParams: z.object({ code: z.string().regex(/^\d+$/) }),
+      responses: {
+        200: z.object({ id: UUIDSchema, qrToken: z.string() }),
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
@@ -4264,6 +4279,15 @@ export const contract = c.router({
     setupWhatsappTemplates: {
       method: 'POST',
       path: '/api/migrations/setup-whatsapp-templates',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
+    addStudentCodeToStudents: {
+      method: 'POST',
+      path: '/api/migrations/add-student-code',
       body: z.object({}).optional(),
       responses: {
         200: z.object({ success: z.boolean(), message: z.string() }),

@@ -74,6 +74,19 @@
     </div>
   </div>
 
+  <!-- QR-less check-in: type the student's short code and press Enter. Always
+       visible so staff can use it whether or not the camera scanner is open. -->
+  <div class="flex items-center gap-2 mb-3" style="max-width: 360px;">
+    <input pInputText type="text" inputmode="numeric" class="flex-1"
+      [ngModel]="manualCode()" (ngModelChange)="manualCode.set($event)"
+      (keyup.enter)="submitManualCode()"
+      [disabled]="resolvingCode()"
+      [placeholder]="'SESSION_QR.CODE_PLACEHOLDER' | translate" />
+    <p-button icon="pi pi-check" [label]="'SESSION_QR.CODE_SUBMIT' | translate"
+      severity="success" [outlined]="true" [loading]="resolvingCode()"
+      (onClick)="submitManualCode()"></p-button>
+  </div>
+
   <!-- QR check-in -->
   <div class="mb-4">
     @if (!scannerOpen()) {

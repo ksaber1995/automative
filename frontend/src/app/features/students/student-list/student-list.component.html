@@ -119,6 +119,7 @@
     >
       <ng-template pTemplate="header">
         <tr>
+          <th pSortableColumn="studentCode">{{ 'STUDENTS.LIST.COL_CODE' | translate }} <p-sortIcon field="studentCode"></p-sortIcon></th>
           <th pSortableColumn="firstName">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
           <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
@@ -133,6 +134,7 @@
       </ng-template>
       <ng-template pTemplate="body" let-student>
         <tr>
+          <td><span class="font-semibold text-indigo-700">#{{ student.studentCode ?? '—' }}</span></td>
           <td>{{ student.firstName }} {{ student.lastName }}</td>
           <td>{{ getAge(student.dateOfBirth) }} {{ 'STUDENTS.LIST.YEARS' | translate }}</td>
           <td>
@@ -221,7 +223,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 7 : 8" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td [attr.colspan]="authService.isTeacher() ? 8 : 9" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

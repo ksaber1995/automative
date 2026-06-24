@@ -28,6 +28,7 @@
     },
     "STUDENTS": {
       "NOT_FOUND": "الطالب غير موجود",
+      "CODE_NOT_FOUND": "لا يوجد طالب بهذا الرقم",
       "ACCESS_DENIED": "الوصول إلى هذا الطالب غير مسموح",
       "ACCESS_DENIED_UPDATE": "تعديل هذا الطالب غير مسموح",
       "ACCESS_DENIED_DELETE": "حذف هذا الطالب غير مسموح",
@@ -529,6 +530,7 @@
     "SCAN_LOOKING_UP": "جارٍ البحث عن الأشهر المستحقة…",
     "SCAN_MANUAL_PLACEHOLDER": "أو امسح بقارئ USB / الصق الرمز ثم اضغط Enter",
     "SCAN_CAMERA_FAILED": "تعذّر تشغيل الكاميرا. تحقق من الأذونات أو استخدم قارئ USB / الإدخال اليدوي.",
+    "CODE_PLACEHOLDER": "رقم الطالب ثم اضغط Enter",
     "SCAN_PICK_MONTH": "اختر شهرًا للدفع",
     "SCAN_PICK_MONTH_HINT": "اختر شهرًا مستحقًا لتسجيل الدفعة",
     "SCAN_NO_DUE": "لا توجد أشهر مستحقة على {{name}}.",
@@ -2626,6 +2628,7 @@
       "ALL_BRANCHES": "جميع الفروع",
       "SEARCH": "البحث بالاسم",
       "SEARCH_PLACEHOLDER": "ابحث باسم الطالب أو ولي الأمر...",
+      "COL_CODE": "الرقم",
       "COL_NAME": "الاسم",
       "COL_AGE": "العمر",
       "COL_PARENT": "ولي الأمر",
@@ -2720,6 +2723,7 @@
     "DETAIL": {
       "EDIT": "تعديل",
       "BACK": "رجوع",
+      "CODE_TOOLTIP": "رقم الطالب — استخدمه لتسجيل الحضور أو الدفع عند عدم توفّر رمز QR",
       "YEARS_OLD": "سنة",
       "PERSONAL": "المعلومات الشخصية",
       "DOB": "تاريخ الميلاد:",
@@ -3654,6 +3658,7 @@
   "STUDENT_QR": {
     "BUTTON": "رمز QR",
     "TITLE": "رمز QR للطالب",
+    "CODE_LABEL": "الرقم",
     "SCAN_HINT": "امسح الرمز لعرض ملف الطالب",
     "PRINT": "طباعة",
     "DOWNLOAD": "تحميل",
@@ -3680,6 +3685,8 @@
     "STARTING_CAMERA": "جارٍ تشغيل الكاميرا…",
     "CAMERA_FAILED": "تعذّر تشغيل الكاميرا. تحقق من الأذونات أو استخدم قارئ USB أو الإدخال اليدوي.",
     "MANUAL_PLACEHOLDER": "أو امسح بقارئ USB / الصق الرمز ثم اضغط Enter",
+    "CODE_PLACEHOLDER": "رقم الطالب ثم اضغط Enter",
+    "CODE_SUBMIT": "تسجيل الحضور",
     "CHECKED_IN": "تم تسجيل حضور {{name}}",
     "ALREADY_PRESENT": "{{name}} مسجّل حاضر بالفعل",
     "SUBSTITUTION_CHECKED_IN": "تم تسجيل حضور {{name}} كتعويض (مسجّل في {{className}})"

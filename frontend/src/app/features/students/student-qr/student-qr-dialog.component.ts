@@ -191,6 +191,7 @@ export class StudentQrDialogComponent {
         <head><title>QR - ${s.firstName} ${s.lastName}</title></head>
         <body style="font-family: sans-serif; text-align: center; padding: 32px;">
           <h2 style="margin: 0 0 4px;">${s.firstName} ${s.lastName}</h2>
+          ${s.studentCode != null ? `<p style="margin: 0 0 12px; font-size: 18px; color: #4338ca;">${this.translate.instant('STUDENT_QR.CODE_LABEL')} <strong>#${s.studentCode}</strong></p>` : ''}
           <img src="${data}" style="width: 320px; height: 320px;" />
         </body>
       </html>

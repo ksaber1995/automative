@@ -375,6 +375,11 @@ CREATE TABLE students (
     qr_expiration DATE,
     qr_price DECIMAL(10, 2),
     qr_paid BOOLEAN DEFAULT false,
+    -- Short, human-friendly sequential number (1, 2, 3, …) assigned per company.
+    -- Lets staff record attendance / payments by typing the number when a
+    -- student forgets their QR. Sequential *within* a company, so each academy
+    -- starts at 1; see migration 045 and the UNIQUE(company_id, student_code) index.
+    student_code INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
@@ -382,6 +387,8 @@ CREATE TABLE students (
 
 CREATE INDEX idx_students_branch_id ON students(branch_id);
 CREATE UNIQUE INDEX idx_students_qr_token ON students(qr_token);
+-- One sequential code per company (codes repeat across companies).
+CREATE UNIQUE INDEX idx_students_company_code ON students(company_id, student_code);
 CREATE INDEX idx_students_company_id ON students(company_id);
 CREATE INDEX idx_students_enrollment_date ON students(enrollment_date);
 CREATE INDEX idx_students_inactive_date ON students(inactive_date);

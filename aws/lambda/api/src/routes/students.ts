@@ -43,6 +43,7 @@ function mapStudentFromDB(row: any) {
     inactiveReason: row.inactive_reason,
     notes: row.notes,
     acquisitionChannel: row.acquisition_channel,
+    studentCode: row.student_code ?? null,
     qrToken: row.qr_token,
     qrActivated: row.qr_activated === true,
     qrExpiration: row.qr_expiration ?? null,
@@ -75,6 +76,15 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
+      // Next sequential code for this company (1, 2, 3, …). The
+      // UNIQUE(company_id, student_code) index is the real guard: under a rare
+      // concurrent insert two rows could read the same MAX, and the loser fails
+      // the insert (surfaced as a 400) rather than silently sharing a code.
+      const codeRow = await queryOne<{ next: number }>(
+        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students WHERE company_id = $1`,
+        [context.companyId]
+      );
+
       const student = await insert('students', {
         company_id: context.companyId,
         first_name: body.firstName,
@@ -92,6 +102,7 @@ export const studentsRoutes = {
         notes: body.notes || null,
         acquisition_channel: body.acquisitionChannel || null,
         qr_token: generateQrToken(),
+        student_code: codeRow?.next ?? 1,
         is_active: true,
       });
 
@@ -476,6 +487,49 @@ export const studentsRoutes = {
     } catch (error) {
       console.error('Lookup student by QR error:', error);
       return mapThrownError(error, 'ERRORS.STUDENTS.LOOKUP_QR_FAILED', 'Failed to lookup student by QR');
+    }
+  },
+
+  // Resolve a student by their short sequential code — the QR-less fallback used
+  // on the attendance and payment screens when a student forgets their QR. We
+  // return the student's qr_token so the caller can drive the *existing* QR
+  // check-in / payment flows with no second round trip.
+  lookupByCode: async ({ params, headers }: { params: { code: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const code = parseInt(params.code, 10);
+      if (!Number.isInteger(code) || code < 1) {
+        return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
+      }
+
+      // Codes are unique per company and only assigned to active students for
+      // lookup purposes; an inactive/unknown code must not resolve.
+      const student = await queryOne<any>(
+        `SELECT id, qr_token FROM students
+         WHERE student_code = $1 AND company_id = $2 AND is_active = true`,
+        [code, context.companyId]
+      );
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
+      }
+
+      // Self-heal: legacy/bulk-imported students may have no QR token yet. Since
+      // the downstream check-in/payment flows key on qr_token, provision one now
+      // so a code lookup always yields a usable token.
+      let qrToken: string = student.qr_token;
+      if (!qrToken) {
+        qrToken = generateQrToken();
+        await update('students', student.id, { qr_token: qrToken });
+      }
+
+      return { status: 200 as const, body: { id: student.id, qrToken } };
+    } catch (error) {
+      console.error('Lookup student by code error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.LOOKUP_CODE_FAILED', 'Failed to lookup student by code');
     }
   },
 };

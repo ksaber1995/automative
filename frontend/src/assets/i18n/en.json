@@ -28,6 +28,7 @@
     },
     "STUDENTS": {
       "NOT_FOUND": "Student not found",
+      "CODE_NOT_FOUND": "No student exists with this code",
       "ACCESS_DENIED": "Access denied to this student",
       "ACCESS_DENIED_UPDATE": "Access denied to update this student",
       "ACCESS_DENIED_DELETE": "Access denied to delete this student",
@@ -529,6 +530,7 @@
     "SCAN_LOOKING_UP": "Looking up due months…",
     "SCAN_MANUAL_PLACEHOLDER": "Or scan with a USB reader / paste a code, then press Enter",
     "SCAN_CAMERA_FAILED": "Could not start the camera. Check permissions or use a USB scanner / manual entry.",
+    "CODE_PLACEHOLDER": "Student code, then Enter",
     "SCAN_PICK_MONTH": "Select a Month to Pay",
     "SCAN_PICK_MONTH_HINT": "choose a due month to record a payment",
     "SCAN_NO_DUE": "{{name}} has no outstanding months — nothing due.",
@@ -2502,6 +2504,7 @@
       "ALL_BRANCHES": "All Branches",
       "SEARCH": "Search by name",
       "SEARCH_PLACEHOLDER": "Search student or parent name...",
+      "COL_CODE": "Code",
       "COL_NAME": "Name",
       "COL_AGE": "Age",
       "COL_PARENT": "Parent",
@@ -2596,6 +2599,7 @@
     "DETAIL": {
       "EDIT": "Edit",
       "BACK": "Back",
+      "CODE_TOOLTIP": "Student code — use it to record attendance or payment when the QR isn't handy",
       "YEARS_OLD": "years old",
       "PERSONAL": "Personal Information",
       "DOB": "Date of Birth:",
@@ -3530,6 +3534,7 @@
   "STUDENT_QR": {
     "BUTTON": "QR Code",
     "TITLE": "Student QR Code",
+    "CODE_LABEL": "Code",
     "SCAN_HINT": "Scan to open this student's profile",
     "PRINT": "Print",
     "DOWNLOAD": "Download",
@@ -3556,6 +3561,8 @@
     "STARTING_CAMERA": "Starting camera…",
     "CAMERA_FAILED": "Could not start the camera. Check permissions or use a USB scanner / manual entry.",
     "MANUAL_PLACEHOLDER": "Or scan with a USB reader / paste a code, then press Enter",
+    "CODE_PLACEHOLDER": "Student code, then Enter",
+    "CODE_SUBMIT": "Check in",
     "CHECKED_IN": "{{name}} marked present",
     "ALREADY_PRESENT": "{{name}} was already present",
     "SUBSTITUTION_CHECKED_IN": "{{name}} marked present by substitution (enrolled in {{className}})"

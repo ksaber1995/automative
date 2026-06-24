@@ -81,6 +81,17 @@ export class StudentService {
     return this.api.get<{ id: string }>(`students/lookup-by-qr/${encodeURIComponent(qrToken)}`);
   }
 
+  /**
+   * Resolve a student by their short sequential code (QR-less fallback). Returns
+   * the student's id and qrToken so callers can reuse the existing QR check-in /
+   * payment flows. 404s when no active student has that code.
+   */
+  lookupByCode(code: string | number): Observable<{ id: string; qrToken: string }> {
+    return this.api.get<{ id: string; qrToken: string }>(
+      `students/lookup-by-code/${encodeURIComponent(String(code))}`,
+    );
+  }
+
   enrollStudent(studentId: string, enrollment: EnrollmentDto): Observable<Enrollment> {
     return this.api.post<Enrollment>(`students/${studentId}/enroll`, enrollment);
   }
