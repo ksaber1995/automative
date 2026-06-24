@@ -412,6 +412,74 @@ export const examsRoutes = {
   },
 
   /**
+   * POST /api/exams/:id/record-by-code  { code, grade }
+   * Like recordByQr but resolves the student by their short sequential code.
+   * Server-side resolution keeps the exam page from importing the students
+   * feature (which would create a circular module dependency).
+   */
+  recordByCode: async ({ params, body, headers }: { params: { id: string }; body: { code: string; grade: string }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const exam = await queryOne<any>(
+        'SELECT * FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
+      }
+
+      const grade = (body?.grade ?? '').toString().trim();
+      if (!grade) return apiError(400, 'ERRORS.EXAMS.GRADE_REQUIRED', 'Grade is required');
+      const code = parseInt((body?.code ?? '').toString().trim(), 10);
+      if (!Number.isInteger(code) || code < 1) {
+        return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
+      }
+
+      const student = await queryOne<any>(
+        'SELECT id, first_name, last_name FROM students WHERE student_code = $1 AND company_id = $2 AND is_active = true',
+        [code, context.companyId],
+      );
+      if (!student) {
+        return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
+      }
+      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, student.id))) {
+        return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
+      }
+
+      const upserted = await queryOne<any>(
+        `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
+         VALUES ($1, $2, $3, $4, $5, false)
+         ON CONFLICT (exam_id, student_id)
+         DO UPDATE SET grade = EXCLUDED.grade, is_absent = false, recorded_at = NOW(), updated_at = NOW()
+         RETURNING (xmax = 0) AS inserted`,
+        [params.id, context.companyId, exam.course_id, student.id, grade],
+      );
+      const alreadyRecorded = !(upserted?.inserted);
+
+      return {
+        status: 200 as const,
+        body: {
+          studentId: student.id,
+          studentFirstName: student.first_name,
+          studentLastName: student.last_name,
+          grade,
+          alreadyRecorded,
+          code: alreadyRecorded ? 'EXAMS.GRADE_UPDATED' : 'EXAMS.GRADE_RECORDED',
+          message: alreadyRecorded ? 'Grade updated' : 'Grade recorded',
+        },
+      };
+    } catch (error: any) {
+      console.error('Exam record-by-code error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.RECORD_FAILED', 'Failed to record grade');
+    }
+  },
+
+  /**
    * POST /api/exams/:id/results  { studentId, grade }
    * Manual (no-camera) grade entry from the roster. Same enrollment check +
    * upsert as recordByQr.

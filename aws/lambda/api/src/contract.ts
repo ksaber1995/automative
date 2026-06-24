@@ -1965,6 +1965,19 @@ export const contract = c.router({
         409: ApiErrorSchema,
       },
     },
+    recordByCode: {
+      method: 'POST',
+      path: '/api/exams/:id/record-by-code',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ code: z.string().min(1), grade: z.string().min(1) }),
+      responses: {
+        200: QrExamResultSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
     saveResult: {
       method: 'POST',
       path: '/api/exams/:id/results',

@@ -103,6 +103,7 @@ const router = {
     getByStudent: examsRoutes.getByStudent,
     results: examsRoutes.results,
     recordByQr: examsRoutes.recordByQr,
+    recordByCode: examsRoutes.recordByCode,
     saveResult: examsRoutes.saveResult,
     deleteResult: examsRoutes.deleteResult,
     markAbsent: examsRoutes.markAbsent,

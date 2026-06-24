@@ -44,6 +44,11 @@ export class ExamService {
     return this.api.post<QrExamResult>(`exams/${id}/record-by-qr`, { qrToken, grade });
   }
 
+  /** Record/update a grade by the student's short code (resolved server-side). */
+  recordByCode(id: string, code: string, grade: string): Observable<QrExamResult> {
+    return this.api.post<QrExamResult>(`exams/${id}/record-by-code`, { code, grade });
+  }
+
   /** Manual (no-camera) grade entry from the roster. */
   saveResult(id: string, studentId: string, grade: string): Observable<{ success: boolean }> {
     return this.api.post<{ success: boolean }>(`exams/${id}/results`, { studentId, grade });

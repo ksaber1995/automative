@@ -12,7 +12,6 @@ import { DialogModule } from 'primeng/dialog';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ExamService } from '../services/exam.service';
-import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
@@ -41,7 +40,6 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private service = inject(ExamService);
-  private studentService = inject(StudentService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
@@ -330,15 +328,25 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     const code = this.manualCode().trim();
     this.manualCode.set('');
     if (!code) return;
-    if (!this.currentGrade().trim()) {
+    const grade = this.currentGrade().trim();
+    if (!grade) {
       this.notifications.error(this.translate.instant('EXAMS.DETAIL.ENTER_GRADE_FIRST'));
       return;
     }
     this.resolvingCode.set(true);
-    this.studentService.lookupByCode(code).subscribe({
-      next: ({ qrToken }) => {
+    this.service.recordByCode(this.examId, code, grade).subscribe({
+      next: (res) => {
         this.resolvingCode.set(false);
-        this.record(qrToken);
+        const name = `${res.studentFirstName} ${res.studentLastName}`;
+        this.lastScanResult.set({ name, grade: res.grade, updated: res.alreadyRecorded });
+        this.playBeep(true);
+        this.roster.update((list) =>
+          list.map((s) => (s.studentId === res.studentId
+            ? { ...s, grade: res.grade, isAbsent: false, recordedAt: new Date().toISOString() }
+            : s)));
+        this.notifications.success(
+          this.translate.instant(res.alreadyRecorded ? 'EXAMS.DETAIL.GRADE_UPDATED_TOAST' : 'EXAMS.DETAIL.GRADE_RECORDED_TOAST', { name, grade: res.grade }),
+        );
       },
       error: () => {
         // Interceptor toasts the translated "no student with this code" message.
