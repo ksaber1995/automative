@@ -1,4 +1,4 @@
-export type MonthlyPaymentStatus = 'PENDING' | 'PAID' | 'PARTIAL' | 'OVERDUE';
+export type MonthlyPaymentStatus = 'PENDING' | 'PAID' | 'PARTIAL' | 'OVERDUE' | 'REFUNDED';
 
 export interface MonthlySubscriptionPayment {
   id: string;
@@ -15,6 +15,10 @@ export interface MonthlySubscriptionPayment {
   dueDate: string;
   paidDate: string | null;
   notes: string | null;
+  /** Cumulative money returned for this bill (0 unless refunded). */
+  refundedAmount?: number;
+  refundNote?: string | null;
+  refundedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +67,15 @@ export interface RecordMonthlyPaymentDto {
   amount: number;
   paymentDate: string;
   notes?: string;
+}
+
+export interface RefundMonthlyPaymentDto {
+  type: 'FULL' | 'PARTIAL';
+  /** Required for PARTIAL; ignored for FULL (which refunds the whole paid amount). */
+  amount?: number;
+  note?: string;
+  /** What to do with the underlying subscription after refunding. */
+  subscriptionAction?: 'KEEP' | 'HOLD' | 'CANCEL';
 }
 
 export interface GenerateMonthlyBillsDto {

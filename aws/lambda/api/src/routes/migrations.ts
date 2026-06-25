@@ -1490,7 +1490,34 @@ async function setupExamAbsenceAndTelegramTemplates() {
   return { success: true, message: 'exam_results.is_absent + telegram exam template types ready' };
 }
 
+async function addMonthlySubscriptionRefunds() {
+  console.log('Starting migration: monthly subscription refunds');
+  await query(`ALTER TABLE monthly_subscription_payments ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0`);
+  await query(`ALTER TABLE monthly_subscription_payments ADD COLUMN IF NOT EXISTS refund_note TEXT`);
+  await query(`ALTER TABLE monthly_subscription_payments ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP WITH TIME ZONE`);
+  await query(`ALTER TABLE monthly_subscription_payments DROP CONSTRAINT IF EXISTS monthly_subscription_payments_payment_status_check`);
+  await query(`ALTER TABLE monthly_subscription_payments ADD CONSTRAINT monthly_subscription_payments_payment_status_check
+    CHECK (payment_status IN ('PENDING', 'PAID', 'PARTIAL', 'OVERDUE', 'REFUNDED'))`);
+  console.log('✅ monthly subscription refunds migration completed!');
+  return { success: true, message: 'monthly_subscription_payments refund columns + REFUNDED status ready' };
+}
+
 export const migrationsRoutes = {
+  addMonthlySubscriptionRefunds: async () => {
+    try {
+      const result = await addMonthlySubscriptionRefunds();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
   setupExamAbsenceAndTelegramTemplates: async () => {
     try {
       const result = await setupExamAbsenceAndTelegramTemplates();

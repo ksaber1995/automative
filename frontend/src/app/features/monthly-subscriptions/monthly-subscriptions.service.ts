@@ -6,6 +6,7 @@ import {
   MonthlyPaymentWithDetails,
   MonthlyPaymentSummary,
   RecordMonthlyPaymentDto,
+  RefundMonthlyPaymentDto,
   GenerateMonthlyBillsDto,
   CourseMonthlyPriceOverride,
   SetPriceOverrideDto,
@@ -64,6 +65,11 @@ export class MonthlySubscriptionsService {
 
   voidPayment(id: string, reason?: string): Observable<any> {
     return this.http.post<any>(`${this.base}/${id}/void`, { reason });
+  }
+
+  /** Refund a paid bill (full or partial), with a note and optional subscription stop. */
+  refund(id: string, dto: RefundMonthlyPaymentDto): Observable<any> {
+    return this.http.post<any>(`${this.base}/${id}/refund`, dto);
   }
 
   /** Resolve a scanned student barcode (QR token) to that student and their still-due months. */

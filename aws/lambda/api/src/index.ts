@@ -190,6 +190,7 @@ const router = {
     summary: monthlySubscriptionsRoutes.summary,
     recordPayment: monthlySubscriptionsRoutes.recordPayment,
     voidPayment: monthlySubscriptionsRoutes.voidPayment,
+    refund: monthlySubscriptionsRoutes.refund,
     listByCourse: monthlySubscriptionsRoutes.listByCourse,
     listByStudent: monthlySubscriptionsRoutes.listByStudent,
     byToken: monthlySubscriptionsRoutes.byToken,

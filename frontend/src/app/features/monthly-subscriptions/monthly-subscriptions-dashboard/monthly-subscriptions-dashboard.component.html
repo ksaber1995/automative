@@ -269,8 +269,8 @@
           <td>{{ p.dueDate | date:'mediumDate' }}</td>
           <td class="text-right">{{ p.amountDue | amount }}</td>
           <td class="text-right text-green-600">{{ p.amountPaid | amount }}</td>
-          <td class="text-right" [class.text-red-600]="p.amountDue - p.amountPaid > 0">
-            {{ (p.amountDue - p.amountPaid) | amount }}
+          <td class="text-right" [class.text-red-600]="p.paymentStatus !== 'REFUNDED' && p.amountDue - p.amountPaid > 0">
+            @if (p.paymentStatus === 'REFUNDED') { - } @else { {{ (p.amountDue - p.amountPaid) | amount }} }
           </td>
           <td>
             <div class="flex items-center gap-1">
@@ -285,10 +285,16 @@
                 ></p-tag>
               }
             </div>
+            @if (p.refundedAmount && p.refundedAmount > 0) {
+              <div class="text-xs text-gray-500 mt-1"
+                [pTooltip]="p.refundNote || ''">
+                {{ 'MONTHLY_SUBSCRIPTIONS.REFUNDED_AMOUNT' | translate }}: {{ p.refundedAmount | amount }}
+              </div>
+            }
           </td>
           <td>
             <div class="flex items-center gap-1">
-              @if (p.paymentStatus !== 'PAID') {
+              @if (p.paymentStatus !== 'PAID' && p.paymentStatus !== 'REFUNDED') {
                 <p-button
                   icon="pi pi-wallet"
                   [label]="'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate"
@@ -306,7 +312,15 @@
                   (onClick)="sendPaymentReminder(p)"
                 ></p-button>
               }
-              @if (p.amountPaid > 0) {
+              @if (p.amountPaid > 0 && p.paymentStatus !== 'REFUNDED') {
+                <p-button
+                  icon="pi pi-replay"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="warn"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.REFUND' | translate"
+                  (onClick)="openRefundDialog(p)"
+                ></p-button>
                 <p-button
                   icon="pi pi-times-circle"
                   [text]="true"
@@ -314,7 +328,7 @@
                   severity="danger"
                   [disabled]="voidingId() === p.id"
                   [pTooltip]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate"
-                  (onClick)="voidPayment(p, $event)"
+                  (onClick)="openVoidDialog(p)"
                 ></p-button>
               }
               @if (p.enrollmentStatus === 'ON_HOLD') {
@@ -326,7 +340,7 @@
                   [pTooltip]="'MONTHLY_SUBSCRIPTIONS.RESUME' | translate"
                   (onClick)="resumeSubscription(p.enrollmentId)"
                 ></p-button>
-              } @else {
+              } @else if (p.enrollmentStatus !== 'DROPPED') {
                 <p-button
                   icon="pi pi-pause"
                   [text]="true"
@@ -335,6 +349,9 @@
                   [pTooltip]="'MONTHLY_SUBSCRIPTIONS.HOLD' | translate"
                   (onClick)="holdSubscription(p)"
                 ></p-button>
+              }
+              @if (p.enrollmentStatus === 'DROPPED') {
+                <p-tag [value]="'MONTHLY_SUBSCRIPTIONS.CANCELLED' | translate" severity="secondary"></p-tag>
               }
             </div>
           </td>
@@ -446,6 +463,92 @@
       [disabled]="payAmount <= 0"
       (onClick)="confirmPayment()"
     ></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Void Dialog (recorded by mistake) -->
+<p-dialog
+  [visible]="showVoidDialog()"
+  (visibleChange)="$event ? null : closeVoidDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '420px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.VOID_TITLE' | translate"
+>
+  @if (voidTarget(); as v) {
+    <div class="flex flex-col gap-4 pt-2">
+      <div class="text-sm text-gray-700">
+        <strong>{{ v.studentFirstName }} {{ v.studentLastName }}</strong>
+        &mdash; {{ v.courseName }} &middot; {{ periodLabel(v) }}
+      </div>
+      <p class="text-sm text-gray-500">{{ 'MONTHLY_SUBSCRIPTIONS.VOID_HELP' | translate }}</p>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.NOTE' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="voidNote" rows="2" class="w-full"
+          [placeholder]="'MONTHLY_SUBSCRIPTIONS.VOID_NOTE_PLACEHOLDER' | translate"></textarea>
+      </div>
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeVoidDialog()"></p-button>
+    <p-button [label]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate" icon="pi pi-times-circle" severity="danger"
+      [loading]="voiding()" (onClick)="confirmVoid()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Refund Dialog (money returned; student leaving) -->
+<p-dialog
+  [visible]="showRefundDialog()"
+  (visibleChange)="$event ? null : closeRefundDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '440px' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.REFUND_TITLE' | translate"
+>
+  @if (refundTarget(); as r) {
+    <div class="flex flex-col gap-4 pt-2">
+      <div class="text-sm text-gray-700">
+        <strong>{{ r.studentFirstName }} {{ r.studentLastName }}</strong>
+        &mdash; {{ r.courseName }} &middot; {{ periodLabel(r) }}
+      </div>
+      <div class="text-sm text-gray-500">
+        {{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_PAID' | translate }}: {{ r.amountPaid | amount }}
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.REFUND_TYPE' | translate }}</label>
+        <p-select [options]="refundTypeOptions" [(ngModel)]="refundType"
+          optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
+      </div>
+
+      @if (refundType === 'PARTIAL') {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.REFUND_AMOUNT' | translate }}</label>
+          <p-inputnumber [(ngModel)]="refundAmount" mode="decimal" [min]="0" [max]="refundMax"
+            [minFractionDigits]="0" [maxFractionDigits]="2" [style]="{ width: '100%' }"></p-inputnumber>
+          <small class="text-gray-400">{{ 'MONTHLY_SUBSCRIPTIONS.REFUND_MAX_HINT' | translate: { max: (refundMax | amount) } }}</small>
+        </div>
+      }
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.REFUND_ACTION' | translate }}</label>
+        <p-select [options]="refundActionOptions" [(ngModel)]="refundAction"
+          optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-gray-600">{{ 'MONTHLY_SUBSCRIPTIONS.NOTE' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="refundNote" rows="2" class="w-full"
+          [placeholder]="'MONTHLY_SUBSCRIPTIONS.REFUND_NOTE_PLACEHOLDER' | translate"></textarea>
+      </div>
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button [label]="'MONTHLY_SUBSCRIPTIONS.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="closeRefundDialog()"></p-button>
+    <p-button [label]="'MONTHLY_SUBSCRIPTIONS.REFUND' | translate" icon="pi pi-replay" severity="warn"
+      [loading]="refunding()"
+      [disabled]="refundType === 'PARTIAL' && (!(refundAmount > 0) || refundAmount > refundMax)"
+      (onClick)="confirmRefund()"></p-button>
   </ng-template>
 </p-dialog>
 

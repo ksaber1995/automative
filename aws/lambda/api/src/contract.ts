@@ -591,7 +591,7 @@ const CourseSchema = z.object({
 // =============================================
 // Monthly Subscription Schemas  (NEW)
 // =============================================
-const MonthlyPaymentStatusSchema = z.enum(['PENDING', 'PAID', 'PARTIAL', 'OVERDUE']);
+const MonthlyPaymentStatusSchema = z.enum(['PENDING', 'PAID', 'PARTIAL', 'OVERDUE', 'REFUNDED']);
 
 const MonthlySubscriptionPaymentSchema = z.object({
   id: UUIDSchema,
@@ -608,6 +608,9 @@ const MonthlySubscriptionPaymentSchema = z.object({
   dueDate: z.string(),
   paidDate: z.string().nullable(),
   notes: z.string().nullable(),
+  refundedAmount: z.number().optional(),
+  refundNote: z.string().nullable().optional(),
+  refundedAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -4029,6 +4032,15 @@ export const contract = c.router({
 
   // Migration routes (one-time use)
   migrations: {
+    addMonthlySubscriptionRefunds: {
+      method: 'POST',
+      path: '/api/migrations/add-monthly-subscription-refunds',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        500: z.object({ success: z.boolean(), message: z.string(), error: z.string().optional() }),
+      },
+    },
     addCourseMonthlyPriceOverrides: {
       method: 'POST',
       path: '/api/migrations/add-course-monthly-price-overrides',
@@ -5033,6 +5045,25 @@ export const contract = c.router({
       path: '/api/monthly-subscriptions/:id/void',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ reason: z.string().optional() }),
+      responses: {
+        200: MonthlySubscriptionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    refund: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/:id/refund',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        type: z.enum(['FULL', 'PARTIAL']),
+        // Required (and validated) for PARTIAL; ignored for FULL.
+        amount: z.number().positive().optional(),
+        note: z.string().optional(),
+        // What to do with the underlying subscription after refunding.
+        subscriptionAction: z.enum(['KEEP', 'HOLD', 'CANCEL']).optional(),
+      }),
       responses: {
         200: MonthlySubscriptionPaymentSchema,
         400: ApiErrorSchema,

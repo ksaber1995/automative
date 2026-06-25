@@ -35,7 +35,7 @@ import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templa
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
-import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription } from '@shared/interfaces/monthly-subscription.interface';
+import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription, RefundMonthlyPaymentDto } from '@shared/interfaces/monthly-subscription.interface';
 import { Course } from '@shared/interfaces/course.interface';
 
 @Component({
@@ -91,7 +91,22 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // Status filter
   statusFilter = signal('ALL');
-  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD'];
+  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD', 'REFUNDED'];
+
+  // ── Void (recorded by mistake) ──────────────────────────────────────────────
+  showVoidDialog = signal(false);
+  voidTarget = signal<MonthlyPaymentWithDetails | null>(null);
+  voidNote = '';
+  voiding = signal(false);
+
+  // ── Refund (money returned; student is leaving) ─────────────────────────────
+  showRefundDialog = signal(false);
+  refundTarget = signal<MonthlyPaymentWithDetails | null>(null);
+  refundType: 'FULL' | 'PARTIAL' = 'FULL';
+  refundAmount = 0;
+  refundNote = '';
+  refundAction: 'KEEP' | 'HOLD' | 'CANCEL' = 'CANCEL';
+  refunding = signal(false);
 
   // ── Monthly price override ──────────────────────────────────────────────────
   // The dialog is self-contained: the user picks course + year + month inside
@@ -526,33 +541,103 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     });
   }
 
-  /** Void a recorded payment after confirmation — clears it and removes its revenue. */
-  voidPayment(payment: MonthlyPaymentWithDetails, event: Event): void {
-    this.confirm.confirm({
-      target: event.target as EventTarget,
-      message: this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_CONFIRM', {
-        name: `${payment.studentFirstName} ${payment.studentLastName}`,
-      }),
-      header: this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_TITLE'),
-      icon: 'pi pi-exclamation-triangle',
-      acceptButtonStyleClass: 'p-button-danger',
-      acceptLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CONFIRM'),
-      rejectLabel: this.translate.instant('MONTHLY_SUBSCRIPTIONS.CANCEL'),
-      accept: () => {
-        this.voidingId.set(payment.id);
-        this.svc.voidPayment(payment.id).pipe(takeUntil(this.destroy$)).subscribe({
-          next: () => {
-            this.voidingId.set(null);
-            this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOIDED'));
-            this.loadData();
-          },
-          error: () => {
-            this.voidingId.set(null);
-            this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_ERROR'));
-          },
-        });
+  // ── Void (recorded by mistake) ──────────────────────────────────────────────
+
+  /** Open the void dialog (clears the payment + its revenue; for mistakes). */
+  openVoidDialog(payment: MonthlyPaymentWithDetails): void {
+    this.voidTarget.set(payment);
+    this.voidNote = '';
+    this.showVoidDialog.set(true);
+  }
+
+  closeVoidDialog(): void {
+    this.showVoidDialog.set(false);
+    this.voidTarget.set(null);
+  }
+
+  confirmVoid(): void {
+    const payment = this.voidTarget();
+    if (!payment) return;
+    this.voiding.set(true);
+    this.voidingId.set(payment.id);
+    this.svc.voidPayment(payment.id, this.voidNote.trim() || undefined).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.voiding.set(false);
+        this.voidingId.set(null);
+        this.closeVoidDialog();
+        this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOIDED'));
+        this.loadData();
+      },
+      error: () => {
+        this.voiding.set(false);
+        this.voidingId.set(null);
+        this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.VOID_ERROR'));
       },
     });
+  }
+
+  // ── Refund (money returned; student is leaving) ─────────────────────────────
+
+  /** Open the refund dialog for a paid/partially-paid bill. */
+  openRefundDialog(payment: MonthlyPaymentWithDetails): void {
+    this.refundTarget.set(payment);
+    this.refundType = 'FULL';
+    this.refundAmount = payment.amountPaid;
+    this.refundNote = '';
+    this.refundAction = 'CANCEL';
+    this.showRefundDialog.set(true);
+  }
+
+  closeRefundDialog(): void {
+    this.showRefundDialog.set(false);
+    this.refundTarget.set(null);
+  }
+
+  /** Max refundable = what's currently retained as paid on this bill. */
+  get refundMax(): number {
+    return this.refundTarget()?.amountPaid ?? 0;
+  }
+
+  confirmRefund(): void {
+    const payment = this.refundTarget();
+    if (!payment) return;
+    const dto: RefundMonthlyPaymentDto = {
+      type: this.refundType,
+      note: this.refundNote.trim() || undefined,
+      subscriptionAction: this.refundAction,
+    };
+    if (this.refundType === 'PARTIAL') {
+      if (!(this.refundAmount > 0) || this.refundAmount > payment.amountPaid) return;
+      dto.amount = this.refundAmount;
+    }
+    this.refunding.set(true);
+    this.svc.refund(payment.id, dto).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.refunding.set(false);
+        this.closeRefundDialog();
+        this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUNDED'));
+        this.loadData();
+      },
+      error: () => {
+        this.refunding.set(false);
+        this.notify.error(this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_ERROR'));
+      },
+    });
+  }
+
+  get refundTypeOptions(): { value: string; label: string }[] {
+    return [
+      { value: 'FULL', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_FULL') },
+      { value: 'PARTIAL', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_PARTIAL') },
+    ];
+  }
+
+  get refundActionOptions(): { value: string; label: string }[] {
+    return [
+      { value: 'CANCEL', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_ACTION_CANCEL') },
+      { value: 'HOLD', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_ACTION_HOLD') },
+      { value: 'KEEP', label: this.translate.instant('MONTHLY_SUBSCRIPTIONS.REFUND_ACTION_KEEP') },
+    ];
   }
 
   // ── Hold / Resume subscription ──────────────────────────────────────────────
@@ -731,6 +816,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       case 'OVERDUE': return 'danger';
       case 'PARTIAL': return 'info';
       case 'ON_HOLD': return 'warn';
+      case 'REFUNDED': return 'secondary';
       default: return 'secondary';
     }
   }

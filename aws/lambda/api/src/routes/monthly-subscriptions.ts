@@ -18,6 +18,9 @@ function mapPaymentFromDB(row: any) {
     dueDate: row.due_date,
     paidDate: row.paid_date || null,
     notes: row.notes || null,
+    refundedAmount: parseFloat(row.refunded_amount || 0),
+    refundNote: row.refund_note || null,
+    refundedAt: row.refunded_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -53,6 +56,8 @@ function mapOverrideFromDB(row: any) {
 
 /** Resolve overdue status on-read: any PENDING row past its due_date becomes OVERDUE */
 function resolveStatus(row: any): string {
+  // REFUNDED is terminal — never re-derive it to OVERDUE on read.
+  if (row.payment_status === 'REFUNDED') return 'REFUNDED';
   if (row.payment_status === 'PAID' || row.payment_status === 'PARTIAL') return row.payment_status;
   const due = new Date(row.due_date);
   const today = new Date();
@@ -421,6 +426,13 @@ export const monthlySubscriptionsRoutes = {
 
       for (const r of rows) {
         const status = resolveStatus(r);
+        // Refunded bills count only their net retained revenue (amount_paid is
+        // already reduced by the refund); they are not "expected" and don't
+        // belong in the pending/overdue buckets.
+        if (status === 'REFUNDED') {
+          totalRevenue += parseFloat(r.amount_paid || 0);
+          continue;
+        }
         totalExpected += parseFloat(r.amount_due);
         totalRevenue += parseFloat(r.amount_paid || 0);
         if (status === 'PAID') paidCount++;
@@ -549,6 +561,85 @@ export const monthlySubscriptionsRoutes = {
     }
   },
 
+  /** POST /api/monthly-subscriptions/:id/refund
+   *  Return money to a leaving student. Unlike void (a mistake reset), a refund
+   *  reduces amount_paid by the refunded amount — so revenue (which sums
+   *  amount_paid) nets out — and records the amount + note, marking the bill
+   *  REFUNDED. Optionally stops the underlying subscription (HOLD or CANCEL).
+   *    body: { type: 'FULL'|'PARTIAL', amount?, note?, subscriptionAction? }
+   */
+  refund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const row = await queryOne<any>(
+        'SELECT * FROM monthly_subscription_payments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!row) return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_FOUND', 'Payment record not found');
+      if (!canAccessBranch(context, row.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const currentPaid = parseFloat(row.amount_paid || 0);
+      if (currentPaid <= 0) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOTHING_TO_REFUND', 'There is no paid amount to refund');
+      }
+
+      const type = body?.type === 'PARTIAL' ? 'PARTIAL' : 'FULL';
+      let refundAmt: number;
+      if (type === 'FULL') {
+        refundAmt = currentPaid;
+      } else {
+        refundAmt = parseFloat(body?.amount);
+        if (!isFinite(refundAmt) || refundAmt <= 0) {
+          return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.INVALID_REFUND_AMOUNT', 'Refund amount must be greater than zero');
+        }
+        if (refundAmt > currentPaid) {
+          return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.REFUND_EXCEEDS_PAID', 'Refund amount cannot exceed the amount paid');
+        }
+      }
+
+      const newPaid = Math.round((currentPaid - refundAmt) * 100) / 100;
+      const newRefunded = Math.round((parseFloat(row.refunded_amount || 0) + refundAmt) * 100) / 100;
+      const note = body?.note ? String(body.note).slice(0, 500) : null;
+
+      await query(
+        `UPDATE monthly_subscription_payments
+         SET amount_paid = $1, payment_status = 'REFUNDED',
+             refunded_amount = $2, refund_note = $3, refunded_at = NOW(), updated_at = NOW()
+         WHERE id = $4`,
+        [newPaid, newRefunded, note, params.id]
+      );
+
+      // Optionally stop the subscription so no further bills are generated.
+      const action = body?.subscriptionAction;
+      if (action === 'CANCEL') {
+        await query(
+          `UPDATE enrollments SET status = 'DROPPED', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
+          [row.enrollment_id, context.companyId]
+        );
+      } else if (action === 'HOLD') {
+        const now = new Date();
+        await query(
+          `UPDATE enrollments
+           SET status = 'ON_HOLD', hold_start_month = $2, hold_start_year = $3, hold_months = NULL, updated_at = NOW()
+           WHERE id = $1 AND company_id = $4 AND status <> 'ON_HOLD'`,
+          [row.enrollment_id, now.getMonth() + 1, now.getFullYear(), context.companyId]
+        );
+      }
+
+      const updated = await queryOne('SELECT * FROM monthly_subscription_payments WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: mapPaymentFromDB(updated) };
+    } catch (error) {
+      console.error('Refund monthly payment error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.REFUND_FAILED', 'Failed to refund payment', 400);
+    }
+  },
+
   /** GET /api/monthly-subscriptions/by-token/:qrToken
    *  Resolve a scanned student barcode (QR token) to that student and their
    *  still-outstanding monthly bills (anything not fully paid), oldest first.
@@ -592,6 +683,7 @@ export const monthlySubscriptionsRoutes = {
          LEFT JOIN classes cl    ON e.class_id = cl.id
          WHERE msp.company_id = $1
            AND msp.student_id = $2
+           AND msp.payment_status <> 'REFUNDED'
            AND (msp.amount_due - msp.amount_paid) > 0
          ORDER BY msp.billing_year ASC, msp.billing_month ASC, c.name`,
         [context.companyId, student.id]
