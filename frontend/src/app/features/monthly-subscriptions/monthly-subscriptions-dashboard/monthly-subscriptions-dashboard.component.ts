@@ -142,6 +142,11 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     return document.documentElement.dir === 'rtl';
   }
 
+  /** Individual-teacher companies have a single branch, so the branch filter/column are hidden. */
+  get isTeacher(): boolean {
+    return this.auth.isTeacher();
+  }
+
   constructor(
     private fb: FormBuilder,
     private svc: MonthlySubscriptionsService,

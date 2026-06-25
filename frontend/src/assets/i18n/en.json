@@ -4043,6 +4043,9 @@
   "TELEGRAM": {
     "TITLE": "Telegram",
     "SUBTITLE": "Automatically send attendance (present/absent) to students and parents on Telegram, and let staff mark attendance by typing a student code into your bot.",
+    "TAB_CONNECTION": "Connection",
+    "TAB_NOTIFICATIONS": "Notifications",
+    "TAB_MESSAGES": "Messages",
     "BOT_SECTION": "Bot connection",
     "BOT_CONNECTED": "Connected to @{{bot}}",
     "BOT_HELP": "Create a bot with @BotFather on Telegram, then paste its token here to connect.",
@@ -4087,6 +4090,8 @@
     "TPL_LINK_WELCOME": "Welcome message (after linking)",
     "TPL_EXAM_RESULT": "Exam result message",
     "TPL_EXAM_ABSENT": "Exam absence message",
+    "RESET_DEFAULT": "Reset to default",
+    "RESET_ALL_DEFAULT": "Reset all to default",
     "SAVE_TEMPLATES": "Save templates"
   },
   "TELEGRAM_CONNECT": {
