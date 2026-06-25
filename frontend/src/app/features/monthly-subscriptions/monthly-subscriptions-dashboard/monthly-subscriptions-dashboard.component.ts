@@ -93,6 +93,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   statusFilter = signal('ALL');
   readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD', 'REFUNDED'];
 
+  // Client-side search by student name over the loaded rows.
+  nameSearch = signal('');
+
   // ── Void (recorded by mistake) ──────────────────────────────────────────────
   showVoidDialog = signal(false);
   voidTarget = signal<MonthlyPaymentWithDetails | null>(null);
@@ -437,12 +440,21 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   applyStatusFilter(): void {
     const status = this.statusFilter();
-    const all = this.payments();
-    this.filteredPayments.set(status === 'ALL' ? [...all] : all.filter(p => p.paymentStatus === status));
+    const q = this.nameSearch().trim().toLowerCase();
+    let rows = this.payments();
+    if (status !== 'ALL') rows = rows.filter(p => p.paymentStatus === status);
+    if (q) rows = rows.filter(p => `${p.studentFirstName} ${p.studentLastName}`.toLowerCase().includes(q));
+    this.filteredPayments.set([...rows]);
   }
 
   onStatusFilterChange(status: string): void {
     this.statusFilter.set(status);
+    this.applyStatusFilter();
+  }
+
+  /** Live name filter over the loaded rows (the code box still does code → pay). */
+  onNameSearch(value: string): void {
+    this.nameSearch.set(value);
     this.applyStatusFilter();
   }
 

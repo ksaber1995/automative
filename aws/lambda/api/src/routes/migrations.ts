@@ -1498,8 +1498,42 @@ async function addMonthlySubscriptionRefunds() {
   await query(`ALTER TABLE monthly_subscription_payments DROP CONSTRAINT IF EXISTS monthly_subscription_payments_payment_status_check`);
   await query(`ALTER TABLE monthly_subscription_payments ADD CONSTRAINT monthly_subscription_payments_payment_status_check
     CHECK (payment_status IN ('PENDING', 'PAID', 'PARTIAL', 'OVERDUE', 'REFUNDED'))`);
-  console.log('✅ monthly subscription refunds migration completed!');
-  return { success: true, message: 'monthly_subscription_payments refund columns + REFUNDED status ready' };
+
+  // Link refunds rows to the exact monthly bill that was refunded.
+  await query(`ALTER TABLE refunds ADD COLUMN IF NOT EXISTS monthly_payment_id UUID`);
+  await query(`ALTER TABLE refunds DROP CONSTRAINT IF EXISTS fk_refunds_monthly_payment`);
+  await query(`ALTER TABLE refunds ADD CONSTRAINT fk_refunds_monthly_payment
+    FOREIGN KEY (monthly_payment_id) REFERENCES monthly_subscription_payments(id) ON DELETE CASCADE`);
+
+  // Backfill: an earlier version recorded refunds by reducing amount_paid and
+  // wrote no refunds row, so those refunds were invisible to the dashboard/
+  // reports. Restore amount_paid to gross and insert the missing refunds row.
+  // Idempotent — only touches REFUNDED bills that have no linked refund yet.
+  const stale = await query(
+    `SELECT id, company_id, enrollment_id, branch_id, student_id, amount_paid, refunded_amount, refunded_at, refund_note
+     FROM monthly_subscription_payments msp
+     WHERE payment_status = 'REFUNDED' AND refunded_amount > 0
+       AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.monthly_payment_id = msp.id)`
+  );
+  let backfilled = 0;
+  for (const m of stale) {
+    const refunded = parseFloat(m.refunded_amount);
+    const gross = Math.round((parseFloat(m.amount_paid || 0) + refunded) * 100) / 100;
+    const type = refunded >= gross ? 'FULL' : 'PARTIAL';
+    const refundDate = m.refunded_at
+      ? new Date(m.refunded_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0];
+    await query(
+      `INSERT INTO refunds (company_id, enrollment_id, monthly_payment_id, branch_id, student_id, amount, refund_date, type, reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [m.company_id, m.enrollment_id, m.id, m.branch_id, m.student_id, refunded, refundDate, type, m.refund_note]
+    );
+    await query(`UPDATE monthly_subscription_payments SET amount_paid = $1, updated_at = NOW() WHERE id = $2`, [gross, m.id]);
+    backfilled++;
+  }
+
+  console.log(`✅ monthly subscription refunds migration completed! (backfilled ${backfilled})`);
+  return { success: true, message: `monthly_subscription_payments refund columns + REFUNDED status ready; refunds.monthly_payment_id added; backfilled ${backfilled}` };
 }
 
 export const migrationsRoutes = {

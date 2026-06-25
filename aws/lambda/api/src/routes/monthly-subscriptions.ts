@@ -426,11 +426,11 @@ export const monthlySubscriptionsRoutes = {
 
       for (const r of rows) {
         const status = resolveStatus(r);
-        // Refunded bills count only their net retained revenue (amount_paid is
-        // already reduced by the refund); they are not "expected" and don't
-        // belong in the pending/overdue buckets.
+        // Refunded bills count only their net retained revenue (gross amount_paid
+        // minus what was refunded); they are not "expected" and don't belong in
+        // the pending/overdue buckets.
         if (status === 'REFUNDED') {
-          totalRevenue += parseFloat(r.amount_paid || 0);
+          totalRevenue += parseFloat(r.amount_paid || 0) - parseFloat(r.refunded_amount || 0);
           continue;
         }
         totalExpected += parseFloat(r.amount_due);
@@ -603,16 +603,30 @@ export const monthlySubscriptionsRoutes = {
         }
       }
 
-      const newPaid = Math.round((currentPaid - refundAmt) * 100) / 100;
       const newRefunded = Math.round((parseFloat(row.refunded_amount || 0) + refundAmt) * 100) / 100;
       const note = body?.note ? String(body.note).slice(0, 500) : null;
+      const refundDate = new Date().toISOString().split('T')[0];
 
+      // amount_paid is left UNCHANGED (gross collected revenue) — the same rule
+      // enrollment refunds follow: revenue queries sum amount_paid and subtract
+      // the refunds table separately (by refund_date). refunded_amount tracks the
+      // returned total for display, like enrollments.total_refunded.
       await query(
         `UPDATE monthly_subscription_payments
-         SET amount_paid = $1, payment_status = 'REFUNDED',
-             refunded_amount = $2, refund_note = $3, refunded_at = NOW(), updated_at = NOW()
-         WHERE id = $4`,
-        [newPaid, newRefunded, note, params.id]
+         SET payment_status = 'REFUNDED', refunded_amount = $1,
+             refund_note = $2, refunded_at = NOW(), updated_at = NOW()
+         WHERE id = $3`,
+        [newRefunded, note, params.id]
+      );
+
+      // Record in the polymorphic refunds table so the refund shows on the
+      // Refunds page, the dashboard, and the P&L reports. enrollment_id ties it
+      // to the enrollment (source = ENROLLMENT); monthly_payment_id links the
+      // exact bill (and makes the backfill idempotent).
+      await query(
+        `INSERT INTO refunds (company_id, enrollment_id, monthly_payment_id, branch_id, student_id, amount, refund_date, type, reason)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [context.companyId, row.enrollment_id, params.id, row.branch_id, row.student_id, refundAmt, refundDate, type, note]
       );
 
       // Optionally stop the subscription so no further bills are generated.

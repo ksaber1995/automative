@@ -27,3 +27,12 @@ ALTER TABLE monthly_subscription_payments
 ALTER TABLE monthly_subscription_payments
   ADD CONSTRAINT monthly_subscription_payments_payment_status_check
   CHECK (payment_status IN ('PENDING', 'PAID', 'PARTIAL', 'OVERDUE', 'REFUNDED'));
+
+-- A monthly-subscription refund is recorded the same way as an enrollment
+-- refund: amount_paid stays gross and a row is written to the polymorphic
+-- refunds table (so the dashboard / Refunds page / P&L reports see it). This
+-- column links that refund row back to the exact monthly bill.
+ALTER TABLE refunds ADD COLUMN IF NOT EXISTS monthly_payment_id UUID;
+ALTER TABLE refunds DROP CONSTRAINT IF EXISTS fk_refunds_monthly_payment;
+ALTER TABLE refunds ADD CONSTRAINT fk_refunds_monthly_payment
+  FOREIGN KEY (monthly_payment_id) REFERENCES monthly_subscription_payments(id) ON DELETE CASCADE;

@@ -161,6 +161,19 @@
       }
     </div>
 
+    <!-- Search by student name (filters the rows below). The code box up top still
+         does code → pay; this just narrows the visible list. -->
+    @if (statusFilter() !== 'ON_HOLD') {
+      <div class="mb-4">
+        <span class="p-input-icon-left" style="position: relative; display: inline-block;">
+          <i class="pi pi-search" style="position:absolute; top:50%; transform:translateY(-50%); inset-inline-start:0.75rem; color:#9ca3af;"></i>
+          <input pInputText type="text" style="width: 280px; padding-inline-start: 2.25rem;"
+            [ngModel]="nameSearch()" (ngModelChange)="onNameSearch($event)"
+            [placeholder]="'MONTHLY_SUBSCRIPTIONS.SEARCH_NAME' | translate" />
+        </span>
+      </div>
+    }
+
     @if (statusFilter() === 'ON_HOLD') {
     <!-- On-Hold Subscriptions Table -->
     <p-table
@@ -268,16 +281,35 @@
           }
           <td>{{ p.dueDate | date:'mediumDate' }}</td>
           <td class="text-right">{{ p.amountDue | amount }}</td>
-          <td class="text-right text-green-600">{{ p.amountPaid | amount }}</td>
+          <td class="text-right">
+            @if (p.refundedAmount && p.refundedAmount > 0) {
+              <!-- Net kept = gross paid − refunded, with the breakdown spelled out. -->
+              <div class="text-green-700 font-semibold">{{ (p.amountPaid - p.refundedAmount) | amount }}</div>
+              <div class="text-[11px] leading-tight text-gray-500 whitespace-nowrap">
+                {{ 'MONTHLY_SUBSCRIPTIONS.PAID_SHORT' | translate }} {{ p.amountPaid | amount }}
+                · <span class="text-orange-600 font-medium">−{{ p.refundedAmount | amount }}</span>
+              </div>
+            } @else {
+              <span class="text-green-600">{{ p.amountPaid | amount }}</span>
+            }
+          </td>
           <td class="text-right" [class.text-red-600]="p.paymentStatus !== 'REFUNDED' && p.amountDue - p.amountPaid > 0">
             @if (p.paymentStatus === 'REFUNDED') { - } @else { {{ (p.amountDue - p.amountPaid) | amount }} }
           </td>
           <td>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1 flex-wrap">
               <p-tag
                 [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + p.paymentStatus | translate"
                 [severity]="getStatusSeverity(p.paymentStatus)"
+                [pTooltip]="p.paymentStatus === 'REFUNDED' ? (p.refundNote || '') : ''"
               ></p-tag>
+              @if (p.refundedAmount && p.refundedAmount > 0) {
+                <p-tag
+                  [value]="(p.amountPaid - p.refundedAmount > 0 ? 'MONTHLY_SUBSCRIPTIONS.PARTIAL_REFUND' : 'MONTHLY_SUBSCRIPTIONS.FULL_REFUND') | translate"
+                  severity="warn"
+                  [pTooltip]="p.refundNote || ''"
+                ></p-tag>
+              }
               @if (p.enrollmentStatus === 'ON_HOLD') {
                 <p-tag
                   [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.ON_HOLD' | translate"
@@ -285,12 +317,6 @@
                 ></p-tag>
               }
             </div>
-            @if (p.refundedAmount && p.refundedAmount > 0) {
-              <div class="text-xs text-gray-500 mt-1"
-                [pTooltip]="p.refundNote || ''">
-                {{ 'MONTHLY_SUBSCRIPTIONS.REFUNDED_AMOUNT' | translate }}: {{ p.refundedAmount | amount }}
-              </div>
-            }
           </td>
           <td>
             <div class="flex items-center gap-1">
