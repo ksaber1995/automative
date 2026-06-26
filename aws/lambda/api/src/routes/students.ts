@@ -11,7 +11,7 @@ function generateQrToken(): string {
 }
 
 // Paid QR activation pricing (EGP), TEACHER-type companies only.
-const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 45 } as const;
+const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
 type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 // A student's QR is "live" when activated and not expired (NULL expiration =
@@ -401,7 +401,7 @@ export const studentsRoutes = {
   },
 
   // Paid QR activation for TEACHER-type companies. ONE_YEAR (25 EGP) sets a
-  // one-year expiry; LIFELONG (45 EGP) never expires. The charge is recorded on
+  // one-year expiry; LIFELONG (40 EGP) never expires. The charge is recorded on
   // the student (qr_price) and starts unpaid (qr_paid = false) — the owner marks
   // it paid from the admin console once the teacher settles the bill.
   activateQr: async ({ params, body, headers }: { params: { id: string }; body: { plan: QrPlan }; headers: { authorization: string } }) => {

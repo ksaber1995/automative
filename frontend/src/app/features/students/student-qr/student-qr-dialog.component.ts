@@ -14,7 +14,7 @@ import { TelegramService } from '../../telegram/telegram.service';
 import { Student } from '@shared/interfaces/student.interface';
 
 /** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
-export const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 45 } as const;
+export const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
 type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 /**

@@ -1519,7 +1519,7 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
-    // Paid QR activation (TEACHER companies). ONE_YEAR = 25 EGP, LIFELONG = 45 EGP.
+    // Paid QR activation (TEACHER companies). ONE_YEAR = 25 EGP, LIFELONG = 40 EGP.
     activateQr: {
       method: 'POST',
       path: '/api/students/:id/activate-qr',
