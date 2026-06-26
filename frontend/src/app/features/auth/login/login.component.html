@@ -144,11 +144,30 @@
             styleClass="w-full mt-2"
           ></p-button>
 
-          <div class="text-center pt-2">
-            <span class="text-gray-600 text-sm">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }} </span>
-            <a routerLink="/auth/register" class="text-primary-600 hover:text-primary-700 text-sm font-semibold">
-              {{ 'AUTH.LOGIN.SIGN_UP' | translate }}
-            </a>
+          <!-- Create account: two separate entry points (academy vs teacher) -->
+          <div class="pt-2">
+            <div class="relative text-center my-2">
+              <div class="absolute inset-x-0 top-1/2 h-px bg-gray-200"></div>
+              <span class="relative bg-white px-3 text-xs font-medium text-gray-400">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <a routerLink="/auth/register/academy"
+                 class="group flex flex-col items-center text-center gap-1.5 rounded-xl border border-gray-200 p-4 hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-primary-50 text-primary-600 group-hover:bg-primary-100 transition-colors">
+                  <i class="pi pi-building"></i>
+                </span>
+                <span class="text-sm font-semibold text-gray-800">{{ 'AUTH.LOGIN.REGISTER_ACADEMY' | translate }}</span>
+                <span class="text-[11px] leading-tight text-gray-400">{{ 'AUTH.LOGIN.REGISTER_ACADEMY_HINT' | translate }}</span>
+              </a>
+              <a routerLink="/auth/register/teacher"
+                 class="group flex flex-col items-center text-center gap-1.5 rounded-xl border border-gray-200 p-4 hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-primary-50 text-primary-600 group-hover:bg-primary-100 transition-colors">
+                  <i class="pi pi-user"></i>
+                </span>
+                <span class="text-sm font-semibold text-gray-800">{{ 'AUTH.LOGIN.REGISTER_TEACHER' | translate }}</span>
+                <span class="text-[11px] leading-tight text-gray-400">{{ 'AUTH.LOGIN.REGISTER_TEACHER_HINT' | translate }}</span>
+              </a>
+            </div>
           </div>
         </form>
 

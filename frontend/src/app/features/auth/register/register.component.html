@@ -93,14 +93,14 @@
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ 'AUTH.REGISTER.COMPANY_NAME' | translate }} <span class="text-red-500">*</span>
+                  {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME' : 'AUTH.REGISTER.COMPANY_NAME') | translate }} <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   formControlName="companyName"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
                   [class.border-red-500]="companyName?.invalid && companyName?.touched"
-                  [placeholder]="'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER' | translate" />
+                  [placeholder]="(accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME_PLACEHOLDER' : 'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER') | translate" />
                 @if (companyName?.invalid && companyName?.touched) {
                   <small class="text-red-500 mt-1 block">
                     @if (companyName?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_NAME_REQUIRED' | translate }} }
@@ -109,20 +109,24 @@
                 }
               </div>
 
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ 'AUTH.REGISTER.TYPE' | translate }} <span class="text-red-500">*</span>
-                </label>
-                <select
-                  formControlName="type"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:border-primary-500 focus:outline-none transition-colors"
-                  [class.border-red-500]="type?.invalid && type?.touched">
-                  <option value="ACADEMY">{{ 'AUTH.REGISTER.TYPE_ACADEMY' | translate }}</option>
-                  <option value="TEACHER">{{ 'AUTH.REGISTER.TYPE_TEACHER' | translate }}</option>
-                </select>
-                @if (type?.invalid && type?.touched) {
-                  <small class="text-red-500 mt-1 block">{{ 'AUTH.REGISTER.TYPE_REQUIRED' | translate }}</small>
-                }
+              <!-- Account type is fixed by the chosen registration link, not a
+                   dropdown. A "switch" link jumps to the other flow. -->
+              <div class="flex items-center justify-between gap-3 rounded-lg border border-primary-100 bg-primary-50 px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <span class="flex items-center justify-center w-9 h-9 rounded-lg bg-white text-primary-600 shrink-0">
+                    <i [class]="accountType() === 'TEACHER' ? 'pi pi-user' : 'pi pi-building'"></i>
+                  </span>
+                  <div>
+                    <div class="text-xs text-gray-500">{{ 'AUTH.REGISTER.REGISTERING_AS' | translate }}</div>
+                    <div class="text-sm font-semibold text-gray-800">
+                      {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.TYPE_TEACHER' : 'AUTH.REGISTER.TYPE_ACADEMY') | translate }}
+                    </div>
+                  </div>
+                </div>
+                <a [routerLink]="accountType() === 'TEACHER' ? '/auth/register/academy' : '/auth/register/teacher'"
+                   class="text-xs font-semibold text-primary-600 hover:text-primary-700 whitespace-nowrap">
+                  {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.SWITCH_TO_ACADEMY' : 'AUTH.REGISTER.SWITCH_TO_TEACHER') | translate }}
+                </a>
               </div>
 
               <!-- TODO: re-enable later. Hidden for now to simplify onboarding.

@@ -5,9 +5,22 @@ export const AUTH_ROUTES: Routes = [
     path: 'login',
     loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)
   },
+  // Separate registration entry points per account type (no in-form dropdown).
+  {
+    path: 'register/academy',
+    data: { accountType: 'ACADEMY' },
+    loadComponent: () => import('./register/register.component').then(m => m.RegisterComponent)
+  },
+  {
+    path: 'register/teacher',
+    data: { accountType: 'TEACHER' },
+    loadComponent: () => import('./register/register.component').then(m => m.RegisterComponent)
+  },
+  // Legacy /auth/register → default to the academy flow.
   {
     path: 'register',
-    loadComponent: () => import('./register/register.component').then(m => m.RegisterComponent)
+    redirectTo: 'register/academy',
+    pathMatch: 'full'
   },
   {
     path: 'verify-email',

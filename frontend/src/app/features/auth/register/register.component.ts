@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../../../core/services/auth.service';
@@ -22,6 +22,7 @@ export class RegisterComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   private recaptcha = inject(RecaptchaService);
@@ -30,12 +31,15 @@ export class RegisterComponent {
   registerForm: FormGroup;
   loading = signal(false);
   serverError = signal('');
+  // Account type is fixed by the route (/auth/register/academy|teacher), not a
+  // dropdown. The login page links to each entry point separately.
+  accountType = signal<'ACADEMY' | 'TEACHER'>('ACADEMY');
 
   constructor() {
     this.registerForm = this.fb.group({
       // Company Information
       companyName: ['', [Validators.required, Validators.minLength(2)]],
-      // Account type: ACADEMY (institution) or TEACHER (individual). Defaults to ACADEMY.
+      // Account type: ACADEMY (institution) or TEACHER (individual). Set from the route.
       type: ['ACADEMY', [Validators.required]],
       // TODO: re-enable later. Hidden for now to simplify onboarding.
       // companyEmail: ['', [Validators.required, Validators.email]],
@@ -51,6 +55,14 @@ export class RegisterComponent {
       phone: ['', [Validators.required, Validators.pattern(/^\d{4,15}$/)]]
     }, {
       validators: this.passwordMatchValidator
+    });
+
+    // Drive the (hidden) type control from the route data so each link
+    // (/auth/register/academy, /auth/register/teacher) registers the right kind.
+    this.route.data.subscribe((data) => {
+      const t = data['accountType'] === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
+      this.accountType.set(t);
+      this.registerForm.get('type')?.setValue(t);
     });
   }
 
