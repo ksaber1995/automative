@@ -391,8 +391,11 @@ export class StudentListComponent implements OnInit {
         }
       }
 
-      // A4 PDF in mm
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      // A4 PDF in mm. `compress: true` deflate-compresses the page/image
+      // streams — essential for large batches (1000+ students = 2000+ pages),
+      // otherwise the embedded QR PNGs blow up the tab's memory and the
+      // download silently fails.
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
       const pw = 210; // page width
       const ph = 297; // page height
       const origin = window.location.origin;
@@ -403,11 +406,13 @@ export class StudentListComponent implements OnInit {
         // --- Odd page: QR code ---
         if (i > 0) pdf.addPage();
         const url = `${origin}/p/s/${student.qrToken}`;
-        const dataUrl = await QRCode.toDataURL(url, { width: 800, margin: 2 });
+        // 500px is plenty to scan a 140mm-wide QR and keeps per-image memory
+        // ~2.5× lower than 800px across thousands of students.
+        const dataUrl = await QRCode.toDataURL(url, { width: 500, margin: 2 });
         const qrSize = 140;
         const qrX = (pw - qrSize) / 2;
         const qrY = (ph - qrSize) / 2;
-        pdf.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+        pdf.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
 
         // --- Even page: student info ---
         pdf.addPage();
@@ -470,6 +475,10 @@ export class StudentListComponent implements OnInit {
           pdf.setTextColor(148, 163, 184);
           pdf.text('—', pw / 2, yPos, { align: 'center' });
         }
+
+        // Yield to the event loop every so often so a large batch doesn't lock
+        // the main thread (which makes the browser kill the "unresponsive" tab).
+        if (i % 25 === 24) await new Promise((r) => setTimeout(r));
       }
 
       pdf.save('qr-codes.pdf');
