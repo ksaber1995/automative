@@ -78,6 +78,29 @@ async function ensureStartedColumn(): Promise<void> {
   return startedColumnInitPromise;
 }
 
+const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+/** Weekday name (UPPER) for a YYYY-MM-DD local date — matches classes.days_of_week. */
+function dayNameForDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return DAY_NAMES[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+/** Shape a checkin-target row into the response (mirrors ActiveSessionInfo + `upcoming`). */
+function mapCheckinTarget(row: any, upcoming: boolean) {
+  return {
+    sessionId: row.id,
+    classId: row.class_id,
+    className: row.class_name,
+    courseName: row.course_name,
+    roomCode: row.room_code ?? null,
+    sessionNumber: row.session_number === null || row.session_number === undefined
+      ? null
+      : parseInt(row.session_number, 10),
+    upcoming,
+  };
+}
+
 function mapSessionFromDB(row: any) {
   return {
     id: row.id,
@@ -615,6 +638,153 @@ export const sessionsRoutes = {
     } catch (error) {
       console.error('Active session for student error:', error);
       return mapThrownError(error, 'ERRORS.SESSIONS.LIST_FAILED', 'Failed to find active session');
+    }
+  },
+
+  /**
+   * GET /api/sessions/checkin-target/:studentId?localDate=YYYY-MM-DD&localTime=HH:MM&branchId=...
+   *
+   * Resolves the session a scanned student should be checked into, so a scan
+   * from anywhere in the app can take attendance automatically. Returns:
+   *   1. their currently-running session (started, not ended), if any; else
+   *   2. an "active or imminent" scheduled session — a class they're enrolled
+   *      in that, per its weekly schedule, is in progress or starts within the
+   *      next 30 minutes. If no session row exists for it yet, one is prepared
+   *      (started=false) so the student can be checked in.
+   * Returns the session info object, or null when nothing matches.
+   *
+   * localDate / localTime are the CLIENT's local wall-clock (the academy's
+   * timezone), so the schedule comparison doesn't depend on the server's UTC.
+   */
+  checkinTarget: async ({
+    params,
+    query: q,
+    headers,
+  }: {
+    params: { studentId: string };
+    query: { localDate?: string; localTime?: string; branchId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      await ensureStartedColumn();
+      await ensureAttendanceMagicColumns();
+      const context = await extractTenantContext(headers.authorization);
+      // May create (prepare) a session, so require write.
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      if (q.branchId && !canAccessBranch(context, q.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const enrolledClassesSubquery = `(
+        SELECT class_id FROM enrollments
+        WHERE company_id = $1 AND student_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+        UNION
+        SELECT class_id FROM master_class_enrollments
+        WHERE company_id = $1 AND student_id = $2 AND status != 'DROPPED'
+      )`;
+
+      // 1) Already-running session for one of the student's classes.
+      {
+        const sqlParams: any[] = [context.companyId, params.studentId];
+        let sql = `
+          SELECT s.id, s.class_id, s.session_number,
+                 cl.name AS class_name, co.name AS course_name, r.code AS room_code
+          FROM sessions s
+          JOIN classes cl ON cl.id = s.class_id
+          LEFT JOIN courses co ON co.id = cl.course_id
+          LEFT JOIN rooms r ON r.id = s.room_id
+          WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+            AND s.class_id IN ${enrolledClassesSubquery}
+        `;
+        const branchClause = appendBranchSqlFilter(context, sqlParams, 's.branch_id');
+        if (branchClause) sql += ` AND ${branchClause}`;
+        sql += ' ORDER BY s.start_date DESC LIMIT 1';
+
+        const row = await queryOne<any>(sql, sqlParams);
+        if (row) {
+          return { status: 200 as const, body: mapCheckinTarget(row, false) };
+        }
+      }
+
+      // 2) Active-or-imminent scheduled class (needs the client's local clock).
+      if (!q.localDate || !q.localTime || !/^\d{4}-\d{2}-\d{2}$/.test(q.localDate)) {
+        return { status: 200 as const, body: null };
+      }
+      const dayName = dayNameForDate(q.localDate);
+
+      const schedParams: any[] = [context.companyId, params.studentId, dayName, q.localDate, q.localTime];
+      let schedSql = `
+        SELECT c.id AS class_id, c.name AS class_name, co.name AS course_name, co.branch_id
+        FROM classes c
+        JOIN courses co ON co.id = c.course_id
+        WHERE co.company_id = $1
+          AND c.is_active = true
+          AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
+          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
+          AND POSITION($3 IN UPPER(c.days_of_week)) > 0
+          AND (c.start_date IS NULL OR c.start_date <= $4::date)
+          AND (c.end_date IS NULL OR c.end_date >= $4::date)
+          AND c.start_time <= ($5::time + interval '30 minutes')
+          AND c.end_time >= $5::time
+          AND c.id IN ${enrolledClassesSubquery}
+      `;
+      const schedBranch = appendBranchSqlFilter(context, schedParams, 'co.branch_id');
+      if (schedBranch) schedSql += ` AND ${schedBranch}`;
+      schedSql += ' ORDER BY c.start_time ASC LIMIT 1';
+
+      const cls = await queryOne<any>(schedSql, schedParams);
+      if (!cls) {
+        return { status: 200 as const, body: null };
+      }
+
+      // Reuse an open session for this class, or prepare one (started=false).
+      let session = await queryOne<any>(
+        `SELECT s.*, cl.name AS class_name, co.name AS course_name, r.code AS room_code
+         FROM sessions s
+         JOIN classes cl ON cl.id = s.class_id
+         LEFT JOIN courses co ON co.id = cl.course_id
+         LEFT JOIN rooms r ON r.id = s.room_id
+         WHERE s.class_id = $1 AND s.company_id = $2 AND s.end_date IS NULL`,
+        [cls.class_id, context.companyId]
+      );
+      if (!session) {
+        const nextRow = await queryOne<any>(
+          `SELECT COALESCE(MAX(session_number), 0) + 1 AS next FROM sessions WHERE class_id = $1`,
+          [cls.class_id]
+        );
+        const inserted = await insert('sessions', {
+          company_id: context.companyId,
+          branch_id: cls.branch_id,
+          room_id: null,
+          class_id: cls.class_id,
+          session_number: parseInt(nextRow?.next ?? '1', 10),
+          start_date: new Date().toISOString(),
+          end_date: null,
+          started: false,
+          notes: null,
+        });
+        session = { ...inserted, class_name: cls.class_name, course_name: cls.course_name, room_code: null };
+      }
+
+      return {
+        status: 200 as const,
+        body: mapCheckinTarget(
+          {
+            id: session.id,
+            class_id: session.class_id,
+            session_number: session.session_number,
+            class_name: session.class_name,
+            course_name: session.course_name,
+            room_code: session.room_code,
+          },
+          true
+        ),
+      };
+    } catch (error) {
+      console.error('Checkin target for student error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.LIST_FAILED', 'Failed to find session');
     }
   },
 

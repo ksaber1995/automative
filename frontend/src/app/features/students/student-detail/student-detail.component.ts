@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -95,6 +96,7 @@ export class StudentDetailComponent implements OnInit {
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
   private confirmationService = inject(ConfirmationService);
+  private destroyRef = inject(DestroyRef);
 
   /** TEACHER companies don't use master courses, so hide that whole section. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -243,19 +245,47 @@ export class StudentDetailComponent implements OnInit {
     return Math.round((this.attendancePresentCount() / total) * 100);
   });
 
-  async ngOnInit() {
-    this.studentId = this.route.snapshot.paramMap.get('id');
-    if (this.studentId) {
-      await this.loadCourses();
-      this.loadClassesForDoneMap();
-      this.loadStudent(this.studentId);
-      this.loadMonthlySubscriptions(this.studentId);
-      this.loadEnrollments(this.studentId);
-      if (!this.isTeacher()) this.loadMasterEnrollments(this.studentId);
-      this.loadAttendance(this.studentId);
-      this.loadBookPurchases(this.studentId);
-      this.loadExamResults(this.studentId);
-    }
+  ngOnInit() {
+    // Subscribe to the route param (not snapshot) so that scanning another
+    // student while already on a detail page — which navigates to the same
+    // /students/:id route and reuses this component instance — reloads the
+    // page for the new id instead of silently doing nothing.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      const id = params.get('id');
+      if (id && id !== this.studentId) {
+        this.studentId = id;
+        this.loadStudentData(id);
+      }
+    });
+  }
+
+  private async loadStudentData(id: string) {
+    this.resetStudentState();
+    await this.loadCourses();
+    this.loadClassesForDoneMap();
+    this.loadStudent(id);
+    this.loadMonthlySubscriptions(id);
+    this.loadEnrollments(id);
+    if (!this.isTeacher()) this.loadMasterEnrollments(id);
+    this.loadAttendance(id);
+    this.loadBookPurchases(id);
+    this.loadExamResults(id);
+  }
+
+  /** Clear per-student state so data from a previously-viewed student
+   *  doesn't linger when navigating to a new id on the same component. */
+  private resetStudentState() {
+    this.student.set(null);
+    this.enrollments.set([]);
+    this.masterEnrollments.set([]);
+    this.monthlyByEnrollment.set(new Map());
+    this.paymentHistoryMap.set(new Map());
+    this.refundHistoryMap.set(new Map());
+    this.attendanceRecords.set([]);
+    this.bookPurchases.set([]);
+    this.examResults.set([]);
+    this.expandedRows = {};
+    this.expandedMasterRows = {};
   }
 
   loadExamResults(studentId: string) {

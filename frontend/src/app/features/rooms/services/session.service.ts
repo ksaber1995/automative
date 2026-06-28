@@ -35,6 +35,12 @@ export interface ActiveSessionInfo {
   sessionNumber?: number | null;
 }
 
+/** The session a scanned student should be checked into (active or imminent). */
+export interface CheckinTargetInfo extends ActiveSessionInfo {
+  /** true when matched by schedule (about to start) rather than already running. */
+  upcoming: boolean;
+}
+
 export interface StartSessionTeacher {
   employeeId: string;
   role?: 'PRIMARY' | 'SUBSTITUTE' | 'ASSISTANT';
@@ -66,6 +72,16 @@ export class SessionService {
   /** The student's currently-running session, or null if none is in progress. */
   activeForStudent(studentId: string): Observable<ActiveSessionInfo | null> {
     return this.api.get<ActiveSessionInfo | null>(`sessions/active-for-student/${studentId}`);
+  }
+
+  /**
+   * The session a scanned student should be checked into — their running
+   * session, or a class scheduled to be in progress / start within 30 min
+   * (prepared on demand). localDate/localTime are the client's local clock.
+   * Returns null when there's nothing to take attendance for.
+   */
+  checkinTarget(studentId: string, localDate: string, localTime: string): Observable<CheckinTargetInfo | null> {
+    return this.api.get<CheckinTargetInfo | null>(`sessions/checkin-target/${studentId}`, { localDate, localTime });
   }
 
   getById(id: string): Observable<Session> {

@@ -4956,6 +4956,23 @@ export const contract = c.router({
         403: ApiErrorSchema,
       },
     },
+    // The session a scanned student should be checked into: their running
+    // session, or an active/imminent scheduled one (preparing it if needed).
+    // localDate/localTime are the client's local clock. Returns info or null.
+    checkinTarget: {
+      method: 'GET' as const,
+      path: '/api/sessions/checkin-target/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      query: z.object({
+        localDate: z.string().optional(),
+        localTime: z.string().optional(),
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.any(),
+        403: ApiErrorSchema,
+      },
+    },
     getById: {
       method: 'GET' as const,
       path: '/api/sessions/:id',

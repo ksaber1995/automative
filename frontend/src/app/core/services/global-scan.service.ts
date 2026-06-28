@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../../features/students/services/student.service';
+import { SessionService } from '../../features/rooms/services/session.service';
+import { AttendanceService } from '../../features/rooms/services/attendance.service';
 import { NotificationService } from './notification.service';
 
 /**
@@ -15,6 +17,8 @@ import { NotificationService } from './notification.service';
 export class GlobalScanService {
   private router = inject(Router);
   private studentService = inject(StudentService);
+  private sessionService = inject(SessionService);
+  private attendanceService = inject(AttendanceService);
   private notify = inject(NotificationService);
   private translate = inject(TranslateService);
 
@@ -53,12 +57,49 @@ export class GlobalScanService {
     this.studentService.lookupByQr(token).subscribe({
       next: (result) => {
         this.looking = false;
-        this.router.navigate(['/students', result.id]);
+        // Take attendance first (if the student has an active or imminent
+        // session), then open their detail page — either way.
+        this.takeAttendanceThenOpen(result.id, token);
       },
       error: () => {
         this.looking = false;
         this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND'));
       },
+    });
+  }
+
+  /**
+   * If the scanned student has an active or imminent (≤30 min) session, check
+   * them in and toast it; then open their detail page. Attendance is
+   * best-effort — any failure never blocks opening the page.
+   */
+  private takeAttendanceThenOpen(studentId: string, token: string): void {
+    const open = () => { this.router.navigate(['/students', studentId]); };
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const localTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    this.sessionService.checkinTarget(studentId, localDate, localTime).subscribe({
+      next: (target) => {
+        if (!target) { open(); return; }
+        this.attendanceService.checkinByQr(target.sessionId, token).subscribe({
+          next: (res) => {
+            const name = `${res.studentFirstName} ${res.studentLastName}`;
+            if (res.attendanceType === 'SUBSTITUTION') {
+              this.notify.success(this.translate.instant('SESSION_QR.SUBSTITUTION_CHECKED_IN', { name, className: res.homeClassName }));
+            } else if (res.alreadyPresent) {
+              this.notify.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
+            } else {
+              this.notify.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
+            }
+            open();
+          },
+          error: () => open(), // interceptor toasts the server error; still open the page
+        });
+      },
+      error: () => open(), // attendance is best-effort; never block opening the student
     });
   }
 }

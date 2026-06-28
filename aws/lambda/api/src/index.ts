@@ -161,6 +161,7 @@ const router = {
     // captured as `:id` and fails "id: Invalid uuid".
     nextNumber: sessionsRoutes.nextNumber,
     activeForStudent: sessionsRoutes.activeForStudent,
+    checkinTarget: sessionsRoutes.checkinTarget,
     getById: sessionsRoutes.getById,
     update: sessionsRoutes.update,
   },
