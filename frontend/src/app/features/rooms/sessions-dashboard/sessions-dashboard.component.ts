@@ -225,8 +225,10 @@ export class SessionsDashboardComponent implements OnInit {
     const branchId = this.selectedBranchId();
     return this.upcomingEntries()
       .filter(e => {
-        // Skip entries that already have an active (started) session
-        if (e.sessionId && !e.sessionEnd) return false;
+        // Skip entries that already have a session today — whether it's still
+        // running (it belongs in the Active tab) or already ended (it's done
+        // for the day). Upcoming should only list classes with no session yet.
+        if (e.sessionId) return false;
         if (!e.startTime) return false;
         const [h, m] = e.startTime.split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return false;

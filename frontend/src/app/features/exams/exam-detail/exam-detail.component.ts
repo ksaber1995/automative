@@ -14,6 +14,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { ExamService } from '../services/exam.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
@@ -44,6 +45,13 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private translate = inject(TranslateService);
   authService = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
+  private globalScan = inject(GlobalScanService);
+
+  // Take over the app-wide (USB/keyboard-wedge) scanner while this page is open,
+  // so a scan records the exam grade here instead of falling through to the
+  // global "take attendance / open student" flow. A short all-digits value is a
+  // student code; anything else is treated as a QR token.
+  private readonly scanHandler = (value: string) => this.recordScanned(value);
 
   examId = '';
   exam = signal<ExamModel | null>(null);
@@ -103,6 +111,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.examId = this.route.snapshot.paramMap.get('id') || '';
+    this.globalScan.register(this.scanHandler);
     this.templatesSvc.load().subscribe({ next: () => {}, error: () => {} });
     if (!this.examId) { this.loading.set(false); return; }
     this.service.getById(this.examId).subscribe({
@@ -327,6 +336,21 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   submitManualCode() {
     const code = this.manualCode().trim();
     this.manualCode.set('');
+    this.recordCode(code);
+  }
+
+  /**
+   * Route a scan captured by the global (USB) scanner to the right recorder:
+   * a short all-digits value is a student code; anything else is a QR token.
+   */
+  private recordScanned(value: string) {
+    const v = (value || '').trim();
+    if (!v) return;
+    if (/^\d{1,7}$/.test(v)) this.recordCode(v);
+    else this.record(this.extractToken(v));
+  }
+
+  private recordCode(code: string) {
     if (!code) return;
     const grade = this.currentGrade().trim();
     if (!grade) {
@@ -488,6 +512,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   back() { this.router.navigate(['/exams']); }
 
   ngOnDestroy() {
+    this.globalScan.unregister(this.scanHandler);
     this.stopCamera();
     this.audioCtx?.close().catch(() => {});
     this.rowSaveTimers.forEach((t) => clearTimeout(t));

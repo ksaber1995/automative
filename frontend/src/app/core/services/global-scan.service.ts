@@ -44,22 +44,33 @@ export class GlobalScanService {
     return raw;
   }
 
-  /** Route a scanned value to the active page's handler, else find the student. */
-  dispatch(decodedText: string): void {
+  /**
+   * Route a scanned value to the active page's handler, else find the student.
+   *
+   * `forceOpen` is set when the scan comes from the navbar's explicit QR-search
+   * dialog: that's a deliberate "open this student" action, so it bypasses any
+   * page-registered handler and always navigates (after taking attendance).
+   */
+  dispatch(decodedText: string, forceOpen = false): void {
     const token = this.extractToken(decodedText);
     if (!token) return;
-    if (this.handler) {
+    if (this.handler && !forceOpen) {
       this.handler(token);
       return;
     }
     if (this.looking) return;
     this.looking = true;
+    // Auto-open the detail page when the scan is an explicit navbar QR search
+    // (forceOpen) or happens while ALREADY viewing a student's details — so
+    // scanning there swaps to the new student. A scan from anywhere else just
+    // takes attendance silently (no navigation).
+    const navigateToDetail = forceOpen || this.isOnStudentDetail();
     this.studentService.lookupByQr(token).subscribe({
       next: (result) => {
         this.looking = false;
         // Take attendance first (if the student has an active or imminent
-        // session), then open their detail page — either way.
-        this.takeAttendanceThenOpen(result.id, token);
+        // session), then open their detail page only when appropriate.
+        this.takeAttendanceThenMaybeOpen(result.id, token, navigateToDetail);
       },
       error: () => {
         this.looking = false;
@@ -68,13 +79,21 @@ export class GlobalScanService {
     });
   }
 
+  /** Is the current route a student-detail page (/students/:id)? */
+  private isOnStudentDetail(): boolean {
+    const url = this.router.url.split('?')[0].split('#')[0];
+    const m = url.match(/^\/students\/([^/]+)$/);
+    return !!m && m[1] !== 'create';
+  }
+
   /**
    * If the scanned student has an active or imminent (≤30 min) session, check
-   * them in and toast it; then open their detail page. Attendance is
-   * best-effort — any failure never blocks opening the page.
+   * them in and toast it. Then open their detail page only when `navigate` is
+   * true (a scan made while already on a student-detail page). Attendance is
+   * best-effort — any failure never blocks the (optional) navigation.
    */
-  private takeAttendanceThenOpen(studentId: string, token: string): void {
-    const open = () => { this.router.navigate(['/students', studentId]); };
+  private takeAttendanceThenMaybeOpen(studentId: string, token: string, navigate: boolean): void {
+    const open = () => { if (navigate) this.router.navigate(['/students', studentId]); };
 
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');

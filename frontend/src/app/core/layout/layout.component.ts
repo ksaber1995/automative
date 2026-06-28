@@ -102,11 +102,54 @@ export class LayoutComponent implements OnInit, OnDestroy {
         // A no-focus keystroke burst ending in Enter is a USB scanner — remember
         // it so the scan button stops defaulting to the camera on this device.
         this.scanPref.markUsbDetected();
-        this.globalScan.dispatch(buf);
+        // If the navbar QR-search dialog is open, this is a deliberate "find
+        // student" scan: force-open their detail page and close the dialog.
+        // Otherwise fall back to the silent attendance-taking dispatch.
+        const explicit = this.qrDialogVisible();
+        this.globalScan.dispatch(buf, explicit);
+        if (explicit) this.closeQrScanner();
       }
       return;
     }
-    if (e.key.length === 1) this.scanBuffer += e.key;
+    // Capture from the PHYSICAL key (e.code), not e.key: a USB keyboard-wedge
+    // scanner emits US-layout scancodes, but e.key is translated through the
+    // OS's active layout. With a non-Latin layout active (e.g. Arabic), e.key
+    // would turn the scanned URL into garbage — the '/p/s/' marker then fails
+    // to match and the whole mangled string is sent as the token (→ "must
+    // contain at most 64 characters"). Reconstructing from e.code keeps scans
+    // working regardless of the active keyboard layout.
+    const ch = this.scanCharForCode(e);
+    if (ch) this.scanBuffer += ch;
+    else if (e.key.length === 1) this.scanBuffer += e.key; // fallback (e.g. dead keys)
+  }
+
+  /** Map a KeyboardEvent's physical key (e.code) to its US-layout character. */
+  private scanCharForCode(e: KeyboardEvent): string | null {
+    const code = e.code;
+    if (code.startsWith('Key') && code.length === 4) {
+      const c = code.charAt(3).toLowerCase();
+      return e.shiftKey ? c.toUpperCase() : c;
+    }
+    if (code.startsWith('Digit') && code.length === 6) {
+      const d = code.charAt(5);
+      return e.shiftKey ? ')!@#$%^&*('.charAt(Number(d)) : d;
+    }
+    if (code.startsWith('Numpad')) {
+      const n = code.slice(6);
+      if (/^\d$/.test(n)) return n;
+      const numpad: Record<string, string> = {
+        Divide: '/', Multiply: '*', Subtract: '-', Add: '+', Decimal: '.',
+      };
+      return numpad[n] ?? null;
+    }
+    const punct: Record<string, [string, string]> = {
+      Slash: ['/', '?'], Period: ['.', '>'], Comma: [',', '<'],
+      Minus: ['-', '_'], Equal: ['=', '+'], Semicolon: [';', ':'],
+      Quote: ["'", '"'], BracketLeft: ['[', '{'], BracketRight: [']', '}'],
+      Backslash: ['\\', '|'], Backquote: ['`', '~'],
+    };
+    const p = punct[code];
+    return p ? (e.shiftKey ? p[1] : p[0]) : null;
   }
 
   constructor(
@@ -177,7 +220,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     const financial: NavLeaf[] = [
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && !auth.isTeacher() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
-      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') && !auth.isTeacher() },
+      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);

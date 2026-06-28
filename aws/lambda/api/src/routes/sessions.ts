@@ -556,7 +556,15 @@ export const sessionsRoutes = {
         LEFT JOIN classes cl ON s.class_id = cl.id
         LEFT JOIN courses co ON cl.course_id = co.id
         LEFT JOIN branches b ON s.branch_id = b.id
-        WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+        WHERE s.company_id = $1 AND s.end_date IS NULL
+          AND (
+            s.started = true
+            -- Auto-attendance prepares sessions (started=false) when a scanned
+            -- student is checked into an active/imminent class. Once anyone has
+            -- been marked present, the class is effectively running, so surface
+            -- it here too — otherwise these sessions vanish from every list.
+            OR EXISTS (SELECT 1 FROM session_attendance sa WHERE sa.session_id = s.id)
+          )
       `;
       const params: any[] = [context.companyId];
 

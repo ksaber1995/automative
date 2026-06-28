@@ -330,7 +330,7 @@
                   <span><i class="pi pi-clock mr-1"></i>{{ 'SESSIONS_DASHBOARD.STARTED_AT' | translate: { time: formatTime(session.startDate) } }}</span>
                   <span class="text-orange-600 font-medium">{{ getDuration(session.startDate) }}</span>
                 </div>
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid gap-2" [class.grid-cols-3]="!isTeacher()" [class.grid-cols-2]="isTeacher()">
                   <p-button
                     [label]="(expandedAttendanceSessionId() === session.id ? 'SESSIONS_DASHBOARD.HIDE_ATTENDANCE' : 'SESSIONS_DASHBOARD.ADD_ATTENDANCE') | translate"
                     [icon]="expandedAttendanceSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-check-square'"
@@ -340,6 +340,9 @@
                     styleClass="w-full"
                     (onClick)="toggleAttendance(session)"
                   ></p-button>
+                  <!-- Teacher-type companies have no co-teachers (the owner is the only
+                       teacher), so the per-session teacher manager is hidden for them. -->
+                  @if (!isTeacher()) {
                   <p-button
                     [label]="(expandedTeachersSessionId() === session.id ? 'SESSIONS_DASHBOARD.HIDE_TEACHERS' : 'SESSIONS_DASHBOARD.MANAGE_TEACHERS') | translate"
                     [icon]="expandedTeachersSessionId() === session.id ? 'pi pi-chevron-up' : 'pi pi-user-edit'"
@@ -349,6 +352,7 @@
                     styleClass="w-full"
                     (onClick)="toggleTeachers(session)"
                   ></p-button>
+                  }
                   <p-button
                     [label]="'SESSIONS_DASHBOARD.END_SESSION' | translate"
                     icon="pi pi-stop"
