@@ -2,6 +2,7 @@ import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { notifySessionAttendance } from './telegram';
+import { ensureAutoManageSessionsColumn } from './companies';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -369,6 +370,156 @@ export const sessionsRoutes = {
     }
   },
 
+  /**
+   * POST /api/sessions/auto-schedule  { localDate, localTime }
+   * Opt-in (company setting `auto_manage_sessions`): starts sessions for classes
+   * whose weekly schedule says they're in progress right now, and ends running
+   * sessions whose scheduled end time has passed today. Idempotent — safe to call
+   * repeatedly (e.g. a client polling every few minutes from multiple tabs).
+   *
+   * localDate / localTime are the CLIENT's local wall-clock (the academy's
+   * timezone) so the schedule comparison doesn't depend on the server's UTC.
+   */
+  autoSchedule: async ({ body, headers }: { body: { localDate?: string; localTime?: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureSessionRoomNullable();
+      await ensureAttendanceMagicColumns();
+      await ensureStartedColumn();
+      await ensureAutoManageSessionsColumn();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const localDate = body?.localDate;
+      const localTime = body?.localTime;
+      if (!localDate || !localTime || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
+        return { status: 200 as const, body: { enabled: false, started: 0, ended: 0 } };
+      }
+
+      // Gate on the company opt-in setting.
+      const comp = await queryOne<any>(
+        'SELECT type, auto_manage_sessions FROM companies WHERE id = $1',
+        [context.companyId]
+      );
+      if (!comp || comp.auto_manage_sessions !== true) {
+        return { status: 200 as const, body: { enabled: false, started: 0, ended: 0 } };
+      }
+      const isTeacherCompany = (comp.type || '').toUpperCase() === 'TEACHER';
+      const dayName = dayNameForDate(localDate);
+
+      // ── Auto-start: classes scheduled in-window now with no running session ──
+      const startParams: any[] = [context.companyId, dayName, localDate, localTime];
+      let startSql = `
+        SELECT c.id AS class_id, c.name AS class_name, c.instructor_id, co.branch_id
+        FROM classes c
+        JOIN courses co ON co.id = c.course_id
+        WHERE co.company_id = $1
+          AND c.is_active = true
+          AND (c.is_finished IS NULL OR c.is_finished = false)
+          AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
+          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
+          AND POSITION($2 IN UPPER(c.days_of_week)) > 0
+          AND (c.start_date IS NULL OR c.start_date <= $3::date)
+          AND (c.end_date IS NULL OR c.end_date >= $3::date)
+          AND c.start_time <= $4::time
+          AND c.end_time > $4::time
+          AND NOT EXISTS (
+            SELECT 1 FROM sessions s
+            WHERE s.class_id = c.id AND s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+          )
+      `;
+      const startBranch = appendBranchSqlFilter(context, startParams, 'co.branch_id');
+      if (startBranch) startSql += ` AND ${startBranch}`;
+      const dueClasses = await query<any>(startSql, startParams);
+
+      let started = 0;
+      for (const cls of dueClasses) {
+        // Promote a prepared (started=false) session if one is open, else insert one.
+        const prepared = await queryOne<any>(
+          `SELECT * FROM sessions WHERE class_id = $1 AND company_id = $2 AND end_date IS NULL AND started = false`,
+          [cls.class_id, context.companyId]
+        );
+        let session: any;
+        if (prepared) {
+          session = await update('sessions', prepared.id, { started: true });
+        } else {
+          const nextRow = await queryOne<any>(
+            `SELECT COALESCE(MAX(session_number), 0) + 1 AS next FROM sessions WHERE class_id = $1`,
+            [cls.class_id]
+          );
+          session = await insert('sessions', {
+            company_id: context.companyId,
+            branch_id: cls.branch_id,
+            room_id: null,
+            class_id: cls.class_id,
+            session_number: parseInt(nextRow?.next ?? '1', 10),
+            start_date: new Date().toISOString(),
+            end_date: null,
+            started: true,
+            notes: null,
+          });
+        }
+        // Mark the class instructor present (so the session has a teacher on record
+        // and can be auto-ended later for company tenants).
+        if (cls.instructor_id) {
+          await query(
+            `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+             VALUES ($1, $2, 'PRIMARY', 'PRESENT', NULL)
+             ON CONFLICT (session_id, employee_id) DO NOTHING`,
+            [session.id, cls.instructor_id]
+          );
+        }
+        started++;
+      }
+
+      // ── Auto-end: running sessions whose scheduled end time has passed today ──
+      const endParams: any[] = [context.companyId, localDate, localTime];
+      let endSql = `
+        SELECT s.id, c.instructor_id
+        FROM sessions s
+        JOIN classes c ON c.id = s.class_id
+        JOIN courses co ON co.id = c.course_id
+        WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+          AND s.start_date::date = $2::date
+          AND c.end_time IS NOT NULL AND c.end_time <= $3::time
+      `;
+      const endBranch = appendBranchSqlFilter(context, endParams, 's.branch_id');
+      if (endBranch) endSql += ` AND ${endBranch}`;
+      const overdue = await query<any>(endSql, endParams);
+
+      let ended = 0;
+      for (const s of overdue) {
+        // Company tenants require a present teacher to end. Ensure the instructor
+        // is recorded present; if none can be, skip and leave it for a manual end.
+        if (!isTeacherCompany) {
+          const present = await queryOne(
+            `SELECT 1 FROM session_teacher_attendance WHERE session_id = $1 AND status = 'PRESENT' LIMIT 1`,
+            [s.id]
+          );
+          if (!present) {
+            if (!s.instructor_id) continue;
+            await query(
+              `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+               VALUES ($1, $2, 'PRIMARY', 'PRESENT', NULL)
+               ON CONFLICT (session_id, employee_id) DO UPDATE SET status = 'PRESENT'`,
+              [s.id, s.instructor_id]
+            );
+          }
+        }
+        await update('sessions', s.id, { end_date: new Date().toISOString() });
+        // Best-effort Telegram present/absent notifications (no-op unless enabled).
+        await notifySessionAttendance(context.companyId, s.id);
+        ended++;
+      }
+
+      return { status: 200 as const, body: { enabled: true, started, ended } };
+    } catch (error) {
+      console.error('Auto-schedule sessions error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.AUTO_SCHEDULE_FAILED', 'Failed to auto-manage sessions', 400);
+    }
+  },
+
   end: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -557,14 +708,11 @@ export const sessionsRoutes = {
         LEFT JOIN courses co ON cl.course_id = co.id
         LEFT JOIN branches b ON s.branch_id = b.id
         WHERE s.company_id = $1 AND s.end_date IS NULL
-          AND (
-            s.started = true
-            -- Auto-attendance prepares sessions (started=false) when a scanned
-            -- student is checked into an active/imminent class. Once anyone has
-            -- been marked present, the class is effectively running, so surface
-            -- it here too — otherwise these sessions vanish from every list.
-            OR EXISTS (SELECT 1 FROM session_attendance sa WHERE sa.session_id = s.id)
-          )
+          -- Only formally-started sessions are "active". Pre-attendance prepares
+          -- a session (started=false); taking attendance must NOT start it. Such
+          -- prepared sessions stay in the Upcoming tab until the teacher clicks
+          -- Start, or auto-start-on-time promotes them.
+          AND s.started = true
       `;
       const params: any[] = [context.companyId];
 

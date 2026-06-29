@@ -152,6 +152,7 @@ const router = {
   sessions: {
     start: sessionsRoutes.start,
     prepare: sessionsRoutes.prepare,
+    autoSchedule: sessionsRoutes.autoSchedule,
     end: sessionsRoutes.end,
     list: sessionsRoutes.list,
     listActive: sessionsRoutes.listActive,

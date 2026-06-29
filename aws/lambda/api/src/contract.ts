@@ -3146,6 +3146,7 @@ export const contract = c.router({
           id: UUIDSchema,
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
+          autoManageSessions: z.boolean(),
         }),
         401: ApiErrorSchema,
       },
@@ -3155,12 +3156,14 @@ export const contract = c.router({
       path: '/api/companies/settings',
       body: z.object({
         globalExpenseAllocation: GlobalExpenseAllocationSchema.optional(),
+        autoManageSessions: z.boolean().optional(),
       }),
       responses: {
         200: z.object({
           id: UUIDSchema,
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
+          autoManageSessions: z.boolean(),
         }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,
@@ -4875,6 +4878,23 @@ export const contract = c.router({
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
+      },
+    },
+    autoSchedule: {
+      method: 'POST' as const,
+      path: '/api/sessions/auto-schedule',
+      body: z.object({
+        localDate: z.string().optional(),
+        localTime: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          enabled: z.boolean(),
+          started: z.number(),
+          ended: z.number(),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     nextNumber: {

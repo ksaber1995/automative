@@ -16,6 +16,8 @@ export interface TimetableEntry {
   sessionId: string | null;
   sessionStart: string | null;
   sessionEnd: string | null;
+  /** False for a prepared (pre-attendance) session that hasn't been formally started. */
+  sessionStarted: boolean;
   isInProgress: boolean;
   scheduledStart: string | null;
   scheduledEnd: string | null;

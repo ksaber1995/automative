@@ -9,6 +9,50 @@
       <i class="pi pi-spin pi-spinner text-4xl text-gray-400"></i>
     </div>
   } @else {
+    <!-- Session automation: auto start/end on schedule -->
+    <p-card styleClass="mb-6">
+      <ng-template pTemplate="header">
+        <div class="px-6 pt-6 pb-2">
+          <div class="flex items-center gap-3 mb-1">
+            <i class="pi pi-clock text-blue-500 text-xl"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ 'SETTINGS.AUTO_SESSIONS_TITLE' | translate }}</h2>
+          </div>
+          <p class="text-gray-500 text-sm ml-8">
+            {{ 'SETTINGS.AUTO_SESSIONS_DESC' | translate }}
+          </p>
+        </div>
+      </ng-template>
+
+      <div class="px-2 pb-2">
+        <div class="flex items-start gap-4 border-2 rounded-xl p-5 transition-all"
+          [class.border-blue-500]="autoManageSessions()"
+          [class.bg-blue-50]="autoManageSessions()"
+          [class.border-gray-200]="!autoManageSessions()">
+          <p-checkbox
+            [ngModel]="autoManageSessions()"
+            (ngModelChange)="autoManageSessions.set($event)"
+            [binary]="true"
+            inputId="autoManageSessions">
+          </p-checkbox>
+          <label for="autoManageSessions" class="flex-1 cursor-pointer">
+            <span class="font-bold text-gray-900 text-lg block mb-1">{{ 'SETTINGS.AUTO_SESSIONS_LABEL' | translate }}</span>
+            <span class="text-gray-600 text-sm">{{ 'SETTINGS.AUTO_SESSIONS_HINT' | translate }}</span>
+          </label>
+        </div>
+      </div>
+
+      <ng-template pTemplate="footer">
+        <div class="flex justify-end pt-2">
+          <p-button
+            [label]="'SETTINGS.SAVE' | translate"
+            icon="pi pi-check"
+            [loading]="saving()"
+            (onClick)="save()">
+          </p-button>
+        </div>
+      </ng-template>
+    </p-card>
+
     <!-- Global Expense Allocation -->
     <p-card>
       <ng-template pTemplate="header">

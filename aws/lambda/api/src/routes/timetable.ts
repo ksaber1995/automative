@@ -57,7 +57,9 @@ function mapEntry(row: any, date: string) {
     sessionId: row.session_id || null,
     sessionStart: row.session_start || null,
     sessionEnd: row.session_end || null,
-    isInProgress: !!row.session_id && !row.session_end,
+    // A prepared (started=false) session is NOT in progress — it's pre-attendance.
+    sessionStarted: row.session_started === true,
+    isInProgress: !!row.session_id && row.session_started === true && !row.session_end,
     scheduledStart,
     scheduledEnd,
     startTime: row.start_time,
@@ -117,6 +119,7 @@ export const timetableRoutes = {
           s.id AS session_id,
           s.start_date AS session_start,
           s.end_date AS session_end,
+          s.started AS session_started,
           s.room_id AS session_room_id,
           r.code AS session_room_code
         FROM classes c
@@ -124,7 +127,7 @@ export const timetableRoutes = {
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
         LEFT JOIN LATERAL (
-          SELECT s2.id, s2.start_date, s2.end_date, s2.room_id
+          SELECT s2.id, s2.start_date, s2.end_date, s2.room_id, s2.started
           FROM sessions s2
           WHERE s2.class_id = c.id
             AND s2.start_date::date = $2::date

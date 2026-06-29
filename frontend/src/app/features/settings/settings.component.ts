@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CompanyService, GlobalExpenseAllocation } from '../../core/services/company.service';
@@ -24,7 +25,7 @@ interface AllocationOption {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, CardModule, ButtonModule, RadioButtonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, CardModule, ButtonModule, RadioButtonModule, CheckboxModule, FormsModule, TranslateModule],
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
@@ -35,6 +36,8 @@ export class SettingsComponent implements OnInit {
   loading = signal(true);
   saving = signal(false);
   selectedMethod = signal<GlobalExpenseAllocation>('OVERHEAD');
+  /** Opt-in: auto start/end sessions on their scheduled times. */
+  autoManageSessions = signal(false);
 
   get selectedMethodValue(): GlobalExpenseAllocation {
     return this.selectedMethod();
@@ -85,6 +88,7 @@ export class SettingsComponent implements OnInit {
     this.companyService.getSettings().subscribe({
       next: (settings) => {
         this.selectedMethod.set(settings.globalExpenseAllocation);
+        this.autoManageSessions.set(settings.autoManageSessions === true);
         this.loading.set(false);
       },
       error: () => {
@@ -95,7 +99,10 @@ export class SettingsComponent implements OnInit {
 
   save() {
     this.saving.set(true);
-    this.companyService.updateSettings({ globalExpenseAllocation: this.selectedMethod() }).subscribe({
+    this.companyService.updateSettings({
+      globalExpenseAllocation: this.selectedMethod(),
+      autoManageSessions: this.autoManageSessions(),
+    }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('SETTINGS.SAVED'));
         this.saving.set(false);

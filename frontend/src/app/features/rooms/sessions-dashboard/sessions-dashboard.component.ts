@@ -225,10 +225,12 @@ export class SessionsDashboardComponent implements OnInit {
     const branchId = this.selectedBranchId();
     return this.upcomingEntries()
       .filter(e => {
-        // Skip entries that already have a session today — whether it's still
-        // running (it belongs in the Active tab) or already ended (it's done
-        // for the day). Upcoming should only list classes with no session yet.
-        if (e.sessionId) return false;
+        // Skip entries whose session today is formally started (it belongs in the
+        // Active tab) or already ended (done for the day). A prepared session
+        // (started=false, from pre-attendance) is NOT started — keep it here so
+        // taking attendance never moves a class into "active" on its own.
+        if (e.sessionId && (e.sessionStarted || e.sessionEnd)) return false;
+        const hasPreparedSession = !!e.sessionId && !e.sessionStarted && !e.sessionEnd;
         if (!e.startTime) return false;
         const [h, m] = e.startTime.split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return false;
@@ -236,8 +238,9 @@ export class SessionsDashboardComponent implements OnInit {
         const diff = entryMinutes - nowMinutes;
         // Show 30 min before start time
         if (diff > 30) return false;
-        // Stay 30 min after start time if no one started it
-        if (diff < -30) return false;
+        // Stay 30 min after start time if no one started it — but keep a prepared
+        // (pre-attendance) session visible so it never silently disappears.
+        if (diff < -30 && !hasPreparedSession) return false;
         return true;
       })
       .filter(e => !branchId || e.branchId === branchId)

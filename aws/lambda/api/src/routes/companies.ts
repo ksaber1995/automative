@@ -2,6 +2,23 @@ import { query, queryOne, update } from '../db/connection';
 import { extractTenantContext } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
+// Auto start/end sessions on schedule (opt-in per company). Added idempotently
+// at runtime so the setting works even before a SQL migration is applied.
+let autoManageColumnInitPromise: Promise<void> | null = null;
+export async function ensureAutoManageSessionsColumn(): Promise<void> {
+  if (!autoManageColumnInitPromise) {
+    autoManageColumnInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS auto_manage_sessions BOOLEAN NOT NULL DEFAULT FALSE`);
+      } catch (e) {
+        autoManageColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return autoManageColumnInitPromise;
+}
+
 function mapCompanyProfile(row: any) {
   return {
     id: row.id,
@@ -91,9 +108,10 @@ export const companiesRoutes = {
 
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
     try {
+      await ensureAutoManageSessionsColumn();
       const context = await extractTenantContext(headers.authorization);
       const company = await queryOne(
-        'SELECT id, name, global_expense_allocation FROM companies WHERE id = $1',
+        'SELECT id, name, global_expense_allocation, auto_manage_sessions FROM companies WHERE id = $1',
         [context.companyId]
       );
       if (!company) {
@@ -105,6 +123,7 @@ export const companiesRoutes = {
           id: company.id,
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
+          autoManageSessions: company.auto_manage_sessions === true,
         },
       };
     } catch (error) {
@@ -113,8 +132,9 @@ export const companiesRoutes = {
     }
   },
 
-  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string }; headers: { authorization: string } }) => {
+  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean }; headers: { authorization: string } }) => {
     try {
+      await ensureAutoManageSessionsColumn();
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -124,6 +144,9 @@ export const companiesRoutes = {
       const updateData: any = {};
       if (body.globalExpenseAllocation !== undefined) {
         updateData.global_expense_allocation = body.globalExpenseAllocation;
+      }
+      if (body.autoManageSessions !== undefined) {
+        updateData.auto_manage_sessions = body.autoManageSessions === true;
       }
 
       const company = await update('companies', context.companyId, updateData);
@@ -137,6 +160,7 @@ export const companiesRoutes = {
           id: company.id,
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
+          autoManageSessions: company.auto_manage_sessions === true,
         },
       };
     } catch (error) {

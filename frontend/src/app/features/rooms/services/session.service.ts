@@ -97,6 +97,16 @@ export class SessionService {
     return this.api.post<Session>('sessions/prepare', { classId, branchId });
   }
 
+  /**
+   * Opt-in auto start/end: ask the server to start sessions whose schedule says
+   * they're in progress now, and end ones whose scheduled end has passed. No-op
+   * unless the company enabled `autoManageSessions`. localDate/localTime are the
+   * client's local clock so the schedule comparison uses the academy's timezone.
+   */
+  autoSchedule(localDate: string, localTime: string): Observable<{ enabled: boolean; started: number; ended: number }> {
+    return this.api.post<{ enabled: boolean; started: number; ended: number }>('sessions/auto-schedule', { localDate, localTime });
+  }
+
   end(id: string, notes?: string, endDate?: string): Observable<Session> {
     return this.api.patch<Session>(`sessions/${id}/end`, { notes, endDate });
   }

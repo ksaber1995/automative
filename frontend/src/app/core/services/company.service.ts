@@ -8,6 +8,8 @@ export interface CompanySettings {
   id: string;
   name: string;
   globalExpenseAllocation: GlobalExpenseAllocation;
+  /** Opt-in: auto start/end sessions on their scheduled times (client-polled). */
+  autoManageSessions: boolean;
 }
 
 export interface CompanyProfileData {

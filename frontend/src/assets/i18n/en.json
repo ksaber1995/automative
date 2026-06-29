@@ -380,6 +380,7 @@
       "ACCESS_DENIED": "Access denied to this session",
       "START_FAILED": "Failed to start session",
       "END_FAILED": "Failed to end session",
+      "AUTO_SCHEDULE_FAILED": "Failed to auto-manage sessions",
       "LIST_FAILED": "Failed to load sessions",
       "CLASS_FINISHED": "Cannot start a session for a finished class",
       "CLASS_HAS_ACTIVE": "This class already has an active session",
@@ -3045,7 +3046,11 @@
     "OVERHEAD_BEST": "Best for executive roles (CEO, owner, accountant) whose work grows the whole company, not just one branch.",
     "OVERHEAD_WARNING": "Branch-level \"Net Profit\" will look artificially high because it doesn't reflect the true cost of the management layer.",
     "SAVE": "Save Settings",
-    "SAVED": "Settings saved successfully"
+    "SAVED": "Settings saved successfully",
+    "AUTO_SESSIONS_TITLE": "Session Automation",
+    "AUTO_SESSIONS_DESC": "Automatically start and end class sessions based on each class's weekly schedule.",
+    "AUTO_SESSIONS_LABEL": "Auto start & end sessions on time",
+    "AUTO_SESSIONS_HINT": "When enabled, a session starts automatically when its class is scheduled to begin, and ends when its scheduled time is over. The schedule is checked every few minutes. When off, sessions only start when you click Start."
   },
   "REPORTS": {
     "TITLE": "Reports & Analytics",
