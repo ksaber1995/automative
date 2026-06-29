@@ -63,9 +63,9 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   // QR scanning
   scannerOpen = signal(false);
   scannerStarting = signal(false);
-  manualToken = signal('');
-  // Record by short student code (resolves the code → student, then grades them).
-  manualCode = signal('');
+  // Unified manual entry: a short value (< 6 chars) is treated as a student code,
+  // anything longer as a QR token. Routes to record-by-code / record-by-qr.
+  manualEntry = signal('');
   resolvingCode = signal(false);
   /** Grade applied to the next scanned/entered student. */
   currentGrade = signal('');
@@ -89,7 +89,9 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     const q = this.search().trim().toLowerCase();
     const list = this.roster();
     if (!q) return list;
-    return list.filter((s) => `${s.firstName} ${s.lastName}`.toLowerCase().includes(q));
+    return list.filter((s) =>
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
+      (s.code != null && String(s.code).toLowerCase().includes(q)));
   });
 
   gradedCount = computed(() => this.roster().filter((s) => s.grade != null && s.grade !== '').length);
@@ -321,32 +323,25 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.record(token);
   }
 
-  submitManualToken() {
-    const token = this.extractToken(this.manualToken());
-    this.manualToken.set('');
-    if (!token) return;
-    this.record(token);
-  }
-
   /**
-   * Record the current grade for a student by their short code: resolve the code
-   * to the student's QR token, then reuse the normal record flow. Requires a
-   * grade to be entered first (same as scanning).
+   * Submit the unified manual-entry field. The value is routed by length:
+   * a short value (< 6 chars) is a student code, anything longer a QR token.
    */
-  submitManualCode() {
-    const code = this.manualCode().trim();
-    this.manualCode.set('');
-    this.recordCode(code);
+  submitManualEntry() {
+    const value = this.manualEntry().trim();
+    this.manualEntry.set('');
+    this.recordScanned(value);
   }
 
   /**
-   * Route a scan captured by the global (USB) scanner to the right recorder:
-   * a short all-digits value is a student code; anything else is a QR token.
+   * Route a value (manual entry or a scan from the global USB scanner) to the
+   * right recorder: a short value (< 6 chars) is a student code; anything
+   * longer is treated as a QR token.
    */
   private recordScanned(value: string) {
     const v = (value || '').trim();
     if (!v) return;
-    if (/^\d{1,7}$/.test(v)) this.recordCode(v);
+    if (v.length < 6) this.recordCode(v);
     else this.record(this.extractToken(v));
   }
 

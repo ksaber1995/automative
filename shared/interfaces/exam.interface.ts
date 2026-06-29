@@ -35,6 +35,8 @@ export interface ExamResultRow {
   studentId: string;
   firstName: string;
   lastName: string;
+  /** Short student code (for search / manual entry). */
+  code?: number | string | null;
   parentName?: string | null;
   parentPhone?: string | null;
   studentPhone?: string | null;

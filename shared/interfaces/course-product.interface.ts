@@ -49,6 +49,8 @@ export interface EducationalBooksCourseSummary {
 export interface BookBuyer {
   studentId: string;
   studentName: string | null;
+  /** Short sequential student code (for search / scan-to-sell). */
+  studentCode?: number | string | null;
   saleId: string;
   quantity: number;
   totalAmount: number;
@@ -58,6 +60,8 @@ export interface BookBuyer {
 export interface BookNonBuyer {
   studentId: string;
   studentName: string | null;
+  /** Short sequential student code (for search / scan-to-sell). */
+  studentCode?: number | string | null;
   enrollmentId: string | null;
 }
 

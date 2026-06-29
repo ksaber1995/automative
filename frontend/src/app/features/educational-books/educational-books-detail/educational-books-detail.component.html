@@ -1,7 +1,7 @@
 <div class="container mx-auto p-4">
   <p-card>
     <ng-template pTemplate="header">
-      <div class="flex justify-between items-center p-4">
+      <div class="flex justify-between items-center gap-3 p-4 flex-wrap">
         <div class="flex items-center gap-3">
           <p-button
             icon="pi pi-arrow-left"
@@ -19,6 +19,35 @@
             </div>
           </div>
         </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="p-input-icon-left">
+            <input
+              type="text"
+              pInputText
+              [ngModel]="search()"
+              (ngModelChange)="search.set($event)"
+              [placeholder]="'EDUCATIONAL_BOOKS.SEARCH' | translate"
+              style="width: 220px;" />
+          </span>
+          <p-button
+            [label]="'EDUCATIONAL_BOOKS.SCAN_BUTTON' | translate"
+            icon="pi pi-qrcode"
+            severity="info"
+            [outlined]="true"
+            (onClick)="openScanner()">
+          </p-button>
+          <!-- QR-less scan-to-sell: type the student's short code, press Enter. -->
+          <input
+            pInputText
+            type="text"
+            inputmode="numeric"
+            style="width: 140px;"
+            [ngModel]="manualCode()"
+            (ngModelChange)="manualCode.set($event)"
+            (keyup.enter)="submitManualCode()"
+            [disabled]="resolvingCode()"
+            [placeholder]="'EDUCATIONAL_BOOKS.CODE_PLACEHOLDER' | translate" />
+        </div>
       </div>
     </ng-template>
 
@@ -32,9 +61,14 @@
           <i class="pi pi-book text-4xl mb-3 block"></i>
           {{ 'EDUCATIONAL_BOOKS.NO_COURSES' | translate }}
         </div>
+      } @else if (filteredProducts().length === 0) {
+        <div class="text-center py-12 text-gray-500">
+          <i class="pi pi-search text-4xl mb-3 block"></i>
+          {{ 'EDUCATIONAL_BOOKS.NO_SEARCH_RESULTS' | translate }}
+        </div>
       }
 
-      @for (product of courseDetail()!.products; track product.courseProductId) {
+      @for (product of filteredProducts(); track product.courseProductId) {
         <div class="border rounded-lg p-4 mb-6">
           <!-- Product header -->
           <div class="flex justify-between items-start gap-3 flex-wrap mb-4">
@@ -88,7 +122,12 @@
                   </ng-template>
                   <ng-template pTemplate="body" let-buyer>
                     <tr>
-                      <td>{{ buyer.studentName || '—' }}</td>
+                      <td>
+                        {{ buyer.studentName || '—' }}
+                        @if (buyer.studentCode != null) {
+                          <span class="text-xs text-gray-400 font-mono ml-1">#{{ buyer.studentCode }}</span>
+                        }
+                      </td>
                       <td>{{ buyer.quantity }}</td>
                       <td class="text-green-600 font-medium">{{ buyer.totalAmount | amount }}</td>
                       <td>{{ buyer.saleDate | date: 'shortDate' }}</td>
@@ -115,7 +154,12 @@
                   </ng-template>
                   <ng-template pTemplate="body" let-student>
                     <tr>
-                      <td>{{ student.studentName || '—' }}</td>
+                      <td>
+                        {{ student.studentName || '—' }}
+                        @if (student.studentCode != null) {
+                          <span class="text-xs text-gray-400 font-mono ml-1">#{{ student.studentCode }}</span>
+                        }
+                      </td>
                       <td class="text-right">
                         <p-button
                           [label]="'EDUCATIONAL_BOOKS.SELL' | translate"
@@ -152,6 +196,9 @@
         <p class="text-sm text-blue-900 font-semibold">{{ sellingProduct()!.productName }}</p>
         <p class="text-xs text-blue-700 mt-1">
           {{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}: {{ sellingStudent()!.studentName || '—' }}
+          @if (sellingStudent()!.studentCode != null) {
+            <span class="font-mono">(#{{ sellingStudent()!.studentCode }})</span>
+          }
         </p>
       </div>
 
@@ -278,5 +325,97 @@
         (onClick)="confirmSell()">
       </p-button>
     </div>
+  </ng-template>
+</p-dialog>
+
+<!-- Scan-to-sell: barcode / QR scanner dialog -->
+<p-dialog
+  [visible]="scannerOpen()"
+  (visibleChange)="$event ? null : closeScanner()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '420px' }"
+  [header]="'EDUCATIONAL_BOOKS.SCAN_TITLE' | translate">
+  <div class="flex flex-col gap-3 pt-2">
+    <p class="text-sm text-gray-500">{{ 'EDUCATIONAL_BOOKS.SCAN_HINT' | translate }}</p>
+
+    @if (cameraStarted()) {
+      <div id="books-qr-region" class="mx-auto rounded-lg overflow-hidden w-full" style="max-width: 320px;"></div>
+      @if (scannerStarting()) {
+        <p class="text-center text-sm text-gray-400">
+          <i class="pi pi-spin pi-spinner"></i> {{ 'EDUCATIONAL_BOOKS.SCAN_STARTING_CAMERA' | translate }}
+        </p>
+      }
+    } @else {
+      <div class="text-center py-4">
+        <i class="pi pi-qrcode text-3xl text-gray-300"></i>
+        <p class="text-sm text-gray-600 mt-2">{{ 'EDUCATIONAL_BOOKS.USB_READY' | translate }}</p>
+        <p-button class="inline-block mt-3" icon="pi pi-camera" [label]="'EDUCATIONAL_BOOKS.USE_CAMERA' | translate"
+          severity="secondary" [outlined]="true" size="small" (onClick)="useCamera()"></p-button>
+      </div>
+    }
+    @if (resolvingToken()) {
+      <p class="text-center text-sm text-gray-400">
+        <i class="pi pi-spin pi-spinner"></i> {{ 'EDUCATIONAL_BOOKS.SCAN_LOOKING_UP' | translate }}
+      </p>
+    }
+
+    <!-- USB scanner / manual entry: a keyboard-wedge scanner "types" the code then presses Enter. -->
+    <input
+      pInputText
+      [ngModel]="manualToken()"
+      (ngModelChange)="manualToken.set($event)"
+      (keyup.enter)="submitManualToken()"
+      [placeholder]="'EDUCATIONAL_BOOKS.SCAN_MANUAL_PLACEHOLDER' | translate"
+      class="w-full" />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'EDUCATIONAL_BOOKS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeScanner()">
+    </p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Product picker (after a scan, when the student has >1 unbought product) -->
+<p-dialog
+  [visible]="showProductPicker()"
+  (visibleChange)="$event ? null : closeProductPicker()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '460px' }"
+  [header]="'EDUCATIONAL_BOOKS.SCAN_PICK_PRODUCT' | translate">
+  <div class="flex flex-col gap-3 pt-2">
+    <div class="text-sm text-gray-700">
+      <i class="pi pi-user mr-1"></i><strong>{{ scanStudentName() }}</strong>
+      <span class="text-gray-500"> &mdash; {{ 'EDUCATIONAL_BOOKS.SCAN_PICK_PRODUCT_HINT' | translate }}</span>
+    </div>
+
+    <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
+      @for (opt of scanProductOptions(); track opt.product.courseProductId) {
+        <button
+          type="button"
+          class="w-full text-start border border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-blue-300 transition-colors flex items-center justify-between gap-3"
+          (click)="selectScanProduct(opt)">
+          <div class="min-w-0">
+            <div class="font-medium text-gray-800">{{ opt.product.productName }}</div>
+            @if (opt.product.isRequired) {
+              <div class="text-xs text-red-500">{{ 'EDUCATIONAL_BOOKS.REQUIRED' | translate }}</div>
+            }
+          </div>
+          <span class="font-semibold shrink-0">{{ opt.product.sellingPrice | amount }}</span>
+        </button>
+      }
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'EDUCATIONAL_BOOKS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeProductPicker()">
+    </p-button>
   </ng-template>
 </p-dialog>

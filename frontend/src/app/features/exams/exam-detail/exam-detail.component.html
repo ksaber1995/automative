@@ -85,46 +85,21 @@
         </div>
         <p class="text-xs text-gray-500">{{ 'EXAMS.DETAIL.SCAN_HINT' | translate }}</p>
 
-        <!-- Manual token entry (USB scanner / fallback) -->
+        <!-- Unified manual entry: student code (short) or QR token (USB scanner / paste). -->
         <div class="flex flex-wrap items-end gap-3">
           <div class="flex-1 min-w-[180px]">
             <label class="block text-sm font-medium text-gray-700 mb-1">
-              {{ 'EXAMS.DETAIL.MANUAL_TOKEN' | translate }}
+              {{ 'EXAMS.DETAIL.MANUAL_ENTRY' | translate }}
             </label>
             <input
               type="text"
               pInputText
               class="w-full"
-              [ngModel]="manualToken()"
-              (ngModelChange)="manualToken.set($event)"
-              (keyup.enter)="submitManualToken()"
-              [placeholder]="'EXAMS.DETAIL.MANUAL_TOKEN_PLACEHOLDER' | translate"
-            />
-          </div>
-          <p-button
-            [label]="'EXAMS.DETAIL.RECORD' | translate"
-            icon="pi pi-check"
-            severity="secondary"
-            (onClick)="submitManualToken()"
-          ></p-button>
-        </div>
-
-        <!-- Record by student code (enter the grade above first). -->
-        <div class="flex flex-wrap items-end gap-3">
-          <div class="flex-1 min-w-[180px]">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              {{ 'EXAMS.DETAIL.BY_CODE' | translate }}
-            </label>
-            <input
-              type="text"
-              pInputText
-              class="w-full"
-              inputmode="numeric"
-              [ngModel]="manualCode()"
-              (ngModelChange)="manualCode.set($event)"
-              (keyup.enter)="submitManualCode()"
+              [ngModel]="manualEntry()"
+              (ngModelChange)="manualEntry.set($event)"
+              (keyup.enter)="submitManualEntry()"
               [disabled]="resolvingCode()"
-              [placeholder]="'EXAMS.DETAIL.BY_CODE_PLACEHOLDER' | translate"
+              [placeholder]="'EXAMS.DETAIL.MANUAL_ENTRY_PLACEHOLDER' | translate"
             />
           </div>
           <p-button
@@ -132,7 +107,7 @@
             icon="pi pi-check"
             severity="secondary"
             [loading]="resolvingCode()"
-            (onClick)="submitManualCode()"
+            (onClick)="submitManualEntry()"
           ></p-button>
         </div>
 
@@ -192,7 +167,10 @@
       </div>
     </div>
 
-    <p-table [value]="filteredRoster()" dataKey="studentId" [loading]="loading()" responsiveLayout="scroll">
+    <p-table [value]="filteredRoster()" dataKey="studentId" [loading]="loading()" responsiveLayout="scroll"
+      [paginator]="true" [rows]="20" [rowsPerPageOptions]="[20, 50, 100]"
+      [currentPageReportTemplate]="'EXAMS.DETAIL.PAGE_REPORT' | translate"
+      [showCurrentPageReport]="true">
       <ng-template pTemplate="header">
         <tr>
           <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>

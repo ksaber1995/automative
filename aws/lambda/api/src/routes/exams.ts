@@ -307,7 +307,7 @@ export const examsRoutes = {
       }
 
       const rows = await query<any>(
-        `SELECT s.id AS student_id, s.first_name, s.last_name,
+        `SELECT s.id AS student_id, s.first_name, s.last_name, s.student_code,
                 s.parent_name, s.parent_phone, s.phone,
                 r.grade, r.is_absent, r.recorded_at
          FROM students s
@@ -330,6 +330,7 @@ export const examsRoutes = {
           studentId: row.student_id,
           firstName: row.first_name,
           lastName: row.last_name,
+          code: row.student_code ?? null,
           parentName: row.parent_name ?? null,
           parentPhone: row.parent_phone ?? null,
           studentPhone: row.phone ?? null,

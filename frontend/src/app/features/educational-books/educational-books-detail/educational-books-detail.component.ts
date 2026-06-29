@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,16 +7,21 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Html5Qrcode } from 'html5-qrcode';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { NotificationService } from '../../../core/services/notification.service';
 import { EducationalBooksService } from '../services/educational-books.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
+import { StudentService } from '../../students/services/student.service';
 import {
   EducationalBooksCourseDetail,
   EducationalBooksProductDetail,
@@ -25,17 +30,23 @@ import {
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 
+/** A product the scanned student hasn't bought yet (one option in the picker). */
+interface ScanSellOption {
+  product: EducationalBooksProductDetail;
+  student: BookNonBuyer;
+}
+
 @Component({
   selector: 'app-educational-books-detail',
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DialogModule,
-    InputNumberModule, DatePickerModule, SelectModule, TableModule, TooltipModule,
+    InputNumberModule, InputTextModule, DatePickerModule, SelectModule, TableModule, TooltipModule,
     TranslateModule, AmountPipe,
   ],
   templateUrl: './educational-books-detail.component.html',
 })
-export class EducationalBooksDetailComponent implements OnInit {
+export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
   private educationalBooksService = inject(EducationalBooksService);
   private productSaleService = inject(ProductSaleService);
   private lookupService = inject(LookupService);
@@ -43,6 +54,9 @@ export class EducationalBooksDetailComponent implements OnInit {
   private translate = inject(TranslateService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private globalScan = inject(GlobalScanService);
+  private scanPref = inject(ScanPreferenceService);
+  private studentService = inject(StudentService);
 
   DiscountType = DiscountType;
 
@@ -51,9 +65,32 @@ export class EducationalBooksDetailComponent implements OnInit {
   branches = signal<LookupOption[]>([]);
   loading = signal(false);
 
+  // Live search over the roster by student name or short code.
+  search = signal('');
+
   branchOptions = computed(() =>
     this.branches().map((b) => ({ label: b.label, value: b.id })),
   );
+
+  /**
+   * Products with their buyer/non-buyer lists filtered by the search term
+   * (name or code). When a query is active, products with no matching student
+   * are dropped so the page only shows relevant rows.
+   */
+  filteredProducts = computed(() => {
+    const detail = this.courseDetail();
+    if (!detail) return [];
+    const q = this.search().trim().toLowerCase();
+    if (!q) return detail.products;
+    const match = (s: { studentName: string | null; studentCode?: number | string | null }) => {
+      const name = (s.studentName || '').toLowerCase();
+      const code = s.studentCode != null ? String(s.studentCode).toLowerCase() : '';
+      return name.includes(q) || code.includes(q);
+    };
+    return detail.products
+      .map((p) => ({ ...p, buyers: p.buyers.filter(match), nonBuyers: p.nonBuyers.filter(match) }))
+      .filter((p) => p.buyers.length > 0 || p.nonBuyers.length > 0);
+  });
 
   paymentMethodOptions = [
     { label: 'EDUCATIONAL_BOOKS.METHOD_CASH', value: PaymentMethod.CASH },
@@ -82,6 +119,28 @@ export class EducationalBooksDetailComponent implements OnInit {
   sellPaymentMethod = signal<PaymentMethod | null>(PaymentMethod.CASH);
   sellBranchId = signal<string | null>(null);
 
+  // ── Pay by QR / scan-to-sell (mirrors the monthly-subscriptions flow) ─────────
+  scannerOpen = signal(false);
+  scannerStarting = signal(false);
+  cameraStarted = signal(false);
+  resolvingToken = signal(false);
+  manualToken = signal('');
+  // QR-less fallback: staff types the student's short sequential code + Enter.
+  manualCode = signal('');
+  resolvingCode = signal(false);
+  // Product picker shown after a scan when the student has >1 unbought product.
+  showProductPicker = signal(false);
+  scanStudentName = signal('');
+  scanProductOptions = signal<ScanSellOption[]>([]);
+  private readonly SCANNER_ELEMENT_ID = 'books-qr-region';
+  private html5Qr?: Html5Qrcode;
+  private lastToken = '';
+  private lastTokenAt = 0;
+  private readonly SCAN_DEDUP_MS = 2500;
+  private readonly scanHandler = (token: string) => this.resolveToken(token);
+
+  usbDetected = () => this.scanPref.usbDetected();
+
   unitPrice = computed(() => this.sellingProduct()?.sellingPrice || 0);
 
   subtotal = computed(() => this.unitPrice() * (this.sellQuantity() || 0));
@@ -102,10 +161,18 @@ export class EducationalBooksDetailComponent implements OnInit {
 
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('courseId') || '';
+    // Take over the app-wide scanner while this page is open so a scan runs the
+    // sell flow here instead of navigating to the student's detail page.
+    this.globalScan.register(this.scanHandler);
     this.loadDetail();
     this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
     });
+  }
+
+  ngOnDestroy() {
+    this.globalScan.unregister(this.scanHandler);
+    this.stopCamera();
   }
 
   loadDetail() {
@@ -138,6 +205,180 @@ export class EducationalBooksDetailComponent implements OnInit {
     // Pre-fill branch from the course when it has one; otherwise force a choice.
     this.sellBranchId.set(this.courseDetail()?.branchId ?? null);
     this.showSellDialog = true;
+  }
+
+  // ── Scan-to-sell flow ─────────────────────────────────────────────────────────
+
+  openScanner(): void {
+    this.scannerOpen.set(true);
+    this.manualToken.set('');
+    this.lastToken = '';
+    // USB scanner is first priority: skip the camera when one is known on this
+    // device. Camera is the explicit fallback.
+    if (this.usbDetected()) return;
+    this.cameraStarted.set(true);
+    setTimeout(() => this.startCamera(), 0);
+  }
+
+  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  useCamera(): void {
+    this.cameraStarted.set(true);
+    setTimeout(() => this.startCamera(), 50);
+  }
+
+  closeScanner(): void {
+    this.stopCamera();
+    this.scannerOpen.set(false);
+  }
+
+  private async startCamera(): Promise<void> {
+    if (this.html5Qr) return;
+    this.scannerStarting.set(true);
+    try {
+      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
+      await this.html5Qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => this.handleScan(decodedText),
+        () => {},
+      );
+    } catch {
+      this.notificationService.error(this.translate.instant('EDUCATIONAL_BOOKS.SCAN_CAMERA_FAILED'));
+      this.html5Qr = undefined;
+    } finally {
+      this.scannerStarting.set(false);
+    }
+  }
+
+  private stopCamera(): void {
+    this.cameraStarted.set(false);
+    const qr = this.html5Qr;
+    this.html5Qr = undefined;
+    if (!qr) return;
+    qr.stop().then(() => qr.clear()).catch(() => {});
+  }
+
+  /** Extract the token from a scanned value: either a profile URL or the raw token. */
+  private extractToken(text: string): string {
+    const raw = (text || '').trim();
+    const marker = '/p/s/';
+    const idx = raw.indexOf(marker);
+    if (idx >= 0) return raw.slice(idx + marker.length).split(/[/?#]/)[0];
+    return raw;
+  }
+
+  /** Camera decode callback. */
+  private handleScan(decodedText: string): void {
+    const token = this.extractToken(decodedText);
+    if (!token) return;
+    const now = Date.now();
+    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = token;
+    this.lastTokenAt = now;
+    this.resolveToken(token);
+  }
+
+  /** USB scanner / manual token entry submit (Enter key). */
+  submitManualToken(): void {
+    const token = this.extractToken(this.manualToken());
+    this.manualToken.set('');
+    if (!token) return;
+    this.resolveToken(token);
+  }
+
+  /**
+   * QR-less scan-to-sell by short student code (Enter key). Resolves the code to
+   * the student, then runs the same find-unbought-products flow.
+   */
+  submitManualCode(): void {
+    const code = this.manualCode().trim();
+    this.manualCode.set('');
+    if (!code || this.resolvingCode()) return;
+    this.resolvingCode.set(true);
+    this.studentService.lookupByCode(code).subscribe({
+      next: ({ id }) => {
+        this.resolvingCode.set(false);
+        this.resolveStudentId(id);
+      },
+      error: () => {
+        // Interceptor toasts the translated "no student with this code" message.
+        this.resolvingCode.set(false);
+      },
+    });
+  }
+
+  /** Resolve a scanned QR token to a student, then run the sell flow. */
+  private resolveToken(token: string): void {
+    if (this.resolvingToken()) return;
+    this.resolvingToken.set(true);
+    this.studentService.lookupByQr(token).subscribe({
+      next: ({ id }) => {
+        this.resolvingToken.set(false);
+        this.resolveStudentId(id);
+      },
+      error: () => {
+        this.resolvingToken.set(false);
+        // Interceptor toasts the translated/fallback server error (unknown token).
+      },
+    });
+  }
+
+  /**
+   * Given a resolved student id, find which of this course's products they
+   * haven't bought yet. None enrolled → info; all bought → info; exactly one →
+   * open the sell dialog; more than one → show the product picker.
+   */
+  private resolveStudentId(studentId: string): void {
+    const detail = this.courseDetail();
+    if (!detail) return;
+    const options: ScanSellOption[] = [];
+    let studentName = '';
+    let inRoster = false;
+    for (const product of detail.products) {
+      const nb = product.nonBuyers.find((s) => s.studentId === studentId);
+      if (nb) {
+        options.push({ product, student: nb });
+        if (nb.studentName) studentName = nb.studentName;
+        inRoster = true;
+        continue;
+      }
+      const buyer = product.buyers.find((b) => b.studentId === studentId);
+      if (buyer) {
+        if (buyer.studentName) studentName = buyer.studentName;
+        inRoster = true;
+      }
+    }
+
+    if (!inRoster) {
+      this.notificationService.info(this.translate.instant('EDUCATIONAL_BOOKS.SCAN_NOT_ENROLLED'));
+      return;
+    }
+    if (options.length === 0) {
+      this.notificationService.info(
+        this.translate.instant('EDUCATIONAL_BOOKS.SCAN_ALL_BOUGHT', { name: studentName || '' }),
+      );
+      return;
+    }
+
+    this.closeScanner();
+    if (options.length === 1) {
+      this.openSellDialog(options[0].product, options[0].student);
+      return;
+    }
+    this.scanStudentName.set(studentName);
+    this.scanProductOptions.set(options);
+    this.showProductPicker.set(true);
+  }
+
+  closeProductPicker(): void {
+    this.showProductPicker.set(false);
+    this.scanProductOptions.set([]);
+  }
+
+  /** A product was picked after a scan — open the sell dialog for it. */
+  selectScanProduct(option: ScanSellOption): void {
+    this.closeProductPicker();
+    this.openSellDialog(option.product, option.student);
   }
 
   canSubmit(): boolean {

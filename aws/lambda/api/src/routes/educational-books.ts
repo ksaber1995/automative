@@ -102,7 +102,7 @@ export const educationalBooksRoutes = {
       // Enrolled roster (one row per student, keep an enrollment id for the buy action).
       const roster = await query(
         `SELECT DISTINCT ON (e.student_id)
-                e.student_id, e.id AS enrollment_id,
+                e.student_id, e.id AS enrollment_id, s.student_code,
                 NULLIF(TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')), '') AS student_name
          FROM enrollments e
          JOIN students s ON e.student_id = s.id
@@ -134,6 +134,7 @@ export const educationalBooksRoutes = {
             buyers.push({
               studentId: r.student_id,
               studentName: r.student_name,
+              studentCode: r.student_code ?? null,
               saleId: sale.id,
               quantity: parseInt(sale.quantity),
               totalAmount: parseFloat(sale.total_amount),
@@ -143,6 +144,7 @@ export const educationalBooksRoutes = {
             nonBuyers.push({
               studentId: r.student_id,
               studentName: r.student_name,
+              studentCode: r.student_code ?? null,
               enrollmentId: r.enrollment_id,
             });
           }
