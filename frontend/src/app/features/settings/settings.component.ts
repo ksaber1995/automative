@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CompanyService, GlobalExpenseAllocation } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { AuthService } from '../../core/services/auth.service';
 
 interface AllocationOption {
   value: GlobalExpenseAllocation;
@@ -32,6 +33,10 @@ export class SettingsComponent implements OnInit {
   private companyService = inject(CompanyService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private authService = inject(AuthService);
+
+  /** Individual-teacher companies have no branches, so the expense-allocation card is hidden. */
+  isTeacher = (): boolean => this.authService.isTeacher();
 
   loading = signal(true);
   saving = signal(false);

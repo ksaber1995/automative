@@ -252,7 +252,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     // Admin — only Global Admins see this section at all.
     const admin: NavLeaf[] = auth.isGlobalAdmin() ? [
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
-      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: !auth.isTeacher() },
+      { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
     ].filter(c => c.visible) : [];
     if (admin.length) {
       entries.push({ kind: 'group', group: {
