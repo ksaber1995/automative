@@ -48,6 +48,18 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
         }
       </div>
 
+      <div class="filters">
+        <button class="filter" [class.on]="statusFilter() === ''" (click)="statusFilter.set('')">
+          All <span class="fcount">{{ rows().length }}</span>
+        </button>
+        <button class="filter" [class.on]="statusFilter() === 'ACTIVE'" (click)="statusFilter.set('ACTIVE')">
+          Active <span class="fcount">{{ statusCount('ACTIVE') }}</span>
+        </button>
+        <button class="filter" [class.on]="statusFilter() === 'TRIAL'" (click)="statusFilter.set('TRIAL')">
+          Trial <span class="fcount">{{ statusCount('TRIAL') }}</span>
+        </button>
+      </div>
+
       <div class="toolbar">
         <input
           class="search"
@@ -283,7 +295,20 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
       padding: 8px 16px; font-size: 14px; cursor: pointer;
     }
     .refresh:disabled { opacity: .6; cursor: default; }
-    .toolbar { display: flex; align-items: center; gap: 12px; margin: 20px 0 12px; }
+    .filters { display: flex; align-items: center; gap: 8px; margin: 20px 0 0; flex-wrap: wrap; }
+    .filter {
+      border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 999px;
+      padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .filter:hover { background: #f1f5f9; }
+    .filter.on { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+    .fcount {
+      background: rgba(15, 23, 42, .08); border-radius: 999px; padding: 0 7px; font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .filter.on .fcount { background: rgba(255, 255, 255, .25); }
+    .toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
     .search {
       flex: 1; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 14px;
     }
@@ -366,6 +391,8 @@ export class AppComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   search = signal('');
+  /** '' = all, otherwise a subscription_type to match (e.g. ACTIVE, TRIAL). */
+  statusFilter = signal('');
 
   // Row-action state
   busyId = signal<string | null>(null);
@@ -387,7 +414,11 @@ export class AppComponent implements OnInit {
 
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
-    const list = this.rows();
+    const status = this.statusFilter();
+    let list = this.rows();
+    if (status) {
+      list = list.filter((r) => (r.subscription_type || '').toUpperCase() === status);
+    }
     if (!q) return list;
     return list.filter(
       (r) =>
@@ -397,6 +428,11 @@ export class AppComponent implements OnInit {
         (r.subscription_type || '').toLowerCase().includes(q),
     );
   });
+
+  /** How many tenants currently carry the given subscription_type. */
+  statusCount(status: string): number {
+    return this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === status).length;
+  }
 
   ngOnInit() {
     this.load();

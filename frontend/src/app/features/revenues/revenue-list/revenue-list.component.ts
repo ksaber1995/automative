@@ -39,9 +39,40 @@ export class RevenueListComponent implements OnInit {
   startDate: string = '';
   endDate: string = '';
   totalRevenue: number = 0;
+  activePreset = signal<string>('month');
 
   ngOnInit() {
     this.loadBranches();
+    // Default to the current month (matches the dashboard's default range).
+    this.setPreset('month');
+  }
+
+  private toIso(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  /** Apply a named date range (This Month / This Year / Last 12 Months) and reload. */
+  setPreset(preset: string) {
+    const now = new Date();
+    this.activePreset.set(preset);
+    let start: Date;
+    switch (preset) {
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      case '12months':
+        start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        break;
+      case 'month':
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+    }
+    this.startDate = this.toIso(start);
+    this.endDate = this.toIso(now);
     this.loadRevenues();
   }
 
@@ -73,6 +104,12 @@ export class RevenueListComponent implements OnInit {
   }
 
   onFilterChange() {
+    this.loadRevenues();
+  }
+
+  /** Manual date-input change: drop the preset highlight, then reload. */
+  onDateChange() {
+    this.activePreset.set('');
     this.loadRevenues();
   }
 
