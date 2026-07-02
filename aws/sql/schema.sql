@@ -1314,6 +1314,7 @@ CREATE TABLE session_packages (
     branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
     sessions_total     INTEGER NOT NULL,
     sessions_used      INTEGER NOT NULL DEFAULT 0,
+    amount_due         DECIMAL(10, 2) NOT NULL DEFAULT 0,
     amount_paid        DECIMAL(10, 2) NOT NULL DEFAULT 0,
     status             VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
                            CHECK (status IN ('ACTIVE', 'EXHAUSTED', 'REFUNDED')),

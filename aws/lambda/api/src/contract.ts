@@ -752,6 +752,7 @@ const SessionPackageSchema = z.object({
   branchId: UUIDSchema,
   sessionsTotal: z.number(),
   sessionsUsed: z.number(),
+  amountDue: z.number().optional(),
   amountPaid: z.number(),
   status: z.enum(['ACTIVE', 'EXHAUSTED', 'REFUNDED']),
   purchasedAt: z.string().nullable(),
@@ -782,6 +783,7 @@ const BuySessionPackageSchema = z.object({
   enrollmentId: UUIDSchema,
   sessionsTotal: z.number().int().positive().optional(),
   amount: z.number().nonnegative().optional(),
+  amountDue: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
@@ -870,6 +872,9 @@ const CreateEnrollmentSchema = z.object({
   // Per-session enrollment fields (ignored unless the course is PER_SESSION):
   sessionBillingMode: z.enum(['PER_SESSION', 'PACKAGE']).optional(),
   buyPackage: z.boolean().optional(),
+  // How the prepaid package is paid: FULL (now), PARTIAL (down payment now), LATER.
+  sessionPackagePayMode: z.enum(['FULL', 'PARTIAL', 'LATER']).optional(),
+  sessionPackageDownPayment: z.number().optional(),
   notes: z.string().optional(),
   // Educational Books: optional linked products bought together with the enrollment
   // (one atomic transaction). Each becomes an attributed product sale.
@@ -5400,6 +5405,18 @@ export const contract = c.router({
       body: BuySessionPackageSchema,
       responses: {
         201: SessionPackageSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    payPackage: {
+      method: 'POST' as const,
+      path: '/api/session-payments/packages/:id/pay',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RecordSessionPaymentSchema,
+      responses: {
+        200: SessionPackageSchema,
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,

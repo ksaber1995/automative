@@ -35,6 +35,7 @@ export async function ensurePerSessionSchema(): Promise<void> {
           branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
           sessions_total INTEGER NOT NULL,
           sessions_used INTEGER NOT NULL DEFAULT 0,
+          amount_due DECIMAL(10, 2) NOT NULL DEFAULT 0,
           amount_paid DECIMAL(10, 2) NOT NULL DEFAULT 0,
           status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXHAUSTED', 'REFUNDED')),
           purchased_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -42,6 +43,8 @@ export async function ensurePerSessionSchema(): Promise<void> {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )`);
+        // amount_due may be missing on packages created before this column existed.
+        await query(`ALTER TABLE session_packages ADD COLUMN IF NOT EXISTS amount_due DECIMAL(10, 2) NOT NULL DEFAULT 0`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_enrollment_id ON session_packages(enrollment_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_company_id ON session_packages(company_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_student_id ON session_packages(student_id)`);
@@ -151,6 +154,7 @@ function mapPackageFromDB(row: any) {
     branchId: row.branch_id,
     sessionsTotal: Number(row.sessions_total),
     sessionsUsed: Number(row.sessions_used),
+    amountDue: parseFloat(row.amount_due || 0),
     amountPaid: parseFloat(row.amount_paid || 0),
     status: row.status,
     purchasedAt: row.purchased_at || null,
@@ -431,8 +435,10 @@ export const sessionPaymentsRoutes = {
       const conditions: string[] = ['sp.company_id = $1'];
       const params: any[] = [context.companyId];
 
-      if (q.from) { params.push(q.from); conditions.push(`se.start_date >= $${params.length}`); }
-      if (q.to)   { params.push(q.to);   conditions.push(`se.start_date <= $${params.length}`); }
+      // Compare by calendar day so the `to` day is fully inclusive regardless of
+      // the session's time-of-day component.
+      if (q.from) { params.push(q.from); conditions.push(`se.start_date::date >= $${params.length}::date`); }
+      if (q.to)   { params.push(q.to);   conditions.push(`se.start_date::date <= $${params.length}::date`); }
 
       if (q.branchId) {
         if (!canAccessBranch(context, q.branchId)) {
@@ -477,8 +483,10 @@ export const sessionPaymentsRoutes = {
       const conditions: string[] = ['sp.company_id = $1'];
       const params: any[] = [context.companyId];
 
-      if (q.from) { params.push(q.from); conditions.push(`se.start_date >= $${params.length}`); }
-      if (q.to)   { params.push(q.to);   conditions.push(`se.start_date <= $${params.length}`); }
+      // Compare by calendar day so the `to` day is fully inclusive regardless of
+      // the session's time-of-day component.
+      if (q.from) { params.push(q.from); conditions.push(`se.start_date::date >= $${params.length}::date`); }
+      if (q.to)   { params.push(q.to);   conditions.push(`se.start_date::date <= $${params.length}::date`); }
 
       if (q.branchId) {
         if (!canAccessBranch(context, q.branchId)) {
@@ -493,9 +501,11 @@ export const sessionPaymentsRoutes = {
       if (q.courseId) { params.push(q.courseId); conditions.push(`sp.course_id = $${params.length}`); }
 
       const rows = await query(
-        `SELECT sp.payment_status, sp.amount_due, sp.amount_paid, sp.refunded_amount
+        `SELECT sp.payment_status, sp.amount_due, sp.amount_paid, sp.refunded_amount,
+                pkg.amount_paid AS pkg_amount, pkg.sessions_total AS pkg_total
          FROM session_payments sp
          JOIN sessions se ON sp.session_id = se.id
+         LEFT JOIN session_packages pkg ON sp.package_id = pkg.id
          WHERE ${conditions.join(' AND ')}`,
         params
       );
@@ -511,10 +521,19 @@ export const sessionPaymentsRoutes = {
         }
         if (status === 'WAIVED') continue;
         totalExpected += parseFloat(r.amount_due || 0);
-        totalRevenue += parseFloat(r.amount_paid || 0);
-        if (status === 'PAID') paidCount++;
-        else if (status === 'COVERED') coveredCount++;
-        else pendingCount++;
+        if (status === 'COVERED') {
+          // A covered session's money was collected up-front in its package. Recognise
+          // its share (package price / package size) so package revenue is reflected
+          // per consumed session, not left at 0.
+          coveredCount++;
+          const pkgTotal = parseInt(r.pkg_total || 0, 10);
+          const pkgAmount = parseFloat(r.pkg_amount || 0);
+          totalRevenue += pkgTotal > 0 ? pkgAmount / pkgTotal : 0;
+        } else {
+          totalRevenue += parseFloat(r.amount_paid || 0);
+          if (status === 'PAID') paidCount++;
+          else pendingCount++;
+        }
       }
 
       return {
@@ -714,16 +733,18 @@ export const sessionPaymentsRoutes = {
       if (!sessionsTotal || sessionsTotal <= 0) {
         return apiError(400, 'ERRORS.SESSION_PAYMENTS.NO_PACKAGE_CONFIGURED', 'No package size configured for this course');
       }
-      const amount = body.amount != null ? parseFloat(body.amount)
-        : (enrollment.session_package_price != null ? parseFloat(enrollment.session_package_price) : 0);
+      // amount_due = full package price; amount = collected now (defaults to full).
+      const price = enrollment.session_package_price != null ? parseFloat(enrollment.session_package_price) : 0;
+      const amountDue = body.amountDue != null ? parseFloat(body.amountDue) : price;
+      const amountPaid = body.amount != null ? parseFloat(body.amount) : amountDue;
 
       const inserted = await query(
         `INSERT INTO session_packages
            (enrollment_id, company_id, student_id, course_id, branch_id,
-            sessions_total, sessions_used, amount_paid, status, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,0,$7,'ACTIVE',$8) RETURNING *`,
+            sessions_total, sessions_used, amount_due, amount_paid, status, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,'ACTIVE',$9) RETURNING *`,
         [enrollment.id, context.companyId, enrollment.student_id, enrollment.course_id, enrollment.branch_id,
-         sessionsTotal, amount, body.notes || null]
+         sessionsTotal, amountDue, amountPaid, body.notes || null]
       );
       const pkg = inserted[0];
 
@@ -757,6 +778,39 @@ export const sessionPaymentsRoutes = {
     } catch (error) {
       console.error('Buy session package error:', error);
       return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.PACKAGE_FAILED', 'Failed to buy package', 400);
+    }
+  },
+
+  /** POST /api/session-payments/packages/:id/pay — collect (part of) a package's balance */
+  payPackage: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const pkg = await queryOne<any>(
+        'SELECT * FROM session_packages WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!pkg) return apiError(404, 'ERRORS.SESSION_PAYMENTS.PACKAGE_NOT_FOUND', 'Package not found');
+      if (!canAccessBranch(context, pkg.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      const amount = parseFloat(body.amount);
+      if (!isFinite(amount) || amount <= 0) {
+        return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_AMOUNT', 'Amount must be greater than zero');
+      }
+      const newPaid = parseFloat(pkg.amount_paid || 0) + amount;
+      await query(
+        `UPDATE session_packages SET amount_paid = $1, updated_at = NOW() WHERE id = $2`,
+        [newPaid, params.id]
+      );
+      const fresh = await queryOne('SELECT * FROM session_packages WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: mapPackageFromDB(fresh) };
+    } catch (error) {
+      console.error('Pay session package error:', error);
+      return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.PACKAGE_PAY_FAILED', 'Failed to record package payment', 400);
     }
   },
 

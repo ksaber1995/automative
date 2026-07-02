@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS session_packages (
     branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
     sessions_total     INTEGER NOT NULL,
     sessions_used      INTEGER NOT NULL DEFAULT 0,
-    amount_paid        DECIMAL(10, 2) NOT NULL DEFAULT 0,          -- block price paid upfront
+    amount_due         DECIMAL(10, 2) NOT NULL DEFAULT 0,          -- full package price
+    amount_paid        DECIMAL(10, 2) NOT NULL DEFAULT 0,          -- collected so far (may be partial)
     status             VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
                            CHECK (status IN ('ACTIVE', 'EXHAUSTED', 'REFUNDED')),
     purchased_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

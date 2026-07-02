@@ -211,6 +211,15 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
   const wantsPackage = body.buyPackage === true || body.sessionBillingMode === 'PACKAGE';
   const packageSize = course?.session_package_size != null ? Number(course.session_package_size) : null;
   const packagePrice = course?.session_package_price != null ? parseFloat(course.session_package_price) : null;
+  // Package payment mode: FULL (pay now), PARTIAL (down payment now), LATER (pay nothing now).
+  const packagePayMode: 'FULL' | 'PARTIAL' | 'LATER' = body.sessionPackagePayMode || 'FULL';
+  const packageDue = packagePrice || 0;
+  let packagePaid = packageDue; // FULL default
+  if (packagePayMode === 'LATER') packagePaid = 0;
+  else if (packagePayMode === 'PARTIAL') {
+    const dp = body.sessionPackageDownPayment != null ? parseFloat(body.sessionPackageDownPayment) : 0;
+    packagePaid = Math.max(0, Math.min(dp, packageDue));
+  }
   const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
 
   await ensurePerSessionSchema();
@@ -231,14 +240,17 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
     const enrollment = enrRes.rows[0];
 
     // Prepaid package (pay X sessions in advance), if chosen and offered.
+    // amount_due = full package price; amount_paid depends on the chosen pay mode
+    // (full now / part now / later). Any remainder is collectible from the
+    // Session Payments dashboard's Packages view.
     if (wantsPackage && packageSize && packageSize > 0) {
       await client.query(
         `INSERT INTO session_packages
            (enrollment_id, company_id, student_id, course_id, branch_id,
-            sessions_total, sessions_used, amount_paid, status, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,0,$7,'ACTIVE',$8)`,
+            sessions_total, sessions_used, amount_due, amount_paid, status, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,'ACTIVE',$9)`,
         [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId,
-         packageSize, packagePrice || 0, 'Package purchased at enrollment']
+         packageSize, packageDue, packagePaid, 'Package purchased at enrollment']
       );
     }
 

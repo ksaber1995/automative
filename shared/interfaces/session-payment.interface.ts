@@ -60,6 +60,7 @@ export interface SessionPackage {
   branchId: string;
   sessionsTotal: number;
   sessionsUsed: number;
+  amountDue?: number;
   amountPaid: number;
   status: 'ACTIVE' | 'EXHAUSTED' | 'REFUNDED';
   purchasedAt: string | null;

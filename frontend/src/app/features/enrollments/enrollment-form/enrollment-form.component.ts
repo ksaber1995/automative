@@ -120,6 +120,9 @@ export class EnrollmentFormComponent implements OnInit {
   monthlyOverrideMonth = signal<string>(''); // e.g. "June 2026"
   // Per-session enrollment: pay each session, or prepay a package in advance.
   sessionBillingModeSig = signal<'PER_SESSION' | 'PACKAGE'>('PER_SESSION');
+  // When prepaying a package: pay it fully now, part now (down payment), or later.
+  sessionPackagePayModeSig = signal<'FULL' | 'PARTIAL' | 'LATER'>('FULL');
+  sessionPackageDownPaymentSig = signal<number>(0);
 
   // True when the selected single course is billed as a monthly subscription.
   isMonthly = computed(() =>
@@ -229,6 +232,8 @@ export class EnrollmentFormComponent implements OnInit {
       downPayment: [0],
       monthlyPayOption: ['PAY_LATER'],
       sessionBillingMode: ['PER_SESSION'],
+      sessionPackagePayMode: ['FULL'],
+      sessionPackageDownPayment: [0],
       notes: ['']
     });
   }
@@ -697,6 +702,9 @@ export class EnrollmentFormComponent implements OnInit {
       // Per-session: pay each session (default) or prepay a package in advance.
       sessionBillingMode: perSession ? this.sessionBillingModeSig() : undefined,
       buyPackage: perSession ? this.sessionBillingModeSig() === 'PACKAGE' : undefined,
+      // Package payment: full now / part now / later.
+      sessionPackagePayMode: (perSession && this.sessionBillingModeSig() === 'PACKAGE') ? this.sessionPackagePayModeSig() : undefined,
+      sessionPackageDownPayment: (perSession && this.sessionBillingModeSig() === 'PACKAGE' && this.sessionPackagePayModeSig() === 'PARTIAL') ? this.sessionPackageDownPaymentSig() : undefined,
       notes: v.notes || undefined
     };
 

@@ -123,6 +123,8 @@ export interface EnrollmentCreateDto {
   // Per-session fields (ignored unless the course is PER_SESSION).
   sessionBillingMode?: 'PER_SESSION' | 'PACKAGE';
   buyPackage?: boolean;
+  sessionPackagePayMode?: 'FULL' | 'PARTIAL' | 'LATER';
+  sessionPackageDownPayment?: number;
   notes?: string;
   // Educational Books: linked products bought together with the enrollment.
   products?: Array<{

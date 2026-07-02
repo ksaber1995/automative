@@ -552,6 +552,8 @@
             <td>
               @if (isMonthly(enrollment)) {
                 <p-tag [value]="'STUDENTS.DETAIL.MONTHLY_TAG' | translate" severity="warn"></p-tag>
+              } @else if (isPerSession(enrollment)) {
+                <p-tag [value]="'STUDENTS.DETAIL.PER_SESSION_TAG' | translate" severity="success"></p-tag>
               } @else if (enrollment.paymentMode === 'INSTALLMENTS') {
                 <p-tag [value]="'STUDENTS.DETAIL.INSTALLMENTS' | translate" severity="info"></p-tag>
               } @else {
@@ -560,6 +562,8 @@
             </td>
             <td>
               @if (isMonthly(enrollment)) {
+                <span class="text-gray-300">—</span>
+              } @else if (isPerSession(enrollment)) {
                 <span class="text-gray-300">—</span>
               } @else if (enrollment.paymentMode === 'INSTALLMENTS') {
                 <!-- Installment breakdown -->
@@ -605,7 +609,7 @@
               <p-tag [value]="statusLabel(enrollment.status)" [severity]="getStatusSeverity(enrollment.status)"></p-tag>
             </td>
             <td>
-              @if (isMonthly(enrollment)) {
+              @if (isMonthly(enrollment) || isPerSession(enrollment)) {
                 <span class="text-gray-300">—</span>
               } @else {
               <div class="flex flex-col gap-1">
@@ -654,6 +658,19 @@
                       [pTooltip]="'STUDENTS.DETAIL.DELETE_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
+                  @if (enrollment.status !== 'DROPPED') {
+                    <p-button
+                      icon="pi pi-arrow-right-arrow-left"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="info"
+                      (onClick)="openChangeClassDialog(enrollment)"
+                      [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
+                    ></p-button>
+                  }
+                </div>
+              } @else if (isPerSession(enrollment)) {
+                <div class="flex gap-1">
                   @if (enrollment.status !== 'DROPPED') {
                     <p-button
                       icon="pi pi-arrow-right-arrow-left"
@@ -756,6 +773,77 @@
                                 [text]="true"
                                 severity="success"
                                 (onClick)="openMonthlyPayDialog(m)"
+                                [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
+                              ></p-button>
+                            }
+                          </td>
+                        </tr>
+                      </ng-template>
+                    </p-table>
+                  }
+                </div>
+              } @else if (isPerSession(enrollment)) {
+                <div class="p-4 bg-emerald-50/40">
+                  <!-- Prepaid packages (bundles) -->
+                  @if (getSessionPackages(enrollment.id).length > 0) {
+                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <i class="pi pi-box text-emerald-600"></i> {{ 'STUDENTS.DETAIL.SESSION_PACKAGES' | translate }}
+                    </h4>
+                    <div class="flex flex-col gap-2 mb-5">
+                      @for (pkg of getSessionPackages(enrollment.id); track pkg.id) {
+                        <div class="bg-white border border-emerald-100 rounded p-3">
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="font-semibold text-emerald-700">
+                              {{ pkg.amountPaid | amount }} · {{ 'STUDENTS.DETAIL.SESSION_PACKAGE_FOR' | translate: { count: pkg.sessionsTotal } }}
+                            </span>
+                            <p-tag [value]="pkg.status" [severity]="pkg.status === 'ACTIVE' ? 'success' : 'secondary'"></p-tag>
+                          </div>
+                          <div class="text-xs text-gray-500 mt-1">
+                            {{ 'STUDENTS.DETAIL.SESSION_PACKAGE_USAGE' | translate: { used: pkg.sessionsUsed, total: pkg.sessionsTotal, remaining: (pkg.sessionsTotal - pkg.sessionsUsed) } }}
+                          </div>
+                          <p-progressbar
+                            [value]="pkg.sessionsTotal > 0 ? (pkg.sessionsUsed / pkg.sessionsTotal) * 100 : 0"
+                            [showValue]="false"
+                            [style]="{ height: '6px', marginTop: '6px' }"
+                          ></p-progressbar>
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  <!-- Per-session charges -->
+                  <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <i class="pi pi-wallet text-emerald-600"></i> {{ 'STUDENTS.DETAIL.SESSION_CHARGES' | translate }}
+                  </h4>
+                  @if (getSessionPayments(enrollment.id).length === 0) {
+                    <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_SESSION_CHARGES' | translate }}</p>
+                  } @else {
+                    <p-table [value]="getSessionPayments(enrollment.id)" responsiveLayout="scroll" dataKey="id" styleClass="p-datatable-sm">
+                      <ng-template pTemplate="header">
+                        <tr>
+                          <th>{{ 'STUDENTS.DETAIL.SESSION_COL_SESSION' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.SESSION_COL_DATE' | translate }}</th>
+                          <th class="text-right">{{ 'STUDENTS.DETAIL.SESSION_COL_DUE' | translate }}</th>
+                          <th class="text-right">{{ 'STUDENTS.DETAIL.SESSION_COL_PAID' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.SESSION_COL_STATUS' | translate }}</th>
+                          <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
+                        </tr>
+                      </ng-template>
+                      <ng-template pTemplate="body" let-m>
+                        <tr>
+                          <td class="font-medium">{{ m.sessionNumber != null ? '#' + m.sessionNumber : '—' }}</td>
+                          <td class="text-sm text-gray-500">{{ m.sessionDate ? formatDate(m.sessionDate) : '—' }}</td>
+                          <td class="text-right">{{ m.amountDue | amount }}</td>
+                          <td class="text-right"><span class="font-semibold text-green-600">{{ (m.amountPaid || 0) | amount }}</span></td>
+                          <td><p-tag [value]="sessionStatusLabel(m.paymentStatus)" [severity]="getSessionStatusSeverity(m.paymentStatus)"></p-tag></td>
+                          <td>
+                            @if (m.paymentStatus === 'PENDING') {
+                              <p-button
+                                icon="pi pi-wallet"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="success"
+                                (onClick)="openSessionPay(m)"
                                 [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
                               ></p-button>
                             }
@@ -1373,3 +1461,7 @@
     ></p-button>
   </ng-template>
 </p-dialog>
+
+
+<!-- Per-session pay popup (shared) -->
+<app-session-pay-dialog (settled)="studentId && loadSessionPayments(studentId)"></app-session-pay-dialog>

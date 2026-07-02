@@ -57,6 +57,8 @@ export class SessionPaymentsDashboardComponent implements OnInit {
   selectedCourseId = signal<string | null>(null);
   selectedTab = signal<StatusTab>('ALL');
   view = signal<'CHARGES' | 'PACKAGES'>('CHARGES');
+  // Quick date-range preset: TODAY | WEEK | MONTH | CUSTOM. Defaults to MONTH.
+  rangePreset = signal<'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM'>('MONTH');
 
   branches = signal<LookupOption[]>([]);
   courses = signal<{ id: string; label: string }[]>([]);
@@ -73,6 +75,12 @@ export class SessionPaymentsDashboardComponent implements OnInit {
   refundAmount = signal<number | null>(null);
   refundNote = signal('');
   submitting = signal(false);
+
+  // Package pay dialog
+  showPackagePay = signal(false);
+  selectedPackage = signal<SessionPackageWithDetails | null>(null);
+  packagePayAmount = signal<number | null>(null);
+  packagePayDate = signal<Date>(new Date());
 
   filtered = computed(() => {
     const tab = this.selectedTab();
@@ -172,6 +180,37 @@ export class SessionPaymentsDashboardComponent implements OnInit {
     });
   }
 
+  // ── Package payment (collect remaining balance) ──────────────────────────────
+  packageRemaining(p: SessionPackageWithDetails): number {
+    return Math.max(0, (p.amountDue ?? 0) - (p.amountPaid || 0));
+  }
+
+  openPackagePay(p: SessionPackageWithDetails): void {
+    this.selectedPackage.set(p);
+    this.packagePayAmount.set(this.packageRemaining(p));
+    this.packagePayDate.set(new Date());
+    this.showPackagePay.set(true);
+  }
+
+  confirmPackagePay(): void {
+    const p = this.selectedPackage();
+    if (!p || this.packagePayAmount() == null) return;
+    this.submitting.set(true);
+    this.service.payPackage(p.id, {
+      amount: this.packagePayAmount() as number,
+      paymentDate: this.fmt(this.packagePayDate()),
+    }).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.showPackagePay.set(false);
+        this.notify.success(this.translate.instant('SESSION_PAYMENTS.PAY_SUCCESS'));
+        this.loadPackages();
+        this.loadData();
+      },
+      error: () => this.submitting.set(false),
+    });
+  }
+
   statusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
     switch (status) {
       case 'PAID': return 'success';
@@ -180,6 +219,35 @@ export class SessionPaymentsDashboardComponent implements OnInit {
       case 'REFUNDED': return 'danger';
       default: return 'secondary';
     }
+  }
+
+  /** Apply a quick date-range preset (Today / This Week / This Month). */
+  setRange(preset: 'TODAY' | 'WEEK' | 'MONTH'): void {
+    this.rangePreset.set(preset);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (preset === 'TODAY') {
+      this.fromDate.set(today);
+      this.toDate.set(today);
+    } else if (preset === 'WEEK') {
+      // Week starts Saturday (common in the region); go back to the last Saturday.
+      const day = today.getDay(); // 0=Sun..6=Sat
+      const daysSinceSat = (day + 1) % 7;
+      const start = new Date(today);
+      start.setDate(today.getDate() - daysSinceSat);
+      this.fromDate.set(start);
+      this.toDate.set(today);
+    } else {
+      this.fromDate.set(this.startOfMonth());
+      this.toDate.set(today);
+    }
+    this.loadData();
+  }
+
+  /** Manual date edits switch the preset to CUSTOM, then reload. */
+  onDateChanged(): void {
+    this.rangePreset.set('CUSTOM');
+    this.loadData();
   }
 
   private startOfMonth(): Date {

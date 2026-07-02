@@ -32,21 +32,23 @@
       </div>
 
       @if (c.coursePackageSize) {
-        <p-button
-          [label]="'SESSION_PAYMENTS.BUY_PACKAGE_INSTEAD' | translate: { count: c.coursePackageSize, amount: (c.coursePackagePrice | amount) }"
-          icon="pi pi-box"
-          severity="secondary"
-          [outlined]="true"
-          [loading]="submitting()"
-          (onClick)="buyPackage()"
-          styleClass="w-full"
-        ></p-button>
+        <div class="flex justify-center">
+          <p-button
+            [label]="'SESSION_PAYMENTS.BUY_PACKAGE_INSTEAD' | translate: { count: c.coursePackageSize, amount: (c.coursePackagePrice | amount) }"
+            icon="pi pi-box"
+            severity="secondary"
+            [text]="true"
+            size="small"
+            [loading]="submitting()"
+            (onClick)="buyPackage()"
+          ></p-button>
+        </div>
       }
     </div>
-
-    <ng-template pTemplate="footer">
-      <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" (onClick)="skip()" [disabled]="submitting()"></p-button>
-      <p-button [label]="'SESSION_PAYMENTS.PAY_SUBMIT' | translate" icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
-    </ng-template>
   }
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" [outlined]="true" (onClick)="skip()" [disabled]="submitting()"></p-button>
+    <p-button [label]="'SESSION_PAYMENTS.PAY_SUBMIT' | translate" icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
+  </ng-template>
 </p-dialog>

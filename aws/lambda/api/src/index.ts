@@ -210,6 +210,7 @@ const router = {
     voidPayment: sessionPaymentsRoutes.voidPayment,
     refund: sessionPaymentsRoutes.refund,
     buyPackage: sessionPaymentsRoutes.buyPackage,
+    payPackage: sessionPaymentsRoutes.payPackage,
     listPackages: sessionPaymentsRoutes.listPackages,
     listByCourse: sessionPaymentsRoutes.listByCourse,
     listByStudent: sessionPaymentsRoutes.listByStudent,

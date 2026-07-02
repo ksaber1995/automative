@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -30,6 +30,8 @@ import { MasterEnrollmentService } from '../../master-courses/services/master-en
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
 import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
+import { SessionPaymentsService } from '../../session-payments/session-payments.service';
+import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
@@ -44,6 +46,7 @@ import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.i
 import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { LinkedCourseSummary } from '@shared/interfaces/master-course.interface';
 import { MonthlyPaymentWithDetails } from '@shared/interfaces/monthly-subscription.interface';
+import { SessionPaymentWithDetails, SessionPackageWithDetails } from '@shared/interfaces/session-payment.interface';
 import { ProductSale } from '@shared/interfaces/product-sale.interface';
 
 @Component({
@@ -73,12 +76,14 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     AmountPipe,
     StudentQrDialogComponent,
     TelegramConnectDialogComponent,
+    SessionPayDialogComponent,
   ],
   templateUrl: './student-detail.component.html',
   styleUrl: './student-detail.component.scss',
   providers: [ConfirmationService],
 })
 export class StudentDetailComponent implements OnInit {
+  @ViewChild(SessionPayDialogComponent) sessionPayDialog?: SessionPayDialogComponent;
   private studentService = inject(StudentService);
   private enrollmentService = inject(EnrollmentService);
   private courseService = inject(CourseService);
@@ -87,6 +92,7 @@ export class StudentDetailComponent implements OnInit {
   private masterCourseService = inject(MasterCourseService);
   private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
   private monthlyService = inject(MonthlySubscriptionsService);
+  private sessionPaymentsService = inject(SessionPaymentsService);
   private attendanceService = inject(AttendanceService);
   private productSaleService = inject(ProductSaleService);
   private examService = inject(ExamService);
@@ -130,6 +136,10 @@ export class StudentDetailComponent implements OnInit {
 
   // Monthly-subscription bills, grouped by enrollmentId (newest month first).
   monthlyByEnrollment = signal<Map<string, MonthlyPaymentWithDetails[]>>(new Map());
+
+  // Per-session charges + prepaid packages, grouped by enrollmentId.
+  sessionPaymentsByEnrollment = signal<Map<string, SessionPaymentWithDetails[]>>(new Map());
+  sessionPackagesByEnrollment = signal<Map<string, SessionPackageWithDetails[]>>(new Map());
 
   // Monthly-subscription payment dialog
   showMonthlyPayDialog = false;
@@ -265,6 +275,7 @@ export class StudentDetailComponent implements OnInit {
     this.loadClassesForDoneMap();
     this.loadStudent(id);
     this.loadMonthlySubscriptions(id);
+    this.loadSessionPayments(id);
     this.loadEnrollments(id);
     if (!this.isTeacher()) this.loadMasterEnrollments(id);
     this.loadAttendance(id);
@@ -279,6 +290,8 @@ export class StudentDetailComponent implements OnInit {
     this.enrollments.set([]);
     this.masterEnrollments.set([]);
     this.monthlyByEnrollment.set(new Map());
+    this.sessionPaymentsByEnrollment.set(new Map());
+    this.sessionPackagesByEnrollment.set(new Map());
     this.paymentHistoryMap.set(new Map());
     this.refundHistoryMap.set(new Map());
     this.attendanceRecords.set([]);
@@ -391,7 +404,8 @@ export class StudentDetailComponent implements OnInit {
         // Monthly-subscription enrollments use the months table instead, and
         // are auto-expanded so the bills are visible without a click.
         enrollments.forEach(e => {
-          if (this.isMonthly(e)) {
+          if (this.isMonthly(e) || this.isPerSession(e)) {
+            // Monthly & per-session enrollments show their own bills table; auto-expand.
             this.expandedRows[e.id] = true;
           } else {
             this.loadPaymentHistory(e.id);
@@ -484,6 +498,69 @@ export class StudentDetailComponent implements OnInit {
         this.actionLoading.set(false);
       },
     });
+  }
+
+  // ─── Per-session payments ───────────────────────────────────────────────────
+
+  loadSessionPayments(studentId: string) {
+    this.sessionPaymentsService.listByStudent(studentId).subscribe({
+      next: (rows) => {
+        const map = new Map<string, SessionPaymentWithDetails[]>();
+        for (const r of rows) {
+          const list = map.get(r.enrollmentId) || [];
+          list.push(r);
+          map.set(r.enrollmentId, list);
+        }
+        this.sessionPaymentsByEnrollment.set(map);
+      },
+      error: () => {},
+    });
+    this.sessionPaymentsService.listPackages({ studentId }).subscribe({
+      next: (rows) => {
+        const map = new Map<string, SessionPackageWithDetails[]>();
+        for (const r of rows) {
+          const list = map.get(r.enrollmentId) || [];
+          list.push(r);
+          map.set(r.enrollmentId, list);
+        }
+        this.sessionPackagesByEnrollment.set(map);
+      },
+      error: () => {},
+    });
+  }
+
+  /** A course billed per attended session (vs. monthly / one-time). */
+  isPerSession(enrollment: Enrollment): boolean {
+    return this.courses.get(enrollment.courseId)?.paymentType === 'PER_SESSION';
+  }
+
+  getSessionPayments(enrollmentId: string): SessionPaymentWithDetails[] {
+    return this.sessionPaymentsByEnrollment().get(enrollmentId) || [];
+  }
+
+  getSessionPackages(enrollmentId: string): SessionPackageWithDetails[] {
+    return this.sessionPackagesByEnrollment().get(enrollmentId) || [];
+  }
+
+  getSessionStatusSeverity(status: string): 'success' | 'warn' | 'danger' | 'info' | 'secondary' {
+    switch (status) {
+      case 'PAID': return 'success';
+      case 'COVERED': return 'info';
+      case 'PENDING': return 'warn';
+      case 'REFUNDED': return 'danger';
+      default: return 'secondary';
+    }
+  }
+
+  sessionStatusLabel(status: string): string {
+    const key = `SESSION_PAYMENTS.STATUS_${status}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? status : translated;
+  }
+
+  /** Open the shared pay popup for a pending session charge. */
+  openSessionPay(payment: SessionPaymentWithDetails) {
+    this.sessionPayDialog?.enqueue([payment]);
   }
 
   // ─── Subscription hold / resume / delete ───────────────────────────────────

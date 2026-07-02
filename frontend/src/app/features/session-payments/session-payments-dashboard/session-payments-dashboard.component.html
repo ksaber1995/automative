@@ -8,15 +8,22 @@
   </div>
 
   <p-card>
+    <!-- Quick range presets -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <p-button [label]="'SESSION_PAYMENTS.RANGE_TODAY' | translate" size="small" [outlined]="rangePreset() !== 'TODAY'" (onClick)="setRange('TODAY')"></p-button>
+      <p-button [label]="'SESSION_PAYMENTS.RANGE_WEEK' | translate" size="small" [outlined]="rangePreset() !== 'WEEK'" (onClick)="setRange('WEEK')"></p-button>
+      <p-button [label]="'SESSION_PAYMENTS.RANGE_MONTH' | translate" size="small" [outlined]="rangePreset() !== 'MONTH'" (onClick)="setRange('MONTH')"></p-button>
+    </div>
+
     <!-- Filters -->
     <div class="flex flex-wrap gap-3 mb-4 items-end">
       <div class="flex flex-col gap-1">
         <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_FROM' | translate }}</label>
-        <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="loadData()"></p-datepicker>
+        <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_TO' | translate }}</label>
-        <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="loadData()"></p-datepicker>
+        <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
       </div>
       <p-select
         [options]="branches()" [(ngModel)]="selectedBranchId" optionLabel="label" optionValue="id"
@@ -113,9 +120,11 @@
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_PACKAGE' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_REMAINING' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_AMOUNT' | translate }}</th>
+            <th>{{ 'SESSION_PAYMENTS.COL_SESSIONS_LEFT' | translate }}</th>
+            <th class="text-right">{{ 'SESSION_PAYMENTS.COL_PKG_PAID' | translate }}</th>
+            <th class="text-right">{{ 'SESSION_PAYMENTS.COL_PKG_REMAINING' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_STATUS' | translate }}</th>
+            <th>{{ 'SESSION_PAYMENTS.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-p>
@@ -124,12 +133,27 @@
             <td>{{ p.courseName }}</td>
             <td>{{ p.sessionsUsed }} / {{ p.sessionsTotal }}</td>
             <td>{{ p.sessionsTotal - p.sessionsUsed }}</td>
-            <td>{{ p.amountPaid | amount }}</td>
+            <td class="text-right">
+              <span class="font-semibold text-green-600">{{ (p.amountPaid || 0) | amount }}</span>
+              <span class="text-gray-400"> / {{ (p.amountDue || 0) | amount }}</span>
+            </td>
+            <td class="text-right">
+              @if (packageRemaining(p) > 0) {
+                <span class="font-semibold text-red-600">{{ packageRemaining(p) | amount }}</span>
+              } @else {
+                <span class="text-gray-300">—</span>
+              }
+            </td>
             <td><p-tag [value]="p.status"></p-tag></td>
+            <td>
+              @if (packageRemaining(p) > 0) {
+                <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(p)"></p-button>
+              }
+            </td>
           </tr>
         </ng-template>
         <ng-template pTemplate="emptymessage">
-          <tr><td colspan="6" class="text-center py-8 text-gray-500">{{ 'SESSION_PAYMENTS.NO_PACKAGES' | translate }}</td></tr>
+          <tr><td colspan="8" class="text-center py-8 text-gray-500">{{ 'SESSION_PAYMENTS.NO_PACKAGES' | translate }}</td></tr>
         </ng-template>
       </p-table>
     }
@@ -166,5 +190,29 @@
   <ng-template pTemplate="footer">
     <p-button [label]="'SESSION_PAYMENTS.CANCEL' | translate" severity="secondary" (onClick)="showRefund.set(false)"></p-button>
     <p-button [label]="'SESSION_PAYMENTS.REFUND_SUBMIT' | translate" severity="danger" (onClick)="confirmRefund()" [loading]="submitting()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Package pay dialog (collect remaining balance) -->
+<p-dialog [(visible)]="showPackagePay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.PACKAGE_PAY_TITLE' | translate">
+  @if (selectedPackage(); as p) {
+    <div class="flex flex-col gap-3 pt-2">
+      <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ p.studentFirstName }} {{ p.studentLastName }}</span></div>
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_PKG_REMAINING' | translate }}</span><span class="font-medium text-red-600">{{ packageRemaining(p) | amount }}</span></div>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="packagePayAmount" mode="currency" currency="USD" [min]="0" [max]="packageRemaining(p)" [style]="{ width: '100%' }"></p-inputnumber>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_DATE' | translate }}</label>
+        <p-datepicker [(ngModel)]="packagePayDate" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSION_PAYMENTS.CANCEL' | translate" severity="secondary" (onClick)="showPackagePay.set(false)"></p-button>
+    <p-button [label]="'SESSION_PAYMENTS.PAY_SUBMIT' | translate" icon="pi pi-check" (onClick)="confirmPackagePay()" [loading]="submitting()"></p-button>
   </ng-template>
 </p-dialog>

@@ -349,6 +349,46 @@
               }
             </div>
           </div>
+
+          <!-- When prepaying a package: how to pay it (full now / part now / later) -->
+          @if (sessionBillingModeSig() === 'PACKAGE') {
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.SESSION_PACKAGE_PAY_OPTION' | translate }} <span class="text-red-500">*</span></label>
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer"
+                  [class.border-green-500]="sessionPackagePayModeSig() === 'FULL'" [class.bg-green-50]="sessionPackagePayModeSig() === 'FULL'">
+                  <p-radiobutton name="sessionPackagePayMode" value="FULL" formControlName="sessionPackagePayMode" (onClick)="sessionPackagePayModeSig.set('FULL')"></p-radiobutton>
+                  <div>
+                    <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_NOW' | translate }}</p>
+                    <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_NOW_DESC' | translate: { amount: (selectedCourse()?.sessionPackagePrice | amount) } }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer"
+                  [class.border-blue-500]="sessionPackagePayModeSig() === 'PARTIAL'" [class.bg-blue-50]="sessionPackagePayModeSig() === 'PARTIAL'">
+                  <p-radiobutton name="sessionPackagePayMode" value="PARTIAL" formControlName="sessionPackagePayMode" (onClick)="sessionPackagePayModeSig.set('PARTIAL')"></p-radiobutton>
+                  <div class="flex-1">
+                    <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_PARTIAL' | translate }}</p>
+                    <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_PARTIAL_DESC' | translate }}</p>
+                    @if (sessionPackagePayModeSig() === 'PARTIAL') {
+                      <div class="mt-2 flex items-center gap-2">
+                        <p-inputnumber formControlName="sessionPackageDownPayment" [min]="0" [max]="selectedCourse()?.sessionPackagePrice"
+                          (onInput)="sessionPackageDownPaymentSig.set($event.value || 0)" mode="currency" currency="USD" [style]="{ width: '160px' }"></p-inputnumber>
+                        <small class="text-gray-500" [innerHTML]="'ENROLLMENT_FORM.REMAINING' | translate: { amount: ((selectedCourse()?.sessionPackagePrice || 0) - sessionPackageDownPaymentSig()) | amount }"></small>
+                      </div>
+                    }
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer"
+                  [class.border-amber-500]="sessionPackagePayModeSig() === 'LATER'" [class.bg-amber-50]="sessionPackagePayModeSig() === 'LATER'">
+                  <p-radiobutton name="sessionPackagePayMode" value="LATER" formControlName="sessionPackagePayMode" (onClick)="sessionPackagePayModeSig.set('LATER')"></p-radiobutton>
+                  <div>
+                    <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_LATER' | translate }}</p>
+                    <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_LATER_DESC' | translate }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
         </div>
         } @else {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
