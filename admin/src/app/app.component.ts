@@ -58,6 +58,9 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
         <button class="filter" [class.on]="statusFilter() === 'TRIAL'" (click)="statusFilter.set('TRIAL')">
           Trial <span class="fcount">{{ statusCount('TRIAL') }}</span>
         </button>
+        <button class="filter" [class.on]="statusFilter() === 'EXPIRED'" (click)="statusFilter.set('EXPIRED')">
+          Expired <span class="fcount">{{ statusCount('EXPIRED') }}</span>
+        </button>
       </div>
 
       <div class="toolbar">
