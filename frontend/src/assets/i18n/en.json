@@ -1563,10 +1563,12 @@
       "TOTAL": "Total",
       "LOAD_ERROR": "Failed to load courses",
       "MONTHLY_BADGE": "Monthly",
+      "PER_SESSION_BADGE": "Per Session",
       "ONE_TIME_BADGE": "One-Time",
       "ALL_PAYMENT_TYPES": "All Payment Types",
       "TYPE_ONE_TIME": "One-Time",
       "TYPE_MONTHLY": "Monthly Subscription",
+      "TYPE_PER_SESSION": "Pay by Session",
       "COL_PAYMENT_TYPE": "Payment Type"
     },
     "FORM": {

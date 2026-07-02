@@ -62,7 +62,7 @@ export class CourseListComponent implements OnInit {
 
   selectedBranchId = signal<string | null>(null);
   selectedLevelId = signal<string | null>(null);
-  selectedPaymentType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION'>('ALL');
+  selectedPaymentType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION'>('ALL');
   selectedTab = signal<'active' | 'inactive'>('active');
 
   // Blocker dialog shown when the API returns a 409 with the list of classes
@@ -84,6 +84,7 @@ export class CourseListComponent implements OnInit {
   paymentTypeOptions = computed(() => [
     { label: this.translate.instant('COURSES.LIST.TYPE_ONE_TIME'), value: 'ONE_TIME' },
     { label: this.translate.instant('COURSES.LIST.TYPE_MONTHLY'), value: 'MONTHLY_SUBSCRIPTION' },
+    { label: this.translate.instant('COURSES.LIST.TYPE_PER_SESSION'), value: 'PER_SESSION' },
   ]);
 
   activeCount = computed(() => this.byBranch().filter(c => c.isActive).length);

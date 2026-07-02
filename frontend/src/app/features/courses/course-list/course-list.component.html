@@ -102,6 +102,12 @@
                 {{ 'COURSES.LIST.MONTHLY_BADGE' | translate }}
               </span>
             }
+            @if (course.paymentType === 'PER_SESSION') {
+              <span class="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <i class="pi pi-wallet me-1" style="font-size:0.65rem"></i>
+                {{ 'COURSES.LIST.PER_SESSION_BADGE' | translate }}
+              </span>
+            }
           </td>
           <td>{{ getBranchName(course.branchId) }}</td>
           <td>{{ course.levelName || '—' }}</td>

@@ -1563,10 +1563,12 @@
       "TOTAL": "الإجمالي",
       "LOAD_ERROR": "فشل تحميل الكورسات",
       "MONTHLY_BADGE": "شهري",
+      "PER_SESSION_BADGE": "بالحصة",
       "ONE_TIME_BADGE": "دفعة واحدة",
       "ALL_PAYMENT_TYPES": "جميع أنواع الدفع",
       "TYPE_ONE_TIME": "دفعة واحدة",
       "TYPE_MONTHLY": "اشتراك شهري",
+      "TYPE_PER_SESSION": "الدفع بالحصة",
       "COL_PAYMENT_TYPE": "نوع الدفع"
     },
     "FORM": {
