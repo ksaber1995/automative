@@ -3,6 +3,7 @@ import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPerm
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
 import { notifyCheckin } from './telegram';
+import { chargeSessionAttendance, chargeSingleCheckin } from './session-payments';
 
 export const attendanceRoutes = {
   /**
@@ -151,12 +152,23 @@ export const attendanceRoutes = {
         );
       }
 
+      // PER_SESSION courses: create/consume per-session charges for this save.
+      // Returns the newly-created PENDING charges that still need collection.
+      // Best-effort: a billing hiccup must never fail the attendance save itself.
+      let sessionCharges: any[] = [];
+      try {
+        sessionCharges = await chargeSessionAttendance(context.companyId, session, presentIds);
+      } catch (billErr) {
+        console.error('Per-session charge (saveForSession) error:', billErr);
+      }
+
       return {
         status: 200 as const,
         body: {
           message: 'Attendance saved successfully',
           code: 'ATTENDANCE.SAVED',
           presentCount: presentIds.length,
+          sessionCharges,
         },
       };
     } catch (error) {
@@ -278,6 +290,15 @@ export const attendanceRoutes = {
         // Best-effort Telegram present notification (no-op unless enabled).
         await notifyCheckin(context.companyId, params.sessionId, student.id);
 
+        // PER_SESSION courses: create/consume the charge for this check-in.
+        // Best-effort — billing must never fail the check-in itself.
+        let sessionCharge: any = null;
+        try {
+          sessionCharge = await chargeSingleCheckin(context.companyId, session, student.id);
+        } catch (billErr) {
+          console.error('Per-session charge (checkinByQr) error:', billErr);
+        }
+
         return {
           status: 200 as const,
           body: {
@@ -290,6 +311,7 @@ export const attendanceRoutes = {
             alreadyPresent,
             code: alreadyPresent ? 'ATTENDANCE.ALREADY_PRESENT' : 'ATTENDANCE.CHECKED_IN',
             message: alreadyPresent ? 'Student was already marked present' : 'Student marked present',
+            sessionCharge,
           },
         };
       }

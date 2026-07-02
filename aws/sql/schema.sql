@@ -283,10 +283,15 @@ CREATE TABLE courses (
     instructor_id UUID,
     level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
-    -- Payment model: ONE_TIME (default, existing behaviour) or MONTHLY_SUBSCRIPTION.
+    -- Payment model: ONE_TIME (default), MONTHLY_SUBSCRIPTION, or PER_SESSION.
     -- When MONTHLY_SUBSCRIPTION, the existing `price` column holds the monthly fee.
+    -- When PER_SESSION, the existing `price` column holds the per-session fee.
     payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'
-        CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION')),
+        CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION')),
+    -- PER_SESSION settings (only meaningful when payment_type = PER_SESSION):
+    session_package_size INTEGER,                                      -- e.g. 8 (null = no advance package offered)
+    session_package_price DECIMAL(10, 2),                             -- e.g. 700 (block price, paid upfront)
+    charge_absent_sessions BOOLEAN NOT NULL DEFAULT FALSE,            -- bill absent sessions too?
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
@@ -421,9 +426,9 @@ CREATE TABLE enrollments (
     notes TEXT,
     company_id UUID NOT NULL,
     master_enrollment_id UUID,
-    -- Denormalised from courses.payment_type for fast monthly-subscription queries
+    -- Denormalised from courses.payment_type for fast subscription/session queries
     payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'
-        CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION')),
+        CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
@@ -1293,6 +1298,84 @@ CREATE INDEX idx_cmpo_company_id  ON course_monthly_price_overrides(company_id);
 
 CREATE TRIGGER update_course_monthly_price_overrides_updated_at
     BEFORE UPDATE ON course_monthly_price_overrides
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- SESSION PACKAGES TABLE  (migration 050)
+-- Prepaid credit balance for PER_SESSION courses ("pay X sessions in advance").
+-- One row per package bought upfront; attendance consumes credits.
+-- =============================================
+CREATE TABLE session_packages (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id      UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    company_id         UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
+    student_id         UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
+    course_id          UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
+    sessions_total     INTEGER NOT NULL,
+    sessions_used      INTEGER NOT NULL DEFAULT 0,
+    amount_paid        DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    status             VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
+                           CHECK (status IN ('ACTIVE', 'EXHAUSTED', 'REFUNDED')),
+    purchased_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    notes              TEXT,
+    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_spkg_enrollment_id ON session_packages(enrollment_id);
+CREATE INDEX idx_spkg_company_id    ON session_packages(company_id);
+CREATE INDEX idx_spkg_student_id    ON session_packages(student_id);
+CREATE INDEX idx_spkg_course_id     ON session_packages(course_id);
+CREATE INDEX idx_spkg_branch_id     ON session_packages(branch_id);
+CREATE INDEX idx_spkg_status        ON session_packages(status);
+
+CREATE TRIGGER update_session_packages_updated_at
+    BEFORE UPDATE ON session_packages
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- SESSION PAYMENTS TABLE  (migration 050)
+-- Per-session billing ledger / dues for PER_SESSION courses.
+-- One row per billable (enrollment, session), created when attendance is taken.
+-- payment_status: COVERED (by package) | PAID | PENDING (due) | WAIVED | REFUNDED
+-- =============================================
+CREATE TABLE session_payments (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id    UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    session_id       UUID NOT NULL REFERENCES sessions(id)    ON DELETE CASCADE,
+    company_id       UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
+    student_id       UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
+    course_id        UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    branch_id        UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
+    package_id       UUID REFERENCES session_packages(id) ON DELETE SET NULL,
+    attendance_state VARCHAR(10) NOT NULL DEFAULT 'PRESENT'
+                         CHECK (attendance_state IN ('PRESENT', 'ABSENT')),
+    amount_due       DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    amount_paid      DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_status   VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+                         CHECK (payment_status IN ('PENDING', 'PAID', 'COVERED', 'WAIVED', 'REFUNDED')),
+    paid_date        DATE,
+    notes            TEXT,
+    refunded_amount  DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    refund_note      TEXT,
+    refunded_at      TIMESTAMP WITH TIME ZONE,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (enrollment_id, session_id)
+);
+
+CREATE INDEX idx_sp_enrollment_id  ON session_payments(enrollment_id);
+CREATE INDEX idx_sp_session_id     ON session_payments(session_id);
+CREATE INDEX idx_sp_company_id     ON session_payments(company_id);
+CREATE INDEX idx_sp_student_id     ON session_payments(student_id);
+CREATE INDEX idx_sp_course_id      ON session_payments(course_id);
+CREATE INDEX idx_sp_branch_id      ON session_payments(branch_id);
+CREATE INDEX idx_sp_package_id     ON session_payments(package_id);
+CREATE INDEX idx_sp_payment_status ON session_payments(payment_status);
+
+CREATE TRIGGER update_session_payments_updated_at
+    BEFORE UPDATE ON session_payments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================

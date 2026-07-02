@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
@@ -27,6 +27,7 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { TimetableService, TimetableEntry } from '../../timetable/timetable.service';
+import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 
 interface DialogTeacherRow {
   employeeId: string;
@@ -77,10 +78,12 @@ function endTimeAfterStartValidator(startDate: string) {
     InputTextModule,
     CheckboxModule,
     TranslateModule,
+    SessionPayDialogComponent,
   ],
   templateUrl: './sessions-dashboard.component.html',
 })
 export class SessionsDashboardComponent implements OnInit {
+  @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
@@ -827,7 +830,7 @@ export class SessionsDashboardComponent implements OnInit {
     const presentIds = students.filter((s) => s.isPresent).map((s) => s.studentId);
     this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'saving' });
     this.attendanceService.saveForSession(sessionId, presentIds).subscribe({
-      next: () => {
+      next: (res) => {
         this.attendanceSaveState.set({ ...this.attendanceSaveState(), [sessionId]: 'saved' });
         this.attendanceSavedClearTimers[sessionId] = setTimeout(() => {
           const next = { ...this.attendanceSaveState() };
@@ -835,6 +838,8 @@ export class SessionsDashboardComponent implements OnInit {
           this.attendanceSaveState.set(next);
           delete this.attendanceSavedClearTimers[sessionId];
         }, 2000);
+        // PER_SESSION courses: prompt to collect any newly-created dues.
+        if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
       },
       error: () => {
         // Interceptor toasted the translated error; also flip the per-row indicator.

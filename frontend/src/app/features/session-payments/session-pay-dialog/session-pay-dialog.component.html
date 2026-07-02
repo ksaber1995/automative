@@ -1,0 +1,52 @@
+<p-dialog
+  [visible]="visible()"
+  (visibleChange)="$event ? null : onHide()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '440px' }"
+  [header]="'SESSION_PAYMENTS.PAY_DIALOG_TITLE' | translate: { name: currentName() }"
+>
+  @if (current(); as c) {
+    <div class="flex flex-col gap-4 pt-2">
+      <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</span><span class="font-medium text-gray-800">{{ c.courseName }}</span></div>
+        @if (c.sessionNumber != null) {
+          <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_SESSION' | translate }}</span><span class="font-medium text-gray-800">#{{ c.sessionNumber }}</span></div>
+        }
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_AMOUNT' | translate }}</span><span class="font-medium text-gray-800">{{ c.amountDue | amount }}</span></div>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="amount" mode="currency" currency="USD" [min]="0" [max]="c.amountDue" [style]="{ width: '100%' }"></p-inputnumber>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_DATE' | translate }}</label>
+        <p-datepicker [(ngModel)]="payDate" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_NOTES' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="notes" rows="2"></textarea>
+      </div>
+
+      @if (c.coursePackageSize) {
+        <p-button
+          [label]="'SESSION_PAYMENTS.BUY_PACKAGE_INSTEAD' | translate: { count: c.coursePackageSize, amount: (c.coursePackagePrice | amount) }"
+          icon="pi pi-box"
+          severity="secondary"
+          [outlined]="true"
+          [loading]="submitting()"
+          (onClick)="buyPackage()"
+          styleClass="w-full"
+        ></p-button>
+      }
+    </div>
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" (onClick)="skip()" [disabled]="submitting()"></p-button>
+      <p-button [label]="'SESSION_PAYMENTS.PAY_SUBMIT' | translate" icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
+    </ng-template>
+  }
+</p-dialog>

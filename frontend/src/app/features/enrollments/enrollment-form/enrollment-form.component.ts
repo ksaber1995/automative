@@ -118,11 +118,19 @@ export class EnrollmentFormComponent implements OnInit {
   // Monthly price override info for display hint
   monthlyOverridePrice = signal<number | null>(null);
   monthlyOverrideMonth = signal<string>(''); // e.g. "June 2026"
+  // Per-session enrollment: pay each session, or prepay a package in advance.
+  sessionBillingModeSig = signal<'PER_SESSION' | 'PACKAGE'>('PER_SESSION');
 
   // True when the selected single course is billed as a monthly subscription.
   isMonthly = computed(() =>
     this.enrollmentType() === 'COURSE' &&
     this.selectedCourse()?.paymentType === 'MONTHLY_SUBSCRIPTION'
+  );
+
+  // True when the selected single course is billed per session.
+  isPerSession = computed(() =>
+    this.enrollmentType() === 'COURSE' &&
+    this.selectedCourse()?.paymentType === 'PER_SESSION'
   );
 
   // ─── Educational Books: products linked to the selected course ──────────────
@@ -220,6 +228,7 @@ export class EnrollmentFormComponent implements OnInit {
       paymentMode: [PaymentMode.FULL, [Validators.required]],
       downPayment: [0],
       monthlyPayOption: ['PAY_LATER'],
+      sessionBillingMode: ['PER_SESSION'],
       notes: ['']
     });
   }
@@ -664,6 +673,8 @@ export class EnrollmentFormComponent implements OnInit {
 
     this.loading.set(true);
     const monthly = this.isMonthly();
+    const perSession = this.isPerSession();
+    const noInstallments = monthly || perSession;
     const enrollmentData = {
       studentId: v.studentId,
       classId: v.classId,
@@ -675,12 +686,17 @@ export class EnrollmentFormComponent implements OnInit {
       discountPercent: this.discountPercentSig(),
       discountAmount: this.discountAmountSig(),
       finalPrice: this.finalPriceSig(),
-      // Monthly courses are billed per month — no installments; finalPrice is the
-      // discounted monthly fee and payFirstMonth records the start month up-front.
-      paymentMode: monthly ? PaymentMode.FULL : v.paymentMode,
-      downPayment: (!monthly && v.paymentMode === 'INSTALLMENTS') ? (v.downPayment || 0) : 0,
-      paymentType: monthly ? 'MONTHLY_SUBSCRIPTION' as const : 'ONE_TIME' as const,
+      // Monthly & per-session courses are billed per period — no installments;
+      // finalPrice is the discounted monthly/per-session fee.
+      paymentMode: noInstallments ? PaymentMode.FULL : v.paymentMode,
+      downPayment: (!noInstallments && v.paymentMode === 'INSTALLMENTS') ? (v.downPayment || 0) : 0,
+      paymentType: monthly ? 'MONTHLY_SUBSCRIPTION' as const
+        : perSession ? 'PER_SESSION' as const
+        : 'ONE_TIME' as const,
       payFirstMonth: monthly ? this.monthlyPayOptionSig() === 'PAY_NOW' : undefined,
+      // Per-session: pay each session (default) or prepay a package in advance.
+      sessionBillingMode: perSession ? this.sessionBillingModeSig() : undefined,
+      buyPackage: perSession ? this.sessionBillingModeSig() === 'PACKAGE' : undefined,
       notes: v.notes || undefined
     };
 

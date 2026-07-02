@@ -64,6 +64,10 @@ export class CourseFormComponent implements OnInit {
       instructorId: [''],
       defaultRoomId: [null],
       levelId: [null],
+      // PER_SESSION settings:
+      chargeAbsentSessions: [false],
+      sessionPackageSize: [null],
+      sessionPackagePrice: [null],
     });
   }
 
@@ -137,6 +141,9 @@ export class CourseFormComponent implements OnInit {
           instructorId: course.instructorId || '',
           defaultRoomId: (course as any).defaultRoomId || null,
           levelId: course.levelId || null,
+          chargeAbsentSessions: (course as any).chargeAbsentSessions ?? false,
+          sessionPackageSize: (course as any).sessionPackageSize ?? null,
+          sessionPackagePrice: (course as any).sessionPackagePrice ?? null,
         });
         // Payment type is fixed once a course is created — lock it in edit mode.
         this.courseForm.get('paymentType')?.disable();
@@ -206,4 +213,5 @@ export class CourseFormComponent implements OnInit {
   get name() { return this.courseForm.get('name'); }
   get price() { return this.courseForm.get('price'); }
   get duration() { return this.courseForm.get('duration'); }
+  get paymentType() { return this.courseForm.get('paymentType'); }
 }

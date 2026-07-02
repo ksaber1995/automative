@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
@@ -24,6 +24,7 @@ import { ScanPreferenceService } from '../../../core/services/scan-preference.se
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 
 interface TeacherRow {
   employeeId: string;
@@ -59,10 +60,11 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, TextareaModule, TooltipModule, TranslateModule],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
+  @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private sessionService = inject(SessionService);
@@ -272,9 +274,11 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     const presentIds = this.students().filter((s) => s.isPresent).map((s) => s.studentId);
     this.saveState.set('saving');
     this.attendanceService.saveForSession(this.sessionId, presentIds).subscribe({
-      next: () => {
+      next: (res) => {
         this.saveState.set('saved');
         this.savedClearTimer = setTimeout(() => this.saveState.set(undefined), 2000);
+        // PER_SESSION courses: prompt to collect any newly-created dues.
+        if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
       },
       error: () => this.saveState.set('error'),
     });
@@ -663,6 +667,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         } else {
           this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
         }
+        // PER_SESSION courses: prompt to collect this check-in's charge (fresh only).
+        if (!res.alreadyPresent && res.sessionCharge) this.payDialog?.enqueue([res.sessionCharge]);
       },
       error: () => {
         // Interceptor toasts the translated server error (unknown token / not enrolled).

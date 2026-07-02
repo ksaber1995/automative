@@ -50,6 +50,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/monthly-subscriptions/monthly-subscriptions-dashboard/monthly-subscriptions-dashboard.component').then(m => m.MonthlySubscriptionsDashboardComponent)
       },
       {
+        path: 'session-payments',
+        canActivate: [permissionGuard('enrollments')],
+        data: { breadcrumb: 'BREADCRUMBS.SESSION_PAYMENTS' },
+        loadComponent: () => import('./features/session-payments/session-payments-dashboard/session-payments-dashboard.component').then(m => m.SessionPaymentsDashboardComponent)
+      },
+      {
         path: 'master-courses',
         canActivate: [permissionGuard('academy'), notTeacherGuard],
         data: { breadcrumb: 'BREADCRUMBS.MASTER_COURSES' },

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -21,6 +21,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { SessionService, Session } from '../../rooms/services/session.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
 import { AttendanceService, SessionAttendanceStudent, ClassAttendanceSummary } from '../../rooms/services/attendance.service';
+import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
 
 @Component({
@@ -42,11 +43,13 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     CheckboxModule,
     ConfirmDialogModule,
     FormsModule,
+    SessionPayDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './class-detail.component.html'
 })
 export class ClassDetailComponent implements OnInit {
+  @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   private classService = inject(ClassService);
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
@@ -260,6 +263,8 @@ export class ClassDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('CLASSES.DETAIL.ATTENDANCE_SAVED', { count: res.presentCount }));
         // Refresh attendance summary if on that tab
         if (this.activeTab === 'attendance') this.loadAttendanceSummary();
+        // PER_SESSION courses: prompt to collect any newly-created dues.
+        if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
       },
       error: () => {
         // Interceptor toasted the translated error.

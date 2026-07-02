@@ -66,6 +66,10 @@
                 <input type="radio" formControlName="paymentType" value="MONTHLY_SUBSCRIPTION" class="accent-blue-600" />
                 <span>{{ 'COURSES.FORM.PAYMENT_TYPE_MONTHLY' | translate }}</span>
               </label>
+              <label class="flex items-center gap-2" [class.cursor-pointer]="!isEditMode()" [class.cursor-not-allowed]="isEditMode()">
+                <input type="radio" formControlName="paymentType" value="PER_SESSION" class="accent-blue-600" />
+                <span>{{ 'COURSES.FORM.PAYMENT_TYPE_PER_SESSION' | translate }}</span>
+              </label>
             </div>
             @if (isEditMode()) {
               <small class="text-gray-500 flex items-center gap-1 mt-1">
@@ -79,9 +83,11 @@
           <div>
             <label for="price" class="block text-sm font-medium text-gray-700 mb-2">
               {{
-                (courseForm.get('paymentType')?.value === 'MONTHLY_SUBSCRIPTION'
+                (paymentType?.value === 'MONTHLY_SUBSCRIPTION'
                   ? 'COURSES.FORM.MONTHLY_FEE_LABEL'
-                  : 'COURSES.FORM.PRICE_LABEL') | translate
+                  : paymentType?.value === 'PER_SESSION'
+                    ? 'COURSES.FORM.SESSION_PRICE_LABEL'
+                    : 'COURSES.FORM.PRICE_LABEL') | translate
               }} <span class="text-red-500">*</span>
             </label>
             <p-inputnumber
@@ -98,6 +104,49 @@
               <small class="text-red-500">{{ 'COURSES.FORM.PRICE_REQUIRED' | translate }}</small>
             }
           </div>
+
+          <!-- Per-session settings (only for PER_SESSION courses) -->
+          @if (paymentType?.value === 'PER_SESSION') {
+            <div class="col-span-2 rounded-lg border border-blue-100 bg-blue-50/50 p-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" formControlName="chargeAbsentSessions" id="chargeAbsentSessions" class="accent-blue-600" />
+                <label for="chargeAbsentSessions" class="cursor-pointer">
+                  {{ 'COURSES.FORM.CHARGE_ABSENT_LABEL' | translate }}
+                </label>
+              </div>
+              <small class="text-gray-500 -mt-2">{{ 'COURSES.FORM.CHARGE_ABSENT_HINT' | translate }}</small>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="sessionPackageSize" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'COURSES.FORM.PACKAGE_SIZE_LABEL' | translate }}
+                  </label>
+                  <p-inputnumber
+                    id="sessionPackageSize"
+                    formControlName="sessionPackageSize"
+                    [min]="1"
+                    [placeholder]="'COURSES.FORM.PACKAGE_SIZE_PLACEHOLDER' | translate"
+                    [style]="{ width: '100%' }"
+                  />
+                </div>
+                <div>
+                  <label for="sessionPackagePrice" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'COURSES.FORM.PACKAGE_PRICE_LABEL' | translate }}
+                  </label>
+                  <p-inputnumber
+                    id="sessionPackagePrice"
+                    formControlName="sessionPackagePrice"
+                    mode="currency"
+                    currency="USD"
+                    [min]="0"
+                    [placeholder]="'COURSES.FORM.PACKAGE_PRICE_PLACEHOLDER' | translate"
+                    [style]="{ width: '100%' }"
+                  />
+                </div>
+              </div>
+              <small class="text-gray-500 -mt-2">{{ 'COURSES.FORM.PACKAGE_HINT' | translate }}</small>
+            </div>
+          }
 
           <!-- Duration (in weeks) -->
           <div>

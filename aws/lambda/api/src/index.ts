@@ -52,6 +52,7 @@ import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
 import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
+import { sessionPaymentsRoutes } from './routes/session-payments';
 import { whatsappTemplatesRoutes } from './routes/whatsappTemplates';
 import { telegramRoutes } from './routes/telegram';
 import { lookupsRoutes } from './routes/lookups';
@@ -200,6 +201,19 @@ const router = {
     getPriceOverride: monthlySubscriptionsRoutes.getPriceOverride,
     deletePriceOverride: monthlySubscriptionsRoutes.deletePriceOverride,
     listPriceOverrides: monthlySubscriptionsRoutes.listPriceOverrides,
+  },
+  sessionPayments: {
+    list: sessionPaymentsRoutes.list,
+    summary: sessionPaymentsRoutes.summary,
+    overdue: sessionPaymentsRoutes.overdue,
+    recordPayment: sessionPaymentsRoutes.recordPayment,
+    voidPayment: sessionPaymentsRoutes.voidPayment,
+    refund: sessionPaymentsRoutes.refund,
+    buyPackage: sessionPaymentsRoutes.buyPackage,
+    listPackages: sessionPaymentsRoutes.listPackages,
+    listByCourse: sessionPaymentsRoutes.listByCourse,
+    listByStudent: sessionPaymentsRoutes.listByStudent,
+    byToken: sessionPaymentsRoutes.byToken,
   },
   lookups: {
     branches: lookupsRoutes.branches,

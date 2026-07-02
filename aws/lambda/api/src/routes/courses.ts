@@ -1,6 +1,7 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensurePerSessionSchema } from './session-payments';
 
 function mapCourseFromDB(row: any) {
   return {
@@ -17,6 +18,9 @@ function mapCourseFromDB(row: any) {
     levelName: row.level_name ?? null,
     isActive: row.is_active,
     paymentType: row.payment_type || 'ONE_TIME',
+    sessionPackageSize: row.session_package_size ?? null,
+    sessionPackagePrice: row.session_package_price != null ? parseFloat(row.session_package_price) : null,
+    chargeAbsentSessions: row.charge_absent_sessions ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -45,6 +49,9 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
+      // PER_SESSION courses need the widened payment_type CHECK + settings columns.
+      if (body.paymentType === 'PER_SESSION') await ensurePerSessionSchema();
+
       const course = await insert('courses', {
         company_id: context.companyId,
         branch_id: body.branchId,
@@ -57,6 +64,9 @@ export const coursesRoutes = {
         level_id: body.levelId || null,
         is_active: true,
         payment_type: body.paymentType || 'ONE_TIME',
+        session_package_size: body.paymentType === 'PER_SESSION' ? (body.sessionPackageSize || null) : null,
+        session_package_price: body.paymentType === 'PER_SESSION' ? (body.sessionPackagePrice ?? null) : null,
+        charge_absent_sessions: body.paymentType === 'PER_SESSION' ? !!body.chargeAbsentSessions : false,
       });
 
       return {
@@ -201,6 +211,12 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.COURSES.ACCESS_DENIED_UPDATE', 'Access denied to update this course');
       }
 
+      // Ensure the per-session columns exist before writing them.
+      if (body.paymentType === 'PER_SESSION' || body.sessionPackageSize !== undefined
+          || body.sessionPackagePrice !== undefined || body.chargeAbsentSessions !== undefined) {
+        await ensurePerSessionSchema();
+      }
+
       const updateData: any = {};
 
       if (body.branchId !== undefined) {
@@ -217,6 +233,9 @@ export const coursesRoutes = {
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.paymentType !== undefined) updateData.payment_type = body.paymentType;
+      if (body.sessionPackageSize !== undefined) updateData.session_package_size = body.sessionPackageSize || null;
+      if (body.sessionPackagePrice !== undefined) updateData.session_package_price = body.sessionPackagePrice ?? null;
+      if (body.chargeAbsentSessions !== undefined) updateData.charge_absent_sessions = !!body.chargeAbsentSessions;
 
       const course = await update('courses', params.id, updateData);
 

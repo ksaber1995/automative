@@ -2,6 +2,7 @@ import { insert, update, findById, query, queryOne, getClient } from '../db/conn
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { insertProductSaleWithClient } from './product-sales';
+import { ensurePerSessionSchema } from './session-payments';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -188,6 +189,89 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
   }
 }
 
+/**
+ * Per-session enrollment (PER_SESSION course). The student is billed for each
+ * session they attend; charges are created when attendance is taken (see
+ * routes/attendance.ts → sessionPayments.chargeAttendance). The enrollment row
+ * itself carries no collected money (amount_paid stays 0 / PENDING); money lives
+ * in session_payments (per session) and session_packages (prepaid blocks).
+ *  - `final_price` stores the discounted per-session fee for reference.
+ *  - If the student chose to prepay a package (buyPackage / sessionBillingMode
+ *    = PACKAGE) and the course offers one, an initial session_packages row is
+ *    created and paid up-front.
+ */
+async function createPerSessionEnrollment(context: any, body: any, course: any) {
+  const coursePrice = course?.price != null ? parseFloat(course.price) : (body.originalPrice || 0);
+  const originalPrice = body.originalPrice != null ? body.originalPrice : coursePrice;
+  const discountPercent = body.discountPercent || 0;
+  const discountAmount = body.discountAmount || 0;
+  // Discounted per-session fee — what each session charge bills.
+  const sessionFee = body.finalPrice != null ? body.finalPrice : originalPrice;
+  const notes = body.notes || null;
+  const wantsPackage = body.buyPackage === true || body.sessionBillingMode === 'PACKAGE';
+  const packageSize = course?.session_package_size != null ? Number(course.session_package_size) : null;
+  const packagePrice = course?.session_package_price != null ? parseFloat(course.session_package_price) : null;
+  const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
+
+  await ensurePerSessionSchema();
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const enrRes = await client.query(
+      `INSERT INTO enrollments
+         (company_id, student_id, class_id, course_id, branch_id, enrollment_date, status,
+          original_price, discount_percent, discount_amount, final_price, payment_mode,
+          down_payment, amount_paid, payment_status, payment_type, completion_date, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'FULL',0,0,'PENDING','PER_SESSION',NULL,$12) RETURNING *`,
+      [context.companyId, body.studentId, body.classId, body.courseId, body.branchId,
+       body.enrollmentDate, body.status, originalPrice, discountPercent, discountAmount,
+       sessionFee, notes]
+    );
+    const enrollment = enrRes.rows[0];
+
+    // Prepaid package (pay X sessions in advance), if chosen and offered.
+    if (wantsPackage && packageSize && packageSize > 0) {
+      await client.query(
+        `INSERT INTO session_packages
+           (enrollment_id, company_id, student_id, course_id, branch_id,
+            sessions_total, sessions_used, amount_paid, status, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,'ACTIVE',$8)`,
+        [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId,
+         packageSize, packagePrice || 0, 'Package purchased at enrollment']
+      );
+    }
+
+    // Linked products (books), if any.
+    for (const p of buyProducts) {
+      await insertProductSaleWithClient(client, context.companyId, {
+        productId: p.productId,
+        branchId: body.branchId,
+        quantity: p.quantity ?? 1,
+        discountType: p.discountType,
+        discountValue: p.discountValue,
+        date: body.enrollmentDate,
+        paymentMethod: p.paymentMethod || null,
+        studentId: body.studentId,
+        courseId: body.courseId,
+        enrollmentId: enrollment.id,
+      });
+    }
+
+    await client.query('COMMIT');
+    return { status: 201 as const, body: mapEnrollmentFromDB(enrollment) };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Create per-session enrollment error:', error);
+    if (error?.statusCode && error?.code) {
+      return apiError(error.statusCode, error.code, error.message);
+    }
+    return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_FAILED', 'Failed to create enrollment', 400);
+  } finally {
+    client.release();
+  }
+}
+
 export const enrollmentsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -216,12 +300,15 @@ export const enrollmentsRoutes = {
       // Monthly-subscription courses follow a per-month billing model, not a
       // one-time price/installment plan. Route them to a dedicated path.
       const course = await queryOne(
-        'SELECT id, payment_type, price FROM courses WHERE id = $1 AND company_id = $2',
+        'SELECT id, payment_type, price, session_package_size, session_package_price FROM courses WHERE id = $1 AND company_id = $2',
         [body.courseId, context.companyId]
       );
       const paymentType: string = course?.payment_type || body.paymentType || 'ONE_TIME';
       if (paymentType === 'MONTHLY_SUBSCRIPTION') {
         return await createMonthlySubscriptionEnrollment(context, body, course);
+      }
+      if (paymentType === 'PER_SESSION') {
+        return await createPerSessionEnrollment(context, body, course);
       }
 
       const paymentMode = body.paymentMode || 'FULL';

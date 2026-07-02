@@ -74,7 +74,7 @@ const PaymentStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
 const PaymentModeSchema = z.enum(['FULL', 'INSTALLMENTS', 'MONTHLY_SUBSCRIPTION']);
 
 // Course Payment Type
-const CoursePaymentTypeSchema = z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']);
+const CoursePaymentTypeSchema = z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']);
 
 // Payment Methods
 const PaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CREDIT_CARD', 'CHECK']);
@@ -389,10 +389,14 @@ const CreateCourseSchema = z.object({
   instructorId: OptionalUUIDSchema,
   defaultRoomId: OptionalUUIDSchema,
   levelId: OptionalUUIDSchema,
-  // Payment model: ONE_TIME (default) or MONTHLY_SUBSCRIPTION. Without this the
-  // field is stripped from the request body and every course saves as ONE_TIME.
+  // Payment model: ONE_TIME (default), MONTHLY_SUBSCRIPTION, or PER_SESSION. Without
+  // this the field is stripped from the request body and every course saves as ONE_TIME.
   paymentType: CoursePaymentTypeSchema.optional(),
   monthlyFee: z.number().optional(),
+  // PER_SESSION settings (price column holds the per-session fee):
+  sessionPackageSize: z.number().int().positive().nullable().optional(),
+  sessionPackagePrice: z.number().nullable().optional(),
+  chargeAbsentSessions: z.boolean().optional(),
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial();
@@ -584,6 +588,9 @@ const CourseSchema = z.object({
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
   paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),
+  sessionPackageSize: z.number().nullable().optional(),
+  sessionPackagePrice: z.number().nullable().optional(),
+  chargeAbsentSessions: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -685,6 +692,100 @@ const SetPriceOverrideSchema = z.object({
 });
 
 // =============================================
+// Session Payment Schemas  (PER_SESSION courses, migration 050)
+// =============================================
+const SessionPaymentStatusSchema = z.enum(['PENDING', 'PAID', 'COVERED', 'WAIVED', 'REFUNDED']);
+
+const SessionPaymentSchema = z.object({
+  id: UUIDSchema,
+  enrollmentId: UUIDSchema,
+  sessionId: UUIDSchema,
+  companyId: UUIDSchema,
+  studentId: UUIDSchema,
+  courseId: UUIDSchema,
+  branchId: UUIDSchema,
+  packageId: UUIDSchema.nullable(),
+  attendanceState: z.enum(['PRESENT', 'ABSENT']),
+  amountDue: z.number(),
+  amountPaid: z.number(),
+  paymentStatus: SessionPaymentStatusSchema,
+  paidDate: z.string().nullable(),
+  notes: z.string().nullable(),
+  refundedAmount: z.number().optional(),
+  refundNote: z.string().nullable().optional(),
+  refundedAt: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const SessionPaymentWithDetailsSchema = SessionPaymentSchema.extend({
+  studentFirstName: z.string(),
+  studentLastName: z.string(),
+  courseName: z.string(),
+  branchName: z.string(),
+  className: z.string().nullable().optional(),
+  sessionNumber: z.number().nullable().optional(),
+  sessionDate: z.string().nullable().optional(),
+  studentPhone: z.string().nullable().optional(),
+  parentPhone: z.string().nullable().optional(),
+  parentName: z.string().nullable().optional(),
+  coursePackageSize: z.number().nullable().optional(),
+  coursePackagePrice: z.number().nullable().optional(),
+});
+
+const SessionPaymentSummarySchema = z.object({
+  totalCharges: z.number(),
+  paidCount: z.number(),
+  coveredCount: z.number(),
+  pendingCount: z.number(),
+  refundedCount: z.number(),
+  totalRevenue: z.number(),
+  totalExpected: z.number(),
+});
+
+const SessionPackageSchema = z.object({
+  id: UUIDSchema,
+  enrollmentId: UUIDSchema,
+  companyId: UUIDSchema,
+  studentId: UUIDSchema,
+  courseId: UUIDSchema,
+  branchId: UUIDSchema,
+  sessionsTotal: z.number(),
+  sessionsUsed: z.number(),
+  amountPaid: z.number(),
+  status: z.enum(['ACTIVE', 'EXHAUSTED', 'REFUNDED']),
+  purchasedAt: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const SessionPackageWithDetailsSchema = SessionPackageSchema.extend({
+  studentFirstName: z.string(),
+  studentLastName: z.string(),
+  courseName: z.string(),
+  branchName: z.string(),
+});
+
+const RecordSessionPaymentSchema = z.object({
+  amount: z.number().positive(),
+  paymentDate: z.string(),
+  notes: z.string().optional(),
+});
+
+const RefundSessionPaymentSchema = z.object({
+  amount: z.number().positive(),
+  note: z.string().optional(),
+});
+
+const BuySessionPackageSchema = z.object({
+  enrollmentId: UUIDSchema,
+  sessionsTotal: z.number().int().positive().optional(),
+  amount: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+});
+
+// =============================================
 // Class Schemas
 // =============================================
 const ClassTypeSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -764,8 +865,11 @@ const CreateEnrollmentSchema = z.object({
   downPayment: z.number().optional(),
   paymentStatus: PaymentStatusSchema.optional(),
   // Monthly-subscription enrollment fields (ignored for one-time courses):
-  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']).optional(),
   payFirstMonth: z.boolean().optional(),
+  // Per-session enrollment fields (ignored unless the course is PER_SESSION):
+  sessionBillingMode: z.enum(['PER_SESSION', 'PACKAGE']).optional(),
+  buyPackage: z.boolean().optional(),
   notes: z.string().optional(),
   // Educational Books: optional linked products bought together with the enrollment
   // (one atomic transaction). Each becomes an attributed product sale.
@@ -794,7 +898,7 @@ const EnrollmentSchema = z.object({
   discountAmount: z.number(),
   finalPrice: z.number(),
   paymentMode: PaymentModeSchema,
-  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']).optional(),
   downPayment: z.number(),
   amountPaid: z.number(),
   paymentStatus: PaymentStatusSchema,
@@ -4674,7 +4778,14 @@ export const contract = c.router({
       pathParams: z.object({ sessionId: UUIDSchema }),
       body: z.object({ presentStudentIds: z.array(UUIDSchema) }),
       responses: {
-        200: z.object({ message: z.string(), presentCount: z.number() }),
+        200: z.object({
+          message: z.string(),
+          presentCount: z.number(),
+          // For PER_SESSION courses: the session charges created/updated by this
+          // save that still need collection (payment_status PENDING). Empty/absent
+          // for other course types.
+          sessionCharges: z.array(SessionPaymentWithDetailsSchema).optional(),
+        }),
         401: ApiErrorSchema,
         402: ApiErrorSchema,
         403: ApiErrorSchema,
@@ -4698,6 +4809,9 @@ export const contract = c.router({
           sessionNumber: z.number().nullable().optional(),
           code: z.string(),
           message: z.string(),
+          // For PER_SESSION courses: the session charge created by this check-in.
+          // paymentStatus PENDING → prompt to collect; COVERED → paid by package.
+          sessionCharge: SessionPaymentWithDetailsSchema.nullable().optional(),
         }),
         400: ApiErrorSchema,
         401: ApiErrorSchema,
@@ -5195,6 +5309,151 @@ export const contract = c.router({
       responses: {
         200: z.array(CourseMonthlyPriceOverrideSchema),
         403: ApiErrorSchema,
+      },
+    },
+  },
+
+  // ============================================================
+  // Session Payments (PER_SESSION courses)
+  // ============================================================
+  sessionPayments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/session-payments',
+      // Inclusive date range (from..to, ISO yyyy-mm-dd) over the session date.
+      query: z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+        branchId: z.string().optional(),
+        courseId: z.string().optional(),
+        sessionId: z.string().optional(),
+        studentId: z.string().optional(),
+        status: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(SessionPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    summary: {
+      method: 'GET' as const,
+      path: '/api/session-payments/summary',
+      query: z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+        branchId: z.string().optional(),
+        courseId: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: SessionPaymentSummarySchema,
+        403: ApiErrorSchema,
+      },
+    },
+    overdue: {
+      method: 'GET' as const,
+      path: '/api/session-payments/overdue',
+      query: z.object({ branchId: z.string().optional() }).optional(),
+      responses: {
+        200: z.array(SessionPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    recordPayment: {
+      method: 'POST' as const,
+      path: '/api/session-payments/:id/pay',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RecordSessionPaymentSchema,
+      responses: {
+        200: SessionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    voidPayment: {
+      method: 'POST' as const,
+      path: '/api/session-payments/:id/void',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ reason: z.string().optional() }),
+      responses: {
+        200: SessionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    refund: {
+      method: 'POST' as const,
+      path: '/api/session-payments/:id/refund',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RefundSessionPaymentSchema,
+      responses: {
+        200: SessionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    buyPackage: {
+      method: 'POST' as const,
+      path: '/api/session-payments/packages',
+      body: BuySessionPackageSchema,
+      responses: {
+        201: SessionPackageSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    listPackages: {
+      method: 'GET' as const,
+      path: '/api/session-payments/packages',
+      query: z.object({
+        branchId: z.string().optional(),
+        courseId: z.string().optional(),
+        studentId: z.string().optional(),
+        status: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(SessionPackageWithDetailsSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    listByCourse: {
+      method: 'GET' as const,
+      path: '/api/session-payments/course/:courseId',
+      pathParams: z.object({ courseId: UUIDSchema }),
+      responses: {
+        200: z.array(SessionPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    listByStudent: {
+      method: 'GET' as const,
+      path: '/api/session-payments/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.array(SessionPaymentWithDetailsSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Resolve a scanned student barcode (QR token) to that student and their
+    // still-due session charges, so staff can collect a payment by scanning.
+    byToken: {
+      method: 'GET' as const,
+      path: '/api/session-payments/by-token/:qrToken',
+      pathParams: z.object({ qrToken: z.string().min(1).max(64) }),
+      responses: {
+        200: z.object({
+          studentId: z.string(),
+          studentFirstName: z.string(),
+          studentLastName: z.string(),
+          dueSessions: z.array(SessionPaymentWithDetailsSchema),
+        }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },

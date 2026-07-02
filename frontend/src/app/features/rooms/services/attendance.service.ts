@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
+import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.interface';
 
 export type AttendanceType = 'NORMAL' | 'SUBSTITUTION';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
@@ -43,6 +44,8 @@ export interface QrCheckinResult {
   sessionNumber?: number | null;
   code: string;
   message: string;
+  /** PER_SESSION courses: the charge created by this check-in (PENDING → prompt to pay). */
+  sessionCharge?: SessionPaymentWithDetails | null;
 }
 
 export interface ClassAttendanceSummary {
@@ -66,8 +69,8 @@ export class AttendanceService {
   }
 
   /** Bulk save attendance for a session */
-  saveForSession(sessionId: string, presentStudentIds: string[]): Observable<{ message: string; presentCount: number }> {
-    return this.api.post<{ message: string; presentCount: number }>(
+  saveForSession(sessionId: string, presentStudentIds: string[]): Observable<{ message: string; presentCount: number; sessionCharges?: SessionPaymentWithDetails[] }> {
+    return this.api.post<{ message: string; presentCount: number; sessionCharges?: SessionPaymentWithDetails[] }>(
       `attendance/session/${sessionId}`,
       { presentStudentIds }
     );

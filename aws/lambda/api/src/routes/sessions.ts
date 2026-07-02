@@ -3,6 +3,7 @@ import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPerm
 import { apiError, mapThrownError } from '../utils/api-error';
 import { notifySessionAttendance } from './telegram';
 import { ensureAutoManageSessionsColumn } from './companies';
+import { chargeAbsencesAtSessionEnd } from './session-payments';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -588,6 +589,14 @@ export const sessionsRoutes = {
 
       // Best-effort Telegram present/absent notifications (no-op unless enabled).
       await notifySessionAttendance(context.companyId, params.id);
+
+      // PER_SESSION courses: bill absent students now that the roster is final
+      // (only if the course opted into charging absences). Best-effort.
+      try {
+        await chargeAbsencesAtSessionEnd(context.companyId, existing);
+      } catch (billErr) {
+        console.error('Per-session absence charge (session end) error:', billErr);
+      }
 
       return { status: 200 as const, body: mapSessionFromDB(session) };
     } catch (error) {

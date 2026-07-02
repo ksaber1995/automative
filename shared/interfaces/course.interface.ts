@@ -12,7 +12,11 @@ export interface Course {
   levelId?: string | null;
   levelName?: string | null;
   isActive: boolean;
-  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';  // NEW
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  // PER_SESSION settings (price holds the per-session fee):
+  sessionPackageSize?: number | null;
+  sessionPackagePrice?: number | null;
+  chargeAbsentSessions?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,7 +36,10 @@ export interface CourseCreateDto {
   maxStudents?: number;
   instructorId?: string;
   levelId?: string | null;
-  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  sessionPackageSize?: number | null;
+  sessionPackagePrice?: number | null;
+  chargeAbsentSessions?: boolean;
 }
 
 export interface CourseUpdateDto {
@@ -45,5 +52,8 @@ export interface CourseUpdateDto {
   instructorId?: string;
   levelId?: string | null;
   isActive?: boolean;
-  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  sessionPackageSize?: number | null;
+  sessionPackagePrice?: number | null;
+  chargeAbsentSessions?: boolean;
 }
