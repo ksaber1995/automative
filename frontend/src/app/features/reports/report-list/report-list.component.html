@@ -380,7 +380,9 @@
                   <th class="text-right" pSortableColumn="revenue">{{ 'REPORTS.COL_REVENUE' | translate }} <p-sortIcon field="revenue"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="expenses">{{ 'REPORTS.COL_EXPENSES' | translate }} <p-sortIcon field="expenses"></p-sortIcon></th>
                   <th class="text-right" pSortableColumn="netProfit">{{ 'REPORTS.COL_NET_PROFIT' | translate }} <p-sortIcon field="netProfit"></p-sortIcon></th>
-                  <th class="text-right" pSortableColumn="activeStudents">{{ 'REPORTS.COL_ACTIVE_STUDENTS' | translate }} <p-sortIcon field="activeStudents"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="activeStudents" [pTooltip]="'REPORTS.CHURN_ACTIVE_HINT' | translate">{{ 'REPORTS.COL_ACTIVE_STUDENTS' | translate }} <p-sortIcon field="activeStudents"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="dormantStudents" [pTooltip]="'REPORTS.CHURN_DORMANT_HINT' | translate">{{ 'REPORTS.CHURN_DORMANT' | translate }} <p-sortIcon field="dormantStudents"></p-sortIcon></th>
+                  <th class="text-right" pSortableColumn="leftStudents" [pTooltip]="'REPORTS.CHURN_INACTIVE_HINT' | translate">{{ 'REPORTS.CHURN_INACTIVE' | translate }} <p-sortIcon field="leftStudents"></p-sortIcon></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-row>
@@ -391,11 +393,13 @@
                   <td class="text-right font-bold" [class.text-green-700]="row.netProfit >= 0" [class.text-red-700]="row.netProfit < 0">
                     {{ row.netProfit | number:'1.2-2' }}
                   </td>
-                  <td class="text-right">{{ row.activeStudents }}</td>
+                  <td class="text-right text-green-700">{{ row.activeStudents }}</td>
+                  <td class="text-right text-orange-700">{{ row.dormantStudents }}</td>
+                  <td class="text-right text-red-700">{{ row.leftStudents }}</td>
                 </tr>
               </ng-template>
               <ng-template pTemplate="emptymessage">
-                <tr><td colspan="5" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
+                <tr><td colspan="7" class="text-center py-6 text-gray-500">{{ 'REPORTS.NO_DATA' | translate }}</td></tr>
               </ng-template>
             </p-table>
           </p-card>

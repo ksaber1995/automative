@@ -74,6 +74,44 @@ function reportBranchClause(alias: string, params: any[], ids: string[] | null):
   return ` AND ${alias} IN (${placeholders})`;
 }
 
+// ── Shared student-status predicates ────────────────────────────────────────
+// SQL fragments over a `students s` row with $2 = startDate and $3 = endDate.
+// Used by both the churn summary and the per-branch report so "active",
+// "dormant" (idle) and "left" mean the same thing on every tab.
+//   active  = present as of $3 AND enrolled (by $3) in a class that was
+//             running as of $3 — started by $3 and not finished by $3.
+//   dormant = present as of $3 but in no running class.
+//   left    = the student record was deactivated within [$2, $3].
+// NOTE: classes.is_active is unreliable (false even for in-progress classes),
+// and enrollment status has no history, so current status is used as a
+// best-effort proxy. Checks single-course (enrollments) and bundle
+// (master_class_enrollments) tables.
+const ACTIVE_ENROLLMENT_EXISTS = `(
+  EXISTS (
+    SELECT 1 FROM enrollments e
+    INNER JOIN classes c ON c.id = e.class_id
+    WHERE e.student_id = s.id
+      AND e.status NOT IN ('DROPPED', 'CANCELLED')
+      AND e.enrollment_date <= $3::date
+      AND c.start_date <= $3::date
+      AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
+  )
+  OR EXISTS (
+    SELECT 1 FROM master_class_enrollments mce
+    INNER JOIN classes c ON c.id = mce.class_id
+    WHERE mce.student_id = s.id
+      AND mce.status != 'DROPPED'
+      AND mce.enrolled_at <= $3::date
+      AND c.start_date <= $3::date
+      AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
+  )
+)`;
+// Present as of the end date: joined by then and not yet left by then.
+const PRESENT_AS_OF_END = `(s.enrollment_date <= $3::date
+  AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
+const LEFT_IN_RANGE = `(s.inactive_date IS NOT NULL
+  AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
+
 export const reportsRoutes = {
   // Monthly P&L: revenue (enrollments + product_sales - refunds) and expenses per month.
   monthlyPL: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
@@ -428,44 +466,12 @@ export const reportsRoutes = {
       // Snapshot the student body AS OF the end of the selected range ($3), with
       // "left" measured within the range [$2, $3]. This makes the top date filter
       // drive the report (e.g. picking an earlier end date shows who was active
-      // back then, before later classes finished).
-      //   active   = present as of $3 AND enrolled (by $3) in a class that was
-      //              running as of $3 — i.e. started by $3 and not yet finished
-      //              by $3 (finished_at is the authoritative finish time; a class
-      //              with no finished_at on/before $3 was still running).
-      //   dormant  = present as of $3 but in no running class.
-      //   left     = the student record was deactivated within the range — its
-      //              inactive_date falls in [$2, $3].
-      // NOTE: classes.is_active is unreliable (false even for in-progress classes),
-      // and enrollment status has no history, so current status is used as a
-      // best-effort proxy. Checks single-course (enrollments) and bundle
-      // (master_class_enrollments) tables.
+      // back then, before later classes finished). See the shared predicate
+      // definitions above `reportsRoutes` for the exact semantics.
       const { startDate, endDate } = defaultRange(q);
-      const activeEnrollmentExists = `(
-        EXISTS (
-          SELECT 1 FROM enrollments e
-          INNER JOIN classes c ON c.id = e.class_id
-          WHERE e.student_id = s.id
-            AND e.status NOT IN ('DROPPED', 'CANCELLED')
-            AND e.enrollment_date <= $3::date
-            AND c.start_date <= $3::date
-            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
-        )
-        OR EXISTS (
-          SELECT 1 FROM master_class_enrollments mce
-          INNER JOIN classes c ON c.id = mce.class_id
-          WHERE mce.student_id = s.id
-            AND mce.status != 'DROPPED'
-            AND mce.enrolled_at <= $3::date
-            AND c.start_date <= $3::date
-            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
-        )
-      )`;
-      // Present as of the end date: joined by then and not yet left by then.
-      const presentAsOfEnd = `(s.enrollment_date <= $3::date
-        AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
-      const leftInRange = `(s.inactive_date IS NOT NULL
-        AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
+      const activeEnrollmentExists = ACTIVE_ENROLLMENT_EXISTS;
+      const presentAsOfEnd = PRESENT_AS_OF_END;
+      const leftInRange = LEFT_IN_RANGE;
 
       const countParams: any[] = [context.companyId, startDate, endDate];
       const branchClause = reportBranchClause('s.branch_id', countParams, scope.ids);
@@ -688,7 +694,15 @@ export const reportsRoutes = {
              WHERE ep.branch_id = b.id AND ep.company_id = $1
                AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS expenses,
-           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id AND s.is_active = true) AS active_students
+           -- Student counts use the same definitions as the Students tab (churn):
+           -- active = enrolled in a class running as of the end date, dormant =
+           -- present but with no running enrollment, left = deactivated in range.
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${PRESENT_AS_OF_END} AND ${ACTIVE_ENROLLMENT_EXISTS}) AS active_students,
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${PRESENT_AS_OF_END} AND NOT ${ACTIVE_ENROLLMENT_EXISTS}) AS dormant_students,
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${LEFT_IN_RANGE}) AS left_students
          FROM branches b
          WHERE b.company_id = $1 ${branchScopeClause}
          ORDER BY enrollment_revenue DESC`,
@@ -720,6 +734,8 @@ export const reportsRoutes = {
             expenses,
             netProfit: revenue - expenses,
             activeStudents: parseInt(r.active_students, 10),
+            dormantStudents: parseInt(r.dormant_students, 10),
+            leftStudents: parseInt(r.left_students, 10),
           };
         }),
       };

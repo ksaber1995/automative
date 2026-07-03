@@ -11,6 +11,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
+import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin, from, of, Observable } from 'rxjs';
 import { map, mergeMap, toArray } from 'rxjs/operators';
@@ -52,6 +53,7 @@ import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
     TabList,
     TabPanel,
     TabPanels,
+    TooltipModule,
     TranslateModule,
   ],
   templateUrl: './report-list.component.html',
@@ -859,6 +861,8 @@ export class ReportListComponent implements OnInit {
       { header: 'Expenses', value: r => r.expenses },
       { header: 'Net Profit', value: r => r.netProfit },
       { header: 'Active Students', value: r => r.activeStudents },
+      { header: 'Dormant', value: r => r.dormantStudents },
+      { header: 'Left', value: r => r.leftStudents },
     ];
     downloadCsv(this.csvFile('profit_by_branch'), this.visibleProfitBranches(), cols);
   }

@@ -74,7 +74,11 @@ export interface ProfitByBranchRow {
   revenue: number;
   expenses: number;
   netProfit: number;
+  // Same definitions as ChurnSummary: active = enrolled in a running class,
+  // dormant = present but idle, left = record deactivated within the range.
   activeStudents: number;
+  dormantStudents: number;
+  leftStudents: number;
 }
 
 export interface ProfitByProductRow {
