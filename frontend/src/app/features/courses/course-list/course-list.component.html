@@ -83,7 +83,9 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          @if (!authService.isTeacher()) {
+            <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
           <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
           <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
           <th pSortableColumn="enrollmentCount">{{ 'COURSES.LIST.COL_ENROLLMENTS' | translate }} <p-sortIcon field="enrollmentCount"></p-sortIcon></th>
@@ -107,7 +109,9 @@
               </span>
             }
           </td>
-          <td>{{ getBranchName(course.branchId) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ getBranchName(course.branchId) }}</td>
+          }
           <td>{{ course.levelName || '—' }}</td>
           <td>{{ course.price | amount }}</td>
           <td>
@@ -192,7 +196,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="text-center py-8">
+          <td [attr.colspan]="authService.isTeacher() ? 5 : 6" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>

@@ -89,10 +89,12 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
               <tr>
                 <th>Company</th>
                 <th>Mobile</th>
+                <th>Email</th>
                 <th>Registration</th>
                 <th>Type</th>
                 <th class="num">Price</th>
                 <th class="num">Students</th>
+                <th class="num">Courses</th>
                 <th class="num">Employees</th>
                 <th class="num">Branches</th>
                 <th class="num">QR</th>
@@ -114,6 +116,13 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
                     }
                   </td>
                   <td>
+                    @if (r.owner_email) {
+                      <a class="mobile" [href]="'mailto:' + r.owner_email">{{ r.owner_email }}</a>
+                    } @else {
+                      —
+                    }
+                  </td>
+                  <td>
                     <span class="reg" [class.teacher]="r.company_type === 'TEACHER'" [class.academy]="r.company_type === 'ACADEMY'">
                       {{ r.company_type || '—' }}
                     </span>
@@ -125,6 +134,7 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
                   </td>
                   <td class="num">{{ formatPrice(r) }}</td>
                   <td class="num">{{ r.student_count }}</td>
+                  <td class="num">{{ r.course_count }}</td>
                   <td class="num">{{ r.employee_count }}</td>
                   <td class="num">{{ r.branch_count }}</td>
                   <td class="num">
