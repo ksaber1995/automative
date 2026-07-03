@@ -7,6 +7,7 @@ export interface MonthlyPLRow {
   enrollmentRevenue: number;
   productRevenue: number;
   masterRevenue: number;
+  sessionRevenue: number;
   refunds: number;
   revenue: number;
   expenses: number;
@@ -58,6 +59,8 @@ export interface ProfitByCourseRow {
   enrollments: number;
   revenue: number;
   avgPrice: number;
+  /** Unit the price is charged in: ONE_TIME (per course), MONTHLY_SUBSCRIPTION, PER_SESSION. */
+  paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
 }
 
 export interface ProfitByBranchRow {

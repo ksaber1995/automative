@@ -1,12 +1,13 @@
 import { query } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensurePerSessionSchema } from './session-payments';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
     query: {
       branchId?: string;
-      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'ALL';
+      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'SESSION' | 'ALL';
       startDate?: string;
       endDate?: string;
     };
@@ -14,6 +15,9 @@ export const revenuesRoutes = {
   }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // session_packages / session_payments are created lazily — make sure they
+      // exist before the UNION below references them.
+      await ensurePerSessionSchema();
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -28,6 +32,7 @@ export const revenuesRoutes = {
       const includeMasters = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'MASTER_ENROLLMENT';
       const includeEvents = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'EVENT';
       const includeSubscriptions = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'SUBSCRIPTION';
+      const includeSessions = !queryParams.source || queryParams.source === 'ALL' || queryParams.source === 'SESSION';
 
       // Shared filters — push once, reuse positional index for every branch.
       // Sentinel value "NULL" means "company-level only" (no branch_id) — only
@@ -240,6 +245,74 @@ export const revenuesRoutes = {
         parts.push(sql);
       }
 
+      // Per-session money enters through two tables: session_packages (prepaid
+      // bundles — amount collected up-front for N sessions) and session_payments
+      // (pay-as-you-go charges). COVERED charges carry amount_paid = 0 (their
+      // money lives on the package row), so summing both never double-counts.
+      // branch_id is NOT NULL on both, so they never appear company-level.
+      if (includeSessions && !companyLevelOnly) {
+        let pkgSql = `SELECT
+          'SESSION' as source,
+          spkg.id as source_id,
+          spkg.company_id,
+          spkg.branch_id,
+          b.name as branch_name,
+          spkg.amount_paid as amount,
+          COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.session_package_id = spkg.id), 0) as total_refunded,
+          CONCAT('Session package: ', s.first_name, ' ', s.last_name, ' - ', c.name,
+            ' (', spkg.sessions_total, ' sessions)') as description,
+          spkg.purchased_at::date as date,
+          'PAID' as payment_status,
+          NULL::text as payment_method,
+          CONCAT(s.first_name, ' ', s.last_name) as student_name,
+          c.name as course_name,
+          NULL::text as product_name,
+          spkg.student_id as student_id,
+          spkg.created_at,
+          NULL::uuid as event_id,
+          NULL::text as event_name
+        FROM session_packages spkg
+        JOIN branches b ON spkg.branch_id = b.id
+        JOIN students s ON spkg.student_id = s.id
+        JOIN courses c ON spkg.course_id = c.id
+        WHERE spkg.company_id = $1 AND spkg.amount_paid > 0`;
+        const bp = applyBranch('spkg.branch_id');
+        if (bp) pkgSql += ` AND ${bp}`;
+        if (startIdx) pkgSql += ` AND spkg.purchased_at::date >= $${startIdx}`;
+        if (endIdx) pkgSql += ` AND spkg.purchased_at::date <= $${endIdx}`;
+        parts.push(pkgSql);
+
+        let spSql = `SELECT
+          'SESSION' as source,
+          sp.id as source_id,
+          sp.company_id,
+          sp.branch_id,
+          b.name as branch_name,
+          sp.amount_paid as amount,
+          COALESCE(sp.refunded_amount, 0) as total_refunded,
+          CONCAT('Session payment: ', s.first_name, ' ', s.last_name, ' - ', c.name) as description,
+          COALESCE(sp.paid_date, sp.created_at::date) as date,
+          sp.payment_status,
+          NULL::text as payment_method,
+          CONCAT(s.first_name, ' ', s.last_name) as student_name,
+          c.name as course_name,
+          NULL::text as product_name,
+          sp.student_id as student_id,
+          sp.created_at,
+          NULL::uuid as event_id,
+          NULL::text as event_name
+        FROM session_payments sp
+        JOIN branches b ON sp.branch_id = b.id
+        JOIN students s ON sp.student_id = s.id
+        JOIN courses c ON sp.course_id = c.id
+        WHERE sp.company_id = $1 AND sp.amount_paid > 0`;
+        const bs = applyBranch('sp.branch_id');
+        if (bs) spSql += ` AND ${bs}`;
+        if (startIdx) spSql += ` AND COALESCE(sp.paid_date, sp.created_at::date) >= $${startIdx}`;
+        if (endIdx) spSql += ` AND COALESCE(sp.paid_date, sp.created_at::date) <= $${endIdx}`;
+        parts.push(spSql);
+      }
+
       if (parts.length === 0) {
         return { status: 200 as const, body: [] };
       }
@@ -287,6 +360,7 @@ export const revenuesRoutes = {
   }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -299,6 +373,10 @@ export const revenuesRoutes = {
       let masterConditions = 'WHERE me.company_id = $1 AND me.amount_paid > 0';
       // Event subscriptions with cash collected (amount > 0).
       let eventConditions = 'WHERE es.company_id = $1 AND es.amount > 0';
+      // Per-session money: prepaid packages + pay-as-you-go charges (COVERED
+      // charges carry 0, their cash lives on the package row — no double count).
+      let pkgConditions = 'WHERE spkg.company_id = $1 AND spkg.amount_paid > 0';
+      let sessionConditions = 'WHERE sp.company_id = $1 AND sp.amount_paid > 0';
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
@@ -309,6 +387,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.branch_id = $${params.length}`;
         masterConditions += ` AND me.branch_id = $${params.length}`;
         eventConditions += ` AND es.branch_id = $${params.length}`;
+        pkgConditions += ` AND spkg.branch_id = $${params.length}`;
+        sessionConditions += ` AND sp.branch_id = $${params.length}`;
       } else {
         const branchClause = appendBranchSqlFilter(context, params, '__COL__');
         if (branchClause) {
@@ -316,6 +396,8 @@ export const revenuesRoutes = {
           productConditions += ` AND ${branchClause.replace(/__COL__/g, 'ps.branch_id')}`;
           masterConditions += ` AND ${branchClause.replace(/__COL__/g, 'me.branch_id')}`;
           eventConditions += ` AND ${branchClause.replace(/__COL__/g, 'es.branch_id')}`;
+          pkgConditions += ` AND ${branchClause.replace(/__COL__/g, 'spkg.branch_id')}`;
+          sessionConditions += ` AND ${branchClause.replace(/__COL__/g, 'sp.branch_id')}`;
         }
       }
 
@@ -326,6 +408,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date >= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date >= $${paramIndex}`;
         eventConditions += ` AND es.payment_date >= $${paramIndex}`;
+        pkgConditions += ` AND spkg.purchased_at::date >= $${paramIndex}`;
+        sessionConditions += ` AND COALESCE(sp.paid_date, sp.created_at::date) >= $${paramIndex}`;
       }
 
       if (queryParams.endDate) {
@@ -335,6 +419,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date <= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date <= $${paramIndex}`;
         eventConditions += ` AND es.payment_date <= $${paramIndex}`;
+        pkgConditions += ` AND spkg.purchased_at::date <= $${paramIndex}`;
+        sessionConditions += ` AND COALESCE(sp.paid_date, sp.created_at::date) <= $${paramIndex}`;
       }
 
       // Get total revenue from enrollments
@@ -365,6 +451,13 @@ export const revenuesRoutes = {
         ${eventConditions}
       `;
 
+      // Get total revenue from per-session money (packages + direct charges)
+      const sessionRevenueQuery = `
+        SELECT
+          COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg ${pkgConditions}), 0)
+          + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp ${sessionConditions}), 0) as total
+      `;
+
       // Get revenue by branch (three LEFT JOINs summed)
       const startIdx = queryParams.startDate ? params.indexOf(queryParams.startDate) + 1 : null;
       const endIdx = queryParams.endDate ? params.indexOf(queryParams.endDate) + 1 : null;
@@ -382,7 +475,7 @@ export const revenuesRoutes = {
         SELECT
           b.id as branch_id,
           b.name as branch_name,
-          COALESCE(enroll.total, 0) + COALESCE(prod.total, 0) + COALESCE(mast.total, 0) + COALESCE(evt.total, 0) as revenue
+          COALESCE(enroll.total, 0) + COALESCE(prod.total, 0) + COALESCE(mast.total, 0) + COALESCE(evt.total, 0) + COALESCE(spkg.total, 0) + COALESCE(sess.total, 0) as revenue
         FROM branches b
         LEFT JOIN (
           SELECT branch_id, SUM(amount_paid) as total
@@ -416,9 +509,25 @@ export const revenuesRoutes = {
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
         ) evt ON evt.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) as total
+          FROM session_packages
+          WHERE company_id = $1 AND amount_paid > 0
+          ${startIdx ? `AND purchased_at::date >= $${startIdx}` : ''}
+          ${endIdx ? `AND purchased_at::date <= $${endIdx}` : ''}
+          GROUP BY branch_id
+        ) spkg ON spkg.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) as total
+          FROM session_payments
+          WHERE company_id = $1 AND amount_paid > 0
+          ${startIdx ? `AND COALESCE(paid_date, created_at::date) >= $${startIdx}` : ''}
+          ${endIdx ? `AND COALESCE(paid_date, created_at::date) <= $${endIdx}` : ''}
+          GROUP BY branch_id
+        ) sess ON sess.branch_id = b.id
         WHERE b.company_id = $1
         ${branchIdx ? `AND b.id = $${branchIdx}` : ''}${adminBranchClause}
-        GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, evt.total
+        GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, evt.total, spkg.total, sess.total
         ORDER BY revenue DESC
       `;
 
@@ -443,17 +552,26 @@ export const revenuesRoutes = {
           SELECT es.payment_date as date, es.amount
           FROM event_subscriptions es
           ${eventConditions}
+          UNION ALL
+          SELECT spkg.purchased_at::date as date, spkg.amount_paid as amount
+          FROM session_packages spkg
+          ${pkgConditions}
+          UNION ALL
+          SELECT COALESCE(sp.paid_date, sp.created_at::date) as date, sp.amount_paid as amount
+          FROM session_payments sp
+          ${sessionConditions}
         ) combined
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `;
 
-      const [enrollmentResult, productResult, masterResult, eventResult, byBranchResult, byMonthResult] = await Promise.all([
+      const [enrollmentResult, productResult, masterResult, eventResult, sessionResult, byBranchResult, byMonthResult] = await Promise.all([
         query(enrollmentRevenueQuery, params),
         query(productRevenueQuery, params),
         query(masterRevenueQuery, params),
         query(eventRevenueQuery, params),
+        query(sessionRevenueQuery, params),
         query(byBranchQuery, params),
         query(byMonthQuery, params),
       ]);
@@ -462,15 +580,17 @@ export const revenuesRoutes = {
       const productRevenue = parseFloat(productResult[0]?.total || 0);
       const masterRevenue = parseFloat(masterResult[0]?.total || 0);
       const eventRevenue = parseFloat(eventResult[0]?.total || 0);
+      const sessionRevenue = parseFloat(sessionResult[0]?.total || 0);
 
       return {
         status: 200 as const,
         body: {
-          totalRevenue: enrollmentRevenue + productRevenue + masterRevenue + eventRevenue,
+          totalRevenue: enrollmentRevenue + productRevenue + masterRevenue + eventRevenue + sessionRevenue,
           enrollmentRevenue,
           productRevenue,
           masterRevenue,
           eventRevenue,
+          sessionRevenue,
           byBranch: byBranchResult.map((row: any) => ({
             branchId: row.branch_id,
             branchName: row.branch_name,

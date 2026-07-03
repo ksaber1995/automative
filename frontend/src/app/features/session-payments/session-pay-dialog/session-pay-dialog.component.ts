@@ -16,7 +16,12 @@ import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.in
 /**
  * Reusable pay-confirmation popup for PER_SESSION attendance. Feed it the charges
  * returned by the attendance endpoints via `enqueue()`. It shows one PENDING
- * charge at a time (Pay / Skip, or Buy package), and toasts COVERED charges.
+ * charge at a time (Pay / Skip), and toasts COVERED charges.
+ *
+ * When the course offers prepaid packages, the dialog has two modes the cashier
+ * can toggle between: pay THIS session, or buy the next N-session package
+ * (which also back-covers this pending charge). Returning package customers
+ * (their previous bundle ran out) default to the package mode.
  */
 @Component({
   selector: 'app-session-pay-dialog',
@@ -44,6 +49,8 @@ export class SessionPayDialogComponent {
   });
   visible = signal(false);
 
+  /** SESSION = pay this one session; PACKAGE = buy the next prepaid bundle. */
+  mode = signal<'SESSION' | 'PACKAGE'>('SESSION');
   amount = signal<number | null>(null);
   payDate = signal<Date>(new Date());
   notes = signal('');
@@ -78,10 +85,20 @@ export class SessionPayDialogComponent {
   private loadCurrent(): void {
     const c = this.current();
     if (!c) { this.visible.set(false); return; }
-    this.amount.set(c.amountDue);
+    // Returning package customers (bought a bundle before, now out of credit)
+    // default to buying the next bundle; everyone else defaults to per-session.
+    const packageMode = !!c.coursePackageSize && !!c.hadPackage;
+    this.setMode(packageMode ? 'PACKAGE' : 'SESSION', c);
     this.payDate.set(new Date());
     this.notes.set('');
     this.visible.set(true);
+  }
+
+  setMode(mode: 'SESSION' | 'PACKAGE', charge?: SessionPaymentWithDetails): void {
+    const c = charge ?? this.current();
+    if (!c) return;
+    this.mode.set(mode);
+    this.amount.set(mode === 'PACKAGE' ? (c.coursePackagePrice ?? 0) : c.amountDue);
   }
 
   private advance(): void {
@@ -95,7 +112,12 @@ export class SessionPayDialogComponent {
     this.advance();
   }
 
+  /** Confirm: pay this session, or buy the package (covers this charge too). */
   pay(): void {
+    if (this.mode() === 'PACKAGE') {
+      this.buyPackage();
+      return;
+    }
     const c = this.current();
     if (!c || this.amount() == null) return;
     this.submitting.set(true);
@@ -118,7 +140,11 @@ export class SessionPayDialogComponent {
     const c = this.current();
     if (!c) return;
     this.submitting.set(true);
-    this.service.buyPackage({ enrollmentId: c.enrollmentId }).subscribe({
+    this.service.buyPackage({
+      enrollmentId: c.enrollmentId,
+      amount: this.amount() != null ? (this.amount() as number) : undefined,
+      notes: this.notes() || undefined,
+    }).subscribe({
       next: () => {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PACKAGE_SUCCESS'));

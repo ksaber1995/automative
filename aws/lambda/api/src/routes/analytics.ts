@@ -5,11 +5,15 @@ import {
   isGlobalAdmin,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensurePerSessionSchema } from './session-payments';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // session_packages / session_payments are created lazily — make sure they
+      // exist before the revenue queries below reference them.
+      await ensurePerSessionSchema();
 
       if (!checkGranularPermission(context, 'dashboard', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -110,11 +114,35 @@ export const analyticsRoutes = {
         evParams
       );
 
+      // Per-session money: prepaid packages (cash collected at purchase) plus
+      // pay-as-you-go charges. COVERED charges carry amount_paid = 0 (their cash
+      // lives on the package row), so summing both never double-counts.
+      const pkgParams: any[] = [context.companyId, startDate, endDate];
+      const packageRevenueData = await query(
+        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
+         FROM session_packages
+         WHERE company_id = $1 AND amount_paid > 0
+           AND purchased_at::date >= $2 AND purchased_at::date <= $3
+           ${buildBranchClause('branch_id', pkgParams)}`,
+        pkgParams
+      );
+      const spParams: any[] = [context.companyId, startDate, endDate];
+      const sessionPayRevenueData = await query(
+        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
+         FROM session_payments
+         WHERE company_id = $1 AND amount_paid > 0
+           AND COALESCE(paid_date, created_at::date) >= $2 AND COALESCE(paid_date, created_at::date) <= $3
+           ${buildBranchClause('branch_id', spParams)}`,
+        spParams
+      );
+
       const enrollmentRevenue = parseFloat(enrollmentRevenueData[0]?.total_revenue || '0');
       const productRevenue = parseFloat(productRevenueData[0]?.total_revenue || '0');
       const masterRevenue = parseFloat(masterRevenueData[0]?.total_revenue || '0');
       const subscriptionRevenue = parseFloat(subscriptionRevenueData[0]?.total_revenue || '0');
       const eventRevenue = parseFloat(eventRevenueData[0]?.total_revenue || '0');
+      const sessionRevenue = parseFloat(packageRevenueData[0]?.total_revenue || '0')
+        + parseFloat(sessionPayRevenueData[0]?.total_revenue || '0');
 
       // Subtract refunds from revenue (includes master-bundle refunds via the
       // polymorphic refunds table).
@@ -126,7 +154,7 @@ export const analyticsRoutes = {
         rfParams
       );
       const totalRefunds = parseFloat(refundData[0]?.total_refunds || '0');
-      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + eventRevenue - totalRefunds;
+      const totalRevenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + eventRevenue + sessionRevenue - totalRefunds;
 
       // --- Company-wide expenses (actual payments only) ---
       const exParams: any[] = [context.companyId, startDate, endDate];
@@ -278,6 +306,19 @@ export const analyticsRoutes = {
                AND me.amount_paid > 0
                AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            ), 0) AS master_revenue,
+           -- Per-session revenue: prepaid packages + pay-as-you-go charges
+           COALESCE((
+             SELECT SUM(spkg.amount_paid) FROM session_packages spkg
+             WHERE spkg.branch_id = b.id AND spkg.company_id = $1
+               AND spkg.amount_paid > 0
+               AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3
+           ), 0) + COALESCE((
+             SELECT SUM(sp.amount_paid) FROM session_payments sp
+             WHERE sp.branch_id = b.id AND sp.company_id = $1
+               AND sp.amount_paid > 0
+               AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
+               AND COALESCE(sp.paid_date, sp.created_at::date) <= $3
+           ), 0) AS session_revenue,
            -- Direct expenses (explicitly assigned to this branch)
            COALESCE((
              SELECT SUM(ep.amount) FROM expense_payments ep
@@ -330,7 +371,7 @@ export const analyticsRoutes = {
 
       // Net branch revenue (after subtracting per-branch refunds) drives proportional allocation.
       const branchNetRevenues = branchRawData.map((b: any) => {
-        const gross = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
+        const gross = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.session_revenue || '0');
         const refunds = parseFloat(b.refunds_amount || '0');
         return gross - refunds;
       });
@@ -343,7 +384,7 @@ export const analyticsRoutes = {
       const distributeUnallocated = allocationMethod !== 'OVERHEAD';
 
       const branchSummaries = branchRawData.map((b: any, i: number) => {
-        const grossRevenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0');
+        const grossRevenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.session_revenue || '0');
         const refunds = parseFloat(b.refunds_amount || '0');
         const netRevenue = grossRevenue - refunds;
         const directExpenses = parseFloat(b.direct_expenses);
@@ -408,6 +449,8 @@ export const analyticsRoutes = {
       const refundBc   = buildBranchClause('branch_id', mParams);
       const subBc      = buildBranchClause('branch_id', mParams);
       const eventBc    = buildBranchClause('branch_id', mParams);
+      const pkgBc      = buildBranchClause('branch_id', mParams);
+      const sessBc     = buildBranchClause('branch_id', mParams);
       const monthlyRevenue = await query(
         // revenue is reported NET of refunds (matches the summary cards and the
         // reports P&L). refunds stays as its own series for display; profit is
@@ -442,6 +485,16 @@ export const analyticsRoutes = {
            WHERE company_id = $1 AND amount > 0
              AND payment_date >= $2 AND payment_date <= $3 ${eventBc}
            UNION ALL
+           SELECT purchased_at::date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
+           FROM session_packages
+           WHERE company_id = $1 AND amount_paid > 0
+             AND purchased_at::date >= $2 AND purchased_at::date <= $3 ${pkgBc}
+           UNION ALL
+           SELECT COALESCE(paid_date, created_at::date) as date, amount_paid as revenue, 0 as expenses, 0 as refunds
+           FROM session_payments
+           WHERE company_id = $1 AND amount_paid > 0
+             AND COALESCE(paid_date, created_at::date) >= $2 AND COALESCE(paid_date, created_at::date) <= $3 ${sessBc}
+           UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expense_payments
            WHERE company_id = $1 AND date >= $2 AND date <= $3 ${expBc}
@@ -472,6 +525,7 @@ export const analyticsRoutes = {
             enrollmentRevenue,
             productRevenue,
             masterRevenue,
+            sessionRevenue,
             totalRefunds,
             unattributedRefunds,
             grossProfit,

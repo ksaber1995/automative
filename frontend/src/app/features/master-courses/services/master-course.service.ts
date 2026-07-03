@@ -13,7 +13,6 @@ export interface AvailableCourse {
   name: string;
   code: string;
   price: number;
-  duration: number;
 }
 
 @Injectable({ providedIn: 'root' })

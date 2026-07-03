@@ -6,6 +6,17 @@
 
   <!-- Filters -->
   <p-card styleClass="mb-4">
+    <!-- Quick range presets (same set as the dashboard) -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <p-button [label]="'REPORTS.PRESET_TODAY' | translate" size="small"
+        [outlined]="activePreset() !== 'today'" (onClick)="setPreset('today')"></p-button>
+      <p-button [label]="'REPORTS.PRESET_MONTH' | translate" size="small"
+        [outlined]="activePreset() !== 'month'" (onClick)="setPreset('month')"></p-button>
+      <p-button [label]="'REPORTS.PRESET_YEAR' | translate" size="small"
+        [outlined]="activePreset() !== 'year'" (onClick)="setPreset('year')"></p-button>
+      <p-button [label]="'REPORTS.PRESET_12MONTHS' | translate" size="small"
+        [outlined]="activePreset() !== '12months'" (onClick)="setPreset('12months')"></p-button>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'REPORTS.START_DATE' | translate }}</label>
@@ -60,7 +71,7 @@
           icon="pi pi-refresh"
           [label]="'REPORTS.APPLY' | translate"
           [loading]="loading()"
-          (onClick)="reload()"
+          (onClick)="activePreset.set(''); reload()"
         ></p-button>
         <p-button
           icon="pi pi-filter-slash"
@@ -73,28 +84,18 @@
   </p-card>
 
   <!-- KPI cards -->
-  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
     <p-card>
       <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_REVENUE' | translate }}</div>
-      <div class="text-2xl font-bold text-green-700">{{ totalRevenue() | number:'1.0-0' }}</div>
+      <div class="text-2xl font-bold text-green-700">{{ grossRevenue() | number:'1.0-0' }}</div>
     </p-card>
     <p-card>
       <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_REFUNDS' | translate }}</div>
       <div class="text-2xl font-bold text-orange-600">{{ totalRefunds() | number:'1.0-0' }}</div>
     </p-card>
     <p-card>
-      <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_EXPENSES' | translate }}</div>
-      <div class="text-2xl font-bold text-red-700">{{ totalExpenses() | number:'1.0-0' }}</div>
-    </p-card>
-    <p-card>
-      <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_NET_PROFIT' | translate }}</div>
-      <div class="text-2xl font-bold" [class.text-green-700]="totalNetProfit() >= 0" [class.text-red-700]="totalNetProfit() < 0">
-        {{ totalNetProfit() | number:'1.0-0' }}
-      </div>
-    </p-card>
-    <p-card>
-      <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_MARGIN' | translate }}</div>
-      <div class="text-2xl font-bold text-blue-700">{{ margin() | number:'1.1-1' }}%</div>
+      <div class="text-sm text-gray-500">{{ 'REPORTS.KPI_NET_REVENUE' | translate }}</div>
+      <div class="text-2xl font-bold text-emerald-700">{{ totalRevenue() | number:'1.0-0' }}</div>
     </p-card>
   </div>
 
@@ -284,16 +285,24 @@
         <div class="grid grid-cols-1 gap-4 pt-4">
           <p-card>
             <ng-template pTemplate="header">
-              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3">
+              <div class="px-6 pt-4 pb-2 flex justify-between items-start gap-3 flex-wrap">
                 <div>
                   <h3 class="text-lg font-semibold">{{ 'REPORTS.TOP_COURSES_TITLE' | translate }}</h3>
                   <p class="text-sm text-gray-500">{{ 'REPORTS.TOP_COURSES_DESC' | translate }}</p>
                 </div>
-                <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportTopCourses()"></p-button>
+                <div class="flex items-center gap-2">
+                  <!-- Y-axis metric toggle: enrollment count vs collected revenue -->
+                  <p-button [label]="'REPORTS.COL_ENROLLMENTS' | translate" size="small"
+                    [outlined]="coursesMetric() !== 'enrollments'" (onClick)="coursesMetric.set('enrollments')"></p-button>
+                  <p-button [label]="'REPORTS.COL_REVENUE' | translate" size="small"
+                    [outlined]="coursesMetric() !== 'revenue'" (onClick)="coursesMetric.set('revenue')"></p-button>
+                  <p-button icon="pi pi-download" [label]="'REPORTS.EXPORT_CSV' | translate" size="small" severity="secondary" [outlined]="true" (onClick)="exportTopCourses()"></p-button>
+                </div>
               </div>
             </ng-template>
             @if (topCoursesChart()) {
-              <p-chart type="bar" [data]="topCoursesChart()" [options]="horizontalBarOpts" [style]="{ height: '400px' }"></p-chart>
+              <!-- Vertical bars: courses on the X axis, the toggled metric on Y -->
+              <p-chart type="bar" [data]="topCoursesChart()" [options]="barOpts" [style]="{ height: '400px' }"></p-chart>
             }
           </p-card>
 
@@ -330,7 +339,10 @@
                   }
                   <td class="text-right">{{ row.enrollments }}</td>
                   <td class="text-right font-semibold text-green-700">{{ row.revenue | number:'1.2-2' }}</td>
-                  <td class="text-right">{{ row.avgPrice | number:'1.2-2' }}</td>
+                  <td class="text-right">
+                    {{ row.avgPrice | number:'1.2-2' }}
+                    <span class="text-xs text-gray-400">{{ ('REPORTS.PRICE_UNIT_' + (row.paymentType || 'ONE_TIME')) | translate }}</span>
+                  </td>
                 </tr>
               </ng-template>
               <ng-template pTemplate="emptymessage">

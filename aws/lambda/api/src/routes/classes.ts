@@ -207,7 +207,11 @@ export const classesRoutes = {
           ) AS student_count,
           EXISTS (
             SELECT 1 FROM sessions s
-            WHERE s.class_id = c.id AND s.end_date IS NULL
+            -- Only formally-started sessions count: a prepared (started=false)
+            -- pre-attendance session must not lock the class out of the Start
+            -- dialog — the start flow promotes/reuses it. Matches the Active
+            -- Sessions list, which also filters on started = true.
+            WHERE s.class_id = c.id AND s.end_date IS NULL AND s.started = true
           ) AS has_active_session
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
@@ -271,7 +275,11 @@ export const classesRoutes = {
           ) AS student_count,
           EXISTS (
             SELECT 1 FROM sessions s
-            WHERE s.class_id = c.id AND s.end_date IS NULL
+            -- Only formally-started sessions count: a prepared (started=false)
+            -- pre-attendance session must not lock the class out of the Start
+            -- dialog — the start flow promotes/reuses it. Matches the Active
+            -- Sessions list, which also filters on started = true.
+            WHERE s.class_id = c.id AND s.end_date IS NULL AND s.started = true
           ) AS has_active_session
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
@@ -310,7 +318,7 @@ export const classesRoutes = {
     }
   },
 
-  checkTeacherAvailability: async ({ query: queryParams, headers }: { query: { instructorId: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
+  checkTeacherAvailability: async ({ query: queryParams, headers }: { query: { instructorId?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
@@ -320,8 +328,21 @@ export const classesRoutes = {
 
       const { instructorId, startDate, endDate, startTime, endTime, daysOfWeek, excludeClassId } = queryParams;
 
-      if (!instructorId || !startDate || !endDate || !startTime || !endTime || !daysOfWeek) {
+      if (!startDate || !endDate || !startTime || !endTime || !daysOfWeek) {
         return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+
+      // TEACHER-type companies have no instructor field on classes — every class
+      // implicitly belongs to the owner-teacher, so an overlap check without an
+      // instructorId compares against ALL of the company's classes. Academies
+      // still require an instructorId (no instructor chosen = nothing to check).
+      let checkWholeCompany = false;
+      if (!instructorId) {
+        const comp = await queryOne<any>('SELECT type FROM companies WHERE id = $1', [context.companyId]);
+        if ((comp?.type || '').toUpperCase() !== 'TEACHER') {
+          return { status: 200 as const, body: { available: true, conflicts: [] } };
+        }
+        checkWholeCompany = true;
       }
 
       const newDays = daysOfWeek.split(',').map(d => d.trim()).filter(Boolean);
@@ -329,17 +350,22 @@ export const classesRoutes = {
         return { status: 200 as const, body: { available: true, conflicts: [] } };
       }
 
-      const params: any[] = [context.companyId, instructorId, endDate, startDate];
+      const params: any[] = [context.companyId, endDate, startDate];
+      let instructorClause = '';
+      if (!checkWholeCompany) {
+        params.push(instructorId);
+        instructorClause = `AND c.instructor_id = $${params.length}`;
+      }
       let sql = `
         SELECT c.id, c.name, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         WHERE co.company_id = $1
-          AND c.instructor_id = $2
+          ${instructorClause}
           AND c.is_active = true
           AND COALESCE(c.is_finished, false) = false
-          AND c.start_date <= $3
-          AND c.end_date >= $4
+          AND c.start_date <= $2
+          AND c.end_date >= $3
           AND c.start_time IS NOT NULL
           AND c.end_time IS NOT NULL
           AND c.days_of_week IS NOT NULL

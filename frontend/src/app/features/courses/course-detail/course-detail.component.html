@@ -20,19 +20,9 @@
           <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.DETAILS_SECTION' | translate }}</h3>
           <div class="space-y-2">
             <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.DURATION' | translate }}</span>
-              <span>{{ c.duration }} {{ 'COURSES.DETAIL.WEEKS' | translate }}</span>
-            </div>
-            <div class="flex">
               <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.PRICE' | translate }}</span>
               <span>{{ c.price | amount }}</span>
             </div>
-            @if (c.maxStudents) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.MAX_STUDENTS' | translate }}</span>
-                <span>{{ c.maxStudents }}</span>
-              </div>
-            }
             <div class="flex">
               <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.STATUS' | translate }}</span>
               <p-tag [value]="(c.isActive ? 'COURSES.DETAIL.ACTIVE' : 'COURSES.DETAIL.INACTIVE') | translate" [severity]="c.isActive ? 'success' : 'danger'"></p-tag>

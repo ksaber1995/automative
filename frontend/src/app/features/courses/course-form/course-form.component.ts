@@ -59,8 +59,6 @@ export class CourseFormComponent implements OnInit {
       description: [''],
       paymentType: ['ONE_TIME', Validators.required],
       price: [0, [Validators.required, Validators.min(0)]],
-      duration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
-      maxStudents: [null],
       instructorId: [''],
       defaultRoomId: [null],
       levelId: [null],
@@ -136,8 +134,6 @@ export class CourseFormComponent implements OnInit {
           description: course.description || '',
           paymentType: (course as any).paymentType || 'ONE_TIME',
           price: course.price,
-          duration: course.duration,
-          maxStudents: course.maxStudents,
           instructorId: course.instructorId || '',
           defaultRoomId: (course as any).defaultRoomId || null,
           levelId: course.levelId || null,
@@ -173,7 +169,6 @@ export class CourseFormComponent implements OnInit {
     const courseData = {
       ...formValue,
       description: formValue.description?.trim() || undefined,
-      maxStudents: formValue.maxStudents || undefined,
       instructorId: formValue.instructorId || undefined,
     };
 
@@ -212,6 +207,5 @@ export class CourseFormComponent implements OnInit {
   get branchId() { return this.courseForm.get('branchId'); }
   get name() { return this.courseForm.get('name'); }
   get price() { return this.courseForm.get('price'); }
-  get duration() { return this.courseForm.get('duration'); }
   get paymentType() { return this.courseForm.get('paymentType'); }
 }

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 
-export type RevenueSource = 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION';
+export type RevenueSource = 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'SESSION';
 
 export interface RevenueItem {
   id: string;
@@ -31,6 +31,7 @@ export interface RevenueSummary {
   productRevenue: number;
   masterRevenue: number;
   eventRevenue: number;
+  sessionRevenue: number;
   byBranch: Array<{
     branchId: string;
     branchName: string;

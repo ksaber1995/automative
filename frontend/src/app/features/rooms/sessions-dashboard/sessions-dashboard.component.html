@@ -9,10 +9,23 @@
   </div>
 
   <!-- Stats -->
-  <div class="grid grid-cols-1 gap-4 mb-6" [class.md:grid-cols-3]="!isTeacher()">
+  <div class="grid grid-cols-1 gap-4 mb-6" [class.md:grid-cols-4]="!isTeacher()" [class.md:grid-cols-2]="isTeacher()">
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <p class="text-sm text-gray-500 mb-1">{{ 'SESSIONS_DASHBOARD.STAT_ACTIVE' | translate }}</p>
       <p class="text-3xl font-bold text-indigo-600">{{ filteredActiveSessions().length }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-sm text-gray-500 mb-1">{{ 'SESSIONS_DASHBOARD.STAT_STUDENTS_IN_PLACE' | translate }}</p>
+      <div class="flex items-center gap-3 flex-wrap">
+        <p class="text-3xl font-bold text-teal-600">{{ studentsInPlace() }}</p>
+        @if (expectedUpcomingStudents() > 0) {
+          <span class="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2 py-1 rounded-full"
+            [pTooltip]="'SESSIONS_DASHBOARD.EXPECTED_SOON_HINT' | translate">
+            <i class="pi pi-clock text-[10px]"></i>
+            {{ 'SESSIONS_DASHBOARD.EXPECTED_SOON' | translate: { count: expectedUpcomingStudents() } }}
+          </span>
+        }
+      </div>
     </div>
     @if (!isTeacher()) {
       <div class="bg-white rounded-xl border border-gray-200 p-5">

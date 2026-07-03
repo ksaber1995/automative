@@ -88,6 +88,18 @@ function dayNameForDate(dateStr: string): string {
   return DAY_NAMES[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
+/**
+ * A prepared (started=false) session from a previous calendar day. Its class
+ * meeting is over — promoting it would attach a new session to an old date, so
+ * callers close it instead. UTC day comparison; a few hours of timezone skew
+ * around midnight is acceptable for a staleness check.
+ */
+function isStalePrepared(prepared: { start_date: string | Date }): boolean {
+  const startDay = new Date(prepared.start_date).toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  return startDay < today;
+}
+
 /** Shape a checkin-target row into the response (mirrors ActiveSessionInfo + `upcoming`). */
 function mapCheckinTarget(row: any, upcoming: boolean) {
   return {
@@ -136,6 +148,7 @@ function mapSessionWithDetailsFromDB(row: any) {
     branchName: row.branch_name,
     durationMinutes,
     studentPresent: row.student_present === null || row.student_present === undefined ? null : !!row.student_present,
+    presentCount: row.present_count === null || row.present_count === undefined ? null : parseInt(row.present_count, 10),
   };
 }
 
@@ -176,10 +189,17 @@ export const sessionsRoutes = {
 
       // If a prepared (started=false) session already exists for this class,
       // just mark it as started and update with any provided room/notes/teachers.
-      const prepared = await queryOne<any>(
+      let prepared = await queryOne<any>(
         `SELECT * FROM sessions WHERE class_id = $1 AND company_id = $2 AND end_date IS NULL AND started = false`,
         [body.classId, context.companyId]
       );
+      // A prepared session left over from a PREVIOUS day is stale — promoting it
+      // would graft today's session onto an old date (and old attendance). Close
+      // it quietly (it keeps any attendance history) and start fresh below.
+      if (prepared && isStalePrepared(prepared)) {
+        await update('sessions', prepared.id, { end_date: prepared.start_date });
+        prepared = null;
+      }
       if (prepared) {
         const updateFields: any = { started: true };
         if (body.roomId) updateFields.room_id = body.roomId;
@@ -340,7 +360,13 @@ export const sessionsRoutes = {
         [body.classId, context.companyId]
       );
       if (existing) {
-        return { status: 200 as const, body: mapSessionFromDB(existing) };
+        // A stale prepared leftover from a previous day is closed, not reused —
+        // otherwise today's pre-attendance lands on an old session date.
+        if (existing.started === false && isStalePrepared(existing)) {
+          await update('sessions', existing.id, { end_date: existing.start_date });
+        } else {
+          return { status: 200 as const, body: mapSessionFromDB(existing) };
+        }
       }
 
       // Auto session number — per class (each class keeps its own 1,2,3,… sequence).
@@ -437,10 +463,15 @@ export const sessionsRoutes = {
       let started = 0;
       for (const cls of dueClasses) {
         // Promote a prepared (started=false) session if one is open, else insert one.
-        const prepared = await queryOne<any>(
+        let prepared = await queryOne<any>(
           `SELECT * FROM sessions WHERE class_id = $1 AND company_id = $2 AND end_date IS NULL AND started = false`,
           [cls.class_id, context.companyId]
         );
+        // Stale leftovers from a previous day are closed, not promoted (see start).
+        if (prepared && isStalePrepared(prepared)) {
+          await update('sessions', prepared.id, { end_date: prepared.start_date });
+          prepared = null;
+        }
         let session: any;
         if (prepared) {
           session = await update('sessions', prepared.id, { started: true });
@@ -710,7 +741,9 @@ export const sessionsRoutes = {
           r.description as room_description,
           cl.name as class_name,
           co.name as course_name,
-          b.name as branch_name
+          b.name as branch_name,
+          -- Students checked in so far (an attendance row = present).
+          (SELECT COUNT(*) FROM session_attendance sa WHERE sa.session_id = s.id) as present_count
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN classes cl ON s.class_id = cl.id
@@ -914,6 +947,12 @@ export const sessionsRoutes = {
          WHERE s.class_id = $1 AND s.company_id = $2 AND s.end_date IS NULL`,
         [cls.class_id, context.companyId]
       );
+      // Don't attach today's check-in to a stale prepared session from a previous
+      // day — close it and prepare a fresh one (see isStalePrepared).
+      if (session && session.started === false && isStalePrepared(session)) {
+        await update('sessions', session.id, { end_date: session.start_date });
+        session = null;
+      }
       if (!session) {
         const nextRow = await queryOne<any>(
           `SELECT COALESCE(MAX(session_number), 0) + 1 AS next FROM sessions WHERE class_id = $1`,

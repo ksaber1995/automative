@@ -129,6 +129,9 @@ export class OverviewComponent implements OnInit {
     this.activePreset.set(preset);
     this.endDate = now;
     switch (preset) {
+      case 'today':
+        this.startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
       case 'month':
         this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;

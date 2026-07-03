@@ -13,17 +13,45 @@ export async function ensurePerSessionSchema(): Promise<void> {
     perSessionSchemaInitPromise = (async () => {
       try {
         // courses: widen payment_type CHECK + per-session settings
-        await query(`ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_payment_type_check`);
-        await query(`ALTER TABLE courses ADD CONSTRAINT courses_payment_type_check
-          CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION'))`);
+        // Constraint DDL runs inside DO blocks that skip work when the constraint
+        // is already in the desired state and swallow duplicate_object: concurrent
+        // cold-starting containers otherwise race between DROP and ADD and the
+        // loser dies with "constraint ... already exists".
+        await query(`DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'courses_payment_type_check' AND conrelid = 'courses'::regclass
+                AND pg_get_constraintdef(oid) LIKE '%PER_SESSION%'
+            ) THEN
+              ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_payment_type_check;
+              BEGIN
+                ALTER TABLE courses ADD CONSTRAINT courses_payment_type_check
+                  CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION'));
+              EXCEPTION WHEN duplicate_object THEN NULL;
+              END;
+            END IF;
+          END $$`);
         await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS session_package_size INTEGER`);
         await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS session_package_price DECIMAL(10, 2)`);
         await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS charge_absent_sessions BOOLEAN NOT NULL DEFAULT FALSE`);
 
         // enrollments: widen payment_type CHECK
-        await query(`ALTER TABLE enrollments DROP CONSTRAINT IF EXISTS enrollments_payment_type_check`);
-        await query(`ALTER TABLE enrollments ADD CONSTRAINT enrollments_payment_type_check
-          CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION'))`);
+        await query(`DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'enrollments_payment_type_check' AND conrelid = 'enrollments'::regclass
+                AND pg_get_constraintdef(oid) LIKE '%PER_SESSION%'
+            ) THEN
+              ALTER TABLE enrollments DROP CONSTRAINT IF EXISTS enrollments_payment_type_check;
+              BEGIN
+                ALTER TABLE enrollments ADD CONSTRAINT enrollments_payment_type_check
+                  CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION'));
+              EXCEPTION WHEN duplicate_object THEN NULL;
+              END;
+            END IF;
+          END $$`);
 
         // session_packages
         await query(`CREATE TABLE IF NOT EXISTS session_packages (
@@ -45,6 +73,11 @@ export async function ensurePerSessionSchema(): Promise<void> {
         )`);
         // amount_due may be missing on packages created before this column existed.
         await query(`ALTER TABLE session_packages ADD COLUMN IF NOT EXISTS amount_due DECIMAL(10, 2) NOT NULL DEFAULT 0`);
+        // Refund tracking (mirrors monthly_subscription_payments): amount_paid
+        // stays gross, refunded_amount records what was returned.
+        await query(`ALTER TABLE session_packages ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0`);
+        await query(`ALTER TABLE session_packages ADD COLUMN IF NOT EXISTS refund_note TEXT`);
+        await query(`ALTER TABLE session_packages ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP WITH TIME ZONE`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_enrollment_id ON session_packages(enrollment_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_company_id ON session_packages(company_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_student_id ON session_packages(student_id)`);
@@ -85,11 +118,38 @@ export async function ensurePerSessionSchema(): Promise<void> {
         await query(`CREATE INDEX IF NOT EXISTS idx_sp_package_id ON session_payments(package_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_sp_payment_status ON session_payments(payment_status)`);
 
-        // refunds link (polymorphic)
+        // refunds link (polymorphic). Skip when the FK already exists — the old
+        // unconditional DROP+ADD both re-validated every refunds row on each cold
+        // start and raced against other containers ("fk_refunds_session_payment
+        // already exists" in production).
         await query(`ALTER TABLE refunds ADD COLUMN IF NOT EXISTS session_payment_id UUID`);
-        await query(`ALTER TABLE refunds DROP CONSTRAINT IF EXISTS fk_refunds_session_payment`);
-        await query(`ALTER TABLE refunds ADD CONSTRAINT fk_refunds_session_payment
-          FOREIGN KEY (session_payment_id) REFERENCES session_payments(id) ON DELETE CASCADE`);
+        await query(`DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'fk_refunds_session_payment' AND conrelid = 'refunds'::regclass
+            ) THEN
+              BEGIN
+                ALTER TABLE refunds ADD CONSTRAINT fk_refunds_session_payment
+                  FOREIGN KEY (session_payment_id) REFERENCES session_payments(id) ON DELETE CASCADE;
+              EXCEPTION WHEN duplicate_object THEN NULL;
+              END;
+            END IF;
+          END $$`);
+        await query(`ALTER TABLE refunds ADD COLUMN IF NOT EXISTS session_package_id UUID`);
+        await query(`DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'fk_refunds_session_package' AND conrelid = 'refunds'::regclass
+            ) THEN
+              BEGIN
+                ALTER TABLE refunds ADD CONSTRAINT fk_refunds_session_package
+                  FOREIGN KEY (session_package_id) REFERENCES session_packages(id) ON DELETE CASCADE;
+              EXCEPTION WHEN duplicate_object THEN NULL;
+              END;
+            END IF;
+          END $$`);
       } catch (e) {
         perSessionSchemaInitPromise = null;
         throw e;
@@ -141,6 +201,10 @@ function mapSessionPaymentWithDetailsFromDB(row: any) {
     parentName: row.parent_name || null,
     coursePackageSize: row.course_package_size != null ? Number(row.course_package_size) : null,
     coursePackagePrice: row.course_package_price != null ? parseFloat(row.course_package_price) : null,
+    enrollmentStatus: row.enrollment_status || null,
+    pkgSessionsTotal: row.pkg_sessions_total != null ? Number(row.pkg_sessions_total) : null,
+    pkgSessionsUsed: row.pkg_sessions_used != null ? Number(row.pkg_sessions_used) : null,
+    hadPackage: row.had_package === true,
   };
 }
 
@@ -157,6 +221,9 @@ function mapPackageFromDB(row: any) {
     amountDue: parseFloat(row.amount_due || 0),
     amountPaid: parseFloat(row.amount_paid || 0),
     status: row.status,
+    refundedAmount: parseFloat(row.refunded_amount || 0),
+    refundNote: row.refund_note || null,
+    refundedAt: row.refunded_at || null,
     purchasedAt: row.purchased_at || null,
     notes: row.notes || null,
     createdAt: row.created_at,
@@ -188,7 +255,13 @@ const DETAILS_SELECT = `
   b.name         AS branch_name,
   cl.name        AS class_name,
   se.session_number AS session_number,
-  se.start_date  AS session_date
+  se.start_date  AS session_date,
+  e.status       AS enrollment_status,
+  pkg.sessions_total AS pkg_sessions_total,
+  pkg.sessions_used  AS pkg_sessions_used,
+  EXISTS (
+    SELECT 1 FROM session_packages spk2 WHERE spk2.enrollment_id = sp.enrollment_id
+  ) AS had_package
 `;
 const DETAILS_FROM = `
   FROM session_payments sp
@@ -198,6 +271,7 @@ const DETAILS_FROM = `
   JOIN sessions se ON sp.session_id = se.id
   LEFT JOIN enrollments e ON sp.enrollment_id = e.id
   LEFT JOIN classes cl    ON e.class_id = cl.id
+  LEFT JOIN session_packages pkg ON sp.package_id = pkg.id
 `;
 
 async function fetchDetailsByIds(companyId: string, ids: string[]) {
@@ -536,12 +610,46 @@ export const sessionPaymentsRoutes = {
         }
       }
 
+      // ── Cash collected — money that actually arrived within the range, dated
+      // by PAYMENT date (not session date). A package purchase counts in full on
+      // the day it was paid (800 paid today = 800 today), unlike totalRevenue
+      // which spreads it across attended sessions (price ÷ package size each).
+      const cashConds: string[] = ['company_id = $1'];
+      const cashParams: any[] = [context.companyId];
+      if (q.branchId) { cashParams.push(q.branchId); cashConds.push(`branch_id = $${cashParams.length}`); }
+      else {
+        const bc = appendBranchSqlFilter(context, cashParams, 'branch_id');
+        if (bc) cashConds.push(bc);
+      }
+      if (q.courseId) { cashParams.push(q.courseId); cashConds.push(`course_id = $${cashParams.length}`); }
+      let spDate = '';
+      let pkgDate = '';
+      if (q.from) {
+        cashParams.push(q.from);
+        spDate += ` AND COALESCE(paid_date, created_at::date) >= $${cashParams.length}::date`;
+        pkgDate += ` AND purchased_at::date >= $${cashParams.length}::date`;
+      }
+      if (q.to) {
+        cashParams.push(q.to);
+        spDate += ` AND COALESCE(paid_date, created_at::date) <= $${cashParams.length}::date`;
+        pkgDate += ` AND purchased_at::date <= $${cashParams.length}::date`;
+      }
+      const cashRow = await queryOne<any>(
+        `SELECT
+           COALESCE((SELECT SUM(amount_paid) FROM session_payments
+                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${spDate}), 0)
+           + COALESCE((SELECT SUM(amount_paid) FROM session_packages
+                       WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${pkgDate}), 0) AS total`,
+        cashParams
+      );
+      const cashCollected = parseFloat(cashRow?.total || 0);
+
       return {
         status: 200 as const,
         body: {
           totalCharges: rows.length,
           paidCount, coveredCount, pendingCount, refundedCount,
-          totalRevenue, totalExpected,
+          totalRevenue, totalExpected, cashCollected,
         },
       };
     } catch (error) {
@@ -672,15 +780,23 @@ export const sessionPaymentsRoutes = {
       }
 
       const currentPaid = parseFloat(row.amount_paid || 0);
-      if (currentPaid <= 0) {
+      const remaining = Math.round((currentPaid - parseFloat(row.refunded_amount || 0)) * 100) / 100;
+      if (remaining <= 0) {
         return apiError(400, 'ERRORS.SESSION_PAYMENTS.NOTHING_TO_REFUND', 'There is no paid amount to refund');
       }
-      const refundAmt = parseFloat(body?.amount);
-      if (!isFinite(refundAmt) || refundAmt <= 0) {
-        return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_REFUND_AMOUNT', 'Refund amount must be greater than zero');
-      }
-      if (refundAmt > currentPaid - parseFloat(row.refunded_amount || 0)) {
-        return apiError(400, 'ERRORS.SESSION_PAYMENTS.REFUND_EXCEEDS_PAID', 'Refund amount cannot exceed the amount paid');
+      // FULL = the whole remaining paid amount; PARTIAL (or legacy amount-only
+      // bodies from cached clients) = the requested amount.
+      let refundAmt: number;
+      if (body?.type === 'FULL' || (body?.type == null && body?.amount == null)) {
+        refundAmt = remaining;
+      } else {
+        refundAmt = parseFloat(body?.amount);
+        if (!isFinite(refundAmt) || refundAmt <= 0) {
+          return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_REFUND_AMOUNT', 'Refund amount must be greater than zero');
+        }
+        if (refundAmt > remaining) {
+          return apiError(400, 'ERRORS.SESSION_PAYMENTS.REFUND_EXCEEDS_PAID', 'Refund amount cannot exceed the amount paid');
+        }
       }
 
       const newRefunded = Math.round((parseFloat(row.refunded_amount || 0) + refundAmt) * 100) / 100;
@@ -814,6 +930,73 @@ export const sessionPaymentsRoutes = {
     }
   },
 
+  /** POST /api/session-payments/packages/:id/refund — return prepaid package money.
+   *  Mirrors the monthly-subscription refund: amount_paid stays gross,
+   *  refunded_amount tracks the returned total, a refunds row carries the money
+   *  out of revenue, and the package goes REFUNDED (no further coverage). */
+  refundPackage: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const pkg = await queryOne<any>(
+        'SELECT * FROM session_packages WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!pkg) return apiError(404, 'ERRORS.SESSION_PAYMENTS.PACKAGE_NOT_FOUND', 'Package not found');
+      if (!canAccessBranch(context, pkg.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const currentPaid = parseFloat(pkg.amount_paid || 0);
+      const remaining = Math.round((currentPaid - parseFloat(pkg.refunded_amount || 0)) * 100) / 100;
+      if (remaining <= 0) {
+        return apiError(400, 'ERRORS.SESSION_PAYMENTS.NOTHING_TO_REFUND', 'There is no paid amount to refund');
+      }
+
+      let refundAmt: number;
+      if (body?.type === 'FULL' || (body?.type == null && body?.amount == null)) {
+        refundAmt = remaining;
+      } else {
+        refundAmt = parseFloat(body?.amount);
+        if (!isFinite(refundAmt) || refundAmt <= 0) {
+          return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_REFUND_AMOUNT', 'Refund amount must be greater than zero');
+        }
+        if (refundAmt > remaining) {
+          return apiError(400, 'ERRORS.SESSION_PAYMENTS.REFUND_EXCEEDS_PAID', 'Refund amount cannot exceed the amount paid');
+        }
+      }
+
+      const newRefunded = Math.round((parseFloat(pkg.refunded_amount || 0) + refundAmt) * 100) / 100;
+      const type = newRefunded >= currentPaid ? 'FULL' : 'PARTIAL';
+      const note = body?.note ? String(body.note).slice(0, 500) : null;
+      const refundDate = new Date().toISOString().split('T')[0];
+
+      await query(
+        `UPDATE session_packages
+         SET status = 'REFUNDED', refunded_amount = $1, refund_note = $2, refunded_at = NOW(), updated_at = NOW()
+         WHERE id = $3`,
+        [newRefunded, note, params.id]
+      );
+
+      // enrollment_id ties the refund to a branch for P&L attribution;
+      // session_package_id links the exact package (and its net on the revenues page).
+      await query(
+        `INSERT INTO refunds (company_id, enrollment_id, session_package_id, branch_id, student_id, amount, refund_date, type, reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [context.companyId, pkg.enrollment_id, params.id, pkg.branch_id, pkg.student_id, refundAmt, refundDate, type, note]
+      );
+
+      const fresh = await queryOne('SELECT * FROM session_packages WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: mapPackageFromDB(fresh) };
+    } catch (error) {
+      console.error('Refund session package error:', error);
+      return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.REFUND_FAILED', 'Failed to refund package', 400);
+    }
+  },
+
   /** GET /api/session-payments/packages?branchId=&courseId=&studentId=&status= */
   listPackages: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
     try {
@@ -858,6 +1041,95 @@ export const sessionPaymentsRoutes = {
     } catch (error) {
       console.error('List session packages error:', error);
       return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.LIST_FAILED', 'Failed to list packages');
+    }
+  },
+
+  /** GET /api/session-payments/renewals-due?branchId=&courseId= — package customers
+   *  whose prepaid sessions ran out: last package fully used (or all credit gone)
+   *  and no active package left. They owe the NEXT package. */
+  renewalsDue: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      q = q || {};
+      const conditions: string[] = [
+        `e.company_id = $1`,
+        `e.payment_type = 'PER_SESSION'`,
+        `e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')`,
+        `c.session_package_size IS NOT NULL AND c.session_package_size > 0`,
+        // No usable credit anywhere on this enrollment…
+        `NOT EXISTS (
+           SELECT 1 FROM session_packages ap
+           WHERE ap.enrollment_id = e.id AND ap.status = 'ACTIVE' AND ap.sessions_used < ap.sessions_total
+         )`,
+        // …and the most recent package ended by being used up, not refunded.
+        `lastpkg.status <> 'REFUNDED'`,
+      ];
+      const params: any[] = [context.companyId];
+
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        conditions.push(`e.branch_id = $${params.length}`);
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'e.branch_id');
+        if (branchClause) conditions.push(branchClause);
+      }
+      if (q.courseId) { params.push(q.courseId); conditions.push(`e.course_id = $${params.length}`); }
+
+      const rows = await query(
+        `SELECT
+           e.id AS enrollment_id,
+           e.student_id, e.branch_id, e.course_id,
+           s.first_name AS student_first_name,
+           s.last_name  AS student_last_name,
+           c.name       AS course_name,
+           c.session_package_size  AS package_size,
+           c.session_package_price AS package_price,
+           b.name       AS branch_name,
+           lastpkg.sessions_total AS last_sessions_total,
+           lastpkg.sessions_used  AS last_sessions_used,
+           lastpkg.updated_at     AS exhausted_at
+         FROM enrollments e
+         JOIN courses c  ON e.course_id = c.id
+         JOIN students s ON e.student_id = s.id
+         JOIN branches b ON e.branch_id = b.id
+         JOIN LATERAL (
+           SELECT * FROM session_packages sp
+           WHERE sp.enrollment_id = e.id
+           ORDER BY sp.purchased_at DESC NULLS LAST LIMIT 1
+         ) lastpkg ON true
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY lastpkg.updated_at DESC`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          enrollmentId: r.enrollment_id,
+          studentId: r.student_id,
+          branchId: r.branch_id,
+          courseId: r.course_id,
+          studentFirstName: r.student_first_name,
+          studentLastName: r.student_last_name,
+          courseName: r.course_name,
+          branchName: r.branch_name,
+          packageSize: r.package_size != null ? Number(r.package_size) : null,
+          packagePrice: r.package_price != null ? parseFloat(r.package_price) : null,
+          lastSessionsTotal: Number(r.last_sessions_total),
+          lastSessionsUsed: Number(r.last_sessions_used),
+          exhaustedAt: r.exhausted_at || null,
+        })),
+      };
+    } catch (error) {
+      console.error('Session package renewals-due error:', error);
+      return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.LIST_FAILED', 'Failed to list due renewals');
     }
   },
 

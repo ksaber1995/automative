@@ -223,15 +223,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/company-profile/company-profile.component').then(m => m.CompanyProfileComponent)
       },
       {
-        path: 'whatsapp-templates',
-        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP_TEMPLATES' },
-        loadComponent: () => import('./features/whatsapp-templates/whatsapp-templates.component').then(m => m.WhatsappTemplatesComponent)
+        path: 'messaging',
+        data: { breadcrumb: 'BREADCRUMBS.MESSAGING' },
+        loadComponent: () => import('./features/messaging/messaging.component').then(m => m.MessagingComponent)
       },
-      {
-        path: 'telegram',
-        data: { breadcrumb: 'BREADCRUMBS.TELEGRAM' },
-        loadComponent: () => import('./features/telegram/telegram-settings.component').then(m => m.TelegramSettingsComponent)
-      }
+      // Old bookmarks for the pages now merged into /messaging.
+      { path: 'whatsapp-templates', redirectTo: '/messaging' },
+      { path: 'telegram', redirectTo: '/messaging' }
     ]
   },
   {

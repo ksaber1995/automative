@@ -211,6 +211,8 @@ const router = {
     refund: sessionPaymentsRoutes.refund,
     buyPackage: sessionPaymentsRoutes.buyPackage,
     payPackage: sessionPaymentsRoutes.payPackage,
+    refundPackage: sessionPaymentsRoutes.refundPackage,
+    renewalsDue: sessionPaymentsRoutes.renewalsDue,
     listPackages: sessionPaymentsRoutes.listPackages,
     listByCourse: sessionPaymentsRoutes.listByCourse,
     listByStudent: sessionPaymentsRoutes.listByStudent,

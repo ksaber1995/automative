@@ -66,6 +66,8 @@ export class ReportListComponent implements OnInit {
   // Filters
   startDate: Date;
   endDate: Date;
+  /** Quick date-range preset ('' = custom dates via Apply). Defaults to this month. */
+  activePreset = signal<string>('month');
   /**
    * Empty array = all branches (no filter, aggregated).
    * One id   = filter to that branch.
@@ -132,6 +134,8 @@ export class ReportListComponent implements OnInit {
     const rev = this.totalRevenue();
     return rev > 0 ? (this.totalNetProfit() / rev) * 100 : 0;
   });
+  /** Gross collected revenue before refunds (monthlyPL revenue is already net). */
+  grossRevenue = computed(() => this.totalRevenue() + this.totalRefunds());
   // Total refunds over the period (already netted out of revenue; surfaced
   // separately so the refund panel/KPI can show the gross amount returned).
   totalRefunds = computed(() => {
@@ -347,17 +351,21 @@ export class ReportListComponent implements OnInit {
     };
   });
 
+  /** Y-axis metric for the courses chart: enrollment count or collected revenue. */
+  coursesMetric = signal<'enrollments' | 'revenue'>('enrollments');
+
   topCoursesChart = computed(() => {
     const data = this.visibleTopCourses();
     if (!data.length) return null;
+    const metric = this.coursesMetric();
     // Color master bundles purple to distinguish from single-course rows.
-    const colors = data.map((r) => (r.type === 'MASTER' ? '#8b5cf6' : '#3b82f6'));
+    const colors = data.map((r) => (r.type === 'MASTER' ? '#8b5cf6' : (metric === 'revenue' ? '#10b981' : '#3b82f6')));
     return {
       labels: data.map((r) => (r.type === 'MASTER' ? `🎁 ${r.courseName}` : r.courseName)),
       datasets: [
         {
-          label: this.translate.instant('REPORTS.CHART_ENROLLMENTS'),
-          data: data.map((r) => r.enrollmentCount),
+          label: this.translate.instant(metric === 'revenue' ? 'REPORTS.CHART_REVENUE' : 'REPORTS.CHART_ENROLLMENTS'),
+          data: data.map((r) => (metric === 'revenue' ? r.revenue : r.enrollmentCount)),
           backgroundColor: colors,
         },
       ],
@@ -463,12 +471,36 @@ export class ReportListComponent implements OnInit {
   });
 
   constructor() {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - 11);
-    start.setDate(1);
-    this.startDate = start;
-    this.endDate = end;
+    // Default range = this month (mirrors the dashboard's default preset).
+    const now = new Date();
+    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.endDate = now;
+  }
+
+  /** Apply a quick range preset (today / this month / this year / last 12 months). */
+  setPreset(preset: string) {
+    const now = new Date();
+    this.activePreset.set(preset);
+    this.endDate = now;
+    switch (preset) {
+      case 'today':
+        this.startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'month':
+        this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        this.startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      case '12months': {
+        const start = new Date();
+        start.setMonth(start.getMonth() - 11);
+        start.setDate(1);
+        this.startDate = start;
+        break;
+      }
+    }
+    this.reload();
   }
 
   ngOnInit() {
@@ -602,12 +634,10 @@ export class ReportListComponent implements OnInit {
   }
 
   resetFilters() {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - 11);
-    start.setDate(1);
-    this.startDate = start;
-    this.endDate = end;
+    const now = new Date();
+    this.activePreset.set('month');
+    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.endDate = now;
     this.branchIds = [];
     this.branchIdsSignal.set([]);
     this.reload();

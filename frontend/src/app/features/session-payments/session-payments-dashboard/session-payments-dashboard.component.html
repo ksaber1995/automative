@@ -1,50 +1,70 @@
 <div class="container-custom py-8">
-  <div class="flex justify-between items-center mb-6">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
     <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_PAYMENTS.TITLE' | translate }}</h1>
-    <div class="flex gap-2">
-      <p-button [label]="'SESSION_PAYMENTS.VIEW_CHARGES' | translate" [outlined]="view() !== 'CHARGES'" size="small" (onClick)="switchView('CHARGES')"></p-button>
-      <p-button [label]="'SESSION_PAYMENTS.VIEW_PACKAGES' | translate" [outlined]="view() !== 'PACKAGES'" size="small" (onClick)="switchView('PACKAGES')"></p-button>
+    <div class="flex items-center gap-2">
+      <p-button
+        [label]="'SESSION_PAYMENTS.SCAN_BUTTON' | translate"
+        icon="pi pi-qrcode"
+        severity="info"
+        [outlined]="true"
+        (onClick)="openScanner()"
+      ></p-button>
+      <!-- QR-less scan-to-pay: type the student's short code, press Enter. -->
+      <input pInputText type="text" inputmode="numeric" style="width: 150px;"
+        [ngModel]="manualCode()" (ngModelChange)="manualCode.set($event)"
+        (keyup.enter)="submitManualCode()"
+        [disabled]="resolvingCode()"
+        [placeholder]="'SESSION_PAYMENTS.CODE_PLACEHOLDER' | translate" />
     </div>
   </div>
 
   <p-card>
-    <!-- Quick range presets -->
-    <div class="flex flex-wrap gap-2 mb-4">
-      <p-button [label]="'SESSION_PAYMENTS.RANGE_TODAY' | translate" size="small" [outlined]="rangePreset() !== 'TODAY'" (onClick)="setRange('TODAY')"></p-button>
-      <p-button [label]="'SESSION_PAYMENTS.RANGE_WEEK' | translate" size="small" [outlined]="rangePreset() !== 'WEEK'" (onClick)="setRange('WEEK')"></p-button>
-      <p-button [label]="'SESSION_PAYMENTS.RANGE_MONTH' | translate" size="small" [outlined]="rangePreset() !== 'MONTH'" (onClick)="setRange('MONTH')"></p-button>
-    </div>
+    <!-- Presets (left) + filters (right) on one line -->
+    <div class="flex flex-wrap gap-3 mb-4 items-end justify-between">
+      <div class="flex flex-wrap gap-2 items-end">
+        <p-button [label]="'SESSION_PAYMENTS.RANGE_TODAY' | translate" size="small" [outlined]="rangePreset() !== 'TODAY'" (onClick)="setRange('TODAY')"></p-button>
+        <p-button [label]="'SESSION_PAYMENTS.RANGE_WEEK' | translate" size="small" [outlined]="rangePreset() !== 'WEEK'" (onClick)="setRange('WEEK')"></p-button>
+        <p-button [label]="'SESSION_PAYMENTS.RANGE_MONTH' | translate" size="small" [outlined]="rangePreset() !== 'MONTH'" (onClick)="setRange('MONTH')"></p-button>
+      </div>
 
-    <!-- Filters -->
-    <div class="flex flex-wrap gap-3 mb-4 items-end">
-      <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_FROM' | translate }}</label>
-        <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
+      <div class="flex flex-wrap gap-3 items-end">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.VIEW' | translate }}</label>
+          <p-select
+            [options]="viewOptions" [(ngModel)]="view" optionLabel="label" optionValue="value"
+            (onChange)="onViewChange()" [style]="{ minWidth: '150px' }"
+          ></p-select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_FROM' | translate }}</label>
+          <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_TO' | translate }}</label>
+          <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
+        </div>
+        @if (!isTeacher()) {
+          <p-select
+            [options]="branches()" [(ngModel)]="selectedBranchId" optionLabel="label" optionValue="id"
+            [placeholder]="'SESSION_PAYMENTS.FILTER_BRANCH' | translate" [showClear]="true" (onChange)="loadData()"
+          ></p-select>
+        }
+        <p-select
+          [options]="courses()" [(ngModel)]="selectedCourseId" optionLabel="label" optionValue="id"
+          [placeholder]="'SESSION_PAYMENTS.FILTER_COURSE' | translate" [showClear]="true" (onChange)="loadData()"
+        ></p-select>
       </div>
-      <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_TO' | translate }}</label>
-        <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
-      </div>
-      <p-select
-        [options]="branches()" [(ngModel)]="selectedBranchId" optionLabel="label" optionValue="id"
-        [placeholder]="'SESSION_PAYMENTS.FILTER_BRANCH' | translate" [showClear]="true" (onChange)="loadData()"
-      ></p-select>
-      <p-select
-        [options]="courses()" [(ngModel)]="selectedCourseId" optionLabel="label" optionValue="id"
-        [placeholder]="'SESSION_PAYMENTS.FILTER_COURSE' | translate" [showClear]="true" (onChange)="loadData()"
-      ></p-select>
     </div>
 
     @if (view() === 'CHARGES') {
-      <!-- Summary cards -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <!-- Summary cards. Paid includes sessions covered by a prepaid package. -->
+      <!-- <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <div class="rounded-lg bg-green-50 border border-green-200 p-4 text-center">
-          <div class="text-2xl font-bold text-green-600">{{ summary()?.paidCount ?? 0 }}</div>
+          <div class="text-2xl font-bold text-green-600">{{ paidTotal() }}</div>
           <div class="text-sm text-green-700">{{ 'SESSION_PAYMENTS.SUMMARY_PAID' | translate }}</div>
-        </div>
-        <div class="rounded-lg bg-blue-50 border border-blue-200 p-4 text-center">
-          <div class="text-2xl font-bold text-blue-600">{{ summary()?.coveredCount ?? 0 }}</div>
-          <div class="text-sm text-blue-700">{{ 'SESSION_PAYMENTS.SUMMARY_COVERED' | translate }}</div>
+          @if ((summary()?.coveredCount ?? 0) > 0) {
+            <div class="text-xs text-green-600 mt-1">{{ 'SESSION_PAYMENTS.SUMMARY_PAID_INCL_COVERED' | translate: { count: summary()?.coveredCount } }}</div>
+          }
         </div>
         <div class="rounded-lg bg-yellow-50 border border-yellow-200 p-4 text-center">
           <div class="text-2xl font-bold text-yellow-600">{{ summary()?.pendingCount ?? 0 }}</div>
@@ -54,22 +74,68 @@
           <div class="text-2xl font-bold text-red-600">{{ summary()?.refundedCount ?? 0 }}</div>
           <div class="text-sm text-red-700">{{ 'SESSION_PAYMENTS.SUMMARY_REFUNDED' | translate }}</div>
         </div>
-        <div class="rounded-lg bg-purple-50 border border-purple-200 p-4 text-center">
-          <div class="text-2xl font-bold text-purple-600">{{ (summary()?.totalRevenue ?? 0) | amount }}</div>
-          <div class="text-sm text-purple-700">{{ 'SESSION_PAYMENTS.SUMMARY_REVENUE' | translate }}</div>
+      </div> -->
+
+      <!-- Two revenue views over the same money: cash that arrived vs value earned.
+           A 800-for-8 package paid today = 800 cash today, but earns 100 per attended session. -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
+          <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.SUMMARY_CASH' | translate }}
+          </div>
+          <div class="text-3xl font-bold text-emerald-600 mt-1">{{ (summary()?.cashCollected ?? 0) | amount }}</div>
+          <div class="text-xs text-emerald-700 mt-2 leading-5">{{ 'SESSION_PAYMENTS.SUMMARY_CASH_HINT' | translate }}</div>
+        </div>
+        <div class="rounded-lg bg-purple-50 border border-purple-200 p-4">
+          <div class="flex items-center gap-2 text-sm font-semibold text-purple-800">
+            <i class="pi pi-chart-line"></i> {{ 'SESSION_PAYMENTS.SUMMARY_EARNED' | translate }}
+          </div>
+          <div class="text-3xl font-bold text-purple-600 mt-1">{{ (summary()?.totalRevenue ?? 0) | amount }}</div>
+          <div class="text-xs text-purple-700 mt-2 leading-5">{{ 'SESSION_PAYMENTS.SUMMARY_EARNED_HINT' | translate }}</div>
         </div>
       </div>
 
-      <!-- Status tabs -->
-      <p-tabs [value]="selectedTab()" (valueChange)="selectedTab.set($any($event))">
-        <p-tablist>
-          <p-tab value="ALL">{{ 'SESSION_PAYMENTS.TAB_ALL' | translate }} ({{ payments().length }})</p-tab>
-          <p-tab value="PENDING">{{ 'SESSION_PAYMENTS.TAB_PENDING' | translate }} ({{ summary()?.pendingCount ?? 0 }})</p-tab>
-          <p-tab value="PAID">{{ 'SESSION_PAYMENTS.TAB_PAID' | translate }} ({{ summary()?.paidCount ?? 0 }})</p-tab>
-          <p-tab value="COVERED">{{ 'SESSION_PAYMENTS.TAB_COVERED' | translate }} ({{ summary()?.coveredCount ?? 0 }})</p-tab>
-          <p-tab value="REFUNDED">{{ 'SESSION_PAYMENTS.TAB_REFUNDED' | translate }} ({{ summary()?.refundedCount ?? 0 }})</p-tab>
-        </p-tablist>
-      </p-tabs>
+      <!-- Package renewals due: bundle used up, next package owed -->
+      @if (renewals().length > 0) {
+        <div class="rounded-lg bg-amber-50 border border-amber-300 p-4 mb-6">
+          <div class="flex items-center gap-2 font-semibold text-amber-800 mb-1">
+            <i class="pi pi-exclamation-triangle"></i>
+            {{ 'SESSION_PAYMENTS.RENEWALS_TITLE' | translate }} ({{ renewals().length }})
+          </div>
+          <p class="text-xs text-amber-700 mb-3">{{ 'SESSION_PAYMENTS.RENEWALS_HINT' | translate }}</p>
+          <div class="flex flex-col gap-2">
+            @for (r of renewals(); track r.enrollmentId) {
+              <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-lg px-3 py-2 flex-wrap">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span>
+                  <span class="text-sm text-gray-500">{{ r.courseName }}</span>
+                  <p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: r.lastSessionsUsed, total: r.lastSessionsTotal }"></p-tag>
+                </div>
+                <p-button
+                  icon="pi pi-box"
+                  size="small"
+                  severity="warn"
+                  [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: r.packageSize, amount: ((r.packagePrice || 0) | amount) }"
+                  (onClick)="openRenewalPay(r)"
+                ></p-button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Status filter tabs (same set as monthly subscriptions) -->
+      <div class="flex gap-2 mb-4 flex-wrap">
+        @for (st of statuses; track st) {
+          <p-button
+            [label]="('SESSION_PAYMENTS.STATUS_' + st | translate) + ' (' + statusCount(st) + ')'"
+            size="small"
+            [outlined]="selectedTab() !== st"
+            [severity]="st === 'ALL' ? 'primary' : statusSeverity(st)"
+            (onClick)="onStatusFilterChange(st)"
+          ></p-button>
+        }
+      </div>
 
       <!-- Table -->
       <p-table [value]="filtered()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
@@ -88,14 +154,30 @@
           <tr [class.bg-yellow-50]="row.paymentStatus === 'PENDING'">
             <td>{{ row.studentFirstName }} {{ row.studentLastName }}</td>
             <td>{{ row.courseName }}</td>
-            <td>{{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}</td>
+            <td>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span>{{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}</span>
+                @if (row.packageId) {
+                  <!-- Paid up-front for X sessions; shows how many were attended so far. -->
+                  <p-tag severity="info"
+                    [value]="'SESSION_PAYMENTS.TYPE_PACKAGE' | translate: { used: row.pkgSessionsUsed ?? '?', total: row.pkgSessionsTotal ?? '?' }"></p-tag>
+                } @else {
+                  <p-tag severity="secondary" [value]="'SESSION_PAYMENTS.TYPE_SINGLE' | translate"></p-tag>
+                }
+              </div>
+            </td>
             <td>{{ row.sessionDate ? (row.sessionDate | date:'mediumDate') : '—' }}</td>
             <td>{{ row.amountPaid | amount }} / {{ row.amountDue | amount }}</td>
             <td>
-              <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + row.paymentStatus) | translate" [severity]="statusSeverity(row.paymentStatus)"></p-tag>
-              @if (row.attendanceState === 'ABSENT') {
-                <span class="ml-1 text-xs text-gray-400">({{ 'SESSION_PAYMENTS.ABSENT' | translate }})</span>
-              }
+              <div class="flex items-center gap-1 flex-wrap">
+                <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + rowTag(row)) | translate" [severity]="statusSeverity(rowTag(row))"></p-tag>
+                @if (row.enrollmentStatus === 'ON_HOLD') {
+                  <p-tag [value]="'SESSION_PAYMENTS.STATUS_ON_HOLD' | translate" severity="warn"></p-tag>
+                }
+                @if (row.attendanceState === 'ABSENT') {
+                  <span class="ml-1 text-xs text-gray-400">({{ 'SESSION_PAYMENTS.ABSENT' | translate }})</span>
+                }
+              </div>
             </td>
             <td class="flex gap-2">
               @if (row.paymentStatus === 'PENDING') {
@@ -144,11 +226,23 @@
                 <span class="text-gray-300">—</span>
               }
             </td>
-            <td><p-tag [value]="p.status"></p-tag></td>
             <td>
-              @if (packageRemaining(p) > 0) {
-                <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(p)"></p-button>
-              }
+              <div class="flex items-center gap-1 flex-wrap">
+                <p-tag [value]="p.status"></p-tag>
+                @if (p.refundedAmount > 0) {
+                  <p-tag severity="warn" [value]="'-' + (p.refundedAmount | amount)" [pTooltip]="p.refundNote || ''"></p-tag>
+                }
+              </div>
+            </td>
+            <td>
+              <div class="flex items-center gap-2">
+                @if (p.status !== 'REFUNDED' && packageRemaining(p) > 0) {
+                  <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(p)"></p-button>
+                }
+                @if (p.status !== 'REFUNDED' && (p.amountPaid || 0) - (p.refundedAmount || 0) > 0) {
+                  <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openPackageRefund(p)"></p-button>
+                }
+              </div>
             </td>
           </tr>
         </ng-template>
@@ -163,6 +257,86 @@
 <!-- Pay popup (shared) -->
 <app-session-pay-dialog (settled)="loadData()"></app-session-pay-dialog>
 
+<!-- Collect next package (renewal) dialog -->
+<p-dialog [(visible)]="showRenewalPay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.RENEWAL_TITLE' | translate">
+  @if (selectedRenewal(); as r) {
+    <div class="flex flex-col gap-3 pt-2">
+      <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span></div>
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</span><span class="font-medium text-gray-800">{{ r.courseName }}</span></div>
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.PKG_LABEL' | translate }}</span><span class="font-medium text-gray-800">{{ 'SESSION_PAYMENTS.PKG_SESSIONS_OF' | translate: { count: r.packageSize } }} — {{ (r.packagePrice || 0) | amount }}</span></div>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="renewalAmount" mode="currency" currency="USD" [min]="0" [max]="r.packagePrice || undefined" [style]="{ width: '100%' }"></p-inputnumber>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_NOTES' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="renewalNotes" rows="2"></textarea>
+      </div>
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSION_PAYMENTS.CANCEL' | translate" severity="secondary" (onClick)="showRenewalPay.set(false)"></p-button>
+    <p-button [label]="'SESSION_PAYMENTS.PAY_PACKAGE_SUBMIT' | translate" icon="pi pi-check" (onClick)="confirmRenewalPay()" [loading]="submitting()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- QR Scanner Dialog -->
+<p-dialog
+  [visible]="scannerOpen()"
+  (visibleChange)="$event ? null : closeScanner()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '420px' }"
+  [header]="'SESSION_PAYMENTS.SCAN_TITLE' | translate"
+>
+  <div class="flex flex-col gap-3 pt-2">
+    <p class="text-sm text-gray-500">{{ 'SESSION_PAYMENTS.SCAN_HINT' | translate }}</p>
+
+    @if (cameraStarted()) {
+      <!-- Camera preview region (html5-qrcode renders the <video> here). -->
+      <div id="session-payments-qr-region" class="mx-auto rounded-lg overflow-hidden w-full" style="max-width: 320px;"></div>
+      @if (scannerStarting()) {
+        <p class="text-center text-sm text-gray-400">
+          <i class="pi pi-spin pi-spinner"></i> {{ 'SESSION_PAYMENTS.SCAN_STARTING_CAMERA' | translate }}
+        </p>
+      }
+    } @else {
+      <!-- USB scanner is the default: wait for the wedge, offer camera fallback. -->
+      <div class="text-center py-4">
+        <i class="pi pi-qrcode text-3xl text-gray-300"></i>
+        <p class="text-sm text-gray-600 mt-2">{{ 'SESSION_PAYMENTS.USB_READY' | translate }}</p>
+        <p-button class="inline-block mt-3" icon="pi pi-camera" [label]="'SESSION_PAYMENTS.USE_CAMERA' | translate"
+          severity="secondary" [outlined]="true" size="small" (onClick)="useCamera()"></p-button>
+      </div>
+    }
+    @if (resolvingToken()) {
+      <p class="text-center text-sm text-gray-400">
+        <i class="pi pi-spin pi-spinner"></i> {{ 'SESSION_PAYMENTS.SCAN_LOOKING_UP' | translate }}
+      </p>
+    }
+
+    <!-- USB scanner / manual entry: a keyboard-wedge scanner "types" the code then presses Enter. -->
+    <input
+      pInputText
+      [ngModel]="manualToken()"
+      (ngModelChange)="manualToken.set($event)"
+      (keyup.enter)="submitManualToken()"
+      [placeholder]="'SESSION_PAYMENTS.SCAN_MANUAL_PLACEHOLDER' | translate"
+      class="w-full"
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'SESSION_PAYMENTS.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="closeScanner()"
+    ></p-button>
+  </ng-template>
+</p-dialog>
+
 <!-- Void dialog -->
 <p-dialog [(visible)]="showVoid" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.VOID_TITLE' | translate">
   <div class="flex flex-col gap-3 pt-2">
@@ -175,13 +349,36 @@
   </ng-template>
 </p-dialog>
 
-<!-- Refund dialog -->
+<!-- Refund dialog (charges + prepaid packages) -->
 <p-dialog [(visible)]="showRefund" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.REFUND_TITLE' | translate">
   <div class="flex flex-col gap-3 pt-2">
-    <div class="flex flex-col gap-1">
-      <label class="font-medium">{{ 'SESSION_PAYMENTS.REFUND_AMOUNT' | translate }}</label>
-      <p-inputnumber [(ngModel)]="refundAmount" mode="currency" currency="USD" [min]="0" [max]="selected()?.amountPaid" [style]="{ width: '100%' }"></p-inputnumber>
+    <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
+      <div class="flex justify-between">
+        <span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span>
+        <span class="font-medium text-gray-800">
+          @if (refundPackageTarget(); as p) {
+            {{ p.studentFirstName }} {{ p.studentLastName }}
+          } @else {
+            {{ selected()?.studentFirstName }} {{ selected()?.studentLastName }}
+          }
+        </span>
+      </div>
+      <div class="flex justify-between">
+        <span>{{ 'SESSION_PAYMENTS.REFUND_MAX' | translate }}</span>
+        <span class="font-medium text-green-700">{{ refundMax() | amount }}</span>
+      </div>
     </div>
+    <div class="flex flex-col gap-1">
+      <label class="font-medium">{{ 'SESSION_PAYMENTS.REFUND_TYPE' | translate }}</label>
+      <p-select [options]="refundTypeOptions" [ngModel]="refundType()" (ngModelChange)="refundType.set($event)"
+        optionLabel="label" optionValue="value" [style]="{ width: '100%' }"></p-select>
+    </div>
+    @if (refundType() === 'PARTIAL') {
+      <div class="flex flex-col gap-1">
+        <label class="font-medium">{{ 'SESSION_PAYMENTS.REFUND_AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="refundAmount" mode="currency" currency="USD" [min]="0" [max]="refundMax()" [style]="{ width: '100%' }"></p-inputnumber>
+      </div>
+    }
     <div class="flex flex-col gap-1">
       <label class="font-medium">{{ 'SESSION_PAYMENTS.REFUND_NOTE' | translate }}</label>
       <textarea pTextarea [(ngModel)]="refundNote" rows="2"></textarea>
@@ -189,7 +386,8 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'SESSION_PAYMENTS.CANCEL' | translate" severity="secondary" (onClick)="showRefund.set(false)"></p-button>
-    <p-button [label]="'SESSION_PAYMENTS.REFUND_SUBMIT' | translate" severity="danger" (onClick)="confirmRefund()" [loading]="submitting()"></p-button>
+    <p-button [label]="'SESSION_PAYMENTS.REFUND_SUBMIT' | translate" severity="danger" (onClick)="confirmRefund()" [loading]="submitting()"
+      [disabled]="refundType() === 'PARTIAL' && (!refundAmount() || refundAmount()! <= 0 || refundAmount()! > refundMax())"></p-button>
   </ng-template>
 </p-dialog>
 

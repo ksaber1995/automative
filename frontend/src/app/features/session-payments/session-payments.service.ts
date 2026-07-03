@@ -8,6 +8,7 @@ import {
   SessionPaymentSummary,
   SessionPackage,
   SessionPackageWithDetails,
+  PackageRenewalDue,
   RecordSessionPaymentDto,
   RefundSessionPaymentDto,
   BuySessionPackageDto,
@@ -72,6 +73,17 @@ export class SessionPaymentsService {
 
   payPackage(id: string, dto: RecordSessionPaymentDto): Observable<SessionPackage> {
     return this.http.post<SessionPackage>(`${this.base}/packages/${id}/pay`, dto);
+  }
+
+  refundPackage(id: string, dto: RefundSessionPaymentDto): Observable<SessionPackage> {
+    return this.http.post<SessionPackage>(`${this.base}/packages/${id}/refund`, dto);
+  }
+
+  renewalsDue(params: { branchId?: string; courseId?: string } = {}): Observable<PackageRenewalDue[]> {
+    let httpParams = new HttpParams();
+    if (params.branchId) httpParams = httpParams.set('branchId', params.branchId);
+    if (params.courseId) httpParams = httpParams.set('courseId', params.courseId);
+    return this.http.get<PackageRenewalDue[]>(`${this.base}/renewals-due`, { params: httpParams });
   }
 
   listPackages(params: { branchId?: string; courseId?: string; studentId?: string; status?: string } = {}): Observable<SessionPackageWithDetails[]> {

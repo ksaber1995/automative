@@ -185,7 +185,10 @@ export class ClassFormComponent implements OnInit {
     const endTime = v.endTime;
     const days: string[] = v.daysOfWeek || [];
 
-    if (!instructorId || !startTime || !endTime || days.length === 0 || !v.startDate) {
+    // Teacher companies have no instructor field — every class implicitly
+    // belongs to the owner-teacher, so the overlap check runs without one.
+    const isTeacherCompany = this.authService.isTeacher();
+    if ((!instructorId && !isTeacherCompany) || !startTime || !endTime || days.length === 0 || !v.startDate) {
       this.availabilityConflicts.set([]);
       return;
     }
@@ -213,7 +216,7 @@ export class ClassFormComponent implements OnInit {
 
     this.checkingAvailability.set(true);
     this.classService.checkTeacherAvailability({
-      instructorId,
+      instructorId: instructorId || undefined,
       startDate,
       endDate,
       startTime,

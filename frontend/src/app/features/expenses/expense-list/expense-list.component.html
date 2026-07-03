@@ -63,11 +63,13 @@
             <span class="ml-2 bg-violet-100 text-violet-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ installmentPlans().length }}</span>
           }
         </p-tab>
-        <p-tab value="events">
-          <i class="pi pi-flag text-pink-600 mr-2"></i>
-          {{ 'EXPENSES.LIST.TAB_EVENTS' | translate }}
-          <span class="ml-2 bg-pink-100 text-pink-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ eventsCount() }}</span>
-        </p-tab>
+        @if (!authService.isTeacher()) {
+          <p-tab value="events">
+            <i class="pi pi-flag text-pink-600 mr-2"></i>
+            {{ 'EXPENSES.LIST.TAB_EVENTS' | translate }}
+            <span class="ml-2 bg-pink-100 text-pink-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ eventsCount() }}</span>
+          </p-tab>
+        }
       </p-tablist>
 
       <p-tabpanels>
@@ -101,7 +103,9 @@
               <tr>
                 <th pSortableColumn="type">{{ 'EXPENSES.LIST.COL_KIND' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
                 <th pSortableColumn="label">{{ 'EXPENSES.LIST.COL_DESC' | translate }} <p-sortIcon field="label"></p-sortIcon></th>
-                <th pSortableColumn="branchName">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                @if (!authService.isTeacher()) {
+                  <th pSortableColumn="branchName">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+                }
                 <th pSortableColumn="category">{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
                 <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
                 <th>{{ 'EXPENSES.LIST.COL_ACTIONS' | translate }}</th>
@@ -116,7 +120,9 @@
                   </p-tag>
                 </td>
                 <td class="font-medium">{{ item.label }}</td>
-                <td>{{ item.branchName || ('EXPENSES.LIST.GLOBAL' | translate) }}</td>
+                @if (!authService.isTeacher()) {
+                  <td>{{ item.branchName || ('EXPENSES.LIST.GLOBAL' | translate) }}</td>
+                }
                 <td>{{ item.category ? (('EXPENSES.CATEGORY_VALUES.' + item.category) | translate) : '—' }}</td>
                 <td class="text-right font-semibold">{{ item.amount | number:'1.2-2' }}</td>
                 <td>
@@ -135,7 +141,7 @@
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="6" class="text-center py-8 text-gray-500">
+                <td [attr.colspan]="authService.isTeacher() ? 5 : 6" class="text-center py-8 text-gray-500">
                   <i class="pi pi-check-circle text-3xl text-green-500 mb-2 block"></i>
                   {{ 'EXPENSES.LIST.NO_DUES' | translate }}
                 </td>
@@ -167,7 +173,9 @@
               <tr>
                 <th pSortableColumn="date">{{ 'EXPENSES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
                 <th pSortableColumn="employeeId">{{ 'EXPENSES.LIST.COL_EMPLOYEE' | translate }} <p-sortIcon field="employeeId"></p-sortIcon></th>
-                <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                @if (!authService.isTeacher()) {
+                  <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                }
                 <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
                 <th pSortableColumn="bonusAmount" class="text-right">{{ 'EXPENSES.LIST.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
                 <th pSortableColumn="discountAmount" class="text-right">{{ 'EXPENSES.LIST.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
@@ -178,7 +186,9 @@
               <tr>
                 <td>{{ p.date | date: 'MMM d, y' }}</td>
                 <td class="font-medium">{{ getEmployeeName(p.employeeId) }}</td>
-                <td>{{ getBranchName(p.branchId) }}</td>
+                @if (!authService.isTeacher()) {
+                  <td>{{ getBranchName(p.branchId) }}</td>
+                }
                 <td class="text-right font-semibold text-green-700">{{ p.amount | number:'1.2-2' }}</td>
                 <td class="text-right">
                   @if (p.bonusAmount && p.bonusAmount > 0) {
@@ -199,7 +209,7 @@
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="7" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_SALARIES' | translate }}</td>
+                <td [attr.colspan]="authService.isTeacher() ? 6 : 7" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_SALARIES' | translate }}</td>
               </tr>
             </ng-template>
           </p-table>
@@ -222,7 +232,9 @@
             <ng-template pTemplate="header">
               <tr>
                 <th pSortableColumn="name">{{ 'EXPENSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-                <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                @if (!authService.isTeacher()) {
+                  <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+                }
                 <th pSortableColumn="vendor">{{ 'EXPENSES.LIST.COL_VENDOR' | translate }} <p-sortIcon field="vendor"></p-sortIcon></th>
                 <th pSortableColumn="totalAmount" class="text-right">{{ 'EXPENSES.LIST.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
                 <th pSortableColumn="monthlyAmount" class="text-right">{{ 'EXPENSES.LIST.COL_MONTHLY' | translate }} <p-sortIcon field="monthlyAmount"></p-sortIcon></th>
@@ -239,7 +251,9 @@
                     {{ plan.name }}
                   </span>
                 </td>
-                <td>{{ getBranchName(plan.branchId) }}</td>
+                @if (!authService.isTeacher()) {
+                  <td>{{ getBranchName(plan.branchId) }}</td>
+                }
                 <td>{{ plan.vendor || '—' }}</td>
                 <td class="text-right font-semibold">{{ plan.totalAmount | number:'1.2-2' }}</td>
                 <td class="text-right">{{ plan.monthlyAmount | number:'1.2-2' }}</td>
@@ -276,16 +290,18 @@
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="9" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_INSTALLMENTS' | translate }}</td>
+                <td [attr.colspan]="authService.isTeacher() ? 8 : 9" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_INSTALLMENTS' | translate }}</td>
               </tr>
             </ng-template>
           </p-table>
         </p-tabpanel>
 
         <!-- ============ Events ============ -->
-        <p-tabpanel value="events">
-          <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
-        </p-tabpanel>
+        @if (!authService.isTeacher()) {
+          <p-tabpanel value="events">
+            <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
+          </p-tabpanel>
+        }
       </p-tabpanels>
     </p-tabs>
   </p-card>
@@ -295,7 +311,7 @@
 <ng-template #expenseTablePanel>
   <!-- Filters -->
   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-    @if (!branchState.isSingleBranch()) {
+    @if (!branchState.isSingleBranch() && !authService.isTeacher()) {
     <div>
       <label class="block text-sm font-medium mb-1">{{ 'EXPENSES.LIST.BRANCH' | translate }}</label>
       <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
@@ -359,7 +375,9 @@
         <th pSortableColumn="date">{{ 'EXPENSES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
         <th pSortableColumn="type">{{ 'EXPENSES.LIST.COL_TYPE' | translate }} <p-sortIcon field="type"></p-sortIcon></th>
         <th pSortableColumn="category">{{ 'EXPENSES.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
-        <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+        @if (!authService.isTeacher()) {
+          <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+        }
         <th pSortableColumn="description">{{ 'EXPENSES.LIST.COL_DESC' | translate }} <p-sortIcon field="description"></p-sortIcon></th>
         <th pSortableColumn="amount">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
         <th pSortableColumn="totalPaid">{{ 'EXPENSES.LIST.COL_TOTAL_PAID' | translate }} <p-sortIcon field="totalPaid"></p-sortIcon></th>
@@ -375,7 +393,9 @@
         <td>{{ expense.date | date: 'MMM d, y' }}</td>
         <td><p-tag [value]="'EXPENSES.LIST.' + expense.type | translate" [severity]="getTypeColor(expense.type)"></p-tag></td>
         <td>{{ expense.category ? (('EXPENSES.CATEGORY_VALUES.' + expense.category) | translate) : '—' }}</td>
-        <td>{{ getBranchName(expense.branchId) }}</td>
+        @if (!authService.isTeacher()) {
+          <td>{{ getBranchName(expense.branchId) }}</td>
+        }
         <td>
           <span
             class="font-medium text-blue-600 hover:underline cursor-pointer"
@@ -463,7 +483,7 @@
     </ng-template>
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="12" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
+        <td [attr.colspan]="authService.isTeacher() ? 11 : 12" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_DATA' | translate }}</td>
       </tr>
     </ng-template>
   </p-table>
@@ -584,7 +604,7 @@
         appendTo="body">
       </p-datepicker>
     </div>
-    @if (!branchState.isSingleBranch()) {
+    @if (!branchState.isSingleBranch() && !authService.isTeacher()) {
     <div>
       <label class="block text-sm font-medium mb-2">{{ 'EXPENSES.LIST.BRANCH_OPTIONAL' | translate }}</label>
       <select [(ngModel)]="salariesBranchId" class="w-full px-3 py-2 border border-gray-300 rounded-md">
