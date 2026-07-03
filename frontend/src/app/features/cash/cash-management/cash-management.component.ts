@@ -173,7 +173,14 @@ export class CashManagementComponent implements OnInit {
     if (this.dialogType === 'ADJUSTMENT') {
       return this.observedAmount !== null && this.observedAmount >= 0;
     }
-    return this.amount !== null && this.amount > 0;
+    if (this.amount === null || this.amount <= 0) return false;
+    if (this.dialogType === 'WITHDRAWAL' && this.withdrawalExceedsAvailable()) return false;
+    return true;
+  }
+
+  withdrawalExceedsAvailable(): boolean {
+    if (this.dialogType !== 'WITHDRAWAL' || this.amount === null) return false;
+    return this.amount > this.systemCashPreview();
   }
 
   systemCashPreview(): number {

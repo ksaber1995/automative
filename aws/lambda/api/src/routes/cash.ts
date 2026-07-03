@@ -357,6 +357,20 @@ export const cashRoutes = {
         if (!isFinite(raw) || raw <= 0) {
           return apiError(400, 'ERRORS.CASH.AMOUNT_INVALID', 'amount must be a positive number');
         }
+        if (type === 'WITHDRAWAL') {
+          const currentResp = await cashRoutes.current({ headers });
+          if (currentResp.status !== 200) {
+            return apiError(400, 'ERRORS.CASH.SYSTEM_CASH_FAILED', 'Could not compute system cash');
+          }
+          const cur = currentResp.body as any;
+          const available = branchId
+            ? ((cur.byBranch || []).find((b: any) => b.branchId === branchId)?.cash ?? 0)
+            : cur.totalCash;
+          // epsilon absorbs the 2-decimal rounding in the aggregates
+          if (raw > available + 0.005) {
+            return apiError(400, 'ERRORS.CASH.INSUFFICIENT_FUNDS', 'Withdrawal amount exceeds the current cash balance');
+          }
+        }
         amount = type === 'WITHDRAWAL' ? -raw : raw;
       }
 

@@ -48,6 +48,7 @@ export class RefundListComponent implements OnInit {
   filterType: 'FULL' | 'PARTIAL' | null = null;
   filterStartDate: Date | null = null;
   filterEndDate: Date | null = null;
+  rangePreset = signal<'TODAY' | 'MONTH' | 'YEAR' | 'LAST_12M' | null>(null);
 
   branchOptions: { label: string; value: string }[] = [];
   typeOptions: { label: string; value: string }[] = [];
@@ -93,8 +94,8 @@ export class RefundListComponent implements OnInit {
     if (this.filterBranch) filters.branchId = this.filterBranch;
     if (this.filterType) filters.type = this.filterType;
     if (this.activeSource() !== 'ALL') filters.source = this.activeSource();
-    if (this.filterStartDate) filters.startDate = this.filterStartDate.toISOString().split('T')[0];
-    if (this.filterEndDate) filters.endDate = this.filterEndDate.toISOString().split('T')[0];
+    if (this.filterStartDate) filters.startDate = this.fmt(this.filterStartDate);
+    if (this.filterEndDate) filters.endDate = this.fmt(this.filterEndDate);
 
     this.refundService.getAllRefunds(filters).subscribe({
       next: (data) => {
@@ -114,7 +115,39 @@ export class RefundListComponent implements OnInit {
     this.filterType = null;
     this.filterStartDate = null;
     this.filterEndDate = null;
+    this.rangePreset.set(null);
     this.load();
+  }
+
+  /** Apply a quick date-range preset (Today / This Month / This Year / Last 12 Months). */
+  setRange(preset: 'TODAY' | 'MONTH' | 'YEAR' | 'LAST_12M') {
+    this.rangePreset.set(preset);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (preset === 'TODAY') {
+      this.filterStartDate = today;
+    } else if (preset === 'MONTH') {
+      this.filterStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (preset === 'YEAR') {
+      this.filterStartDate = new Date(now.getFullYear(), 0, 1);
+    } else {
+      this.filterStartDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    }
+    this.filterEndDate = today;
+    this.load();
+  }
+
+  /** Manual datepicker edits drop the preset highlight — the range is custom now. */
+  onManualDateChange() {
+    this.rangePreset.set(null);
+    this.load();
+  }
+
+  private fmt(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   viewSource(refund: RefundWithDetails) {
