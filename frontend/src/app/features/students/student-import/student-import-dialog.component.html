@@ -1,0 +1,145 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [style]="{ width: '56rem', maxWidth: '95vw' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'STUDENTS.IMPORT.TITLE' | translate"
+  (onShow)="onDialogShow()"
+>
+  <!-- Instructions -->
+  <div class="mb-4 text-sm">
+    <p class="mb-2">{{ 'STUDENTS.IMPORT.INTRO' | translate }}</p>
+    <p class="mb-2 font-medium">{{ 'STUDENTS.IMPORT.COLUMNS_HELP' | translate }}</p>
+    <div class="flex flex-wrap gap-2 mb-3">
+      @for (col of templateColumns; track col) {
+        <code class="px-2 py-1 bg-gray-100 rounded text-xs">
+          {{ col }}@if (col === 'student_name') { <span class="text-red-500">*</span> }
+        </code>
+      }
+    </div>
+    <p class="text-xs text-gray-500">{{ 'STUDENTS.IMPORT.COLUMNS_NOTE' | translate }}</p>
+  </div>
+
+  <!-- Actions: template + file picker -->
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <button
+      pButton
+      type="button"
+      size="small"
+      severity="secondary"
+      icon="pi pi-download"
+      [label]="'STUDENTS.IMPORT.DOWNLOAD_TEMPLATE' | translate"
+      (click)="downloadTemplate()"
+    ></button>
+
+    <label class="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 text-sm">
+      <i class="pi pi-upload"></i>
+      <span>{{ 'STUDENTS.IMPORT.CHOOSE_FILE' | translate }}</span>
+      <input type="file" accept=".xlsx,.xls,.csv" class="hidden" (change)="onFileSelected($event)" />
+    </label>
+
+    @if (fileName()) {
+      <span class="text-sm text-gray-600"><i class="pi pi-file mr-1"></i>{{ fileName() }}</span>
+    }
+  </div>
+
+  <!-- Branch picker (multi-branch companies only) -->
+  @if (!branchState.isSingleBranch() && rows().length > 0 && !result()) {
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">
+        {{ 'STUDENTS.IMPORT.TARGET_BRANCH' | translate }} <span class="text-red-500">*</span>
+      </label>
+      <p-select
+        [options]="branchOptions()"
+        [ngModel]="selectedBranchId()"
+        (ngModelChange)="selectedBranchId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'STUDENTS.IMPORT.SELECT_BRANCH' | translate"
+        [style]="{ width: '20rem', maxWidth: '100%' }"
+      ></p-select>
+    </div>
+  }
+
+  <!-- Parse error -->
+  @if (parseError()) {
+    <div class="p-3 mb-4 rounded bg-red-50 text-red-700 text-sm">
+      <i class="pi pi-exclamation-triangle mr-2"></i>{{ 'STUDENTS.IMPORT.PARSE_ERROR' | translate }}
+    </div>
+  }
+
+  <!-- Preview -->
+  @if (rows().length > 0 && !result()) {
+    <div class="mb-3 flex items-center gap-3 text-sm">
+      <span class="font-medium">{{ 'STUDENTS.IMPORT.READY_COUNT' | translate: { count: rows().length } }}</span>
+      @if (skipped() > 0) {
+        <span class="text-amber-600">{{ 'STUDENTS.IMPORT.SKIPPED_COUNT' | translate: { count: skipped() } }}</span>
+      }
+    </div>
+    <div class="border rounded overflow-hidden">
+      <p-table [value]="previewRows()" [scrollable]="true" scrollHeight="16rem" styleClass="p-datatable-sm">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>{{ 'STUDENTS.IMPORT.COL_NAME' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_PARENT' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_PHONE' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_PARENT_PHONE' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_GENDER' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_DOB' | translate }}</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-row>
+          <tr>
+            <td>{{ row.firstName }} {{ row.lastName }}</td>
+            <td>{{ row.parentName }}</td>
+            <td>{{ row.phone }}</td>
+            <td>{{ row.parentPhone }}</td>
+            <td>{{ row.gender }}</td>
+            <td>{{ row.dateOfBirth }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </div>
+    @if (rows().length > previewRows().length) {
+      <p class="text-xs text-gray-500 mt-2">{{ 'STUDENTS.IMPORT.PREVIEW_TRUNCATED' | translate: { shown: previewRows().length, total: rows().length } }}</p>
+    }
+  }
+
+  <!-- Result summary -->
+  @if (result(); as res) {
+    <div class="p-4 rounded bg-gray-50">
+      <div class="flex items-center gap-2 mb-2">
+        <i class="pi pi-check-circle text-green-600 text-xl"></i>
+        <span class="font-semibold">{{ 'STUDENTS.IMPORT.RESULT_CREATED' | translate: { count: res.created } }}</span>
+      </div>
+      @if (res.failed > 0) {
+        <div class="text-amber-700 text-sm mb-2">
+          {{ 'STUDENTS.IMPORT.RESULT_FAILED' | translate: { count: res.failed } }}
+        </div>
+        <ul class="text-xs text-gray-600 list-disc ms-5 max-h-40 overflow-auto">
+          @for (e of res.errors; track e.row) {
+            <li>{{ 'STUDENTS.IMPORT.ROW' | translate }} {{ e.row }}: {{ ('STUDENTS.IMPORT.ERR_' + e.message) | translate }}</li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    @if (result()) {
+      <button pButton type="button" [label]="'STUDENTS.IMPORT.CLOSE' | translate" (click)="close()"></button>
+    } @else {
+      <button pButton type="button" severity="secondary" [text]="true" [label]="'STUDENTS.IMPORT.CANCEL' | translate" (click)="close()"></button>
+      <button
+        pButton
+        type="button"
+        icon="pi pi-upload"
+        [label]="'STUDENTS.IMPORT.IMPORT_BTN' | translate"
+        [disabled]="!canImport()"
+        [loading]="importing()"
+        (click)="doImport()"
+      ></button>
+    }
+  </ng-template>
+</p-dialog>

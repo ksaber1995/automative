@@ -113,6 +113,98 @@ export const studentsRoutes = {
     }
   },
 
+  // Bulk-create students from a parsed spreadsheet. Every row lands in the one
+  // chosen branch. Best-effort: valid rows are inserted even if others fail;
+  // the response reports how many succeeded plus a per-row error list so the
+  // user can fix the bad rows and re-import just those.
+  bulkImport: async ({ body, headers }: { body: { branchId: string; students: any[] }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      if (!canAccessBranch(context, body.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const rows = Array.isArray(body.students) ? body.students : [];
+      if (rows.length === 0) {
+        return apiError(400, 'ERRORS.STUDENTS.IMPORT_EMPTY', 'No students to import');
+      }
+
+      // Compute the starting sequential code once, then increment in memory.
+      // The UNIQUE(company_id, student_code) index stays the real guard: a
+      // concurrent import could collide and that single row's insert fails
+      // (recorded as a row error) rather than silently sharing a code.
+      const codeRow = await queryOne<{ next: number }>(
+        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students WHERE company_id = $1`,
+        [context.companyId]
+      );
+      let nextCode = codeRow?.next ?? 1;
+
+      const today = new Date().toISOString().slice(0, 10);
+      const errors: { row: number; message: string }[] = [];
+      let created = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i] || {};
+        // 1-based row number matching the spreadsheet's first data row.
+        const rowNum = i + 1;
+
+        const firstName = String(r.firstName ?? '').trim();
+        if (!firstName) {
+          errors.push({ row: rowNum, message: 'MISSING_NAME' });
+          continue;
+        }
+
+        const gender = r.gender === 'MALE' || r.gender === 'FEMALE' ? r.gender : null;
+        const emptyToNull = (v: any) => {
+          const s = v === null || v === undefined ? '' : String(v).trim();
+          return s === '' ? null : s;
+        };
+
+        try {
+          await insert('students', {
+            company_id: context.companyId,
+            first_name: firstName,
+            last_name: String(r.lastName ?? '').trim(),
+            date_of_birth: emptyToNull(r.dateOfBirth),
+            gender,
+            email: emptyToNull(r.email),
+            phone: emptyToNull(r.phone),
+            parent_name: emptyToNull(r.parentName),
+            parent_phone: emptyToNull(r.parentPhone),
+            parent_email: emptyToNull(r.parentEmail),
+            address: emptyToNull(r.address),
+            branch_id: body.branchId,
+            enrollment_date: today,
+            notes: emptyToNull(r.notes),
+            qr_token: generateQrToken(),
+            student_code: nextCode,
+            is_active: true,
+          });
+          created++;
+          nextCode++;
+        } catch (rowError) {
+          console.error(`Bulk import row ${rowNum} failed:`, rowError);
+          errors.push({ row: rowNum, message: 'INSERT_FAILED' });
+          // Advance the code so a single failed row doesn't force every later
+          // row to retry the same (possibly conflicting) code.
+          nextCode++;
+        }
+      }
+
+      return {
+        status: 200 as const,
+        body: { created, failed: errors.length, errors },
+      };
+    } catch (error) {
+      console.error('Bulk import students error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENTS.IMPORT_FAILED', 'Failed to import students', 400);
+    }
+  },
+
   list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

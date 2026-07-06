@@ -73,6 +73,27 @@ export interface StudentCreateDto {
   acquisitionChannel?: AcquisitionChannel;
 }
 
+/** One parsed spreadsheet row sent to the bulk-import endpoint. */
+export interface StudentImportRow {
+  firstName: string;
+  lastName?: string;
+  gender?: Gender | null;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  parentEmail?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
+export interface StudentImportResult {
+  created: number;
+  failed: number;
+  errors: { row: number; message: string }[];
+}
+
 export interface StudentUpdateDto {
   firstName?: string;
   lastName?: string;

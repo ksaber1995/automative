@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Student, StudentCreateDto, StudentUpdateDto } from '@shared/interfaces/student.interface';
+import { Student, StudentCreateDto, StudentUpdateDto, StudentImportRow, StudentImportResult } from '@shared/interfaces/student.interface';
 
 export interface EnrollmentDto {
   courseId: string;
@@ -48,6 +48,11 @@ export class StudentService {
 
   createStudent(student: StudentCreateDto): Observable<Student> {
     return this.api.post<Student>('students', student);
+  }
+
+  /** Bulk-create students from a parsed spreadsheet, all into one branch. */
+  bulkImportStudents(branchId: string, students: StudentImportRow[]): Observable<StudentImportResult> {
+    return this.api.post<StudentImportResult>('students/bulk-import', { branchId, students });
   }
 
   updateStudent(id: string, student: StudentUpdateDto): Observable<Student> {

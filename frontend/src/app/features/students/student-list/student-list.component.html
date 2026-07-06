@@ -3,7 +3,10 @@
     <ng-template pTemplate="header">
       <div class="flex justify-between items-center p-4">
         <h2 class="text-2xl font-bold">{{ 'STUDENTS.LIST.TITLE' | translate }}</h2>
-        <button pButton [label]="'STUDENTS.LIST.ADD' | translate" icon="pi pi-plus" (click)="createStudent()"></button>
+        <div class="flex gap-2">
+          <button pButton severity="secondary" [outlined]="true" [label]="'STUDENTS.IMPORT.BUTTON' | translate" icon="pi pi-file-import" (click)="openImport()"></button>
+          <button pButton [label]="'STUDENTS.LIST.ADD' | translate" icon="pi pi-plus" (click)="createStudent()"></button>
+        </div>
       </div>
     </ng-template>
 
@@ -289,4 +292,6 @@
   </p-card>
 
   <p-confirmDialog></p-confirmDialog>
+
+  <app-student-import-dialog [(visible)]="importVisible" (imported)="loadStudents()"></app-student-import-dialog>
 </div>

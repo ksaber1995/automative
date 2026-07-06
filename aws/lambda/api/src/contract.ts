@@ -294,6 +294,35 @@ const CreateStudentSchema = z.object({
 
 const UpdateStudentSchema = CreateStudentSchema.partial();
 
+// One parsed row from the bulk-import spreadsheet. Kept deliberately lenient
+// (only firstName is required; email/phone are free strings, not format-checked)
+// so a single malformed cell can't reject the whole batch — the frontend has
+// already validated/previewed the rows, and the backend records per-row errors.
+const BulkImportStudentRowSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().optional(),
+  gender: GenderSchema.nullable().optional(),
+  dateOfBirth: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  parentName: z.string().nullable().optional(),
+  parentPhone: z.string().nullable().optional(),
+  parentEmail: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+const BulkImportStudentsSchema = z.object({
+  branchId: UUIDSchema,
+  students: z.array(BulkImportStudentRowSchema).min(1).max(1000),
+});
+
+const BulkImportResultSchema = z.object({
+  created: z.number(),
+  failed: z.number(),
+  errors: z.array(z.object({ row: z.number(), message: z.string() })),
+});
+
 const StudentSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
@@ -1694,6 +1723,19 @@ export const contract = c.router({
       responses: {
         201: StudentSchema,
         400: ApiErrorSchema,
+      },
+    },
+    // Bulk-create students from a parsed spreadsheet. All rows land in the one
+    // chosen branch. Returns counts + per-row errors (best-effort: valid rows
+    // are inserted even if some rows fail).
+    bulkImport: {
+      method: 'POST',
+      path: '/api/students/bulk-import',
+      body: BulkImportStudentsSchema,
+      responses: {
+        200: BulkImportResultSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     list: {

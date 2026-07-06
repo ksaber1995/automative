@@ -19,6 +19,7 @@ import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
+import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -50,7 +51,8 @@ interface EnrollmentCounts {
     TabsModule,
     DialogModule,
     TreeModule,
-    TranslateModule
+    TranslateModule,
+    StudentImportDialogComponent
   ],
   providers: [ConfirmationService],
   templateUrl: './student-list.component.html',
@@ -333,6 +335,12 @@ export class StudentListComponent implements OnInit {
 
   createStudent() {
     this.router.navigate(['/students/create']);
+  }
+
+  importVisible = signal(false);
+
+  openImport() {
+    this.importVisible.set(true);
   }
 
   getChannelLabel(channel: AcquisitionChannel | null | undefined): string {
