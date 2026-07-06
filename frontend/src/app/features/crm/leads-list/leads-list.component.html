@@ -16,7 +16,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <button pButton icon="pi pi-list" [outlined]="viewMode() !== 'list'" severity="secondary" size="small" [pTooltip]="'CRM.VIEW_LIST' | translate" (click)="viewMode.set('list')"></button>
         <button pButton icon="pi pi-th-large" [outlined]="viewMode() !== 'board'" severity="secondary" size="small" [pTooltip]="'CRM.VIEW_BOARD' | translate" (click)="viewMode.set('board')"></button>
-        <button pButton icon="pi pi-calendar-clock" [label]="'CRM.MY_TASKS' | translate" [outlined]="true" severity="warn" size="small" (click)="openTasks()"></button>
+        <button pButton icon="pi pi-check-square" [label]="'CRM.TASKS' | translate" [outlined]="true" severity="warn" size="small" (click)="goToTasks()"></button>
         <button pButton icon="pi pi-whatsapp" [label]="'CRM.BULK_WA' | translate" [outlined]="true" severity="success" size="small" (click)="openBulk()"></button>
         <button pButton icon="pi pi-plus" [label]="'CRM.ADD_LEAD' | translate" (click)="openCreate()"></button>
       </div>
@@ -36,6 +36,8 @@
           <input pInputText [(ngModel)]="search" (keyup.enter)="load()" [placeholder]="'CRM.SEARCH_PLACEHOLDER' | translate" />
         </span>
         <button pButton icon="pi pi-search" [label]="'CRM.SEARCH' | translate" [outlined]="true" size="small" (click)="load()"></button>
+        <span class="mx-1 text-gray-300">|</span>
+        <button pButton icon="pi pi-phone" [label]="'CRM.TO_CALL' | translate" size="small" [outlined]="!toCallOnly()" severity="warn" (click)="toggleToCall()"></button>
       </div>
 
       @if (viewMode() === 'board') {
@@ -93,6 +95,11 @@
                 @if (needsFollowup(lead)) {
                   <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5" [pTooltip]="'CRM.FOLLOWUP_DUE' | translate">
                     <i class="pi pi-exclamation-circle"></i>
+                  </span>
+                }
+                @if (lead.reachCount) {
+                  <span class="inline-flex items-center gap-1 text-xs text-gray-500" [pTooltip]="'CRM.REACHES' | translate: { count: lead.reachCount }">
+                    <i class="pi pi-phone"></i> {{ lead.reachCount }}
                   </span>
                 }
               </div>
@@ -217,28 +224,6 @@
       (requestEdit)="openEdit($event)"
       (requestConvert)="confirmConvert($event)"
     ></app-lead-panel>
-
-    <!-- My tasks -->
-    <p-dialog [(visible)]="tasksVisible" [modal]="true" [draggable]="false" [style]="{ width: '460px' }" [header]="'CRM.MY_TASKS' | translate">
-      @if (tasksLoading()) {
-        <div class="text-center text-gray-400 py-6"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
-      } @else if (tasks().length === 0) {
-        <p class="text-center text-gray-400 py-6">{{ 'CRM.NO_TASKS' | translate }}</p>
-      } @else {
-        <div class="flex flex-col gap-2">
-          @for (t of tasks(); track t.id) {
-            <div class="flex items-start gap-2 border border-gray-100 rounded-lg p-2.5" [class.bg-amber-50]="taskOverdue(t)" [class.border-amber-200]="taskOverdue(t)">
-              <p-button icon="pi pi-check" severity="success" [text]="true" size="small" [pTooltip]="'CRM.ACT_COMPLETE' | translate" (onClick)="completeTask(t)"></p-button>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-gray-800">{{ t.subject || (('CRM.ACT_' + t.type) | translate) }}</div>
-                <button class="text-xs text-indigo-600 hover:underline" (click)="openTaskLead(t)">{{ t.leadName }}</button>
-                <span class="text-xs ml-2" [class.text-amber-600]="taskOverdue(t)" [class.text-gray-400]="!taskOverdue(t)"><i class="pi pi-clock"></i> {{ t.dueAt | date: 'MMM d, h:mm a' }}</span>
-              </div>
-            </div>
-          }
-        </div>
-      }
-    </p-dialog>
 
     <!-- Bulk WhatsApp: one send per click (avoids popup blocking), each logged -->
     <p-dialog [(visible)]="bulkVisible" [modal]="true" [draggable]="false" [style]="{ width: '460px' }" [header]="'CRM.BULK_TITLE' | translate">

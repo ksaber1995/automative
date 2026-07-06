@@ -61,9 +61,31 @@ async function ensureCrmSchema(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_company ON crm_activities(company_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_owner ON crm_activities(owner_user_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_due ON crm_activities(due_at)`);
+  // Tasks become first-class & assignable (migration 055): an employee assignee,
+  // a priority, and standalone tasks (lead optional).
+  await query(`ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS assigned_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL`);
+  await query(`ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM'`);
+  await query(`ALTER TABLE crm_activities ALTER COLUMN lead_id DROP NOT NULL`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_assignee ON crm_activities(assigned_employee_id)`);
   await query(`DROP TRIGGER IF EXISTS update_crm_activities_updated_at ON crm_activities`);
   await query(`CREATE TRIGGER update_crm_activities_updated_at BEFORE UPDATE ON crm_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
+
+  // Call log (migration 056): one row per outreach/call attempt to a lead, with
+  // the response and the obstacle to joining. Drives the reach count & call history.
+  await query(`CREATE TABLE IF NOT EXISTS crm_lead_calls (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    lead_id UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+    response VARCHAR(24) NOT NULL DEFAULT 'NO_ANSWER',
+    obstacle VARCHAR(24),
+    notes TEXT,
+    called_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    called_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_calls_lead ON crm_lead_calls(lead_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_calls_company ON crm_lead_calls(company_id)`);
 
   crmSchemaEnsured = true;
 }
@@ -104,6 +126,9 @@ function mapLeadFromDB(row: any) {
     lastActivityAt: row.last_activity_at ?? null,
     openTaskCount: row.open_task_count !== undefined && row.open_task_count !== null ? parseInt(row.open_task_count, 10) : 0,
     nextTaskDueAt: row.next_task_due_at ?? null,
+    reachCount: row.reach_count !== undefined && row.reach_count !== null ? parseInt(row.reach_count, 10) : 0,
+    lastCallAt: row.last_call_at ?? null,
+    lastResponse: row.last_response ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -123,8 +148,28 @@ function mapActivityFromDB(row: any) {
     doneAt: row.done_at ?? null,
     ownerUserId: row.owner_user_id ?? null,
     ownerName: row.owner_name ?? null,
+    assignedEmployeeId: row.assigned_employee_id ?? null,
+    assigneeName: row.assignee_name ?? null,
+    priority: row.priority ?? 'MEDIUM',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+const CALL_RESPONSES = ['NO_ANSWER', 'ANSWERED', 'INTERESTED', 'NOT_INTERESTED', 'CALL_BACK', 'WRONG_NUMBER'];
+const CALL_OBSTACLES = ['NONE', 'PRICE', 'SCHEDULE', 'DISTANCE', 'STILL_THINKING', 'COMPETITOR', 'NOT_INTERESTED', 'OTHER'];
+
+function mapCallFromDB(row: any) {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    response: row.response,
+    obstacle: row.obstacle ?? null,
+    notes: row.notes ?? null,
+    calledBy: row.called_by ?? null,
+    calledByName: row.called_by_name ?? null,
+    calledAt: row.called_at,
+    createdAt: row.created_at,
   };
 }
 
@@ -134,14 +179,17 @@ const LEAD_SELECT = `
          TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS owner_name,
          (SELECT MAX(a.created_at) FROM crm_activities a WHERE a.lead_id = l.id) AS last_activity_at,
          (SELECT COUNT(*) FROM crm_activities a WHERE a.lead_id = l.id AND a.done_at IS NULL AND a.due_at IS NOT NULL) AS open_task_count,
-         (SELECT MIN(a.due_at) FROM crm_activities a WHERE a.lead_id = l.id AND a.done_at IS NULL AND a.due_at IS NOT NULL) AS next_task_due_at
+         (SELECT MIN(a.due_at) FROM crm_activities a WHERE a.lead_id = l.id AND a.done_at IS NULL AND a.due_at IS NOT NULL) AS next_task_due_at,
+         (SELECT COUNT(*) FROM crm_lead_calls c WHERE c.lead_id = l.id) AS reach_count,
+         (SELECT MAX(c.called_at) FROM crm_lead_calls c WHERE c.lead_id = l.id) AS last_call_at,
+         (SELECT c.response FROM crm_lead_calls c WHERE c.lead_id = l.id ORDER BY c.called_at DESC LIMIT 1) AS last_response
   FROM crm_leads l
   LEFT JOIN courses co ON co.id = l.interested_course_id
   LEFT JOIN users u ON u.id = l.owner_user_id
 `;
 
 export const crmRoutes = {
-  listLeads: async ({ query: q, headers }: { query: { stage?: string; ownerId?: string; branchId?: string; search?: string }; headers: { authorization: string } }) => {
+  listLeads: async ({ query: q, headers }: { query: { stage?: string; ownerId?: string; branchId?: string; search?: string; toCall?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -173,6 +221,15 @@ export const crmRoutes = {
       if (q.search) {
         params.push(`%${q.search}%`);
         sql += ` AND (l.full_name ILIKE $${params.length} OR l.phone ILIKE $${params.length} OR l.email ILIKE $${params.length})`;
+      }
+      // "Who I have to call" — open leads never called, due for follow-up, or whose
+      // last call went unanswered / needs a call-back.
+      if (q.toCall === 'true') {
+        sql += ` AND l.stage NOT IN ('WON','LOST') AND l.converted_student_id IS NULL AND (
+          (SELECT COUNT(*) FROM crm_lead_calls c WHERE c.lead_id = l.id) = 0
+          OR (l.next_action_at IS NOT NULL AND l.next_action_at <= CURRENT_DATE)
+          OR (SELECT c.response FROM crm_lead_calls c WHERE c.lead_id = l.id ORDER BY c.called_at DESC LIMIT 1) IN ('NO_ANSWER','CALL_BACK')
+        )`;
       }
       sql += ` ORDER BY l.created_at DESC`;
 
@@ -502,8 +559,9 @@ export const crmRoutes = {
     }
   },
 
-  // "My day": open (not done) tasks/activities with a due date owned by me.
-  myTasks: async ({ headers }: { headers: { authorization: string } }) => {
+  // Tasks list (dedicated page). Filter by assignee (employee), status, lead, text.
+  // Standalone tasks (no lead) are included via LEFT JOIN.
+  listTasks: async ({ query: q, headers }: { query: { assigneeId?: string; status?: string; leadId?: string; search?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -513,21 +571,197 @@ export const crmRoutes = {
       const denied = await crmDenied(context.companyId);
       if (denied) return denied;
 
-      const rows = await query<any>(
-        `SELECT a.*, l.full_name AS lead_name,
-                TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS owner_name
-         FROM crm_activities a
-         JOIN crm_leads l ON l.id = a.lead_id
-         LEFT JOIN users u ON u.id = a.owner_user_id
-         WHERE a.company_id = $1 AND a.owner_user_id = $2
-           AND a.due_at IS NOT NULL AND a.done_at IS NULL
-         ORDER BY a.due_at ASC`,
-        [context.companyId, context.userId]
-      );
+      const params: any[] = [context.companyId];
+      let sql = `SELECT a.*, l.full_name AS lead_name,
+                        TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS owner_name,
+                        TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+                 FROM crm_activities a
+                 LEFT JOIN crm_leads l ON l.id = a.lead_id
+                 LEFT JOIN users u ON u.id = a.owner_user_id
+                 LEFT JOIN employees e ON e.id = a.assigned_employee_id
+                 WHERE a.company_id = $1 AND a.type = 'TASK'`;
+      const status = q.status || 'open';
+      if (status === 'open') sql += ` AND a.done_at IS NULL`;
+      else if (status === 'overdue') sql += ` AND a.done_at IS NULL AND a.due_at IS NOT NULL AND a.due_at < NOW()`;
+      else if (status === 'done') sql += ` AND a.done_at IS NOT NULL`;
+      // 'all' → no status filter
+      if (q.assigneeId) { params.push(q.assigneeId); sql += ` AND a.assigned_employee_id = $${params.length}`; }
+      if (q.leadId) { params.push(q.leadId); sql += ` AND a.lead_id = $${params.length}`; }
+      if (q.search) { params.push(`%${q.search}%`); sql += ` AND (a.subject ILIKE $${params.length} OR a.body ILIKE $${params.length})`; }
+      sql += ` ORDER BY (a.done_at IS NOT NULL), a.due_at ASC NULLS LAST, a.created_at DESC`;
+
+      const rows = await query<any>(sql, params);
       return { status: 200 as const, body: rows.map(mapActivityFromDB) };
     } catch (error) {
-      console.error('My tasks error:', error);
+      console.error('List tasks error:', error);
       return mapThrownError(error, 'ERRORS.CRM.TASKS_FAILED', 'Failed to load tasks');
+    }
+  },
+
+  // Create a standalone or lead-linked task, assignable to an employee.
+  createTask: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      if (!body?.subject || !String(body.subject).trim()) {
+        return apiError(400, 'ERRORS.CRM.TASK_SUBJECT_REQUIRED', 'Task title is required');
+      }
+      const priority = ['LOW', 'MEDIUM', 'HIGH'].includes(body.priority) ? body.priority : 'MEDIUM';
+
+      const task = await insert('crm_activities', {
+        company_id: context.companyId,
+        lead_id: body.leadId || null,
+        type: 'TASK',
+        subject: String(body.subject).trim(),
+        body: body.body || null,
+        due_at: body.dueAt || null,
+        assigned_employee_id: body.assignedEmployeeId || null,
+        priority,
+        owner_user_id: context.userId,
+        created_by: context.userId,
+      });
+      const full = await queryOne<any>(
+        `SELECT a.*, l.full_name AS lead_name,
+                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+         FROM crm_activities a
+         LEFT JOIN crm_leads l ON l.id = a.lead_id
+         LEFT JOIN employees e ON e.id = a.assigned_employee_id WHERE a.id = $1`,
+        [task.id]
+      );
+      return { status: 201 as const, body: mapActivityFromDB(full || task) };
+    } catch (error) {
+      console.error('Create task error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.TASK_CREATE_FAILED', 'Failed to create task', 400);
+    }
+  },
+
+  // Update a task: fields, assignee, priority, or completion.
+  updateTask: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const existing = await queryOne<any>(`SELECT * FROM crm_activities WHERE id = $1 AND company_id = $2 AND type = 'TASK'`, [params.id, context.companyId]);
+      if (!existing) return apiError(404, 'ERRORS.CRM.NOT_FOUND', 'Task not found');
+
+      const data: Record<string, any> = {};
+      if (body.subject !== undefined) data.subject = String(body.subject).trim();
+      if (body.body !== undefined) data.body = body.body || null;
+      if (body.dueAt !== undefined) data.due_at = body.dueAt || null;
+      if (body.leadId !== undefined) data.lead_id = body.leadId || null;
+      if (body.assignedEmployeeId !== undefined) data.assigned_employee_id = body.assignedEmployeeId || null;
+      if (body.priority !== undefined && ['LOW', 'MEDIUM', 'HIGH'].includes(body.priority)) data.priority = body.priority;
+      if (body.done !== undefined) data.done_at = body.done ? (existing.done_at || new Date().toISOString()) : null;
+
+      await update('crm_activities', params.id, data);
+      const full = await queryOne<any>(
+        `SELECT a.*, l.full_name AS lead_name,
+                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+         FROM crm_activities a
+         LEFT JOIN crm_leads l ON l.id = a.lead_id
+         LEFT JOIN employees e ON e.id = a.assigned_employee_id WHERE a.id = $1`,
+        [params.id]
+      );
+      return { status: 200 as const, body: mapActivityFromDB(full) };
+    } catch (error) {
+      console.error('Update task error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.TASK_UPDATE_FAILED', 'Failed to update task', 400);
+    }
+  },
+
+  // ── Call log (per lead): history of reach attempts + response + obstacle ─────
+  listCalls: async ({ params, headers }: { params: { leadId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const lead = await queryOne<any>('SELECT id FROM crm_leads WHERE id = $1 AND company_id = $2', [params.leadId, context.companyId]);
+      if (!lead) return apiError(404, 'ERRORS.CRM.NOT_FOUND', 'Lead not found');
+
+      const rows = await query<any>(
+        `SELECT c.*, TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS called_by_name
+         FROM crm_lead_calls c LEFT JOIN users u ON u.id = c.called_by
+         WHERE c.lead_id = $1 AND c.company_id = $2
+         ORDER BY c.called_at DESC`,
+        [params.leadId, context.companyId]
+      );
+      return { status: 200 as const, body: rows.map(mapCallFromDB) };
+    } catch (error) {
+      console.error('List calls error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.CALLS_FAILED', 'Failed to load call history');
+    }
+  },
+
+  logCall: async ({ params, body, headers }: { params: { leadId: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const lead = await queryOne<any>('SELECT id FROM crm_leads WHERE id = $1 AND company_id = $2', [params.leadId, context.companyId]);
+      if (!lead) return apiError(404, 'ERRORS.CRM.NOT_FOUND', 'Lead not found');
+
+      const response = CALL_RESPONSES.includes(body?.response) ? body.response : 'NO_ANSWER';
+      const obstacle = body?.obstacle && body.obstacle !== 'NONE' && CALL_OBSTACLES.includes(body.obstacle) ? body.obstacle : null;
+
+      const call = await insert('crm_lead_calls', {
+        company_id: context.companyId,
+        lead_id: params.leadId,
+        response,
+        obstacle,
+        notes: body?.notes || null,
+        called_by: context.userId,
+        called_at: body?.calledAt || new Date().toISOString(),
+      });
+      const full = await queryOne<any>(
+        `SELECT c.*, TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS called_by_name
+         FROM crm_lead_calls c LEFT JOIN users u ON u.id = c.called_by WHERE c.id = $1`,
+        [call.id]
+      );
+      return { status: 201 as const, body: mapCallFromDB(full || call) };
+    } catch (error) {
+      console.error('Log call error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.CALL_LOG_FAILED', 'Failed to log the call', 400);
+    }
+  },
+
+  deleteCall: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const existing = await queryOne<any>('SELECT id FROM crm_lead_calls WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+      if (!existing) return apiError(404, 'ERRORS.CRM.NOT_FOUND', 'Call not found');
+      await deleteById('crm_lead_calls', params.id);
+      return { status: 200 as const, body: { message: 'Call deleted', code: 'CRM.CALL_DELETED' } };
+    } catch (error) {
+      console.error('Delete call error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.CALL_DELETE_FAILED', 'Failed to delete call', 400);
     }
   },
 
@@ -592,6 +826,14 @@ export const crmRoutes = {
          FROM crm_activities WHERE company_id = $1`, [cid]
       );
 
+      // Why leads don't join — obstacles cited on calls (distinct leads per obstacle).
+      const obstacleRows = await query<any>(
+        `SELECT obstacle, COUNT(DISTINCT lead_id)::int AS count
+         FROM crm_lead_calls
+         WHERE company_id = $1 AND obstacle IS NOT NULL AND obstacle <> 'NONE'
+         GROUP BY obstacle ORDER BY count DESC`, [cid]
+      );
+
       return {
         status: 200 as const,
         body: {
@@ -600,6 +842,7 @@ export const crmRoutes = {
           sources: sources.map((s: any) => ({ source: s.source, total: s.total, won: s.won })),
           leaderboard,
           tasks: { open: taskTotals?.open ?? 0, overdue: taskTotals?.overdue ?? 0 },
+          obstacles: obstacleRows.map((o: any) => ({ obstacle: o.obstacle, count: o.count })),
         },
       };
     } catch (error) {

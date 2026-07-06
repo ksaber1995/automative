@@ -1452,8 +1452,23 @@ const CrmLeadSchema = z.object({
   lastActivityAt: z.string().nullable().optional(),
   openTaskCount: z.number().optional(),
   nextTaskDueAt: z.string().nullable().optional(),
+  reachCount: z.number().optional(),
+  lastCallAt: z.string().nullable().optional(),
+  lastResponse: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const CrmCallSchema = z.object({
+  id: UUIDSchema,
+  leadId: UUIDSchema,
+  response: z.string(),
+  obstacle: z.string().nullable(),
+  notes: z.string().nullable(),
+  calledBy: UUIDSchema.nullable(),
+  calledByName: z.string().nullable(),
+  calledAt: z.string(),
+  createdAt: z.string(),
 });
 
 const CrmLeadWriteSchema = z.object({
@@ -1480,8 +1495,21 @@ const CrmActivitySchema = z.object({
   doneAt: z.string().nullable(),
   ownerUserId: UUIDSchema.nullable(),
   ownerName: z.string().nullable(),
+  assignedEmployeeId: UUIDSchema.nullable().optional(),
+  assigneeName: z.string().nullable().optional(),
+  priority: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const CrmTaskWriteSchema = z.object({
+  subject: z.string().optional(),
+  body: z.string().nullable().optional(),
+  dueAt: z.string().nullable().optional(),
+  leadId: OptionalUUIDSchema,
+  assignedEmployeeId: OptionalUUIDSchema,
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+  done: z.boolean().optional(),
 });
 
 const CrmActivityWriteSchema = z.object({
@@ -2234,6 +2262,7 @@ export const contract = c.router({
         ownerId: UUIDSchema.optional(),
         branchId: UUIDSchema.optional(),
         search: z.string().optional(),
+        toCall: z.string().optional(),
       }),
       responses: {
         200: z.array(CrmLeadSchema),
@@ -2328,12 +2357,77 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
-    myTasks: {
+    listTasks: {
       method: 'GET',
       path: '/api/crm/tasks',
+      query: z.object({
+        assigneeId: UUIDSchema.optional(),
+        status: z.string().optional(),
+        leadId: UUIDSchema.optional(),
+        search: z.string().optional(),
+      }),
       responses: {
         200: z.array(CrmActivitySchema),
         403: ApiErrorSchema,
+      },
+    },
+    createTask: {
+      method: 'POST',
+      path: '/api/crm/tasks',
+      body: CrmTaskWriteSchema,
+      responses: {
+        201: CrmActivitySchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    updateTask: {
+      method: 'PATCH',
+      path: '/api/crm/tasks/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CrmTaskWriteSchema,
+      responses: {
+        200: CrmActivitySchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    listCalls: {
+      method: 'GET',
+      path: '/api/crm/leads/:leadId/calls',
+      pathParams: z.object({ leadId: UUIDSchema }),
+      responses: {
+        200: z.array(CrmCallSchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    logCall: {
+      method: 'POST',
+      path: '/api/crm/leads/:leadId/calls',
+      pathParams: z.object({ leadId: UUIDSchema }),
+      body: z.object({
+        response: z.string(),
+        obstacle: z.string().nullable().optional(),
+        notes: z.string().nullable().optional(),
+        calledAt: z.string().optional(),
+      }),
+      responses: {
+        201: CrmCallSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    deleteCall: {
+      method: 'DELETE',
+      path: '/api/crm/calls/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
     getAnalytics: {
@@ -2357,6 +2451,7 @@ export const contract = c.router({
             overdueTasks: z.number(),
           })),
           tasks: z.object({ open: z.number(), overdue: z.number() }),
+          obstacles: z.array(z.object({ obstacle: z.string(), count: z.number() })).optional(),
         }),
         403: ApiErrorSchema,
       },

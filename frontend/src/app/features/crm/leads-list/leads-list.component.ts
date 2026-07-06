@@ -57,6 +57,7 @@ export class LeadsListComponent implements OnInit {
 
   filterStage = signal<string | null>(null);
   search = '';
+  toCallOnly = signal(false);
 
   viewMode = signal<'list' | 'board'>('list');
 
@@ -72,11 +73,6 @@ export class LeadsListComponent implements OnInit {
   // Lead panel (detail + activities)
   panelVisible = signal(false);
   selectedLead = signal<CrmLead | null>(null);
-
-  // My tasks
-  tasksVisible = signal(false);
-  tasks = signal<CrmActivity[]>([]);
-  tasksLoading = signal(false);
 
   // Lost-reason capture
   lostVisible = signal(false);
@@ -108,11 +104,17 @@ export class LeadsListComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.crm.listLeads({ stage: this.filterStage() || undefined, search: this.search || undefined }).subscribe({
+    this.crm.listLeads({
+      stage: this.filterStage() || undefined,
+      search: this.search || undefined,
+      toCall: this.toCallOnly() ? 'true' : undefined,
+    }).subscribe({
       next: (rows) => { this.leads.set(rows); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
+
+  toggleToCall() { this.toCallOnly.update(v => !v); this.load(); }
 
   stageLabel(s: string): string { return this.translate.instant('CRM.STAGE_' + s); }
 
@@ -224,26 +226,8 @@ export class LeadsListComponent implements OnInit {
   // ── Lead panel ──
   openPanel(lead: CrmLead) { this.selectedLead.set(lead); this.panelVisible.set(true); }
 
-  // ── My tasks ──
-  openTasks() {
-    this.tasksVisible.set(true);
-    this.tasksLoading.set(true);
-    this.crm.myTasks().subscribe({
-      next: (t) => { this.tasks.set(t); this.tasksLoading.set(false); },
-      error: () => this.tasksLoading.set(false),
-    });
-  }
-  completeTask(t: CrmActivity) {
-    this.crm.updateActivity(t.id, { done: true }).subscribe({
-      next: () => this.tasks.update(list => list.filter(x => x.id !== t.id)),
-      error: () => {},
-    });
-  }
-  openTaskLead(t: CrmActivity) {
-    const lead = this.leads().find(l => l.id === t.leadId);
-    if (lead) { this.tasksVisible.set(false); this.openPanel(lead); }
-  }
-  taskOverdue(t: CrmActivity): boolean { return !!t.dueAt && new Date(t.dueAt) < new Date(); }
+  /** Tasks now live on their own page (assignable to employees). */
+  goToTasks() { this.router.navigate(['/crm/tasks']); }
 
   whatsapp(lead: CrmLead) {
     const text = this.translate.instant('CRM.WA_GREETING', { name: lead.fullName, academy: this.authService.getCompanyName() });

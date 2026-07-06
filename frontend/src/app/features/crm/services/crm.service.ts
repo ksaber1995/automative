@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { CrmLead, CrmLeadWriteDto, CrmActivity, CrmActivityWriteDto } from '@shared/interfaces/crm.interface';
+import { CrmLead, CrmLeadWriteDto, CrmActivity, CrmActivityWriteDto, CrmTaskWriteDto, CrmLeadCall, CrmCallWriteDto } from '@shared/interfaces/crm.interface';
 
 export interface CrmAnalytics {
   totalLeads: number;
@@ -13,6 +13,7 @@ export interface CrmAnalytics {
   sources: { source: string; total: number; won: number }[];
   leaderboard: { ownerUserId: string | null; ownerName: string | null; total: number; won: number; openTasks: number; overdueTasks: number }[];
   tasks: { open: number; overdue: number };
+  obstacles?: { obstacle: string; count: number }[];
 }
 
 export interface AtRiskStudent {
@@ -30,12 +31,13 @@ export interface AtRiskStudent {
 export class CrmService {
   private api = inject(ApiService);
 
-  listLeads(params?: { stage?: string; ownerId?: string; branchId?: string; search?: string }): Observable<CrmLead[]> {
+  listLeads(params?: { stage?: string; ownerId?: string; branchId?: string; search?: string; toCall?: string }): Observable<CrmLead[]> {
     const clean: any = {};
     if (params?.stage) clean.stage = params.stage;
     if (params?.ownerId) clean.ownerId = params.ownerId;
     if (params?.branchId) clean.branchId = params.branchId;
     if (params?.search) clean.search = params.search;
+    if (params?.toCall) clean.toCall = params.toCall;
     return this.api.get<CrmLead[]>('crm/leads', Object.keys(clean).length ? clean : undefined);
   }
 
@@ -72,8 +74,35 @@ export class CrmService {
     return this.api.delete<{ message: string; code: string }>(`crm/activities/${id}`);
   }
 
-  myTasks(): Observable<CrmActivity[]> {
-    return this.api.get<CrmActivity[]>('crm/tasks');
+  // Tasks (dedicated page)
+  listTasks(filters?: { assigneeId?: string; status?: string; leadId?: string; search?: string }): Observable<CrmActivity[]> {
+    const clean: any = {};
+    if (filters?.assigneeId) clean.assigneeId = filters.assigneeId;
+    if (filters?.status) clean.status = filters.status;
+    if (filters?.leadId) clean.leadId = filters.leadId;
+    if (filters?.search) clean.search = filters.search;
+    return this.api.get<CrmActivity[]>('crm/tasks', Object.keys(clean).length ? clean : undefined);
+  }
+
+  createTask(dto: CrmTaskWriteDto): Observable<CrmActivity> {
+    return this.api.post<CrmActivity>('crm/tasks', dto);
+  }
+
+  updateTask(id: string, dto: CrmTaskWriteDto): Observable<CrmActivity> {
+    return this.api.patch<CrmActivity>(`crm/tasks/${id}`, dto);
+  }
+
+  // Call log
+  listCalls(leadId: string): Observable<CrmLeadCall[]> {
+    return this.api.get<CrmLeadCall[]>(`crm/leads/${leadId}/calls`);
+  }
+
+  logCall(leadId: string, dto: CrmCallWriteDto): Observable<CrmLeadCall> {
+    return this.api.post<CrmLeadCall>(`crm/leads/${leadId}/calls`, dto);
+  }
+
+  deleteCall(id: string): Observable<{ message: string; code: string }> {
+    return this.api.delete<{ message: string; code: string }>(`crm/calls/${id}`);
   }
 
   getAnalytics(): Observable<CrmAnalytics> {

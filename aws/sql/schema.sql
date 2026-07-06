@@ -1603,7 +1603,7 @@ CREATE TRIGGER update_crm_leads_updated_at
 CREATE TABLE crm_activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    lead_id UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+    lead_id UUID REFERENCES crm_leads(id) ON DELETE CASCADE,   -- nullable: TASKs can be standalone (migration 055)
     type VARCHAR(20) NOT NULL DEFAULT 'NOTE'
         CHECK (type IN ('NOTE', 'CALL', 'WHATSAPP', 'MEETING', 'TASK', 'TRIAL')),
     subject VARCHAR(300),
@@ -1611,6 +1611,9 @@ CREATE TABLE crm_activities (
     due_at TIMESTAMP WITH TIME ZONE,
     done_at TIMESTAMP WITH TIME ZONE,
     owner_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    -- Tasks are assignable to an employee (mobile app future) — migration 055.
+    assigned_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+    priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM',
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1619,6 +1622,23 @@ CREATE INDEX idx_crm_act_lead ON crm_activities(lead_id);
 CREATE INDEX idx_crm_act_company ON crm_activities(company_id);
 CREATE INDEX idx_crm_act_owner ON crm_activities(owner_user_id);
 CREATE INDEX idx_crm_act_due ON crm_activities(due_at);
+CREATE INDEX idx_crm_act_assignee ON crm_activities(assigned_employee_id);
+
+-- CRM call log (migration 056) — one row per reach/call attempt to a lead, with
+-- the response and the obstacle to joining. Powers the reach count & call history.
+CREATE TABLE crm_lead_calls (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    lead_id UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+    response VARCHAR(24) NOT NULL DEFAULT 'NO_ANSWER',   -- NO_ANSWER/ANSWERED/INTERESTED/...
+    obstacle VARCHAR(24),                                -- PRICE/SCHEDULE/DISTANCE/... (null = none)
+    notes TEXT,
+    called_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    called_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_crm_calls_lead ON crm_lead_calls(lead_id);
+CREATE INDEX idx_crm_calls_company ON crm_lead_calls(company_id);
 
 CREATE TRIGGER update_crm_activities_updated_at
     BEFORE UPDATE ON crm_activities

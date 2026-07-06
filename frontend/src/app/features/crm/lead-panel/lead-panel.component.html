@@ -21,6 +21,63 @@
       }
     </div>
 
+    <!-- Calls: reach count + log a call + history -->
+    <div class="border border-gray-200 rounded-lg p-3 mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-semibold text-gray-700"><i class="pi pi-phone text-gray-400"></i> {{ 'CRM.CALLS' | translate }}</span>
+        <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5">{{ 'CRM.REACHES' | translate: { count: reachCount() } }}</span>
+      </div>
+
+      <!-- Log a call -->
+      <div class="flex flex-col gap-2 mb-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ 'CRM.CALL_RESPONSE' | translate }}</label>
+            <p-select [options]="callResponses" [(ngModel)]="callForm.response" appendTo="body" [style]="{ width: '100%' }">
+              <ng-template let-r pTemplate="selectedItem">{{ responseLabel(r) }}</ng-template>
+              <ng-template let-r pTemplate="item">{{ responseLabel(r) }}</ng-template>
+            </p-select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ 'CRM.CALL_OBSTACLE' | translate }}</label>
+            <p-select [options]="callObstacles" [(ngModel)]="callForm.obstacle" appendTo="body" [style]="{ width: '100%' }">
+              <ng-template let-o pTemplate="selectedItem">{{ obstacleLabel(o) }}</ng-template>
+              <ng-template let-o pTemplate="item">{{ obstacleLabel(o) }}</ng-template>
+            </p-select>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input pInputText [(ngModel)]="callForm.notes" [placeholder]="'CRM.CALL_NOTES' | translate" class="flex-1" />
+          <p-button icon="pi pi-phone" [label]="'CRM.LOG_CALL' | translate" size="small" (onClick)="logCall()" [loading]="loggingCall()"></p-button>
+        </div>
+      </div>
+
+      <!-- History -->
+      @if (callsLoading()) {
+        <div class="text-center text-gray-400 py-2"><i class="pi pi-spin pi-spinner"></i></div>
+      } @else if (calls().length === 0) {
+        <p class="text-xs text-gray-400 text-center py-2">{{ 'CRM.NO_CALLS' | translate }}</p>
+      } @else {
+        <div class="flex flex-col gap-1.5 max-h-52 overflow-y-auto pr-1">
+          @for (c of calls(); track c.id) {
+            <div class="flex items-start gap-2 border border-gray-100 rounded p-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p-tag [value]="responseLabel(c.response)" [severity]="responseSeverity(c.response)"></p-tag>
+                  @if (c.obstacle && c.obstacle !== 'NONE') {
+                    <span class="text-xs text-gray-500"><i class="pi pi-exclamation-circle"></i> {{ obstacleLabel(c.obstacle) }}</span>
+                  }
+                </div>
+                @if (c.notes) { <div class="text-sm text-gray-600 mt-0.5">{{ c.notes }}</div> }
+                <div class="text-xs text-gray-400 mt-0.5">{{ c.calledByName }} · {{ c.calledAt | date: 'MMM d, h:mm a' }}</div>
+              </div>
+              <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small" (onClick)="removeCall(c)"></p-button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
     <!-- Add activity -->
     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
       <div class="flex gap-2 mb-2">

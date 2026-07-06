@@ -1,0 +1,120 @@
+<div class="p-4">
+  @if (!authService.canUseCrm()) {
+    <p-card><div class="text-center py-10 text-gray-500">{{ 'CRM.LOCKED_HINT' | translate }}</div></p-card>
+  } @else {
+    <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.T_TITLE' | translate }}</h1>
+        <p class="text-sm text-gray-500">{{ 'CRM.T_SUBTITLE' | translate }}</p>
+      </div>
+      <button pButton icon="pi pi-plus" [label]="'CRM.T_ADD' | translate" (click)="openCreate()"></button>
+    </div>
+
+    <p-card>
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-2 items-center mb-4">
+        @for (s of statusOptions; track s.value) {
+          <button pButton size="small" [label]="s.label" [outlined]="filterStatus() !== s.value" severity="secondary" (click)="setStatus(s.value)"></button>
+        }
+        <span class="mx-1 text-gray-300">|</span>
+        <p-select [options]="assigneeFilterOptions()" [(ngModel)]="filterAssignee" (ngModelChange)="load()" optionLabel="label" optionValue="value" [style]="{ minWidth: '200px' }" appendTo="body"></p-select>
+        <input pInputText [(ngModel)]="search" (keyup.enter)="load()" [placeholder]="'CRM.SEARCH_PLACEHOLDER' | translate" />
+        <button pButton icon="pi pi-search" [outlined]="true" size="small" (click)="load()"></button>
+      </div>
+
+      <p-table [value]="tasks()" [loading]="loading()" [paginator]="tasks().length > 20" [rows]="20" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th style="width: 44px"></th>
+            <th>{{ 'CRM.T_COL_TASK' | translate }}</th>
+            <th>{{ 'CRM.T_COL_ASSIGNEE' | translate }}</th>
+            <th>{{ 'CRM.T_COL_PRIORITY' | translate }}</th>
+            <th>{{ 'CRM.T_COL_LEAD' | translate }}</th>
+            <th>{{ 'CRM.T_COL_DUE' | translate }}</th>
+            <th style="width: 96px"></th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-t>
+          <tr [class.opacity-60]="t.doneAt">
+            <td>
+              <p-button [icon]="t.doneAt ? 'pi pi-undo' : 'pi pi-check'" [severity]="t.doneAt ? 'secondary' : 'success'" [text]="true" size="small"
+                        [pTooltip]="(t.doneAt ? 'CRM.ACT_REOPEN' : 'CRM.ACT_COMPLETE') | translate" (onClick)="toggleDone(t)"></p-button>
+            </td>
+            <td>
+              <div class="font-medium text-gray-800" [class.line-through]="t.doneAt">{{ t.subject }}</div>
+              @if (t.body) { <div class="text-xs text-gray-500 truncate max-w-xs">{{ t.body }}</div> }
+            </td>
+            <td class="text-sm text-gray-600">
+              @if (t.assigneeName) { <span><i class="pi pi-user text-gray-400"></i> {{ t.assigneeName }}</span> }
+              @else { <span class="text-gray-400">{{ 'CRM.T_UNASSIGNED' | translate }}</span> }
+            </td>
+            <td><p-tag [value]="priorityLabel(t.priority)" [severity]="prioritySeverity(t.priority)"></p-tag></td>
+            <td class="text-sm text-gray-600">{{ t.leadName || '—' }}</td>
+            <td class="text-sm whitespace-nowrap" [class.text-red-600]="isOverdue(t)" [class.text-gray-500]="!isOverdue(t)">
+              @if (t.dueAt) { <i class="pi pi-clock"></i> {{ t.dueAt | date: 'MMM d, h:mm a' }} } @else { — }
+            </td>
+            <td>
+              <div class="flex items-center gap-1 justify-end">
+                <p-button icon="pi pi-pencil" severity="secondary" [text]="true" size="small" (onClick)="openEdit(t)"></p-button>
+                <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small" (onClick)="confirmDelete(t)"></p-button>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="7" class="text-center py-12 text-gray-400">
+              <i class="pi pi-check-square text-4xl mb-3"></i>
+              <p class="text-lg font-medium">{{ 'CRM.T_EMPTY' | translate }}</p>
+              <p class="text-sm">{{ 'CRM.T_EMPTY_HINT' | translate }}</p>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+
+    <!-- Create / edit -->
+    <p-dialog [(visible)]="dialogVisible" [modal]="true" [draggable]="false" [resizable]="false" [style]="{ width: '480px' }"
+              [header]="(editingId() ? 'CRM.T_EDIT' : 'CRM.T_ADD') | translate">
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_TASK' | translate }} <span class="text-red-500">*</span></label>
+          <input pInputText [(ngModel)]="form.subject" class="w-full" [placeholder]="'CRM.TASK_SUBJECT' | translate" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ 'CRM.NOTES' | translate }}</label>
+          <textarea pTextarea [(ngModel)]="form.body" rows="2" class="w-full"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_ASSIGNEE' | translate }}</label>
+            <p-select [options]="employees()" [(ngModel)]="form.assignedEmployeeId" optionLabel="label" optionValue="value" [showClear]="true" [filter]="true" [placeholder]="'CRM.T_UNASSIGNED' | translate" appendTo="body" [style]="{ width: '100%' }"></p-select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_PRIORITY' | translate }}</label>
+            <p-select [options]="priorities" [(ngModel)]="form.priority" appendTo="body" [style]="{ width: '100%' }">
+              <ng-template let-p pTemplate="selectedItem">{{ priorityLabel(p) }}</ng-template>
+              <ng-template let-p pTemplate="item">{{ priorityLabel(p) }}</ng-template>
+            </p-select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_DUE' | translate }}</label>
+            <p-datepicker [(ngModel)]="form.dueAt" [showTime]="true" dateFormat="yy-mm-dd" [showIcon]="true" appendTo="body" [style]="{ width: '100%' }" styleClass="w-full"></p-datepicker>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_LEAD' | translate }}</label>
+            <p-select [options]="leads()" [(ngModel)]="form.leadId" optionLabel="label" optionValue="value" [showClear]="true" [filter]="true" [placeholder]="'CRM.T_NO_LEAD' | translate" appendTo="body" [style]="{ width: '100%' }"></p-select>
+          </div>
+        </div>
+      </div>
+      <ng-template pTemplate="footer">
+        <p-button [label]="'CRM.CANCEL' | translate" [text]="true" (onClick)="dialogVisible.set(false)" [disabled]="saving()"></p-button>
+        <p-button [label]="'CRM.SAVE' | translate" icon="pi pi-check" (onClick)="save()" [loading]="saving()"></p-button>
+      </ng-template>
+    </p-dialog>
+
+    <p-confirmDialog></p-confirmDialog>
+  }
+</div>

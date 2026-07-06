@@ -72,6 +72,25 @@
         </p-card>
       </div>
 
+      <!-- Obstacles: why leads don't join -->
+      <p-card [header]="'CRM.OBSTACLES' | translate" styleClass="mt-4">
+        @if (!d.obstacles || d.obstacles.length === 0) {
+          <p class="text-sm text-gray-400 text-center py-4">{{ 'CRM.OBST_NONE_YET' | translate }}</p>
+        } @else {
+          <div class="flex flex-col gap-2">
+            @for (o of d.obstacles; track o.obstacle) {
+              <div class="flex items-center gap-3">
+                <div class="w-40 flex-none text-sm text-gray-700">{{ obstacleLabel(o.obstacle) }}</div>
+                <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                  <div class="h-6 rounded-full bg-amber-500 transition-all" [style.width]="obstacleBar(o.count)"></div>
+                </div>
+                <div class="w-10 text-right font-semibold text-gray-700 tabular-nums">{{ o.count }}</div>
+              </div>
+            }
+          </div>
+        }
+      </p-card>
+
       <!-- Leaderboard -->
       <p-card [header]="'CRM.LEADERBOARD' | translate" styleClass="mt-4">
         @if (d.leaderboard.length === 0) {

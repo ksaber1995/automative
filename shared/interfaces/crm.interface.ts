@@ -22,17 +22,45 @@ export interface CrmLead {
   lastActivityAt?: string | null;
   openTaskCount?: number;
   nextTaskDueAt?: string | null;
+  reachCount?: number;
+  lastCallAt?: string | null;
+  lastResponse?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export const CALL_RESPONSES: string[] = ['NO_ANSWER', 'ANSWERED', 'INTERESTED', 'NOT_INTERESTED', 'CALL_BACK', 'WRONG_NUMBER'];
+export const CALL_OBSTACLES: string[] = ['NONE', 'PRICE', 'SCHEDULE', 'DISTANCE', 'STILL_THINKING', 'COMPETITOR', 'NOT_INTERESTED', 'OTHER'];
+
+export interface CrmLeadCall {
+  id: string;
+  leadId: string;
+  response: string;
+  obstacle?: string | null;
+  notes?: string | null;
+  calledBy?: string | null;
+  calledByName?: string | null;
+  calledAt: string;
+  createdAt: string;
+}
+
+export interface CrmCallWriteDto {
+  response: string;
+  obstacle?: string | null;
+  notes?: string | null;
+  calledAt?: string;
 }
 
 export type ActivityType = 'NOTE' | 'CALL' | 'WHATSAPP' | 'MEETING' | 'TASK' | 'TRIAL';
 
 export const ACTIVITY_TYPES: ActivityType[] = ['NOTE', 'CALL', 'WHATSAPP', 'MEETING', 'TASK', 'TRIAL'];
 
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export const TASK_PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
+
 export interface CrmActivity {
   id: string;
-  leadId: string;
+  leadId?: string | null;
   leadName?: string | null;
   type: ActivityType;
   subject?: string | null;
@@ -41,8 +69,21 @@ export interface CrmActivity {
   doneAt?: string | null;
   ownerUserId?: string | null;
   ownerName?: string | null;
+  assignedEmployeeId?: string | null;
+  assigneeName?: string | null;
+  priority?: TaskPriority;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CrmTaskWriteDto {
+  subject?: string;
+  body?: string | null;
+  dueAt?: string | null;
+  leadId?: string | null;
+  assignedEmployeeId?: string | null;
+  priority?: TaskPriority;
+  done?: boolean;
 }
 
 export interface CrmActivityWriteDto {

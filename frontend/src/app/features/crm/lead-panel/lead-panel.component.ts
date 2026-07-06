@@ -14,7 +14,7 @@ import { CrmService } from '../services/crm.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
-import { CrmActivity, CrmLead, ACTIVITY_TYPES, ActivityType } from '@shared/interfaces/crm.interface';
+import { CrmActivity, CrmLead, ACTIVITY_TYPES, ActivityType, CrmLeadCall, CALL_RESPONSES, CALL_OBSTACLES } from '@shared/interfaces/crm.interface';
 
 @Component({
   selector: 'app-lead-panel',
@@ -45,7 +45,19 @@ export class LeadPanelComponent {
   readonly activityTypes = ACTIVITY_TYPES;
   form: { type: ActivityType; subject: string; body: string; dueAt: Date | null } = this.blank();
 
+  // Call log
+  calls = signal<CrmLeadCall[]>([]);
+  callsLoading = signal(false);
+  loggingCall = signal(false);
+  readonly callResponses = CALL_RESPONSES;
+  readonly callObstacles = CALL_OBSTACLES;
+  callForm: { response: string; obstacle: string; notes: string } = this.blankCall();
+
   private loadedFor: string | null = null;
+
+  private blankCall() {
+    return { response: 'NO_ANSWER', obstacle: 'NONE', notes: '' };
+  }
 
   constructor() {
     effect(() => {
@@ -54,7 +66,9 @@ export class LeadPanelComponent {
       if (open && l && this.loadedFor !== l.id) {
         this.loadedFor = l.id;
         this.form = this.blank();
+        this.callForm = this.blankCall();
         this.loadActivities(l.id);
+        this.loadCalls(l.id);
       }
       if (!open) this.loadedFor = null;
     });
@@ -123,6 +137,54 @@ export class LeadPanelComponent {
   removeActivity(a: CrmActivity) {
     this.crm.deleteActivity(a.id).subscribe({
       next: () => { this.activities.update(list => list.filter(x => x.id !== a.id)); this.changed.emit(); },
+      error: () => {},
+    });
+  }
+
+  // ── Call log ──
+  private loadCalls(leadId: string) {
+    this.callsLoading.set(true);
+    this.crm.listCalls(leadId).subscribe({
+      next: (rows) => { this.calls.set(rows); this.callsLoading.set(false); },
+      error: () => this.callsLoading.set(false),
+    });
+  }
+
+  reachCount(): number { return this.calls().length; }
+
+  responseLabel(r: string): string { return this.translate.instant('CRM.RESP_' + r); }
+  obstacleLabel(o?: string | null): string { return o ? this.translate.instant('CRM.OBST_' + o) : ''; }
+
+  responseSeverity(r: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+    if (r === 'INTERESTED') return 'success';
+    if (r === 'ANSWERED') return 'info';
+    if (r === 'CALL_BACK') return 'warn';
+    if (r === 'NOT_INTERESTED' || r === 'WRONG_NUMBER') return 'danger';
+    return 'secondary';
+  }
+
+  logCall() {
+    const l = this.lead();
+    if (!l) return;
+    this.loggingCall.set(true);
+    this.crm.logCall(l.id, {
+      response: this.callForm.response,
+      obstacle: this.callForm.obstacle || 'NONE',
+      notes: this.callForm.notes.trim() || null,
+    }).subscribe({
+      next: (call) => {
+        this.calls.update(list => [call, ...list]);
+        this.callForm = this.blankCall();
+        this.loggingCall.set(false);
+        this.changed.emit(); // refresh reach count on the list
+      },
+      error: () => this.loggingCall.set(false),
+    });
+  }
+
+  removeCall(c: CrmLeadCall) {
+    this.crm.deleteCall(c.id).subscribe({
+      next: () => { this.calls.update(list => list.filter(x => x.id !== c.id)); this.changed.emit(); },
       error: () => {},
     });
   }

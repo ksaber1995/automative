@@ -63,4 +63,15 @@ export class CrmInsightsComponent implements OnInit {
   barWidth(count: number): string {
     return Math.round((count / this.funnelMax()) * 100) + '%';
   }
+
+  obstacleLabel(o: string): string { return this.translate.instant('CRM.OBST_' + o); }
+
+  obstaclesMax = computed(() => {
+    const list = this.data()?.obstacles || [];
+    return Math.max(1, ...list.map(x => x.count));
+  });
+
+  obstacleBar(count: number): string {
+    return Math.round((count / this.obstaclesMax()) * 100) + '%';
+  }
 }

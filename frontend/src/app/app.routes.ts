@@ -128,6 +128,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/crm/crm-retention/crm-retention.component').then(m => m.CrmRetentionComponent)
       },
       {
+        path: 'crm/tasks',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.CRM' },
+        loadComponent: () => import('./features/crm/crm-tasks/crm-tasks.component').then(m => m.CrmTasksComponent)
+      },
+      {
         path: 'employees',
         canActivate: [permissionGuard('employees')],
         data: { breadcrumb: 'BREADCRUMBS.EMPLOYEES' },
