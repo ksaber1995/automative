@@ -110,6 +110,24 @@ export const routes: Routes = [
         loadChildren: () => import('./features/enrollments/enrollments.routes').then(m => m.ENROLLMENTS_ROUTES)
       },
       {
+        path: 'crm',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.CRM' },
+        loadComponent: () => import('./features/crm/leads-list/leads-list.component').then(m => m.LeadsListComponent)
+      },
+      {
+        path: 'crm/insights',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.CRM' },
+        loadComponent: () => import('./features/crm/crm-insights/crm-insights.component').then(m => m.CrmInsightsComponent)
+      },
+      {
+        path: 'crm/retention',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.CRM' },
+        loadComponent: () => import('./features/crm/crm-retention/crm-retention.component').then(m => m.CrmRetentionComponent)
+      },
+      {
         path: 'employees',
         canActivate: [permissionGuard('employees')],
         data: { breadcrumb: 'BREADCRUMBS.EMPLOYEES' },

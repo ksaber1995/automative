@@ -179,6 +179,16 @@ export class AuthService {
     return this.currentUser()?.companyType === 'TEACHER';
   }
 
+  /** Company feature plan; ADVANCED unlocks CRM and future add-ons. */
+  plan(): 'SIMPLE' | 'ADVANCED' {
+    return this.currentUser()?.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
+  }
+
+  /** CRM is available to academies (not solo teachers) on the Advanced plan. */
+  canUseCrm(): boolean {
+    return !this.isTeacher() && this.plan() === 'ADVANCED';
+  }
+
   /**
    * True when the teacher tenant falls in the free QR-activation launch tier
    * (first 100 registered teacher companies). Drives the QR dialog to activate

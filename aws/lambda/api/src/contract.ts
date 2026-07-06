@@ -195,6 +195,7 @@ const SafeUserSchema = z.object({
   role: UserRoleSchema,
   companyId: UUIDSchema,
   companyType: z.enum(['ACADEMY', 'TEACHER']).optional(),
+  plan: z.enum(['SIMPLE', 'ADVANCED']).optional(), // Feature plan; ADVANCED unlocks CRM
   qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
@@ -1428,6 +1429,68 @@ const TelegramSettingsSchema = z.object({
   notifyTarget: z.enum(['STUDENT', 'PARENT', 'BOTH']),
 });
 
+// CRM lead (Phase 1)
+const CrmLeadSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  fullName: z.string(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  source: z.string().nullable(),
+  interestedCourseId: UUIDSchema.nullable(),
+  interestedCourseName: z.string().nullable(),
+  stage: z.string(),
+  ownerUserId: UUIDSchema.nullable(),
+  ownerName: z.string().nullable(),
+  notes: z.string().nullable(),
+  lostReason: z.string().nullable(),
+  nextActionAt: z.string().nullable(),
+  convertedStudentId: UUIDSchema.nullable(),
+  lastActivityAt: z.string().nullable().optional(),
+  openTaskCount: z.number().optional(),
+  nextTaskDueAt: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const CrmLeadWriteSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  interestedCourseId: OptionalUUIDSchema,
+  branchId: OptionalUUIDSchema,
+  stage: z.string().optional(),
+  ownerUserId: OptionalUUIDSchema,
+  notes: z.string().nullable().optional(),
+  nextActionAt: z.string().nullable().optional(),
+});
+
+const CrmActivitySchema = z.object({
+  id: UUIDSchema,
+  leadId: UUIDSchema,
+  leadName: z.string().nullable().optional(),
+  type: z.string(),
+  subject: z.string().nullable(),
+  body: z.string().nullable(),
+  dueAt: z.string().nullable(),
+  doneAt: z.string().nullable(),
+  ownerUserId: UUIDSchema.nullable(),
+  ownerName: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const CrmActivityWriteSchema = z.object({
+  type: z.string().optional(),
+  subject: z.string().nullable().optional(),
+  body: z.string().nullable().optional(),
+  dueAt: z.string().nullable().optional(),
+  ownerUserId: OptionalUUIDSchema,
+  done: z.boolean().optional(),
+});
+
 // =============================================
 // API Contract
 // =============================================
@@ -2156,6 +2219,162 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
+  // CRM (Phase 1) — lead pipeline for ADVANCED-plan academies
+  crm: {
+    listLeads: {
+      method: 'GET',
+      path: '/api/crm/leads',
+      query: z.object({
+        stage: z.string().optional(),
+        ownerId: UUIDSchema.optional(),
+        branchId: UUIDSchema.optional(),
+        search: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(CrmLeadSchema),
+        403: ApiErrorSchema,
+      },
+    },
+    createLead: {
+      method: 'POST',
+      path: '/api/crm/leads',
+      body: CrmLeadWriteSchema,
+      responses: {
+        201: CrmLeadSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    updateLead: {
+      method: 'PATCH',
+      path: '/api/crm/leads/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CrmLeadWriteSchema.partial().extend({ lostReason: z.string().nullable().optional() }),
+      responses: {
+        200: CrmLeadSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    deleteLead: {
+      method: 'DELETE',
+      path: '/api/crm/leads/:id',
+      responses: {
+        200: z.object({ message: z.string(), code: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    convertLead: {
+      method: 'POST',
+      path: '/api/crm/leads/:id/convert',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ branchId: UUIDSchema.optional() }),
+      responses: {
+        200: z.object({ studentId: UUIDSchema, leadId: UUIDSchema }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    listActivities: {
+      method: 'GET',
+      path: '/api/crm/leads/:leadId/activities',
+      pathParams: z.object({ leadId: UUIDSchema }),
+      responses: {
+        200: z.array(CrmActivitySchema),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    createActivity: {
+      method: 'POST',
+      path: '/api/crm/leads/:leadId/activities',
+      pathParams: z.object({ leadId: UUIDSchema }),
+      body: CrmActivityWriteSchema,
+      responses: {
+        201: CrmActivitySchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    updateActivity: {
+      method: 'PATCH',
+      path: '/api/crm/activities/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CrmActivityWriteSchema,
+      responses: {
+        200: CrmActivitySchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    deleteActivity: {
+      method: 'DELETE',
+      path: '/api/crm/activities/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    myTasks: {
+      method: 'GET',
+      path: '/api/crm/tasks',
+      responses: {
+        200: z.array(CrmActivitySchema),
+        403: ApiErrorSchema,
+      },
+    },
+    getAnalytics: {
+      method: 'GET',
+      path: '/api/crm/analytics',
+      responses: {
+        200: z.object({
+          totalLeads: z.number(),
+          won: z.number(),
+          lost: z.number(),
+          open: z.number(),
+          conversionRate: z.number(),
+          funnel: z.array(z.object({ stage: z.string(), count: z.number() })),
+          sources: z.array(z.object({ source: z.string(), total: z.number(), won: z.number() })),
+          leaderboard: z.array(z.object({
+            ownerUserId: UUIDSchema.nullable(),
+            ownerName: z.string().nullable(),
+            total: z.number(),
+            won: z.number(),
+            openTasks: z.number(),
+            overdueTasks: z.number(),
+          })),
+          tasks: z.object({ open: z.number(), overdue: z.number() }),
+        }),
+        403: ApiErrorSchema,
+      },
+    },
+    getAtRisk: {
+      method: 'GET',
+      path: '/api/crm/at-risk',
+      responses: {
+        200: z.array(z.object({
+          studentId: UUIDSchema,
+          fullName: z.string(),
+          phone: z.string().nullable(),
+          parentName: z.string().nullable(),
+          parentPhone: z.string().nullable(),
+          branchId: UUIDSchema.nullable(),
+          outstanding: z.number(),
+          reasons: z.array(z.string()),
+        })),
+        403: ApiErrorSchema,
+      },
     },
   },
 

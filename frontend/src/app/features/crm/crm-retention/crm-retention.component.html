@@ -1,0 +1,65 @@
+<div class="p-4">
+  @if (!authService.canUseCrm()) {
+    <p-card><div class="text-center py-10 text-gray-500">{{ 'CRM.LOCKED_HINT' | translate }}</div></p-card>
+  } @else {
+    <app-crm-nav></app-crm-nav>
+
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.RETENTION_TITLE' | translate }}</h1>
+        <p class="text-sm text-gray-500">{{ 'CRM.RETENTION_SUBTITLE' | translate }}</p>
+      </div>
+      @if (items().length > 0) {
+        <div class="text-right">
+          <div class="text-xs text-gray-400 uppercase">{{ 'CRM.RISK_OUTSTANDING' | translate }}</div>
+          <div class="text-xl font-bold text-red-600 tabular-nums">{{ totalOutstanding() | number:'1.2-2' }}</div>
+        </div>
+      }
+    </div>
+
+    <p-card>
+      <p-table [value]="items()" [loading]="loading()" [paginator]="items().length > 20" [rows]="20" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>{{ 'CRM.COL_NAME' | translate }}</th>
+            <th>{{ 'CRM.RISK_CONTACT' | translate }}</th>
+            <th>{{ 'CRM.RISK_REASONS' | translate }}</th>
+            <th class="text-right">{{ 'CRM.RISK_OUTSTANDING' | translate }}</th>
+            <th style="width: 60px"></th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-s>
+          <tr>
+            <td class="font-medium text-gray-800">{{ s.fullName }}</td>
+            <td class="text-sm text-gray-600">
+              @if (s.parentName) { <div>{{ s.parentName }}</div> }
+              <div>{{ s.parentPhone || s.phone || '—' }}</div>
+            </td>
+            <td>
+              <div class="flex gap-1 flex-wrap">
+                @for (r of s.reasons; track r) {
+                  <p-tag [value]="reasonLabel(r)" [severity]="reasonSeverity(r)"></p-tag>
+                }
+              </div>
+            </td>
+            <td class="text-right font-semibold text-red-600 tabular-nums">{{ s.outstanding | number:'1.2-2' }}</td>
+            <td>
+              <p-button icon="pi pi-whatsapp" severity="success" [text]="true" size="small"
+                        [pTooltip]="'CRM.RISK_REACH' | translate" (onClick)="whatsapp(s)"
+                        [disabled]="!s.parentPhone && !s.phone"></p-button>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="5" class="text-center py-12 text-gray-400">
+              <i class="pi pi-check-circle text-4xl mb-3 text-green-400"></i>
+              <p class="text-lg font-medium">{{ 'CRM.RISK_NONE' | translate }}</p>
+              <p class="text-sm">{{ 'CRM.RISK_NONE_HINT' | translate }}</p>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+  }
+</div>

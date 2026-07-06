@@ -21,6 +21,8 @@ CREATE TABLE companies (
     registration_number VARCHAR(100),
     industry VARCHAR(100),
     type VARCHAR(20) NOT NULL DEFAULT 'ACADEMY',
+    -- Feature plan (migration 053): SIMPLE (core) or ADVANCED (unlocks CRM, etc.).
+    plan VARCHAR(20) NOT NULL DEFAULT 'SIMPLE' CHECK (plan IN ('SIMPLE', 'ADVANCED')),
     subscription_tier VARCHAR(50) DEFAULT 'BASIC' CHECK (subscription_tier IN ('BASIC', 'PROFESSIONAL', 'ENTERPRISE')),
     subscription_status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (subscription_status IN ('TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED')),
     subscription_start_date DATE DEFAULT CURRENT_DATE,
@@ -1562,6 +1564,65 @@ CREATE TABLE telegram_bot_pool (
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_tg_pool_assigned ON telegram_bot_pool(assigned_company_id);
+
+-- =============================================
+-- CRM LEADS (migration 053) — Phase 1 CRM for ADVANCED-plan academies.
+-- A prospective student before they enroll: captured, owned, moved through a
+-- fixed pipeline, and converted into a real student on close.
+-- =============================================
+CREATE TABLE crm_leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+    full_name VARCHAR(200) NOT NULL,
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    source VARCHAR(50),                        -- acquisition channel (WALK_IN, REFERRAL, ...)
+    interested_course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+    stage VARCHAR(20) NOT NULL DEFAULT 'NEW'
+        CHECK (stage IN ('NEW', 'CONTACTED', 'TRIAL', 'NEGOTIATION', 'WON', 'LOST')),
+    owner_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    lost_reason TEXT,
+    next_action_at DATE,
+    converted_student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_crm_leads_company ON crm_leads(company_id);
+CREATE INDEX idx_crm_leads_branch ON crm_leads(branch_id);
+CREATE INDEX idx_crm_leads_stage ON crm_leads(stage);
+CREATE INDEX idx_crm_leads_owner ON crm_leads(owner_user_id);
+
+CREATE TRIGGER update_crm_leads_updated_at
+    BEFORE UPDATE ON crm_leads
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- CRM activities/tasks (migration 054) — timeline entries on a lead: notes,
+-- calls, meetings, and dated follow-up tasks (done_at = completed).
+CREATE TABLE crm_activities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    lead_id UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+    type VARCHAR(20) NOT NULL DEFAULT 'NOTE'
+        CHECK (type IN ('NOTE', 'CALL', 'WHATSAPP', 'MEETING', 'TASK', 'TRIAL')),
+    subject VARCHAR(300),
+    body TEXT,
+    due_at TIMESTAMP WITH TIME ZONE,
+    done_at TIMESTAMP WITH TIME ZONE,
+    owner_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_crm_act_lead ON crm_activities(lead_id);
+CREATE INDEX idx_crm_act_company ON crm_activities(company_id);
+CREATE INDEX idx_crm_act_owner ON crm_activities(owner_user_id);
+CREATE INDEX idx_crm_act_due ON crm_activities(due_at);
+
+CREATE TRIGGER update_crm_activities_updated_at
+    BEFORE UPDATE ON crm_activities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Grant permissions (adjust as needed for your specific AWS RDS setup)
 -- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automative_user;

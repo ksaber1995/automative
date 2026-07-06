@@ -1,0 +1,82 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true" [draggable]="false" [resizable]="false"
+  [style]="{ width: '540px' }"
+  [header]="lead()?.fullName || ('CRM.LEAD' | translate)"
+>
+  @if (lead(); as l) {
+    <!-- Summary -->
+    <div class="flex flex-wrap items-center gap-2 mb-3 text-sm text-gray-600">
+      @if (l.phone) { <span><i class="pi pi-phone text-gray-400"></i> {{ l.phone }}</span> }
+      @if (l.email) { <span><i class="pi pi-envelope text-gray-400"></i> {{ l.email }}</span> }
+      @if (l.interestedCourseName) { <span><i class="pi pi-book text-gray-400"></i> {{ l.interestedCourseName }}</span> }
+      @if (l.ownerName) { <span><i class="pi pi-user text-gray-400"></i> {{ l.ownerName }}</span> }
+    </div>
+
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
+      <p-button icon="pi pi-whatsapp" [label]="'CRM.SEND_WA' | translate" severity="success" size="small" (onClick)="whatsapp()" [disabled]="!l.phone"></p-button>
+      <p-button icon="pi pi-pencil" [label]="'CRM.EDIT' | translate" severity="secondary" [outlined]="true" size="small" (onClick)="requestEdit.emit(l)"></p-button>
+      @if (!l.convertedStudentId) {
+        <p-button icon="pi pi-user-plus" [label]="'CRM.CONVERT' | translate" severity="info" [outlined]="true" size="small" (onClick)="requestConvert.emit(l)"></p-button>
+      }
+    </div>
+
+    <!-- Add activity -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+      <div class="flex gap-2 mb-2">
+        <p-select [options]="activityTypes" [(ngModel)]="form.type" appendTo="body" [style]="{ width: '150px' }">
+          <ng-template let-t pTemplate="selectedItem"><i [class]="typeIcon(t)"></i> {{ typeLabel(t) }}</ng-template>
+          <ng-template let-t pTemplate="item"><i [class]="typeIcon(t)"></i> {{ typeLabel(t) }}</ng-template>
+        </p-select>
+        <input pInputText [(ngModel)]="form.subject" [placeholder]="'CRM.ACT_SUBJECT' | translate" class="flex-1" />
+      </div>
+      <textarea pTextarea [(ngModel)]="form.body" rows="2" class="w-full mb-2" [placeholder]="'CRM.ACT_BODY' | translate"></textarea>
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">{{ 'CRM.ACT_DUE' | translate }}</span>
+          <p-datepicker [(ngModel)]="form.dueAt" [showTime]="true" dateFormat="yy-mm-dd" [showIcon]="true" appendTo="body" [style]="{ width: '210px' }"></p-datepicker>
+        </div>
+        <p-button icon="pi pi-plus" [label]="'CRM.ACT_ADD' | translate" size="small" (onClick)="addActivity()" [loading]="adding()"></p-button>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{{ 'CRM.ACT_TIMELINE' | translate }}</div>
+    @if (loading()) {
+      <div class="text-center text-gray-400 py-4"><i class="pi pi-spin pi-spinner"></i></div>
+    } @else if (activities().length === 0) {
+      <p class="text-sm text-gray-400 py-3 text-center">{{ 'CRM.ACT_NONE' | translate }}</p>
+    } @else {
+      <div class="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+        @for (a of activities(); track a.id) {
+          <div class="flex items-start gap-3 border border-gray-100 rounded-lg p-2.5"
+               [class.bg-amber-50]="isOverdue(a)"
+               [class.border-amber-200]="isOverdue(a)">
+            <i [class]="typeIcon(a.type)" class="text-gray-400 mt-1"></i>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold text-gray-500">{{ typeLabel(a.type) }}</span>
+                @if (a.dueAt && !a.doneAt) {
+                  <span class="text-xs" [class.text-amber-600]="isOverdue(a)" [class.text-gray-400]="!isOverdue(a)">
+                    <i class="pi pi-clock"></i> {{ a.dueAt | date: 'MMM d, h:mm a' }}
+                  </span>
+                }
+                @if (a.doneAt) { <p-tag [value]="'CRM.ACT_DONE' | translate" severity="success"></p-tag> }
+              </div>
+              @if (a.subject) { <div class="text-sm font-medium text-gray-800" [class.line-through]="a.doneAt">{{ a.subject }}</div> }
+              @if (a.body) { <div class="text-sm text-gray-600 whitespace-pre-line">{{ a.body }}</div> }
+              <div class="text-xs text-gray-400 mt-0.5">{{ a.ownerName }} · {{ a.createdAt | date: 'MMM d, y' }}</div>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              @if (a.type === 'TASK' || a.dueAt) {
+                <p-button [icon]="a.doneAt ? 'pi pi-undo' : 'pi pi-check'" [severity]="a.doneAt ? 'secondary' : 'success'" [text]="true" size="small"
+                          [pTooltip]="(a.doneAt ? 'CRM.ACT_REOPEN' : 'CRM.ACT_COMPLETE') | translate" (onClick)="toggleDone(a)"></p-button>
+              }
+              <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small" (onClick)="removeActivity(a)"></p-button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</p-dialog>

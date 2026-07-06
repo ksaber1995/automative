@@ -34,7 +34,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
               c.is_active as company_is_active,
               c.subscription_status,
               c.name as company_name,
-              c.type as company_type
+              c.type as company_type,
+              c.plan as company_plan
        FROM users u
        JOIN companies c ON u.company_id = c.id
        WHERE LOWER(u.email) = LOWER($1)`,
@@ -50,7 +51,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.is_active as company_is_active,
             c.subscription_status,
             c.name as company_name,
-            c.type as company_type
+            c.type as company_type,
+            c.plan as company_plan
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone = $1
@@ -64,7 +66,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.is_active as company_is_active,
             c.subscription_status,
             c.name as company_name,
-            c.type as company_type
+            c.type as company_type,
+            c.plan as company_plan
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone IS NOT NULL AND $1 LIKE '%' || u.phone
@@ -89,6 +92,7 @@ async function buildSafeUser(user: any, branchIds: string[]) {
     role: user.role,
     companyId: user.company_id,
     companyType: user.company_type ?? 'ACADEMY',
+    plan: user.company_plan ?? 'SIMPLE',
     qrFree,
     branchId: user.branch_id,
     branchIds,
@@ -382,7 +386,7 @@ export const authRoutes = {
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
       const user = await queryOne<any>(
-        `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type
+        `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type, c.plan as company_plan
          FROM users u
          JOIN companies c ON u.company_id = c.id
          WHERE LOWER(u.email) = LOWER($1)`,
@@ -622,13 +626,13 @@ export const authRoutes = {
       const decoded = await verifyToken(token);
 
       const user = await queryOne<any>(
-        `SELECT u.*, c.type as company_type,
+        `SELECT u.*, c.type as company_type, c.plan as company_plan,
                 array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
          FROM users u
          JOIN companies c ON u.company_id = c.id
          LEFT JOIN user_branches ub ON ub.user_id = u.id
          WHERE u.id = $1
-         GROUP BY u.id, c.type`,
+         GROUP BY u.id, c.type, c.plan`,
         [decoded.id]
       );
 

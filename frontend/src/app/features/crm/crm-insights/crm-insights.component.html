@@ -1,0 +1,108 @@
+<div class="p-4">
+  @if (!authService.canUseCrm()) {
+    <p-card><div class="text-center py-10 text-gray-500">{{ 'CRM.LOCKED_HINT' | translate }}</div></p-card>
+  } @else {
+    <app-crm-nav></app-crm-nav>
+
+    @if (loading()) {
+      <div class="text-center text-gray-400 py-16"><i class="pi pi-spin pi-spinner text-3xl"></i></div>
+    } @else if (data(); as d) {
+      <!-- KPI tiles -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide">{{ 'CRM.KPI_TOTAL' | translate }}</div>
+          <div class="text-2xl font-bold text-gray-800">{{ d.totalLeads }}</div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide">{{ 'CRM.KPI_OPEN' | translate }}</div>
+          <div class="text-2xl font-bold text-indigo-600">{{ d.open }}</div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide">{{ 'CRM.KPI_WON' | translate }}</div>
+          <div class="text-2xl font-bold text-green-600">{{ d.won }}</div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide">{{ 'CRM.KPI_CONVERSION' | translate }}</div>
+          <div class="text-2xl font-bold text-gray-800">{{ d.conversionRate }}%</div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide">{{ 'CRM.KPI_OVERDUE' | translate }}</div>
+          <div class="text-2xl font-bold" [class.text-red-600]="d.tasks.overdue > 0" [class.text-gray-800]="d.tasks.overdue === 0">{{ d.tasks.overdue }}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Funnel -->
+        <p-card [header]="'CRM.FUNNEL' | translate">
+          <div class="flex flex-col gap-2">
+            @for (f of d.funnel; track f.stage) {
+              <div class="flex items-center gap-3">
+                <div class="w-28 flex-none"><p-tag [value]="stageLabel(f.stage)" [severity]="stageSeverity(f.stage)"></p-tag></div>
+                <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                  <div class="h-6 rounded-full bg-indigo-500 transition-all" [style.width]="barWidth(f.count)"></div>
+                </div>
+                <div class="w-10 text-right font-semibold text-gray-700 tabular-nums">{{ f.count }}</div>
+              </div>
+            }
+          </div>
+        </p-card>
+
+        <!-- Sources -->
+        <p-card [header]="'CRM.BY_SOURCE' | translate">
+          @if (d.sources.length === 0) {
+            <p class="text-sm text-gray-400 text-center py-4">{{ 'CRM.NO_DATA' | translate }}</p>
+          } @else {
+            <p-table [value]="d.sources">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>{{ 'CRM.COL_SOURCE' | translate }}</th>
+                  <th class="text-right">{{ 'CRM.KPI_TOTAL' | translate }}</th>
+                  <th class="text-right">{{ 'CRM.KPI_WON' | translate }}</th>
+                  <th class="text-right">{{ 'CRM.KPI_CONVERSION' | translate }}</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-s>
+                <tr>
+                  <td>{{ sourceLabel(s.source) }}</td>
+                  <td class="text-right tabular-nums">{{ s.total }}</td>
+                  <td class="text-right tabular-nums text-green-600">{{ s.won }}</td>
+                  <td class="text-right tabular-nums">{{ pct(s.won, s.total) }}%</td>
+                </tr>
+              </ng-template>
+            </p-table>
+          }
+        </p-card>
+      </div>
+
+      <!-- Leaderboard -->
+      <p-card [header]="'CRM.LEADERBOARD' | translate" styleClass="mt-4">
+        @if (d.leaderboard.length === 0) {
+          <p class="text-sm text-gray-400 text-center py-4">{{ 'CRM.NO_DATA' | translate }}</p>
+        } @else {
+          <p-table [value]="d.leaderboard">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'CRM.COL_OWNER' | translate }}</th>
+                <th class="text-right">{{ 'CRM.KPI_TOTAL' | translate }}</th>
+                <th class="text-right">{{ 'CRM.KPI_WON' | translate }}</th>
+                <th class="text-right">{{ 'CRM.KPI_CONVERSION' | translate }}</th>
+                <th class="text-right">{{ 'CRM.LB_OPEN_TASKS' | translate }}</th>
+                <th class="text-right">{{ 'CRM.LB_OVERDUE' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-o>
+              <tr>
+                <td class="font-medium">{{ o.ownerName || '—' }}</td>
+                <td class="text-right tabular-nums">{{ o.total }}</td>
+                <td class="text-right tabular-nums text-green-600">{{ o.won }}</td>
+                <td class="text-right tabular-nums">{{ pct(o.won, o.total) }}%</td>
+                <td class="text-right tabular-nums">{{ o.openTasks }}</td>
+                <td class="text-right tabular-nums" [class.text-red-600]="o.overdueTasks > 0">{{ o.overdueTasks }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        }
+      </p-card>
+    }
+  }
+</div>
