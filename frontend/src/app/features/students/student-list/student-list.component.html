@@ -72,9 +72,9 @@
       </p-tablist>
     </p-tabs>
 
-    <!-- QR Activation Filter (teacher companies only) -->
-    @if (authService.isTeacher()) {
-      <div class="flex gap-2 my-3 flex-wrap items-center">
+    <!-- QR toolbar: activation filter (teacher only) + QR downloads (all company types) -->
+    <div class="flex gap-2 my-3 flex-wrap items-center">
+      @if (authService.isTeacher()) {
         <button
           pButton
           size="small"
@@ -100,26 +100,65 @@
           (click)="qrFilter.set('NOT_ACTIVATED')"
         ></button>
         <span class="mx-2 text-gray-300">|</span>
-        <button
-          pButton
-          size="small"
-          icon="pi pi-print"
-          [label]="'STUDENTS.LIST.QR_PRINT_PDF' | translate"
-          severity="info"
-          [loading]="downloading()"
-          (click)="printQrPdf()"
-        ></button>
-        <button
-          pButton
-          size="small"
+      }
+      <button
+        pButton
+        size="small"
+        icon="pi pi-file-pdf"
+        [label]="'STUDENTS.LIST.QR_PRINT_PDF' | translate"
+        severity="info"
+        [loading]="pdfPreparing()"
+        (click)="openPdfDialog()"
+      ></button>
+      <button
+        pButton
+        size="small"
+        icon="pi pi-download"
+        [label]="'STUDENTS.LIST.QR_DOWNLOAD_ZIP' | translate"
+        severity="secondary"
+        [loading]="downloadingZip()"
+        (click)="downloadQrZip()"
+      ></button>
+    </div>
+
+    <!-- QR PDF export: pick courses/classes → one PDF per class, bundled in a ZIP -->
+    <p-dialog
+      [(visible)]="pdfDialogVisible"
+      [modal]="true"
+      [draggable]="false"
+      [resizable]="false"
+      [style]="{ width: '460px' }"
+      [header]="'STUDENTS.LIST.QR_PDF_DIALOG_TITLE' | translate"
+    >
+      <p class="text-sm text-gray-500 mb-3">{{ 'STUDENTS.LIST.QR_PDF_DIALOG_HINT' | translate }}</p>
+
+      @if (pdfTreeNodes().length === 0) {
+        <p class="text-sm text-gray-400 py-4 text-center">{{ 'STUDENTS.LIST.QR_PDF_NO_CLASSES' | translate }}</p>
+      } @else {
+        <p-tree
+          [value]="pdfTreeNodes()"
+          selectionMode="checkbox"
+          [(selection)]="pdfSelection"
+          [style]="{ maxHeight: '360px', overflow: 'auto', width: '100%' }"
+        ></p-tree>
+      }
+
+      <ng-template pTemplate="footer">
+        <p-button
+          [label]="'STUDENTS.LIST.QR_PDF_CANCEL' | translate"
+          [text]="true"
+          (onClick)="pdfDialogVisible.set(false)"
+          [disabled]="generatingPdf()"
+        ></p-button>
+        <p-button
           icon="pi pi-download"
-          [label]="'STUDENTS.LIST.QR_DOWNLOAD_ZIP' | translate"
-          severity="secondary"
-          [loading]="downloadingZip()"
-          (click)="downloadQrZip()"
-        ></button>
-      </div>
-    }
+          [label]="'STUDENTS.LIST.QR_PDF_DOWNLOAD' | translate"
+          (onClick)="downloadSelectedPdfs()"
+          [loading]="generatingPdf()"
+          [disabled]="pdfTreeNodes().length === 0"
+        ></p-button>
+      </ng-template>
+    </p-dialog>
 
     <!-- Students Table -->
     <p-table

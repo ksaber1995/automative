@@ -1132,8 +1132,9 @@ const CreateEmployeeSchema = z.object({
   department: z.string().optional(),
   position: z.string().optional(),
   salary: z.number().nullable().optional(),
-  salaryType: z.enum(['MONTHLY', 'SESSION_BASED']).optional(),
+  salaryType: z.enum(['MONTHLY', 'SESSION_BASED', 'PERCENTAGE']).optional(),
   sessionRate: z.number().nullable().optional(),
+  percentageRate: z.number().nullable().optional(),
   hireDate: z.string().optional(),
   branchId: OptionalUUIDSchema,
   isGlobal: z.boolean().optional(),
@@ -1153,6 +1154,7 @@ const EmployeeSchema = z.object({
   salary: z.number().nullable(),
   salaryType: z.string(),
   sessionRate: z.number().nullable(),
+  percentageRate: z.number().nullable().optional(),
   hireDate: z.string().nullable(),
   branchId: UUIDSchema.nullable(),
   isGlobal: z.boolean(),
@@ -2881,6 +2883,10 @@ export const contract = c.router({
             branchName: z.string().nullable(),
             templateId: z.string().nullable(),
             employeeId: z.string().nullable(),
+            salaryType: z.string().optional(),
+            sessionCount: z.number().optional(),
+            sessionRate: z.number().optional(),
+            percentageRate: z.number().optional(),
           })),
           totalDue: z.number(),
           month: z.string(),
@@ -2924,6 +2930,22 @@ export const contract = c.router({
       pathParams: z.object({ employeeId: UUIDSchema }),
       responses: {
         200: z.array(ExpensePaymentSchema),
+        404: ApiErrorSchema,
+      },
+    },
+    getEmployeePercentageSummary: {
+      method: 'GET',
+      path: '/api/expenses/employee/:employeeId/percentage-summary',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          salaryType: z.string(),
+          percentageRate: z.number(),
+          totalPaid: z.number(),   // net amount students have paid across the teacher's classes
+          accrued: z.number(),     // percentageRate% of totalPaid
+          withdrawn: z.number(),   // base salary already withdrawn
+          owed: z.number(),        // accrued - withdrawn (>= 0), available to withdraw now
+        }),
         404: ApiErrorSchema,
       },
     },
@@ -4775,6 +4797,11 @@ export const contract = c.router({
           attendanceType: z.enum(['NORMAL', 'SUBSTITUTION']).nullable().optional(),
           homeClassName: z.string().nullable().optional(),
           isEnrolled: z.boolean().optional(),
+          charge: z.object({
+            status: z.string(),
+            amountDue: z.number(),
+            amountPaid: z.number(),
+          }).nullable().optional(),
         })),
         401: ApiErrorSchema,
         402: ApiErrorSchema,

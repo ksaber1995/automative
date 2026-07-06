@@ -112,18 +112,58 @@
           </div>
         </ng-template>
         <div class="space-y-3">
-          <div class="flex justify-between items-center">
-            <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.MONTHLY_SALARY' | translate }}</span>
-            <span class="text-2xl font-bold text-green-600">
-              {{ employee()!.salary ? (employee()!.salary | number:'1.2-2') : '—' }}
-            </span>
-          </div>
-          @if (employee()!.salary && employee()!.salary > 0) {
-            <p-divider styleClass="my-2"></p-divider>
-            <div class="flex justify-between">
-              <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.ANNUAL_EST' | translate }}</span>
-              <span class="font-medium text-gray-700">{{ (employee()!.salary * 12) | number:'1.2-2' }}</span>
+          @if (isPercentage()) {
+            <!-- Percentage-of-revenue teacher: earnings accrue from what students pay -->
+            <div class="flex justify-between items-center">
+              <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.PCT_RATE' | translate }}</span>
+              <span class="text-2xl font-bold text-green-600">{{ (employee()!.percentageRate ?? 0) | number:'1.0-2' }}%</span>
             </div>
+            @if (percentageLoading()) {
+              <div class="text-center text-gray-400 py-3"><i class="pi pi-spin pi-spinner"></i></div>
+            } @else if (percentageSummary(); as s) {
+              <p-divider styleClass="my-2"></p-divider>
+              <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.PCT_TOTAL_PAID' | translate }}</span>
+                <span class="font-medium text-gray-700">{{ s.totalPaid | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.PCT_ACCRUED' | translate }}</span>
+                <span class="font-medium text-gray-700">{{ s.accrued | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.PCT_WITHDRAWN' | translate }}</span>
+                <span class="font-medium text-gray-700">{{ s.withdrawn | number:'1.2-2' }}</span>
+              </div>
+              <p-divider styleClass="my-2"></p-divider>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm font-semibold">{{ 'EMPLOYEES.DETAIL.PCT_OWED' | translate }}</span>
+                <span class="text-xl font-bold" [class.text-green-600]="s.owed > 0" [class.text-gray-400]="s.owed <= 0">{{ s.owed | number:'1.2-2' }}</span>
+              </div>
+              <button
+                pButton
+                class="w-full mt-2"
+                icon="pi pi-money-bill"
+                [label]="'EMPLOYEES.DETAIL.PCT_WITHDRAW' | translate"
+                severity="success"
+                [disabled]="s.owed <= 0"
+                [loading]="withdrawing()"
+                (click)="confirmWithdrawPercentage()"
+              ></button>
+            }
+          } @else {
+            <div class="flex justify-between items-center">
+              <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.MONTHLY_SALARY' | translate }}</span>
+              <span class="text-2xl font-bold text-green-600">
+                {{ employee()!.salary ? (employee()!.salary | number:'1.2-2') : '—' }}
+              </span>
+            </div>
+            @if (employee()!.salary && employee()!.salary > 0) {
+              <p-divider styleClass="my-2"></p-divider>
+              <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.ANNUAL_EST' | translate }}</span>
+                <span class="font-medium text-gray-700">{{ (employee()!.salary * 12) | number:'1.2-2' }}</span>
+              </div>
+            }
           }
         </div>
       </p-card>

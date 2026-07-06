@@ -8,6 +8,8 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { DialogModule } from 'primeng/dialog';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -60,7 +62,8 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
+  providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
@@ -72,6 +75,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private studentService = inject(StudentService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
   private employeeService = inject(EmployeeService);
+  private confirmationService = inject(ConfirmationService);
   private languageService = inject(LanguageService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
@@ -226,13 +230,55 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     // manages, so unchecking one removes their attendance row outright (undo a
     // wrong scan). They can't be toggled back on here — re-scan to re-add.
     if (student.attendanceType === 'SUBSTITUTION') {
-      if (!value) this.removeAttendee(student);
+      if (!value) this.confirmChargeThen(student, () => this.removeAttendee(student));
       return;
     }
+    // PER_SESSION: un-checking a student who already has a charge deletes that
+    // charge (and any payment). Confirm before the destructive save.
+    if (!value && student.charge) {
+      this.confirmChargeThen(student, () => this.applyPresence(student, false));
+      return;
+    }
+    this.applyPresence(student, value);
+  }
+
+  private applyPresence(student: SessionAttendanceStudent, value: boolean) {
+    // Clear the local charge when un-checking — it's about to be deleted server-side,
+    // so we shouldn't re-prompt for it on a subsequent toggle.
     this.students.update((list) =>
-      list.map((s) => (s.studentId === student.studentId ? { ...s, isPresent: value } : s)),
+      list.map((s) => (s.studentId === student.studentId ? { ...s, isPresent: value, charge: value ? s.charge : null } : s)),
     );
     this.scheduleSave();
+  }
+
+  /** Re-emit the student (unchanged) so a cancelled checkbox snaps back to checked. */
+  private revertCheckbox(student: SessionAttendanceStudent) {
+    this.students.update((list) =>
+      list.map((s) => (s.studentId === student.studentId ? { ...s } : s)),
+    );
+  }
+
+  /**
+   * If the student has a per-session charge, confirm (showing the paid amount)
+   * before running the destructive action; otherwise run it immediately.
+   */
+  private confirmChargeThen(student: SessionAttendanceStudent, onAccept: () => void) {
+    const c = student.charge;
+    if (!c) { onAccept(); return; }
+    const name = `${student.studentFirstName} ${student.studentLastName}`.trim();
+    const detail = c.amountPaid > 0
+      ? this.translate.instant('SESSION_ATTENDANCE.UNCHECK_PAID', { amount: c.amountPaid })
+      : this.translate.instant('SESSION_ATTENDANCE.UNCHECK_UNPAID', { amount: c.amountDue });
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_TITLE'),
+      message: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_MSG', { name }) + ' ' + detail,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: onAccept,
+      reject: () => this.revertCheckbox(student),
+    });
   }
 
   /** Remove a (substitution) attendee from the session — undoes a wrong scan. */
@@ -250,8 +296,29 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
 
   /** Bulk-set every student currently matching the search filter. */
   markAllFiltered(present: boolean) {
-    const ids = new Set(this.filteredStudents().map((s) => s.studentId));
-    if (ids.size === 0) return;
+    const targets = this.filteredStudents();
+    if (targets.length === 0) return;
+    // Marking many absent would delete each of their per-session charges — confirm once.
+    if (!present) {
+      const charged = targets.filter((s) => s.charge);
+      if (charged.length > 0) {
+        this.confirmationService.confirm({
+          header: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_TITLE'),
+          message: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_MANY', { count: charged.length }),
+          icon: 'pi pi-exclamation-triangle',
+          acceptLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_ACCEPT'),
+          rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
+          acceptButtonStyleClass: 'p-button-danger',
+          accept: () => this.applyMarkAll(targets, present),
+        });
+        return;
+      }
+    }
+    this.applyMarkAll(targets, present);
+  }
+
+  private applyMarkAll(targets: SessionAttendanceStudent[], present: boolean) {
+    const ids = new Set(targets.map((s) => s.studentId));
     this.students.update((list) =>
       list.map((s) => (ids.has(s.studentId) ? { ...s, isPresent: present } : s)),
     );

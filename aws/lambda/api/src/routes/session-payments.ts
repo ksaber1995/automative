@@ -455,6 +455,64 @@ export async function chargeAbsencesAtSessionEnd(companyId: string, session: any
   }
 }
 
+// ============================================================
+// Reverse a PER_SESSION attendance charge when a student is un-marked present.
+// Deletes their PRESENT session_payments row(s) for the session and gives back
+// any prepaid-package credit the row consumed. Paid rows are removed too — the
+// student didn't attend, so the session shouldn't be charged; the delete
+// cascades to any linked refund. ABSENT charges (session-end absence billing)
+// are intentionally left alone. Best-effort; callers wrap in try/catch.
+// ============================================================
+
+// Is this session's class a PER_SESSION course?
+async function isPerSessionClass(classId: string): Promise<boolean> {
+  const course = await queryOne<any>(
+    `SELECT co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
+    [classId]
+  );
+  return !!course && course.payment_type === 'PER_SESSION';
+}
+
+// Delete one PRESENT charge row and, if it was package-covered, restore the credit.
+async function reverseChargeRow(row: { id: string; package_id: string | null }): Promise<void> {
+  if (row.package_id) {
+    await query(
+      `UPDATE session_packages
+       SET sessions_used = GREATEST(sessions_used - 1, 0),
+           status = CASE WHEN status = 'EXHAUSTED' THEN 'ACTIVE' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [row.package_id]
+    );
+  }
+  await query(`DELETE FROM session_payments WHERE id = $1`, [row.id]);
+}
+
+/** Reverse PRESENT charges for every student in this session NOT in keepStudentIds. */
+export async function reverseUnattendedCharges(companyId: string, session: any, keepStudentIds: string[]): Promise<void> {
+  if (!(await isPerSessionClass(session.class_id))) return;
+  await ensurePerSessionSchema();
+  const rows = await query<any>(
+    `SELECT id, package_id FROM session_payments
+     WHERE session_id = $1 AND company_id = $2 AND attendance_state = 'PRESENT'
+       AND NOT (student_id = ANY($3::uuid[]))`,
+    [session.id, companyId, keepStudentIds || []]
+  );
+  for (const r of rows) await reverseChargeRow(r);
+}
+
+/** Reverse a single student's PRESENT charge for this session (used on un-check). */
+export async function reverseStudentCharge(companyId: string, session: any, studentId: string): Promise<void> {
+  if (!(await isPerSessionClass(session.class_id))) return;
+  await ensurePerSessionSchema();
+  const rows = await query<any>(
+    `SELECT id, package_id FROM session_payments
+     WHERE session_id = $1 AND company_id = $2 AND student_id = $3 AND attendance_state = 'PRESENT'`,
+    [session.id, companyId, studentId]
+  );
+  for (const r of rows) await reverseChargeRow(r);
+}
+
 /**
  * Charge a single QR/manual check-in for one present student. Returns the charge
  * (with details) so the caller can prompt for payment (PENDING) or toast that it

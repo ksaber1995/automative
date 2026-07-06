@@ -6,10 +6,26 @@ import { apiError, mapThrownError } from '../utils/api-error';
 // Idempotent guard — ensures the session-based salary columns exist even on a
 // DB that hasn't had migration 037 applied yet (mirrors ensureExamTables).
 let salaryColumnsEnsured = false;
-async function ensureSalaryColumns(): Promise<void> {
+export async function ensureSalaryColumns(): Promise<void> {
   if (salaryColumnsEnsured) return;
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS salary_type VARCHAR(20) NOT NULL DEFAULT 'MONTHLY'`);
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS session_rate DECIMAL(10, 2)`);
+  // PERCENTAGE salary type (migration 051): a % of what students have PAID for
+  // the teacher's classes. Add the rate column and widen the salary_type CHECK.
+  await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS percentage_rate DECIMAL(5, 2)`);
+  await query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'employees_salary_type_check'
+          AND pg_get_constraintdef(oid) LIKE '%PERCENTAGE%'
+      ) THEN
+        ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_salary_type_check;
+        ALTER TABLE employees ADD CONSTRAINT employees_salary_type_check
+          CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED', 'PERCENTAGE'));
+      END IF;
+    END $$;
+  `);
   await query(`
     CREATE TABLE IF NOT EXISTS session_salary_payments (
       id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -51,6 +67,87 @@ async function getUnpaidSessionIds(
     [companyId, employeeId, monthStart, monthEnd],
   );
   return rows.map((r) => r.id);
+}
+
+// ── PERCENTAGE salary accrual (migration 051) ───────────────────────────────
+// A PERCENTAGE teacher earns `percentage_rate`% of the net money students have
+// actually PAID for the classes they teach (classes.instructor_id = employee).
+// Earnings accrue live as payments arrive; the teacher can withdraw the balance
+// any time (like SESSION_BASED). No ledger table is needed because the accrual
+// is a running monetary sum, not a set of discrete units:
+//   owed = accrued(percentage% of total paid) − base already withdrawn.
+
+// Net amount students have PAID across the employee's classes, summed over all
+// payment models. The per-session tables are optional (created lazily per
+// tenant), so guard them with to_regclass before referencing them.
+async function getTeacherPaidTotal(companyId: string, employeeId: string): Promise<number> {
+  const reg = await queryOne<any>(
+    `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
+            to_regclass('public.session_payments')            IS NOT NULL AS has_sp,
+            to_regclass('public.session_packages')            IS NOT NULL AS has_spkg`
+  );
+
+  // ONE_TIME enrollments carry class_id directly; refunds net out via total_refunded.
+  const parts: string[] = [
+    `COALESCE((SELECT SUM(COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0))
+               FROM enrollments e
+               JOIN classes c ON c.id = e.class_id
+               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`,
+  ];
+  // MONTHLY_SUBSCRIPTION and PER_SESSION tables lack class_id → reach it through
+  // enrollment_id → enrollments.class_id. COVERED session rows carry amount_paid=0
+  // (their money sits on the package row), so summing both never double-counts.
+  if (reg?.has_msp) {
+    parts.push(`COALESCE((SELECT SUM(COALESCE(msp.amount_paid,0))
+               FROM monthly_subscription_payments msp
+               JOIN enrollments e ON e.id = msp.enrollment_id
+               JOIN classes c ON c.id = e.class_id
+               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+  }
+  if (reg?.has_sp) {
+    parts.push(`COALESCE((SELECT SUM(COALESCE(sp.amount_paid,0))
+               FROM session_payments sp
+               JOIN enrollments e ON e.id = sp.enrollment_id
+               JOIN classes c ON c.id = e.class_id
+               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+  }
+  if (reg?.has_spkg) {
+    parts.push(`COALESCE((SELECT SUM(COALESCE(spkg.amount_paid,0))
+               FROM session_packages spkg
+               JOIN enrollments e ON e.id = spkg.enrollment_id
+               JOIN classes c ON c.id = e.class_id
+               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+  }
+
+  const row = await queryOne<any>(`SELECT (${parts.join(' + ')}) AS total`, [companyId, employeeId]);
+  return row && row.total != null ? parseFloat(row.total) : 0;
+}
+
+// Base salary already withdrawn = the pre-bonus, pre-discount portion of past
+// SALARIES payments (amount − bonus + discount). Bonuses don't reduce future
+// accrual; discounts do (they mean less was actually drawn against earnings).
+async function getWithdrawnSalaryBase(companyId: string, employeeId: string): Promise<number> {
+  const row = await queryOne<any>(
+    `SELECT COALESCE(SUM(COALESCE(amount,0) - COALESCE(bonus_amount,0) + COALESCE(discount_amount,0)), 0) AS base
+     FROM expense_payments
+     WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES'`,
+    [companyId, employeeId]
+  );
+  return row && row.base != null ? parseFloat(row.base) : 0;
+}
+
+// Full percentage picture for one employee: what they've earned so far and what
+// remains to withdraw right now.
+async function getPercentageSummary(
+  companyId: string,
+  emp: any,
+): Promise<{ percentageRate: number; totalPaid: number; accrued: number; withdrawn: number; owed: number }> {
+  const percentageRate = emp.percentage_rate ? parseFloat(emp.percentage_rate) : 0;
+  const totalPaid = await getTeacherPaidTotal(companyId, emp.id);
+  const accrued = Math.round(totalPaid * percentageRate) / 100; // == (totalPaid * rate/100) to 2dp
+  const withdrawn = await getWithdrawnSalaryBase(companyId, emp.id);
+  const owed = Math.max(0, Math.round((accrued - withdrawn) * 100) / 100);
+  return { percentageRate, totalPaid, accrued, withdrawn, owed };
 }
 
 // Total PRESENT sessions for an employee in a month (paid or not) — used for
@@ -322,6 +419,7 @@ export const expensesRoutes = {
                   AND ep.date >= $2 AND ep.date <= $3
               ))
              OR (e.salary_type = 'SESSION_BASED' AND e.session_rate > 0)
+             OR (e.salary_type = 'PERCENTAGE' AND e.percentage_rate > 0)
            )`,
         employeeParams
       );
@@ -345,6 +443,12 @@ export const expensesRoutes = {
           const amount = unpaidIds.length * rate;
           if (amount > 0) {
             salaryItems.push({ ...base, amount, salaryType: 'SESSION_BASED', sessionCount: unpaidIds.length, sessionRate: rate });
+          }
+        } else if (e.salary_type === 'PERCENTAGE') {
+          // Owed = accrued (percentage of paid) − already withdrawn; withdraw any time.
+          const { percentageRate, owed } = await getPercentageSummary(context.companyId, e);
+          if (owed > 0) {
+            salaryItems.push({ ...base, amount: owed, salaryType: 'PERCENTAGE', percentageRate });
           }
         } else {
           salaryItems.push({ ...base, amount: parseFloat(e.salary), salaryType: 'MONTHLY' });
@@ -665,9 +769,14 @@ export const expensesRoutes = {
 
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       const isSessionBased = emp.salary_type === 'SESSION_BASED';
+      const isPercentage = emp.salary_type === 'PERCENTAGE';
       if (isSessionBased) {
         if (!emp.session_rate || parseFloat(emp.session_rate) <= 0) {
           return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no session rate configured');
+        }
+      } else if (isPercentage) {
+        if (!emp.percentage_rate || parseFloat(emp.percentage_rate) <= 0) {
+          return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no percentage rate configured');
         }
       } else if (!emp.salary || parseFloat(emp.salary) <= 0) {
         return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
@@ -692,6 +801,15 @@ export const expensesRoutes = {
         }
         baseSalary = unpaidSessionIds.length * rate;
         baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${unpaidSessionIds.length} sessions × ${rate})`;
+      } else if (isPercentage) {
+        // Withdraw the currently-available balance (accrued − already withdrawn).
+        // No monthly lock: pay out whatever has accrued since the last withdrawal.
+        const { percentageRate, owed } = await getPercentageSummary(context.companyId, emp);
+        if (owed <= 0) {
+          return apiError(400, 'ERRORS.EXPENSES.NO_PERCENTAGE_DUE', 'No percentage earnings available to withdraw');
+        }
+        baseSalary = owed;
+        baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${percentageRate}% revenue share)`;
       } else {
         const existing = await queryOne(
           `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
@@ -775,6 +893,33 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get employee salary history error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.SALARY_HISTORY_FAILED', 'Failed to get salary history');
+    }
+  },
+
+  // Live percentage earnings for one teacher: total paid across their classes,
+  // accrued share, already withdrawn, and what's available to withdraw now.
+  getEmployeePercentageSummary: async ({ params, headers }: { params: { employeeId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureSalaryColumns();
+
+      const emp = await queryOne(
+        'SELECT * FROM employees WHERE id = $1 AND company_id = $2',
+        [params.employeeId, context.companyId]
+      );
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+
+      const summary = await getPercentageSummary(context.companyId, emp);
+      return {
+        status: 200 as const,
+        body: { salaryType: emp.salary_type || 'MONTHLY', ...summary },
+      };
+    } catch (error) {
+      console.error('Get employee percentage summary error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.PERCENTAGE_SUMMARY_FAILED', 'Failed to get percentage summary');
     }
   },
 

@@ -14,6 +14,7 @@ import { SelectModule } from 'primeng/select';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
@@ -50,6 +51,7 @@ interface SalaryAdjustment {
     InputNumberModule,
     InputTextModule,
     ConfirmDialogModule,
+    DialogModule,
     TranslateModule,
     AmountPipe,
   ],
@@ -208,6 +210,15 @@ export class SalariesComponent implements OnInit {
 
   getBasePaid(p: ExpensePayment): number {
     return (p.amount || 0) - (p.bonusAmount || 0) + (p.discountAmount || 0);
+  }
+
+  // ── Payment details view dialog ──────────────────────────────────────────
+  viewDialogVisible = signal(false);
+  viewPayment = signal<ExpensePayment | null>(null);
+
+  openPaymentDetails(p: ExpensePayment) {
+    this.viewPayment.set(p);
+    this.viewDialogVisible.set(true);
   }
 
   confirmDeletePayment(p: ExpensePayment) {

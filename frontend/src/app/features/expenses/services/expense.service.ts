@@ -39,6 +39,15 @@ export interface BackPayResult {
   code: string;
 }
 
+export interface PercentageSummary {
+  salaryType: string;
+  percentageRate: number;
+  totalPaid: number;   // net paid by students across the teacher's classes
+  accrued: number;     // percentageRate% of totalPaid
+  withdrawn: number;   // base salary already withdrawn
+  owed: number;        // available to withdraw now (accrued - withdrawn, >= 0)
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -103,6 +112,10 @@ export class ExpenseService {
 
   getEmployeeSalaryHistory(employeeId: string): Observable<ExpensePayment[]> {
     return this.api.get<ExpensePayment[]>(`expenses/employee/${employeeId}/salary-history`);
+  }
+
+  getEmployeePercentageSummary(employeeId: string): Observable<PercentageSummary> {
+    return this.api.get<PercentageSummary>(`expenses/employee/${employeeId}/percentage-summary`);
   }
 
   previewEmployeeBackPay(employeeId: string, upTo?: string): Observable<BackPayPreview> {

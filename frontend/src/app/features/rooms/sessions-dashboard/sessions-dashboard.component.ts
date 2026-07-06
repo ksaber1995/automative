@@ -13,6 +13,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session, StartSessionTeacher } from '../services/session.service';
@@ -77,9 +79,11 @@ function endTimeAfterStartValidator(startDate: string) {
     TabsModule,
     InputTextModule,
     CheckboxModule,
+    ConfirmDialogModule,
     TranslateModule,
     SessionPayDialogComponent,
   ],
+  providers: [ConfirmationService],
   templateUrl: './sessions-dashboard.component.html',
 })
 export class SessionsDashboardComponent implements OnInit {
@@ -96,6 +100,7 @@ export class SessionsDashboardComponent implements OnInit {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private timetableService = inject(TimetableService);
+  private confirmationService = inject(ConfirmationService);
 
   /** Teacher-type companies have no rooms/co-teachers — hide those UI bits. */
   isTeacher = (): boolean => this.authService.isTeacher();
@@ -814,8 +819,31 @@ export class SessionsDashboardComponent implements OnInit {
    * and schedules a debounced save so rapid toggles only fire one network call.
    */
   toggleStudentPresence(sessionId: string, student: SessionAttendanceStudent, value: boolean) {
+    // PER_SESSION: un-checking a student who already has a charge deletes it (and
+    // any payment). Confirm before the destructive save; cancel snaps the box back.
+    if (!value && student.charge) {
+      const name = `${student.studentFirstName} ${student.studentLastName}`.trim();
+      const detail = student.charge.amountPaid > 0
+        ? this.translate.instant('SESSION_ATTENDANCE.UNCHECK_PAID', { amount: student.charge.amountPaid })
+        : this.translate.instant('SESSION_ATTENDANCE.UNCHECK_UNPAID', { amount: student.charge.amountDue });
+      this.confirmationService.confirm({
+        header: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_TITLE'),
+        message: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_MSG', { name }) + ' ' + detail,
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_ACCEPT'),
+        rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
+        acceptButtonStyleClass: 'p-button-danger',
+        accept: () => this.applyStudentPresence(sessionId, student, false),
+        reject: () => this.rerenderAttendance(sessionId, student),
+      });
+      return;
+    }
+    this.applyStudentPresence(sessionId, student, value);
+  }
+
+  private applyStudentPresence(sessionId: string, student: SessionAttendanceStudent, value: boolean) {
     const updated = this.getAttendanceStudents(sessionId).map((s) =>
-      s.studentId === student.studentId ? { ...s, isPresent: value } : s,
+      s.studentId === student.studentId ? { ...s, isPresent: value, charge: value ? s.charge : null } : s,
     );
     this.attendanceBySession.set({
       ...this.attendanceBySession(),
@@ -833,6 +861,14 @@ export class SessionsDashboardComponent implements OnInit {
       delete this.attendanceSaveTimers[sessionId];
       this.flushAttendanceSave(sessionId);
     }, this.ATTENDANCE_SAVE_DEBOUNCE_MS);
+  }
+
+  /** Re-emit the roster (unchanged) so a cancelled checkbox snaps back to checked. */
+  private rerenderAttendance(sessionId: string, student: SessionAttendanceStudent) {
+    const updated = this.getAttendanceStudents(sessionId).map((s) =>
+      s.studentId === student.studentId ? { ...s } : s,
+    );
+    this.attendanceBySession.set({ ...this.attendanceBySession(), [sessionId]: updated });
   }
 
   private flushAttendanceSave(sessionId: string) {

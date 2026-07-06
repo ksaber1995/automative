@@ -1,6 +1,7 @@
 import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensureSalaryColumns } from './expenses';
 
 function mapEmployeeFromDB(row: any) {
   return {
@@ -15,6 +16,7 @@ function mapEmployeeFromDB(row: any) {
     salary: row.salary ? parseFloat(row.salary) : null,
     salaryType: row.salary_type || 'MONTHLY',
     sessionRate: row.session_rate !== null && row.session_rate !== undefined ? parseFloat(row.session_rate) : null,
+    percentageRate: row.percentage_rate !== null && row.percentage_rate !== undefined ? parseFloat(row.percentage_rate) : null,
     hireDate: row.hire_date,
     branchId: row.branch_id,
     isGlobal: row.is_global,
@@ -60,6 +62,8 @@ export const employeesRoutes = {
         }
       }
 
+      // Make sure percentage_rate / the widened salary_type CHECK exist before insert.
+      await ensureSalaryColumns();
       const employee = await insert('employees', {
         company_id: context.companyId,
         first_name: body.firstName,
@@ -71,6 +75,7 @@ export const employeesRoutes = {
         salary: body.salary || null,
         salary_type: body.salaryType || 'MONTHLY',
         session_rate: body.sessionRate ?? null,
+        percentage_rate: body.percentageRate ?? null,
         hire_date: body.hireDate || null,
         branch_id: body.branchId || null,
         is_global: isGlobalAdmin(context) ? (body.isGlobal || false) : false,
@@ -207,6 +212,7 @@ export const employeesRoutes = {
         }
       }
 
+      await ensureSalaryColumns();
       const updateData: any = {};
 
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
@@ -218,6 +224,7 @@ export const employeesRoutes = {
       if (body.salary !== undefined) updateData.salary = body.salary;
       if (body.salaryType !== undefined) updateData.salary_type = body.salaryType;
       if (body.sessionRate !== undefined) updateData.session_rate = body.sessionRate;
+      if (body.percentageRate !== undefined) updateData.percentage_rate = body.percentageRate;
       if (body.hireDate !== undefined) updateData.hire_date = body.hireDate;
       if (body.branchId !== undefined) {
         if (body.branchId && !canAccessBranch(context, body.branchId)) {

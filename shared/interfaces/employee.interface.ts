@@ -1,4 +1,4 @@
-export type SalaryType = 'MONTHLY' | 'SESSION_BASED';
+export type SalaryType = 'MONTHLY' | 'SESSION_BASED' | 'PERCENTAGE';
 
 export interface Employee {
   id: string;
@@ -15,6 +15,8 @@ export interface Employee {
   salaryType: SalaryType;
   /** Pay per taught session, when salaryType === 'SESSION_BASED'. */
   sessionRate?: number | null;
+  /** Percent of paid class revenue, when salaryType === 'PERCENTAGE' (0–100). */
+  percentageRate?: number | null;
   hireDate: string;
   terminationDate?: string | null;
   isActive: boolean;
@@ -37,6 +39,7 @@ export interface EmployeeCreateDto {
   salary: number;
   salaryType?: SalaryType;
   sessionRate?: number | null;
+  percentageRate?: number | null;
   hireDate: string;
   notes?: string;
 }
@@ -53,6 +56,7 @@ export interface EmployeeUpdateDto {
   salary?: number;
   salaryType?: SalaryType;
   sessionRate?: number | null;
+  percentageRate?: number | null;
   terminationDate?: string;
   isActive?: boolean;
   notes?: string;

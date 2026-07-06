@@ -13,6 +13,7 @@ import { EmployeeService } from '../services/employee.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-employee-form',
@@ -40,6 +41,7 @@ export class EmployeeFormComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
+  private authService = inject(AuthService);
 
   employeeForm: FormGroup;
   loading = signal(false);
@@ -65,6 +67,7 @@ export class EmployeeFormComponent implements OnInit {
       salaryType: ['MONTHLY', [Validators.required]],
       salary: [null, [Validators.required, Validators.min(1)]],
       sessionRate: [null],
+      percentageRate: [null],
       hireDate: [today, [Validators.required]],
       notes: ['']
     });
@@ -81,27 +84,40 @@ export class EmployeeFormComponent implements OnInit {
       branchControl?.updateValueAndValidity();
     });
 
-    // Monthly → require `salary`; session-based → require `sessionRate`.
+    // Require the field that matches the chosen salary type:
+    //   MONTHLY → salary, SESSION_BASED → sessionRate, PERCENTAGE → percentageRate.
     this.employeeForm.get('salaryType')?.valueChanges.subscribe((type: string) => {
       const salaryCtrl = this.employeeForm.get('salary');
       const rateCtrl = this.employeeForm.get('sessionRate');
+      const pctCtrl = this.employeeForm.get('percentageRate');
+      salaryCtrl?.clearValidators();
+      rateCtrl?.clearValidators();
+      pctCtrl?.clearValidators();
       if (type === 'SESSION_BASED') {
-        salaryCtrl?.clearValidators();
         rateCtrl?.setValidators([Validators.required, Validators.min(1)]);
+      } else if (type === 'PERCENTAGE') {
+        // A percentage of paid revenue: 0 < rate <= 100.
+        pctCtrl?.setValidators([Validators.required, Validators.min(0.01), Validators.max(100)]);
       } else {
         salaryCtrl?.setValidators([Validators.required, Validators.min(1)]);
-        rateCtrl?.clearValidators();
       }
       salaryCtrl?.updateValueAndValidity();
       rateCtrl?.updateValueAndValidity();
+      pctCtrl?.updateValueAndValidity();
     });
   }
 
   private rebuildSalaryTypeOptions() {
-    this.salaryTypeOptions.set([
+    const options = [
       { label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_MONTHLY'), value: 'MONTHLY' },
       { label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_SESSION'), value: 'SESSION_BASED' },
-    ]);
+    ];
+    // Percentage-of-revenue pay is an academy-only model (a teacher tenant is a
+    // single person, so there's no separate teacher to revenue-share with).
+    if (!this.authService.isTeacher()) {
+      options.push({ label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_PERCENTAGE'), value: 'PERCENTAGE' });
+    }
+    this.salaryTypeOptions.set(options);
   }
 
   ngOnInit() {
@@ -193,6 +209,7 @@ export class EmployeeFormComponent implements OnInit {
   get salary() { return this.employeeForm.get('salary'); }
   get salaryType() { return this.employeeForm.get('salaryType'); }
   get sessionRate() { return this.employeeForm.get('sessionRate'); }
+  get percentageRate() { return this.employeeForm.get('percentageRate'); }
   get hireDate() { return this.employeeForm.get('hireDate'); }
   get branchId() { return this.employeeForm.get('branchId'); }
   get isGlobal() { return this.employeeForm.get('isGlobal'); }

@@ -44,7 +44,6 @@
       <div class="flex items-center justify-center gap-2 mt-4 flex-wrap">
         <p-button icon="pi pi-print" [label]="'STUDENT_QR.PRINT' | translate" size="small" [outlined]="true" (onClick)="print()" [disabled]="!dataUrl()"></p-button>
         <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [disabled]="!dataUrl()"></p-button>
-        <p-button icon="pi pi-refresh" [label]="'STUDENT_QR.REGENERATE' | translate" size="small" severity="danger" [outlined]="true" (onClick)="regenerate()" [loading]="regenerating()"></p-button>
       </div>
 
       <!-- Click-to-chat: send from the staff member's own WhatsApp number -->

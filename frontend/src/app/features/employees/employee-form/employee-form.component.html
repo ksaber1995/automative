@@ -54,7 +54,7 @@
         </div>
 
         <!-- Monthly salary (when salary type = MONTHLY) -->
-        @if (salaryType?.value !== 'SESSION_BASED') {
+        @if (salaryType?.value !== 'SESSION_BASED' && salaryType?.value !== 'PERCENTAGE') {
           <div class="field">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
             <p-inputnumber formControlName="salary" [min]="1" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
@@ -72,6 +72,18 @@
             <small class="text-gray-400">{{ 'EMPLOYEES.FORM.SESSION_RATE_HINT' | translate }}</small>
             @if (sessionRate?.invalid && sessionRate?.touched) {
               <small class="text-red-500 block">{{ 'EMPLOYEES.FORM.SESSION_RATE_REQUIRED' | translate }}</small>
+            }
+          </div>
+        }
+
+        <!-- Percentage of revenue (when salary type = PERCENTAGE) -->
+        @if (salaryType?.value === 'PERCENTAGE') {
+          <div class="field">
+            <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.PERCENTAGE' | translate }} <span class="text-red-500">*</span></label>
+            <p-inputnumber formControlName="percentageRate" [min]="0" [max]="100" suffix=" %" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full"></p-inputnumber>
+            <small class="text-gray-400">{{ 'EMPLOYEES.FORM.PERCENTAGE_HINT' | translate }}</small>
+            @if (percentageRate?.invalid && percentageRate?.touched) {
+              <small class="text-red-500 block">{{ 'EMPLOYEES.FORM.PERCENTAGE_REQUIRED' | translate }}</small>
             }
           </div>
         }

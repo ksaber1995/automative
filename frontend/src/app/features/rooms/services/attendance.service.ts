@@ -19,6 +19,8 @@ export interface SessionAttendanceStudent {
   attendanceType?: AttendanceType | null;
   homeClassName?: string | null;
   isEnrolled?: boolean;
+  /** PER_SESSION: the student's existing charge for this session (null if none). */
+  charge?: { status: string; amountDue: number; amountPaid: number } | null;
 }
 
 export interface StudentAttendanceRecord {

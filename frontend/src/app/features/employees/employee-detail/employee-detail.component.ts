@@ -21,7 +21,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { ExpenseService, BackPayPreview } from '../../expenses/services/expense.service';
+import { ExpenseService, BackPayPreview, PercentageSummary } from '../../expenses/services/expense.service';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../attendance/services/teacher-attendance.service';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
@@ -93,6 +93,12 @@ export class EmployeeDetailComponent implements OnInit {
   }
 
   isSessionBased = computed(() => this.employee()?.salaryType === 'SESSION_BASED');
+  isPercentage = computed(() => this.employee()?.salaryType === 'PERCENTAGE');
+
+  // Live percentage earnings (accrued from what students have paid) + withdraw.
+  percentageSummary = signal<PercentageSummary | null>(null);
+  percentageLoading = signal(false);
+  withdrawing = signal(false);
 
   getBaseSalary(item: ExpensePayment): number {
     return item.amount - (item.bonusAmount || 0) + (item.discountAmount || 0);
@@ -125,12 +131,47 @@ export class EmployeeDetailComponent implements OnInit {
         }
         this.loadSalaryHistory(id);
         this.loadAttendanceHistory(id);
+        if (emp.salaryType === 'PERCENTAGE') this.loadPercentageSummary(id);
       },
       error: () => {
         // Interceptor toasted the translated error.
         this.loading.set(false);
         this.router.navigate(['/employees']);
       }
+    });
+  }
+
+  private loadPercentageSummary(employeeId: string) {
+    this.percentageLoading.set(true);
+    this.expenseService.getEmployeePercentageSummary(employeeId).subscribe({
+      next: (s) => { this.percentageSummary.set(s); this.percentageLoading.set(false); },
+      error: () => { this.percentageLoading.set(false); },
+    });
+  }
+
+  /** Withdraw the currently-available percentage balance (accrued − withdrawn). */
+  confirmWithdrawPercentage() {
+    const emp = this.employee();
+    const s = this.percentageSummary();
+    if (!emp || !s || s.owed <= 0) return;
+    this.confirmationService.confirm({
+      message: this.translate.instant('EMPLOYEES.DETAIL.PCT_WITHDRAW_CONFIRM', { amount: s.owed.toFixed(2) }),
+      header: this.translate.instant('EMPLOYEES.DETAIL.PCT_WITHDRAW_TITLE'),
+      icon: 'pi pi-money-bill',
+      acceptLabel: this.translate.instant('EMPLOYEES.DETAIL.PCT_WITHDRAW_ACCEPT'),
+      rejectLabel: this.translate.instant('EMPLOYEES.DETAIL.CANCEL'),
+      accept: () => {
+        this.withdrawing.set(true);
+        this.expenseService.payEmployeeSalary(emp.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('EMPLOYEES.DETAIL.PCT_WITHDRAW_SUCCESS'));
+            this.withdrawing.set(false);
+            this.loadPercentageSummary(emp.id);
+            this.loadSalaryHistory(emp.id);
+          },
+          error: () => { this.withdrawing.set(false); },
+        });
+      },
     });
   }
 

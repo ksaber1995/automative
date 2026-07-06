@@ -3,7 +3,7 @@ import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPerm
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
 import { notifyCheckin } from './telegram';
-import { chargeSessionAttendance, chargeSingleCheckin } from './session-payments';
+import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema } from './session-payments';
 
 export const attendanceRoutes = {
   /**
@@ -86,6 +86,29 @@ export const attendanceRoutes = {
         [session.class_id, context.companyId, params.sessionId]
       );
 
+      // PER_SESSION courses: attach each student's existing session charge so the
+      // UI can warn (and show paid amount) before un-checking deletes it.
+      const chargeByStudent = new Map<string, { status: string; amountDue: number; amountPaid: number }>();
+      const courseType = await queryOne<any>(
+        `SELECT co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
+        [session.class_id]
+      );
+      if (courseType?.payment_type === 'PER_SESSION') {
+        await ensurePerSessionSchema();
+        const charges = await query<any>(
+          `SELECT student_id, payment_status, amount_due, amount_paid
+           FROM session_payments WHERE session_id = $1 AND company_id = $2`,
+          [params.sessionId, context.companyId]
+        );
+        for (const c of charges) {
+          chargeByStudent.set(c.student_id, {
+            status: c.payment_status,
+            amountDue: parseFloat(c.amount_due || 0),
+            amountPaid: parseFloat(c.amount_paid || 0),
+          });
+        }
+      }
+
       return {
         status: 200 as const,
         body: students.map((row: any) => ({
@@ -101,6 +124,7 @@ export const attendanceRoutes = {
           attendanceType: row.attendance_type || null,
           homeClassName: row.home_class_name || null,
           isEnrolled: row.is_enrolled === true,
+          charge: chargeByStudent.get(row.student_id) || null,
         })),
       };
     } catch (error) {
@@ -161,6 +185,13 @@ export const attendanceRoutes = {
       } catch (billErr) {
         console.error('Per-session charge (saveForSession) error:', billErr);
       }
+      // Un-checked students: drop the per-session charge created when they were
+      // marked present (and refund any package credit). Best-effort.
+      try {
+        await reverseUnattendedCharges(context.companyId, session, presentIds);
+      } catch (revErr) {
+        console.error('Per-session reverse (saveForSession) error:', revErr);
+      }
 
       return {
         status: 200 as const,
@@ -200,6 +231,13 @@ export const attendanceRoutes = {
         'DELETE FROM session_attendance WHERE session_id = $1 AND student_id = $2',
         [params.sessionId, params.studentId]
       );
+      // Un-checking a student drops the per-session charge raised for their
+      // attendance (and restores any package credit). Best-effort.
+      try {
+        await reverseStudentCharge(context.companyId, session, params.studentId);
+      } catch (revErr) {
+        console.error('Per-session reverse (removeAttendee) error:', revErr);
+      }
       return { status: 200 as const, body: { message: 'Attendee removed', code: 'ATTENDANCE.REMOVED' } };
     } catch (error) {
       console.error('Remove attendee error:', error);

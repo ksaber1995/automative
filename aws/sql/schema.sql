@@ -585,8 +585,12 @@ CREATE TABLE employees (
     department VARCHAR(100),
     salary DECIMAL(10, 2),
     salary_type VARCHAR(20) NOT NULL DEFAULT 'MONTHLY'
-        CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED')),
+        CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED', 'PERCENTAGE')),
     session_rate DECIMAL(10, 2),
+    -- PERCENTAGE salary (migration 051): teacher earns this % of what students
+    -- have PAID for the classes they teach (classes.instructor_id). Withdrawable
+    -- any time, like SESSION_BASED.
+    percentage_rate DECIMAL(5, 2),
     hire_date DATE,
     notes TEXT,
     branch_id UUID,

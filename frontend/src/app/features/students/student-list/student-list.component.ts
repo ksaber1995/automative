@@ -8,8 +8,10 @@ import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
+import { DialogModule } from 'primeng/dialog';
+import { TreeModule } from 'primeng/tree';
 import { FormsModule } from '@angular/forms';
-import { ConfirmationService } from 'primeng/api';
+import { ConfirmationService, TreeNode } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
 import QRCode from 'qrcode';
@@ -46,6 +48,8 @@ interface EnrollmentCounts {
     ConfirmDialogModule,
     TooltipModule,
     TabsModule,
+    DialogModule,
+    TreeModule,
     TranslateModule
   ],
   providers: [ConfirmationService],
@@ -347,20 +351,41 @@ export class StudentListComponent implements OnInit {
     return age;
   }
 
-  // --- Print QR Codes as PDF ---
-  downloading = signal(false);
+  // --- Download QR Codes as per-class PDFs (bundled in a ZIP) ---
+  // The button opens a course/class picker; each selected class becomes its own
+  // PDF (`Course/Class.pdf`) and they're all packaged into a single ZIP — the
+  // PDF equivalent of the folder-per-class ZIP export below.
+  pdfPreparing = signal(false);      // loading enrollments + building the tree
+  generatingPdf = signal(false);     // rendering PDFs + zipping
+  pdfDialogVisible = signal(false);
+  pdfTreeNodes = signal<TreeNode[]>([]);
+  pdfSelection: TreeNode[] = [];      // p-tree checkbox selection (parents + leaves)
 
-  async printQrPdf() {
-    this.downloading.set(true);
+  // Cached while the dialog is open so Download doesn't refetch/recompute.
+  private pdfClassStudents = new Map<string, Student[]>();                       // classId -> its activated students
+  private pdfClassMeta = new Map<string, { className: string; courseName: string }>();
+  private pdfStudentGroups = new Map<string, string[]>();                        // studentId -> "Course - Class" labels
+
+  /**
+   * Students whose QR can be downloaded. Teachers can only export ACTIVATED QRs
+   * (unactivated ones aren't live/scannable); academies get QR free, so any
+   * active student with a token is exportable.
+   */
+  private qrDownloadableStudents(): Student[] {
+    const teacher = this.authService.isTeacher();
+    return this.students().filter(s => s.isActive && s.qrToken && (!teacher || s.qrActivated));
+  }
+
+  /** Open the course/class picker for the per-class PDF export. */
+  async openPdfDialog() {
+    const activatedStudents = this.qrDownloadableStudents();
+    if (activatedStudents.length === 0) {
+      this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
+      return;
+    }
+
+    this.pdfPreparing.set(true);
     try {
-      const activatedStudents = this.students().filter(s => s.isActive && s.qrActivated && s.qrToken);
-      if (activatedStudents.length === 0) {
-        this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
-        this.downloading.set(false);
-        return;
-      }
-
-      // Load enrollments, classes, courses in parallel
       const [enrollments, classes, courses] = await new Promise<[any[], Class[], any[]]>((resolve, reject) => {
         forkJoin({
           enrollments: this.enrollmentService.getAllEnrollments(),
@@ -374,119 +399,195 @@ export class StudentListComponent implements OnInit {
 
       const courseMap = new Map(courses.map((c: any) => [c.id, c.name]));
       const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
+      const studentById = new Map(activatedStudents.map(s => [s.id, s]));
       const studentIdSet = new Set(activatedStudents.map(s => s.id));
 
-      // Build student -> class names mapping
+      const classStudents = new Map<string, Student[]>();
+      const classSeen = new Map<string, Set<string>>();  // dedupe students within a class
+      const classMeta = new Map<string, { className: string; courseName: string }>();
       const studentGroups = new Map<string, string[]>();
+      const courseClasses = new Map<string, Set<string>>(); // courseId -> classIds (with activated students)
+
       for (const e of enrollments) {
-        if (studentIdSet.has(e.studentId)) {
-          if (!studentGroups.has(e.studentId)) studentGroups.set(e.studentId, []);
-          const cls = classMap.get(e.classId);
-          if (cls) {
-            const courseName = courseMap.get(cls.courseId) || '';
-            const label = courseName ? `${courseName} - ${cls.name}` : cls.name;
-            const list = studentGroups.get(e.studentId)!;
-            if (!list.includes(label)) list.push(label);
-          }
+        if (!studentIdSet.has(e.studentId)) continue;
+        const cls = classMap.get(e.classId);
+        if (!cls) continue;
+        const courseName = courseMap.get(cls.courseId) || 'Unknown Course';
+
+        if (!classMeta.has(e.classId)) classMeta.set(e.classId, { className: cls.name, courseName });
+        if (!classStudents.has(e.classId)) { classStudents.set(e.classId, []); classSeen.set(e.classId, new Set()); }
+        const seen = classSeen.get(e.classId)!;
+        if (!seen.has(e.studentId)) {
+          seen.add(e.studentId);
+          classStudents.get(e.classId)!.push(studentById.get(e.studentId)!);
         }
+        if (!courseClasses.has(cls.courseId)) courseClasses.set(cls.courseId, new Set());
+        courseClasses.get(cls.courseId)!.add(e.classId);
+
+        if (!studentGroups.has(e.studentId)) studentGroups.set(e.studentId, []);
+        const label = `${courseName} - ${cls.name}`;
+        const gl = studentGroups.get(e.studentId)!;
+        if (!gl.includes(label)) gl.push(label);
       }
 
-      // A4 PDF in mm. `compress: true` deflate-compresses the page/image
-      // streams — essential for large batches (1000+ students = 2000+ pages),
-      // otherwise the embedded QR PNGs blow up the tab's memory and the
-      // download silently fails.
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-      const pw = 210; // page width
-      const ph = 297; // page height
-      const origin = window.location.origin;
+      // Build the course -> class tree, sorted alphabetically, with per-class counts.
+      const nodes: TreeNode[] = Array.from(courseClasses.keys())
+        .sort((a, b) => String(courseMap.get(a) || '').localeCompare(String(courseMap.get(b) || '')))
+        .map(courseId => {
+          const children: TreeNode[] = Array.from(courseClasses.get(courseId)!)
+            .sort((a, b) => (classMeta.get(a)?.className || '').localeCompare(classMeta.get(b)?.className || ''))
+            .map(cid => ({
+              key: `class:${cid}`,
+              label: `${classMeta.get(cid)?.className || 'Class'} (${classStudents.get(cid)?.length || 0})`,
+              data: cid,
+              leaf: true,
+            }));
+          return {
+            key: `course:${courseId}`,
+            label: String(courseMap.get(courseId) || 'Unknown Course'),
+            children,
+            expanded: true,
+          } as TreeNode;
+        });
 
-      for (let i = 0; i < activatedStudents.length; i++) {
-        const student = activatedStudents[i];
-
-        // --- Odd page: QR code ---
-        if (i > 0) pdf.addPage();
-        const url = `${origin}/p/s/${student.qrToken}`;
-        // 500px is plenty to scan a 140mm-wide QR and keeps per-image memory
-        // ~2.5× lower than 800px across thousands of students.
-        const dataUrl = await QRCode.toDataURL(url, { width: 500, margin: 2 });
-        const qrSize = 140;
-        const qrX = (pw - qrSize) / 2;
-        const qrY = (ph - qrSize) / 2;
-        pdf.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
-
-        // --- Even page: student info ---
-        pdf.addPage();
-        const name = `${student.firstName} ${student.lastName}`.trim();
-        const phone = student.phone || '';
-        const groups = studentGroups.get(student.id) || [];
-
-        // Centered card design
-        const cardW = 160;
-        const cardX = (pw - cardW) / 2;
-        let cardH = 90 + groups.length * 10;
-        if (cardH < 100) cardH = 100;
-        const cardY = (ph - cardH) / 2;
-
-        // Card background
-        pdf.setFillColor(245, 247, 250);
-        pdf.roundedRect(cardX, cardY, cardW, cardH, 6, 6, 'F');
-
-        // Top accent bar
-        pdf.setFillColor(59, 130, 246);
-        // Draw a rect clipped to top rounded corners
-        pdf.roundedRect(cardX, cardY, cardW, 14, 6, 6, 'F');
-        pdf.setFillColor(245, 247, 250);
-        pdf.rect(cardX, cardY + 8, cardW, 6, 'F');
-
-        // Student name
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(28);
-        pdf.setTextColor(30, 41, 59);
-        pdf.text(name, pw / 2, cardY + 36, { align: 'center' });
-
-        // Phone
-        let yPos = cardY + 50;
-        if (phone) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(16);
-          pdf.setTextColor(100, 116, 139);
-          pdf.text(phone, pw / 2, yPos, { align: 'center' });
-          yPos += 14;
-        }
-
-        // Divider
-        pdf.setDrawColor(203, 213, 225);
-        pdf.setLineWidth(0.5);
-        pdf.line(cardX + 20, yPos, cardX + cardW - 20, yPos);
-        yPos += 10;
-
-        // Groups
-        if (groups.length > 0) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(13);
-          pdf.setTextColor(71, 85, 105);
-          for (const g of groups) {
-            pdf.text(g, pw / 2, yPos, { align: 'center' });
-            yPos += 10;
-          }
-        } else {
-          pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(13);
-          pdf.setTextColor(148, 163, 184);
-          pdf.text('—', pw / 2, yPos, { align: 'center' });
-        }
-
-        // Yield to the event loop every so often so a large batch doesn't lock
-        // the main thread (which makes the browser kill the "unresponsive" tab).
-        if (i % 25 === 24) await new Promise((r) => setTimeout(r));
-      }
-
-      pdf.save('qr-codes.pdf');
-      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
+      this.pdfClassStudents = classStudents;
+      this.pdfClassMeta = classMeta;
+      this.pdfStudentGroups = studentGroups;
+      this.pdfTreeNodes.set(nodes);
+      this.pdfSelection = this.flattenTreeNodes(nodes); // preselect everything
+      this.pdfDialogVisible.set(true);
     } catch {
       this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
     } finally {
-      this.downloading.set(false);
+      this.pdfPreparing.set(false);
+    }
+  }
+
+  /** Generate one PDF per selected class and download them all as a single ZIP. */
+  async downloadSelectedPdfs() {
+    const selectedClassIds = (this.pdfSelection || [])
+      .filter(n => typeof n.key === 'string' && n.key.startsWith('class:'))
+      .map(n => n.data as string);
+    if (selectedClassIds.length === 0) {
+      this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_PDF_NO_SELECTION'));
+      return;
+    }
+
+    this.generatingPdf.set(true);
+    try {
+      const zip = new JSZip();
+      const origin = window.location.origin;
+      let rendered = 0;
+
+      for (const classId of selectedClassIds) {
+        const studentsInClass = this.pdfClassStudents.get(classId) || [];
+        if (studentsInClass.length === 0) continue;
+        const meta = this.pdfClassMeta.get(classId);
+
+        // A4 PDF, deflate-compressed so large classes don't blow up tab memory.
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+        for (let i = 0; i < studentsInClass.length; i++) {
+          const student = studentsInClass[i];
+          const groups = this.pdfStudentGroups.get(student.id) || [];
+          await this.renderStudentPages(pdf, student, origin, groups, i === 0);
+          // Yield periodically so a large batch doesn't lock the main thread.
+          if (++rendered % 25 === 0) await new Promise((r) => setTimeout(r));
+        }
+
+        const courseName = this.sanitizeName(meta?.courseName || 'Unknown Course');
+        const className = this.sanitizeName(meta?.className || 'Unknown Class');
+        zip.file(`${courseName}/${className}.pdf`, pdf.output('arraybuffer'));
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, 'qr-pdfs.zip');
+      this.pdfDialogVisible.set(false);
+      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_PDF_DOWNLOAD_SUCCESS', { count: selectedClassIds.length }));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
+    } finally {
+      this.generatingPdf.set(false);
+    }
+  }
+
+  /** Flatten a tree into a single array (parents + children) for full selection. */
+  private flattenTreeNodes(nodes: TreeNode[]): TreeNode[] {
+    const out: TreeNode[] = [];
+    const walk = (list: TreeNode[]) => list.forEach(n => { out.push(n); if (n.children) walk(n.children); });
+    walk(nodes);
+    return out;
+  }
+
+  /** Render a student's two pages (QR page + info card) into an existing PDF. */
+  private async renderStudentPages(pdf: jsPDF, student: Student, origin: string, groups: string[], isFirst: boolean): Promise<void> {
+    const pw = 210; // page width (mm)
+    const ph = 297; // page height (mm)
+
+    // --- QR page ---
+    if (!isFirst) pdf.addPage();
+    const url = `${origin}/p/s/${student.qrToken}`;
+    // 500px is plenty to scan a 140mm-wide QR and keeps per-image memory low.
+    const dataUrl = await QRCode.toDataURL(url, { width: 500, margin: 2 });
+    const qrSize = 140;
+    pdf.addImage(dataUrl, 'PNG', (pw - qrSize) / 2, (ph - qrSize) / 2, qrSize, qrSize, undefined, 'FAST');
+
+    // --- Info card page ---
+    pdf.addPage();
+    const name = `${student.firstName} ${student.lastName}`.trim();
+    const phone = student.phone || '';
+
+    const cardW = 160;
+    const cardX = (pw - cardW) / 2;
+    let cardH = 90 + groups.length * 10;
+    if (cardH < 100) cardH = 100;
+    const cardY = (ph - cardH) / 2;
+
+    // Card background
+    pdf.setFillColor(245, 247, 250);
+    pdf.roundedRect(cardX, cardY, cardW, cardH, 6, 6, 'F');
+
+    // Top accent bar (clip the bottom rounded corners with a plain rect)
+    pdf.setFillColor(59, 130, 246);
+    pdf.roundedRect(cardX, cardY, cardW, 14, 6, 6, 'F');
+    pdf.setFillColor(245, 247, 250);
+    pdf.rect(cardX, cardY + 8, cardW, 6, 'F');
+
+    // Student name
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(28);
+    pdf.setTextColor(30, 41, 59);
+    pdf.text(name, pw / 2, cardY + 36, { align: 'center' });
+
+    // Phone
+    let yPos = cardY + 50;
+    if (phone) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(16);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(phone, pw / 2, yPos, { align: 'center' });
+      yPos += 14;
+    }
+
+    // Divider
+    pdf.setDrawColor(203, 213, 225);
+    pdf.setLineWidth(0.5);
+    pdf.line(cardX + 20, yPos, cardX + cardW - 20, yPos);
+    yPos += 10;
+
+    // Groups (class labels)
+    if (groups.length > 0) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(13);
+      pdf.setTextColor(71, 85, 105);
+      for (const g of groups) {
+        pdf.text(g, pw / 2, yPos, { align: 'center' });
+        yPos += 10;
+      }
+    } else {
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(13);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('—', pw / 2, yPos, { align: 'center' });
     }
   }
 
@@ -496,7 +597,7 @@ export class StudentListComponent implements OnInit {
   async downloadQrZip() {
     this.downloadingZip.set(true);
     try {
-      const activatedStudents = this.students().filter(s => s.isActive && s.qrActivated && s.qrToken);
+      const activatedStudents = this.qrDownloadableStudents();
       if (activatedStudents.length === 0) {
         this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
         this.downloadingZip.set(false);
