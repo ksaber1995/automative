@@ -14,7 +14,7 @@ import { TelegramService } from '../../telegram/telegram.service';
 import { Student } from '@shared/interfaces/student.interface';
 
 /** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
-export const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
+export const QR_PLAN_PRICES = { ONE_YEAR: 15, LIFELONG: 30 } as const;
 type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 /**
@@ -63,6 +63,9 @@ export class StudentQrDialogComponent {
   /** TEACHER companies pay per QR; academies get it free. */
   isTeacher = (): boolean => this.authService.isTeacher();
 
+  /** First-100 teacher launch tier: activation is free (no charge prompt). */
+  isQrFree = (): boolean => this.authService.isQrFree();
+
   /** Is the current student's QR paid-activated and not expired? */
   qrLive = computed<boolean>(() => {
     const s = this.student();
@@ -106,6 +109,24 @@ export class StudentQrDialogComponent {
 
   planPrice(plan: QrPlan): number {
     return QR_PLAN_PRICES[plan];
+  }
+
+  /** Free-tier tenant: activate immediately with no plan choice or cost prompt.
+   *  Grants a lifelong QR at price 0 (the backend enforces the free price). */
+  activateFree(): void {
+    const s = this.student();
+    if (!s || this.activating()) return;
+    this.activating.set(true);
+    this.studentService.activateQr(s.id, 'LIFELONG').subscribe({
+      next: (updated) => {
+        this.activating.set(false);
+        this.activated.emit(updated);
+        if (updated.qrToken) this.render(updated.qrToken);
+      },
+      error: () => {
+        this.activating.set(false);
+      },
+    });
   }
 
   /** Step 1: user picks a plan → show the cost warning. */

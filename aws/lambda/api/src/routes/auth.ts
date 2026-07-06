@@ -6,6 +6,7 @@ import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
+import { isCompanyQrFree } from '../utils/qr-pricing';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -72,7 +73,14 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
   );
 }
 
-function buildSafeUser(user: any, branchIds: string[]) {
+async function buildSafeUser(user: any, branchIds: string[]) {
+  // Launch promo: expose whether this (teacher) tenant gets free QR activation
+  // so the client can skip the cost prompt. Academies are never charged, so we
+  // only query for teacher companies.
+  const qrFree =
+    (user.company_type ?? 'ACADEMY') === 'TEACHER'
+      ? await isCompanyQrFree(user.company_id)
+      : false;
   return {
     id: user.id,
     email: user.email,
@@ -81,6 +89,7 @@ function buildSafeUser(user: any, branchIds: string[]) {
     role: user.role,
     companyId: user.company_id,
     companyType: user.company_type ?? 'ACADEMY',
+    qrFree,
     branchId: user.branch_id,
     branchIds,
     linkedEmployeeId: user.linked_employee_id ?? null,
@@ -165,7 +174,7 @@ export const authRoutes = {
         body: {
           accessToken,
           refreshToken,
-          user: buildSafeUser(user, branchIds),
+          user: await buildSafeUser(user, branchIds),
         },
       };
     } catch (error) {
@@ -423,7 +432,7 @@ export const authRoutes = {
         body: {
           accessToken,
           refreshToken,
-          user: buildSafeUser({ ...user, email_verified: true }, branchIds),
+          user: await buildSafeUser({ ...user, email_verified: true }, branchIds),
         },
       };
     } catch (error) {
@@ -631,7 +640,7 @@ export const authRoutes = {
 
       return {
         status: 200 as const,
-        body: buildSafeUser(user, branchIds),
+        body: await buildSafeUser(user, branchIds),
       };
     } catch (error) {
       console.error('Profile error:', error);

@@ -25,6 +25,7 @@ export interface SafeUser {
   lastName: string;
   role: UserRole;
   companyType?: 'ACADEMY' | 'TEACHER'; // Owning company's registration type
+  qrFree?: boolean;                  // Teacher tenant in the free QR-activation launch tier
   branchId?: string | null;
   branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)
   linkedEmployeeId?: string | null;

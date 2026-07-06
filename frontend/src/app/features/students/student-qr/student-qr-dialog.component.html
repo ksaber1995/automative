@@ -84,21 +84,38 @@
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 mt-4">
-          <p-button
-            styleClass="w-full"
-            icon="pi pi-calendar"
-            [label]="'STUDENT_QR.ACTIVATE_ONE_YEAR' | translate: { price: planPrice('ONE_YEAR') }"
-            (onClick)="choosePlan('ONE_YEAR')"
-          ></p-button>
-          <p-button
-            styleClass="w-full"
-            icon="pi pi-infinity"
-            severity="success"
-            [label]="'STUDENT_QR.ACTIVATE_LIFELONG' | translate: { price: planPrice('LIFELONG') }"
-            (onClick)="choosePlan('LIFELONG')"
-          ></p-button>
-        </div>
+        @if (isQrFree()) {
+          <!-- Free launch tier: one-tap activation, no charge -->
+          <div class="flex flex-col gap-2 mt-4">
+            <p class="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              {{ 'STUDENT_QR.FREE_HINT' | translate }}
+            </p>
+            <p-button
+              styleClass="w-full"
+              icon="pi pi-gift"
+              severity="success"
+              [label]="'STUDENT_QR.ACTIVATE_FREE' | translate"
+              (onClick)="activateFree()"
+              [loading]="activating()"
+            ></p-button>
+          </div>
+        } @else {
+          <div class="flex flex-col gap-2 mt-4">
+            <p-button
+              styleClass="w-full"
+              icon="pi pi-calendar"
+              [label]="'STUDENT_QR.ACTIVATE_ONE_YEAR' | translate: { price: planPrice('ONE_YEAR') }"
+              (onClick)="choosePlan('ONE_YEAR')"
+            ></p-button>
+            <p-button
+              styleClass="w-full"
+              icon="pi pi-infinity"
+              severity="success"
+              [label]="'STUDENT_QR.ACTIVATE_LIFELONG' | translate: { price: planPrice('LIFELONG') }"
+              (onClick)="choosePlan('LIFELONG')"
+            ></p-button>
+          </div>
+        }
       }
     }
   </div>

@@ -3720,6 +3720,8 @@
     "LOCKED_HINT": "Activate this student's QR code to print, share, and scan it.",
     "ACTIVATE_ONE_YEAR": "Activate for 1 year — {{price}} EGP",
     "ACTIVATE_LIFELONG": "Activate lifelong — {{price}} EGP",
+    "ACTIVATE_FREE": "Activate QR — Free",
+    "FREE_HINT": "You're on the free launch plan — QR activation is on us. 🎉",
     "CONFIRM_TITLE": "Confirm QR activation",
     "CONFIRM_ONE_YEAR": "You will be billed {{price}} EGP to activate this QR code for one year. Continue?",
     "CONFIRM_LIFELONG": "You will be billed {{price}} EGP to activate this QR code for life. Continue?",

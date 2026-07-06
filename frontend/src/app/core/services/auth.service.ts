@@ -179,6 +179,15 @@ export class AuthService {
     return this.currentUser()?.companyType === 'TEACHER';
   }
 
+  /**
+   * True when the teacher tenant falls in the free QR-activation launch tier
+   * (first 100 registered teacher companies). Drives the QR dialog to activate
+   * for free instead of prompting for the paid plans.
+   */
+  isQrFree(): boolean {
+    return this.currentUser()?.qrFree === true;
+  }
+
   // ─── Permission checks ───────────────────────────────────────────────────────
 
   /**

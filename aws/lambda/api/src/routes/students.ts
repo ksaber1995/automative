@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { QR_PLAN_PRICES, QrPlan, isCompanyQrFree } from '../utils/qr-pricing';
 
 // 16 random bytes → 32 hex chars. ~128 bits of entropy, matching the
 // students.qr_token VARCHAR(32) column. Unguessable so the unauthenticated
@@ -9,10 +10,6 @@ import { apiError, mapThrownError } from '../utils/api-error';
 function generateQrToken(): string {
   return randomBytes(16).toString('hex');
 }
-
-// Paid QR activation pricing (EGP), TEACHER-type companies only.
-const QR_PLAN_PRICES = { ONE_YEAR: 25, LIFELONG: 40 } as const;
-type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 // A student's QR is "live" when activated and not expired (NULL expiration =
 // lifelong). Used to gate scan/check-in/public-profile for teacher tenants.
@@ -400,10 +397,12 @@ export const studentsRoutes = {
     }
   },
 
-  // Paid QR activation for TEACHER-type companies. ONE_YEAR (25 EGP) sets a
-  // one-year expiry; LIFELONG (40 EGP) never expires. The charge is recorded on
+  // Paid QR activation for TEACHER-type companies. ONE_YEAR (15 EGP) sets a
+  // one-year expiry; LIFELONG (30 EGP) never expires. The charge is recorded on
   // the student (qr_price) and starts unpaid (qr_paid = false) — the owner marks
   // it paid from the admin console once the teacher settles the bill.
+  // Launch promo: the first QR_FREE_TEACHER_LIMIT teacher companies get every
+  // activation free — price 0 and pre-marked paid (nothing to settle).
   activateQr: async ({ params, body, headers }: { params: { id: string }; body: { plan: QrPlan }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -432,7 +431,10 @@ export const studentsRoutes = {
         return apiError(409, 'ERRORS.STUDENTS.QR_ALREADY_ACTIVE', 'QR is already activated for this student');
       }
 
-      const price = QR_PLAN_PRICES[plan];
+      // Free-tier teacher companies pay nothing; the activation is recorded at
+      // price 0 and already settled (qr_paid = true) so it never shows as due.
+      const free = await isCompanyQrFree(context.companyId);
+      const price = free ? 0 : QR_PLAN_PRICES[plan];
       const expiration =
         plan === 'ONE_YEAR'
           ? (() => {
@@ -446,7 +448,7 @@ export const studentsRoutes = {
         qr_activated: true,
         qr_expiration: expiration,
         qr_price: price,
-        qr_paid: false,
+        qr_paid: free,
       };
       // Self-heal: some students (e.g. bulk-imported) may have no QR token yet.
       // Without one the QR can't render or be scanned, so provision it on

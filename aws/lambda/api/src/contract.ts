@@ -195,6 +195,7 @@ const SafeUserSchema = z.object({
   role: UserRoleSchema,
   companyId: UUIDSchema,
   companyType: z.enum(['ACADEMY', 'TEACHER']).optional(),
+  qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
   linkedEmployeeId: UUIDSchema.nullable().optional(),
