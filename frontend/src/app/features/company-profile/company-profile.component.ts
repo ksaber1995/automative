@@ -2,26 +2,52 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
+import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CompanyProfile, CompanyQrSummary, CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-company-profile',
   standalone: true,
-  imports: [CommonModule, DatePipe, CardModule, TagModule, SkeletonModule, TranslateModule],
+  imports: [CommonModule, DatePipe, CardModule, TagModule, ButtonModule, SkeletonModule, TranslateModule],
   templateUrl: './company-profile.component.html',
 })
 export class CompanyProfileComponent implements OnInit {
   private companyService = inject(CompanyService);
   private authService = inject(AuthService);
+  private notify = inject(NotificationService);
+  private translate = inject(TranslateService);
 
   loading = signal(true);
   profile = signal<CompanyProfile | null>(null);
+  upgrading = signal(false);
 
   /** QR billing panel is only meaningful for TEACHER-type companies. */
   isTeacher = (): boolean => this.authService.isTeacher();
+
+  /** Plan card is academy-only. */
+  isAcademy = (): boolean => !this.authService.isTeacher();
+  plan = computed<'SIMPLE' | 'ADVANCED'>(() => this.profile()?.company.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE');
+
+  upgrade() {
+    if (this.upgrading()) return;
+    this.upgrading.set(true);
+    this.companyService.upgradePlan('ADVANCED').subscribe({
+      next: () => {
+        this.upgrading.set(false);
+        this.notify.success(this.translate.instant('COMPANY_PROFILE.PLAN_UPGRADED'));
+        // Reflect locally, refresh the profile, and refresh the signed-in user so
+        // the CRM sidebar appears without a re-login.
+        const p = this.profile();
+        if (p) this.profile.set({ ...p, company: { ...p.company, plan: 'ADVANCED' } });
+        this.authService.refreshUser();
+      },
+      error: () => this.upgrading.set(false),
+    });
+  }
 
   qr = computed<CompanyQrSummary | null>(() => this.profile()?.qr ?? null);
 

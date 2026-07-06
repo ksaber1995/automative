@@ -12,6 +12,30 @@
       <p-skeleton height="1.5rem"></p-skeleton>
     </p-card>
   } @else if (profile(); as p) {
+    <!-- Plan (academies only) -->
+    @if (isAcademy()) {
+      <div class="mb-6 rounded-xl border p-5 flex items-center justify-between gap-4 flex-wrap"
+           [class.bg-indigo-50]="plan() === 'ADVANCED'" [class.border-indigo-200]="plan() === 'ADVANCED'"
+           [class.bg-white]="plan() !== 'ADVANCED'" [class.border-gray-200]="plan() !== 'ADVANCED'">
+        <div class="flex items-center gap-3">
+          <i class="pi pi-star-fill text-2xl" [class.text-indigo-500]="plan() === 'ADVANCED'" [class.text-gray-300]="plan() !== 'ADVANCED'"></i>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-gray-800">{{ 'COMPANY_PROFILE.PLAN_LABEL' | translate }}</span>
+              <p-tag [value]="(plan() === 'ADVANCED' ? 'COMPANY_PROFILE.PLAN_ADVANCED' : 'COMPANY_PROFILE.PLAN_BASIC') | translate"
+                     [severity]="plan() === 'ADVANCED' ? 'success' : 'secondary'"></p-tag>
+            </div>
+            <p class="text-sm text-gray-500 mt-0.5">{{ (plan() === 'ADVANCED' ? 'COMPANY_PROFILE.PLAN_ADVANCED_HINT' : 'COMPANY_PROFILE.PLAN_BASIC_HINT') | translate }}</p>
+          </div>
+        </div>
+        @if (plan() !== 'ADVANCED') {
+          <p-button icon="pi pi-arrow-up" [label]="'COMPANY_PROFILE.UPGRADE' | translate" (onClick)="upgrade()" [loading]="upgrading()"></p-button>
+        } @else {
+          <span class="inline-flex items-center gap-1 text-sm font-medium text-green-700"><i class="pi pi-check-circle"></i> {{ 'COMPANY_PROFILE.PLAN_ACTIVE' | translate }}</span>
+        }
+      </div>
+    }
+
     <!-- Subscription Banner -->
     @if (p.subscription) {
       <div class="mb-6 rounded-lg p-5 border flex items-center gap-4"

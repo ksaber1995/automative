@@ -41,6 +41,8 @@ export class RegisterComponent {
       companyName: ['', [Validators.required, Validators.minLength(2)]],
       // Account type: ACADEMY (institution) or TEACHER (individual). Set from the route.
       type: ['ACADEMY', [Validators.required]],
+      // Feature plan (academies only): SIMPLE (Basic) or ADVANCED. Defaults to Basic.
+      plan: ['SIMPLE'],
       // TODO: re-enable later. Hidden for now to simplify onboarding.
       // companyEmail: ['', [Validators.required, Validators.email]],
       // companyCode: [''],
@@ -123,9 +125,14 @@ export class RegisterComponent {
     });
   }
 
+  selectPlan(p: 'SIMPLE' | 'ADVANCED') {
+    this.registerForm.get('plan')?.setValue(p);
+  }
+
   // Form field getters
   get companyName() { return this.registerForm.get('companyName'); }
   get type() { return this.registerForm.get('type'); }
+  get plan() { return this.registerForm.get('plan'); }
   // TODO: re-enable later. Hidden for now to simplify onboarding.
   // get companyEmail() { return this.registerForm.get('companyEmail'); }
   // get companyCode() { return this.registerForm.get('companyCode'); }

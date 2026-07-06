@@ -6,7 +6,6 @@ import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { CrmNavComponent } from '../crm-nav/crm-nav.component';
 import { CrmService, AtRiskStudent } from '../services/crm.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -15,7 +14,7 @@ import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
 @Component({
   selector: 'app-crm-retention',
   standalone: true,
-  imports: [CommonModule, CardModule, TableModule, TagModule, ButtonModule, TooltipModule, TranslateModule, CrmNavComponent],
+  imports: [CommonModule, CardModule, TableModule, TagModule, ButtonModule, TooltipModule, TranslateModule],
   templateUrl: './crm-retention.component.html',
 })
 export class CrmRetentionComponent implements OnInit {

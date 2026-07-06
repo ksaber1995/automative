@@ -4,14 +4,13 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { CrmNavComponent } from '../crm-nav/crm-nav.component';
 import { CrmService, CrmAnalytics } from '../services/crm.service';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-crm-insights',
   standalone: true,
-  imports: [CommonModule, CardModule, TableModule, TagModule, TranslateModule, CrmNavComponent],
+  imports: [CommonModule, CardModule, TableModule, TagModule, TranslateModule],
   templateUrl: './crm-insights.component.html',
 })
 export class CrmInsightsComponent implements OnInit {

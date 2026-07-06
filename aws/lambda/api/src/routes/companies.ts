@@ -34,6 +34,7 @@ function mapCompanyProfile(row: any) {
     taxId: row.tax_id,
     registrationNumber: row.registration_number,
     industry: row.industry,
+    plan: row.plan ?? 'SIMPLE',
     timezone: row.timezone,
     currency: row.currency,
     locale: row.locale,
@@ -166,6 +167,29 @@ export const companiesRoutes = {
     } catch (error) {
       console.error('Update company settings error:', error);
       return mapThrownError(error, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update settings', 400);
+    }
+  },
+
+  // Self-service plan change (academies only): SIMPLE ⇄ ADVANCED. ADVANCED
+  // unlocks CRM & add-ons. Admin-gated. No billing enforced yet.
+  upgradePlan: async ({ body, headers }: { body: { plan?: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can change the plan');
+      }
+      const company = await queryOne<any>('SELECT type FROM companies WHERE id = $1', [context.companyId]);
+      if (!company) return apiError(404, 'ERRORS.COMPANIES.NOT_FOUND', 'Company not found');
+      if (company.type !== 'ACADEMY') {
+        return apiError(400, 'ERRORS.COMPANIES.PLAN_ACADEMY_ONLY', 'Plans apply to academies only');
+      }
+      const plan = body?.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
+      const updated = await update('companies', context.companyId, { plan });
+      if (!updated) return apiError(400, 'ERRORS.COMPANIES.PLAN_UPDATE_FAILED', 'Failed to update plan');
+      return { status: 200 as const, body: { plan: updated.plan ?? plan } };
+    } catch (error) {
+      console.error('Upgrade plan error:', error);
+      return mapThrownError(error, 'ERRORS.COMPANIES.PLAN_UPDATE_FAILED', 'Failed to update plan', 400);
     }
   },
 };

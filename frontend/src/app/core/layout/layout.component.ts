@@ -206,13 +206,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
     const people: NavLeaf[] = [
       { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('branches') && !auth.isTeacher() },
       { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
-      { labelKey: 'NAV.CRM', icon: 'pi pi-filter', routerLink: ['/crm'], visible: auth.canUseCrm() },
       { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') },
       { labelKey: 'NAV.ATTENDANCE_TEACHERS', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('academy') && !auth.isTeacher() },
     ].filter(c => c.visible);
     if (people.length) {
       entries.push({ kind: 'group', group: {
         groupKey: 'people', labelKey: 'NAV.GROUPS.PEOPLE', icon: 'pi pi-users', children: people,
+      }});
+    }
+
+    // Client Management (CRM) — its own top-level group; each tab is a route.
+    const clientMgmt: NavLeaf[] = [
+      { labelKey: 'NAV.CRM_LEADS', icon: 'pi pi-filter', routerLink: ['/crm'], visible: auth.canUseCrm() },
+      { labelKey: 'NAV.CRM_INSIGHTS', icon: 'pi pi-chart-bar', routerLink: ['/crm/insights'], visible: auth.canUseCrm() },
+      { labelKey: 'NAV.CRM_RETENTION', icon: 'pi pi-heart', routerLink: ['/crm/retention'], visible: auth.canUseCrm() },
+    ].filter(c => c.visible);
+    if (clientMgmt.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'clientMgmt', labelKey: 'NAV.GROUPS.CLIENT_MGMT', icon: 'pi pi-address-book', children: clientMgmt,
       }});
     }
 

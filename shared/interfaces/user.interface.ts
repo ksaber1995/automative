@@ -83,6 +83,8 @@ export interface RegisterDto {
   companyName: string;
   // Account type chosen at signup: ACADEMY (institution) or TEACHER (individual).
   type?: 'ACADEMY' | 'TEACHER';
+  // Feature plan chosen at signup (academies only).
+  plan?: 'SIMPLE' | 'ADVANCED';
   industry?: string;
   timezone?: string;
 

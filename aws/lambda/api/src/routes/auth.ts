@@ -193,6 +193,7 @@ export const authRoutes = {
     body: {
       companyName: string;
       type?: 'ACADEMY' | 'TEACHER';
+      plan?: 'SIMPLE' | 'ADVANCED';
       industry?: string;
       firstName: string;
       lastName: string;
@@ -255,19 +256,21 @@ export const authRoutes = {
       // Account type chosen at signup; anything other than TEACHER falls back
       // to ACADEMY so a missing/garbage value can't violate the CHECK constraint.
       const companyType = body.type === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
+      // Feature plan is academy-only; teachers are always SIMPLE.
+      const plan = companyType === 'ACADEMY' && body.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
 
       const companyRes = await client.query(
         `INSERT INTO companies
           (name, type, industry, subscription_tier, subscription_status,
            subscription_start_date, subscription_end_date, max_branches, max_users,
-           timezone, currency, locale, is_active, onboarding_completed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           timezone, currency, locale, is_active, onboarding_completed, plan)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          RETURNING *`,
         [
           body.companyName, companyType, body.industry || 'Tech Center',
           'BASIC', 'TRIAL',
           new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false,
+          1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false, plan,
         ]
       );
       const company = companyRes.rows[0];

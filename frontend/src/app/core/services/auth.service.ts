@@ -116,6 +116,14 @@ export class AuthService {
     return this.http.get<SafeUser>(`${environment.apiUrl}/auth/profile`);
   }
 
+  /** Re-fetch the signed-in user so plan/permission-driven UI (e.g. CRM nav) updates in place. */
+  refreshUser(): void {
+    this.getProfile().subscribe({
+      next: (user) => this.currentUser.set(user),
+      error: () => {},
+    });
+  }
+
   getToken(): string | null {
     return localStorage.getItem(environment.jwtTokenKey);
   }

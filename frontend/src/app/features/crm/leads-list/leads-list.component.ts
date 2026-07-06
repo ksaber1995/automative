@@ -17,7 +17,6 @@ import { DragDropModule } from 'primeng/dragdrop';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { LeadPanelComponent } from '../lead-panel/lead-panel.component';
-import { CrmNavComponent } from '../crm-nav/crm-nav.component';
 import { CrmService } from '../services/crm.service';
 import { CourseService } from '../../courses/services/course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -35,7 +34,7 @@ type Sev = 'secondary' | 'info' | 'warn' | 'success' | 'danger' | 'contrast';
   imports: [
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DialogModule, SelectModule, InputTextModule, TextareaModule, DatePickerModule,
-    TooltipModule, ConfirmDialogModule, DragDropModule, TranslateModule, LeadPanelComponent, CrmNavComponent,
+    TooltipModule, ConfirmDialogModule, DragDropModule, TranslateModule, LeadPanelComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './leads-list.component.html',

@@ -129,6 +129,37 @@
                 </a>
               </div>
 
+              <!-- Plan choice — academies only -->
+              @if (accountType() === 'ACADEMY') {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'AUTH.REGISTER.PLAN_LABEL' | translate }}</label>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button type="button" (click)="selectPlan('SIMPLE')"
+                      class="text-left rounded-lg border p-4 transition-colors"
+                      [class.border-primary-500]="plan?.value === 'SIMPLE'"
+                      [class.bg-primary-50]="plan?.value === 'SIMPLE'"
+                      [class.border-gray-200]="plan?.value !== 'SIMPLE'">
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-800">{{ 'AUTH.REGISTER.PLAN_BASIC' | translate }}</span>
+                        @if (plan?.value === 'SIMPLE') { <i class="pi pi-check-circle text-primary-600"></i> }
+                      </div>
+                      <p class="text-xs text-gray-500 mt-1">{{ 'AUTH.REGISTER.PLAN_BASIC_DESC' | translate }}</p>
+                    </button>
+                    <button type="button" (click)="selectPlan('ADVANCED')"
+                      class="text-left rounded-lg border p-4 transition-colors relative"
+                      [class.border-primary-500]="plan?.value === 'ADVANCED'"
+                      [class.bg-primary-50]="plan?.value === 'ADVANCED'"
+                      [class.border-gray-200]="plan?.value !== 'ADVANCED'">
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-800">{{ 'AUTH.REGISTER.PLAN_ADVANCED' | translate }}</span>
+                        @if (plan?.value === 'ADVANCED') { <i class="pi pi-check-circle text-primary-600"></i> }
+                      </div>
+                      <p class="text-xs text-gray-500 mt-1">{{ 'AUTH.REGISTER.PLAN_ADVANCED_DESC' | translate }}</p>
+                    </button>
+                  </div>
+                </div>
+              }
+
               <!-- TODO: re-enable later. Hidden for now to simplify onboarding.
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">

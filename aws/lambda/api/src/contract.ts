@@ -145,6 +145,8 @@ const RegisterRequestSchema = z.object({
   // Account type: ACADEMY (institution) or TEACHER (individual). Optional so
   // older clients that omit it still validate; the backend defaults to ACADEMY.
   type: z.enum(['ACADEMY', 'TEACHER']).optional(),
+  // Feature plan chosen at signup (academies only; teachers are always SIMPLE).
+  plan: z.enum(['SIMPLE', 'ADVANCED']).optional(),
   // Industry is hidden in the registration UI but submitted with a default
   // ("Tech Center") so the backend can store it. Optional so future clients
   // that omit it still validate.
@@ -3464,6 +3466,7 @@ export const contract = c.router({
             taxId: z.string().nullable(),
             registrationNumber: z.string().nullable(),
             industry: z.string().nullable(),
+            plan: z.string().optional(),
             timezone: z.string().nullable(),
             currency: z.string().nullable(),
             locale: z.string().nullable(),
@@ -3523,6 +3526,17 @@ export const contract = c.router({
         }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,
+      },
+    },
+    upgradePlan: {
+      method: 'POST' as const,
+      path: '/api/companies/upgrade-plan',
+      body: z.object({ plan: z.enum(['SIMPLE', 'ADVANCED']) }),
+      responses: {
+        200: z.object({ plan: z.string() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },

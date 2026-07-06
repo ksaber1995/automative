@@ -26,6 +26,7 @@ export interface CompanyProfileData {
   taxId: string | null;
   registrationNumber: string | null;
   industry: string | null;
+  plan?: 'SIMPLE' | 'ADVANCED';
   timezone: string | null;
   currency: string | null;
   locale: string | null;
@@ -74,5 +75,9 @@ export class CompanyService {
 
   getProfile(): Observable<CompanyProfile> {
     return this.api.get<CompanyProfile>('companies/profile');
+  }
+
+  upgradePlan(plan: 'SIMPLE' | 'ADVANCED'): Observable<{ plan: string }> {
+    return this.api.post<{ plan: string }>('companies/upgrade-plan', { plan });
   }
 }

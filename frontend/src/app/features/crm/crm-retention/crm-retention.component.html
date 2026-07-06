@@ -2,8 +2,6 @@
   @if (!authService.canUseCrm()) {
     <p-card><div class="text-center py-10 text-gray-500">{{ 'CRM.LOCKED_HINT' | translate }}</div></p-card>
   } @else {
-    <app-crm-nav></app-crm-nav>
-
     <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.RETENTION_TITLE' | translate }}</h1>
