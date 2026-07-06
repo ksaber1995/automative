@@ -107,7 +107,6 @@
         <tr>
           <th pSortableColumn="name">{{ 'MASTER_COURSES.DETAIL.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="price" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
-          <th pSortableColumn="duration" class="text-right">{{ 'MASTER_COURSES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="duration"></p-sortIcon></th>
           <th pSortableColumn="isActive">{{ 'MASTER_COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
           @if (authService.canWrite('academy')) {
             <th>{{ 'MASTER_COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
@@ -118,7 +117,6 @@
         <tr>
           <td class="font-medium">{{ row.name }}</td>
           <td class="text-right">{{ row.price | amount }}</td>
-          <td class="text-right">{{ row.duration }} {{ 'MASTER_COURSES.WEEKS' | translate }}</td>
           <td>
             <p-tag
               [value]="row.isActive ? ('MASTER_COURSES.ACTIVE' | translate) : ('MASTER_COURSES.INACTIVE' | translate)"

@@ -13,6 +13,12 @@
 
   <!-- Filters -->
   <p-card>
+    <div class="flex flex-wrap gap-2 mb-4">
+      <p-button [label]="'REFUNDS.LIST.RANGE_TODAY' | translate" size="small" [outlined]="rangePreset() !== 'TODAY'" (onClick)="setRange('TODAY')"></p-button>
+      <p-button [label]="'REFUNDS.LIST.RANGE_MONTH' | translate" size="small" [outlined]="rangePreset() !== 'MONTH'" (onClick)="setRange('MONTH')"></p-button>
+      <p-button [label]="'REFUNDS.LIST.RANGE_YEAR' | translate" size="small" [outlined]="rangePreset() !== 'YEAR'" (onClick)="setRange('YEAR')"></p-button>
+      <p-button [label]="'REFUNDS.LIST.RANGE_LAST_12M' | translate" size="small" [outlined]="rangePreset() !== 'LAST_12M'" (onClick)="setRange('LAST_12M')"></p-button>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
       @if (!branchState.isSingleBranch()) {
         <div>
@@ -49,7 +55,7 @@
           [showIcon]="true"
           dateFormat="yy-mm-dd"
           [style]="{ width: '100%' }"
-          (onSelect)="load()"
+          (onSelect)="onManualDateChange()"
         ></p-datepicker>
       </div>
       <div>
@@ -59,7 +65,7 @@
           [showIcon]="true"
           dateFormat="yy-mm-dd"
           [style]="{ width: '100%' }"
-          (onSelect)="load()"
+          (onSelect)="onManualDateChange()"
         ></p-datepicker>
       </div>
       <div class="flex items-end">

@@ -7,6 +7,7 @@ import {
   type TenantContext,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensurePerSessionSchema } from './session-payments';
 
 type AuthHeaders = { authorization: string };
 type RangeQuery = { startDate?: string; endDate?: string; branchId?: string };
@@ -73,11 +74,52 @@ function reportBranchClause(alias: string, params: any[], ids: string[] | null):
   return ` AND ${alias} IN (${placeholders})`;
 }
 
+// ── Shared student-status predicates ────────────────────────────────────────
+// SQL fragments over a `students s` row with $2 = startDate and $3 = endDate.
+// Used by both the churn summary and the per-branch report so "active",
+// "dormant" (idle) and "left" mean the same thing on every tab.
+//   active  = present as of $3 AND enrolled (by $3) in a class that was
+//             running as of $3 — started by $3 and not finished by $3.
+//   dormant = present as of $3 but in no running class.
+//   left    = the student record was deactivated within [$2, $3].
+// NOTE: classes.is_active is unreliable (false even for in-progress classes),
+// and enrollment status has no history, so current status is used as a
+// best-effort proxy. Checks single-course (enrollments) and bundle
+// (master_class_enrollments) tables.
+const ACTIVE_ENROLLMENT_EXISTS = `(
+  EXISTS (
+    SELECT 1 FROM enrollments e
+    INNER JOIN classes c ON c.id = e.class_id
+    WHERE e.student_id = s.id
+      AND e.status NOT IN ('DROPPED', 'CANCELLED')
+      AND e.enrollment_date <= $3::date
+      AND c.start_date <= $3::date
+      AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
+  )
+  OR EXISTS (
+    SELECT 1 FROM master_class_enrollments mce
+    INNER JOIN classes c ON c.id = mce.class_id
+    WHERE mce.student_id = s.id
+      AND mce.status != 'DROPPED'
+      AND mce.enrolled_at <= $3::date
+      AND c.start_date <= $3::date
+      AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
+  )
+)`;
+// Present as of the end date: joined by then and not yet left by then.
+const PRESENT_AS_OF_END = `(s.enrollment_date <= $3::date
+  AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
+const LEFT_IN_RANGE = `(s.inactive_date IS NOT NULL
+  AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
+
 export const reportsRoutes = {
   // Monthly P&L: revenue (enrollments + product_sales - refunds) and expenses per month.
   monthlyPL: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // session_packages / session_payments are created lazily — make sure they
+      // exist before the session_rev CTE references them.
+      await ensurePerSessionSchema();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -126,6 +168,24 @@ export const reportsRoutes = {
              AND paid_date >= $2 AND paid_date <= $3 ${branchClause}
            GROUP BY 1
          ),
+         -- Per-session money: prepaid packages + pay-as-you-go charges. COVERED
+         -- charges carry amount_paid = 0, so the two never double-count.
+         session_rev AS (
+           SELECT m, SUM(amt) AS amt FROM (
+             SELECT date_trunc('month', purchased_at)::date AS m, SUM(amount_paid) AS amt
+             FROM session_packages
+             WHERE company_id = $1 AND amount_paid > 0
+               AND purchased_at::date >= $2 AND purchased_at::date <= $3 ${branchClause}
+             GROUP BY 1
+             UNION ALL
+             SELECT date_trunc('month', COALESCE(paid_date, created_at::date))::date AS m, SUM(amount_paid) AS amt
+             FROM session_payments
+             WHERE company_id = $1 AND amount_paid > 0
+               AND COALESCE(paid_date, created_at::date) >= $2
+               AND COALESCE(paid_date, created_at::date) <= $3 ${branchClause}
+             GROUP BY 1
+           ) u GROUP BY m
+         ),
          refund_amt AS (
            SELECT date_trunc('month', refund_date)::date AS m, SUM(amount) AS amt
            FROM refunds
@@ -144,6 +204,7 @@ export const reportsRoutes = {
            COALESCE(product_rev.amt, 0) AS product_revenue,
            COALESCE(master_rev.amt, 0) AS master_revenue,
            COALESCE(sub_rev.amt, 0) AS subscription_revenue,
+           COALESCE(session_rev.amt, 0) AS session_revenue,
            COALESCE(refund_amt.amt, 0) AS refunds,
            COALESCE(expense_amt.amt, 0) AS expenses
          FROM months
@@ -151,6 +212,7 @@ export const reportsRoutes = {
          LEFT JOIN product_rev ON product_rev.m = months.month_start
          LEFT JOIN master_rev ON master_rev.m = months.month_start
          LEFT JOIN sub_rev ON sub_rev.m = months.month_start
+         LEFT JOIN session_rev ON session_rev.m = months.month_start
          LEFT JOIN refund_amt ON refund_amt.m = months.month_start
          LEFT JOIN expense_amt ON expense_amt.m = months.month_start
          ORDER BY months.month_start ASC`,
@@ -162,14 +224,16 @@ export const reportsRoutes = {
         const productRevenue = parseFloat(r.product_revenue);
         const masterRevenue = parseFloat(r.master_revenue);
         const subscriptionRevenue = parseFloat(r.subscription_revenue);
+        const sessionRevenue = parseFloat(r.session_revenue);
         const refunds = parseFloat(r.refunds);
         const expenses = parseFloat(r.expenses);
-        const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - refunds;
+        const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue - refunds;
         return {
           month: r.month,
           enrollmentRevenue,
           productRevenue,
           masterRevenue,
+          sessionRevenue,
           refunds,
           revenue,
           expenses,
@@ -235,6 +299,8 @@ export const reportsRoutes = {
   topCourses: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // Revenue subqueries reference the lazily-created per-session tables.
+      await ensurePerSessionSchema();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -254,7 +320,25 @@ export const reportsRoutes = {
              b.name AS branch_name,
              COUNT(e.id) AS enrollment_count,
              COUNT(e.id) FILTER (WHERE e.status = 'ACTIVE') AS active_count,
-             COALESCE(SUM(e.amount_paid), 0) AS revenue
+             -- Real collected revenue, net of refunds: up-front enrollment money
+             -- plus monthly bills and per-session money paid in the range. The
+             -- old SUM(amount_paid) alone showed the course price for one-time
+             -- enrollments and 0 for monthly/per-session courses.
+             COALESCE(SUM(e.amount_paid), 0)
+               + COALESCE((SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
+                   WHERE msp.course_id = c.id AND msp.company_id = $1 AND msp.amount_paid > 0
+                     AND msp.paid_date >= $2 AND msp.paid_date <= $3), 0)
+               + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp
+                   WHERE sp.course_id = c.id AND sp.company_id = $1 AND sp.amount_paid > 0
+                     AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
+                     AND COALESCE(sp.paid_date, sp.created_at::date) <= $3), 0)
+               + COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg
+                   WHERE spkg.course_id = c.id AND spkg.company_id = $1 AND spkg.amount_paid > 0
+                     AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3), 0)
+               - COALESCE((SELECT SUM(r.amount) FROM refunds r
+                   JOIN enrollments e2 ON r.enrollment_id = e2.id
+                   WHERE r.company_id = $1 AND e2.course_id = c.id
+                     AND r.refund_date >= $2 AND r.refund_date <= $3), 0) AS revenue
            FROM enrollments e
            INNER JOIN courses c ON c.id = e.course_id
            INNER JOIN branches b ON b.id = e.branch_id
@@ -271,7 +355,11 @@ export const reportsRoutes = {
              b.name AS branch_name,
              COUNT(me.id) AS enrollment_count,
              COUNT(me.id) FILTER (WHERE me.status = 'ACTIVE') AS active_count,
-             COALESCE(SUM(me.amount_paid), 0) AS revenue
+             COALESCE(SUM(me.amount_paid), 0)
+               - COALESCE((SELECT SUM(r.amount) FROM refunds r
+                   JOIN master_enrollments me2 ON r.master_enrollment_id = me2.id
+                   WHERE r.company_id = $1 AND me2.master_course_id = mc.id
+                     AND r.refund_date >= $2 AND r.refund_date <= $3), 0) AS revenue
            FROM master_enrollments me
            INNER JOIN master_courses mc ON mc.id = me.master_course_id
            INNER JOIN branches b ON b.id = me.branch_id
@@ -378,44 +466,12 @@ export const reportsRoutes = {
       // Snapshot the student body AS OF the end of the selected range ($3), with
       // "left" measured within the range [$2, $3]. This makes the top date filter
       // drive the report (e.g. picking an earlier end date shows who was active
-      // back then, before later classes finished).
-      //   active   = present as of $3 AND enrolled (by $3) in a class that was
-      //              running as of $3 — i.e. started by $3 and not yet finished
-      //              by $3 (finished_at is the authoritative finish time; a class
-      //              with no finished_at on/before $3 was still running).
-      //   dormant  = present as of $3 but in no running class.
-      //   left     = the student record was deactivated within the range — its
-      //              inactive_date falls in [$2, $3].
-      // NOTE: classes.is_active is unreliable (false even for in-progress classes),
-      // and enrollment status has no history, so current status is used as a
-      // best-effort proxy. Checks single-course (enrollments) and bundle
-      // (master_class_enrollments) tables.
+      // back then, before later classes finished). See the shared predicate
+      // definitions above `reportsRoutes` for the exact semantics.
       const { startDate, endDate } = defaultRange(q);
-      const activeEnrollmentExists = `(
-        EXISTS (
-          SELECT 1 FROM enrollments e
-          INNER JOIN classes c ON c.id = e.class_id
-          WHERE e.student_id = s.id
-            AND e.status NOT IN ('DROPPED', 'CANCELLED')
-            AND e.enrollment_date <= $3::date
-            AND c.start_date <= $3::date
-            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
-        )
-        OR EXISTS (
-          SELECT 1 FROM master_class_enrollments mce
-          INNER JOIN classes c ON c.id = mce.class_id
-          WHERE mce.student_id = s.id
-            AND mce.status != 'DROPPED'
-            AND mce.enrolled_at <= $3::date
-            AND c.start_date <= $3::date
-            AND NOT (c.finished_at IS NOT NULL AND c.finished_at::date <= $3::date)
-        )
-      )`;
-      // Present as of the end date: joined by then and not yet left by then.
-      const presentAsOfEnd = `(s.enrollment_date <= $3::date
-        AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
-      const leftInRange = `(s.inactive_date IS NOT NULL
-        AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
+      const activeEnrollmentExists = ACTIVE_ENROLLMENT_EXISTS;
+      const presentAsOfEnd = PRESENT_AS_OF_END;
+      const leftInRange = LEFT_IN_RANGE;
 
       const countParams: any[] = [context.companyId, startDate, endDate];
       const branchClause = reportBranchClause('s.branch_id', countParams, scope.ids);
@@ -467,6 +523,8 @@ export const reportsRoutes = {
   profitByCourse: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // Revenue subqueries reference the lazily-created per-session tables.
+      await ensurePerSessionSchema();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -485,16 +543,32 @@ export const reportsRoutes = {
              c.name AS course_name,
              b.name AS branch_name,
              COUNT(e.id) AS enrollments,
-             COALESCE(SUM(e.amount_paid), 0) AS revenue,
-             COALESCE(AVG(e.final_price), 0) AS avg_price
+             -- Real collected revenue, net of refunds (see topCourses).
+             COALESCE(SUM(e.amount_paid), 0)
+               + COALESCE((SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
+                   WHERE msp.course_id = c.id AND msp.company_id = $1 AND msp.amount_paid > 0
+                     AND msp.paid_date >= $2 AND msp.paid_date <= $3), 0)
+               + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp
+                   WHERE sp.course_id = c.id AND sp.company_id = $1 AND sp.amount_paid > 0
+                     AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
+                     AND COALESCE(sp.paid_date, sp.created_at::date) <= $3), 0)
+               + COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg
+                   WHERE spkg.course_id = c.id AND spkg.company_id = $1 AND spkg.amount_paid > 0
+                     AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3), 0)
+               - COALESCE((SELECT SUM(r.amount) FROM refunds r
+                   JOIN enrollments e2 ON r.enrollment_id = e2.id
+                   WHERE r.company_id = $1 AND e2.course_id = c.id
+                     AND r.refund_date >= $2 AND r.refund_date <= $3), 0) AS revenue,
+             COALESCE(AVG(e.final_price), 0) AS avg_price,
+             -- The unit the price is charged in (per course / month / session).
+             COALESCE(c.payment_type, 'ONE_TIME') AS payment_type
            FROM courses c
            INNER JOIN branches b ON b.id = c.branch_id
            LEFT JOIN enrollments e ON e.course_id = c.id
              AND e.company_id = $1
              AND e.enrollment_date >= $2 AND e.enrollment_date <= $3
            WHERE b.company_id = $1 ${courseBranchClause}
-           GROUP BY c.id, c.name, b.name
-           HAVING COUNT(e.id) > 0
+           GROUP BY c.id, c.name, b.name, c.payment_type
 
            UNION ALL
 
@@ -504,8 +578,13 @@ export const reportsRoutes = {
              mc.name AS course_name,
              b.name AS branch_name,
              COUNT(me.id) AS enrollments,
-             COALESCE(SUM(me.amount_paid), 0) AS revenue,
-             COALESCE(AVG(me.final_price), 0) AS avg_price
+             COALESCE(SUM(me.amount_paid), 0)
+               - COALESCE((SELECT SUM(r.amount) FROM refunds r
+                   JOIN master_enrollments me2 ON r.master_enrollment_id = me2.id
+                   WHERE r.company_id = $1 AND me2.master_course_id = mc.id
+                     AND r.refund_date >= $2 AND r.refund_date <= $3), 0) AS revenue,
+             COALESCE(AVG(me.final_price), 0) AS avg_price,
+             'ONE_TIME' AS payment_type
            FROM master_courses mc
            INNER JOIN branches b ON b.id = mc.branch_id
            LEFT JOIN master_enrollments me ON me.master_course_id = mc.id
@@ -513,8 +592,10 @@ export const reportsRoutes = {
              AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            WHERE b.company_id = $1 ${masterBranchClause}
            GROUP BY mc.id, mc.name, b.name
-           HAVING COUNT(me.id) > 0
          ) combined
+         -- Keep a course visible when it collected money in the range even with
+         -- no NEW enrollments (monthly/per-session renewals), and vice versa.
+         WHERE enrollments > 0 OR revenue <> 0
          ORDER BY revenue DESC
          LIMIT 50`,
         params
@@ -529,6 +610,7 @@ export const reportsRoutes = {
           enrollments: parseInt(r.enrollments, 10),
           revenue: parseFloat(r.revenue),
           avgPrice: parseFloat(r.avg_price),
+          paymentType: r.payment_type || 'ONE_TIME',
         })),
       };
     } catch (error) {
@@ -540,6 +622,7 @@ export const reportsRoutes = {
   profitByBranch: async ({ query: q, headers }: { query: RangeQuery; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -577,6 +660,19 @@ export const reportsRoutes = {
                AND msp.amount_paid > 0
                AND msp.paid_date >= $2 AND msp.paid_date <= $3
            ), 0) AS subscription_revenue,
+           -- Per-session revenue: prepaid packages + pay-as-you-go charges
+           COALESCE((
+             SELECT SUM(spkg.amount_paid) FROM session_packages spkg
+             WHERE spkg.branch_id = b.id AND spkg.company_id = $1
+               AND spkg.amount_paid > 0
+               AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3
+           ), 0) + COALESCE((
+             SELECT SUM(sp.amount_paid) FROM session_payments sp
+             WHERE sp.branch_id = b.id AND sp.company_id = $1
+               AND sp.amount_paid > 0
+               AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
+               AND COALESCE(sp.paid_date, sp.created_at::date) <= $3
+           ), 0) AS session_revenue,
            -- Refunds attributable to this branch. Most refunds have a NULL
            -- branch_id and are linked via enrollment / master enrollment /
            -- product sale / event subscription, so attribute through those
@@ -598,7 +694,15 @@ export const reportsRoutes = {
              WHERE ep.branch_id = b.id AND ep.company_id = $1
                AND ep.date >= $2 AND ep.date <= $3
            ), 0) AS expenses,
-           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id AND s.is_active = true) AS active_students
+           -- Student counts use the same definitions as the Students tab (churn):
+           -- active = enrolled in a class running as of the end date, dormant =
+           -- present but with no running enrollment, left = deactivated in range.
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${PRESENT_AS_OF_END} AND ${ACTIVE_ENROLLMENT_EXISTS}) AS active_students,
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${PRESENT_AS_OF_END} AND NOT ${ACTIVE_ENROLLMENT_EXISTS}) AS dormant_students,
+           (SELECT COUNT(*) FROM students s WHERE s.branch_id = b.id
+              AND ${LEFT_IN_RANGE}) AS left_students
          FROM branches b
          WHERE b.company_id = $1 ${branchScopeClause}
          ORDER BY enrollment_revenue DESC`,
@@ -610,12 +714,14 @@ export const reportsRoutes = {
           const enrollmentRevenue = parseFloat(r.enrollment_revenue);
           const productRevenue = parseFloat(r.product_revenue);
           const masterRevenue = parseFloat(r.master_revenue);
-          // Subscription revenue is folded into the branch total (no separate
-          // response field) so branch revenue/profit reconciles with the P&L.
+          // Subscription and per-session revenue are folded into the branch total
+          // (no separate response field) so branch revenue/profit reconciles with
+          // the P&L.
           const subscriptionRevenue = parseFloat(r.subscription_revenue);
+          const sessionRevenue = parseFloat(r.session_revenue);
           const refunds = parseFloat(r.refunds);
           const expenses = parseFloat(r.expenses);
-          const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue - refunds;
+          const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue - refunds;
           return {
             branchId: r.branch_id,
             branchName: r.branch_name,
@@ -628,6 +734,8 @@ export const reportsRoutes = {
             expenses,
             netProfit: revenue - expenses,
             activeStudents: parseInt(r.active_students, 10),
+            dormantStudents: parseInt(r.dormant_students, 10),
+            leftStudents: parseInt(r.left_students, 10),
           };
         }),
       };

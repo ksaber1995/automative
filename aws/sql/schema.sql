@@ -278,8 +278,7 @@ CREATE TABLE courses (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10, 2) NOT NULL,
-    duration INTEGER NOT NULL,
-    max_students INTEGER,
+    -- duration/max_students live on classes, not courses (migration 051).
     instructor_id UUID,
     level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,

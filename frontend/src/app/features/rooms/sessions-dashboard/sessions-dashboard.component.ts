@@ -328,6 +328,16 @@ export class SessionsDashboardComponent implements OnInit {
   filteredOccupiedRooms = computed(() => this.filteredRooms().filter((r: Room) => r.isOccupied));
   filteredFreeRooms = computed(() => this.filteredRooms().filter((r: Room) => !r.isOccupied && r.isActive));
 
+  /** Students currently checked in across the (branch-filtered) active sessions. */
+  studentsInPlace = computed(() =>
+    this.filteredActiveSessions().reduce((sum, s) => sum + (s.presentCount || 0), 0)
+  );
+
+  /** Students enrolled in upcoming sessions inside the 30-min window — expected arrivals. */
+  expectedUpcomingStudents = computed(() =>
+    this.filteredUpcoming().reduce((sum, e) => sum + (e.studentCount || 0), 0)
+  );
+
   // ── Dialog-level data ───────────────────────────────────────────────────────
   dialogFreeRooms = signal<Room[]>([]);
   /** Only classes with at least 1 enrolled student; active-session ones are marked disabled */
@@ -840,6 +850,10 @@ export class SessionsDashboardComponent implements OnInit {
         }, 2000);
         // PER_SESSION courses: prompt to collect any newly-created dues.
         if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
+        // Keep the "students in place" stat live without a full reload.
+        this.activeSessions.set(this.activeSessions().map(s =>
+          s.id === sessionId ? { ...s, presentCount: presentIds.length } : s
+        ));
       },
       error: () => {
         // Interceptor toasted the translated error; also flip the per-row indicator.

@@ -23,6 +23,8 @@ export interface Session {
   durationMinutes?: number | null;
   /** When filtering history by a student: was that student present this session? (null otherwise) */
   studentPresent?: boolean | null;
+  /** Students checked in so far (active-sessions list only). */
+  presentCount?: number | null;
 }
 
 /** A student's currently-running session, returned by activeForStudent (or null). */

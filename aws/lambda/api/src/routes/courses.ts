@@ -11,8 +11,6 @@ function mapCourseFromDB(row: any) {
     name: row.name,
     description: row.description,
     price: parseFloat(row.price),
-    duration: row.duration,
-    maxStudents: row.max_students,
     instructorId: row.instructor_id,
     levelId: row.level_id ?? null,
     levelName: row.level_name ?? null,
@@ -58,8 +56,6 @@ export const coursesRoutes = {
         name: body.name,
         description: body.description || null,
         price: body.price,
-        duration: body.duration,
-        max_students: body.maxStudents || null,
         instructor_id: body.instructorId || null,
         level_id: body.levelId || null,
         is_active: true,
@@ -228,8 +224,6 @@ export const coursesRoutes = {
       if (body.name !== undefined) updateData.name = body.name;
       if (body.description !== undefined) updateData.description = body.description;
       if (body.price !== undefined) updateData.price = body.price;
-      if (body.duration !== undefined) updateData.duration = body.duration;
-      if (body.maxStudents !== undefined) updateData.max_students = body.maxStudents;
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.paymentType !== undefined) updateData.payment_type = body.paymentType;

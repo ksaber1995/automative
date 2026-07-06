@@ -55,11 +55,11 @@ export class BranchListComponent implements OnInit {
   // Filter state
   private statusFilterSignal = signal<'all' | 'active' | 'inactive'>('all');
 
-  statusFilterOptions = [
-    { label: 'All Branches', value: 'all' },
-    { label: 'Active Only', value: 'active' },
-    { label: 'Inactive Only', value: 'inactive' }
-  ];
+  statusFilterOptions = computed(() => [
+    { label: this.translate.instant('BRANCHES.LIST.FILTER_ALL'), value: 'all' },
+    { label: this.translate.instant('BRANCHES.LIST.FILTER_ACTIVE'), value: 'active' },
+    { label: this.translate.instant('BRANCHES.LIST.FILTER_INACTIVE'), value: 'inactive' }
+  ]);
 
   // Getter/setter for ngModel compatibility
   get statusFilter() {

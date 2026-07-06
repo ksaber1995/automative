@@ -148,38 +148,7 @@
             </div>
           }
 
-          <!-- Duration (in weeks) -->
-          <div>
-            <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'COURSES.FORM.DURATION_LABEL' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <p-inputnumber
-              id="duration"
-              formControlName="duration"
-              [min]="1"
-              [max]="52"
-              [placeholder]="'COURSES.FORM.DURATION_PLACEHOLDER' | translate"
-              [style]="{ width: '100%' }"
-              [class.border-red-500]="duration?.invalid && duration?.touched"
-            />
-            @if (duration?.invalid && duration?.touched) {
-              <small class="text-red-500">{{ 'COURSES.FORM.DURATION_REQUIRED' | translate }}</small>
-            }
-          </div>
-
-          <!-- Max Students -->
-          <div>
-            <label for="maxStudents" class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'COURSES.FORM.MAX_STUDENTS_LABEL' | translate }}
-            </label>
-            <p-inputnumber
-              id="maxStudents"
-              formControlName="maxStudents"
-              [min]="1"
-              [placeholder]="'COURSES.FORM.MAX_STUDENTS_PLACEHOLDER' | translate"
-              [style]="{ width: '100%' }"
-            />
-          </div>
+          <!-- Duration and max students live on classes, not courses. -->
 
           <!-- Instructor (hidden for teacher companies) -->
           @if (!authService.isTeacher()) {

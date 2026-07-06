@@ -285,7 +285,11 @@
             <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5"></i>
             <div class="flex-1">
               <p class="font-semibold text-red-700">
-                {{ 'CLASSES.FORM.TEACHER_CONFLICT_TITLE' | translate: { name: instructorName() } }}
+                @if (authService.isTeacher()) {
+                  {{ 'CLASSES.FORM.TEACHER_CONFLICT_TITLE_SELF' | translate }}
+                } @else {
+                  {{ 'CLASSES.FORM.TEACHER_CONFLICT_TITLE' | translate: { name: instructorName() } }}
+                }
               </p>
               <p class="text-sm text-red-700 mt-1">
                 {{ 'CLASSES.FORM.TEACHER_CONFLICT_HINT' | translate }}

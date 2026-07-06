@@ -5,8 +5,6 @@ export interface Course {
   name: string;
   description: string | null;
   price: number;
-  duration: number;
-  maxStudents: number | null;
   instructorId: string | null;
   defaultRoomId: string | null;
   levelId?: string | null;
@@ -32,8 +30,6 @@ export interface CourseCreateDto {
   name: string;
   description?: string;
   price: number;
-  duration: number;
-  maxStudents?: number;
   instructorId?: string;
   levelId?: string | null;
   paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
@@ -47,8 +43,6 @@ export interface CourseUpdateDto {
   name?: string;
   description?: string;
   price?: number;
-  duration?: number;
-  maxStudents?: number;
   instructorId?: string;
   levelId?: string | null;
   isActive?: boolean;

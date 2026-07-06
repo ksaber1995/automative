@@ -256,7 +256,9 @@
         }
       </tr>
     </ng-template>
-    <ng-template pTemplate="rowexpansion" let-session>
+    <!-- PrimeNG v18+ renamed this template from "rowexpansion" — with the old
+         name the table silently renders no expansion row at all. -->
+    <ng-template pTemplate="expandedrow" let-session>
       <tr>
         <td [attr.colspan]="historyColspan()" class="bg-gray-50">
           @if (detail(session.id); as d) {

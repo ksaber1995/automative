@@ -47,15 +47,17 @@
 
     <!-- Filters -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.LIST.BRANCH' | translate }}</label>
-        <select [(ngModel)]="selectedBranchId" (change)="load()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-          <option value="">{{ 'INSTALLMENTS.LIST.ALL_BRANCHES' | translate }}</option>
-          @for (b of branches(); track b.id) {
-            <option [value]="b.id">{{ b.label }}</option>
-          }
-        </select>
-      </div>
+      @if (!authService.isTeacher()) {
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.LIST.BRANCH' | translate }}</label>
+          <select [(ngModel)]="selectedBranchId" (change)="load()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+            <option value="">{{ 'INSTALLMENTS.LIST.ALL_BRANCHES' | translate }}</option>
+            @for (b of branches(); track b.id) {
+              <option [value]="b.id">{{ b.label }}</option>
+            }
+          </select>
+        </div>
+      }
       <div>
         <label class="block text-sm font-medium mb-1">{{ 'INSTALLMENTS.LIST.STATUS' | translate }}</label>
         <select [(ngModel)]="selectedStatus" (change)="load()" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
@@ -72,7 +74,9 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'INSTALLMENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="branchId">{{ 'INSTALLMENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          @if (!authService.isTeacher()) {
+            <th pSortableColumn="branchId">{{ 'INSTALLMENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
           <th pSortableColumn="category">{{ 'INSTALLMENTS.LIST.COL_CATEGORY' | translate }} <p-sortIcon field="category"></p-sortIcon></th>
           <th pSortableColumn="totalAmount">{{ 'INSTALLMENTS.LIST.COL_TOTAL' | translate }} <p-sortIcon field="totalAmount"></p-sortIcon></th>
           <th pSortableColumn="downpaymentAmount">{{ 'INSTALLMENTS.LIST.COL_DOWN' | translate }} <p-sortIcon field="downpaymentAmount"></p-sortIcon></th>
@@ -94,7 +98,9 @@
               <div class="text-xs text-gray-500">{{ plan.vendor }}</div>
             }
           </td>
-          <td>{{ getBranchName(plan.branchId) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ getBranchName(plan.branchId) }}</td>
+          }
           <td>{{ plan.category }}</td>
           <td class="font-semibold">{{ plan.totalAmount | number:'1.2-2' }}</td>
           <td>{{ plan.downpaymentAmount | number:'1.2-2' }}</td>
@@ -149,7 +155,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="11" class="text-center py-8 text-gray-500">
+          <td [attr.colspan]="authService.isTeacher() ? 10 : 11" class="text-center py-8 text-gray-500">
             {{ 'INSTALLMENTS.LIST.NO_DATA' | translate }}
           </td>
         </tr>

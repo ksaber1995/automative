@@ -13,6 +13,8 @@ export interface CompanySubscription {
   company_type: string | null;
   /** Owner's mobile number (E.164-ish, e.g. +201234567890), from the registrant user. */
   mobile: string | null;
+  /** Owner (registrant) user's email. */
+  owner_email: string | null;
   subscription_type: string | null;
   price: number | null;
   start_date: string | null;
@@ -20,6 +22,7 @@ export interface CompanySubscription {
   employee_count: number;
   branch_count: number;
   student_count: number;
+  course_count: number;
   /** Number of students with a paid-activated QR code. */
   qr_activated_count: number;
   /** Total billed for QR activations (sum of qr_price over activated students). */

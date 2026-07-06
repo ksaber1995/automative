@@ -62,7 +62,8 @@ export class ClassService {
   }
 
   checkTeacherAvailability(params: {
-    instructorId: string;
+    /** Omitted for TEACHER-type companies — the check runs against all their classes. */
+    instructorId?: string;
     startDate: string;
     endDate: string;
     startTime?: string;

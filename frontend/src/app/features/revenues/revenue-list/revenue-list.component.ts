@@ -35,7 +35,7 @@ export class RevenueListComponent implements OnInit {
   branches = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
-  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'ALL' = 'ALL';
+  selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'SESSION' | 'ALL' = 'ALL';
   startDate: string = '';
   endDate: string = '';
   totalRevenue: number = 0;
@@ -60,6 +60,9 @@ export class RevenueListComponent implements OnInit {
     this.activePreset.set(preset);
     let start: Date;
     switch (preset) {
+      case 'today':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
       case 'year':
         start = new Date(now.getFullYear(), 0, 1);
         break;
@@ -118,6 +121,7 @@ export class RevenueListComponent implements OnInit {
     if (source === 'MASTER_ENROLLMENT') return { severity: 'secondary', label: 'Bundle' };
     if (source === 'EVENT') return { severity: 'warn', label: 'Event' };
     if (source === 'SUBSCRIPTION') return { severity: 'success', label: 'Subscription' };
+    if (source === 'SESSION') return { severity: 'info', label: 'Session' };
     return { severity: 'info', label: 'Product' };
   }
 
@@ -163,6 +167,9 @@ export class RevenueListComponent implements OnInit {
       if (revenue.studentId) {
         this.router.navigate(['/students', revenue.studentId]);
       }
+    } else if (revenue.source === 'SESSION') {
+      // Per-session charges and packages live on the Session Payments dashboard.
+      this.router.navigate(['/session-payments']);
     } else {
       this.router.navigate(['/products/sales']);
     }

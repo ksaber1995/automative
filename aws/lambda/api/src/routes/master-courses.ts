@@ -171,8 +171,6 @@ export const masterCoursesRoutes = {
           branchName: r.branch_name,
           name: r.name,
           price: parseFloat(r.price),
-          duration: r.duration,
-          maxStudents: r.max_students,
           isActive: r.is_active,
         })),
       };
@@ -436,7 +434,7 @@ export const masterCoursesRoutes = {
       }
 
       const rows = await query(
-        `SELECT id, name, price, duration
+        `SELECT id, name, price
          FROM courses
          WHERE company_id = $1 AND branch_id = $2 AND is_active = true
            AND id NOT IN (
@@ -451,7 +449,6 @@ export const masterCoursesRoutes = {
           id: r.id,
           name: r.name,
           price: parseFloat(r.price),
-          duration: r.duration,
         })),
       };
     } catch (error: any) {

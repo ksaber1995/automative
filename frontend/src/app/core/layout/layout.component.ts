@@ -195,8 +195,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
-      { labelKey: 'NAV.WHATSAPP_TEMPLATES', icon: 'pi pi-whatsapp', routerLink: ['/whatsapp-templates'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.TELEGRAM', icon: 'pi pi-telegram', routerLink: ['/telegram'], visible: auth.canWrite('academy') },
     ].filter(c => c.visible);
     if (academic.length) {
       entries.push({ kind: 'group', group: {
@@ -253,6 +251,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     // Admin — only Global Admins see this section at all.
     const admin: NavLeaf[] = auth.isGlobalAdmin() ? [
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
+      { labelKey: 'NAV.MESSAGING', icon: 'pi pi-comments', routerLink: ['/messaging'], visible: true },
       { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
     ].filter(c => c.visible) : [];
     if (admin.length) {

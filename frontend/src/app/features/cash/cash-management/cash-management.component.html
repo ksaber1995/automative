@@ -274,6 +274,17 @@
                          mode="decimal" [minFractionDigits]="2"
                          styleClass="w-full"
                          [placeholder]="'CASH.AMOUNT_PLACEHOLDER' | translate"></p-inputnumber>
+          @if (dialogType === 'WITHDRAWAL') {
+            @if (withdrawalExceedsAvailable()) {
+              <small class="text-red-600 block mt-1">
+                {{ 'CASH.WITHDRAW_EXCEEDS' | translate: { available: formatCurrency(systemCashPreview()) } }}
+              </small>
+            } @else {
+              <small class="text-gray-500 block mt-1">
+                {{ 'CASH.AVAILABLE_CASH' | translate }}: {{ formatCurrency(systemCashPreview()) }}
+              </small>
+            }
+          }
         </div>
       }
 

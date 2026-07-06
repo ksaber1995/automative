@@ -36,7 +36,7 @@ const DEFAULT_TELEGRAM_TEMPLATES: Record<TemplateType, string> = {
   standalone: true,
   imports: [CommonModule, FormsModule, CardModule, ButtonModule, InputTextModule, TextareaModule, CheckboxModule, SelectModule, DialogModule, TabsModule, TranslateModule],
   template: `
-    <div class="p-4 max-w-3xl mx-auto" style="display:flex; flex-direction:column; gap:1rem;">
+    <div class="p-4 mx-auto" style="display:flex; flex-direction:column; gap:1rem;">
       <h2 class="text-2xl font-bold">{{ 'TELEGRAM.TITLE' | translate }}</h2>
       <p class="text-gray-500">{{ 'TELEGRAM.SUBTITLE' | translate }}</p>
 

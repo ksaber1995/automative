@@ -385,8 +385,6 @@ const CreateCourseSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   price: z.number(),
-  duration: z.number(),
-  maxStudents: z.number().optional(),
   instructorId: OptionalUUIDSchema,
   defaultRoomId: OptionalUUIDSchema,
   levelId: OptionalUUIDSchema,
@@ -568,8 +566,6 @@ const LinkedCourseSummarySchema = z.object({
   name: z.string(),
   code: z.string(),
   price: z.number(),
-  duration: z.number(),
-  maxStudents: z.number().nullable(),
   isActive: z.boolean(),
 });
 
@@ -581,8 +577,6 @@ const CourseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   price: z.number(),
-  duration: z.number(),
-  maxStudents: z.number().nullable(),
   instructorId: UUIDSchema.nullable(),
   levelId: UUIDSchema.nullable().optional(),
   levelName: z.string().nullable().optional(),
@@ -742,6 +736,8 @@ const SessionPaymentSummarySchema = z.object({
   refundedCount: z.number(),
   totalRevenue: z.number(),
   totalExpected: z.number(),
+  /** Money actually received in the range (payment-dated); packages count in full on purchase day. */
+  cashCollected: z.number().optional(),
 });
 
 const SessionPackageSchema = z.object({
@@ -756,6 +752,9 @@ const SessionPackageSchema = z.object({
   amountDue: z.number().optional(),
   amountPaid: z.number(),
   status: z.enum(['ACTIVE', 'EXHAUSTED', 'REFUNDED']),
+  refundedAmount: z.number().optional(),
+  refundNote: z.string().nullable().optional(),
+  refundedAt: z.string().nullable().optional(),
   purchasedAt: z.string().nullable(),
   notes: z.string().nullable(),
   createdAt: z.string(),
@@ -776,7 +775,10 @@ const RecordSessionPaymentSchema = z.object({
 });
 
 const RefundSessionPaymentSchema = z.object({
-  amount: z.number().positive(),
+  // FULL refunds the whole remaining paid amount; PARTIAL requires `amount`.
+  // Omitted type + amount present = legacy partial-by-amount (old clients).
+  type: z.enum(['FULL', 'PARTIAL']).optional(),
+  amount: z.number().positive().optional(),
   note: z.string().optional(),
 });
 
@@ -994,7 +996,7 @@ const RevenueItemSchema = z.object({
   companyId: UUIDSchema,
   branchId: UUIDSchema.nullable(),
   branchName: z.string().nullable(),
-  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION']),
+  source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION', 'SESSION']),
   sourceId: UUIDSchema,
   studentId: UUIDSchema.nullable(),
   amount: z.number(),
@@ -1017,6 +1019,7 @@ const RevenueSummarySchema = z.object({
   productRevenue: z.number(),
   masterRevenue: z.number(),
   eventRevenue: z.number(),
+  sessionRevenue: z.number(),
   byBranch: z.array(z.object({
     branchId: z.string(),
     branchName: z.string(),
@@ -2505,7 +2508,9 @@ export const contract = c.router({
       method: 'GET',
       path: '/api/classes/check-teacher-availability',
       query: z.object({
-        instructorId: UUIDSchema,
+        // Optional: TEACHER-type companies have no instructor on classes — the
+        // check then runs against all of the company's classes.
+        instructorId: OptionalUUIDSchema,
         startDate: z.string(),
         endDate: z.string(),
         startTime: z.string().optional(),
@@ -2812,7 +2817,7 @@ export const contract = c.router({
       path: '/api/revenues',
       query: z.object({
         branchId: UUIDSchema.optional(),
-        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION', 'ALL']).optional(),
+        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION', 'SESSION', 'ALL']).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),
@@ -5421,6 +5426,30 @@ export const contract = c.router({
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
+      },
+    },
+    refundPackage: {
+      method: 'POST' as const,
+      path: '/api/session-payments/packages/:id/refund',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: RefundSessionPaymentSchema,
+      responses: {
+        200: SessionPackageSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    renewalsDue: {
+      method: 'GET' as const,
+      path: '/api/session-payments/renewals-due',
+      query: z.object({
+        branchId: z.string().optional(),
+        courseId: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.any()),
+        403: ApiErrorSchema,
       },
     },
     listPackages: {

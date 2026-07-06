@@ -8,47 +8,71 @@
 >
   @if (current(); as c) {
     <div class="flex flex-col gap-4 pt-2">
+      <!-- Mode toggle: pay this session vs buy the next prepaid bundle -->
+      @if (c.coursePackageSize) {
+        <div class="grid grid-cols-2 gap-2">
+          <p-button
+            [label]="'SESSION_PAYMENTS.MODE_PACKAGE' | translate: { count: c.coursePackageSize }"
+            icon="pi pi-box"
+            size="small"
+            [outlined]="mode() !== 'PACKAGE'"
+            (onClick)="setMode('PACKAGE')"
+          ></p-button>
+          <p-button
+            [label]="'SESSION_PAYMENTS.MODE_SESSION' | translate"
+            icon="pi pi-ticket"
+            size="small"
+            [outlined]="mode() !== 'SESSION'"
+            (onClick)="setMode('SESSION')"
+          ></p-button>
+        </div>
+        @if (mode() === 'PACKAGE' && c.hadPackage) {
+          <div class="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+            {{ 'SESSION_PAYMENTS.RENEWAL_HINT' | translate: { count: c.coursePackageSize } }}
+          </div>
+        }
+      }
+
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
         <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</span><span class="font-medium text-gray-800">{{ c.courseName }}</span></div>
         @if (c.sessionNumber != null) {
           <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_SESSION' | translate }}</span><span class="font-medium text-gray-800">#{{ c.sessionNumber }}</span></div>
         }
-        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_AMOUNT' | translate }}</span><span class="font-medium text-gray-800">{{ c.amountDue | amount }}</span></div>
+        @if (mode() === 'PACKAGE') {
+          <div class="flex justify-between">
+            <span>{{ 'SESSION_PAYMENTS.PKG_LABEL' | translate }}</span>
+            <span class="font-medium text-gray-800">{{ 'SESSION_PAYMENTS.PKG_SESSIONS_OF' | translate: { count: c.coursePackageSize } }} — {{ (c.coursePackagePrice || 0) | amount }}</span>
+          </div>
+        } @else {
+          <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_AMOUNT' | translate }}</span><span class="font-medium text-gray-800">{{ c.amountDue | amount }}</span></div>
+        }
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_AMOUNT' | translate }}</label>
-        <p-inputnumber [(ngModel)]="amount" mode="currency" currency="USD" [min]="0" [max]="c.amountDue" [style]="{ width: '100%' }"></p-inputnumber>
+        <p-inputnumber [(ngModel)]="amount" mode="currency" currency="USD" [min]="0"
+          [max]="mode() === 'PACKAGE' ? (c.coursePackagePrice || undefined) : c.amountDue"
+          [style]="{ width: '100%' }"></p-inputnumber>
       </div>
 
-      <div class="flex flex-col gap-1">
-        <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_DATE' | translate }}</label>
-        <p-datepicker [(ngModel)]="payDate" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
-      </div>
+      @if (mode() === 'SESSION') {
+        <div class="flex flex-col gap-1">
+          <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_DATE' | translate }}</label>
+          <p-datepicker [(ngModel)]="payDate" dateFormat="yy-mm-dd" [style]="{ width: '100%' }"></p-datepicker>
+        </div>
+      }
 
       <div class="flex flex-col gap-1">
         <label class="font-medium">{{ 'SESSION_PAYMENTS.PAY_NOTES' | translate }}</label>
         <textarea pTextarea [(ngModel)]="notes" rows="2"></textarea>
       </div>
-
-      @if (c.coursePackageSize) {
-        <div class="flex justify-center">
-          <p-button
-            [label]="'SESSION_PAYMENTS.BUY_PACKAGE_INSTEAD' | translate: { count: c.coursePackageSize, amount: (c.coursePackagePrice | amount) }"
-            icon="pi pi-box"
-            severity="secondary"
-            [text]="true"
-            size="small"
-            [loading]="submitting()"
-            (onClick)="buyPackage()"
-          ></p-button>
-        </div>
-      }
     </div>
   }
 
   <ng-template pTemplate="footer">
     <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" [outlined]="true" (onClick)="skip()" [disabled]="submitting()"></p-button>
-    <p-button [label]="'SESSION_PAYMENTS.PAY_SUBMIT' | translate" icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
+    <p-button
+      [label]="(mode() === 'PACKAGE' ? 'SESSION_PAYMENTS.PAY_PACKAGE_SUBMIT' : 'SESSION_PAYMENTS.PAY_SUBMIT') | translate"
+      icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
   </ng-template>
 </p-dialog>

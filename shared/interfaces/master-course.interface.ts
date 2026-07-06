@@ -43,8 +43,6 @@ export interface LinkedCourseSummary {
   branchName: string | null;
   name: string;
   price: number;
-  duration: number;
-  maxStudents: number | null;
   isActive: boolean;
 }
 
