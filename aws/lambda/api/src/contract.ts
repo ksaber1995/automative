@@ -1521,6 +1521,48 @@ const CrmActivityWriteSchema = z.object({
   done: z.boolean().optional(),
 });
 
+// WhatsApp Cloud API (foundation)
+const WaSettingsSchema = z.object({
+  autoSendOnCheckin: z.boolean(),
+  autoSendOnAbsence: z.boolean(),
+  absenceWarningThreshold: z.number(),
+  autoSendAbsenceWarning: z.boolean(),
+  crmAutoOutreach: z.boolean(),
+  crmAutoDrip: z.boolean(),
+  crmStopOnReply: z.boolean(),
+});
+
+const WaTemplateSchema = z.object({
+  id: UUIDSchema,
+  key: z.string(),
+  metaTemplateName: z.string().nullable(),
+  category: z.string(),
+  language: z.string(),
+  body: z.string(),
+  isActive: z.boolean(),
+});
+
+const WaConversationSchema = z.object({
+  id: UUIDSchema,
+  contactPhone: z.string(),
+  contactName: z.string().nullable(),
+  studentId: UUIDSchema.nullable(),
+  leadId: UUIDSchema.nullable(),
+  lastMessageAt: z.string().nullable(),
+  lastInboundAt: z.string().nullable(),
+  unreadCount: z.number(),
+});
+
+const WaMessageSchema = z.object({
+  id: UUIDSchema,
+  direction: z.string(),
+  type: z.string(),
+  templateKey: z.string().nullable(),
+  body: z.string().nullable(),
+  status: z.string().nullable(),
+  createdAt: z.string(),
+});
+
 // =============================================
 // API Contract
 // =============================================
@@ -2472,6 +2514,100 @@ export const contract = c.router({
         })),
         403: ApiErrorSchema,
       },
+    },
+  },
+
+  // WhatsApp Cloud API (foundation) — per-tenant number, settings, templates, inbox
+  waCloud: {
+    getAccount: {
+      method: 'GET',
+      path: '/api/wa/account',
+      responses: {
+        200: z.object({
+          status: z.string(),
+          wabaId: z.string().nullable(),
+          phoneNumberId: z.string().nullable(),
+          displayPhoneNumber: z.string().nullable(),
+          verifiedName: z.string().nullable(),
+          qualityRating: z.string().nullable(),
+          connectedAt: z.string().nullable(),
+        }),
+        403: ApiErrorSchema,
+      },
+    },
+    disconnect: {
+      method: 'POST',
+      path: '/api/wa/account/disconnect',
+      body: z.object({}).optional(),
+      responses: { 200: z.object({ message: z.string(), code: z.string() }), 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
+    getSettings: {
+      method: 'GET',
+      path: '/api/wa/settings',
+      responses: { 200: WaSettingsSchema, 403: ApiErrorSchema },
+    },
+    updateSettings: {
+      method: 'PUT',
+      path: '/api/wa/settings',
+      body: WaSettingsSchema.partial(),
+      responses: { 200: WaSettingsSchema, 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
+    listTemplates: {
+      method: 'GET',
+      path: '/api/wa/templates',
+      responses: { 200: z.array(WaTemplateSchema), 403: ApiErrorSchema },
+    },
+    upsertTemplate: {
+      method: 'PUT',
+      path: '/api/wa/templates/:key',
+      pathParams: z.object({ key: z.string() }),
+      body: z.object({
+        metaTemplateName: z.string().nullable().optional(),
+        category: z.string().optional(),
+        language: z.string().optional(),
+        body: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: { 200: WaTemplateSchema, 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
+    send: {
+      method: 'POST',
+      path: '/api/wa/send',
+      body: z.object({
+        to: z.string().optional(),
+        templateKey: z.string().optional(),
+        text: z.string().optional(),
+        studentId: UUIDSchema.optional(),
+        leadId: UUIDSchema.optional(),
+      }),
+      responses: { 200: z.any(), 400: ApiErrorSchema, 403: ApiErrorSchema, 501: ApiErrorSchema },
+    },
+    listConversations: {
+      method: 'GET',
+      path: '/api/wa/conversations',
+      responses: { 200: z.array(WaConversationSchema), 403: ApiErrorSchema },
+    },
+    getMessages: {
+      method: 'GET',
+      path: '/api/wa/conversations/:id/messages',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(WaMessageSchema), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    webhookVerify: {
+      method: 'GET',
+      path: '/api/public/wa/webhook',
+      query: z.object({
+        'hub.mode': z.string().optional(),
+        'hub.verify_token': z.string().optional(),
+        'hub.challenge': z.string().optional(),
+      }),
+      responses: { 200: z.string(), 403: z.string() },
+    },
+    webhookReceive: {
+      method: 'POST',
+      path: '/api/public/wa/webhook',
+      body: z.any(),
+      responses: { 200: z.object({ received: z.boolean() }) },
     },
   },
 

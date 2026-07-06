@@ -337,5 +337,7 @@ lead records deep-link into the relevant conversation.
 
 ---
 
-*Draft plan. Complements `docs/messaging-feature-plan.md` (single-WABA utility
-notifications) and `docs/meta-whatsapp-setup-guide.md` (Meta account setup).*
+*Actionable checklists: **`whatsapp-platform-setup.md`** (Part 1 — Netrofit's
+one-time setup) and **`whatsapp-tenant-onboarding.md`** (Part 2 — the steps each
+academy follows).*
+

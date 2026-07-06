@@ -133,6 +133,31 @@ export const routes: Routes = [
         data: { breadcrumb: 'BREADCRUMBS.CRM' },
         loadComponent: () => import('./features/crm/crm-tasks/crm-tasks.component').then(m => m.CrmTasksComponent)
       },
+      { path: 'whatsapp', redirectTo: 'whatsapp/connect', pathMatch: 'full' },
+      {
+        path: 'whatsapp/connect',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP' },
+        loadComponent: () => import('./features/whatsapp/wa-connect/wa-connect.component').then(m => m.WaConnectComponent)
+      },
+      {
+        path: 'whatsapp/inbox',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP' },
+        loadComponent: () => import('./features/whatsapp/wa-inbox/wa-inbox.component').then(m => m.WaInboxComponent)
+      },
+      {
+        path: 'whatsapp/settings',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP' },
+        loadComponent: () => import('./features/whatsapp/wa-settings/wa-settings.component').then(m => m.WaSettingsComponent)
+      },
+      {
+        path: 'whatsapp/templates',
+        canActivate: [permissionGuard('academy')],
+        data: { breadcrumb: 'BREADCRUMBS.WHATSAPP' },
+        loadComponent: () => import('./features/whatsapp/wa-templates/wa-templates.component').then(m => m.WaTemplatesComponent)
+      },
       {
         path: 'employees',
         canActivate: [permissionGuard('employees')],

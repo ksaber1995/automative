@@ -1,0 +1,63 @@
+<div class="p-4">
+  <app-wa-nav></app-wa-nav>
+  <div class="mb-4">
+    <h1 class="text-2xl font-bold text-gray-800">{{ 'WA.INBOX_TITLE' | translate }}</h1>
+    <p class="text-sm text-gray-500">{{ 'WA.INBOX_SUBTITLE' | translate }}</p>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center text-gray-400 py-10"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
+  } @else if (conversations().length === 0) {
+    <p-card>
+      <div class="text-center py-12 text-gray-400">
+        <i class="pi pi-inbox text-4xl mb-3"></i>
+        <p class="text-lg font-medium">{{ 'WA.INBOX_EMPTY' | translate }}</p>
+        <p class="text-sm">{{ 'WA.INBOX_EMPTY_HINT' | translate }}</p>
+      </div>
+    </p-card>
+  } @else {
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" style="min-height: 480px;">
+      <!-- Conversation list -->
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div class="max-h-[560px] overflow-y-auto">
+          @for (c of conversations(); track c.id) {
+            <button class="w-full text-left px-3 py-2.5 border-b border-gray-100 hover:bg-gray-50"
+                    [class.bg-green-50]="selected()?.id === c.id" (click)="select(c)">
+              <div class="flex items-center justify-between">
+                <span class="font-medium text-gray-800 truncate">{{ c.contactName || c.contactPhone }}</span>
+                @if (c.unreadCount > 0) { <span class="text-xs bg-green-500 text-white rounded-full px-1.5">{{ c.unreadCount }}</span> }
+              </div>
+              <div class="text-xs text-gray-400">{{ c.contactPhone }} · {{ c.lastMessageAt | date: 'MMM d, h:mm a' }}</div>
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Thread -->
+      <div class="md:col-span-2 bg-white border border-gray-200 rounded-lg flex flex-col">
+        @if (!selected()) {
+          <div class="flex-1 flex items-center justify-center text-gray-400 text-sm">{{ 'WA.INBOX_PICK' | translate }}</div>
+        } @else {
+          <div class="px-4 py-2.5 border-b border-gray-200 font-medium text-gray-800">{{ selected()!.contactName || selected()!.contactPhone }}</div>
+          <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 max-h-[500px]">
+            @if (messagesLoading()) {
+              <div class="text-center text-gray-400 py-4"><i class="pi pi-spin pi-spinner"></i></div>
+            } @else {
+              @for (m of messages(); track m.id) {
+                <div class="max-w-[75%] rounded-lg px-3 py-2 text-sm"
+                     [class.self-end]="m.direction === 'OUT'" [class.bg-green-100]="m.direction === 'OUT'"
+                     [class.self-start]="m.direction === 'IN'" [class.bg-gray-100]="m.direction === 'IN'">
+                  <div class="whitespace-pre-line text-gray-800">{{ m.body }}</div>
+                  <div class="text-[10px] text-gray-400 mt-0.5 text-right">
+                    {{ m.createdAt | date: 'h:mm a' }}@if (m.direction === 'OUT' && m.status) { · {{ m.status | lowercase }} }
+                  </div>
+                </div>
+              }
+            }
+          </div>
+          <div class="border-t border-gray-200 p-3 text-xs text-gray-400 text-center">{{ 'WA.INBOX_REPLY_PENDING' | translate }}</div>
+        }
+      </div>
+    </div>
+  }
+</div>

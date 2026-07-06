@@ -228,6 +228,22 @@ export class LayoutComponent implements OnInit, OnDestroy {
       }});
     }
 
+    // WhatsApp (Cloud API) — company messaging config + inbox.
+    // Hidden from the sidebar until the Meta setup is finished (flip to enable).
+    // Routes/pages stay reachable by URL; only the nav group is hidden.
+    const WHATSAPP_ENABLED = false;
+    const whatsapp: NavLeaf[] = [
+      { labelKey: 'NAV.WA_CONNECT', icon: 'pi pi-link', routerLink: ['/whatsapp/connect'], visible: WHATSAPP_ENABLED && auth.canRead('academy') },
+      { labelKey: 'NAV.WA_INBOX', icon: 'pi pi-inbox', routerLink: ['/whatsapp/inbox'], visible: WHATSAPP_ENABLED && auth.canRead('academy') },
+      { labelKey: 'NAV.WA_SETTINGS', icon: 'pi pi-cog', routerLink: ['/whatsapp/settings'], visible: WHATSAPP_ENABLED && auth.canWrite('academy') },
+      { labelKey: 'NAV.WA_TEMPLATES', icon: 'pi pi-file-edit', routerLink: ['/whatsapp/templates'], visible: WHATSAPP_ENABLED && auth.canWrite('academy') },
+    ].filter(c => c.visible);
+    if (whatsapp.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'whatsapp', labelKey: 'NAV.GROUPS.WHATSAPP', icon: 'pi pi-whatsapp', children: whatsapp,
+      }});
+    }
+
     // Financial
     const financial: NavLeaf[] = [
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && !auth.isTeacher() },
