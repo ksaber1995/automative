@@ -104,6 +104,65 @@ export class SubscriptionsService {
       { botToken },
     );
   }
+
+  // ── Offline licenses (desktop app keys) ────────────────────────────────────
+
+  /** List every offline license key issued. */
+  listLicenses(): Observable<OfflineLicense[]> {
+    return this.http.get<OfflineLicense[]>(`${ADMIN_ENDPOINT}/licenses`);
+  }
+
+  /** Mint a new license key. Returns the created row (has the licenseKey to email). */
+  createLicense(body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; notes?: string }): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses`, body);
+  }
+
+  /** Activate a license (permanent when activationEndsAt is null/omitted). */
+  activateLicense(id: string, activationEndsAt?: string | null): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/activate`, { activationEndsAt });
+  }
+
+  /** Push the trial end out by N days. */
+  extendTrial(id: string, days: number): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/extend-trial`, { days });
+  }
+
+  /** Unbind the license from its current device so it can be re-activated elsewhere. */
+  resetDevice(id: string): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/reset-device`, {});
+  }
+
+  /** Switch a license between TEACHER and ACADEMY tiers. */
+  setTier(id: string, tier: 'TEACHER' | 'ACADEMY'): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/tier`, { tier });
+  }
+
+  /** Revoke / un-revoke a license. */
+  setRevoked(id: string, revoked: boolean): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/revoke`, { revoked });
+  }
+
+  /** Permanently delete a license row. */
+  deleteLicense(id: string): Observable<{ deleted: true }> {
+    return this.http.delete<{ deleted: true }>(`${ADMIN_ENDPOINT}/licenses/${id}`);
+  }
+}
+
+/** One offline (desktop) license key. Dates are ISO strings or null. */
+export interface OfflineLicense {
+  id: string;
+  licenseKey: string;
+  tier: 'TEACHER' | 'ACADEMY';
+  label: string | null;
+  notes: string | null;
+  deviceId: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  activated: boolean;
+  activationEndsAt: string | null;
+  revoked: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /** One bot in the platform-owned Telegram pool. */

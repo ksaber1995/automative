@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CompanySubscription, PoolBot, SubscriptionsService } from './subscriptions.service';
+import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } from './subscriptions.service';
 
 @Component({
   selector: 'app-root',
@@ -44,6 +44,122 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
                 {{ '@' + b.bot_username }} · {{ b.company_name || 'available' }}
               </span>
             }
+          </div>
+        }
+      </div>
+
+      <!-- Offline licenses (desktop app keys the owner emails to customers) -->
+      <div class="card" style="margin: 20px 0; padding: 16px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0; font-size:16px;">Offline licenses</h2>
+            <p class="sub" style="margin-top:4px;">
+              {{ licenses().length }} issued — mint a key, email it to the customer, then activate once they install.
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <select class="search" style="flex:0 0 auto; min-width:130px;"
+              [ngModel]="newLicenseTier()" (ngModelChange)="newLicenseTier.set($event)">
+              <option value="TEACHER">TEACHER</option>
+              <option value="ACADEMY">ACADEMY</option>
+            </select>
+            <input class="search" style="min-width:200px;" type="text"
+              [ngModel]="newLicenseLabel()" (ngModelChange)="newLicenseLabel.set($event)"
+              placeholder="Label (e.g. customer name)…" />
+            <button class="act activate" [disabled]="creatingLicense()" (click)="createLicense()">
+              {{ creatingLicense() ? 'Creating…' : 'Create' }}
+            </button>
+          </div>
+        </div>
+
+        @if (newLicenseKey(); as key) {
+          <div class="keybox">
+            <div>
+              <div class="keybox-label">New license key — send this to the customer</div>
+              <code class="keybox-key">{{ key }}</code>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="act activate" (click)="copyKey(key)">Copy</button>
+              <button class="act" (click)="newLicenseKey.set(null)">Dismiss</button>
+            </div>
+          </div>
+        }
+
+        @if (licensesLoading()) {
+          <div class="state">Loading…</div>
+        } @else if (licenses().length === 0) {
+          <div class="state">No licenses issued yet.</div>
+        } @else {
+          <div style="margin-top:12px; overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Tier</th>
+                  <th>Label</th>
+                  <th>Device</th>
+                  <th>Status</th>
+                  <th>Trial ends</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of licenses(); track l.id) {
+                  <tr>
+                    <td>
+                      <code class="lic-key">{{ l.licenseKey }}</code>
+                      <button class="act" style="margin-left:6px;" (click)="copyKey(l.licenseKey)">Copy</button>
+                    </td>
+                    <td>
+                      <span class="reg" [class.teacher]="l.tier === 'TEACHER'" [class.academy]="l.tier === 'ACADEMY'">
+                        {{ l.tier }}
+                      </span>
+                    </td>
+                    <td>{{ l.label || '—' }}</td>
+                    <td>
+                      @if (l.deviceId) {
+                        <code class="lic-key" title="{{ l.deviceId }}">{{ shortDevice(l.deviceId) }}</code>
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td>
+                      <span class="badge"
+                        [class.trial]="licenseStatus(l).kind === 'TRIAL'"
+                        [class.expired]="licenseStatus(l).kind === 'EXPIRED'"
+                        [class.revoked]="licenseStatus(l).kind === 'REVOKED'">
+                        {{ licenseStatus(l).text }}
+                      </span>
+                    </td>
+                    <td>{{ formatDate(l.trialEndsAt) }}</td>
+                    <td>{{ formatDate(l.createdAt) }}</td>
+                    <td>
+                      <div class="actions">
+                        <button class="act activate" [disabled]="busyId() === l.id" (click)="activateLicense(l)">
+                          Activate
+                        </button>
+                        <button class="act" [disabled]="busyId() === l.id" (click)="extendTrial(l)">
+                          Extend trial
+                        </button>
+                        <button class="act" [disabled]="busyId() === l.id || !l.deviceId" (click)="resetDevice(l)">
+                          Reset device
+                        </button>
+                        <button class="act" [disabled]="busyId() === l.id" (click)="toggleTier(l)">
+                          Make {{ l.tier === 'ACADEMY' ? 'Teacher' : 'Academy' }}
+                        </button>
+                        <button class="act" [disabled]="busyId() === l.id" (click)="toggleRevoked(l)">
+                          {{ l.revoked ? 'Unrevoke' : 'Revoke' }}
+                        </button>
+                        <button class="act danger" [disabled]="busyId() === l.id" (click)="deleteLicense(l)">
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         }
       </div>
@@ -345,6 +461,19 @@ import { CompanySubscription, PoolBot, SubscriptionsService } from './subscripti
       font-weight: 600; background: #dcfce7; color: #166534;
     }
     .badge.trial { background: #fef9c3; color: #854d0e; }
+    .badge.expired { background: #f1f5f9; color: #64748b; }
+    .badge.revoked { background: #fee2e2; color: #b91c1c; }
+    .lic-key { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, monospace; }
+    .keybox {
+      margin-top: 12px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; background: #f0fdf4; border: 1px solid #86efac;
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .keybox-label { font-size: 12px; font-weight: 600; color: #166534; margin-bottom: 4px; }
+    .keybox-key {
+      font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #14532d;
+      letter-spacing: .5px; word-break: break-all;
+    }
     .reg {
       display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
       font-weight: 600; background: #e2e8f0; color: #475569;
@@ -425,6 +554,14 @@ export class AppComponent implements OnInit {
   poolToken = signal('');
   addingBot = signal(false);
 
+  // Offline licenses
+  licenses = signal<OfflineLicense[]>([]);
+  licensesLoading = signal(true);
+  newLicenseTier = signal<'TEACHER' | 'ACADEMY'>('TEACHER');
+  newLicenseLabel = signal('');
+  creatingLicense = signal(false);
+  newLicenseKey = signal<string | null>(null);
+
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
     const status = this.statusFilter();
@@ -450,6 +587,7 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     this.load();
     this.loadBots();
+    this.loadLicenses();
   }
 
   loadBots() {
@@ -477,6 +615,167 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.addingBot.set(false);
         this.showFlash(err?.error?.message || 'Could not add bot');
+      },
+    });
+  }
+
+  // ── Offline licenses ─────────────────────────────────────────────────────────
+  loadLicenses() {
+    this.licensesLoading.set(true);
+    this.service.listLicenses().subscribe({
+      next: (data) => {
+        this.licenses.set(data);
+        this.licensesLoading.set(false);
+      },
+      error: () => {
+        this.licensesLoading.set(false);
+      },
+    });
+  }
+
+  createLicense() {
+    if (this.creatingLicense()) return;
+    this.creatingLicense.set(true);
+    this.service
+      .createLicense({ tier: this.newLicenseTier(), label: this.newLicenseLabel().trim() || undefined })
+      .subscribe({
+        next: (lic) => {
+          this.creatingLicense.set(false);
+          this.newLicenseLabel.set('');
+          this.newLicenseKey.set(lic.licenseKey);
+          this.showFlash(`License created: ${lic.licenseKey}`);
+          this.loadLicenses();
+        },
+        error: (err) => {
+          this.creatingLicense.set(false);
+          this.error.set(`Create license failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+        },
+      });
+  }
+
+  copyKey(key: string) {
+    navigator.clipboard?.writeText(key).then(
+      () => this.showFlash('Key copied to clipboard.'),
+      () => this.showFlash('Could not copy — select and copy manually.'),
+    );
+  }
+
+  /** Short display for a bound device id. */
+  shortDevice(id: string): string {
+    return id.length > 12 ? id.slice(0, 12) + '…' : id;
+  }
+
+  /** Compute a status badge for a license row. */
+  licenseStatus(l: OfflineLicense): { kind: 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'REVOKED'; text: string } {
+    if (l.revoked) return { kind: 'REVOKED', text: 'Revoked' };
+    const now = Date.now();
+    if (l.activated && (!l.activationEndsAt || new Date(l.activationEndsAt).getTime() > now)) {
+      return { kind: 'ACTIVE', text: 'Active' };
+    }
+    if (!l.activated && l.trialEndsAt && new Date(l.trialEndsAt).getTime() > now) {
+      return { kind: 'TRIAL', text: `Trial (ends ${this.formatDate(l.trialEndsAt)})` };
+    }
+    return { kind: 'EXPIRED', text: 'Expired' };
+  }
+
+  activateLicense(l: OfflineLicense) {
+    this.busyId.set(l.id);
+    this.service.activateLicense(l.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`${l.label || l.licenseKey} activated.`);
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Activate failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  extendTrial(l: OfflineLicense) {
+    const input = window.prompt('Extend trial by how many days?', '7');
+    if (input === null) return;
+    const days = parseInt(input, 10);
+    if (isNaN(days) || days <= 0) {
+      this.showFlash('Enter a positive number of days.');
+      return;
+    }
+    this.busyId.set(l.id);
+    this.service.extendTrial(l.id, days).subscribe({
+      next: (res) => {
+        this.busyId.set(null);
+        this.showFlash(`Trial extended to ${this.formatDate(res.trialEndsAt)}.`);
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Extend trial failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  resetDevice(l: OfflineLicense) {
+    if (!window.confirm('Unbind this license from its current device? The customer can then activate on a new machine.')) return;
+    this.busyId.set(l.id);
+    this.service.resetDevice(l.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash('Device reset — license is unbound.');
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Reset device failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  toggleTier(l: OfflineLicense) {
+    const target: 'TEACHER' | 'ACADEMY' = l.tier === 'ACADEMY' ? 'TEACHER' : 'ACADEMY';
+    this.busyId.set(l.id);
+    this.service.setTier(l.id, target).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`License is now ${target}.`);
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Change tier failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  toggleRevoked(l: OfflineLicense) {
+    const target = !l.revoked;
+    if (target && !window.confirm('Revoke this license? The customer will lose access.')) return;
+    this.busyId.set(l.id);
+    this.service.setRevoked(l.id, target).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(target ? 'License revoked.' : 'License un-revoked.');
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Revoke failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  deleteLicense(l: OfflineLicense) {
+    if (!window.confirm(`Permanently delete license ${l.licenseKey}? This cannot be undone.`)) return;
+    this.busyId.set(l.id);
+    this.service.deleteLicense(l.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash('License deleted.');
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Delete failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }
