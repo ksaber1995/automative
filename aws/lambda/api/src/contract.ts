@@ -1646,7 +1646,12 @@ export const contract = c.router({
     register: {
       method: 'POST' as const,
       path: '/api/public/license/register',
-      body: z.object({ deviceId: z.string(), name: z.string(), phone: z.string() }),
+      body: z.object({
+        deviceId: z.string(),
+        name: z.string(),
+        phone: z.string(),
+        tier: z.enum(['TEACHER', 'ACADEMY']).optional(),
+      }),
       responses: {
         200: SignedLicenseSchema,
         400: ApiErrorSchema,

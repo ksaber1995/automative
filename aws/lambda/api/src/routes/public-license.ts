@@ -70,13 +70,14 @@ export const publicLicenseRoutes = {
 
   // First run: create the trial for this device from the customer's name/phone.
   // Idempotent — re-registering the same device just returns its current status.
-  register: async ({ body }: { body: { deviceId: string; name: string; phone: string } }) => {
+  register: async ({ body }: { body: { deviceId: string; name: string; phone: string; tier?: string } }) => {
     enforceByIp(RATE_LIMITS.PUBLIC_LICENSE_IP);
     try {
       await ensureOfflineLicenseTable();
       const deviceId = (body?.deviceId || '').trim();
       const name = (body?.name || '').trim();
       const phone = (body?.phone || '').trim();
+      const tier = String(body?.tier || '').toUpperCase() === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
       if (!deviceId || !name || !phone) {
         return apiError(400, 'ERRORS.LICENSE.INVALID_REQUEST', 'Name, phone and device id are required');
       }
@@ -87,8 +88,8 @@ export const publicLicenseRoutes = {
         const end = new Date(start.getTime() + TRIAL_DAYS * 86_400_000);
         lic = await queryOne<any>(
           `INSERT INTO offline_license (device_id, name, phone, tier, trial_started_at, trial_ends_at)
-           VALUES ($1, $2, $3, 'ACADEMY', $4, $5) RETURNING *`,
-          [deviceId, name, phone, start.toISOString(), end.toISOString()]
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [deviceId, name, phone, tier, start.toISOString(), end.toISOString()]
         );
       }
       return { status: 200 as const, body: signLicenseToken(buildPayload(lic, deviceId)) };
