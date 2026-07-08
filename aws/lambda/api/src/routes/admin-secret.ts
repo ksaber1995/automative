@@ -1,4 +1,34 @@
+import { randomInt } from 'crypto';
 import { query, queryOne } from '../db/connection';
+import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
+
+// Human-friendly, unambiguous key alphabet (no 0/O/1/I).
+const KEY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function generateLicenseKey(tier: 'TEACHER' | 'ACADEMY'): string {
+  const prefix = tier === 'ACADEMY' ? 'ACAD' : 'TCHR';
+  const group = () =>
+    Array.from({ length: 4 }, () => KEY_ALPHABET[randomInt(KEY_ALPHABET.length)]).join('');
+  return `${prefix}-${group()}-${group()}-${group()}`;
+}
+
+function mapLicenseRow(r: any) {
+  return {
+    id: r.id,
+    licenseKey: r.license_key,
+    tier: r.tier,
+    label: r.label ?? null,
+    notes: r.notes ?? null,
+    deviceId: r.device_id ?? null,
+    trialStartedAt: r.trial_started_at ? new Date(r.trial_started_at).toISOString() : null,
+    trialEndsAt: r.trial_ends_at ? new Date(r.trial_ends_at).toISOString() : null,
+    activated: !!r.activated,
+    activationEndsAt: r.activation_ends_at ? new Date(r.activation_ends_at).toISOString() : null,
+    revoked: !!r.revoked,
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+  };
+}
 
 /**
  * Intentionally-obscure, unauthenticated read-only endpoint for the owner's
@@ -303,6 +333,150 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret add telegram bot failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Add bot failed' } };
+    }
+  },
+
+  // ─── Offline desktop licenses ────────────────────────────────────────────
+  // Cross-tenant management of the offline_license table. Same obscure-path
+  // "auth" as the rest of this console.
+
+  listLicenses: async () => {
+    try {
+      await ensureOfflineLicenseTable();
+      const rows = await query<any>('SELECT * FROM offline_license ORDER BY created_at DESC');
+      return { status: 200 as const, body: rows.map(mapLicenseRow) };
+    } catch (error: any) {
+      console.error('karim-admin-secret list licenses failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List failed' } };
+    }
+  },
+
+  createLicense: async ({ body }: { body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; notes?: string } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const tier = body?.tier === 'ACADEMY' ? 'ACADEMY' : 'TEACHER';
+      // Retry on the vanishingly rare key collision.
+      let row: any = null;
+      for (let attempt = 0; attempt < 5 && !row; attempt++) {
+        const key = generateLicenseKey(tier);
+        try {
+          row = await queryOne<any>(
+            `INSERT INTO offline_license (license_key, tier, label, notes)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [key, tier, body?.label || null, body?.notes || null]
+          );
+        } catch (e: any) {
+          if (e?.code !== '23505') throw e; // not a unique-violation → real error
+        }
+      }
+      if (!row) return { status: 500 as const, body: { message: 'Could not generate a unique key' } };
+      return { status: 201 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret create license failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Create failed' } };
+    }
+  },
+
+  activateLicense: async ({ params, body }: { params: { id: string }; body: { activationEndsAt?: string | null } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const row = await queryOne<any>(
+        `UPDATE offline_license
+           SET activated = true, activation_ends_at = $2, revoked = false,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, body?.activationEndsAt || null]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret activate license failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Activate failed' } };
+    }
+  },
+
+  extendTrial: async ({ params, body }: { params: { id: string }; body: { days: number } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const days = Math.max(1, Math.floor(body?.days || 0));
+      // Extend from the later of the current trial end or now, so a lapsed
+      // trial gets a fresh window rather than one still in the past.
+      const row = await queryOne<any>(
+        `UPDATE offline_license
+           SET trial_started_at = COALESCE(trial_started_at, CURRENT_TIMESTAMP),
+               trial_ends_at = GREATEST(COALESCE(trial_ends_at, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP)
+                               + ($2 || ' days')::interval,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, String(days)]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret extend trial failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Extend failed' } };
+    }
+  },
+
+  resetDevice: async ({ params }: { params: { id: string } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      // Clear the device lock so the license can bind to a new machine. Trial
+      // dates are preserved (validate only starts the trial when it's null).
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET device_id = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret reset device failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Reset failed' } };
+    }
+  },
+
+  setLicenseTier: async ({ params, body }: { params: { id: string }; body: { tier: 'TEACHER' | 'ACADEMY' } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const tier = body?.tier === 'ACADEMY' ? 'ACADEMY' : 'TEACHER';
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET tier = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, tier]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set tier failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set tier failed' } };
+    }
+  },
+
+  setLicenseRevoked: async ({ params, body }: { params: { id: string }; body: { revoked: boolean } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET revoked = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, body?.revoked === true]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret revoke license failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Revoke failed' } };
+    }
+  },
+
+  deleteLicense: async ({ params }: { params: { id: string } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      await query('DELETE FROM offline_license WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: { deleted: true } };
+    } catch (error: any) {
+      console.error('karim-admin-secret delete license failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
     }
   },
 };

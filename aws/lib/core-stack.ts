@@ -243,6 +243,10 @@ export class CoreStack extends cdk.Stack {
         FRONTEND_BASE_URL: props?.frontendBaseUrl ?? 'http://localhost:4200',
         // Public API base, used to register the Telegram bot webhook.
         API_BASE_URL: props?.apiBaseUrl ?? '',
+        // ed25519 private key (PEM, pkcs8) used to sign offline desktop license
+        // tokens. Set via env at deploy; the matching public key is embedded in
+        // the Electron app. Without it, /api/public/license/validate returns 500.
+        LICENSE_SIGNING_KEY: process.env.LICENSE_SIGNING_KEY ?? '',
       },
       vpc,
       vpcSubnets: {
