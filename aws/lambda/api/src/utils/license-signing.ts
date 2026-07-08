@@ -15,7 +15,7 @@ import { sign } from 'crypto';
  * The client verifies the signature over the exact `token` bytes, then decodes.
  */
 export interface LicenseTokenPayload {
-  licenseKey: string;
+  licenseKey: string | null;
   deviceId: string;
   tier: 'TEACHER' | 'ACADEMY';
   status: 'TRIAL' | 'ACTIVE' | 'EXPIRED';

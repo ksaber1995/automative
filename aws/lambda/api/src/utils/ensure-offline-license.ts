@@ -16,14 +16,18 @@ export async function ensureOfflineLicenseTable(): Promise<void> {
         await query(`
           CREATE TABLE IF NOT EXISTS offline_license (
             id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            license_key        VARCHAR(64) NOT NULL UNIQUE,
-            tier               VARCHAR(20) NOT NULL DEFAULT 'TEACHER'
+            -- The product license key. NULL during self-service trial; set by the
+            -- owner once the customer pays, then entered in-app to unlock.
+            license_key        VARCHAR(64) UNIQUE,
+            tier               VARCHAR(20) NOT NULL DEFAULT 'ACADEMY'
                                  CHECK (tier IN ('TEACHER', 'ACADEMY')),
             label              VARCHAR(255),
+            -- Customer-supplied on first run (self-registration).
+            name               VARCHAR(255),
             -- Customer contact number (for calling them); not used for validation.
             phone              VARCHAR(32),
             notes              TEXT,
-            -- Bound on first successful validate; locks the license to one machine.
+            -- Bound on first run (registration); locks the record to one machine.
             device_id          VARCHAR(128),
             -- Trial starts on first device bind (first run), not on creation.
             trial_started_at   TIMESTAMP WITH TIME ZONE,
@@ -39,8 +43,11 @@ export async function ensureOfflineLicenseTable(): Promise<void> {
         await query(
           `CREATE INDEX IF NOT EXISTS idx_offline_license_key ON offline_license(license_key)`
         );
-        // Backfill the phone column on tables created before it was added.
+        // Backfill columns / relax constraints on tables created earlier.
         await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS phone VARCHAR(32)`);
+        await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
+        // Trials now create rows without a key; the key is issued later.
+        await query(`ALTER TABLE offline_license ALTER COLUMN license_key DROP NOT NULL`);
       } catch (e) {
         initPromise = null; // allow a later retry
         throw e;

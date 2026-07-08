@@ -52,33 +52,21 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
       <div class="card" style="margin: 20px 0; padding: 16px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
           <div>
-            <h2 style="margin:0; font-size:16px;">Offline licenses</h2>
+            <h2 style="margin:0; font-size:16px;">Offline trials &amp; licenses</h2>
             <p class="sub" style="margin-top:4px;">
-              {{ licenses().length }} issued — mint a key, email it to the customer, then activate once they install.
+              {{ licenses().length }} device(s) registered — customers sign up in-app for a 7-day trial.
+              When one pays, click <b>Issue license</b> and send them the key to unlock.
             </p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <select class="search" style="flex:0 0 auto; min-width:130px;"
-              [ngModel]="newLicenseTier()" (ngModelChange)="newLicenseTier.set($event)">
-              <option value="TEACHER">TEACHER</option>
-              <option value="ACADEMY">ACADEMY</option>
-            </select>
-            <input class="search" style="min-width:180px;" type="text"
-              [ngModel]="newLicenseLabel()" (ngModelChange)="newLicenseLabel.set($event)"
-              placeholder="Label (e.g. customer name)…" />
-            <input class="search" style="min-width:150px;" type="tel"
-              [ngModel]="newLicensePhone()" (ngModelChange)="newLicensePhone.set($event)"
-              placeholder="Phone (to call)…" />
-            <button class="act activate" [disabled]="creatingLicense()" (click)="createLicense()">
-              {{ creatingLicense() ? 'Creating…' : 'Create' }}
-            </button>
+            <button class="act" [disabled]="licensesLoading()" (click)="loadLicenses()">Refresh</button>
           </div>
         </div>
 
         @if (newLicenseKey(); as key) {
           <div class="keybox">
             <div>
-              <div class="keybox-label">New license key — send this to the customer</div>
+              <div class="keybox-label">Product license key — send this to the customer to unlock</div>
               <code class="keybox-key">{{ key }}</code>
             </div>
             <div style="display:flex; gap:8px;">
@@ -91,36 +79,26 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
         @if (licensesLoading()) {
           <div class="state">Loading…</div>
         } @else if (licenses().length === 0) {
-          <div class="state">No licenses issued yet.</div>
+          <div class="state">No registrations yet.</div>
         } @else {
           <div style="margin-top:12px; overflow-x:auto;">
             <table>
               <thead>
                 <tr>
+                  <th>Name</th>
+                  <th>Phone</th>
                   <th>Key</th>
                   <th>Tier</th>
-                  <th>Label</th>
-                  <th>Phone</th>
                   <th>Device</th>
                   <th>Status</th>
                   <th>Trial ends</th>
-                  <th>Created</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 @for (l of licenses(); track l.id) {
                   <tr>
-                    <td>
-                      <code class="lic-key">{{ l.licenseKey }}</code>
-                      <button class="act" style="margin-left:6px;" (click)="copyKey(l.licenseKey)">Copy</button>
-                    </td>
-                    <td>
-                      <span class="reg" [class.teacher]="l.tier === 'TEACHER'" [class.academy]="l.tier === 'ACADEMY'">
-                        {{ l.tier }}
-                      </span>
-                    </td>
-                    <td>{{ l.label || '—' }}</td>
+                    <td>{{ l.name || '—' }}</td>
                     <td>
                       @if (l.phone) {
                         <a href="tel:{{ l.phone }}">{{ l.phone }}</a>
@@ -130,6 +108,19 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                       <button class="act" style="margin-left:6px;" [disabled]="busyId() === l.id" (click)="editPhone(l)">
                         {{ l.phone ? 'Edit' : 'Add' }}
                       </button>
+                    </td>
+                    <td>
+                      @if (l.licenseKey) {
+                        <code class="lic-key">{{ l.licenseKey }}</code>
+                        <button class="act" style="margin-left:6px;" (click)="copyKey(l.licenseKey!)">Copy</button>
+                      } @else {
+                        <span class="sub" style="opacity:.6;">Not issued</span>
+                      }
+                    </td>
+                    <td>
+                      <span class="reg" [class.teacher]="l.tier === 'TEACHER'" [class.academy]="l.tier === 'ACADEMY'">
+                        {{ l.tier }}
+                      </span>
                     </td>
                     <td>
                       @if (l.deviceId) {
@@ -147,14 +138,21 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                       </span>
                     </td>
                     <td>{{ formatDate(l.trialEndsAt) }}</td>
-                    <td>{{ formatDate(l.createdAt) }}</td>
                     <td>
                       <div class="actions">
-                        <button class="act activate" [disabled]="busyId() === l.id" (click)="activateLicense(l)">
-                          Activate
+                        @if (!l.licenseKey) {
+                          <button class="act activate" [disabled]="busyId() === l.id" (click)="issueLicense(l)">
+                            Issue license
+                          </button>
+                        }
+                        <button class="act" [disabled]="busyId() === l.id" (click)="changeExpiry(l)">
+                          Change expiry
                         </button>
                         <button class="act" [disabled]="busyId() === l.id" (click)="extendTrial(l)">
-                          Extend trial
+                          +Extend
+                        </button>
+                        <button class="act" [disabled]="busyId() === l.id" (click)="activateLicense(l)">
+                          Activate
                         </button>
                         <button class="act" [disabled]="busyId() === l.id || !l.deviceId" (click)="resetDevice(l)">
                           Reset device
@@ -712,6 +710,47 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Save phone failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  issueLicense(l: OfflineLicense) {
+    if (l.licenseKey) { this.newLicenseKey.set(l.licenseKey); return; }
+    this.busyId.set(l.id);
+    this.service.issueLicense(l.id).subscribe({
+      next: (lic) => {
+        this.busyId.set(null);
+        this.newLicenseKey.set(lic.licenseKey);
+        this.showFlash(`License issued for ${l.name || l.phone || 'customer'}: ${lic.licenseKey}`);
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Issue failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  changeExpiry(l: OfflineLicense) {
+    const current = l.trialEndsAt ? l.trialEndsAt.slice(0, 10) : '';
+    const input = window.prompt('Set trial expiry date (YYYY-MM-DD):', current);
+    if (input === null) return;
+    const v = input.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      this.showFlash('Enter a date as YYYY-MM-DD.');
+      return;
+    }
+    this.busyId.set(l.id);
+    // End of the chosen day, so the trial is valid through that date.
+    this.service.setTrialEndDate(l.id, `${v}T23:59:59.000Z`).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`Trial expiry set to ${v}.`);
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Change expiry failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

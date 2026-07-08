@@ -18,6 +18,7 @@ function mapLicenseRow(r: any) {
     licenseKey: r.license_key,
     tier: r.tier,
     label: r.label ?? null,
+    name: r.name ?? null,
     phone: r.phone ?? null,
     notes: r.notes ?? null,
     deviceId: r.device_id ?? null,
@@ -416,6 +417,57 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret extend trial failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Extend failed' } };
+    }
+  },
+
+  // Issue the product license for a paid customer: generate a key on their row
+  // (matching the row's tier) if it doesn't have one yet. The owner sends this
+  // key to the customer, who enters it in-app to unlock after the trial.
+  issueLicense: async ({ params }: { params: { id: string } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const existing = await queryOne<any>('SELECT * FROM offline_license WHERE id = $1', [params.id]);
+      if (!existing) return { status: 404 as const, body: { message: 'License not found' } };
+      if (existing.license_key) {
+        return { status: 200 as const, body: mapLicenseRow(existing) }; // already issued
+      }
+      let row: any = null;
+      for (let attempt = 0; attempt < 5 && !row; attempt++) {
+        const key = generateLicenseKey(existing.tier === 'ACADEMY' ? 'ACADEMY' : 'TEACHER');
+        try {
+          row = await queryOne<any>(
+            `UPDATE offline_license SET license_key = $2, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 RETURNING *`,
+            [params.id, key]
+          );
+        } catch (e: any) {
+          if (e?.code !== '23505') throw e; // key collision → retry
+        }
+      }
+      if (!row) return { status: 500 as const, body: { message: 'Could not generate a unique key' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret issue license failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Issue failed' } };
+    }
+  },
+
+  // Set an absolute trial expiry date (the owner "changing the expiration day").
+  setTrialEndDate: async ({ params, body }: { params: { id: string }; body: { trialEndsAt: string } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const row = await queryOne<any>(
+        `UPDATE offline_license
+           SET trial_started_at = COALESCE(trial_started_at, CURRENT_TIMESTAMP),
+               trial_ends_at = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, body.trialEndsAt]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set trial end failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set expiry failed' } };
     }
   },
 

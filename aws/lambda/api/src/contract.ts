@@ -1595,9 +1595,10 @@ const WaMessageSchema = z.object({
 // Offline desktop license (admin-console view of the offline_license table).
 const LicenseSchema = z.object({
   id: UUIDSchema,
-  licenseKey: z.string(),
+  licenseKey: z.string().nullable(),
   tier: z.enum(['TEACHER', 'ACADEMY']),
   label: z.string().nullable(),
+  name: z.string().nullable(),
   phone: z.string().nullable(),
   notes: z.string().nullable(),
   deviceId: z.string().nullable(),
@@ -1610,10 +1611,18 @@ const LicenseSchema = z.object({
   updatedAt: z.string().nullable(),
 });
 
-// Signed license token returned by the public validate endpoint.
+// Signed license token returned by the public register/activate endpoints.
 const SignedLicenseSchema = z.object({
   token: z.string(),
   signature: z.string(),
+});
+
+// validate() response: `registered:false` tells the app to show the sign-up
+// form; otherwise the signed token fields are present.
+const LicenseValidateSchema = z.object({
+  registered: z.boolean(),
+  token: z.string().optional(),
+  signature: z.string().optional(),
 });
 
 // =============================================
@@ -1622,15 +1631,36 @@ const SignedLicenseSchema = z.object({
 export const contract = c.router({
   // Public, unauthenticated license validation for the offline desktop app.
   publicLicense: {
+    // Per-launch status check, keyed by device id.
     validate: {
       method: 'POST' as const,
       path: '/api/public/license/validate',
-      body: z.object({ licenseKey: z.string(), deviceId: z.string() }),
+      body: z.object({ deviceId: z.string() }),
+      responses: {
+        200: LicenseValidateSchema,
+        400: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    // First run: self-register with name + phone to start the trial.
+    register: {
+      method: 'POST' as const,
+      path: '/api/public/license/register',
+      body: z.object({ deviceId: z.string(), name: z.string(), phone: z.string() }),
       responses: {
         200: SignedLicenseSchema,
         400: ApiErrorSchema,
-        403: ApiErrorSchema,
-        404: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    // Post-trial: enter the product license the owner issued to unlock.
+    activate: {
+      method: 'POST' as const,
+      path: '/api/public/license/activate',
+      body: z.object({ deviceId: z.string(), licenseKey: z.string() }),
+      responses: {
+        200: SignedLicenseSchema,
+        400: ApiErrorSchema,
         500: ApiErrorSchema,
       },
     },
@@ -4760,6 +4790,20 @@ export const contract = c.router({
       path: '/api/karim-admin-secret/licenses/:id/tier',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ tier: z.enum(['TEACHER', 'ACADEMY']) }),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
+    },
+    issueLicense: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/issue',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
+    },
+    setTrialEndDate: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/trial-end',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ trialEndsAt: z.string() }),
       responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
     },
     setLicensePhone: {

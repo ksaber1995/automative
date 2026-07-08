@@ -122,6 +122,16 @@ export class SubscriptionsService {
     return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/phone`, { phone });
   }
 
+  /** Issue the product license key for a paid customer (generates it on their row). */
+  issueLicense(id: string): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/issue`, {});
+  }
+
+  /** Change the trial expiry to a specific date (ISO / YYYY-MM-DD). */
+  setTrialEndDate(id: string, trialEndsAt: string): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/trial-end`, { trialEndsAt });
+  }
+
   /** Activate a license (permanent when activationEndsAt is null/omitted). */
   activateLicense(id: string, activationEndsAt?: string | null): Observable<OfflineLicense> {
     return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/activate`, { activationEndsAt });
@@ -156,9 +166,10 @@ export class SubscriptionsService {
 /** One offline (desktop) license key. Dates are ISO strings or null. */
 export interface OfflineLicense {
   id: string;
-  licenseKey: string;
+  licenseKey: string | null;
   tier: 'TEACHER' | 'ACADEMY';
   label: string | null;
+  name: string | null;
   phone: string | null;
   notes: string | null;
   deviceId: string | null;
