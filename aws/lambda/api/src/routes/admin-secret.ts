@@ -18,6 +18,7 @@ function mapLicenseRow(r: any) {
     licenseKey: r.license_key,
     tier: r.tier,
     label: r.label ?? null,
+    phone: r.phone ?? null,
     notes: r.notes ?? null,
     deviceId: r.device_id ?? null,
     trialStartedAt: r.trial_started_at ? new Date(r.trial_started_at).toISOString() : null,
@@ -351,7 +352,7 @@ export const adminSecretRoutes = {
     }
   },
 
-  createLicense: async ({ body }: { body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; notes?: string } }) => {
+  createLicense: async ({ body }: { body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; phone?: string; notes?: string } }) => {
     try {
       await ensureOfflineLicenseTable();
       const tier = body?.tier === 'ACADEMY' ? 'ACADEMY' : 'TEACHER';
@@ -361,9 +362,9 @@ export const adminSecretRoutes = {
         const key = generateLicenseKey(tier);
         try {
           row = await queryOne<any>(
-            `INSERT INTO offline_license (license_key, tier, label, notes)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [key, tier, body?.label || null, body?.notes || null]
+            `INSERT INTO offline_license (license_key, tier, label, phone, notes)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [key, tier, body?.label || null, body?.phone || null, body?.notes || null]
           );
         } catch (e: any) {
           if (e?.code !== '23505') throw e; // not a unique-violation → real error
@@ -450,6 +451,23 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set tier failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set tier failed' } };
+    }
+  },
+
+  setLicensePhone: async ({ params, body }: { params: { id: string }; body: { phone: string | null } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const phone = body?.phone?.trim() || null;
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET phone = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, phone]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set phone failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set phone failed' } };
     }
   },
 

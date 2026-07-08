@@ -1598,6 +1598,7 @@ const LicenseSchema = z.object({
   licenseKey: z.string(),
   tier: z.enum(['TEACHER', 'ACADEMY']),
   label: z.string().nullable(),
+  phone: z.string().nullable(),
   notes: z.string().nullable(),
   deviceId: z.string().nullable(),
   trialStartedAt: z.string().nullable(),
@@ -4728,6 +4729,7 @@ export const contract = c.router({
       body: z.object({
         tier: z.enum(['TEACHER', 'ACADEMY']).optional(),
         label: z.string().optional(),
+        phone: z.string().optional(),
         notes: z.string().optional(),
       }),
       responses: { 201: LicenseSchema, 500: z.object({ message: z.string() }) },
@@ -4758,6 +4760,13 @@ export const contract = c.router({
       path: '/api/karim-admin-secret/licenses/:id/tier',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({ tier: z.enum(['TEACHER', 'ACADEMY']) }),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
+    },
+    setLicensePhone: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/phone',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ phone: z.string().nullable() }),
       responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
     },
     setLicenseRevoked: {

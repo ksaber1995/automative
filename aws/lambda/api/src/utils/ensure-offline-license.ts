@@ -20,6 +20,8 @@ export async function ensureOfflineLicenseTable(): Promise<void> {
             tier               VARCHAR(20) NOT NULL DEFAULT 'TEACHER'
                                  CHECK (tier IN ('TEACHER', 'ACADEMY')),
             label              VARCHAR(255),
+            -- Customer contact number (for calling them); not used for validation.
+            phone              VARCHAR(32),
             notes              TEXT,
             -- Bound on first successful validate; locks the license to one machine.
             device_id          VARCHAR(128),
@@ -37,6 +39,8 @@ export async function ensureOfflineLicenseTable(): Promise<void> {
         await query(
           `CREATE INDEX IF NOT EXISTS idx_offline_license_key ON offline_license(license_key)`
         );
+        // Backfill the phone column on tables created before it was added.
+        await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS phone VARCHAR(32)`);
       } catch (e) {
         initPromise = null; // allow a later retry
         throw e;

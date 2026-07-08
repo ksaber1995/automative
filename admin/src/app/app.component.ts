@@ -63,9 +63,12 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
               <option value="TEACHER">TEACHER</option>
               <option value="ACADEMY">ACADEMY</option>
             </select>
-            <input class="search" style="min-width:200px;" type="text"
+            <input class="search" style="min-width:180px;" type="text"
               [ngModel]="newLicenseLabel()" (ngModelChange)="newLicenseLabel.set($event)"
               placeholder="Label (e.g. customer name)…" />
+            <input class="search" style="min-width:150px;" type="tel"
+              [ngModel]="newLicensePhone()" (ngModelChange)="newLicensePhone.set($event)"
+              placeholder="Phone (to call)…" />
             <button class="act activate" [disabled]="creatingLicense()" (click)="createLicense()">
               {{ creatingLicense() ? 'Creating…' : 'Create' }}
             </button>
@@ -97,6 +100,7 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                   <th>Key</th>
                   <th>Tier</th>
                   <th>Label</th>
+                  <th>Phone</th>
                   <th>Device</th>
                   <th>Status</th>
                   <th>Trial ends</th>
@@ -117,6 +121,16 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                       </span>
                     </td>
                     <td>{{ l.label || '—' }}</td>
+                    <td>
+                      @if (l.phone) {
+                        <a href="tel:{{ l.phone }}">{{ l.phone }}</a>
+                      } @else {
+                        —
+                      }
+                      <button class="act" style="margin-left:6px;" [disabled]="busyId() === l.id" (click)="editPhone(l)">
+                        {{ l.phone ? 'Edit' : 'Add' }}
+                      </button>
+                    </td>
                     <td>
                       @if (l.deviceId) {
                         <code class="lic-key" title="{{ l.deviceId }}">{{ shortDevice(l.deviceId) }}</code>
@@ -559,6 +573,7 @@ export class AppComponent implements OnInit {
   licensesLoading = signal(true);
   newLicenseTier = signal<'TEACHER' | 'ACADEMY'>('TEACHER');
   newLicenseLabel = signal('');
+  newLicensePhone = signal('');
   creatingLicense = signal(false);
   newLicenseKey = signal<string | null>(null);
 
@@ -637,11 +652,16 @@ export class AppComponent implements OnInit {
     if (this.creatingLicense()) return;
     this.creatingLicense.set(true);
     this.service
-      .createLicense({ tier: this.newLicenseTier(), label: this.newLicenseLabel().trim() || undefined })
+      .createLicense({
+        tier: this.newLicenseTier(),
+        label: this.newLicenseLabel().trim() || undefined,
+        phone: this.newLicensePhone().trim() || undefined,
+      })
       .subscribe({
         next: (lic) => {
           this.creatingLicense.set(false);
           this.newLicenseLabel.set('');
+          this.newLicensePhone.set('');
           this.newLicenseKey.set(lic.licenseKey);
           this.showFlash(`License created: ${lic.licenseKey}`);
           this.loadLicenses();
@@ -676,6 +696,24 @@ export class AppComponent implements OnInit {
       return { kind: 'TRIAL', text: `Trial (ends ${this.formatDate(l.trialEndsAt)})` };
     }
     return { kind: 'EXPIRED', text: 'Expired' };
+  }
+
+  editPhone(l: OfflineLicense) {
+    const input = window.prompt('Customer phone number (leave empty to clear):', l.phone || '');
+    if (input === null) return; // cancelled
+    const phone = input.trim() || null;
+    this.busyId.set(l.id);
+    this.service.setPhone(l.id, phone).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(phone ? `Phone saved for ${l.label || l.licenseKey}.` : 'Phone cleared.');
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Save phone failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
   }
 
   activateLicense(l: OfflineLicense) {

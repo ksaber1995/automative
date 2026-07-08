@@ -113,8 +113,13 @@ export class SubscriptionsService {
   }
 
   /** Mint a new license key. Returns the created row (has the licenseKey to email). */
-  createLicense(body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; notes?: string }): Observable<OfflineLicense> {
+  createLicense(body: { tier?: 'TEACHER' | 'ACADEMY'; label?: string; phone?: string; notes?: string }): Observable<OfflineLicense> {
     return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses`, body);
+  }
+
+  /** Set/clear the customer's contact phone number. */
+  setPhone(id: string, phone: string | null): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/phone`, { phone });
   }
 
   /** Activate a license (permanent when activationEndsAt is null/omitted). */
@@ -154,6 +159,7 @@ export interface OfflineLicense {
   licenseKey: string;
   tier: 'TEACHER' | 'ACADEMY';
   label: string | null;
+  phone: string | null;
   notes: string | null;
   deviceId: string | null;
   trialStartedAt: string | null;

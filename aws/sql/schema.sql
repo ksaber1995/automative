@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS offline_license (
     tier               VARCHAR(20) NOT NULL DEFAULT 'TEACHER'
                          CHECK (tier IN ('TEACHER', 'ACADEMY')),
     label              VARCHAR(255),
+    phone              VARCHAR(32),           -- customer contact number (for calling them)
     notes              TEXT,
     device_id          VARCHAR(128),          -- bound on first validate; locks to one device
     trial_started_at   TIMESTAMP WITH TIME ZONE,
