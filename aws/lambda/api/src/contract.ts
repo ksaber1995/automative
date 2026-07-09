@@ -1607,7 +1607,33 @@ const LicenseSchema = z.object({
   activated: z.boolean(),
   activationEndsAt: z.string().nullable(),
   revoked: z.boolean(),
+  // Auto-update per-device overrides (offline desktop): pin to a version and/or
+  // freeze updates. Optional so older callers/rows without them still validate.
+  pinnedVersion: z.string().nullable().optional(),
+  updateBlocked: z.boolean().optional(),
   createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+
+// Offline desktop auto-update: a published build's artifact metadata.
+const DesktopReleaseSchema = z.object({
+  id: UUIDSchema,
+  channel: z.string(),
+  version: z.string(),
+  exeFilename: z.string(),
+  sha512: z.string(),
+  size: z.number(),
+  releaseNotes: z.string().nullable(),
+  releaseDate: z.string().nullable(),
+  createdAt: z.string().nullable(),
+});
+
+// Offline desktop auto-update: a channel's current rollout state.
+const DesktopRolloutSchema = z.object({
+  channel: z.string(),
+  targetVersion: z.string().nullable(),
+  rolloutPercent: z.number(),
+  previousVersion: z.string().nullable(),
   updatedAt: z.string().nullable(),
 });
 
@@ -4831,6 +4857,68 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: { 200: z.object({ deleted: z.boolean() }), 500: z.object({ message: z.string() }) },
+    },
+
+    // ── Offline desktop auto-update: release registry & rollout control ──────
+    // Static /desktop paths are registered before the /:id device-override ones.
+    listReleases: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/desktop/releases',
+      responses: { 200: z.array(DesktopReleaseSchema), 500: z.object({ message: z.string() }) },
+    },
+    registerRelease: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/desktop/releases',
+      body: z.object({
+        channel: z.string().optional(),
+        version: z.string(),
+        exeFilename: z.string(),
+        sha512: z.string(),
+        size: z.number(),
+        releaseNotes: z.string().optional(),
+      }),
+      responses: {
+        200: DesktopReleaseSchema,
+        400: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    deleteRelease: {
+      method: 'DELETE',
+      path: '/api/karim-admin-secret/desktop/releases/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.object({ deleted: z.boolean() }), 500: z.object({ message: z.string() }) },
+    },
+    listRollouts: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/desktop/rollout',
+      responses: { 200: z.array(DesktopRolloutSchema), 500: z.object({ message: z.string() }) },
+    },
+    setRollout: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/desktop/rollout',
+      body: z.object({
+        channel: z.string().optional(),
+        targetVersion: z.string().nullable(),
+        rolloutPercent: z.number().optional(),
+        previousVersion: z.string().nullable().optional(),
+      }),
+      responses: { 200: DesktopRolloutSchema, 500: z.object({ message: z.string() }) },
+    },
+    setDevicePin: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/pin',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ version: z.string().nullable() }),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
+    },
+    setDeviceUpdateBlocked: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/update-blocked',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ blocked: z.boolean() }),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
     },
   },
 

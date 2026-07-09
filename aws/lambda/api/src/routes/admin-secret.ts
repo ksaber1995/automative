@@ -1,6 +1,7 @@
 import { randomInt } from 'crypto';
 import { query, queryOne } from '../db/connection';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
+import { ensureOfflineReleaseTables } from '../utils/ensure-offline-release';
 
 // Human-friendly, unambiguous key alphabet (no 0/O/1/I).
 const KEY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -27,7 +28,33 @@ function mapLicenseRow(r: any) {
     activated: !!r.activated,
     activationEndsAt: r.activation_ends_at ? new Date(r.activation_ends_at).toISOString() : null,
     revoked: !!r.revoked,
+    pinnedVersion: r.pinned_version ?? null,
+    updateBlocked: !!r.update_blocked,
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+  };
+}
+
+function mapReleaseRow(r: any) {
+  return {
+    id: r.id,
+    channel: r.channel,
+    version: r.version,
+    exeFilename: r.exe_filename,
+    sha512: r.sha512,
+    size: Number(r.size),
+    releaseNotes: r.release_notes ?? null,
+    releaseDate: r.release_date ? new Date(r.release_date).toISOString() : null,
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+  };
+}
+
+function mapChannelRow(r: any) {
+  return {
+    channel: r.channel,
+    targetVersion: r.target_version ?? null,
+    rolloutPercent: Number(r.rollout_percent ?? 100),
+    previousVersion: r.previous_version ?? null,
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
   };
 }
@@ -547,6 +574,151 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret delete license failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
+    }
+  },
+
+  // ─── Offline desktop auto-update: release registry & rollout ──────────────
+  // The owner (or the publish script) registers each build's artifact metadata,
+  // then points a channel at a version with a rollout percentage. The device
+  // feed (`/api/public/update/*`) reads these to decide what each client gets.
+
+  listReleases: async () => {
+    try {
+      await ensureOfflineReleaseTables();
+      const rows = await query<any>('SELECT * FROM offline_release ORDER BY created_at DESC');
+      return { status: 200 as const, body: rows.map(mapReleaseRow) };
+    } catch (error: any) {
+      console.error('karim-admin-secret list releases failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List failed' } };
+    }
+  },
+
+  // Register (or update) a build. Idempotent on (channel, version) so re-running
+  // the publish script for the same build just refreshes its metadata.
+  registerRelease: async ({
+    body,
+  }: {
+    body: { channel?: string; version: string; exeFilename: string; sha512: string; size: number; releaseNotes?: string };
+  }) => {
+    try {
+      await ensureOfflineReleaseTables();
+      const channel = (body?.channel || 'latest').trim();
+      const version = (body?.version || '').trim();
+      const exeFilename = (body?.exeFilename || '').trim();
+      const sha512 = (body?.sha512 || '').trim();
+      const size = Number(body?.size);
+      if (!version || !exeFilename || !sha512 || !Number.isFinite(size) || size <= 0) {
+        return { status: 400 as const, body: { message: 'version, exeFilename, sha512 and a positive size are required' } };
+      }
+      const row = await queryOne<any>(
+        `INSERT INTO offline_release (channel, version, exe_filename, sha512, size, release_notes)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (channel, version) DO UPDATE
+           SET exe_filename = EXCLUDED.exe_filename,
+               sha512       = EXCLUDED.sha512,
+               size         = EXCLUDED.size,
+               release_notes = EXCLUDED.release_notes,
+               release_date = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [channel, version, exeFilename, sha512, size, body?.releaseNotes || null]
+      );
+      return { status: 200 as const, body: mapReleaseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret register release failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Register failed' } };
+    }
+  },
+
+  deleteRelease: async ({ params }: { params: { id: string } }) => {
+    try {
+      await ensureOfflineReleaseTables();
+      await query('DELETE FROM offline_release WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: { deleted: true } };
+    } catch (error: any) {
+      console.error('karim-admin-secret delete release failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
+    }
+  },
+
+  // Current rollout state for every channel.
+  listRollouts: async () => {
+    try {
+      await ensureOfflineReleaseTables();
+      const rows = await query<any>('SELECT * FROM offline_update_channel ORDER BY channel');
+      return { status: 200 as const, body: rows.map(mapChannelRow) };
+    } catch (error: any) {
+      console.error('karim-admin-secret list rollouts failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List failed' } };
+    }
+  },
+
+  // Point a channel at a target version with a rollout percentage. This is the
+  // single lever for staged rollout (raise the percent) and rollback (set the
+  // target back to a known-good version).
+  setRollout: async ({
+    body,
+  }: {
+    body: { channel?: string; targetVersion: string | null; rolloutPercent?: number; previousVersion?: string | null };
+  }) => {
+    try {
+      await ensureOfflineReleaseTables();
+      const channel = (body?.channel || 'latest').trim();
+      const target = body?.targetVersion ? String(body.targetVersion).trim() : null;
+      const previous = body?.previousVersion ? String(body.previousVersion).trim() : null;
+      let pct = Number(body?.rolloutPercent ?? 100);
+      if (!Number.isFinite(pct)) pct = 100;
+      pct = Math.max(0, Math.min(100, Math.round(pct)));
+      const row = await queryOne<any>(
+        `INSERT INTO offline_update_channel (channel, target_version, rollout_percent, previous_version, updated_at)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+         ON CONFLICT (channel) DO UPDATE
+           SET target_version   = EXCLUDED.target_version,
+               rollout_percent  = EXCLUDED.rollout_percent,
+               previous_version = EXCLUDED.previous_version,
+               updated_at       = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [channel, target, pct, previous]
+      );
+      return { status: 200 as const, body: mapChannelRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set rollout failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set rollout failed' } };
+    }
+  },
+
+  // Pin one device to a specific version (or clear the pin with null). Overrides
+  // the channel rollout for just that machine.
+  setDevicePin: async ({ params, body }: { params: { id: string }; body: { version: string | null } }) => {
+    try {
+      await ensureOfflineReleaseTables();
+      const version = body?.version ? String(body.version).trim() : null;
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET pinned_version = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, version]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set device pin failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set pin failed' } };
+    }
+  },
+
+  // Freeze (or unfreeze) auto-updates for one device.
+  setDeviceUpdateBlocked: async ({ params, body }: { params: { id: string }; body: { blocked: boolean } }) => {
+    try {
+      await ensureOfflineReleaseTables();
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET update_blocked = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, body?.blocked === true]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set device blocked failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set blocked failed' } };
     }
   },
 };
