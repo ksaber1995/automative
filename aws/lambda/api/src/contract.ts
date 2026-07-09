@@ -1609,6 +1609,10 @@ const LicenseSchema = z.object({
   revoked: z.boolean(),
   // Annual renewal fee — owner bookkeeping only, never sent to the client.
   price: z.number().nullable().optional(),
+  // Usage telemetry reported on the app's heartbeat (aggregate counts, no PII).
+  studentCount: z.number().nullable().optional(),
+  courseCount: z.number().nullable().optional(),
+  lastSeenAt: z.string().nullable().optional(),
   // Auto-update per-device overrides (offline desktop): pin to a version and/or
   // freeze updates. Optional so older callers/rows without them still validate.
   pinnedVersion: z.string().nullable().optional(),
@@ -1663,7 +1667,16 @@ export const contract = c.router({
     validate: {
       method: 'POST' as const,
       path: '/api/public/license/validate',
-      body: z.object({ deviceId: z.string() }),
+      body: z.object({
+        deviceId: z.string(),
+        // Optional usage counts the app piggybacks on its heartbeat (no PII).
+        stats: z
+          .object({
+            students: z.number().optional(),
+            courses: z.number().optional(),
+          })
+          .optional(),
+      }),
       responses: {
         200: LicenseValidateSchema,
         400: ApiErrorSchema,

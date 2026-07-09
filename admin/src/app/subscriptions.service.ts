@@ -195,6 +195,11 @@ export interface OfflineLicense {
   revoked: boolean;
   /** Annual renewal fee recorded at activation (owner bookkeeping). */
   price: number | null;
+  /** Aggregate usage the desktop app reports on its heartbeat (no PII). */
+  studentCount: number | null;
+  courseCount: number | null;
+  /** When the app last phoned home (heartbeat). */
+  lastSeenAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

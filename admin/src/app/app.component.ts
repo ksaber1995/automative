@@ -91,6 +91,9 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                   <th>Tier</th>
                   <th>Device</th>
                   <th>Status</th>
+                  <th class="num">Students</th>
+                  <th class="num">Courses</th>
+                  <th>Last seen</th>
                   <th>Trial ends</th>
                   <th>Renewal</th>
                   <th class="num">Price</th>
@@ -139,6 +142,9 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                         {{ licenseStatus(l).text }}
                       </span>
                     </td>
+                    <td class="num">{{ l.studentCount != null ? l.studentCount : '—' }}</td>
+                    <td class="num">{{ l.courseCount != null ? l.courseCount : '—' }}</td>
+                    <td>{{ l.lastSeenAt ? formatDate(l.lastSeenAt) : '—' }}</td>
                     <td>{{ formatDate(l.trialEndsAt) }}</td>
                     <td>{{ l.activated ? formatDate(l.activationEndsAt) : '—' }}</td>
                     <td class="num">

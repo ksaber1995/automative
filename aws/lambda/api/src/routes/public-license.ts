@@ -10,6 +10,13 @@ function startOfToday(): Date {
   return new Date(new Date().toISOString().slice(0, 10));
 }
 
+/** Client-reported counts are advisory; keep only sane non-negative integers. */
+function sanitizeCount(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(Math.floor(n), 10_000_000);
+}
+
 /** Compute the live status of a license row and build the signed-token payload. */
 function buildPayload(lic: any, deviceId: string): LicenseTokenPayload {
   const now = new Date();
@@ -47,9 +54,11 @@ function buildPayload(lic: any, deviceId: string): LicenseTokenPayload {
  * the owner issues (and enters via `activate`).
  */
 export const publicLicenseRoutes = {
-  // Called on every launch. Looks the device up and returns its current signed
-  // status. If the device was never seen, tells the app to show the sign-up form.
-  validate: async ({ body }: { body: { deviceId: string } }) => {
+  // Called on every launch (and on the app's periodic heartbeat). Looks the
+  // device up and returns its current signed status. If the device was never
+  // seen, tells the app to show the sign-up form. The optional `stats` piggyback
+  // lets the app report aggregate usage counts (no PII) on the same call.
+  validate: async ({ body }: { body: { deviceId: string; stats?: { students?: number; courses?: number } } }) => {
     enforceByIp(RATE_LIMITS.PUBLIC_LICENSE_IP);
     try {
       await ensureOfflineLicenseTable();
@@ -61,6 +70,17 @@ export const publicLicenseRoutes = {
       if (!lic) {
         return { status: 200 as const, body: { registered: false } };
       }
+      // Heartbeat: always stamp last-seen; update the counts when the app sent
+      // them (COALESCE keeps the last known values when a call omits stats, e.g.
+      // the very first launch call before the local DB is open).
+      await query(
+        `UPDATE offline_license
+           SET last_seen_at = CURRENT_TIMESTAMP,
+               student_count = COALESCE($2, student_count),
+               course_count  = COALESCE($3, course_count)
+         WHERE device_id = $1`,
+        [deviceId, sanitizeCount(body?.stats?.students), sanitizeCount(body?.stats?.courses)]
+      );
       return { status: 200 as const, body: { registered: true, ...signLicenseToken(buildPayload(lic, deviceId)) } };
     } catch (error: any) {
       console.error('License validate error:', error);
