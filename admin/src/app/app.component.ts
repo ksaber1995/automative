@@ -3,12 +3,33 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } from './subscriptions.service';
 
+type LicSortCol =
+  | 'name' | 'tier' | 'status' | 'students' | 'courses' | 'lastSeen' | 'trialEnds' | 'renewal' | 'price';
+
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="wrap">
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">Netrofit <span>Admin</span></div>
+        <nav>
+          <button class="navitem" [class.on]="view() === 'companies'" (click)="view.set('companies')">
+            <span>Companies</span><span class="navcount">{{ rows().length }}</span>
+          </button>
+          <button class="navitem" [class.on]="view() === 'licenses'" (click)="view.set('licenses')">
+            <span>Desktop licenses</span><span class="navcount">{{ licenses().length }}</span>
+          </button>
+          <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
+            <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
+          </button>
+        </nav>
+        <button class="refresh side" (click)="refreshAll()">Refresh all</button>
+      </aside>
+      <main class="main">
+
+      @if (view() === 'companies') {
       <header>
         <div>
           <h1>Companies &amp; Subscriptions</h1>
@@ -18,7 +39,9 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
           {{ loading() ? 'Loading…' : 'Refresh' }}
         </button>
       </header>
+      }
 
+      @if (view() === 'bots') {
       <!-- Telegram bot pool (platform-owned; academies auto-claim a free bot on enable) -->
       <div class="card" style="margin: 20px 0; padding: 16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
@@ -47,7 +70,9 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
           </div>
         }
       </div>
+      }
 
+      @if (view() === 'licenses') {
       <!-- Offline licenses (desktop app keys the owner emails to customers) -->
       <div class="card" style="margin: 20px 0; padding: 16px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
@@ -76,6 +101,32 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
           </div>
         }
 
+        @if (licenses().length) {
+          <div class="lic-toolbar">
+            <input class="search" type="text"
+              [ngModel]="licSearch()" (ngModelChange)="licSearch.set($event)"
+              placeholder="Search name, phone, key or device…" />
+            <div class="lic-chips">
+              <button class="filter" [class.on]="licStatus() === ''" (click)="licStatus.set('')">
+                All <span class="fcount">{{ licenses().length }}</span>
+              </button>
+              <button class="filter" [class.on]="licStatus() === 'ACTIVE'" (click)="licStatus.set('ACTIVE')">
+                Active <span class="fcount">{{ licStatusCount('ACTIVE') }}</span>
+              </button>
+              <button class="filter" [class.on]="licStatus() === 'TRIAL'" (click)="licStatus.set('TRIAL')">
+                Trial <span class="fcount">{{ licStatusCount('TRIAL') }}</span>
+              </button>
+              <button class="filter" [class.on]="licStatus() === 'EXPIRED'" (click)="licStatus.set('EXPIRED')">
+                Expired <span class="fcount">{{ licStatusCount('EXPIRED') }}</span>
+              </button>
+              <button class="filter" [class.on]="licStatus() === 'REVOKED'" (click)="licStatus.set('REVOKED')">
+                Revoked <span class="fcount">{{ licStatusCount('REVOKED') }}</span>
+              </button>
+            </div>
+            <span class="count">{{ visibleLicenses().length }} / {{ licenses().length }}</span>
+          </div>
+        }
+
         @if (licensesLoading()) {
           <div class="state">Loading…</div>
         } @else if (licenses().length === 0) {
@@ -85,23 +136,23 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
+                  <th class="sortable" (click)="sortLic('name')">Name{{ sortIcon('name') }}</th>
                   <th>Phone</th>
                   <th>Key</th>
-                  <th>Tier</th>
+                  <th class="sortable" (click)="sortLic('tier')">Tier{{ sortIcon('tier') }}</th>
                   <th>Device</th>
-                  <th>Status</th>
-                  <th class="num">Students</th>
-                  <th class="num">Courses</th>
-                  <th>Last seen</th>
-                  <th>Trial ends</th>
-                  <th>Renewal</th>
-                  <th class="num">Price</th>
+                  <th class="sortable" (click)="sortLic('status')">Status{{ sortIcon('status') }}</th>
+                  <th class="num sortable" (click)="sortLic('students')">Students{{ sortIcon('students') }}</th>
+                  <th class="num sortable" (click)="sortLic('courses')">Courses{{ sortIcon('courses') }}</th>
+                  <th class="sortable" (click)="sortLic('lastSeen')">Last seen{{ sortIcon('lastSeen') }}</th>
+                  <th class="sortable" (click)="sortLic('trialEnds')">Trial ends{{ sortIcon('trialEnds') }}</th>
+                  <th class="sortable" (click)="sortLic('renewal')">Renewal{{ sortIcon('renewal') }}</th>
+                  <th class="num sortable" (click)="sortLic('price')">Price{{ sortIcon('price') }}</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                @for (l of licenses(); track l.id) {
+                @for (l of visibleLicenses(); track l.id) {
                   <tr>
                     <td>{{ l.name || '—' }}</td>
                     <td>
@@ -185,12 +236,17 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                     </td>
                   </tr>
                 }
+                @if (visibleLicenses().length === 0) {
+                  <tr><td colspan="13" class="state">No matches.</td></tr>
+                }
               </tbody>
             </table>
           </div>
         }
       </div>
+      }
 
+      @if (view() === 'companies') {
       <div class="filters">
         <button class="filter" [class.on]="statusFilter() === ''" (click)="statusFilter.set('')">
           All <span class="fcount">{{ rows().length }}</span>
@@ -333,6 +389,8 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
         </div>
       }
 
+      }
+
       @if (flash()) {
         <div class="flash">{{ flash() }}</div>
       }
@@ -439,10 +497,38 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
           </div>
         </div>
       }
+      </main>
     </div>
   `,
   styles: [`
-    .wrap {  margin: 0 auto; padding: 32px 20px 60px; }
+    .app { display: flex; align-items: stretch; min-height: 100vh; }
+    .sidebar {
+      width: 236px; flex: 0 0 236px; background: #0f172a; color: #e2e8f0;
+      padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .brand { font-size: 18px; font-weight: 800; color: #fff; padding: 6px 10px 18px; }
+    .brand span { color: #818cf8; font-weight: 600; }
+    .sidebar nav { display: flex; flex-direction: column; gap: 4px; }
+    .navitem {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; text-align: left; border: 0; background: transparent; color: #cbd5e1;
+      padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .navitem:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+    .navitem.on { background: #4f46e5; color: #fff; }
+    .navcount {
+      background: rgba(255, 255, 255, .15); border-radius: 999px; padding: 1px 8px;
+      font-size: 12px; font-variant-numeric: tabular-nums;
+    }
+    .refresh.side { margin-top: auto; background: rgba(255, 255, 255, .08); border-color: transparent; color: #e2e8f0; }
+    .refresh.side:hover { background: rgba(255, 255, 255, .16); }
+    .main { flex: 1 1 auto; min-width: 0; padding: 30px 28px 60px; }
+    .lic-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+    .lic-toolbar .search { flex: 1; min-width: 220px; }
+    .lic-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background: #eef2ff; color: #4f46e5; }
     header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { margin: 0; font-size: 24px; }
     .sub { margin: 4px 0 0; color: #64748b; font-size: 14px; }
@@ -556,6 +642,9 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
 export class AppComponent implements OnInit {
   private service = inject(SubscriptionsService);
 
+  /** Which section the sidebar is showing. */
+  view = signal<'companies' | 'licenses' | 'bots'>('companies');
+
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
@@ -590,6 +679,11 @@ export class AppComponent implements OnInit {
   creatingLicense = signal(false);
   newLicenseKey = signal<string | null>(null);
 
+  // Licenses table: search, status filter, and sort.
+  licSearch = signal('');
+  licStatus = signal<'' | 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'REVOKED'>('');
+  licSort = signal<{ col: LicSortCol; dir: 1 | -1 }>({ col: 'lastSeen', dir: -1 });
+
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
     const status = this.statusFilter();
@@ -610,6 +704,76 @@ export class AppComponent implements OnInit {
   /** How many tenants currently carry the given subscription_type. */
   statusCount(status: string): number {
     return this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === status).length;
+  }
+
+  /** Licenses after search + status filter + the active column sort. */
+  visibleLicenses = computed(() => {
+    const q = this.licSearch().trim().toLowerCase();
+    const status = this.licStatus();
+    const { col, dir } = this.licSort();
+    let list = this.licenses().slice();
+    if (status) list = list.filter((l) => this.licenseStatus(l).kind === status);
+    if (q) {
+      list = list.filter(
+        (l) =>
+          (l.name || '').toLowerCase().includes(q) ||
+          (l.label || '').toLowerCase().includes(q) ||
+          (l.phone || '').toLowerCase().includes(q) ||
+          (l.licenseKey || '').toLowerCase().includes(q) ||
+          (l.deviceId || '').toLowerCase().includes(q),
+      );
+    }
+    const val = (l: OfflineLicense): string | number => {
+      switch (col) {
+        case 'name': return (l.name || l.label || '').toLowerCase();
+        case 'tier': return l.tier;
+        case 'status': return this.licenseStatus(l).kind;
+        case 'students': return l.studentCount ?? -1;
+        case 'courses': return l.courseCount ?? -1;
+        case 'lastSeen': return l.lastSeenAt ? new Date(l.lastSeenAt).getTime() : 0;
+        case 'trialEnds': return l.trialEndsAt ? new Date(l.trialEndsAt).getTime() : 0;
+        case 'renewal': return l.activationEndsAt ? new Date(l.activationEndsAt).getTime() : 0;
+        case 'price': return l.price ?? -1;
+      }
+    };
+    return list.sort((a, b) => {
+      const av = val(a);
+      const bv = val(b);
+      const cmp =
+        typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+      return cmp * dir;
+    });
+  });
+
+  /** Toggle sort on a column (numeric/date columns start descending). */
+  sortLic(col: LicSortCol): void {
+    const cur = this.licSort();
+    const numeric =
+      col === 'students' || col === 'courses' || col === 'lastSeen' ||
+      col === 'trialEnds' || col === 'renewal' || col === 'price';
+    if (cur.col === col) this.licSort.set({ col, dir: cur.dir === 1 ? -1 : 1 });
+    else this.licSort.set({ col, dir: numeric ? -1 : 1 });
+  }
+
+  /** Sort arrow for a column header (empty when it isn't the active sort). */
+  sortIcon(col: LicSortCol): string {
+    const s = this.licSort();
+    if (s.col !== col) return '';
+    return s.dir === 1 ? ' ▲' : ' ▼';
+  }
+
+  /** How many licenses currently sit in the given status bucket. */
+  licStatusCount(kind: string): number {
+    return this.licenses().filter((l) => this.licenseStatus(l).kind === kind).length;
+  }
+
+  /** Sidebar "Refresh all" — reload every section. */
+  refreshAll(): void {
+    this.load();
+    this.loadBots();
+    this.loadLicenses();
   }
 
   ngOnInit() {
