@@ -46,6 +46,9 @@ export async function ensureOfflineLicenseTable(): Promise<void> {
         // Backfill columns / relax constraints on tables created earlier.
         await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS phone VARCHAR(32)`);
         await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
+        // The annual renewal fee agreed with this customer. Owner-only bookkeeping
+        // (never sent to the client); recorded at activation, editable later.
+        await query(`ALTER TABLE offline_license ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2)`);
         // Trials now create rows without a key; the key is issued later.
         await query(`ALTER TABLE offline_license ALTER COLUMN license_key DROP NOT NULL`);
       } catch (e) {

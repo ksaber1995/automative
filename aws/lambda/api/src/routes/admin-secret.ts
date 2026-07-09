@@ -28,6 +28,7 @@ function mapLicenseRow(r: any) {
     activated: !!r.activated,
     activationEndsAt: r.activation_ends_at ? new Date(r.activation_ends_at).toISOString() : null,
     revoked: !!r.revoked,
+    price: r.price == null ? null : Number(r.price),
     pinnedVersion: r.pinned_version ?? null,
     updateBlocked: !!r.update_blocked,
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
@@ -406,21 +407,54 @@ export const adminSecretRoutes = {
     }
   },
 
-  activateLicense: async ({ params, body }: { params: { id: string }; body: { activationEndsAt?: string | null } }) => {
+  activateLicense: async ({
+    params,
+    body,
+  }: {
+    params: { id: string };
+    body: { activationEndsAt?: string | null; price?: number | null };
+  }) => {
     try {
       await ensureOfflineLicenseTable();
+      const price =
+        body?.price === null || body?.price === undefined ? null : Number(body.price);
+      // Renewal day defaults to one year out when no explicit date is given, so
+      // both first activation and a later renewal just restart the annual clock.
+      // price is only overwritten when a value is supplied (COALESCE keeps it).
       const row = await queryOne<any>(
         `UPDATE offline_license
-           SET activated = true, activation_ends_at = $2, revoked = false,
+           SET activated = true,
+               activation_ends_at = COALESCE($2::date, (CURRENT_DATE + INTERVAL '1 year')::date),
+               price = COALESCE($3, price),
+               revoked = false,
                updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 RETURNING *`,
-        [params.id, body?.activationEndsAt || null]
+        [params.id, body?.activationEndsAt || null, price]
       );
       if (!row) return { status: 404 as const, body: { message: 'License not found' } };
       return { status: 200 as const, body: mapLicenseRow(row) };
     } catch (error: any) {
       console.error('karim-admin-secret activate license failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Activate failed' } };
+    }
+  },
+
+  // Edit the recorded annual price independently of activation.
+  setLicensePrice: async ({ params, body }: { params: { id: string }; body: { price: number | null } }) => {
+    try {
+      await ensureOfflineLicenseTable();
+      const price =
+        body?.price === null || body?.price === undefined ? null : Number(body.price);
+      const row = await queryOne<any>(
+        `UPDATE offline_license SET price = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 RETURNING *`,
+        [params.id, price]
+      );
+      if (!row) return { status: 404 as const, body: { message: 'License not found' } };
+      return { status: 200 as const, body: mapLicenseRow(row) };
+    } catch (error: any) {
+      console.error('karim-admin-secret set price failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set price failed' } };
     }
   },
 

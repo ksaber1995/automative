@@ -132,9 +132,24 @@ export class SubscriptionsService {
     return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/trial-end`, { trialEndsAt });
   }
 
-  /** Activate a license (permanent when activationEndsAt is null/omitted). */
-  activateLicense(id: string, activationEndsAt?: string | null): Observable<OfflineLicense> {
-    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/activate`, { activationEndsAt });
+  /**
+   * Activate a license. Renewal day defaults to one year out when
+   * activationEndsAt is null/omitted. `price` records the annual renewal fee.
+   */
+  activateLicense(
+    id: string,
+    activationEndsAt?: string | null,
+    price?: number | null
+  ): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/activate`, {
+      activationEndsAt,
+      price,
+    });
+  }
+
+  /** Set/clear the recorded annual renewal price. */
+  setPrice(id: string, price: number | null): Observable<OfflineLicense> {
+    return this.http.post<OfflineLicense>(`${ADMIN_ENDPOINT}/licenses/${id}/price`, { price });
   }
 
   /** Push the trial end out by N days. */
@@ -178,6 +193,8 @@ export interface OfflineLicense {
   activated: boolean;
   activationEndsAt: string | null;
   revoked: boolean;
+  /** Annual renewal fee recorded at activation (owner bookkeeping). */
+  price: number | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

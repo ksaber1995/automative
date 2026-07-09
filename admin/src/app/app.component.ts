@@ -92,6 +92,8 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                   <th>Device</th>
                   <th>Status</th>
                   <th>Trial ends</th>
+                  <th>Renewal</th>
+                  <th class="num">Price</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -138,6 +140,13 @@ import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } fr
                       </span>
                     </td>
                     <td>{{ formatDate(l.trialEndsAt) }}</td>
+                    <td>{{ l.activated ? formatDate(l.activationEndsAt) : '—' }}</td>
+                    <td class="num">
+                      {{ l.price != null ? l.price : '—' }}
+                      <button class="act" style="margin-left:6px;" [disabled]="busyId() === l.id" (click)="setPrice(l)">
+                        {{ l.price != null ? 'Edit' : 'Set' }}
+                      </button>
+                    </td>
                     <td>
                       <div class="actions">
                         @if (!l.licenseKey) {
@@ -756,16 +765,63 @@ export class AppComponent implements OnInit {
   }
 
   activateLicense(l: OfflineLicense) {
+    // Renewal day is set to one year from today on the server. Optionally record
+    // the annual price now (blank keeps whatever is already stored).
+    const input = window.prompt(
+      'Activate: renewal day will be set to one year from today.\nAnnual renewal price (numbers only; leave blank to keep current):',
+      l.price != null ? String(l.price) : ''
+    );
+    if (input === null) return;
+    const trimmed = input.trim();
+    let price: number | null | undefined = undefined;
+    if (trimmed !== '') {
+      const n = Number(trimmed);
+      if (isNaN(n) || n < 0) {
+        this.showFlash('Enter a valid price, or leave blank.');
+        return;
+      }
+      price = n;
+    }
     this.busyId.set(l.id);
-    this.service.activateLicense(l.id).subscribe({
-      next: () => {
+    this.service.activateLicense(l.id, undefined, price).subscribe({
+      next: (res) => {
         this.busyId.set(null);
-        this.showFlash(`${l.label || l.licenseKey} activated.`);
+        this.showFlash(`${l.label || l.licenseKey} activated — renews ${this.formatDate(res.activationEndsAt)}.`);
         this.loadLicenses();
       },
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Activate failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  setPrice(l: OfflineLicense) {
+    const input = window.prompt(
+      'Annual renewal price (numbers only; leave blank to clear):',
+      l.price != null ? String(l.price) : ''
+    );
+    if (input === null) return;
+    const trimmed = input.trim();
+    let price: number | null = null;
+    if (trimmed !== '') {
+      const n = Number(trimmed);
+      if (isNaN(n) || n < 0) {
+        this.showFlash('Enter a valid price, or leave blank to clear.');
+        return;
+      }
+      price = n;
+    }
+    this.busyId.set(l.id);
+    this.service.setPrice(l.id, price).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash('Price updated.');
+        this.loadLicenses();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Set price failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

@@ -117,8 +117,13 @@ export const publicLicenseRoutes = {
         return apiError(400, 'ERRORS.LICENSE.INVALID_KEY', 'That license key is not valid for this device');
       }
 
+      // Activation starts the one-year clock: set the renewal day to a year out
+      // unless the owner already pinned an explicit expiry.
       const updated = await queryOne<any>(
-        `UPDATE offline_license SET activated = true, updated_at = CURRENT_TIMESTAMP
+        `UPDATE offline_license
+           SET activated = true,
+               activation_ends_at = COALESCE(activation_ends_at, (CURRENT_DATE + INTERVAL '1 year')::date),
+               updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 RETURNING *`,
         [lic.id]
       );

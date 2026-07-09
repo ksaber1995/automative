@@ -1607,6 +1607,8 @@ const LicenseSchema = z.object({
   activated: z.boolean(),
   activationEndsAt: z.string().nullable(),
   revoked: z.boolean(),
+  // Annual renewal fee — owner bookkeeping only, never sent to the client.
+  price: z.number().nullable().optional(),
   // Auto-update per-device overrides (offline desktop): pin to a version and/or
   // freeze updates. Optional so older callers/rows without them still validate.
   pinnedVersion: z.string().nullable().optional(),
@@ -4799,7 +4801,17 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/karim-admin-secret/licenses/:id/activate',
       pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ activationEndsAt: z.string().nullable().optional() }),
+      body: z.object({
+        activationEndsAt: z.string().nullable().optional(),
+        price: z.number().nullable().optional(),
+      }),
+      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
+    },
+    setLicensePrice: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/licenses/:id/price',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ price: z.number().nullable() }),
       responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
     },
     extendTrial: {
