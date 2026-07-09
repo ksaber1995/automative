@@ -205,34 +205,8 @@ type LicSortCol =
                       </button>
                     </td>
                     <td>
-                      <div class="actions">
-                        @if (!l.licenseKey) {
-                          <button class="act activate" [disabled]="busyId() === l.id" (click)="issueLicense(l)">
-                            Issue license
-                          </button>
-                        }
-                        <button class="act" [disabled]="busyId() === l.id" (click)="changeExpiry(l)">
-                          Change expiry
-                        </button>
-                        <button class="act" [disabled]="busyId() === l.id" (click)="extendTrial(l)">
-                          +Extend
-                        </button>
-                        <button class="act" [disabled]="busyId() === l.id" (click)="activateLicense(l)">
-                          Activate
-                        </button>
-                        <button class="act" [disabled]="busyId() === l.id || !l.deviceId" (click)="resetDevice(l)">
-                          Reset device
-                        </button>
-                        <button class="act" [disabled]="busyId() === l.id" (click)="toggleTier(l)">
-                          Make {{ l.tier === 'ACADEMY' ? 'Teacher' : 'Academy' }}
-                        </button>
-                        <button class="act" [disabled]="busyId() === l.id" (click)="toggleRevoked(l)">
-                          {{ l.revoked ? 'Unrevoke' : 'Revoke' }}
-                        </button>
-                        <button class="act danger" [disabled]="busyId() === l.id" (click)="deleteLicense(l)">
-                          Delete
-                        </button>
-                      </div>
+                      <button class="act menu-btn" [disabled]="busyId() === l.id"
+                        (click)="actionMenu.set(l)" title="Actions">⋯</button>
                     </td>
                   </tr>
                 }
@@ -395,6 +369,35 @@ type LicSortCol =
         <div class="flash">{{ flash() }}</div>
       }
 
+      <!-- Licence row actions menu -->
+      @if (actionMenu(); as m) {
+        <div class="overlay" (click)="actionMenu.set(null)">
+          <div class="modal menu-modal" (click)="$event.stopPropagation()">
+            <h2>{{ m.name || m.licenseKey || 'License' }}</h2>
+            <p class="modal-sub">{{ licenseStatus(m).text }} · {{ m.tier }}</p>
+            <div class="menu-list">
+              @if (!m.licenseKey) {
+                <button class="menu-item activate" (click)="actionMenu.set(null); issueLicense(m)">Issue license</button>
+              }
+              <button class="menu-item" (click)="actionMenu.set(null); activateLicense(m)">Activate / renew</button>
+              <button class="menu-item" (click)="actionMenu.set(null); changeExpiry(m)">Change trial expiry</button>
+              <button class="menu-item" (click)="actionMenu.set(null); extendTrial(m)">Extend trial</button>
+              <button class="menu-item" [disabled]="!m.deviceId" (click)="actionMenu.set(null); resetDevice(m)">Reset device</button>
+              <button class="menu-item" (click)="actionMenu.set(null); toggleTier(m)">
+                Make {{ m.tier === 'ACADEMY' ? 'Teacher' : 'Academy' }}
+              </button>
+              <button class="menu-item" (click)="actionMenu.set(null); toggleRevoked(m)">
+                {{ m.revoked ? 'Unrevoke' : 'Revoke' }}
+              </button>
+              <button class="menu-item danger" (click)="actionMenu.set(null); deleteLicense(m)">Delete</button>
+            </div>
+            <div class="modal-foot">
+              <button class="act" (click)="actionMenu.set(null)">Close</button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Extend subscription dialog -->
       @if (extendRow(); as row) {
         <div class="overlay" (click)="closeExtend()">
@@ -529,6 +532,18 @@ type LicSortCol =
     .lic-chips { display: flex; gap: 6px; flex-wrap: wrap; }
     th.sortable { cursor: pointer; user-select: none; }
     th.sortable:hover { background: #eef2ff; color: #4f46e5; }
+    .menu-btn { font-size: 16px; line-height: 1; padding: 4px 12px; font-weight: 700; letter-spacing: 1px; }
+    .menu-modal { max-width: 320px; }
+    .menu-list { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 6px; }
+    .menu-item {
+      text-align: left; width: 100%; border: 0; background: transparent; color: #0f172a;
+      padding: 9px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .menu-item:hover:not(:disabled) { background: #f1f5f9; }
+    .menu-item:disabled { opacity: .45; cursor: default; }
+    .menu-item.activate { color: #166534; }
+    .menu-item.danger { color: #b91c1c; }
+    .menu-item.danger:hover:not(:disabled) { background: #fef2f2; }
     header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { margin: 0; font-size: 24px; }
     .sub { margin: 4px 0 0; color: #64748b; font-size: 14px; }
@@ -683,6 +698,8 @@ export class AppComponent implements OnInit {
   licSearch = signal('');
   licStatus = signal<'' | 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'REVOKED'>('');
   licSort = signal<{ col: LicSortCol; dir: 1 | -1 }>({ col: 'lastSeen', dir: -1 });
+  /** The licence whose row-actions menu is open (null = closed). */
+  actionMenu = signal<OfflineLicense | null>(null);
 
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
