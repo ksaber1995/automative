@@ -6,7 +6,6 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import { Construct } from 'constructs';
@@ -206,38 +205,6 @@ export class CoreStack extends cdk.Stack {
       });
     }
 
-    // =============================================
-    // Offline desktop auto-update artifact bucket
-    // =============================================
-    // Public-read hosting for the electron-updater feed artifacts (installer +
-    // blockmap) under the `updates/` prefix. The installers are the same public
-    // binaries we hand to customers, so public GET on that prefix is fine; the
-    // gating decision (who gets which version) is made by the Lambda feed, not
-    // by hiding the files. The API Lambda only ever serves the tiny generated
-    // latest.yml and 302-redirects the binary download here.
-    const updatesBucket = new s3.Bucket(this, 'DesktopUpdatesBucket', {
-      bucketName: `${this.account}-netrofit-desktop-updates-${stage}`,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      blockPublicAccess: new s3.BlockPublicAccess({
-        blockPublicAcls: true,
-        ignorePublicAcls: true,
-        blockPublicPolicy: false,
-        restrictPublicBuckets: false,
-      }),
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
-    updatesBucket.addToResourcePolicy(
-      new iam.PolicyStatement({
-        sid: 'PublicReadDesktopUpdates',
-        actions: ['s3:GetObject'],
-        resources: [updatesBucket.arnForObjects('updates/*')],
-        principals: [new iam.AnyPrincipal()],
-      })
-    );
-    const updateArtifactBaseUrl = `https://${updatesBucket.bucketRegionalDomainName}/updates`;
-    new cdk.CfnOutput(this, 'DesktopUpdatesBucketName', { value: updatesBucket.bucketName });
-    new cdk.CfnOutput(this, 'DesktopUpdatesBaseUrl', { value: updateArtifactBaseUrl });
-
     // API Lambda Function
     this.apiLambda = new NodejsFunction(this, 'ApiLambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -280,9 +247,6 @@ export class CoreStack extends cdk.Stack {
         // tokens. Set via env at deploy; the matching public key is embedded in
         // the Electron app. Without it, /api/public/license/validate returns 500.
         LICENSE_SIGNING_KEY: process.env.LICENSE_SIGNING_KEY ?? '',
-        // Base URL the desktop update feed 302-redirects binary downloads to.
-        // Points at the public `updates/` prefix of the bucket above.
-        UPDATE_ARTIFACT_BASE_URL: updateArtifactBaseUrl,
       },
       vpc,
       vpcSubnets: {

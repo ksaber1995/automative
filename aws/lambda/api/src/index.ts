@@ -12,7 +12,6 @@ type ApiGatewayEvent = APIGatewayProxyEvent | APIGatewayProxyEventV2;
 type ApiGatewayResponse = APIGatewayProxyResult | APIGatewayProxyResultV2;
 import { contract } from './contract';
 import { runWithRequestContext } from './utils/request-context';
-import { handleUpdateFeedRequest } from './routes/public-update';
 import { authRoutes } from './routes/auth';
 import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
@@ -330,11 +329,6 @@ export const handler = async (
   });
 
   const ip = extractClientIp(event);
-
-  // The offline desktop auto-update feed is not a ts-rest route (it returns raw
-  // YAML / redirects electron-updater expects), so intercept it up front.
-  const updateResponse = await handleUpdateFeedRequest(event as any);
-  if (updateResponse) return updateResponse as ApiGatewayResponse;
 
   try {
     return await runWithRequestContext({ ip }, () => lambdaHandler(event, context));
