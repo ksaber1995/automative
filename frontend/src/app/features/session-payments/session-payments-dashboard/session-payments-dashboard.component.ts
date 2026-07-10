@@ -142,6 +142,25 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     return this.payments().filter(p => this.effectiveStatus(p) === tab);
   });
 
+  /** Packages filtered by the shared status tabs (same set as charges). */
+  filteredPackages = computed(() => {
+    const tab = this.selectedTab();
+    if (tab === 'ALL') return this.packages();
+    return this.packages().filter(p => this.packageEffectiveStatus(p) === tab);
+  });
+
+  /**
+   * Status tabs to show for the active view. Packages can't be OVERDUE or
+   * ON_HOLD (those are per-session concepts), and COVERED only ever applies to a
+   * per-session charge — so the packages view sticks to paid/owed statuses.
+   */
+  get visibleStatuses(): StatusTab[] {
+    if (this.view() === 'PACKAGES') {
+      return ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'REFUNDED'];
+    }
+    return this.statuses;
+  }
+
   ngOnInit(): void {
     this.lookup.branches().subscribe({ next: b => this.branches.set(b), error: () => {} });
     this.courseService.getAllCourses().subscribe({
@@ -231,6 +250,30 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     if (this.view() === 'PACKAGES') this.loadPackages();
   }
 
+  /** Switch the CHARGES / PACKAGES view (rendered as tabs). Reset the status
+   *  filter so we never land on a tab that's empty in the other view. */
+  setView(v: 'CHARGES' | 'PACKAGES'): void {
+    if (this.view() === v) return;
+    this.view.set(v);
+    this.selectedTab.set('ALL');
+    if (v === 'PACKAGES') this.loadPackages();
+  }
+
+  /**
+   * Map a prepaid package to a display status using the same tab set as charges:
+   * PENDING (nothing collected), PARTIAL (some collected), PAID (fully collected),
+   * REFUNDED (fully refunded). Never COVERED — that's a per-session-charge state.
+   */
+  packageEffectiveStatus(p: SessionPackageWithDetails): StatusTab {
+    const due = p.amountDue ?? 0;
+    const paid = p.amountPaid || 0;
+    const refunded = p.refundedAmount || 0;
+    if (p.status === 'REFUNDED' || (refunded > 0 && paid - refunded <= 0)) return 'REFUNDED';
+    if (paid <= 0) return 'PENDING';
+    if (paid < due) return 'PARTIAL';
+    return 'PAID';
+  }
+
   // ── Derived status (tabs / tags) ────────────────────────────────────────────
 
   /** Map a charge to its display status (the monthly-subscriptions tab set). */
@@ -257,6 +300,10 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   }
 
   statusCount(st: StatusTab): number {
+    if (this.view() === 'PACKAGES') {
+      if (st === 'ALL') return this.packages().length;
+      return this.packages().filter(p => this.packageEffectiveStatus(p) === st).length;
+    }
     if (st === 'ALL') return this.payments().length;
     if (st === 'ON_HOLD') return this.payments().filter(p => p.enrollmentStatus === 'ON_HOLD').length;
     return this.payments().filter(p => this.effectiveStatus(p) === st).length;

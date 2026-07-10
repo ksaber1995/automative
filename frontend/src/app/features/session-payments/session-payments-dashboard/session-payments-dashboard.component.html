@@ -19,6 +19,28 @@
   </div>
 
   <p-card>
+    <!-- Primary view switch — two obvious tabs (charges vs prepaid packages). -->
+    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 mb-5">
+      <button type="button"
+        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        [class.bg-white]="view() === 'CHARGES'"
+        [class.shadow-sm]="view() === 'CHARGES'"
+        [class.text-blue-600]="view() === 'CHARGES'"
+        [class.text-gray-500]="view() !== 'CHARGES'"
+        (click)="setView('CHARGES')">
+        <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}
+      </button>
+      <button type="button"
+        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        [class.bg-white]="view() === 'PACKAGES'"
+        [class.shadow-sm]="view() === 'PACKAGES'"
+        [class.text-blue-600]="view() === 'PACKAGES'"
+        [class.text-gray-500]="view() !== 'PACKAGES'"
+        (click)="setView('PACKAGES')">
+        <i class="pi pi-box"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}
+      </button>
+    </div>
+
     <!-- Presets (left) + filters (right) on one line -->
     <div class="flex flex-wrap gap-3 mb-4 items-end justify-between">
       <div class="flex flex-wrap gap-2 items-end">
@@ -28,13 +50,6 @@
       </div>
 
       <div class="flex flex-wrap gap-3 items-end">
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.VIEW' | translate }}</label>
-          <p-select
-            [options]="viewOptions" [(ngModel)]="view" optionLabel="label" optionValue="value"
-            (onChange)="onViewChange()" [style]="{ minWidth: '150px' }"
-          ></p-select>
-        </div>
         <div class="flex flex-col gap-1">
           <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_FROM' | translate }}</label>
           <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
@@ -124,19 +139,23 @@
         </div>
       }
 
-      <!-- Status filter tabs (same set as monthly subscriptions) -->
-      <div class="flex gap-2 mb-4 flex-wrap">
-        @for (st of statuses; track st) {
-          <p-button
-            [label]="('SESSION_PAYMENTS.STATUS_' + st | translate) + ' (' + statusCount(st) + ')'"
-            size="small"
-            [outlined]="selectedTab() !== st"
-            [severity]="st === 'ALL' ? 'primary' : statusSeverity(st)"
-            (onClick)="onStatusFilterChange(st)"
-          ></p-button>
-        }
-      </div>
+    }
 
+    <!-- Status filter tabs — shared across both views. In the packages view the
+         set is trimmed (no per-session-only OVERDUE / ON_HOLD / COVERED). -->
+    <div class="flex gap-2 mb-4 flex-wrap">
+      @for (st of visibleStatuses; track st) {
+        <p-button
+          [label]="('SESSION_PAYMENTS.STATUS_' + st | translate) + ' (' + statusCount(st) + ')'"
+          size="small"
+          [outlined]="selectedTab() !== st"
+          [severity]="st === 'ALL' ? 'primary' : statusSeverity(st)"
+          (onClick)="onStatusFilterChange(st)"
+        ></p-button>
+      }
+    </div>
+
+    @if (view() === 'CHARGES') {
       <!-- Table -->
       <p-table [value]="filtered()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
@@ -196,7 +215,7 @@
       </p-table>
     } @else {
       <!-- Packages view -->
-      <p-table [value]="packages()" [paginator]="true" [rows]="20" styleClass="mt-4">
+      <p-table [value]="filteredPackages()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
@@ -228,7 +247,7 @@
             </td>
             <td>
               <div class="flex items-center gap-1 flex-wrap">
-                <p-tag [value]="p.status"></p-tag>
+                <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + packageEffectiveStatus(p)) | translate" [severity]="statusSeverity(packageEffectiveStatus(p))"></p-tag>
                 @if (p.refundedAmount > 0) {
                   <p-tag severity="warn" [value]="'-' + (p.refundedAmount | amount)" [pTooltip]="p.refundNote || ''"></p-tag>
                 }
