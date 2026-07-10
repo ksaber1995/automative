@@ -198,9 +198,9 @@
         <h3 class="text-base font-semibold text-gray-700 mt-8 mb-2 flex items-center gap-2"><i class="pi pi-box text-gray-400"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}</h3>
       }
 
-      <!-- Packages view. Under the Pending / All status filter the table also
-           lists renewal-due students (last bundle used up, owe the next) as amber
-           rows on top: it shows the sessions they finished, any unpaid overflow
+      <!-- Packages view. Under the Pending status filter the table also lists
+           renewal-due students (last bundle used up, owe the next) as amber rows
+           on top: it shows the sessions they finished, any unpaid overflow
            sessions, and a Renew action. -->
       <p-table [value]="packagesTableRows()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">

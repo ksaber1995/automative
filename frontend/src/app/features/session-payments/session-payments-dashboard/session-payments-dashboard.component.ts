@@ -184,7 +184,8 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
    */
   packagesTableRows = computed(() => {
     const pkgRows = this.filteredPackages().map(p => ({ kind: 'package' as const, p }));
-    const showRenewals = this.selectedTab() === 'PENDING' || this.selectedTab() === 'ALL';
+    // Renewals-due belong to the Pending filter only (they owe the next package).
+    const showRenewals = this.selectedTab() === 'PENDING';
     const renewalRows = showRenewals
       ? this.renewals().map(r => ({ kind: 'renewal' as const, r }))
       : [];
