@@ -1,4 +1,4 @@
-import { Component, inject, input, model, output, signal, computed, effect } from '@angular/core';
+import { Component, inject, input, model, output, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
@@ -12,10 +12,6 @@ import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templa
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { TelegramService } from '../../telegram/telegram.service';
 import { Student } from '@shared/interfaces/student.interface';
-
-/** QR activation pricing (EGP) — mirrors QR_PLAN_PRICES on the backend. */
-export const QR_PLAN_PRICES = { ONE_YEAR: 15, LIFELONG: 30 } as const;
-type QrPlan = keyof typeof QR_PLAN_PRICES;
 
 /**
  * Dialog that renders a student's QR code (encoding the public profile URL),
@@ -44,8 +40,6 @@ export class StudentQrDialogComponent {
   student = input<Student | null>(null);
   /** Emitted after a successful regenerate so the parent can refresh its copy. */
   regenerated = output<Student>();
-  /** Emitted after a successful paid activation so the parent can refresh. */
-  activated = output<Student>();
 
   dataUrl = signal<string>('');
   // Telegram connect links (parent/student deep links), fetched when the dialog
@@ -54,28 +48,6 @@ export class StudentQrDialogComponent {
   telegramStudentUrl = signal<string | null>(null);
   private tgFetchedForId: string | null = null;
   regenerating = signal(false);
-  activating = signal(false);
-  /** Plan awaiting confirmation in the inline warning step (null = none). */
-  pendingPlan = signal<QrPlan | null>(null);
-
-  readonly prices = QR_PLAN_PRICES;
-
-  /** TEACHER companies pay per QR; academies get it free. */
-  isTeacher = (): boolean => this.authService.isTeacher();
-
-  /** First-100 teacher launch tier: activation is free (no charge prompt). */
-  isQrFree = (): boolean => this.authService.isQrFree();
-
-  /** Is the current student's QR paid-activated and not expired? */
-  qrLive = computed<boolean>(() => {
-    const s = this.student();
-    if (!s?.qrActivated) return false;
-    if (!s.qrExpiration) return true; // lifelong
-    return new Date(s.qrExpiration) >= new Date(new Date().toISOString().slice(0, 10));
-  });
-
-  /** Show the QR itself only when free (academy) or paid-activated (teacher). */
-  showQr = computed<boolean>(() => !this.isTeacher() || this.qrLive());
 
   constructor() {
     // Warm the click-to-chat templates so the send buttons have bodies ready.
@@ -86,7 +58,7 @@ export class StudentQrDialogComponent {
     effect(() => {
       const s = this.student();
       const open = this.visible();
-      if (open && s?.qrToken && this.showQr()) {
+      if (open && s?.qrToken) {
         this.render(s.qrToken);
       }
       // Fetch Telegram connect links once per student when the dialog opens, so
@@ -105,64 +77,6 @@ export class StudentQrDialogComponent {
         });
       }
     });
-  }
-
-  planPrice(plan: QrPlan): number {
-    return QR_PLAN_PRICES[plan];
-  }
-
-  /** Free-tier tenant: activate immediately with no plan choice or cost prompt.
-   *  Grants a lifelong QR at price 0 (the backend enforces the free price). */
-  activateFree(): void {
-    const s = this.student();
-    if (!s || this.activating()) return;
-    this.activating.set(true);
-    this.studentService.activateQr(s.id, 'LIFELONG').subscribe({
-      next: (updated) => {
-        this.activating.set(false);
-        this.activated.emit(updated);
-        if (updated.qrToken) this.render(updated.qrToken);
-      },
-      error: () => {
-        this.activating.set(false);
-      },
-    });
-  }
-
-  /** Step 1: user picks a plan → show the cost warning. */
-  choosePlan(plan: QrPlan): void {
-    if (this.activating()) return;
-    this.pendingPlan.set(plan);
-  }
-
-  cancelPlan(): void {
-    this.pendingPlan.set(null);
-  }
-
-  /** Step 2: user confirms the warning → bill + activate. */
-  confirmActivate(): void {
-    const s = this.student();
-    const plan = this.pendingPlan();
-    if (!s || !plan || this.activating()) return;
-    this.activating.set(true);
-    this.studentService.activateQr(s.id, plan).subscribe({
-      next: (updated) => {
-        this.activating.set(false);
-        this.pendingPlan.set(null);
-        this.activated.emit(updated);
-        if (updated.qrToken) this.render(updated.qrToken);
-      },
-      error: () => {
-        this.activating.set(false);
-      },
-    });
-  }
-
-  /** Friendly expiry label for the activated badge ('' = lifelong). */
-  expiryLabel(): string {
-    const exp = this.student()?.qrExpiration;
-    if (!exp) return '';
-    return new Date(exp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   private profileUrl(token: string): string {
@@ -246,7 +160,7 @@ export class StudentQrDialogComponent {
         <head><title>QR - ${s.firstName} ${s.lastName}</title></head>
         <body style="font-family: sans-serif; text-align: center; padding: 32px;">
           <h2 style="margin: 0 0 4px;">${s.firstName} ${s.lastName}</h2>
-          ${this.showQr() && s.studentCode != null ? `<p style="margin: 0 0 12px; font-size: 18px; color: #4338ca;">${this.translate.instant('STUDENT_QR.CODE_LABEL')} <strong>#${s.studentCode}</strong></p>` : ''}
+          ${s.studentCode != null ? `<p style="margin: 0 0 12px; font-size: 18px; color: #4338ca;">${this.translate.instant('STUDENT_QR.CODE_LABEL')} <strong>#${s.studentCode}</strong></p>` : ''}
           <img src="${data}" style="width: 320px; height: 320px;" />
         </body>
       </html>

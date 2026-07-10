@@ -76,11 +76,6 @@ export class StudentService {
     return this.api.post<Student>(`students/${id}/regenerate-qr`, {});
   }
 
-  /** Paid QR activation (TEACHER companies). ONE_YEAR = 25 EGP, LIFELONG = 40 EGP. */
-  activateQr(id: string, plan: 'ONE_YEAR' | 'LIFELONG'): Observable<Student> {
-    return this.api.post<Student>(`students/${id}/activate-qr`, { plan });
-  }
-
   /** Lookup a student by their QR token. Returns just the student ID. */
   lookupByQr(qrToken: string): Observable<{ id: string }> {
     return this.api.get<{ id: string }>(`students/lookup-by-qr/${encodeURIComponent(qrToken)}`);

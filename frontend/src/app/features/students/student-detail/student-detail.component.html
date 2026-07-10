@@ -67,7 +67,7 @@
 
   @if (student(); as s) {
     <!-- QR code dialog -->
-    <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)" (activated)="onQrRegenerated($event)"></app-student-qr-dialog>
+    <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)"></app-student-qr-dialog>
 
     <!-- Telegram connect dialog -->
     <app-telegram-connect-dialog [(visible)]="showTelegramDialog" [studentId]="s.id"></app-telegram-connect-dialog>

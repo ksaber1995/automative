@@ -276,27 +276,16 @@ export const attendanceRoutes = {
       }
 
       // Resolve the student by token, scoped to this tenant — a token from
-      // another company must not be accepted. Also pull company type + QR
-      // activation so teacher tenants' unactivated QRs can be rejected.
+      // another company must not be accepted. Every student's QR works by
+      // default (no activation gate).
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name, s.qr_activated, s.qr_expiration,
-                co.type AS company_type
+        `SELECT s.id, s.first_name, s.last_name
          FROM students s
-         JOIN companies co ON co.id = s.company_id
          WHERE s.qr_token = $1 AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
       );
       if (!student) {
         return apiError(404, 'ERRORS.ATTENDANCE.QR_STUDENT_NOT_FOUND', 'No active student matches this QR code');
-      }
-
-      // TEACHER tenants pay per QR. An unactivated/expired QR can't check in.
-      if (student.company_type === 'TEACHER') {
-        const live = student.qr_activated === true &&
-          (!student.qr_expiration || new Date(student.qr_expiration) >= new Date(new Date().toISOString().slice(0, 10)));
-        if (!live) {
-          return apiError(402, 'ERRORS.ATTENDANCE.QR_NOT_ACTIVATED', 'This QR code is not activated');
-        }
       }
 
       // Is the student enrolled in THIS session's class?

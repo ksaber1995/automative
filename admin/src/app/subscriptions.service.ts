@@ -23,12 +23,6 @@ export interface CompanySubscription {
   branch_count: number;
   student_count: number;
   course_count: number;
-  /** Number of students with a paid-activated QR code. */
-  qr_activated_count: number;
-  /** Total billed for QR activations (sum of qr_price over activated students). */
-  qr_total_cost: number;
-  /** Billed-but-unpaid QR activation amount. */
-  qr_unpaid_cost: number;
 }
 
 // Obscure, unauthenticated endpoint on the production API. The path is the only
@@ -61,17 +55,6 @@ export class SubscriptionsService {
     return this.http.post<{ success: boolean; company_type: string }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/type`,
       { type },
-    );
-  }
-
-  /** Mark a company's QR activations as paid / unpaid. */
-  setQrPaid(
-    companyId: string,
-    paid: boolean,
-  ): Observable<{ success: boolean; paid: boolean; updated_count: number }> {
-    return this.http.post<{ success: boolean; paid: boolean; updated_count: number }>(
-      `${ADMIN_ENDPOINT}/companies/${companyId}/qr-paid`,
-      { paid },
     );
   }
 

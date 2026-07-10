@@ -1901,20 +1901,6 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
-    // Paid QR activation (TEACHER companies). ONE_YEAR = 25 EGP, LIFELONG = 40 EGP.
-    activateQr: {
-      method: 'POST',
-      path: '/api/students/:id/activate-qr',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ plan: z.enum(['ONE_YEAR', 'LIFELONG']) }),
-      responses: {
-        200: StudentSchema,
-        400: ApiErrorSchema,
-        403: ApiErrorSchema,
-        404: ApiErrorSchema,
-        409: ApiErrorSchema,
-      },
-    },
     lookupByQr: {
       method: 'GET',
       path: '/api/students/lookup-by-qr/:qrToken',
@@ -3845,16 +3831,6 @@ export const contract = c.router({
             subscriptionStartDate: z.string().nullable(),
             subscriptionEndDate: z.string().nullable(),
           }).nullable(),
-          qr: z.object({
-            studentCount: z.number(),
-            activatedCount: z.number(),
-            oneYearCount: z.number(),
-            lifelongCount: z.number(),
-            totalCost: z.number(),
-            paidCost: z.number(),
-            unpaidCost: z.number(),
-            currency: z.string(),
-          }).optional(),
         }),
         401: ApiErrorSchema,
         404: ApiErrorSchema,
@@ -4664,9 +4640,6 @@ export const contract = c.router({
             employee_count: z.number(),
             branch_count: z.number(),
             student_count: z.number(),
-            qr_activated_count: z.number(),
-            qr_total_cost: z.number(),
-            qr_unpaid_cost: z.number(),
           })
         ),
         500: z.object({ message: z.string() }),
@@ -4707,18 +4680,6 @@ export const contract = c.router({
       responses: {
         200: z.object({ success: z.boolean(), company_type: z.string() }),
         400: z.object({ message: z.string() }),
-        404: z.object({ message: z.string() }),
-        500: z.object({ message: z.string() }),
-      },
-    },
-    // Mark a company's QR activations as paid / unpaid.
-    setQrPaid: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/companies/:companyId/qr-paid',
-      pathParams: z.object({ companyId: UUIDSchema }),
-      body: z.object({ paid: z.boolean() }),
-      responses: {
-        200: z.object({ success: z.boolean(), paid: z.boolean(), updated_count: z.number() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

@@ -9,113 +9,33 @@
   <div class="text-center">
     <p class="text-sm text-gray-500 mb-2">{{ studentName() }}</p>
 
-    <!-- Short student code — the QR-less fallback for attendance / payment.
-         Only revealed once the QR is active (same gate as showing the QR). -->
-    @if (showQr() && student()?.studentCode != null) {
+    <!-- Short student code — the QR-less fallback for attendance / payment. -->
+    @if (student()?.studentCode != null) {
       <div class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">
         <i class="pi pi-hashtag"></i>
         <span>{{ 'STUDENT_QR.CODE_LABEL' | translate }} <strong>{{ student()?.studentCode }}</strong></span>
       </div>
     }
 
-    @if (showQr()) {
-      <!-- QR is free (academy) or paid-activated (teacher) -->
-      @if (dataUrl()) {
-        <img [src]="dataUrl()" alt="QR code" class="mx-auto rounded-lg border border-gray-200" style="width: 260px; height: 260px;" />
-      } @else {
-        <div class="flex items-center justify-center text-gray-300" style="width: 260px; height: 260px; margin: 0 auto;">
-          <i class="pi pi-spin pi-spinner text-3xl"></i>
-        </div>
-      }
-
-      <p class="text-xs text-gray-400 mt-3">{{ 'STUDENT_QR.SCAN_HINT' | translate }}</p>
-
-      @if (isTeacher() && qrLive()) {
-        <div class="mt-3 inline-flex items-center gap-2 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
-          <i class="pi pi-check-circle"></i>
-          @if (expiryLabel()) {
-            <span>{{ 'STUDENT_QR.ACTIVE_UNTIL' | translate: { date: expiryLabel() } }}</span>
-          } @else {
-            <span>{{ 'STUDENT_QR.ACTIVE_LIFELONG' | translate }}</span>
-          }
-        </div>
-      }
-
-      <div class="flex items-center justify-center gap-2 mt-4 flex-wrap">
-        <p-button icon="pi pi-print" [label]="'STUDENT_QR.PRINT' | translate" size="small" [outlined]="true" (onClick)="print()" [disabled]="!dataUrl()"></p-button>
-        <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [disabled]="!dataUrl()"></p-button>
-      </div>
-
-      <!-- Click-to-chat: send from the staff member's own WhatsApp number -->
-      <div class="flex items-center justify-center gap-2 mt-2 flex-wrap">
-        <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_QR_STUDENT' | translate" size="small" severity="success" (onClick)="sendQrToStudent()" [disabled]="!dataUrl()"></p-button>
-        <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_FOLLOWUP_PARENT' | translate" size="small" severity="success" [outlined]="true" (onClick)="sendFollowupToParent()" [disabled]="!dataUrl()"></p-button>
-      </div>
+    @if (dataUrl()) {
+      <img [src]="dataUrl()" alt="QR code" class="mx-auto rounded-lg border border-gray-200" style="width: 260px; height: 260px;" />
     } @else {
-      <!-- TEACHER company, QR not yet activated -->
-      @if (pendingPlan(); as plan) {
-        <!-- Step 2: cost warning / confirmation -->
-        <div class="text-left bg-amber-50 border border-amber-200 rounded-lg p-4 mt-2">
-          <div class="flex items-start gap-2">
-            <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5"></i>
-            <div>
-              <p class="text-sm font-semibold text-amber-800">{{ 'STUDENT_QR.CONFIRM_TITLE' | translate }}</p>
-              <p class="text-sm text-amber-700 mt-1">
-                @if (plan === 'ONE_YEAR') {
-                  {{ 'STUDENT_QR.CONFIRM_ONE_YEAR' | translate: { price: planPrice('ONE_YEAR') } }}
-                } @else {
-                  {{ 'STUDENT_QR.CONFIRM_LIFELONG' | translate: { price: planPrice('LIFELONG') } }}
-                }
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center justify-end gap-2 mt-4">
-            <p-button [label]="'STUDENT_QR.CANCEL' | translate" size="small" [text]="true" (onClick)="cancelPlan()" [disabled]="activating()"></p-button>
-            <p-button [label]="'STUDENT_QR.CONFIRM_ACTIVATE' | translate" size="small" severity="warn" (onClick)="confirmActivate()" [loading]="activating()"></p-button>
-          </div>
-        </div>
-      } @else {
-        <!-- Step 1: locked QR + the two activation options -->
-        <div class="relative mx-auto" style="width: 260px; height: 260px;">
-          <div class="flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-200 rounded-lg h-full">
-            <i class="pi pi-lock text-4xl mb-2"></i>
-            <span class="text-xs text-gray-400 px-6 text-center">{{ 'STUDENT_QR.LOCKED_HINT' | translate }}</span>
-          </div>
-        </div>
-
-        @if (isQrFree()) {
-          <!-- Free launch tier: one-tap activation, no charge -->
-          <div class="flex flex-col gap-2 mt-4">
-            <p class="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-              {{ 'STUDENT_QR.FREE_HINT' | translate }}
-            </p>
-            <p-button
-              styleClass="w-full"
-              icon="pi pi-gift"
-              severity="success"
-              [label]="'STUDENT_QR.ACTIVATE_FREE' | translate"
-              (onClick)="activateFree()"
-              [loading]="activating()"
-            ></p-button>
-          </div>
-        } @else {
-          <div class="flex flex-col gap-2 mt-4">
-            <p-button
-              styleClass="w-full"
-              icon="pi pi-calendar"
-              [label]="'STUDENT_QR.ACTIVATE_ONE_YEAR' | translate: { price: planPrice('ONE_YEAR') }"
-              (onClick)="choosePlan('ONE_YEAR')"
-            ></p-button>
-            <p-button
-              styleClass="w-full"
-              icon="pi pi-infinity"
-              severity="success"
-              [label]="'STUDENT_QR.ACTIVATE_LIFELONG' | translate: { price: planPrice('LIFELONG') }"
-              (onClick)="choosePlan('LIFELONG')"
-            ></p-button>
-          </div>
-        }
-      }
+      <div class="flex items-center justify-center text-gray-300" style="width: 260px; height: 260px; margin: 0 auto;">
+        <i class="pi pi-spin pi-spinner text-3xl"></i>
+      </div>
     }
+
+    <p class="text-xs text-gray-400 mt-3">{{ 'STUDENT_QR.SCAN_HINT' | translate }}</p>
+
+    <div class="flex items-center justify-center gap-2 mt-4 flex-wrap">
+      <p-button icon="pi pi-print" [label]="'STUDENT_QR.PRINT' | translate" size="small" [outlined]="true" (onClick)="print()" [disabled]="!dataUrl()"></p-button>
+      <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [disabled]="!dataUrl()"></p-button>
+    </div>
+
+    <!-- Click-to-chat: send from the staff member's own WhatsApp number -->
+    <div class="flex items-center justify-center gap-2 mt-2 flex-wrap">
+      <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_QR_STUDENT' | translate" size="small" severity="success" (onClick)="sendQrToStudent()" [disabled]="!dataUrl()"></p-button>
+      <p-button icon="pi pi-whatsapp" [label]="'STUDENT_QR.SEND_FOLLOWUP_PARENT' | translate" size="small" severity="success" [outlined]="true" (onClick)="sendFollowupToParent()" [disabled]="!dataUrl()"></p-button>
+    </div>
   </div>
 </p-dialog>

@@ -85,7 +85,6 @@ export class StudentListComponent implements OnInit {
   // studentId → set of courseIds the student is enrolled in (drives the course filter).
   studentCourseMap = signal<Map<string, Set<string>>>(new Map());
   activeTab = signal<'active' | 'inactive'>('active');
-  qrFilter = signal<'ALL' | 'ACTIVATED' | 'NOT_ACTIVATED'>('ALL');
 
   // The lookup returns active branches only, so all entries are selectable/active.
   branches = computed(() => this.allBranches());
@@ -109,9 +108,6 @@ export class StudentListComponent implements OnInit {
     let filtered = this.activeTab() === 'active'
       ? list.filter(s => s.isActive)
       : list.filter(s => !s.isActive);
-    const qr = this.qrFilter();
-    if (qr === 'ACTIVATED') filtered = filtered.filter(s => s.qrActivated);
-    else if (qr === 'NOT_ACTIVATED') filtered = filtered.filter(s => !s.qrActivated);
     const courseId = this.selectedCourseId();
     if (courseId) {
       const map = this.studentCourseMap();
@@ -134,19 +130,6 @@ export class StudentListComponent implements OnInit {
 
   activeCount = computed(() => this.students().filter(s => s.isActive).length);
   inactiveCount = computed(() => this.students().filter(s => !s.isActive).length);
-
-  qrActivatedCount = computed(() => {
-    const list = this.activeTab() === 'active'
-      ? this.students().filter(s => s.isActive)
-      : this.students().filter(s => !s.isActive);
-    return list.filter(s => s.qrActivated).length;
-  });
-  qrNotActivatedCount = computed(() => {
-    const list = this.activeTab() === 'active'
-      ? this.students().filter(s => s.isActive)
-      : this.students().filter(s => !s.isActive);
-    return list.filter(s => !s.qrActivated).length;
-  });
 
   onSearchChange(value: string) {
     this.searchTerm.set(value);
@@ -375,13 +358,11 @@ export class StudentListComponent implements OnInit {
   private pdfStudentGroups = new Map<string, string[]>();                        // studentId -> "Course - Class" labels
 
   /**
-   * Students whose QR can be downloaded. Teachers can only export ACTIVATED QRs
-   * (unactivated ones aren't live/scannable); academies get QR free, so any
-   * active student with a token is exportable.
+   * Students whose QR can be downloaded — any active student with a token
+   * (QR is active by default for all tenants).
    */
   private qrDownloadableStudents(): Student[] {
-    const teacher = this.authService.isTeacher();
-    return this.students().filter(s => s.isActive && s.qrToken && (!teacher || s.qrActivated));
+    return this.students().filter(s => s.isActive && s.qrToken);
   }
 
   /** Open the course/class picker for the per-class PDF export. */

@@ -75,35 +75,8 @@
       </p-tablist>
     </p-tabs>
 
-    <!-- QR toolbar: activation filter (teacher only) + QR downloads (all company types) -->
+    <!-- QR toolbar: QR downloads (all company types) -->
     <div class="flex gap-2 my-3 flex-wrap items-center">
-      @if (authService.isTeacher()) {
-        <button
-          pButton
-          size="small"
-          [label]="('STUDENTS.LIST.QR_ALL' | translate) + ' (' + (qrActivatedCount() + qrNotActivatedCount()) + ')'"
-          [outlined]="qrFilter() !== 'ALL'"
-          severity="secondary"
-          (click)="qrFilter.set('ALL')"
-        ></button>
-        <button
-          pButton
-          size="small"
-          [label]="('STUDENTS.LIST.QR_ACTIVATED' | translate) + ' (' + qrActivatedCount() + ')'"
-          [outlined]="qrFilter() !== 'ACTIVATED'"
-          severity="success"
-          (click)="qrFilter.set('ACTIVATED')"
-        ></button>
-        <button
-          pButton
-          size="small"
-          [label]="('STUDENTS.LIST.QR_NOT_ACTIVATED' | translate) + ' (' + qrNotActivatedCount() + ')'"
-          [outlined]="qrFilter() !== 'NOT_ACTIVATED'"
-          severity="danger"
-          (click)="qrFilter.set('NOT_ACTIVATED')"
-        ></button>
-        <span class="mx-2 text-gray-300">|</span>
-      }
       <button
         pButton
         size="small"

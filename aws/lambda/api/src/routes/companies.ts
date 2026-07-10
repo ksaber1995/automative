@@ -60,21 +60,6 @@ export const companiesRoutes = {
         [context.companyId]
       );
 
-      // Paid-QR-activation summary (relevant to TEACHER tenants). Counts every
-      // activated student and splits the billed amount into paid vs unpaid.
-      const qrAgg = await queryOne<any>(
-        `SELECT
-            COUNT(*)                                                    AS student_count,
-            COUNT(*) FILTER (WHERE qr_activated)                        AS activated_count,
-            COUNT(*) FILTER (WHERE qr_activated AND qr_expiration IS NOT NULL) AS one_year_count,
-            COUNT(*) FILTER (WHERE qr_activated AND qr_expiration IS NULL)     AS lifelong_count,
-            COALESCE(SUM(qr_price) FILTER (WHERE qr_activated), 0)       AS total_cost,
-            COALESCE(SUM(qr_price) FILTER (WHERE qr_activated AND qr_paid), 0)     AS paid_cost,
-            COALESCE(SUM(qr_price) FILTER (WHERE qr_activated AND NOT qr_paid), 0) AS unpaid_cost
-         FROM students WHERE company_id = $1`,
-        [context.companyId]
-      );
-
       return {
         status: 200 as const,
         body: {
@@ -89,16 +74,6 @@ export const companiesRoutes = {
                 subscriptionEndDate: subscription.subscription_end_date,
               }
             : null,
-          qr: {
-            studentCount: Number(qrAgg?.student_count ?? 0),
-            activatedCount: Number(qrAgg?.activated_count ?? 0),
-            oneYearCount: Number(qrAgg?.one_year_count ?? 0),
-            lifelongCount: Number(qrAgg?.lifelong_count ?? 0),
-            totalCost: parseFloat(qrAgg?.total_cost ?? 0),
-            paidCost: parseFloat(qrAgg?.paid_cost ?? 0),
-            unpaidCost: parseFloat(qrAgg?.unpaid_cost ?? 0),
-            currency: company.currency || 'EGP',
-          },
         },
       };
     } catch (error) {
