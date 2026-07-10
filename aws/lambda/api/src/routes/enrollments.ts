@@ -213,7 +213,10 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
   const packagePrice = course?.session_package_price != null ? parseFloat(course.session_package_price) : null;
   // Package payment mode: FULL (pay now), PARTIAL (down payment now), LATER (pay nothing now).
   const packagePayMode: 'FULL' | 'PARTIAL' | 'LATER' = body.sessionPackagePayMode || 'FULL';
-  const packageDue = packagePrice || 0;
+  // The package charge honours a discount applied at enrollment (the discount is
+  // on the package, not the per-session fee). Falls back to the course list price.
+  const packageDue =
+    body.sessionPackageFinalPrice != null ? parseFloat(body.sessionPackageFinalPrice) : (packagePrice || 0);
   let packagePaid = packageDue; // FULL default
   if (packagePayMode === 'LATER') packagePaid = 0;
   else if (packagePayMode === 'PARTIAL') {

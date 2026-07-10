@@ -478,12 +478,33 @@ export class EnrollmentFormComponent implements OnInit {
         this.selectedCourse.set(course);
         this.enrollmentForm.patchValue({ classId: '', discountType: 'none' });
         this.discountTypeSig.set('none');
+        // A freshly picked per-session course defaults to per-session billing;
+        // the pricing block then reflects the per-session fee.
+        this.sessionBillingModeSig.set('PER_SESSION');
+        this.enrollmentForm.patchValue({ sessionBillingMode: 'PER_SESSION' });
         this.setPrices(course.price, 0, 0, course.price);
       }
     }
     // Refresh the linked-books list for the newly selected course.
     this.loadCourseBooks(courseId || null);
     this.checkCoverage();
+  }
+
+  /**
+   * Switch a per-session enrollment between paying each session and prepaying a
+   * package. The pricing block below mirrors this choice so any discount applies
+   * to whichever base is selected: the per-session fee, or the package total.
+   */
+  setSessionBillingMode(mode: 'PER_SESSION' | 'PACKAGE') {
+    this.sessionBillingModeSig.set(mode);
+    this.enrollmentForm.patchValue({ sessionBillingMode: mode, discountType: 'none' });
+    this.discountTypeSig.set('none');
+    const course = this.selectedCourse();
+    if (!course) return;
+    const base = mode === 'PACKAGE'
+      ? (course.sessionPackagePrice ?? course.price)
+      : course.price;
+    this.setPrices(base, 0, 0, base);
   }
 
   onClassChange() {
@@ -680,6 +701,10 @@ export class EnrollmentFormComponent implements OnInit {
     const monthly = this.isMonthly();
     const perSession = this.isPerSession();
     const noInstallments = monthly || perSession;
+    const inPackageMode = perSession && this.sessionBillingModeSig() === 'PACKAGE';
+    // The undiscounted per-session fee; in package mode the discount is on the
+    // package, so the enrollment keeps the course's list session price.
+    const perSessionFee = this.selectedCourse()?.price ?? this.originalPriceSig();
     const enrollmentData = {
       studentId: v.studentId,
       classId: v.classId,
@@ -687,10 +712,14 @@ export class EnrollmentFormComponent implements OnInit {
       branchId: v.branchId,
       enrollmentDate: this.formatDate(v.enrollmentDate),
       status: v.status,
-      originalPrice: this.originalPriceSig(),
-      discountPercent: this.discountPercentSig(),
-      discountAmount: this.discountAmountSig(),
-      finalPrice: this.finalPriceSig(),
+      // In package mode the pricing block reflects the PACKAGE (so discounts land
+      // on the package total), so the enrollment's own per-session fee stays at
+      // the course list price and the discounted package rides on
+      // sessionPackageFinalPrice below.
+      originalPrice: inPackageMode ? perSessionFee : this.originalPriceSig(),
+      discountPercent: inPackageMode ? 0 : this.discountPercentSig(),
+      discountAmount: inPackageMode ? 0 : this.discountAmountSig(),
+      finalPrice: inPackageMode ? perSessionFee : this.finalPriceSig(),
       // Monthly & per-session courses are billed per period — no installments;
       // finalPrice is the discounted monthly/per-session fee.
       paymentMode: noInstallments ? PaymentMode.FULL : v.paymentMode,
@@ -702,6 +731,9 @@ export class EnrollmentFormComponent implements OnInit {
       // Per-session: pay each session (default) or prepay a package in advance.
       sessionBillingMode: perSession ? this.sessionBillingModeSig() : undefined,
       buyPackage: perSession ? this.sessionBillingModeSig() === 'PACKAGE' : undefined,
+      // The package charge after any discount (the pricing block's final price
+      // while in package mode). Backend falls back to the list price if omitted.
+      sessionPackageFinalPrice: inPackageMode ? this.finalPriceSig() : undefined,
       // Package payment: full now / part now / later.
       sessionPackagePayMode: (perSession && this.sessionBillingModeSig() === 'PACKAGE') ? this.sessionPackagePayModeSig() : undefined,
       sessionPackageDownPayment: (perSession && this.sessionBillingModeSig() === 'PACKAGE' && this.sessionPackagePayModeSig() === 'PARTIAL') ? this.sessionPackageDownPaymentSig() : undefined,

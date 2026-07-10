@@ -195,9 +195,38 @@
           }
         }
 
+        <!-- Per-session billing option — shown BEFORE pricing so any discount
+             below applies to whichever base (single session or package) is chosen. -->
+        @if (isPerSession() && selectedCourse() && !coverage()?.covered) {
+        <p-divider></p-divider>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.SESSION_BILLING_OPTION' | translate }} <span class="text-red-500">*</span></h3>
+        <div class="flex gap-8 mb-2">
+          <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
+            [class.border-green-500]="sessionBillingModeSig() === 'PER_SESSION'"
+            [class.bg-green-50]="sessionBillingModeSig() === 'PER_SESSION'">
+            <p-radiobutton name="sessionBillingMode" value="PER_SESSION" formControlName="sessionBillingMode" (onClick)="setSessionBillingMode('PER_SESSION')"></p-radiobutton>
+            <div>
+              <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PAY_EACH' | translate }}</p>
+              <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PAY_EACH_DESC' | translate: { amount: (selectedCourse()?.price | amount) } }}</p>
+            </div>
+          </div>
+          @if (selectedCourse()?.sessionPackageSize) {
+          <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
+            [class.border-blue-500]="sessionBillingModeSig() === 'PACKAGE'"
+            [class.bg-blue-50]="sessionBillingModeSig() === 'PACKAGE'">
+            <p-radiobutton name="sessionBillingMode" value="PACKAGE" formControlName="sessionBillingMode" (onClick)="setSessionBillingMode('PACKAGE')"></p-radiobutton>
+            <div>
+              <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PREPAY_PACKAGE' | translate }}</p>
+              <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PREPAY_PACKAGE_DESC' | translate: { count: selectedCourse()?.sessionPackageSize, amount: (selectedCourse()?.sessionPackagePrice | amount) } }}</p>
+            </div>
+          </div>
+          }
+        </div>
+        }
+
         @if (showPricingBlock()) {
         <p-divider></p-divider>
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PRICING' | translate }}</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ 'ENROLLMENT_FORM.PRICING' | translate }}@if (isPerSession() && sessionBillingModeSig() === 'PACKAGE') { <span class="text-base font-normal text-blue-600">— {{ 'ENROLLMENT_FORM.SESSION_PREPAY_PACKAGE' | translate }}</span> }</h3>
 
         <!-- Monthly price override hint -->
         @if (monthlyOverridePrice() !== null) {
@@ -318,39 +347,19 @@
           </div>
         </div>
         } @else if (isPerSession()) {
-        <!-- Per-session: pay each session, or prepay a package (block) in advance -->
+        <!-- Per-session payment. The pay-each-session vs prepay-package choice is
+             made in the billing-option block above; here we only surface the
+             session fee, or collect how to pay a prepaid package. -->
         <div class="grid grid-cols-1 gap-4">
+          @if (sessionBillingModeSig() === 'PER_SESSION') {
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
             <i class="pi pi-wallet text-blue-500 mt-0.5"></i>
             <p class="text-sm text-blue-700" [innerHTML]="'ENROLLMENT_FORM.SESSION_INFO' | translate: { fee: (finalPriceSig() | amount) }"></p>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.SESSION_BILLING_OPTION' | translate }} <span class="text-red-500">*</span></label>
-            <div class="flex gap-8">
-              <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
-                [class.border-green-500]="sessionBillingModeSig() === 'PER_SESSION'"
-                [class.bg-green-50]="sessionBillingModeSig() === 'PER_SESSION'">
-                <p-radiobutton name="sessionBillingMode" value="PER_SESSION" formControlName="sessionBillingMode" (onClick)="sessionBillingModeSig.set('PER_SESSION')"></p-radiobutton>
-                <div>
-                  <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PAY_EACH' | translate }}</p>
-                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PAY_EACH_DESC' | translate: { amount: (finalPriceSig() | amount) } }}</p>
-                </div>
-              </div>
-              @if (selectedCourse()?.sessionPackageSize) {
-              <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
-                [class.border-blue-500]="sessionBillingModeSig() === 'PACKAGE'"
-                [class.bg-blue-50]="sessionBillingModeSig() === 'PACKAGE'">
-                <p-radiobutton name="sessionBillingMode" value="PACKAGE" formControlName="sessionBillingMode" (onClick)="sessionBillingModeSig.set('PACKAGE')"></p-radiobutton>
-                <div>
-                  <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PREPAY_PACKAGE' | translate }}</p>
-                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PREPAY_PACKAGE_DESC' | translate: { count: selectedCourse()?.sessionPackageSize, amount: (selectedCourse()?.sessionPackagePrice | amount) } }}</p>
-                </div>
-              </div>
-              }
-            </div>
-          </div>
+          }
 
-          <!-- When prepaying a package: how to pay it (full now / part now / later) -->
+          <!-- When prepaying a package: how to pay it (full now / part now / later).
+               finalPriceSig() is the discounted package total in this mode. -->
           @if (sessionBillingModeSig() === 'PACKAGE') {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.SESSION_PACKAGE_PAY_OPTION' | translate }} <span class="text-red-500">*</span></label>
@@ -360,7 +369,7 @@
                   <p-radiobutton name="sessionPackagePayMode" value="FULL" formControlName="sessionPackagePayMode" (onClick)="sessionPackagePayModeSig.set('FULL')"></p-radiobutton>
                   <div>
                     <p class="font-medium">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_NOW' | translate }}</p>
-                    <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_NOW_DESC' | translate: { amount: (selectedCourse()?.sessionPackagePrice | amount) } }}</p>
+                    <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_NOW_DESC' | translate: { amount: (finalPriceSig() | amount) } }}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer"
@@ -371,9 +380,9 @@
                     <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.SESSION_PKG_PAY_PARTIAL_DESC' | translate }}</p>
                     @if (sessionPackagePayModeSig() === 'PARTIAL') {
                       <div class="mt-2 flex items-center gap-2">
-                        <p-inputnumber formControlName="sessionPackageDownPayment" [min]="0" [max]="selectedCourse()?.sessionPackagePrice"
+                        <p-inputnumber formControlName="sessionPackageDownPayment" [min]="0" [max]="finalPriceSig()"
                           (onInput)="sessionPackageDownPaymentSig.set($event.value || 0)" mode="currency" currency="USD" [style]="{ width: '160px' }"></p-inputnumber>
-                        <small class="text-gray-500" [innerHTML]="'ENROLLMENT_FORM.REMAINING' | translate: { amount: ((selectedCourse()?.sessionPackagePrice || 0) - sessionPackageDownPaymentSig()) | amount }"></small>
+                        <small class="text-gray-500" [innerHTML]="'ENROLLMENT_FORM.REMAINING' | translate: { amount: ((finalPriceSig() || 0) - sessionPackageDownPaymentSig()) | amount }"></small>
                       </div>
                     }
                   </div>

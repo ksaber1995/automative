@@ -910,6 +910,9 @@ const CreateEnrollmentSchema = z.object({
   // How the prepaid package is paid: FULL (now), PARTIAL (down payment now), LATER.
   sessionPackagePayMode: z.enum(['FULL', 'PARTIAL', 'LATER']).optional(),
   sessionPackageDownPayment: z.number().optional(),
+  // The package charge (after any discount) when prepaying a package. When
+  // omitted the course's list session_package_price is used.
+  sessionPackageFinalPrice: z.number().optional(),
   notes: z.string().optional(),
   // Educational Books: optional linked products bought together with the enrollment
   // (one atomic transaction). Each becomes an attributed product sale.
