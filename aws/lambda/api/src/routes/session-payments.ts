@@ -1156,7 +1156,12 @@ export const sessionPaymentsRoutes = {
            b.name       AS branch_name,
            lastpkg.sessions_total AS last_sessions_total,
            lastpkg.sessions_used  AS last_sessions_used,
-           lastpkg.updated_at     AS exhausted_at
+           lastpkg.updated_at     AS exhausted_at,
+           -- Sessions this student attended that are still unpaid (a per-session
+           -- charge exists but wasn't covered by a package) — the overflow they
+           -- racked up after the bundle ran out.
+           (SELECT COUNT(*) FROM session_payments spp
+             WHERE spp.enrollment_id = e.id AND spp.payment_status = 'PENDING') AS unpaid_sessions
          FROM enrollments e
          JOIN courses c  ON e.course_id = c.id
          JOIN students s ON e.student_id = s.id
@@ -1186,6 +1191,7 @@ export const sessionPaymentsRoutes = {
           packagePrice: r.package_price != null ? parseFloat(r.package_price) : null,
           lastSessionsTotal: Number(r.last_sessions_total),
           lastSessionsUsed: Number(r.last_sessions_used),
+          unpaidSessions: Number(r.unpaid_sessions || 0),
           exhaustedAt: r.exhausted_at || null,
         })),
       };

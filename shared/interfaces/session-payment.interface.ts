@@ -62,6 +62,8 @@ export interface PackageRenewalDue {
   packagePrice: number | null;
   lastSessionsTotal: number;
   lastSessionsUsed: number;
+  /** Attended-but-unpaid sessions racked up after the bundle ran out. */
+  unpaidSessions: number;
   exhaustedAt: string | null;
 }
 
