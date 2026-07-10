@@ -572,6 +572,7 @@
     "RENEWALS_HINT": "These students used up their prepaid sessions and owe the next package.",
     "RENEWAL_USED": "Finished {{used}} of {{total}} sessions",
     "RENEWAL_UNPAID": "Attended {{count}} unpaid session(s) — pay per session or renew",
+    "RENEWAL_DUE_STATUS": "Renewal due",
     "RENEW_BTN": "Collect {{count}}-session package ({{amount}})",
     "RENEWAL_TITLE": "Collect Next Package",
     "PAY_SUCCESS": "Payment recorded",

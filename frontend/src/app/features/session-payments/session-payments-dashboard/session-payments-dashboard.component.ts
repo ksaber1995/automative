@@ -177,6 +177,20 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     }
   });
 
+  /**
+   * Rows for the Packages table: the prepaid-package rows, plus — under the
+   * Pending (or All) status filter — the renewal-due students (last bundle used
+   * up, owe the next). Renewals sit on top since they need action.
+   */
+  packagesTableRows = computed(() => {
+    const pkgRows = this.filteredPackages().map(p => ({ kind: 'package' as const, p }));
+    const showRenewals = this.selectedTab() === 'PENDING' || this.selectedTab() === 'ALL';
+    const renewalRows = showRenewals
+      ? this.renewals().map(r => ({ kind: 'renewal' as const, r }))
+      : [];
+    return [...renewalRows, ...pkgRows];
+  });
+
   ngOnInit(): void {
     this.lookup.branches().subscribe({ next: b => this.branches.set(b), error: () => {} });
     this.courseService.getAllCourses().subscribe({

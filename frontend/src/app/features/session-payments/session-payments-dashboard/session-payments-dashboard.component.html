@@ -198,44 +198,11 @@
         <h3 class="text-base font-semibold text-gray-700 mt-8 mb-2 flex items-center gap-2"><i class="pi pi-box text-gray-400"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}</h3>
       }
 
-      <!-- Package renewals due — students whose prepaid bundle ran out and owe the
-           next package. Shown under the Pending filter (and the All-status view).
-           Each shows how many sessions they finished and, if they kept attending
-           after the bundle, how many unpaid sessions they racked up (payable per
-           session, or clear by renewing the package). -->
-      @if ((selectedTab() === 'PENDING' || selectedTab() === 'ALL') && renewals().length > 0) {
-        <div class="rounded-lg bg-amber-50 border border-amber-300 p-4 mb-6">
-          <div class="flex items-center gap-2 font-semibold text-amber-800 mb-1">
-            <i class="pi pi-exclamation-triangle"></i>
-            {{ 'SESSION_PAYMENTS.RENEWALS_TITLE' | translate }} ({{ renewals().length }})
-          </div>
-          <p class="text-xs text-amber-700 mb-3">{{ 'SESSION_PAYMENTS.RENEWALS_HINT' | translate }}</p>
-          <div class="flex flex-col gap-2">
-            @for (r of renewals(); track r.enrollmentId) {
-              <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-lg px-3 py-2 flex-wrap">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span>
-                  <span class="text-sm text-gray-500">{{ r.courseName }}</span>
-                  <p-tag severity="success" [value]="'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: r.lastSessionsUsed, total: r.lastSessionsTotal }"></p-tag>
-                  @if (r.unpaidSessions > 0) {
-                    <p-tag severity="danger" [value]="'SESSION_PAYMENTS.RENEWAL_UNPAID' | translate: { count: r.unpaidSessions }"></p-tag>
-                  }
-                </div>
-                <p-button
-                  icon="pi pi-box"
-                  size="small"
-                  severity="warn"
-                  [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: r.packageSize, amount: ((r.packagePrice || 0) | amount) }"
-                  (onClick)="openRenewalPay(r)"
-                ></p-button>
-              </div>
-            }
-          </div>
-        </div>
-      }
-
-      <!-- Packages view -->
-      <p-table [value]="filteredPackages()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
+      <!-- Packages view. Under the Pending / All status filter the table also
+           lists renewal-due students (last bundle used up, owe the next) as amber
+           rows on top: it shows the sessions they finished, any unpaid overflow
+           sessions, and a Renew action. -->
+      <p-table [value]="packagesTableRows()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
@@ -248,42 +215,66 @@
             <th>{{ 'SESSION_PAYMENTS.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
-        <ng-template pTemplate="body" let-p>
-          <tr>
-            <td>{{ p.studentFirstName }} {{ p.studentLastName }}</td>
-            <td>{{ p.courseName }}</td>
-            <td>{{ p.sessionsUsed }} / {{ p.sessionsTotal }}</td>
-            <td>{{ p.sessionsTotal - p.sessionsUsed }}</td>
-            <td class="text-right">
-              <span class="font-semibold text-green-600">{{ (p.amountPaid || 0) | amount }}</span>
-              <span class="text-gray-400"> / {{ (p.amountDue || 0) | amount }}</span>
-            </td>
-            <td class="text-right">
-              @if (packageRemaining(p) > 0) {
-                <span class="font-semibold text-red-600">{{ packageRemaining(p) | amount }}</span>
-              } @else {
-                <span class="text-gray-300">—</span>
-              }
-            </td>
-            <td>
-              <div class="flex items-center gap-1 flex-wrap">
-                <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + packageEffectiveStatus(p)) | translate" [severity]="statusSeverity(packageEffectiveStatus(p))"></p-tag>
-                @if (p.refundedAmount > 0) {
-                  <p-tag severity="warn" [value]="'-' + (p.refundedAmount | amount)" [pTooltip]="p.refundNote || ''"></p-tag>
+        <ng-template pTemplate="body" let-row>
+          @if (row.kind === 'renewal') {
+            <tr class="bg-amber-50">
+              <td>{{ row.r.studentFirstName }} {{ row.r.studentLastName }}</td>
+              <td>{{ row.r.courseName }}</td>
+              <td>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span>{{ 'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: row.r.lastSessionsUsed, total: row.r.lastSessionsTotal } }}</span>
+                  @if (row.r.unpaidSessions > 0) {
+                    <p-tag severity="danger" [value]="'SESSION_PAYMENTS.RENEWAL_UNPAID' | translate: { count: row.r.unpaidSessions }"></p-tag>
+                  }
+                </div>
+              </td>
+              <td>0</td>
+              <td class="text-right"><span class="text-gray-300">—</span></td>
+              <td class="text-right"><span class="font-semibold text-red-600">{{ (row.r.packagePrice || 0) | amount }}</span></td>
+              <td><p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_DUE_STATUS' | translate"></p-tag></td>
+              <td>
+                <p-button icon="pi pi-box" severity="warn" size="small"
+                  [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: row.r.packageSize, amount: ((row.r.packagePrice || 0) | amount) }"
+                  (onClick)="openRenewalPay(row.r)"></p-button>
+              </td>
+            </tr>
+          } @else {
+            <tr>
+              <td>{{ row.p.studentFirstName }} {{ row.p.studentLastName }}</td>
+              <td>{{ row.p.courseName }}</td>
+              <td>{{ row.p.sessionsUsed }} / {{ row.p.sessionsTotal }}</td>
+              <td>{{ row.p.sessionsTotal - row.p.sessionsUsed }}</td>
+              <td class="text-right">
+                <span class="font-semibold text-green-600">{{ (row.p.amountPaid || 0) | amount }}</span>
+                <span class="text-gray-400"> / {{ (row.p.amountDue || 0) | amount }}</span>
+              </td>
+              <td class="text-right">
+                @if (packageRemaining(row.p) > 0) {
+                  <span class="font-semibold text-red-600">{{ packageRemaining(row.p) | amount }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
                 }
-              </div>
-            </td>
-            <td>
-              <div class="flex items-center gap-2">
-                @if (p.status !== 'REFUNDED' && packageRemaining(p) > 0) {
-                  <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(p)"></p-button>
-                }
-                @if (p.status !== 'REFUNDED' && (p.amountPaid || 0) - (p.refundedAmount || 0) > 0) {
-                  <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openPackageRefund(p)"></p-button>
-                }
-              </div>
-            </td>
-          </tr>
+              </td>
+              <td>
+                <div class="flex items-center gap-1 flex-wrap">
+                  <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + packageEffectiveStatus(row.p)) | translate" [severity]="statusSeverity(packageEffectiveStatus(row.p))"></p-tag>
+                  @if (row.p.refundedAmount > 0) {
+                    <p-tag severity="warn" [value]="'-' + (row.p.refundedAmount | amount)" [pTooltip]="row.p.refundNote || ''"></p-tag>
+                  }
+                </div>
+              </td>
+              <td>
+                <div class="flex items-center gap-2">
+                  @if (row.p.status !== 'REFUNDED' && packageRemaining(row.p) > 0) {
+                    <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(row.p)"></p-button>
+                  }
+                  @if (row.p.status !== 'REFUNDED' && (row.p.amountPaid || 0) - (row.p.refundedAmount || 0) > 0) {
+                    <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openPackageRefund(row.p)"></p-button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
         </ng-template>
         <ng-template pTemplate="emptymessage">
           <tr><td colspan="8" class="text-center py-8 text-gray-500">{{ 'SESSION_PAYMENTS.NO_PACKAGES' | translate }}</td></tr>
