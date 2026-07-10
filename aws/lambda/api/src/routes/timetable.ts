@@ -58,8 +58,11 @@ function mapEntry(row: any, date: string) {
     sessionStart: row.session_start || null,
     sessionEnd: row.session_end || null,
     // A prepared (started=false) session is NOT in progress — it's pre-attendance.
-    sessionStarted: row.session_started === true,
-    isInProgress: !!row.session_id && row.session_started === true && !row.session_end,
+    // Accept 1 as well as true so a started session is detected regardless of how
+    // the driver returns booleans (SQLite hands back 1/0, Postgres true/false) —
+    // otherwise a started session is never flagged and lingers in "upcoming".
+    sessionStarted: row.session_started === true || row.session_started === 1,
+    isInProgress: !!row.session_id && (row.session_started === true || row.session_started === 1) && !row.session_end,
     scheduledStart,
     scheduledEnd,
     startTime: row.start_time,

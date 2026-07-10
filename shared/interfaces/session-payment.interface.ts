@@ -76,6 +76,8 @@ export interface SessionPaymentSummary {
   totalExpected: number;
   /** Cash collected in range (payment-dated); packages count in full on purchase day. */
   cashCollected?: number;
+  /** Of cashCollected, the portion from prepaid packages only. */
+  packageCashCollected?: number;
 }
 
 export interface SessionPackage {

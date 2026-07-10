@@ -19,7 +19,7 @@
   </div>
 
   <p-card>
-    <!-- Primary view switch — two obvious tabs (charges vs prepaid packages). -->
+    <!-- Primary view switch — obvious tabs: session charges, prepaid packages, or all. -->
     <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 mb-5">
       <button type="button"
         class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
@@ -38,6 +38,15 @@
         [class.text-gray-500]="view() !== 'PACKAGES'"
         (click)="setView('PACKAGES')">
         <i class="pi pi-box"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}
+      </button>
+      <button type="button"
+        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        [class.bg-white]="view() === 'ALL'"
+        [class.shadow-sm]="view() === 'ALL'"
+        [class.text-blue-600]="view() === 'ALL'"
+        [class.text-gray-500]="view() !== 'ALL'"
+        (click)="setView('ALL')">
+        <i class="pi pi-list"></i> {{ 'SESSION_PAYMENTS.VIEW_ALL' | translate }}
       </button>
     </div>
 
@@ -71,36 +80,25 @@
       </div>
     </div>
 
-    @if (view() === 'CHARGES') {
-      <!-- Summary cards. Paid includes sessions covered by a prepaid package. -->
-      <!-- <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <div class="rounded-lg bg-green-50 border border-green-200 p-4 text-center">
-          <div class="text-2xl font-bold text-green-600">{{ paidTotal() }}</div>
-          <div class="text-sm text-green-700">{{ 'SESSION_PAYMENTS.SUMMARY_PAID' | translate }}</div>
-          @if ((summary()?.coveredCount ?? 0) > 0) {
-            <div class="text-xs text-green-600 mt-1">{{ 'SESSION_PAYMENTS.SUMMARY_PAID_INCL_COVERED' | translate: { count: summary()?.coveredCount } }}</div>
-          }
+    <!-- Money summary. Cash Collected shows for every view; its value is the cash
+         for that view — session charges only, packages only, or the combined
+         total (with a session/package breakdown). Earned revenue (session-
+         attendance value) is only meaningful alongside charges. -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+          <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.SUMMARY_CASH' | translate }}@if (view() !== 'CHARGES') { <span class="font-normal text-emerald-600">· {{ (view() === 'ALL' ? 'SESSION_PAYMENTS.VIEW_ALL' : 'SESSION_PAYMENTS.VIEW_PACKAGES') | translate }}</span> }
         </div>
-        <div class="rounded-lg bg-yellow-50 border border-yellow-200 p-4 text-center">
-          <div class="text-2xl font-bold text-yellow-600">{{ summary()?.pendingCount ?? 0 }}</div>
-          <div class="text-sm text-yellow-700">{{ 'SESSION_PAYMENTS.SUMMARY_PENDING' | translate }}</div>
-        </div>
-        <div class="rounded-lg bg-red-50 border border-red-200 p-4 text-center">
-          <div class="text-2xl font-bold text-red-600">{{ summary()?.refundedCount ?? 0 }}</div>
-          <div class="text-sm text-red-700">{{ 'SESSION_PAYMENTS.SUMMARY_REFUNDED' | translate }}</div>
-        </div>
-      </div> -->
-
-      <!-- Two revenue views over the same money: cash that arrived vs value earned.
-           A 800-for-8 package paid today = 800 cash today, but earns 100 per attended session. -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-          <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-            <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.SUMMARY_CASH' | translate }}
+        <div class="text-3xl font-bold text-emerald-600 mt-1">{{ cashForView() | amount }}</div>
+        @if (view() === 'ALL') {
+          <div class="text-xs text-emerald-700 mt-2 leading-5">
+            {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}: {{ sessionCash() | amount }} · {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}: {{ packageCash() | amount }}
           </div>
-          <div class="text-3xl font-bold text-emerald-600 mt-1">{{ (summary()?.cashCollected ?? 0) | amount }}</div>
+        } @else {
           <div class="text-xs text-emerald-700 mt-2 leading-5">{{ 'SESSION_PAYMENTS.SUMMARY_CASH_HINT' | translate }}</div>
-        </div>
+        }
+      </div>
+      @if (view() !== 'PACKAGES') {
         <div class="rounded-lg bg-purple-50 border border-purple-200 p-4">
           <div class="flex items-center gap-2 text-sm font-semibold text-purple-800">
             <i class="pi pi-chart-line"></i> {{ 'SESSION_PAYMENTS.SUMMARY_EARNED' | translate }}
@@ -108,54 +106,59 @@
           <div class="text-3xl font-bold text-purple-600 mt-1">{{ (summary()?.totalRevenue ?? 0) | amount }}</div>
           <div class="text-xs text-purple-700 mt-2 leading-5">{{ 'SESSION_PAYMENTS.SUMMARY_EARNED_HINT' | translate }}</div>
         </div>
-      </div>
-
-      <!-- Package renewals due: bundle used up, next package owed -->
-      @if (renewals().length > 0) {
-        <div class="rounded-lg bg-amber-50 border border-amber-300 p-4 mb-6">
-          <div class="flex items-center gap-2 font-semibold text-amber-800 mb-1">
-            <i class="pi pi-exclamation-triangle"></i>
-            {{ 'SESSION_PAYMENTS.RENEWALS_TITLE' | translate }} ({{ renewals().length }})
-          </div>
-          <p class="text-xs text-amber-700 mb-3">{{ 'SESSION_PAYMENTS.RENEWALS_HINT' | translate }}</p>
-          <div class="flex flex-col gap-2">
-            @for (r of renewals(); track r.enrollmentId) {
-              <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-lg px-3 py-2 flex-wrap">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span>
-                  <span class="text-sm text-gray-500">{{ r.courseName }}</span>
-                  <p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: r.lastSessionsUsed, total: r.lastSessionsTotal }"></p-tag>
-                </div>
-                <p-button
-                  icon="pi pi-box"
-                  size="small"
-                  severity="warn"
-                  [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: r.packageSize, amount: ((r.packagePrice || 0) | amount) }"
-                  (onClick)="openRenewalPay(r)"
-                ></p-button>
-              </div>
-            }
-          </div>
-        </div>
-      }
-
-    }
-
-    <!-- Status filter tabs — shared across both views. In the packages view the
-         set is trimmed (no per-session-only OVERDUE / ON_HOLD / COVERED). -->
-    <div class="flex gap-2 mb-4 flex-wrap">
-      @for (st of visibleStatuses; track st) {
-        <p-button
-          [label]="('SESSION_PAYMENTS.STATUS_' + st | translate) + ' (' + statusCount(st) + ')'"
-          size="small"
-          [outlined]="selectedTab() !== st"
-          [severity]="st === 'ALL' ? 'primary' : statusSeverity(st)"
-          (onClick)="onStatusFilterChange(st)"
-        ></p-button>
       }
     </div>
 
-    @if (view() === 'CHARGES') {
+    <!-- Package renewals due: bundle used up, next package owed (charges + all). -->
+    @if (view() !== 'PACKAGES' && renewals().length > 0) {
+      <div class="rounded-lg bg-amber-50 border border-amber-300 p-4 mb-6">
+        <div class="flex items-center gap-2 font-semibold text-amber-800 mb-1">
+          <i class="pi pi-exclamation-triangle"></i>
+          {{ 'SESSION_PAYMENTS.RENEWALS_TITLE' | translate }} ({{ renewals().length }})
+        </div>
+        <p class="text-xs text-amber-700 mb-3">{{ 'SESSION_PAYMENTS.RENEWALS_HINT' | translate }}</p>
+        <div class="flex flex-col gap-2">
+          @for (r of renewals(); track r.enrollmentId) {
+            <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-lg px-3 py-2 flex-wrap">
+              <div class="flex items-center gap-3 flex-wrap">
+                <span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span>
+                <span class="text-sm text-gray-500">{{ r.courseName }}</span>
+                <p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: r.lastSessionsUsed, total: r.lastSessionsTotal }"></p-tag>
+              </div>
+              <p-button
+                icon="pi pi-box"
+                size="small"
+                severity="warn"
+                [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: r.packageSize, amount: ((r.packagePrice || 0) | amount) }"
+                (onClick)="openRenewalPay(r)"
+              ></p-button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Status filter tabs — shown for the single-dataset views (Charges/Packages).
+         Hidden in All, which shows both tables in full. In the packages view the
+         set is trimmed (no per-session-only OVERDUE / ON_HOLD / COVERED). -->
+    @if (view() !== 'ALL') {
+      <div class="flex gap-2 mb-4 flex-wrap">
+        @for (st of visibleStatuses; track st) {
+          <p-button
+            [label]="('SESSION_PAYMENTS.STATUS_' + st | translate) + ' (' + statusCount(st) + ')'"
+            size="small"
+            [outlined]="selectedTab() !== st"
+            [severity]="st === 'ALL' ? 'primary' : statusSeverity(st)"
+            (onClick)="onStatusFilterChange(st)"
+          ></p-button>
+        }
+      </div>
+    }
+
+    @if (view() !== 'PACKAGES') {
+      @if (view() === 'ALL') {
+        <h3 class="text-base font-semibold text-gray-700 mb-2 flex items-center gap-2"><i class="pi pi-wallet text-gray-400"></i> {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}</h3>
+      }
       <!-- Table -->
       <p-table [value]="filtered()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
@@ -213,7 +216,12 @@
           <tr><td colspan="7" class="text-center py-8 text-gray-500">{{ 'SESSION_PAYMENTS.NO_RECORDS' | translate }}</td></tr>
         </ng-template>
       </p-table>
-    } @else {
+    }
+
+    @if (view() !== 'CHARGES') {
+      @if (view() === 'ALL') {
+        <h3 class="text-base font-semibold text-gray-700 mt-8 mb-2 flex items-center gap-2"><i class="pi pi-box text-gray-400"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}</h3>
+      }
       <!-- Packages view -->
       <p-table [value]="filteredPackages()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">

@@ -74,7 +74,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   selectedBranchId = signal<string | null>(null);
   selectedCourseId = signal<string | null>(null);
   selectedTab = signal<StatusTab>('ALL');
-  view = signal<'CHARGES' | 'PACKAGES'>('CHARGES');
+  view = signal<'CHARGES' | 'PACKAGES' | 'ALL'>('CHARGES');
   // Quick date-range preset: TODAY | WEEK | MONTH | CUSTOM. Defaults to MONTH.
   rangePreset = signal<'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM'>('MONTH');
 
@@ -161,6 +161,22 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     return this.statuses;
   }
 
+  // ── Cash collected, split by money source ────────────────────────────────────
+  // cashCollected (server) = session-charge cash + prepaid-package cash. We show
+  // the slice that matches the active view: sessions, packages, or the total.
+  packageCash = computed(() => this.summary()?.packageCashCollected ?? 0);
+  sessionCash = computed(() => Math.max(0, (this.summary()?.cashCollected ?? 0) - this.packageCash()));
+  totalCash = computed(() => this.summary()?.cashCollected ?? 0);
+
+  /** The Cash Collected figure for the active view. */
+  cashForView = computed(() => {
+    switch (this.view()) {
+      case 'PACKAGES': return this.packageCash();
+      case 'ALL': return this.totalCash();
+      default: return this.sessionCash();
+    }
+  });
+
   ngOnInit(): void {
     this.lookup.branches().subscribe({ next: b => this.branches.set(b), error: () => {} });
     this.courseService.getAllCourses().subscribe({
@@ -201,7 +217,8 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
       },
       error: () => this.loading.set(false),
     });
-    if (this.view() === 'PACKAGES') this.loadPackages();
+    // Packages feed the Packages view and the combined All view.
+    if (this.view() !== 'CHARGES') this.loadPackages();
   }
 
   // ── Package renewal collection ──────────────────────────────────────────────
@@ -239,24 +256,17 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     }).subscribe({ next: p => this.packages.set(p), error: () => {} });
   }
 
-  get viewOptions(): { value: 'CHARGES' | 'PACKAGES'; label: string }[] {
-    return [
-      { value: 'CHARGES', label: this.translate.instant('SESSION_PAYMENTS.VIEW_CHARGES') },
-      { value: 'PACKAGES', label: this.translate.instant('SESSION_PAYMENTS.VIEW_PACKAGES') },
-    ];
-  }
-
   onViewChange(): void {
-    if (this.view() === 'PACKAGES') this.loadPackages();
+    if (this.view() !== 'CHARGES') this.loadPackages();
   }
 
-  /** Switch the CHARGES / PACKAGES view (rendered as tabs). Reset the status
-   *  filter so we never land on a tab that's empty in the other view. */
-  setView(v: 'CHARGES' | 'PACKAGES'): void {
+  /** Switch the CHARGES / PACKAGES / ALL view (rendered as tabs). Reset the
+   *  status filter so we never land on a tab that's empty in the other view. */
+  setView(v: 'CHARGES' | 'PACKAGES' | 'ALL'): void {
     if (this.view() === v) return;
     this.view.set(v);
     this.selectedTab.set('ALL');
-    if (v === 'PACKAGES') this.loadPackages();
+    if (v !== 'CHARGES') this.loadPackages();
   }
 
   /**

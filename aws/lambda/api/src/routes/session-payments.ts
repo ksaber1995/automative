@@ -692,22 +692,26 @@ export const sessionPaymentsRoutes = {
         spDate += ` AND COALESCE(paid_date, created_at::date) <= $${cashParams.length}::date`;
         pkgDate += ` AND purchased_at::date <= $${cashParams.length}::date`;
       }
+      // Split the cash into per-session-charge money and prepaid-package money so
+      // the dashboard can show "cash for packages only" and a session/package/all
+      // breakdown. cashCollected (total) = sessionCash + packageCashCollected.
       const cashRow = await queryOne<any>(
         `SELECT
            COALESCE((SELECT SUM(amount_paid) FROM session_payments
-                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${spDate}), 0)
-           + COALESCE((SELECT SUM(amount_paid) FROM session_packages
-                       WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${pkgDate}), 0) AS total`,
+                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${spDate}), 0) AS session_cash,
+           COALESCE((SELECT SUM(amount_paid) FROM session_packages
+                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${pkgDate}), 0) AS package_cash`,
         cashParams
       );
-      const cashCollected = parseFloat(cashRow?.total || 0);
+      const packageCashCollected = parseFloat(cashRow?.package_cash || 0);
+      const cashCollected = parseFloat(cashRow?.session_cash || 0) + packageCashCollected;
 
       return {
         status: 200 as const,
         body: {
           totalCharges: rows.length,
           paidCount, coveredCount, pendingCount, refundedCount,
-          totalRevenue, totalExpected, cashCollected,
+          totalRevenue, totalExpected, cashCollected, packageCashCollected,
         },
       };
     } catch (error) {

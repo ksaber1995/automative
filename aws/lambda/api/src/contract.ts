@@ -770,6 +770,8 @@ const SessionPaymentSummarySchema = z.object({
   totalExpected: z.number(),
   /** Money actually received in the range (payment-dated); packages count in full on purchase day. */
   cashCollected: z.number().optional(),
+  /** Of cashCollected, the portion from prepaid packages only (payment-dated). */
+  packageCashCollected: z.number().optional(),
 });
 
 const SessionPackageSchema = z.object({
