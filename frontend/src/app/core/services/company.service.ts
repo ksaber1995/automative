@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { CardDesign } from '@shared/interfaces/card-design.interface';
 
 export type GlobalExpenseAllocation = 'PROPORTIONAL' | 'EQUAL' | 'OVERHEAD';
 
@@ -79,5 +80,14 @@ export class CompanyService {
 
   upgradePlan(plan: 'SIMPLE' | 'ADVANCED'): Observable<{ plan: string }> {
     return this.api.post<{ plan: string }>('companies/upgrade-plan', { plan });
+  }
+
+  /** Shared back face of the printed student ID cards. Server fills in defaults. */
+  getCardDesign(): Observable<CardDesign> {
+    return this.api.get<CardDesign>('companies/card-design');
+  }
+
+  updateCardDesign(design: CardDesign): Observable<CardDesign> {
+    return this.api.put<CardDesign>('companies/card-design', design);
   }
 }

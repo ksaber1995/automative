@@ -267,6 +267,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       },
       {
+        // Shared back face of the printed student ID cards. Admin-gated to match
+        // the API, which only lets ADMIN/GLOBAL_ADMIN write the design.
+        path: 'card-design',
+        canActivate: [roleGuard([UserRole.GLOBAL_ADMIN, UserRole.ADMIN])],
+        data: { breadcrumb: 'BREADCRUMBS.CARD_DESIGN' },
+        loadComponent: () => import('./features/card-design/card-design.component').then(m => m.CardDesignComponent)
+      },
+      {
         path: 'company-profile',
         data: { breadcrumb: 'BREADCRUMBS.COMPANY_PROFILE' },
         loadComponent: () => import('./features/company-profile/company-profile.component').then(m => m.CompanyProfileComponent)

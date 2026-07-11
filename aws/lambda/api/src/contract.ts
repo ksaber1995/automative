@@ -92,6 +92,21 @@ const WithdrawalCategorySchema = z.enum(['OWNER_DRAW', 'PROFIT_DISTRIBUTION', 'D
 // Global Expense Allocation Method
 const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD']);
 
+// Student ID card — the shared back face, configured once per company.
+// Lengths are capped so a pasted essay can't blow up the rendered card.
+const CardDesignSchema = z.object({
+  teacherName: z.string().max(80),
+  teacherTitle: z.string().max(80),
+  phone: z.string().max(40),
+  whatsapp: z.string().max(40),
+  email: z.string().max(120),
+  location: z.string().max(80),
+  qrLink: z.string().max(500),
+  slogan: z.string().max(200),
+  instructions: z.array(z.string().max(160)).max(5),
+  highlights: z.array(z.string().max(60)).max(4),
+});
+
 // Debt Status
 const DebtStatusSchema = z.enum(['ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED']);
 
@@ -3852,6 +3867,24 @@ export const contract = c.router({
           autoManageSessions: z.boolean(),
         }),
         401: ApiErrorSchema,
+      },
+    },
+    getCardDesign: {
+      method: 'GET' as const,
+      path: '/api/companies/card-design',
+      responses: {
+        200: CardDesignSchema,
+        401: ApiErrorSchema,
+      },
+    },
+    updateCardDesign: {
+      method: 'PUT' as const,
+      path: '/api/companies/card-design',
+      body: CardDesignSchema,
+      responses: {
+        200: CardDesignSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
       },
     },
     updateSettings: {

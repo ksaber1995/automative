@@ -75,17 +75,8 @@
       </p-tablist>
     </p-tabs>
 
-    <!-- QR toolbar: QR downloads (all company types) -->
+    <!-- Student ID cards: one PNG per student per class, bundled in a ZIP -->
     <div class="flex gap-2 my-3 flex-wrap items-center">
-      <button
-        pButton
-        size="small"
-        icon="pi pi-file-pdf"
-        [label]="'STUDENTS.LIST.QR_PRINT_PDF' | translate"
-        severity="info"
-        [loading]="pdfPreparing()"
-        (click)="openPdfDialog()"
-      ></button>
       <button
         pButton
         size="small"
@@ -96,45 +87,6 @@
         (click)="downloadQrZip()"
       ></button>
     </div>
-
-    <!-- QR PDF export: pick courses/classes → one PDF per class, bundled in a ZIP -->
-    <p-dialog
-      [(visible)]="pdfDialogVisible"
-      [modal]="true"
-      [draggable]="false"
-      [resizable]="false"
-      [style]="{ width: '460px' }"
-      [header]="'STUDENTS.LIST.QR_PDF_DIALOG_TITLE' | translate"
-    >
-      <p class="text-sm text-gray-500 mb-3">{{ 'STUDENTS.LIST.QR_PDF_DIALOG_HINT' | translate }}</p>
-
-      @if (pdfTreeNodes().length === 0) {
-        <p class="text-sm text-gray-400 py-4 text-center">{{ 'STUDENTS.LIST.QR_PDF_NO_CLASSES' | translate }}</p>
-      } @else {
-        <p-tree
-          [value]="pdfTreeNodes()"
-          selectionMode="checkbox"
-          [(selection)]="pdfSelection"
-          [style]="{ maxHeight: '360px', overflow: 'auto', width: '100%' }"
-        ></p-tree>
-      }
-
-      <ng-template pTemplate="footer">
-        <p-button
-          [label]="'STUDENTS.LIST.QR_PDF_CANCEL' | translate"
-          [text]="true"
-          (onClick)="pdfDialogVisible.set(false)"
-          [disabled]="generatingPdf()"
-        ></p-button>
-        <p-button
-          icon="pi pi-download"
-          [label]="'STUDENTS.LIST.QR_PDF_DOWNLOAD' | translate"
-          (onClick)="downloadSelectedPdfs()"
-          [loading]="generatingPdf()"
-          [disabled]="pdfTreeNodes().length === 0"
-        ></p-button>
-      </ng-template>
-    </p-dialog>
 
     <!-- Students Table -->
     <p-table

@@ -8,17 +8,16 @@ import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
-import { DialogModule } from 'primeng/dialog';
-import { TreeModule } from 'primeng/tree';
 import { FormsModule } from '@angular/forms';
-import { ConfirmationService, TreeNode } from 'primeng/api';
+import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
-import QRCode from 'qrcode';
-import { jsPDF } from 'jspdf';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
+import { StudentCardData, currentAcademicYear, renderStudentCardPng } from '../student-card.util';
+import { renderCardBackPng } from '../card-back.util';
+import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -49,8 +48,6 @@ interface EnrollmentCounts {
     ConfirmDialogModule,
     TooltipModule,
     TabsModule,
-    DialogModule,
-    TreeModule,
     TranslateModule,
     StudentImportDialogComponent
   ],
@@ -64,6 +61,7 @@ export class StudentListComponent implements OnInit {
   private enrollmentService = inject(EnrollmentService);
   private classService = inject(ClassService);
   private courseService = inject(CourseService);
+  private companyService = inject(CompanyService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private confirmationService = inject(ConfirmationService);
@@ -342,246 +340,19 @@ export class StudentListComponent implements OnInit {
     return age;
   }
 
-  // --- Download QR Codes as per-class PDFs (bundled in a ZIP) ---
-  // The button opens a course/class picker; each selected class becomes its own
-  // PDF (`Course/Class.pdf`) and they're all packaged into a single ZIP — the
-  // PDF equivalent of the folder-per-class ZIP export below.
-  pdfPreparing = signal(false);      // loading enrollments + building the tree
-  generatingPdf = signal(false);     // rendering PDFs + zipping
-  pdfDialogVisible = signal(false);
-  pdfTreeNodes = signal<TreeNode[]>([]);
-  pdfSelection: TreeNode[] = [];      // p-tree checkbox selection (parents + leaves)
-
-  // Cached while the dialog is open so Download doesn't refetch/recompute.
-  private pdfClassStudents = new Map<string, Student[]>();                       // classId -> its activated students
-  private pdfClassMeta = new Map<string, { className: string; courseName: string }>();
-  private pdfStudentGroups = new Map<string, string[]>();                        // studentId -> "Course - Class" labels
+  // --- Download student ID cards as a ZIP ---
+  // One PNG ID card per student per class, filed under `Course/Class/`. A student
+  // in two classes therefore gets two cards, since the card names the course,
+  // class and level it was issued for.
+  downloadingZip = signal(false);
 
   /**
-   * Students whose QR can be downloaded — any active student with a token
+   * Students whose card can be downloaded — any active student with a token
    * (QR is active by default for all tenants).
    */
   private qrDownloadableStudents(): Student[] {
     return this.students().filter(s => s.isActive && s.qrToken);
   }
-
-  /** Open the course/class picker for the per-class PDF export. */
-  async openPdfDialog() {
-    const activatedStudents = this.qrDownloadableStudents();
-    if (activatedStudents.length === 0) {
-      this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
-      return;
-    }
-
-    this.pdfPreparing.set(true);
-    try {
-      const [enrollments, classes, courses] = await new Promise<[any[], Class[], any[]]>((resolve, reject) => {
-        forkJoin({
-          enrollments: this.enrollmentService.getAllEnrollments(),
-          classes: this.classService.getAllClasses(),
-          courses: this.courseService.getAllCourses(),
-        }).subscribe({
-          next: (res) => resolve([res.enrollments, res.classes, res.courses]),
-          error: reject,
-        });
-      });
-
-      const courseMap = new Map(courses.map((c: any) => [c.id, c.name]));
-      const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
-      const studentById = new Map(activatedStudents.map(s => [s.id, s]));
-      const studentIdSet = new Set(activatedStudents.map(s => s.id));
-
-      const classStudents = new Map<string, Student[]>();
-      const classSeen = new Map<string, Set<string>>();  // dedupe students within a class
-      const classMeta = new Map<string, { className: string; courseName: string }>();
-      const studentGroups = new Map<string, string[]>();
-      const courseClasses = new Map<string, Set<string>>(); // courseId -> classIds (with activated students)
-
-      for (const e of enrollments) {
-        if (!studentIdSet.has(e.studentId)) continue;
-        const cls = classMap.get(e.classId);
-        if (!cls) continue;
-        const courseName = courseMap.get(cls.courseId) || 'Unknown Course';
-
-        if (!classMeta.has(e.classId)) classMeta.set(e.classId, { className: cls.name, courseName });
-        if (!classStudents.has(e.classId)) { classStudents.set(e.classId, []); classSeen.set(e.classId, new Set()); }
-        const seen = classSeen.get(e.classId)!;
-        if (!seen.has(e.studentId)) {
-          seen.add(e.studentId);
-          classStudents.get(e.classId)!.push(studentById.get(e.studentId)!);
-        }
-        if (!courseClasses.has(cls.courseId)) courseClasses.set(cls.courseId, new Set());
-        courseClasses.get(cls.courseId)!.add(e.classId);
-
-        if (!studentGroups.has(e.studentId)) studentGroups.set(e.studentId, []);
-        const label = `${courseName} - ${cls.name}`;
-        const gl = studentGroups.get(e.studentId)!;
-        if (!gl.includes(label)) gl.push(label);
-      }
-
-      // Build the course -> class tree, sorted alphabetically, with per-class counts.
-      const nodes: TreeNode[] = Array.from(courseClasses.keys())
-        .sort((a, b) => String(courseMap.get(a) || '').localeCompare(String(courseMap.get(b) || '')))
-        .map(courseId => {
-          const children: TreeNode[] = Array.from(courseClasses.get(courseId)!)
-            .sort((a, b) => (classMeta.get(a)?.className || '').localeCompare(classMeta.get(b)?.className || ''))
-            .map(cid => ({
-              key: `class:${cid}`,
-              label: `${classMeta.get(cid)?.className || 'Class'} (${classStudents.get(cid)?.length || 0})`,
-              data: cid,
-              leaf: true,
-            }));
-          return {
-            key: `course:${courseId}`,
-            label: String(courseMap.get(courseId) || 'Unknown Course'),
-            children,
-            expanded: true,
-          } as TreeNode;
-        });
-
-      this.pdfClassStudents = classStudents;
-      this.pdfClassMeta = classMeta;
-      this.pdfStudentGroups = studentGroups;
-      this.pdfTreeNodes.set(nodes);
-      this.pdfSelection = this.flattenTreeNodes(nodes); // preselect everything
-      this.pdfDialogVisible.set(true);
-    } catch {
-      this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
-    } finally {
-      this.pdfPreparing.set(false);
-    }
-  }
-
-  /** Generate one PDF per selected class and download them all as a single ZIP. */
-  async downloadSelectedPdfs() {
-    const selectedClassIds = (this.pdfSelection || [])
-      .filter(n => typeof n.key === 'string' && n.key.startsWith('class:'))
-      .map(n => n.data as string);
-    if (selectedClassIds.length === 0) {
-      this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_PDF_NO_SELECTION'));
-      return;
-    }
-
-    this.generatingPdf.set(true);
-    try {
-      const zip = new JSZip();
-      const origin = window.location.origin;
-      let rendered = 0;
-
-      for (const classId of selectedClassIds) {
-        const studentsInClass = this.pdfClassStudents.get(classId) || [];
-        if (studentsInClass.length === 0) continue;
-        const meta = this.pdfClassMeta.get(classId);
-
-        // A4 PDF, deflate-compressed so large classes don't blow up tab memory.
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-        for (let i = 0; i < studentsInClass.length; i++) {
-          const student = studentsInClass[i];
-          const groups = this.pdfStudentGroups.get(student.id) || [];
-          await this.renderStudentPages(pdf, student, origin, groups, i === 0);
-          // Yield periodically so a large batch doesn't lock the main thread.
-          if (++rendered % 25 === 0) await new Promise((r) => setTimeout(r));
-        }
-
-        const courseName = this.sanitizeName(meta?.courseName || 'Unknown Course');
-        const className = this.sanitizeName(meta?.className || 'Unknown Class');
-        zip.file(`${courseName}/${className}.pdf`, pdf.output('arraybuffer'));
-      }
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, 'qr-pdfs.zip');
-      this.pdfDialogVisible.set(false);
-      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_PDF_DOWNLOAD_SUCCESS', { count: selectedClassIds.length }));
-    } catch {
-      this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
-    } finally {
-      this.generatingPdf.set(false);
-    }
-  }
-
-  /** Flatten a tree into a single array (parents + children) for full selection. */
-  private flattenTreeNodes(nodes: TreeNode[]): TreeNode[] {
-    const out: TreeNode[] = [];
-    const walk = (list: TreeNode[]) => list.forEach(n => { out.push(n); if (n.children) walk(n.children); });
-    walk(nodes);
-    return out;
-  }
-
-  /** Render a student's two pages (QR page + info card) into an existing PDF. */
-  private async renderStudentPages(pdf: jsPDF, student: Student, origin: string, groups: string[], isFirst: boolean): Promise<void> {
-    const pw = 210; // page width (mm)
-    const ph = 297; // page height (mm)
-
-    // --- QR page ---
-    if (!isFirst) pdf.addPage();
-    const url = `${origin}/p/s/${student.qrToken}`;
-    // 500px is plenty to scan a 140mm-wide QR and keeps per-image memory low.
-    const dataUrl = await QRCode.toDataURL(url, { width: 500, margin: 2 });
-    const qrSize = 140;
-    pdf.addImage(dataUrl, 'PNG', (pw - qrSize) / 2, (ph - qrSize) / 2, qrSize, qrSize, undefined, 'FAST');
-
-    // --- Info card page ---
-    pdf.addPage();
-    const name = `${student.firstName} ${student.lastName}`.trim();
-    const phone = student.phone || '';
-
-    const cardW = 160;
-    const cardX = (pw - cardW) / 2;
-    let cardH = 90 + groups.length * 10;
-    if (cardH < 100) cardH = 100;
-    const cardY = (ph - cardH) / 2;
-
-    // Card background
-    pdf.setFillColor(245, 247, 250);
-    pdf.roundedRect(cardX, cardY, cardW, cardH, 6, 6, 'F');
-
-    // Top accent bar (clip the bottom rounded corners with a plain rect)
-    pdf.setFillColor(59, 130, 246);
-    pdf.roundedRect(cardX, cardY, cardW, 14, 6, 6, 'F');
-    pdf.setFillColor(245, 247, 250);
-    pdf.rect(cardX, cardY + 8, cardW, 6, 'F');
-
-    // Student name
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(28);
-    pdf.setTextColor(30, 41, 59);
-    pdf.text(name, pw / 2, cardY + 36, { align: 'center' });
-
-    // Phone
-    let yPos = cardY + 50;
-    if (phone) {
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(16);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(phone, pw / 2, yPos, { align: 'center' });
-      yPos += 14;
-    }
-
-    // Divider
-    pdf.setDrawColor(203, 213, 225);
-    pdf.setLineWidth(0.5);
-    pdf.line(cardX + 20, yPos, cardX + cardW - 20, yPos);
-    yPos += 10;
-
-    // Groups (class labels)
-    if (groups.length > 0) {
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(13);
-      pdf.setTextColor(71, 85, 105);
-      for (const g of groups) {
-        pdf.text(g, pw / 2, yPos, { align: 'center' });
-        yPos += 10;
-      }
-    } else {
-      pdf.setFont('helvetica', 'italic');
-      pdf.setFontSize(13);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text('—', pw / 2, yPos, { align: 'center' });
-    }
-  }
-
-  // --- Download QR Codes as ZIP ---
-  downloadingZip = signal(false);
 
   async downloadQrZip() {
     this.downloadingZip.set(true);
@@ -589,7 +360,6 @@ export class StudentListComponent implements OnInit {
       const activatedStudents = this.qrDownloadableStudents();
       if (activatedStudents.length === 0) {
         this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_NO_ACTIVATED'));
-        this.downloadingZip.set(false);
         return;
       }
 
@@ -604,49 +374,82 @@ export class StudentListComponent implements OnInit {
         });
       });
 
-      const courseMap = new Map(courses.map((c: any) => [c.id, c.name]));
+      const courseMap = new Map<string, { name: string; levelName: string }>(
+        courses.map((c: any) => [c.id, { name: c.name, levelName: c.levelName || '' }])
+      );
       const classMap = new Map(classes.map((c: Class) => [c.id, { name: c.name, courseId: c.courseId }]));
       const studentIdSet = new Set(activatedStudents.map(s => s.id));
 
-      const studentEnrollments = new Map<string, { courseId: string; classId: string }[]>();
+      const studentEnrollments = new Map<string, string[]>();   // studentId -> classIds
       for (const e of enrollments) {
         if (studentIdSet.has(e.studentId)) {
           if (!studentEnrollments.has(e.studentId)) studentEnrollments.set(e.studentId, []);
-          studentEnrollments.get(e.studentId)!.push({ courseId: e.courseId, classId: e.classId });
+          studentEnrollments.get(e.studentId)!.push(e.classId);
         }
       }
 
       const zip = new JSZip();
       const origin = window.location.origin;
+      const companyName = this.authService.getCompanyName();
+      const year = currentAcademicYear();
+      const canvas = document.createElement('canvas');   // reused for every card
+      await document.fonts.ready;                        // Arabic must shape before we rasterise
+      let rendered = 0;
 
       for (const student of activatedStudents) {
-        const url = `${origin}/p/s/${student.qrToken}`;
-        const dataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2 });
-        const base64 = dataUrl.split(',')[1];
-        const name = `${student.firstName} ${student.lastName}`.trim();
+        const card: StudentCardData = {
+          companyName,
+          name: `${student.firstName} ${student.lastName}`.trim(),
+          code: student.studentCode != null ? `#${student.studentCode}` : '',
+          level: '',
+          group: '',
+          year,
+          subject: '',
+          qrUrl: `${origin}/p/s/${student.qrToken}`,
+        };
         const phone = student.phone ? ` (${student.phone})` : '';
-        const fileName = this.sanitizeName(`${name}${phone}`) + '.png';
+        const fileName = this.sanitizeName(`${card.name}${phone}`) + '.png';
 
-        const enrs = studentEnrollments.get(student.id) || [];
-        if (enrs.length === 0) {
-          zip.file(`Uncategorized/${fileName}`, base64, { base64: true });
+        const classIds = studentEnrollments.get(student.id) || [];
+        if (classIds.length === 0) {
+          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas), { base64: true });
         } else {
           const addedPaths = new Set<string>();
-          for (const enr of enrs) {
-            const courseName = this.sanitizeName(courseMap.get(enr.courseId) || 'Unknown Course');
-            const classInfo = classMap.get(enr.classId);
+          for (const classId of classIds) {
+            const classInfo = classMap.get(classId);
+            const course = classInfo ? courseMap.get(classInfo.courseId) : undefined;
+            const courseName = this.sanitizeName(course?.name || 'Unknown Course');
             const className = this.sanitizeName(classInfo?.name || 'Unknown Class');
             const path = `${courseName}/${className}/${fileName}`;
-            if (!addedPaths.has(path)) {
-              zip.file(path, base64, { base64: true });
-              addedPaths.add(path);
-            }
+            if (addedPaths.has(path)) continue;
+            addedPaths.add(path);
+
+            const png = await renderStudentCardPng({
+              ...card,
+              level: course?.levelName || '',
+              group: classInfo?.name || '',
+              subject: course?.name || '',
+            }, canvas);
+            zip.file(path, png, { base64: true });
           }
         }
+
+        // Yield periodically so a large batch doesn't lock the main thread.
+        if (++rendered % 10 === 0) await new Promise((r) => setTimeout(r));
+      }
+
+      // The back face is identical for every student (Settings > Card Design), so
+      // it ships once at the ZIP root rather than beside each card. Optional: if
+      // it fails to render, the student cards are still worth delivering.
+      try {
+        const design = await firstValueFrom(this.companyService.getCardDesign());
+        zip.file('card-back.png', await renderCardBackPng(design, canvas), { base64: true });
+      } catch {
+        console.warn('Card back face skipped — could not load or render the card design.');
       }
 
       const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, 'qr-codes.zip');
+      saveAs(blob, 'student-cards.zip');
       this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
     } catch {
       this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));

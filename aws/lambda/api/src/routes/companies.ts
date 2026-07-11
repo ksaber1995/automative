@@ -19,6 +19,80 @@ export async function ensureAutoManageSessionsColumn(): Promise<void> {
   return autoManageColumnInitPromise;
 }
 
+// Student ID card back face — one shared design per company. Same idempotent
+// runtime-migration approach as above.
+let cardDesignColumnInitPromise: Promise<void> | null = null;
+export async function ensureCardDesignColumn(): Promise<void> {
+  if (!cardDesignColumnInitPromise) {
+    cardDesignColumnInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS card_design JSONB`);
+      } catch (e) {
+        cardDesignColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return cardDesignColumnInitPromise;
+}
+
+interface CardDesign {
+  teacherName: string;
+  teacherTitle: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  location: string;
+  qrLink: string;
+  slogan: string;
+  instructions: string[];
+  highlights: string[];
+}
+
+const DEFAULT_CARD_DESIGN: CardDesign = {
+  teacherName: '',
+  teacherTitle: '',
+  phone: '',
+  whatsapp: '',
+  email: '',
+  location: '',
+  qrLink: '',
+  slogan: 'التفوق لا يأتي صدفة\nبل هو نتيجة الإجتهاد والثقة بالله',
+  instructions: [
+    'يحافظ الطالب على البطاقة وعدم إعارتها.',
+    'في حالة فقدان البطاقة يتم إبلاغ المعلم فوراً.',
+    'تُستخدم البطاقة في الحضور والانصراف.',
+    'المحافظة على البطاقة وعدم العبث بها.',
+    'الالتزام بالقوانين دليل على احترامك لنفسك وللآخرين.',
+  ],
+  highlights: ['شرح مبسط وفهم عميق', 'مراجعات نهائية', 'اختبارات دورية', 'متابعة مستمرة وتقييم شامل'],
+};
+
+/**
+ * Merge whatever is stored over the defaults, so a company that has never saved
+ * (or that saved before a field existed) still gets a complete, renderable card.
+ * teacherName falls back to the company name.
+ */
+function resolveCardDesign(stored: any, companyName: string): CardDesign {
+  const d = stored && typeof stored === 'object' ? stored : {};
+  const str = (v: any, fallback: string) => (typeof v === 'string' ? v : fallback);
+  const list = (v: any, fallback: string[], cap: number) =>
+    Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, cap) : fallback;
+
+  return {
+    teacherName: str(d.teacherName, '').trim() || companyName,
+    teacherTitle: str(d.teacherTitle, DEFAULT_CARD_DESIGN.teacherTitle),
+    phone: str(d.phone, DEFAULT_CARD_DESIGN.phone),
+    whatsapp: str(d.whatsapp, DEFAULT_CARD_DESIGN.whatsapp),
+    email: str(d.email, DEFAULT_CARD_DESIGN.email),
+    location: str(d.location, DEFAULT_CARD_DESIGN.location),
+    qrLink: str(d.qrLink, DEFAULT_CARD_DESIGN.qrLink),
+    slogan: str(d.slogan, DEFAULT_CARD_DESIGN.slogan),
+    instructions: list(d.instructions, DEFAULT_CARD_DESIGN.instructions, 5),
+    highlights: list(d.highlights, DEFAULT_CARD_DESIGN.highlights, 4),
+  };
+}
+
 function mapCompanyProfile(row: any) {
   return {
     id: row.id,
@@ -142,6 +216,51 @@ export const companiesRoutes = {
     } catch (error) {
       console.error('Update company settings error:', error);
       return mapThrownError(error, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update settings', 400);
+    }
+  },
+
+  getCardDesign: async ({ headers }: { headers: { authorization: string } }) => {
+    try {
+      await ensureCardDesignColumn();
+      const context = await extractTenantContext(headers.authorization);
+      const company = await queryOne<any>(
+        'SELECT name, card_design FROM companies WHERE id = $1',
+        [context.companyId]
+      );
+      if (!company) return apiError(404, 'ERRORS.COMPANIES.NOT_FOUND', 'Company not found');
+      return {
+        status: 200 as const,
+        body: resolveCardDesign(company.card_design, company.name),
+      };
+    } catch (error) {
+      console.error('Get card design error:', error);
+      return mapThrownError(error, 'ERRORS.COMPANIES.SETTINGS_FAILED', 'Unauthorized', 401);
+    }
+  },
+
+  updateCardDesign: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      await ensureCardDesignColumn();
+      const context = await extractTenantContext(headers.authorization);
+
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can update the card design');
+      }
+
+      const company = await queryOne<any>('SELECT name FROM companies WHERE id = $1', [context.companyId]);
+      if (!company) return apiError(404, 'ERRORS.COMPANIES.NOT_FOUND', 'Company not found');
+
+      const design = resolveCardDesign(body, company.name);
+      // Explicit ::jsonb cast — the generic update() helper would bind the object as text.
+      await query('UPDATE companies SET card_design = $1::jsonb, updated_at = NOW() WHERE id = $2', [
+        JSON.stringify(design),
+        context.companyId,
+      ]);
+
+      return { status: 200 as const, body: design };
+    } catch (error) {
+      console.error('Update card design error:', error);
+      return mapThrownError(error, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update card design');
     }
   },
 

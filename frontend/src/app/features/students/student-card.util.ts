@@ -1,0 +1,571 @@
+import QRCode from 'qrcode';
+
+/**
+ * Renders the front face of the printed student ID card (the QR/attendance card)
+ * onto a canvas, then exports it as a PNG.
+ *
+ * Card stock is 8.6 x 5.4 cm (CR80); at 300 dpi that's 1016 x 638 px, which is
+ * what the whole layout below is measured in — treat these as fixed and lay out
+ * against them rather than scaling.
+ */
+export const CARD_W = 1016;
+export const CARD_H = 638;
+
+export const NAVY = '#141d55';
+export const NAVY_D = '#0a1036';
+export const GOLD = '#c9992f';
+export const GOLD_L = '#f4dc96';
+const GREY = '#6b7280';
+const LINE = '#e3e6ec';
+export const FONT = '"Segoe UI", Tahoma, Arial, sans-serif';
+
+export interface StudentCardData {
+  companyName: string;
+  name: string;
+  code: string;
+  level: string;
+  group: string;
+  year: string;
+  subject: string;
+  qrUrl: string;
+}
+
+export type Ctx = CanvasRenderingContext2D;
+export type Align = 'right' | 'center' | 'left';
+export type Dir = 'rtl' | 'ltr';
+
+/** The academic year the card is printed for, e.g. "2025 - 2026" (rolls over in September). */
+export function currentAcademicYear(now: Date = new Date()): string {
+  const start = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${start} - ${start + 1}`;
+}
+
+export function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+export function goldGrad(ctx: Ctx, x0: number, y0: number, x1: number, y1: number): CanvasGradient {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, '#8a6516');
+  g.addColorStop(0.25, GOLD);
+  g.addColorStop(0.5, GOLD_L);
+  g.addColorStop(0.75, GOLD);
+  g.addColorStop(1, '#8a6516');
+  return g;
+}
+
+/** Draw text, shrinking the font until it fits maxW — names and course titles vary wildly in length. */
+export function fitText(
+  ctx: Ctx, text: string, x: number, y: number, maxW: number,
+  size: number, weight: string, color: string, align: Align, dir: Dir,
+): void {
+  ctx.save();
+  ctx.direction = dir;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  let s = size;
+  ctx.font = `${weight} ${s}px ${FONT}`;
+  while (s > 9 && ctx.measureText(text).width > maxW) {
+    s -= 1;
+    ctx.font = `${weight} ${s}px ${FONT}`;
+  }
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+export function star(ctx: Ctx, cx: number, cy: number, r: number): void {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    const px = cx + Math.cos(a) * rad;
+    const py = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawPanel(ctx: Ctx): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(320, 0);
+  ctx.bezierCurveTo(292, 200, 300, 432, 260, CARD_H);
+  ctx.lineTo(0, CARD_H);
+  ctx.closePath();
+  ctx.fillStyle = NAVY;
+  ctx.fill();
+
+  // Flat wedge instead of a gradient — see the note on gradients in drawStudentCard.
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = NAVY_D;
+  ctx.beginPath();
+  ctx.moveTo(0, 300);
+  ctx.lineTo(320, 140);
+  ctx.lineTo(320, CARD_H);
+  ctx.lineTo(0, CARD_H);
+  ctx.closePath();
+  ctx.globalAlpha = 0.55;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.moveTo(348, 0);
+  ctx.bezierCurveTo(320, 200, 328, 432, 288, CARD_H);
+  ctx.strokeStyle = goldGrad(ctx, 280, 0, 350, CARD_H);
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(364, 0);
+  ctx.bezierCurveTo(336, 200, 344, 432, 304, CARD_H);
+  ctx.strokeStyle = GOLD;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.beginPath();
+  ctx.moveTo(-10, 498);
+  ctx.bezierCurveTo(80, 556, 180, 588, 272, CARD_H - 4);
+  ctx.strokeStyle = goldGrad(ctx, 0, 498, 272, CARD_H);
+  ctx.lineWidth = 13;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-10, 544);
+  ctx.bezierCurveTo(70, 590, 155, 613, 232, CARD_H);
+  ctx.strokeStyle = GOLD;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawCrest(ctx: Ctx, cx: number, cy: number): void {
+  ctx.save();
+  ctx.fillStyle = goldGrad(ctx, cx - 60, cy - 70, cx + 60, cy - 50);
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i - 2) * 0.235;
+    star(ctx, cx + Math.cos(a) * 74, cy + 12 + Math.sin(a) * 74, 8.5);
+  }
+
+  const w = 47;
+  const top = cy - 44;
+  ctx.beginPath();
+  ctx.moveTo(cx - w, top);
+  ctx.lineTo(cx + w, top);
+  ctx.lineTo(cx + w, cy + 12);
+  ctx.bezierCurveTo(cx + w, cy + 42, cx + 22, cy + 54, cx, cy + 62);
+  ctx.bezierCurveTo(cx - 22, cy + 54, cx - w, cy + 42, cx - w, cy + 12);
+  ctx.closePath();
+  ctx.fillStyle = NAVY_D;
+  ctx.fill();
+  ctx.strokeStyle = goldGrad(ctx, cx - w, top, cx + w, cy + 62);
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx - 27, cy + 4);
+  ctx.quadraticCurveTo(cx - 13, cy - 4, cx - 1, cy + 2);
+  ctx.lineTo(cx - 1, cy + 25);
+  ctx.quadraticCurveTo(cx - 13, cy + 19, cx - 27, cy + 27);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 27, cy + 4);
+  ctx.quadraticCurveTo(cx + 13, cy - 4, cx + 1, cy + 2);
+  ctx.lineTo(cx + 1, cy + 25);
+  ctx.quadraticCurveTo(cx + 13, cy + 19, cx + 27, cy + 27);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = goldGrad(ctx, cx - 8, cy - 30, cx + 8, cy + 2);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 32);
+  ctx.lineTo(cx + 8, cy - 12);
+  ctx.lineTo(cx, cy - 2);
+  ctx.lineTo(cx - 8, cy - 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Empty gold-framed silhouette — students have no photo on file, so this is left blank to be filled in. */
+function drawPhoto(ctx: Ctx): void {
+  const x = 45, y = 208, w = 190, h = 232, r = 16;
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = goldGrad(ctx, x, y, x + w, y + h);
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  roundRect(ctx, x + 4, y + 4, w - 8, h - 8, r - 4);
+  ctx.clip();
+  ctx.fillStyle = '#eceef2';
+  ctx.fillRect(x, y, w, h);
+
+  const cx = x + w / 2;
+  ctx.fillStyle = '#c8ccd6';
+  ctx.beginPath();
+  ctx.arc(cx, y + 84, 42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - 74, y + h);
+  ctx.bezierCurveTo(cx - 74, y + 150, cx + 74, y + 150, cx + 74, y + h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
+
+function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
+  ctx.save();
+  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (kind === 'user') {
+    ctx.beginPath();
+    ctx.arc(cx, cy - 6, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy + 11);
+    ctx.bezierCurveTo(cx - 10, cy + 1, cx + 10, cy + 1, cx + 10, cy + 11);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'id') {
+    ctx.font = `bold 15px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction = 'ltr';
+    ctx.fillText('ID', cx, cy + 1);
+  } else if (kind === 'cap') {
+    ctx.beginPath();
+    ctx.moveTo(cx - 13, cy - 3);
+    ctx.lineTo(cx, cy - 10);
+    ctx.lineTo(cx + 13, cy - 3);
+    ctx.lineTo(cx, cy + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy + 1);
+    ctx.lineTo(cx - 7, cy + 9);
+    ctx.quadraticCurveTo(cx, cy + 13, cx + 7, cy + 9);
+    ctx.lineTo(cx + 7, cy + 1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 13, cy - 3);
+    ctx.lineTo(cx + 13, cy + 7);
+    ctx.stroke();
+  } else if (kind === 'group') {
+    ctx.beginPath();
+    ctx.arc(cx - 6, cy - 5, 4.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 7, cy - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, cy + 9);
+    ctx.bezierCurveTo(cx - 14, cy + 1, cx + 2, cy + 1, cx + 2, cy + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 1, cy + 8);
+    ctx.bezierCurveTo(cx + 1, cy + 2, cx + 14, cy + 2, cx + 14, cy + 8);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    roundRect(ctx, cx - 12, cy - 10, 24, 21, 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, cy - 3);
+    ctx.lineTo(cx + 12, cy - 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy - 14);
+    ctx.lineTo(cx - 6, cy - 8);
+    ctx.moveTo(cx + 6, cy - 14);
+    ctx.lineTo(cx + 6, cy - 8);
+    ctx.stroke();
+    ctx.fillRect(cx - 8, cy + 1, 4, 4);
+    ctx.fillRect(cx - 1, cy + 1, 4, 4);
+  }
+  ctx.restore();
+}
+
+function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: number): void {
+  ctx.save();
+  ctx.strokeStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
+  ctx.fillStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
+  ctx.lineWidth = 2.4;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  if (kind === 'book') {
+    ctx.beginPath();
+    ctx.moveTo(cx - 15, cy - 10);
+    ctx.quadraticCurveTo(cx - 7, cy - 15, cx, cy - 9);
+    ctx.lineTo(cx, cy + 12);
+    ctx.quadraticCurveTo(cx - 7, cy + 6, cx - 15, cy + 11);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 15, cy - 10);
+    ctx.quadraticCurveTo(cx + 7, cy - 15, cx, cy - 9);
+    ctx.lineTo(cx, cy + 12);
+    ctx.quadraticCurveTo(cx + 7, cy + 6, cx + 15, cy + 11);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (kind === 'target') {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    star(ctx, cx, cy, 15);
+  }
+  ctx.restore();
+}
+
+function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource): void {
+  ctx.save();
+  roundRect(ctx, 0, 0, CARD_W, CARD_H, 30);
+  ctx.clip();
+
+  // NOTE ON GRADIENTS: large-area gradients are avoided throughout this card.
+  // The browser dithers them to hide banding, and that noise is incompressible —
+  // a gradient-filled navy panel alone took the exported PNG from 15 KB to 223 KB
+  // (~350 KB/card, i.e. a 100 MB ZIP for a mid-size academy). Big shapes are flat
+  // fills; goldGrad() is only used on thin strokes and small glyphs, where the
+  // dithered area is negligible.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+  // Same reason: integer-aligned squares, not anti-aliased arcs.
+  ctx.fillStyle = '#e8ebf3';
+  for (let y = 14; y < CARD_H; y += 15) {
+    for (let x = 380; x < CARD_W; x += 15) {
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+
+  drawPanel(ctx);
+  drawCrest(ctx, 140, 106);
+  drawPhoto(ctx);
+
+  // --- header ---
+  const hcx = 626;
+  if (data.companyName) {
+    fitText(ctx, data.companyName, hcx, 46, 400, 19, 'bold', GOLD, 'center', 'rtl');
+  }
+  fitText(ctx, 'بطاقة تعريف الطالب', hcx, 88, 440, 40, 'bold', NAVY, 'center', 'rtl');
+
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.letterSpacing = '3px';
+  ctx.font = `600 19px ${FONT}`;
+  ctx.fillStyle = '#5a6076';
+  ctx.fillText('STUDENT ID CARD', hcx, 124);
+  const tw = ctx.measureText('STUDENT ID CARD').width;
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = goldGrad(ctx, hcx - 200, 0, hcx + 200, 0);
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hcx - tw / 2 - 62, 124);
+  ctx.lineTo(hcx - tw / 2 - 14, 124);
+  ctx.moveTo(hcx + tw / 2 + 14, 124);
+  ctx.lineTo(hcx + tw / 2 + 62, 124);
+  ctx.stroke();
+  ctx.restore();
+
+  // --- info rows ---
+  const rows: { icon: RowIcon; label: string; value: string; dir: Dir; gold?: boolean }[] = [
+    { icon: 'user', label: 'اسم الطالب', value: data.name, dir: 'rtl' },
+    { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
+    { icon: 'cap', label: 'الصف الدراسي', value: data.level, dir: 'rtl' },
+    { icon: 'group', label: 'المجموعة', value: data.group, dir: 'rtl' },
+    { icon: 'cal', label: 'العام الدراسي', value: data.year, dir: 'ltr' },
+  ];
+
+  const rx = 360;      // left edge — clears the gold ribbon on the navy panel
+  const chip = 42;
+  const labelR = 766;
+  const valueR = 640;
+  const valueMaxW = valueR - (rx + chip + 14);
+  const rowH = 66;
+
+  rows.forEach((row, i) => {
+    const cy = 158 + rowH * i + rowH / 2;
+
+    roundRect(ctx, rx, cy - chip / 2, chip, chip, 11);
+    ctx.fillStyle = NAVY;
+    ctx.fill();
+    rowIcon(ctx, row.icon, rx + chip / 2, cy);
+
+    fitText(ctx, row.label, labelR, cy, 124, 19, '600', GREY, 'right', 'rtl');
+    fitText(
+      ctx,
+      row.value || '—',
+      row.dir === 'ltr' ? valueR - valueMaxW / 2 : valueR,
+      cy,
+      valueMaxW,
+      23,
+      'bold',
+      row.gold ? '#a97c1c' : NAVY,
+      row.dir === 'ltr' ? 'center' : 'right',
+      row.dir,
+    );
+
+    if (i < rows.length - 1) {
+      ctx.strokeStyle = LINE;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rx + chip + 14, cy + 33);
+      ctx.lineTo(labelR, cy + 33);
+      ctx.stroke();
+    }
+  });
+
+  // --- subject banner (course name) ---
+  // Course names run long ("اللغة العربية الأول الإعدادي"), so the banner is
+  // widened to BANNER_R and the text is bounded on BOTH sides: it must not run
+  // into the quill on the left, and it keeps a clear right inset from the edge.
+  const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
+  const TEXT_R = BANNER_R - 46;
+  const TEXT_L = 396;        // leaves a gap after the quill (ends at ~374)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(200, 544);
+  ctx.lineTo(BANNER_R - 16, 544);
+  ctx.arcTo(BANNER_R, 544, BANNER_R, 560, 16);
+  ctx.lineTo(BANNER_R, 596);
+  ctx.arcTo(BANNER_R, 612, BANNER_R - 16, 612, 16);
+  ctx.lineTo(232, 612);
+  ctx.closePath();
+  ctx.fillStyle = NAVY_D;
+  ctx.fill();
+  ctx.restore();
+
+  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', GOLD_L, 'right', 'rtl');
+
+  ctx.save();
+  ctx.strokeStyle = goldGrad(ctx, 332, 560, 376, 598);
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(334, 596);
+  ctx.quadraticCurveTo(354, 590, 374, 560);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(343, 593);
+  ctx.quadraticCurveTo(363, 592, 372, 569);
+  ctx.stroke();
+  ctx.restore();
+
+  // --- QR ---
+  // qx + qs must leave a real margin to the card edge (CARD_W): this is a printed
+  // and guillotined card, so anything under ~2mm (24px) risks being cut into.
+  const qx = 780, qy = 152, qs = 200;
+  roundRect(ctx, qx, qy, qs, qs, 14);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = goldGrad(ctx, qx, qy, qx + qs, qy + qs);
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.drawImage(qr, qx + 12, qy + 12, qs - 24, qs - 24);
+
+  const capTop = qy + qs + 14;
+  roundRect(ctx, qx, capTop, qs, 64, 12);
+  ctx.fillStyle = NAVY_D;
+  ctx.fill();
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', GOLD_L, 'right', 'rtl');
+  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, '600', '#ffffff', 'right', 'rtl');
+
+  ctx.save();
+  ctx.strokeStyle = goldGrad(ctx, qx + 14, capTop + 14, qx + 50, capTop + 50);
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  roundRect(ctx, qx + 18, capTop + 15, 24, 34, 4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(qx + 24, capTop + 24);
+  ctx.lineTo(qx + 36, capTop + 24);
+  ctx.moveTo(qx + 24, capTop + 32);
+  ctx.lineTo(qx + 36, capTop + 32);
+  ctx.moveTo(qx + 24, capTop + 40);
+  ctx.lineTo(qx + 36, capTop + 40);
+  ctx.stroke();
+  ctx.restore();
+
+  // --- footer values ---
+  // Centred under the QR column (qx .. qx + qs).
+  const feet: { icon: 'book' | 'target' | 'star'; label: string; cx: number }[] = [
+    { icon: 'star', label: 'تميز', cx: 942 },
+    { icon: 'target', label: 'تطور', cx: 880 },
+    { icon: 'book', label: 'تعلم', cx: 818 },
+  ];
+  for (const f of feet) {
+    footIcon(ctx, f.icon, f.cx, 544);
+    fitText(ctx, f.label, f.cx, 588, 60, 17, 'bold', NAVY, 'center', 'rtl');
+  }
+
+  ctx.restore();
+
+  roundRect(ctx, 1, 1, CARD_W - 2, CARD_H - 2, 30);
+  ctx.strokeStyle = '#d7dae1';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/**
+ * Renders one card and returns it as raw base64 PNG (no data-URL prefix), ready
+ * for JSZip. Pass a canvas to reuse across a batch — a fresh 1016x638 canvas per
+ * student would otherwise pin a lot of memory for a large export.
+ */
+export async function renderStudentCardPng(data: StudentCardData, canvas: HTMLCanvasElement): Promise<string> {
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D canvas context unavailable');
+
+  const qrDataUrl = await QRCode.toDataURL(data.qrUrl, { width: 500, margin: 0 });
+  const qr = new Image();
+  qr.src = qrDataUrl;
+  await qr.decode();
+
+  ctx.clearRect(0, 0, CARD_W, CARD_H);
+  drawStudentCard(ctx, data, qr);
+
+  return canvas.toDataURL('image/png').split(',')[1];
+}

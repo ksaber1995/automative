@@ -1,0 +1,162 @@
+<div class="container mx-auto p-6">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'CARD_DESIGN.TITLE' | translate }}</h1>
+    <p class="text-gray-500 mt-1">{{ 'CARD_DESIGN.SUBTITLE' | translate }}</p>
+  </div>
+
+  @if (loading()) {
+    <div class="flex justify-center py-20"><i class="pi pi-spin pi-spinner text-4xl text-gray-400"></i></div>
+  } @else {
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+
+      <!-- ---------- form ---------- -->
+      <div class="flex flex-col gap-6">
+
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-user mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.TEACHER_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.TEACHER_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.NAME' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().teacherName"
+                     (ngModelChange)="set('teacherName', $event)" maxlength="80" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.JOB_TITLE' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().teacherTitle"
+                     (ngModelChange)="set('teacherTitle', $event)" maxlength="80" />
+            </div>
+          </div>
+        </p-card>
+
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-phone mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.CONTACT_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.CONTACT_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.PHONE' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().phone"
+                     (ngModelChange)="set('phone', $event)" maxlength="40" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.WHATSAPP' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().whatsapp"
+                     (ngModelChange)="set('whatsapp', $event)" maxlength="40" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.EMAIL' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().email"
+                     (ngModelChange)="set('email', $event)" maxlength="120" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.LOCATION' | translate }}</label>
+              <input pInputText class="w-full" [ngModel]="design().location"
+                     (ngModelChange)="set('location', $event)" maxlength="80" />
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'CARD_DESIGN.QR_LINK' | translate }}</label>
+            <input pInputText class="w-full" dir="ltr" placeholder="https://..." [ngModel]="design().qrLink"
+                   (ngModelChange)="set('qrLink', $event)" maxlength="500" />
+            <p class="text-xs text-gray-400 mt-1">{{ 'CARD_DESIGN.QR_LINK_HINT' | translate }}</p>
+          </div>
+        </p-card>
+
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-list-check mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.RULES_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.RULES_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <div class="flex flex-col gap-3">
+            @for (rule of design().instructions; track $index) {
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 shrink-0 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold
+                             flex items-center justify-center">{{ $index + 1 }}</span>
+                <input pInputText class="w-full" [ngModel]="rule"
+                       (ngModelChange)="setListItem('instructions', $index, $event)" maxlength="160" />
+              </div>
+            }
+          </div>
+        </p-card>
+
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-star mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.HIGHLIGHTS_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.HIGHLIGHTS_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            @for (h of design().highlights; track $index) {
+              <input pInputText class="w-full" [ngModel]="h"
+                     (ngModelChange)="setListItem('highlights', $index, $event)" maxlength="60" />
+            }
+          </div>
+        </p-card>
+
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-comment mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.SLOGAN_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.SLOGAN_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <textarea pTextarea class="w-full" rows="2" maxlength="200" [ngModel]="design().slogan"
+                    (ngModelChange)="set('slogan', $event)"></textarea>
+
+          <ng-template pTemplate="footer">
+            <div class="flex justify-end pt-2">
+              <p-button [label]="'CARD_DESIGN.SAVE' | translate" icon="pi pi-check"
+                        [loading]="saving()" (onClick)="save()"></p-button>
+            </div>
+          </ng-template>
+        </p-card>
+      </div>
+
+      <!-- ---------- live preview ---------- -->
+      <div class="xl:sticky xl:top-6">
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-eye mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.PREVIEW_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.PREVIEW_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <!-- canvas is the real 1016x638 print bitmap, scaled down for display -->
+          <canvas #preview class="w-full h-auto rounded-xl shadow-lg border border-gray-200"></canvas>
+
+          <p class="text-xs text-gray-400 mt-3">{{ 'CARD_DESIGN.PREVIEW_NOTE' | translate }}</p>
+        </p-card>
+      </div>
+    </div>
+  }
+</div>
