@@ -24,7 +24,9 @@
     "PREVIEW_HINT": "Updates as you type.",
     "PREVIEW_NOTE": "Actual print size 8.6 x 5.4 cm (300 dpi). This exact image ships as card-back.png in the students ZIP.",
     "SAVE": "Save design",
-    "SAVED": "Card design saved successfully"
+    "SAVED": "Card design saved successfully",
+    "DOWNLOAD": "Download PNG",
+    "DOWNLOAD_ERROR": "Failed to render the card design"
   },
   "ERRORS": {
     "GENERIC": "An error occurred",

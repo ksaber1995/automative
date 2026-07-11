@@ -155,6 +155,14 @@
           <canvas #preview class="w-full h-auto rounded-xl shadow-lg border border-gray-200"></canvas>
 
           <p class="text-xs text-gray-400 mt-3">{{ 'CARD_DESIGN.PREVIEW_NOTE' | translate }}</p>
+
+          <ng-template pTemplate="footer">
+            <div class="flex justify-end pt-2">
+              <p-button [label]="'CARD_DESIGN.DOWNLOAD' | translate" icon="pi pi-download"
+                        severity="secondary" [outlined]="true"
+                        [loading]="downloading()" (onClick)="downloadPng()"></p-button>
+            </div>
+          </ng-template>
         </p-card>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { saveAs } from 'file-saver';
 import { CardDesign, CARD_DESIGN_MAX, DEFAULT_CARD_DESIGN } from '@shared/interfaces/card-design.interface';
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -34,6 +35,7 @@ export class CardDesignComponent implements OnInit {
 
   loading = signal(true);
   saving = signal(false);
+  downloading = signal(false);
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
 
   readonly maxInstructions = CARD_DESIGN_MAX.instructions;
@@ -95,6 +97,25 @@ export class CardDesignComponent implements OnInit {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }
     });
+  }
+
+  /**
+   * Download the back face on its own, as the print-ready PNG. Renders from the
+   * CURRENT form state (not the saved copy), so what you see is what you get
+   * even with unsaved edits.
+   */
+  async downloadPng() {
+    this.downloading.set(true);
+    try {
+      const canvas = document.createElement('canvas');
+      const base64 = await renderCardBackPng(this.design(), canvas);
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      saveAs(new Blob([bytes], { type: 'image/png' }), 'card-back.png');
+    } catch {
+      this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
+    } finally {
+      this.downloading.set(false);
+    }
   }
 
   save() {
