@@ -1,5 +1,18 @@
 {
   "CARD_DESIGN": {
+    "TEMPLATE_TITLE": "Design",
+    "TEMPLATE_HINT": "Pick the design for your cards. It applies to both faces, and to every card in the students ZIP.",
+    "TEMPLATE_NAVY": "Navy & Gold",
+    "TEMPLATE_MAROON": "Maroon & Cream",
+    "TEMPLATE_MINIMAL": "Minimal Teal",
+    "TEMPLATE_ACTIVE": "Selected",
+    "PREVIEW_BACK": "Back — shared, editable",
+    "PREVIEW_FRONT": "Front — per student, not editable",
+    "PREVIEW_FRONT_NOTE": "Shown with sample data. Each student gets their own name, code, class and QR.",
+    "SAMPLE_NAME": "محمد أحمد علي",
+    "SAMPLE_LEVEL": "الصف الثالث الإعدادي",
+    "SAMPLE_GROUP": "مجموعة ( أ )",
+    "SAMPLE_SUBJECT": "اللغة العربية",
     "TITLE": "Card Design",
     "SUBTITLE": "Design the shared back face of your printed student ID cards.",
     "TEACHER_TITLE": "Teacher",

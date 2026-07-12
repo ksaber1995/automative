@@ -8,7 +8,15 @@
  *
  * Stored as JSONB on `companies.card_design`.
  */
+export type CardTemplateId = 'navy' | 'maroon' | 'minimal';
+
 export interface CardDesign {
+  /**
+   * Which of the three card designs to print. Governs BOTH faces: the shared
+   * back rendered here, and the per-student fronts in the ZIP export, so a
+   * printed pair always matches.
+   */
+  template: CardTemplateId;
   /** Defaults to the company name when blank. */
   teacherName: string;
   /** The line under the name, e.g. "خبير اللغة العربية". */
@@ -33,6 +41,7 @@ export const CARD_DESIGN_MAX = {
 } as const;
 
 export const DEFAULT_CARD_DESIGN: CardDesign = {
+  template: 'navy',
   teacherName: '',
   teacherTitle: '',
   phone: '',

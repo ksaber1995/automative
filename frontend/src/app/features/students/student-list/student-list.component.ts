@@ -15,8 +15,7 @@ import { firstValueFrom, forkJoin } from 'rxjs';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
-import { StudentCardData, currentAcademicYear, renderStudentCardPng } from '../student-card.util';
-import { renderCardBackPng } from '../card-back.util';
+import { StudentCardData, currentAcademicYear, renderCardBackPng, renderStudentCardPng } from '../card-render.util';
 import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -388,6 +387,11 @@ export class StudentListComponent implements OnInit {
         }
       }
 
+      // Load the card design first: it picks the template for the per-student
+      // fronts as well as the shared back, so a printed pair always matches.
+      const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
+      const template = design?.template;
+
       const zip = new JSZip();
       const origin = window.location.origin;
       const companyName = this.authService.getCompanyName();
@@ -412,7 +416,7 @@ export class StudentListComponent implements OnInit {
 
         const classIds = studentEnrollments.get(student.id) || [];
         if (classIds.length === 0) {
-          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas), { base64: true });
+          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template), { base64: true });
         } else {
           const addedPaths = new Set<string>();
           for (const classId of classIds) {
@@ -429,7 +433,7 @@ export class StudentListComponent implements OnInit {
               level: course?.levelName || '',
               group: classInfo?.name || '',
               subject: course?.name || '',
-            }, canvas);
+            }, canvas, template);
             zip.file(path, png, { base64: true });
           }
         }
@@ -438,14 +442,14 @@ export class StudentListComponent implements OnInit {
         if (++rendered % 10 === 0) await new Promise((r) => setTimeout(r));
       }
 
-      // The back face is identical for every student (Settings > Card Design), so
-      // it ships once at the ZIP root rather than beside each card. Optional: if
-      // it fails to render, the student cards are still worth delivering.
-      try {
-        const design = await firstValueFrom(this.companyService.getCardDesign());
-        zip.file('card-back.png', await renderCardBackPng(design, canvas), { base64: true });
-      } catch {
-        console.warn('Card back face skipped — could not load or render the card design.');
+      // The back face is identical for every student, so it ships once at the ZIP
+      // root. Optional: if it fails, the student cards are still worth delivering.
+      if (design) {
+        try {
+          zip.file('card-back.png', await renderCardBackPng(design, canvas), { base64: true });
+        } catch {
+          console.warn('Card back face skipped — could not render the card design.');
+        }
       }
 
       const blob = await zip.generateAsync({ type: 'blob' });

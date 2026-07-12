@@ -1,8 +1,10 @@
-import QRCode from 'qrcode';
+import { CardTheme, CARD_THEMES } from './card-theme';
 
 /**
- * Renders the front face of the printed student ID card (the QR/attendance card)
- * onto a canvas, then exports it as a PNG.
+ * Renders the ORNATE front face of the printed student ID card (the
+ * QR/attendance card) onto a canvas. Shared by the 'navy' and 'maroon'
+ * templates, which differ only in palette and typeface — see card-theme.ts.
+ * The flat 'minimal' template has its own renderer in card-minimal.util.ts.
  *
  * Card stock is 8.6 x 5.4 cm (CR80); at 300 dpi that's 1016 x 638 px, which is
  * what the whole layout below is measured in — treat these as fixed and lay out
@@ -11,13 +13,15 @@ import QRCode from 'qrcode';
 export const CARD_W = 1016;
 export const CARD_H = 638;
 
-export const NAVY = '#141d55';
-export const NAVY_D = '#0a1036';
-export const GOLD = '#c9992f';
-export const GOLD_L = '#f4dc96';
-const GREY = '#6b7280';
-const LINE = '#e3e6ec';
-export const FONT = '"Segoe UI", Tahoma, Arial, sans-serif';
+/**
+ * Palette for the draw currently in flight. Set once at the top of
+ * drawStudentCard()/drawCardBack(); a draw is fully synchronous, so a
+ * module-level binding cannot interleave between templates.
+ */
+export let T: CardTheme = CARD_THEMES.navy;
+export function setCardTheme(theme: CardTheme): void {
+  T = theme;
+}
 
 export interface StudentCardData {
   companyName: string;
@@ -52,11 +56,11 @@ export function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, 
 
 export function goldGrad(ctx: Ctx, x0: number, y0: number, x1: number, y1: number): CanvasGradient {
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
-  g.addColorStop(0, '#8a6516');
-  g.addColorStop(0.25, GOLD);
-  g.addColorStop(0.5, GOLD_L);
-  g.addColorStop(0.75, GOLD);
-  g.addColorStop(1, '#8a6516');
+  g.addColorStop(0, T.accentDeep);
+  g.addColorStop(0.25, T.accent);
+  g.addColorStop(0.5, T.accentLight);
+  g.addColorStop(0.75, T.accent);
+  g.addColorStop(1, T.accentDeep);
   return g;
 }
 
@@ -71,13 +75,35 @@ export function fitText(
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
   let s = size;
-  ctx.font = `${weight} ${s}px ${FONT}`;
+  ctx.font = `${weight} ${s}px ${T.font}`;
   while (s > 9 && ctx.measureText(text).width > maxW) {
     s -= 1;
-    ctx.font = `${weight} ${s}px ${FONT}`;
+    ctx.font = `${weight} ${s}px ${T.font}`;
   }
   ctx.fillText(text, x, y);
   ctx.restore();
+}
+
+/** Wrap `text` to at most `maxLines` lines that each fit `maxW`; returns the lines. */
+export function wrap(ctx: Ctx, text: string, maxW: number, size: number, weight: string, maxLines: number): string[] {
+  ctx.save();
+  ctx.font = `${weight} ${size}px ${T.font}`;
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (ctx.measureText(next).width <= maxW || !line) {
+      line = next;
+    } else {
+      lines.push(line);
+      line = w;
+      if (lines.length === maxLines) break;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  ctx.restore();
+  return lines;
 }
 
 export function star(ctx: Ctx, cx: number, cy: number, r: number): void {
@@ -101,13 +127,13 @@ function drawPanel(ctx: Ctx): void {
   ctx.bezierCurveTo(292, 200, 300, 432, 260, CARD_H);
   ctx.lineTo(0, CARD_H);
   ctx.closePath();
-  ctx.fillStyle = NAVY;
+  ctx.fillStyle = T.panel;
   ctx.fill();
 
   // Flat wedge instead of a gradient — see the note on gradients in drawStudentCard.
   ctx.save();
   ctx.clip();
-  ctx.fillStyle = NAVY_D;
+  ctx.fillStyle = T.panelDark;
   ctx.beginPath();
   ctx.moveTo(0, 300);
   ctx.lineTo(320, 140);
@@ -128,7 +154,7 @@ function drawPanel(ctx: Ctx): void {
   ctx.beginPath();
   ctx.moveTo(364, 0);
   ctx.bezierCurveTo(336, 200, 344, 432, 304, CARD_H);
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = 2.5;
   ctx.stroke();
@@ -144,7 +170,7 @@ function drawPanel(ctx: Ctx): void {
   ctx.beginPath();
   ctx.moveTo(-10, 544);
   ctx.bezierCurveTo(70, 590, 155, 613, 232, CARD_H);
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.5;
   ctx.lineWidth = 3;
   ctx.stroke();
@@ -169,7 +195,7 @@ function drawCrest(ctx: Ctx, cx: number, cy: number): void {
   ctx.bezierCurveTo(cx + w, cy + 42, cx + 22, cy + 54, cx, cy + 62);
   ctx.bezierCurveTo(cx - 22, cy + 54, cx - w, cy + 42, cx - w, cy + 12);
   ctx.closePath();
-  ctx.fillStyle = NAVY_D;
+  ctx.fillStyle = T.panelDark;
   ctx.fill();
   ctx.strokeStyle = goldGrad(ctx, cx - w, top, cx + w, cy + 62);
   ctx.lineWidth = 5;
@@ -251,7 +277,7 @@ function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
     ctx.closePath();
     ctx.fill();
   } else if (kind === 'id') {
-    ctx.font = `bold 15px ${FONT}`;
+    ctx.font = `bold 15px ${T.font}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.direction = 'ltr';
@@ -349,7 +375,7 @@ function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: nu
   ctx.restore();
 }
 
-function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource): void {
+export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource): void {
   ctx.save();
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 30);
   ctx.clip();
@@ -360,11 +386,11 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
   // (~350 KB/card, i.e. a 100 MB ZIP for a mid-size academy). Big shapes are flat
   // fills; goldGrad() is only used on thin strokes and small glyphs, where the
   // dithered area is negligible.
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = T.page;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
   // Same reason: integer-aligned squares, not anti-aliased arcs.
-  ctx.fillStyle = '#e8ebf3';
+  ctx.fillStyle = T.dot;
   for (let y = 14; y < CARD_H; y += 15) {
     for (let x = 380; x < CARD_W; x += 15) {
       ctx.fillRect(x, y, 2, 2);
@@ -378,17 +404,17 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
   // --- header ---
   const hcx = 626;
   if (data.companyName) {
-    fitText(ctx, data.companyName, hcx, 46, 400, 19, 'bold', GOLD, 'center', 'rtl');
+    fitText(ctx, data.companyName, hcx, 46, 400, 19, 'bold', T.accent, 'center', 'rtl');
   }
-  fitText(ctx, 'بطاقة تعريف الطالب', hcx, 88, 440, 40, 'bold', NAVY, 'center', 'rtl');
+  fitText(ctx, 'بطاقة تعريف الطالب', hcx, 88, 440, 40, 'bold', T.panel, 'center', 'rtl');
 
   ctx.save();
   ctx.direction = 'ltr';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
-  ctx.font = `600 19px ${FONT}`;
-  ctx.fillStyle = '#5a6076';
+  ctx.font = `600 19px ${T.font}`;
+  ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hcx, 124);
   const tw = ctx.measureText('STUDENT ID CARD').width;
   ctx.restore();
@@ -425,11 +451,11 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
     const cy = 158 + rowH * i + rowH / 2;
 
     roundRect(ctx, rx, cy - chip / 2, chip, chip, 11);
-    ctx.fillStyle = NAVY;
+    ctx.fillStyle = T.panel;
     ctx.fill();
     rowIcon(ctx, row.icon, rx + chip / 2, cy);
 
-    fitText(ctx, row.label, labelR, cy, 124, 19, '600', GREY, 'right', 'rtl');
+    fitText(ctx, row.label, labelR, cy, 124, 19, '600', T.muted, 'right', 'rtl');
     fitText(
       ctx,
       row.value || '—',
@@ -438,13 +464,13 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
       valueMaxW,
       23,
       'bold',
-      row.gold ? '#a97c1c' : NAVY,
+      row.gold ? T.accentInk : T.panel,
       row.dir === 'ltr' ? 'center' : 'right',
       row.dir,
     );
 
     if (i < rows.length - 1) {
-      ctx.strokeStyle = LINE;
+      ctx.strokeStyle = T.line;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(rx + chip + 14, cy + 33);
@@ -469,11 +495,11 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
   ctx.arcTo(BANNER_R, 612, BANNER_R - 16, 612, 16);
   ctx.lineTo(232, 612);
   ctx.closePath();
-  ctx.fillStyle = NAVY_D;
+  ctx.fillStyle = T.panelDark;
   ctx.fill();
   ctx.restore();
 
-  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', GOLD_L, 'right', 'rtl');
+  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentLight, 'right', 'rtl');
 
   ctx.save();
   ctx.strokeStyle = goldGrad(ctx, 332, 560, 376, 598);
@@ -503,13 +529,13 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
 
   const capTop = qy + qs + 14;
   roundRect(ctx, qx, capTop, qs, 64, 12);
-  ctx.fillStyle = NAVY_D;
+  ctx.fillStyle = T.panelDark;
   ctx.fill();
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', GOLD_L, 'right', 'rtl');
+  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentLight, 'right', 'rtl');
   fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, '600', '#ffffff', 'right', 'rtl');
 
   ctx.save();
@@ -537,35 +563,13 @@ function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource)
   ];
   for (const f of feet) {
     footIcon(ctx, f.icon, f.cx, 544);
-    fitText(ctx, f.label, f.cx, 588, 60, 17, 'bold', NAVY, 'center', 'rtl');
+    fitText(ctx, f.label, f.cx, 588, 60, 17, 'bold', T.panel, 'center', 'rtl');
   }
 
   ctx.restore();
 
   roundRect(ctx, 1, 1, CARD_W - 2, CARD_H - 2, 30);
-  ctx.strokeStyle = '#d7dae1';
+  ctx.strokeStyle = T.line;
   ctx.lineWidth = 2;
   ctx.stroke();
-}
-
-/**
- * Renders one card and returns it as raw base64 PNG (no data-URL prefix), ready
- * for JSZip. Pass a canvas to reuse across a batch — a fresh 1016x638 canvas per
- * student would otherwise pin a lot of memory for a large export.
- */
-export async function renderStudentCardPng(data: StudentCardData, canvas: HTMLCanvasElement): Promise<string> {
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas context unavailable');
-
-  const qrDataUrl = await QRCode.toDataURL(data.qrUrl, { width: 500, margin: 0 });
-  const qr = new Image();
-  qr.src = qrDataUrl;
-  await qr.decode();
-
-  ctx.clearRect(0, 0, CARD_W, CARD_H);
-  drawStudentCard(ctx, data, qr);
-
-  return canvas.toDataURL('image/png').split(',')[1];
 }

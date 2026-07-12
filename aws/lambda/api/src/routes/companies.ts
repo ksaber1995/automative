@@ -36,7 +36,11 @@ export async function ensureCardDesignColumn(): Promise<void> {
   return cardDesignColumnInitPromise;
 }
 
+type CardTemplateId = 'navy' | 'maroon' | 'minimal';
+const CARD_TEMPLATES: CardTemplateId[] = ['navy', 'maroon', 'minimal'];
+
 interface CardDesign {
+  template: CardTemplateId;
   teacherName: string;
   teacherTitle: string;
   phone: string;
@@ -50,6 +54,7 @@ interface CardDesign {
 }
 
 const DEFAULT_CARD_DESIGN: CardDesign = {
+  template: 'navy',
   teacherName: '',
   teacherTitle: '',
   phone: '',
@@ -79,7 +84,12 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
   const list = (v: any, fallback: string[], cap: number) =>
     Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, cap) : fallback;
 
+  const template: CardTemplateId = CARD_TEMPLATES.includes(d.template)
+    ? d.template
+    : DEFAULT_CARD_DESIGN.template;
+
   return {
+    template,
     teacherName: str(d.teacherName, '').trim() || companyName,
     teacherTitle: str(d.teacherTitle, DEFAULT_CARD_DESIGN.teacherTitle),
     phone: str(d.phone, DEFAULT_CARD_DESIGN.phone),

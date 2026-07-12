@@ -10,15 +10,25 @@ import { saveAs } from 'file-saver';
 import { CardDesign, CARD_DESIGN_MAX, DEFAULT_CARD_DESIGN } from '@shared/interfaces/card-design.interface';
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { renderCardBackPng } from '../students/card-back.util';
+import {
+  StudentCardData, currentAcademicYear, renderCardBackPng, renderStudentCardPng,
+} from '../students/card-render.util';
+import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 
 /**
- * Settings > Card Design — edits the SHARED back face of the printed student ID
- * cards (teacher details, rules, contacts, slogan, info QR). The front face is
- * per-student and generated from student data; nothing here affects it.
+ * Settings > Card Design.
  *
- * Saved design is exported as a single `card-back.png` at the root of the
- * students ZIP.
+ * Two things live here:
+ *  - the TEMPLATE, which governs BOTH faces of every printed card;
+ *  - the content of the shared BACK face (teacher details, rules, contacts,
+ *    slogan, info QR), which is identical for every student.
+ *
+ * The FRONT face is per-student and generated from student data, so it is not
+ * editable — but it follows the chosen template, and the preview renders it from
+ * sample data so you can see exactly what the students will get.
+ *
+ * On export: one front per student per class, plus a single shared
+ * `card-back.png` at the root of the students ZIP.
  */
 @Component({
   selector: 'app-card-design',
@@ -32,12 +42,14 @@ export class CardDesignComponent implements OnInit {
   private translate = inject(TranslateService);
 
   @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
   saving = signal(false);
   downloading = signal(false);
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
 
+  readonly templates = CARD_TEMPLATES;
   readonly maxInstructions = CARD_DESIGN_MAX.instructions;
   readonly maxHighlights = CARD_DESIGN_MAX.highlights;
 
@@ -54,6 +66,23 @@ export class CardDesignComponent implements OnInit {
         this.redraw();
       },
     });
+  }
+
+  /**
+   * Stand-in student for the front-face preview. The real fronts are built from
+   * each student's own record at export time; this only shows the look and feel.
+   */
+  private sampleStudent(): StudentCardData {
+    return {
+      companyName: this.design().teacherName || '',
+      name: this.translate.instant('CARD_DESIGN.SAMPLE_NAME'),
+      code: '#1024',
+      level: this.translate.instant('CARD_DESIGN.SAMPLE_LEVEL'),
+      group: this.translate.instant('CARD_DESIGN.SAMPLE_GROUP'),
+      year: currentAcademicYear(),
+      subject: this.translate.instant('CARD_DESIGN.SAMPLE_SUBJECT'),
+      qrUrl: `${window.location.origin}/p/s/preview`,
+    };
   }
 
   /** Pad the lists to their max so the form always shows every editable slot. */
@@ -89,10 +118,14 @@ export class CardDesignComponent implements OnInit {
     this.redrawPending = true;
     requestAnimationFrame(async () => {
       this.redrawPending = false;
-      const canvas = this.previewCanvas?.nativeElement;
-      if (!canvas) return;
+      const d = this.design();
+      const back = this.previewCanvas?.nativeElement;
+      const front = this.previewFrontCanvas?.nativeElement;
       try {
-        await renderCardBackPng(this.design(), canvas);
+        if (back) await renderCardBackPng(d, back);
+        // The student side is not editable — it is rendered from sample data so
+        // you can see the look and feel the students will actually get.
+        if (front) await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate);
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }

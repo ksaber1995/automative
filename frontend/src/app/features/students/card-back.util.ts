@@ -1,29 +1,24 @@
-import QRCode from 'qrcode';
 import { CardDesign } from '@shared/interfaces/card-design.interface';
-import {
-  CARD_H, CARD_W, Ctx, FONT, GOLD, GOLD_L, NAVY, NAVY_D,
-  fitText, goldGrad, roundRect,
-} from './student-card.util';
+import { CARD_H, CARD_W, Ctx, T, fitText, goldGrad, roundRect, wrap } from './student-card.util';
 
 /**
- * The BACK face of the student ID card — identical for every student, so it is
- * configured once per company (Settings > Card Design) and exported as a single
- * shared `card-back.png`.
+ * The ORNATE BACK face of the student ID card — identical for every student, so
+ * it is configured once per company (Settings > Card Design) and exported as a
+ * single shared `card-back.png`. Shared by the 'navy' and 'maroon' templates;
+ * the flat 'minimal' template has its own renderer in card-minimal.util.ts.
  *
  * Same 1016x638 (8.6 x 5.4 cm @ 300dpi) canvas as the front. See the note on
  * gradients in student-card.util.ts: big fills are flat on purpose, because
  * dithered gradients triple the exported PNG size.
  */
 
-const CREAM = '#f7f2e4';
-
 type ContactIcon = 'phone' | 'whatsapp' | 'email' | 'pin';
 type HighlightIcon = 'book' | 'clipboard' | 'checklist' | 'chart';
 
 function contactIcon(ctx: Ctx, kind: ContactIcon, cx: number, cy: number): void {
   ctx.save();
-  ctx.strokeStyle = NAVY_D;
-  ctx.fillStyle = NAVY_D;
+  ctx.strokeStyle = T.panelDark;
+  ctx.fillStyle = T.panelDark;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -84,7 +79,7 @@ function contactIcon(ctx: Ctx, kind: ContactIcon, cx: number, cy: number): void 
     ctx.bezierCurveTo(cx - 2, cy + 5, cx - 7, cy + 3, cx - 7, cy - 3);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = GOLD_L;
+    ctx.fillStyle = T.accentLight;
     ctx.beginPath();
     ctx.arc(cx, cy - 3, 2.6, 0, Math.PI * 2);
     ctx.fill();
@@ -146,37 +141,16 @@ function highlightIcon(ctx: Ctx, kind: HighlightIcon, cx: number, cy: number): v
   ctx.restore();
 }
 
-/** Wrap `text` to at most `maxLines` lines that each fit `maxW`; returns the lines. */
-function wrap(ctx: Ctx, text: string, maxW: number, size: number, weight: string, maxLines: number): string[] {
-  ctx.save();
-  ctx.font = `${weight} ${size}px ${FONT}`;
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = '';
-  for (const w of words) {
-    const next = line ? `${line} ${w}` : w;
-    if (ctx.measureText(next).width <= maxW || !line) {
-      line = next;
-    } else {
-      lines.push(line);
-      line = w;
-      if (lines.length === maxLines) break;
-    }
-  }
-  if (line && lines.length < maxLines) lines.push(line);
-  ctx.restore();
-  return lines;
-}
 
-function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): void {
+export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): void {
   ctx.save();
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 30);
   ctx.clip();
 
-  // Flat navy field + a faint lighter dot grid (integer-aligned; see gradient note).
-  ctx.fillStyle = NAVY;
+  // Flat field + a faint lighter dot grid (integer-aligned; see gradient note).
+  ctx.fillStyle = T.panel;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
-  ctx.fillStyle = '#1d2765';
+  ctx.fillStyle = T.dotDark;
   for (let y = 16; y < CARD_H; y += 16) {
     for (let x = 16; x < CARD_W; x += 16) ctx.fillRect(x, y, 2, 2);
   }
@@ -201,9 +175,9 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
   fitText(ctx, d.teacherName || '—', tR, 60, 232, 32, 'bold', '#ffffff', 'right', 'rtl');
 
   if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 100, 210, 19, 'bold', GOLD_L, 'right', 'rtl');
+    fitText(ctx, d.teacherTitle, tR, 100, 210, 19, 'bold', T.accentLight, 'right', 'rtl');
     ctx.save();
-    ctx.strokeStyle = GOLD;
+    ctx.strokeStyle = T.accent;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -233,7 +207,7 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
 
   // divider between the teacher column and the instructions
   ctx.save();
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.5;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -252,11 +226,11 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
   ctx.fillStyle = goldGrad(ctx, pillCx - 100, 44, pillCx + 100, 80);
   ctx.fill();
   ctx.restore();
-  fitText(ctx, 'تعليمات للطالب', pillCx + 62, 62, 130, 19, 'bold', NAVY_D, 'right', 'rtl');
+  fitText(ctx, 'تعليمات للطالب', pillCx + 62, 62, 130, 19, 'bold', T.panelDark, 'right', 'rtl');
   highlightIcon(ctx, 'clipboard', pillCx - 74, 62);
 
   ctx.save();
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
@@ -278,7 +252,7 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
     ctx.arc(insR + 17, cy, 11, 0, Math.PI * 2);
     ctx.fill();
     ctx.save();
-    ctx.strokeStyle = NAVY_D;
+    ctx.strokeStyle = T.panelDark;
     ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -307,13 +281,13 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
 
     const capTop = qy + qs + 12;
     roundRect(ctx, qx, capTop, qs, 58, 12);
-    ctx.fillStyle = NAVY_D;
+    ctx.fillStyle = T.panelDark;
     ctx.fill();
-    ctx.strokeStyle = GOLD;
+    ctx.strokeStyle = T.accent;
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', GOLD_L, 'right', 'rtl');
+    fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentLight, 'right', 'rtl');
     fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, '600', '#ffffff', 'right', 'rtl');
 
     // globe glyph
@@ -335,7 +309,7 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
 
   // ================= bottom =================
   ctx.save();
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.45;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -349,12 +323,12 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
   if (d.slogan && d.slogan.trim()) {
     const sx = 596, sy = 392, sw = 376, sh = 194;
     roundRect(ctx, sx, sy, sw, sh, 18);
-    ctx.fillStyle = CREAM;
+    ctx.fillStyle = T.quote;
     ctx.fill();
 
     ctx.save();
     ctx.fillStyle = goldGrad(ctx, sx, sy, sx + sw, sy + sh);
-    ctx.font = `bold 54px ${FONT}`;
+    ctx.font = `bold 54px ${T.font}`;
     ctx.textBaseline = 'top';
     ctx.direction = 'ltr';
     ctx.textAlign = 'left';
@@ -366,7 +340,7 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
     const startY = sy + sh / 2 - (lines.length - 1) * 20;
     lines.forEach((line, i) => {
       // narrower than the box so a long line can't run under the quote glyphs
-      fitText(ctx, line, sx + sw / 2, startY + i * 40, sw - 118, 23, 'bold', NAVY_D, 'center', 'rtl');
+      fitText(ctx, line, sx + sw / 2, startY + i * 40, sw - 118, 23, 'bold', T.panelDark, 'center', 'rtl');
     });
   }
 
@@ -385,7 +359,7 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
       });
       if (i < hi.length - 1) {
         ctx.save();
-        ctx.strokeStyle = GOLD;
+        ctx.strokeStyle = T.accent;
         ctx.globalAlpha = 0.45;
         ctx.lineWidth = 1.6;
         ctx.beginPath();
@@ -398,28 +372,4 @@ function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): vo
   }
 
   ctx.restore();
-}
-
-/**
- * Renders the shared back face. Returns raw base64 PNG (no data-URL prefix) so
- * it can go straight into JSZip; pass a canvas to reuse it across renders.
- */
-export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasElement): Promise<string> {
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas context unavailable');
-
-  let qr: HTMLImageElement | null = null;
-  if (design.qrLink && design.qrLink.trim()) {
-    const dataUrl = await QRCode.toDataURL(design.qrLink.trim(), { width: 500, margin: 0 });
-    qr = new Image();
-    qr.src = dataUrl;
-    await qr.decode();
-  }
-
-  ctx.clearRect(0, 0, CARD_W, CARD_H);
-  drawCardBack(ctx, design, qr);
-
-  return canvas.toDataURL('image/png').split(',')[1];
 }

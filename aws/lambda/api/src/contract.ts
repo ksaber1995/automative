@@ -95,6 +95,7 @@ const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD
 // Student ID card — the shared back face, configured once per company.
 // Lengths are capped so a pasted essay can't blow up the rendered card.
 const CardDesignSchema = z.object({
+  template: z.enum(['navy', 'maroon', 'minimal']),
   teacherName: z.string().max(80),
   teacherTitle: z.string().max(80),
   phone: z.string().max(40),
