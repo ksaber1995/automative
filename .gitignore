@@ -88,3 +88,9 @@ frontend/.angular/
 # Compiled output
 **/*.js.map
 **/*.d.ts.map
+
+# Build output of a stray root-level electron build (not source).
+/electron/
+
+# `offline` is a linked git worktree (branch: offline), not part of master.
+/offline/
