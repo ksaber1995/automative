@@ -186,7 +186,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
       { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
-      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('academy') },
@@ -202,9 +201,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
       }});
     }
 
-    // People & Branches
+    // People
     const people: NavLeaf[] = [
-      { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('branches') && !auth.isTeacher() },
       { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
       // Shared back face of the printed ID cards. isGlobalAdmin() covers ADMIN too,
       // which is exactly who the API lets save the design.
