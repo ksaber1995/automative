@@ -30,6 +30,7 @@ import { LanguageService } from '../../../core/services/language.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { TimetableService, TimetableEntry } from '../../timetable/timetable.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
+import { SessionHistoryComponent } from '../session-history/session-history.component';
 
 interface DialogTeacherRow {
   employeeId: string;
@@ -82,6 +83,7 @@ function endTimeAfterStartValidator(startDate: string) {
     ConfirmDialogModule,
     TranslateModule,
     SessionPayDialogComponent,
+    SessionHistoryComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './sessions-dashboard.component.html',

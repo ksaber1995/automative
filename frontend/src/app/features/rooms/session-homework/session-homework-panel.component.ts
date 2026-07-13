@@ -8,7 +8,6 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Html5Qrcode } from 'html5-qrcode';
 import { ExamService } from '../../exams/services/exam.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
@@ -70,16 +69,8 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   currentGrade = signal('');
   lastScanResult = signal<{ name: string; grade: string; updated: boolean } | null>(null);
 
-  scannerOpen = signal(false);
-  scannerStarting = signal(false);
   manualEntry = signal('');
   resolvingCode = signal(false);
-
-  private readonly SCANNER_ELEMENT_ID = 'homework-qr-scanner-region';
-  private html5Qr?: Html5Qrcode;
-  private lastToken = '';
-  private lastTokenAt = 0;
-  private readonly SCAN_DEDUP_MS = 2500;
 
   private rowSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   rowState = signal<Record<string, 'saving' | 'saved' | 'error'>>({});
@@ -120,14 +111,11 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
         this.step.set('pick');
         this.active.set(null);
         this.loadList();
-      } else {
-        this.stopCamera();
       }
     });
   }
 
   ngOnDestroy(): void {
-    this.stopCamera();
     this.rowSaveTimers.forEach((t) => clearTimeout(t));
   }
 
@@ -185,7 +173,6 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   }
 
   back(): void {
-    this.stopCamera();
     this.step.set('pick');
     this.loadList();
   }
@@ -205,6 +192,21 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   }
 
   // ── Step 2: record ────────────────────────────────────────────────────────
+  /**
+   * A mark comes off an <input type="number">, so ngModel hands back a NUMBER (or
+   * null when the box is empty) — not a string. Everything downstream treats a mark
+   * as text (.trim(), string compare, the API payload), so it is normalised here at
+   * the boundary rather than defended against at each call site.
+   */
+  private asMark(value: unknown): string {
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  /** The mark applied to the next scan, always as text. */
+  setCurrentGrade(value: unknown): void {
+    this.currentGrade.set(this.asMark(value));
+  }
+
   /** Clamp to the homework's max so a typo can't store 100 out of 10. */
   private clampGrade(value: string): string {
     const max = this.active()?.maxGrade;
@@ -279,12 +281,12 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   }
 
   // ── Roster inline entry (no camera) ───────────────────────────────────────
-  onGradeInput(row: ExamResultRow, value: string): void {
+  onGradeInput(row: ExamResultRow, value: unknown): void {
     const hw = this.active();
     if (!hw) return;
     // Don't clamp mid-typing: rewriting the value under the caret is what makes an
     // input fight the user. It's clamped once, on save.
-    const raw = value ?? '';
+    const raw = this.asMark(value);
     this.grades.update((g) => ({ ...g, [row.studentId]: raw }));
 
     const existing = this.rowSaveTimers.get(row.studentId);
@@ -331,57 +333,6 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     });
   }
 
-  // ── Camera ────────────────────────────────────────────────────────────────
-  async openScanner(): Promise<void> {
-    if (!this.currentGrade().trim()) {
-      this.notifications.error(this.translate.instant('SESSION_HOMEWORK.ENTER_MARK_FIRST'));
-      return;
-    }
-    this.scannerOpen.set(true);
-    setTimeout(() => this.startCamera(), 0); // wait for the region to exist
-  }
-
-  async startCamera(): Promise<void> {
-    if (this.html5Qr) return;
-    this.scannerStarting.set(true);
-    try {
-      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
-      await this.html5Qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => this.onDecoded(decodedText),
-        () => {}, // per-frame decode misses are normal
-      );
-    } catch {
-      this.notifications.error(this.translate.instant('SESSION_HOMEWORK.CAMERA_FAILED'));
-      this.html5Qr = undefined;
-    } finally {
-      this.scannerStarting.set(false);
-    }
-  }
-
-  private onDecoded(decodedText: string): void {
-    // One physical card lingers in frame for many frames — ignore repeats.
-    const token = this.extractToken(decodedText);
-    const now = Date.now();
-    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
-    this.lastToken = token;
-    this.lastTokenAt = now;
-    this.handleScan(token);
-  }
-
-  closeScanner(): void {
-    this.stopCamera();
-    this.scannerOpen.set(false);
-  }
-
-  private stopCamera(): void {
-    const qr = this.html5Qr;
-    this.html5Qr = undefined;
-    if (!qr) return;
-    qr.stop().then(() => qr.clear()).catch(() => {});
-  }
-
   private beep(lower: boolean): void {
     try {
       const ctx = new AudioContext();
@@ -399,7 +350,6 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   }
 
   close(): void {
-    this.stopCamera();
     this.visible.set(false);
   }
 }

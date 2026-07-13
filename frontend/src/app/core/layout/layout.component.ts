@@ -186,8 +186,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') && !auth.isTeacher() },
+      // Session history is the Sessions page's History tab now; the route stays
+      // reachable by URL, it just doesn't need its own sidebar entry.
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.SESSION_HISTORY', icon: 'pi pi-history', routerLink: ['/session-history'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
@@ -242,15 +243,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     // Financial
     const financial: NavLeaf[] = [
+      // The daily collection screens — what students owe and pay — so they lead the
+      // group rather than sitting under the ledgers.
+      { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
+      { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && !auth.isTeacher() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
       { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
-      // What students owe and pay — collection screens, so they sit with the money
-      // rather than with the teaching schedule.
-      { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);
     if (financial.length) {
       entries.push({ kind: 'group', group: {

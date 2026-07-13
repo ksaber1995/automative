@@ -4273,7 +4273,7 @@
     "CLEAR_FILTER": "Clear Filter",
     "TAB_ACTIVE": "Active Sessions",
     "TAB_ROOMS": "Room Status",
-    "TAB_HISTORY": "Session History",
+    "TAB_HISTORY": "History",
     "LOADING_ACTIVE": "Loading active sessions...",
     "NO_ACTIVE_TITLE": "No active sessions",
     "NO_ACTIVE_HINT_BRANCH": "No active sessions for this branch",

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, input, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
@@ -19,10 +19,12 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { Class } from '@shared/interfaces/class.interface';
 
 /**
- * Standalone "Session History" page (moved out of the Sessions dashboard tab).
- * Lists ended/active sessions with server-side filters: branch, course, class,
- * and student. The Room column and Branch filter are hidden for TEACHER-type
+ * Session history: ended/active sessions with server-side filters (branch, course,
+ * class, student). The Room column and Branch filter are hidden for TEACHER-type
  * companies (which have no rooms/branches concept in the UI).
+ *
+ * Lives as the History tab of the Sessions page (`embedded`), and stays reachable
+ * on its own /session-history route, which is what the standalone header is for.
  */
 @Component({
   selector: 'app-session-history',
@@ -31,6 +33,9 @@ import { Class } from '@shared/interfaces/class.interface';
   templateUrl: './session-history.component.html',
 })
 export class SessionHistoryComponent implements OnInit, OnDestroy {
+  /** True when hosted inside the Sessions page's History tab (see the template). */
+  embedded = input<boolean>(false);
+
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
   private lookupService = inject(LookupService);

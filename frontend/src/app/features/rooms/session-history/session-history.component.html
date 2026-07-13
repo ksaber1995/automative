@@ -1,9 +1,15 @@
-<div class="p-6">
+<!-- Embedded as the Sessions page's History tab, the surrounding page already
+     supplies the padding and title — so only the standalone route draws them. -->
+<div [class.p-6]="!embedded()">
   <div class="mb-6 flex items-start justify-between gap-4">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_HISTORY.TITLE' | translate }}</h1>
-      <p class="text-gray-500 mt-1">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
-    </div>
+    @if (!embedded()) {
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_HISTORY.TITLE' | translate }}</h1>
+        <p class="text-gray-500 mt-1">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
+      </div>
+    } @else {
+      <p class="text-gray-500">{{ 'SESSION_HISTORY.SUBTITLE' | translate }}</p>
+    }
     <p-button
       [label]="(matrixView() ? 'SESSION_HISTORY.VIEW_LIST' : 'SESSION_HISTORY.VIEW_GRID') | translate"
       [icon]="matrixView() ? 'pi pi-list' : 'pi pi-table'"

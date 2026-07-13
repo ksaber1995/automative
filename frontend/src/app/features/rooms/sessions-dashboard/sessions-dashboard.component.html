@@ -90,6 +90,10 @@
           {{ 'SESSIONS_DASHBOARD.TAB_ROOMS' | translate }}
         </p-tab>
       }
+      <p-tab value="history">
+        <i class="pi pi-history mr-2"></i>
+        {{ 'SESSIONS_DASHBOARD.TAB_HISTORY' | translate }}
+      </p-tab>
     </p-tablist>
 
     <p-tabpanels>
@@ -629,6 +633,14 @@
         }
       </p-tabpanel>
       }
+
+      <!-- History — rendered only while its tab is open, so the page's app-wide scan
+           handler is registered exactly when it's on screen and released on the way out. -->
+      <p-tabpanel value="history">
+        @if (activeTab === 'history') {
+          <app-session-history [embedded]="true"></app-session-history>
+        }
+      </p-tabpanel>
 
     </p-tabpanels>
   </p-tabs>

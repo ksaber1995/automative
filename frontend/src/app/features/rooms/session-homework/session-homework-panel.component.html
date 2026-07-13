@@ -94,13 +94,11 @@
       </label>
       <div class="flex items-center gap-2 flex-wrap">
         <input pInputText type="number" min="0" [max]="active()?.maxGrade ?? null"
-          class="w-24" [ngModel]="currentGrade()" (ngModelChange)="currentGrade.set($event)"
+          class="w-24" [ngModel]="currentGrade()" (ngModelChange)="setCurrentGrade($event)"
           [placeholder]="'SESSION_HOMEWORK.MARK' | translate" />
         @if (active()?.maxGrade != null) {
           <span class="text-gray-500">/ {{ active()?.maxGrade }}</span>
         }
-        <p-button icon="pi pi-qrcode" [label]="'SESSION_HOMEWORK.SCAN' | translate"
-          size="small" severity="help" (onClick)="openScanner()"></p-button>
         <input pInputText type="text" class="flex-1 min-w-[14rem]"
           [ngModel]="manualEntry()" (ngModelChange)="manualEntry.set($event)"
           (keyup.enter)="submitManualEntry()"
@@ -120,22 +118,6 @@
         </div>
       }
     </div>
-
-    @if (scannerOpen()) {
-      <div class="rounded-xl border border-gray-200 p-3 mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-medium text-gray-700">{{ 'SESSION_HOMEWORK.SCANNING' | translate }}</span>
-          <p-button icon="pi pi-times" [text]="true" size="small"
-            [label]="'SESSION_HOMEWORK.CLOSE_SCANNER' | translate" (onClick)="closeScanner()"></p-button>
-        </div>
-        @if (scannerStarting()) {
-          <div class="text-center py-4 text-gray-500">
-            <i class="pi pi-spin pi-spinner text-xl"></i>
-          </div>
-        }
-        <div id="homework-qr-scanner-region" class="mx-auto rounded-lg overflow-hidden" style="max-width: 320px;"></div>
-      </div>
-    }
 
     <!-- Roster: type a mark directly for anyone who isn't being scanned -->
     <input pInputText type="text" class="w-full mb-2"
