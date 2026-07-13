@@ -283,6 +283,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
       { labelKey: 'NAV.MESSAGING', icon: 'pi pi-comments', routerLink: ['/messaging'], visible: true },
       { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
+      // Set-up-once configuration rather than daily screens, so they live here with
+      // Settings instead of cluttering Academic and People.
+      { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('branches') && !auth.isTeacher() },
+      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: auth.canRead('academy') },
       // Shared back face of the printed ID cards — a company-wide setting, and
       // isGlobalAdmin() (which gates this whole group) is exactly who the API lets
       // save it, so it sits with Settings rather than with the students.
