@@ -4,9 +4,12 @@ import { AuthService } from '../services/auth.service';
 import { PermissionResource, PermissionAction } from '@shared/interfaces/permissions.interface';
 
 /** Ordered list of routes to try when redirecting to first accessible page */
+// NOTE: /branches is deliberately absent. It now guards on `academy`, so listing
+// it here against the `branches` resource would hand a branches-only user
+// /branches as their landing page — which its own guard would then bounce, back
+// into this same lookup, forever. Anyone with academy read lands on /courses.
 const ROUTE_PERMISSION_MAP: Array<{ path: string; resource: PermissionResource }> = [
   { path: '/dashboard',   resource: 'dashboard' },
-  { path: '/branches',    resource: 'branches' },
   { path: '/courses',     resource: 'academy' },
   { path: '/students',    resource: 'students' },
   { path: '/enrollments', resource: 'enrollments' },

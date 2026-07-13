@@ -1,7 +1,7 @@
 <div class="container-custom py-8">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">{{ 'BRANCHES.LIST.TITLE' | translate }}</h1>
-    @if (authService.canWrite('branches')) {
+    @if (authService.canWrite('academy')) {
       <p-button
         [label]="'BRANCHES.LIST.ADD' | translate"
         icon="pi pi-plus"
@@ -79,7 +79,7 @@
                 (onClick)="viewBranch(branch)"
                 [pTooltip]="'BRANCHES.LIST.VIEW' | translate"
               ></p-button>
-              @if (authService.canWrite('branches')) {
+              @if (authService.canWrite('academy')) {
                 <p-button
                   icon="pi pi-pencil"
                   [rounded]="true"
@@ -89,7 +89,7 @@
                   [pTooltip]="'BRANCHES.LIST.EDIT' | translate"
                 ></p-button>
               }
-              @if (authService.canDelete('branches') && !branch.hasFinancials) {
+              @if (authService.canDelete('academy') && !branch.hasFinancials) {
                 <p-button
                   icon="pi pi-trash"
                   [rounded]="true"

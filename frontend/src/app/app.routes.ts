@@ -33,7 +33,9 @@ export const routes: Routes = [
       },
       {
         path: 'branches',
-        canActivate: [permissionGuard('branches')],
+        // Branches gates on academy (not the legacy 'branches' resource), matching
+        // the sidebar.
+        canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.BRANCHES' },
         loadChildren: () => import('./features/branches/branches.routes').then(m => m.BRANCHES_ROUTES)
       },
@@ -63,7 +65,8 @@ export const routes: Routes = [
       },
       {
         path: 'levels',
-        canActivate: [permissionGuard('academy')],
+        // No resource guard: Levels is reachable to any signed-in user, matching
+        // the sidebar, where it sits in the (global-admin gated) Admin group.
         data: { breadcrumb: 'BREADCRUMBS.LEVELS' },
         loadComponent: () => import('./features/levels/level-list/level-list.component').then(m => m.LevelListComponent)
       },
