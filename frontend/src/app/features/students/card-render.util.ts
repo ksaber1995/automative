@@ -32,6 +32,10 @@ function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   canvas.height = CARD_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable');
+  // The bulk export reuses ONE canvas for every student, and the draw functions
+  // leave a scale transform behind. Reset it, or the next card would be drawn
+  // through it a second time.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, CARD_W, CARD_H);
   return ctx;
 }

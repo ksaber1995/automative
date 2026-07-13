@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  CARD_H, CARD_W, Ctx, StudentCardData, T, fitText, roundRect, wrap,
+  DESIGN_H, DESIGN_W, Ctx, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap,
 } from './student-card.util';
 
 /**
@@ -18,20 +18,25 @@ const SILHOUETTE = '#cbd5e1';   // slate 300
 /** Rounded page + hairline border, shared by both faces. */
 function page(ctx: Ctx): void {
   ctx.fillStyle = T.page;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 }
 
 function border(ctx: Ctx): void {
-  roundRect(ctx, 1, 1, CARD_W - 2, CARD_H - 2, 26);
+  // Called after restore(), so it re-establishes the full-card transform itself —
+  // the hairline frame traces the card's real edge.
+  ctx.save();
+  bgTransform(ctx);
+  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 26);
   ctx.strokeStyle = T.line;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
 }
 
 /** The teal spine down the left edge — the one strong colour on the front. */
 function spine(ctx: Ctx): void {
   ctx.fillStyle = T.accent;
-  ctx.fillRect(0, 0, 12, CARD_H);
+  ctx.fillRect(0, 0, 12, DESIGN_H);
 }
 
 function photo(ctx: Ctx, x: number, y: number, w: number, h: number): void {
@@ -61,14 +66,19 @@ function photo(ctx: Ctx, x: number, y: number, w: number, h: number): void {
 
 export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasImageSource): void {
   ctx.save();
-  roundRect(ctx, 0, 0, CARD_W, CARD_H, 26);
+
+  // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
+  bgTransform(ctx);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
   ctx.clip();
   page(ctx);
 
   // left wash column, then the spine on top of it
   ctx.fillStyle = T.wash;
-  ctx.fillRect(0, 0, 268, CARD_H);
+  ctx.fillRect(0, 0, 268, DESIGN_H);
   spine(ctx);
+
+  contentTransform(ctx);
 
   photo(ctx, 46, 168, 186, 226);
 
@@ -90,7 +100,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
-  ctx.font = `600 14px ${T.font}`;
+  ctx.font = `bold 14px ${T.font}`;
   ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hR, 122);
   ctx.restore();
@@ -117,7 +127,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   rows.forEach((row, i) => {
     const y = top + i * rowH;
-    fitText(ctx, row.label, rR, y, rR - rL, 15, '600', T.muted, 'right', 'rtl');
+    fitText(ctx, row.label, rR, y, rR - rL, 15, 'bold', T.muted, 'right', 'rtl');
     fitText(
       ctx,
       row.value || '—',
@@ -155,7 +165,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.drawImage(qr, qx + 12, qy + 12, qs - 24, qs - 24);
 
   fitText(ctx, 'امسح الرمز', qx + qs / 2, qy + qs + 30, qs, 17, 'bold', T.accent, 'center', 'rtl');
-  fitText(ctx, 'للحضور والانصراف', qx + qs / 2, qy + qs + 54, qs, 14, '600', T.muted, 'center', 'rtl');
+  fitText(ctx, 'للحضور والانصراف', qx + qs / 2, qy + qs + 54, qs, 14, 'bold', T.muted, 'center', 'rtl');
 
   ctx.restore();
   border(ctx);
@@ -238,16 +248,21 @@ function icon(ctx: Ctx, kind: Contact, cx: number, cy: number): void {
 
 export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): void {
   ctx.save();
-  roundRect(ctx, 0, 0, CARD_W, CARD_H, 26);
+
+  // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
+  bgTransform(ctx);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
   ctx.clip();
   page(ctx);
   spine(ctx);
+
+  contentTransform(ctx);
 
   // ---- teacher block (right) ----
   const tR = 968;
   fitText(ctx, d.teacherName || '—', tR, 58, 300, 30, 'bold', T.ink, 'right', 'rtl');
   if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 92, 300, 18, '600', T.accent, 'right', 'rtl');
+    fitText(ctx, d.teacherTitle, tR, 92, 300, 18, 'bold', T.accent, 'right', 'rtl');
   }
 
   const contacts = ([
@@ -260,7 +275,7 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
   contacts.forEach((c, i) => {
     const cy = 148 + i * 42;
     icon(ctx, c.k, tR - 14, cy);
-    fitText(ctx, c.v, tR - 38, cy, 250, 16, '600', T.body, 'right', c.k === 'pin' ? 'rtl' : 'ltr');
+    fitText(ctx, c.v, tR - 38, cy, 250, 16, 'bold', T.body, 'right', c.k === 'pin' ? 'rtl' : 'ltr');
   });
 
   // hairline divider between teacher and rules
@@ -298,7 +313,7 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
     ctx.lineTo(667, cy - 3.5);
     ctx.stroke();
 
-    fitText(ctx, rule, 640, cy, 340, 16, '600', T.body, 'right', 'rtl');
+    fitText(ctx, rule, 640, cy, 340, 16, 'bold', T.body, 'right', 'rtl');
   });
 
   // ---- info QR (left) ----
@@ -313,7 +328,7 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
     ctx.drawImage(qr, qx + 10, qy + 10, qs - 20, qs - 20);
 
     fitText(ctx, 'امسح الرمز', qx + qs / 2, qy + qs + 26, qs, 16, 'bold', T.accent, 'center', 'rtl');
-    fitText(ctx, 'للاطلاع على المعلومات', qx + qs / 2, qy + qs + 48, qs + 20, 13, '600', T.muted, 'center', 'rtl');
+    fitText(ctx, 'للاطلاع على المعلومات', qx + qs / 2, qy + qs + 48, qs + 20, 13, 'bold', T.muted, 'center', 'rtl');
   }
 
   // ---- bottom ----

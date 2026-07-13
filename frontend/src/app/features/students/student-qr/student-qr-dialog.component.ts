@@ -231,7 +231,8 @@ export class StudentQrDialogComponent {
       if (!base64 || !s) return;
       const w = window.open('', '_blank', 'width=560,height=460');
       if (!w) return;
-      // Sized to a real CR80 ID card so it comes off the printer ready to cut.
+      // Printed at the card's real size (9 x 5.7 cm), so it comes off the printer
+      // ready to cut — the artwork already carries a 0.5 cm safe margin.
       w.document.write(`
         <html>
           <head>
@@ -239,7 +240,7 @@ export class StudentQrDialogComponent {
             <style>
               @page { margin: 12mm; }
               body { margin: 0; text-align: center; }
-              img { width: 85.6mm; height: auto; }
+              img { width: 90mm; height: 57mm; }
             </style>
           </head>
           <body><img src="data:image/png;base64,${base64}" /></body>

@@ -1,5 +1,5 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
-import { CARD_H, CARD_W, Ctx, T, fitText, goldGrad, roundRect, wrap } from './student-card.util';
+import { DESIGN_H, DESIGN_W, Ctx, T, bgTransform, contentTransform, fitText, goldGrad, roundRect, wrap } from './student-card.util';
 
 /**
  * The ORNATE BACK face of the student ID card — identical for every student, so
@@ -144,16 +144,21 @@ function highlightIcon(ctx: Ctx, kind: HighlightIcon, cx: number, cy: number): v
 
 export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | null): void {
   ctx.save();
-  roundRect(ctx, 0, 0, CARD_W, CARD_H, 30);
+
+  // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
+  bgTransform(ctx);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 30);
   ctx.clip();
 
   // Flat field + a faint lighter dot grid (integer-aligned; see gradient note).
   ctx.fillStyle = T.panel;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
   ctx.fillStyle = T.dotDark;
-  for (let y = 16; y < CARD_H; y += 16) {
-    for (let x = 16; x < CARD_W; x += 16) ctx.fillRect(x, y, 2, 2);
+  for (let y = 16; y < DESIGN_H; y += 16) {
+    for (let x = 16; x < DESIGN_W; x += 16) ctx.fillRect(x, y, 2, 2);
   }
+
+  contentTransform(ctx);
 
   // ================= teacher block (right) =================
   const tR = 936;            // right edge of the teacher column's text
@@ -265,7 +270,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
 
     // The column runs from just right of the QR (ends at 250) to insR, so the
     // longest rule still renders near full size instead of shrinking to nothing.
-    fitText(ctx, rule, insR - 6, cy, 348, 16, '600', '#ffffff', 'right', 'rtl');
+    fitText(ctx, rule, insR - 6, cy, 348, 16, 'bold', '#ffffff', 'right', 'rtl');
   });
 
   // ================= info QR (left) =================
@@ -288,7 +293,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     ctx.stroke();
 
     fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentLight, 'right', 'rtl');
-    fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, '600', '#ffffff', 'right', 'rtl');
+    fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, 'bold', '#ffffff', 'right', 'rtl');
 
     // globe glyph
     ctx.save();

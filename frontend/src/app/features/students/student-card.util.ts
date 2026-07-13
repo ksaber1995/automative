@@ -5,13 +5,42 @@ import { CardTheme, CARD_THEMES } from './card-theme';
  * QR/attendance card) onto a canvas. Shared by the 'navy' and 'maroon'
  * templates, which differ only in palette and typeface — see card-theme.ts.
  * The flat 'minimal' template has its own renderer in card-minimal.util.ts.
- *
- * Card stock is 8.6 x 5.4 cm (CR80); at 300 dpi that's 1016 x 638 px, which is
- * what the whole layout below is measured in — treat these as fixed and lay out
- * against them rather than scaling.
  */
-export const CARD_W = 1016;
-export const CARD_H = 638;
+/**
+ * The printed card is 9 × 5.7 cm at 300 dpi, with a 0.5 cm safe margin on every
+ * side that no content may enter — a guillotined card loses a millimetre or two,
+ * and a name or QR clipped off the edge makes the card useless.
+ *
+ * The artwork is still authored in the ORIGINAL 1016 × 638 space (every
+ * coordinate below is in it). Two transforms map that space onto the print
+ * canvas, so nothing had to be re-measured by hand:
+ *
+ *   background → fills the whole card, bleeding off all four edges
+ *   content    → fits inside the card minus the 0.5 cm margin
+ *
+ * So the panel and ribbons still run to the edge, while the text, photo, crest
+ * and QR are guaranteed to sit inside the safe zone.
+ */
+const CM = 300 / 2.54;                       // px per cm at 300 dpi ≈ 118.11
+export const CARD_W = Math.round(9 * CM);    // 1063 px = 9 cm
+export const CARD_H = Math.round(5.7 * CM);  //  673 px = 5.7 cm
+export const CARD_SAFE = Math.round(0.5 * CM); // 59 px = 0.5 cm
+
+/** The space every drawing coordinate in these files is written in. */
+export const DESIGN_W = 1016;
+export const DESIGN_H = 638;
+
+/** Map design space onto the full card — art bleeds off every edge. */
+export function bgTransform(ctx: CanvasRenderingContext2D): void {
+  ctx.setTransform(CARD_W / DESIGN_W, 0, 0, CARD_H / DESIGN_H, 0, 0);
+}
+
+/** Map design space inside the safe margin — no content can reach an edge. */
+export function contentTransform(ctx: CanvasRenderingContext2D): void {
+  const w = CARD_W - 2 * CARD_SAFE;
+  const h = CARD_H - 2 * CARD_SAFE;
+  ctx.setTransform(w / DESIGN_W, 0, 0, h / DESIGN_H, CARD_SAFE, CARD_SAFE);
+}
 
 /**
  * Palette for the draw currently in flight. Set once at the top of
@@ -131,8 +160,8 @@ function drawPanel(ctx: Ctx): void {
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(320, 0);
-  ctx.bezierCurveTo(292, 200, 300, 432, 260, CARD_H);
-  ctx.lineTo(0, CARD_H);
+  ctx.bezierCurveTo(292, 200, 300, 432, 260, DESIGN_H);
+  ctx.lineTo(0, DESIGN_H);
   ctx.closePath();
   ctx.fillStyle = T.panel;
   ctx.fill();
@@ -144,8 +173,8 @@ function drawPanel(ctx: Ctx): void {
   ctx.beginPath();
   ctx.moveTo(0, 300);
   ctx.lineTo(320, 140);
-  ctx.lineTo(320, CARD_H);
-  ctx.lineTo(0, CARD_H);
+  ctx.lineTo(320, DESIGN_H);
+  ctx.lineTo(0, DESIGN_H);
   ctx.closePath();
   ctx.globalAlpha = 0.55;
   ctx.fill();
@@ -153,14 +182,14 @@ function drawPanel(ctx: Ctx): void {
 
   ctx.beginPath();
   ctx.moveTo(348, 0);
-  ctx.bezierCurveTo(320, 200, 328, 432, 288, CARD_H);
-  ctx.strokeStyle = goldGrad(ctx, 280, 0, 350, CARD_H);
+  ctx.bezierCurveTo(320, 200, 328, 432, 288, DESIGN_H);
+  ctx.strokeStyle = goldGrad(ctx, 280, 0, 350, DESIGN_H);
   ctx.lineWidth = 10;
   ctx.stroke();
 
   ctx.beginPath();
   ctx.moveTo(364, 0);
-  ctx.bezierCurveTo(336, 200, 344, 432, 304, CARD_H);
+  ctx.bezierCurveTo(336, 200, 344, 432, 304, DESIGN_H);
   ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = 2.5;
@@ -169,14 +198,14 @@ function drawPanel(ctx: Ctx): void {
 
   ctx.beginPath();
   ctx.moveTo(-10, 498);
-  ctx.bezierCurveTo(80, 556, 180, 588, 272, CARD_H - 4);
-  ctx.strokeStyle = goldGrad(ctx, 0, 498, 272, CARD_H);
+  ctx.bezierCurveTo(80, 556, 180, 588, 272, DESIGN_H - 4);
+  ctx.strokeStyle = goldGrad(ctx, 0, 498, 272, DESIGN_H);
   ctx.lineWidth = 13;
   ctx.stroke();
 
   ctx.beginPath();
   ctx.moveTo(-10, 544);
-  ctx.bezierCurveTo(70, 590, 155, 613, 232, CARD_H);
+  ctx.bezierCurveTo(70, 590, 155, 613, 232, DESIGN_H);
   ctx.strokeStyle = T.accent;
   ctx.globalAlpha = 0.5;
   ctx.lineWidth = 3;
@@ -384,8 +413,11 @@ function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: nu
 
 export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource): void {
   ctx.save();
-  roundRect(ctx, 0, 0, CARD_W, CARD_H, 30);
-  ctx.clip();
+
+  // ── Background: bleeds off all four edges ────────────────────────────────────
+  bgTransform(ctx);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 30);
+  ctx.clip();   // clipping is baked in device space, so it survives the transform swap below
 
   // NOTE ON GRADIENTS: large-area gradients are avoided throughout this card.
   // The browser dithers them to hide banding, and that noise is incompressible —
@@ -394,17 +426,21 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // fills; goldGrad() is only used on thin strokes and small glyphs, where the
   // dithered area is negligible.
   ctx.fillStyle = T.page;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 
   // Same reason: integer-aligned squares, not anti-aliased arcs.
   ctx.fillStyle = T.dot;
-  for (let y = 14; y < CARD_H; y += 15) {
-    for (let x = 380; x < CARD_W; x += 15) {
+  for (let y = 14; y < DESIGN_H; y += 15) {
+    for (let x = 380; x < DESIGN_W; x += 15) {
       ctx.fillRect(x, y, 2, 2);
     }
   }
 
   drawPanel(ctx);
+
+  // ── Content: inside the 0.5 cm safe margin, so nothing can be cut off ────────
+  contentTransform(ctx);
+
   drawCrest(ctx, 140, 106);
   drawPhoto(ctx);
 
@@ -420,7 +456,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
-  ctx.font = `600 19px ${T.font}`;
+  ctx.font = `bold 19px ${T.font}`;
   ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hcx, 124);
   const tw = ctx.measureText('STUDENT ID CARD').width;
@@ -462,7 +498,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
     ctx.fill();
     rowIcon(ctx, row.icon, rx + chip / 2, cy);
 
-    fitText(ctx, row.label, labelR, cy, 124, 19, '600', T.muted, 'right', 'rtl');
+    fitText(ctx, row.label, labelR, cy, 124, 19, 'bold', T.muted, 'right', 'rtl');
     fitText(
       ctx,
       row.value || '—',
@@ -519,7 +555,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.restore();
 
   // --- QR ---
-  // qx + qs must leave a real margin to the card edge (CARD_W): this is a printed
+  // qx + qs must leave a real margin to the card edge (DESIGN_W): this is a printed
   // and guillotined card, so anything under ~2mm (24px) risks being cut into.
   const qx = 780, qy = 152, qs = 200;
   roundRect(ctx, qx, qy, qs, qs, 14);
@@ -539,7 +575,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.stroke();
 
   fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentLight, 'right', 'rtl');
-  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, '600', '#ffffff', 'right', 'rtl');
+  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, 'bold', '#ffffff', 'right', 'rtl');
 
   ctx.save();
   ctx.strokeStyle = goldGrad(ctx, qx + 14, capTop + 14, qx + 50, capTop + 50);
@@ -571,8 +607,13 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
 
   ctx.restore();
 
-  roundRect(ctx, 1, 1, CARD_W - 2, CARD_H - 2, 30);
+  // The card's edge frame — drawn after restore(), so it re-establishes the
+  // full-card transform and traces the real 9 x 5.7 cm edge.
+  ctx.save();
+  bgTransform(ctx);
+  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 30);
   ctx.strokeStyle = T.line;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
 }
