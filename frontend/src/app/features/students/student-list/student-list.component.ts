@@ -6,6 +6,9 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { FormsModule } from '@angular/forms';
@@ -48,6 +51,9 @@ interface EnrollmentCounts {
     TooltipModule,
     TabsModule,
     TranslateModule,
+    DialogModule,
+    MultiSelectModule,
+    RadioButtonModule,
     StudentImportDialogComponent
   ],
   providers: [ConfirmationService],
@@ -345,6 +351,44 @@ export class StudentListComponent implements OnInit {
   // class and level it was issued for.
   downloadingZip = signal(false);
 
+  // --- Export scope dialog ---
+  // The export can be a few thousand cards, so it asks what to print before doing
+  // the work: everything, or only the courses / classes / teachers picked here.
+  zipDialogOpen = signal(false);
+  zipScope = signal<'all' | 'filter'>('all');
+  zipCourseIds = signal<string[]>([]);
+  zipClassIds = signal<string[]>([]);
+  zipTeacherIds = signal<string[]>([]);
+  zipClassOptions = signal<LookupOption[]>([]);
+  zipTeacherOptions = signal<LookupOption[]>([]);
+  loadingZipOptions = signal(false);
+
+  /** Nothing ticked under "selected only" — there'd be no cards to render. */
+  zipFilterEmpty = computed(() =>
+    this.zipScope() === 'filter' &&
+    !this.zipCourseIds().length && !this.zipClassIds().length && !this.zipTeacherIds().length);
+
+  openZipDialog(): void {
+    this.zipDialogOpen.set(true);
+    if (this.zipClassOptions().length || this.loadingZipOptions()) return;
+
+    // Teachers come off the classes themselves (a class names its instructor), so
+    // the picker only offers teachers who actually have a class to print.
+    this.loadingZipOptions.set(true);
+    forkJoin({
+      classes: this.classService.getAllClasses(),
+      employees: this.lookupService.employees(),
+    }).subscribe({
+      next: ({ classes, employees }) => {
+        this.zipClassOptions.set(classes.map((c) => ({ id: c.id, label: c.name })));
+        const withClasses = new Set(classes.map((c) => c.instructorId).filter(Boolean) as string[]);
+        this.zipTeacherOptions.set(employees.filter((e) => withClasses.has(e.id)));
+        this.loadingZipOptions.set(false);
+      },
+      error: () => this.loadingZipOptions.set(false),
+    });
+  }
+
   /**
    * Students whose card can be downloaded — any active student with a token
    * (QR is active by default for all tenants).
@@ -354,6 +398,7 @@ export class StudentListComponent implements OnInit {
   }
 
   async downloadQrZip() {
+    this.zipDialogOpen.set(false);
     this.downloadingZip.set(true);
     try {
       const activatedStudents = this.qrDownloadableStudents();
@@ -373,6 +418,21 @@ export class StudentListComponent implements OnInit {
         });
       });
 
+      // Which classes are in scope? A class is in if it was picked directly, or its
+      // course was, or its teacher was — the three pickers widen the selection
+      // rather than narrowing each other. null = no filtering at all.
+      const scoped = this.zipScope() === 'filter';
+      const pickedCourses = new Set(this.zipCourseIds());
+      const pickedClasses = new Set(this.zipClassIds());
+      const pickedTeachers = new Set(this.zipTeacherIds());
+      const allowedClassIds: Set<string> | null = scoped
+        ? new Set(classes
+            .filter((c) => pickedClasses.has(c.id)
+              || pickedCourses.has(c.courseId)
+              || (c.instructorId != null && pickedTeachers.has(c.instructorId)))
+            .map((c) => c.id))
+        : null;
+
       const courseMap = new Map<string, { name: string; levelName: string }>(
         courses.map((c: any) => [c.id, { name: c.name, levelName: c.levelName || '' }])
       );
@@ -381,10 +441,22 @@ export class StudentListComponent implements OnInit {
 
       const studentEnrollments = new Map<string, string[]>();   // studentId -> classIds
       for (const e of enrollments) {
-        if (studentIdSet.has(e.studentId)) {
-          if (!studentEnrollments.has(e.studentId)) studentEnrollments.set(e.studentId, []);
-          studentEnrollments.get(e.studentId)!.push(e.classId);
-        }
+        if (!studentIdSet.has(e.studentId)) continue;
+        if (allowedClassIds && !allowedClassIds.has(e.classId)) continue;
+        if (!studentEnrollments.has(e.studentId)) studentEnrollments.set(e.studentId, []);
+        studentEnrollments.get(e.studentId)!.push(e.classId);
+      }
+
+      // Under a filter, a student with no in-scope class has nothing to print —
+      // including them would file an unlabelled card under Uncategorized, which is
+      // exactly what the user asked NOT to get when they narrowed the export.
+      const exportStudents = allowedClassIds
+        ? activatedStudents.filter((s) => (studentEnrollments.get(s.id)?.length ?? 0) > 0)
+        : activatedStudents;
+
+      if (exportStudents.length === 0) {
+        this.notificationService.warning(this.translate.instant('STUDENTS.LIST.QR_ZIP_NO_MATCH'));
+        return;
       }
 
       // Load the card design first: it picks the template for the per-student
@@ -400,7 +472,7 @@ export class StudentListComponent implements OnInit {
       await document.fonts.ready;                        // Arabic must shape before we rasterise
       let rendered = 0;
 
-      for (const student of activatedStudents) {
+      for (const student of exportStudents) {
         const card: StudentCardData = {
           companyName,
           name: `${student.firstName} ${student.lastName}`.trim(),
@@ -454,7 +526,7 @@ export class StudentListComponent implements OnInit {
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, 'student-cards.zip');
-      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: activatedStudents.length }));
+      this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: exportStudents.length }));
     } catch {
       this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
     } finally {

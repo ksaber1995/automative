@@ -3088,6 +3088,18 @@
       "QR_DOWNLOAD_ZIP": "Download ID cards (ZIP)",
       "QR_DOWNLOAD_SUCCESS": "Downloaded ID cards for {{count}} students successfully",
       "QR_DOWNLOAD_ERROR": "Failed to download student ID cards",
+      "QR_ZIP_TITLE": "Download ID cards",
+      "QR_ZIP_HINT": "Choose which cards to render. A large academy can be thousands of cards, so narrowing it keeps the ZIP quick.",
+      "QR_ZIP_ALL": "Everything — every active student",
+      "QR_ZIP_SELECTED": "Only the selected courses, classes or teachers",
+      "QR_ZIP_COURSES": "Courses",
+      "QR_ZIP_CLASSES": "Classes",
+      "QR_ZIP_TEACHERS": "Teachers",
+      "QR_ZIP_ANY": "Any",
+      "QR_ZIP_COMBINE_HINT": "A class is included if you picked it, its course, or its teacher.",
+      "QR_ZIP_DOWNLOAD": "Download",
+      "QR_ZIP_CANCEL": "Cancel",
+      "QR_ZIP_NO_MATCH": "No students match that selection.",
       "QR_NO_ACTIVATED": "No activated QR codes to download"
     },
     "FORM": {

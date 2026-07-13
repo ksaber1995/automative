@@ -7,6 +7,7 @@ import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
 import { isCompanyQrFree } from '../utils/qr-pricing';
+import { DEFAULT_CARD_DESIGN, ensureCardDesignColumn } from './companies';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -259,18 +260,24 @@ export const authRoutes = {
       // Feature plan is academy-only; teachers are always SIMPLE.
       const plan = companyType === 'ACADEMY' && body.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
 
+      // Every new tenant starts with the default ID-card design already on the row,
+      // so the card-design page opens on a real record instead of an implicit
+      // default that only exists until someone saves.
+      await ensureCardDesignColumn();
+
       const companyRes = await client.query(
         `INSERT INTO companies
           (name, type, industry, subscription_tier, subscription_status,
            subscription_start_date, subscription_end_date, max_branches, max_users,
-           timezone, currency, locale, is_active, onboarding_completed, plan)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           timezone, currency, locale, is_active, onboarding_completed, plan, card_design)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)
          RETURNING *`,
         [
           body.companyName, companyType, body.industry || 'Tech Center',
           'BASIC', 'TRIAL',
           new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false, plan,
+          JSON.stringify(DEFAULT_CARD_DESIGN),
         ]
       );
       const company = companyRes.rows[0];

@@ -53,7 +53,18 @@ interface CardDesign {
   highlights: string[];
 }
 
-const DEFAULT_CARD_DESIGN: CardDesign = {
+/**
+ * The card design every tenant starts with. It is also written to the row at
+ * signup (see auth.ts) and backfilled for existing tenants by migration 060, so
+ * the design is a real, editable record rather than an implicit default — but
+ * resolveCardDesign still merges it underneath whatever is stored, so a row that
+ * predates a new field (or was never saved) keeps rendering.
+ *
+ * teacherName is deliberately left empty: resolveCardDesign falls back to the
+ * company name, so a tenant that renames itself doesn't keep a stale name on its
+ * cards.
+ */
+export const DEFAULT_CARD_DESIGN: CardDesign = {
   template: 'navy',
   teacherName: '',
   teacherTitle: '',
