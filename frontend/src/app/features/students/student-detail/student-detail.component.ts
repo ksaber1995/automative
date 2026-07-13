@@ -118,9 +118,23 @@ export class StudentDetailComponent implements OnInit {
    * disabled when there are none (or no parent number to send them to) rather than
    * sending an empty-bodied message.
    */
+  // ── Send notes to the parent ────────────────────────────────────────────────
+  // The note is written here, in the dialog — gating the button on the student
+  // already HAVING notes made it useless exactly when you want it, since there was
+  // no way to write one. The student's saved notes just seed the box.
+  notesDialogOpen = signal(false);
+  notesDraft = signal('');
+
+  openNotesDialog(): void {
+    const s = this.student();
+    this.notesDraft.set(s?.notes?.trim() || '');
+    this.notesDialogOpen.set(true);
+  }
+
+  /** Click-to-chat the typed note to the parent, from the staff member's own WhatsApp. */
   sendNotesToParent(): void {
     const s = this.student();
-    const notes = s?.notes?.trim();
+    const notes = this.notesDraft().trim();
     if (!s || !notes) return;
 
     const text = this.translate.instant('WHATSAPP.NOTES_PARENT_BODY', {
@@ -129,7 +143,9 @@ export class StudentDetailComponent implements OnInit {
       studentName: `${s.firstName} ${s.lastName}`.trim(),
       notes,
     });
-    if (!openWhatsappChat(s.parentPhone, text)) {
+    if (openWhatsappChat(s.parentPhone, text)) {
+      this.notesDialogOpen.set(false);
+    } else {
       this.notificationService.error(this.translate.instant('STUDENTS.DETAIL.SEND_NOTES_NO_PHONE'));
     }
   }

@@ -3383,9 +3383,14 @@
       "CHANGE_CLASS_FULL_WARNING": "This class is at or over its maximum capacity. You can still move the student.",
       "CLASS_CHANGED": "Class changed successfully.",
       "SEND_NOTES": "Send notes",
-      "SEND_NOTES_TOOLTIP": "Send this student's notes to their parent on WhatsApp",
+      "SEND_NOTES_TOOLTIP": "Write a note and send it to the parent on WhatsApp",
       "SEND_NOTES_NO_NOTES": "This student has no notes to send.",
-      "SEND_NOTES_NO_PHONE": "This student has no parent phone number."
+      "SEND_NOTES_NO_PHONE": "This student has no parent phone number.",
+      "SEND_NOTES_TITLE": "Send notes to parent",
+      "SEND_NOTES_HINT": "This opens WhatsApp to {{parent}} with the message ready to send from your own number.",
+      "SEND_NOTES_THE_PARENT": "the parent",
+      "SEND_NOTES_PLACEHOLDER": "Write what you want the parent to know…",
+      "SEND_NOTES_SEND": "Open WhatsApp"
     },
     "CREATED": "Student created successfully",
     "UPDATED": "Student updated successfully",

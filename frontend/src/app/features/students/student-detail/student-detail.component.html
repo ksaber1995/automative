@@ -69,6 +69,38 @@
     <!-- QR code dialog -->
     <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)"></app-student-qr-dialog>
 
+    <!-- Write the note here and send it — the student's saved notes only seed the box -->
+    <p-dialog
+      [visible]="notesDialogOpen()"
+      (visibleChange)="notesDialogOpen.set($event)"
+      [modal]="true"
+      [draggable]="false"
+      [dismissableMask]="true"
+      [style]="{ width: '32rem', maxWidth: '95vw' }"
+      [header]="'STUDENTS.DETAIL.SEND_NOTES_TITLE' | translate"
+    >
+      <p class="text-sm text-gray-500 mb-3">
+        {{ 'STUDENTS.DETAIL.SEND_NOTES_HINT' | translate: { parent: s.parentName || ('STUDENTS.DETAIL.SEND_NOTES_THE_PARENT' | translate) } }}
+      </p>
+
+      <textarea pTextarea rows="5" class="w-full"
+        [ngModel]="notesDraft()" (ngModelChange)="notesDraft.set($event)"
+        [placeholder]="'STUDENTS.DETAIL.SEND_NOTES_PLACEHOLDER' | translate"></textarea>
+
+      @if (!s.parentPhone) {
+        <p class="text-sm text-red-500 mt-2">
+          <i class="pi pi-exclamation-circle"></i> {{ 'STUDENTS.DETAIL.SEND_NOTES_NO_PHONE' | translate }}
+        </p>
+      }
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" [text]="true" (onClick)="notesDialogOpen.set(false)"></p-button>
+        <p-button icon="pi pi-whatsapp" [label]="'STUDENTS.DETAIL.SEND_NOTES_SEND' | translate"
+          [disabled]="!notesDraft().trim() || !s.parentPhone"
+          (onClick)="sendNotesToParent()"></p-button>
+      </ng-template>
+    </p-dialog>
+
 
     <!-- Student Information Card -->
     <p-card>
@@ -89,9 +121,8 @@
           <div class="flex gap-2">
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
             <button pButton [label]="'STUDENTS.DETAIL.SEND_NOTES' | translate" icon="pi pi-whatsapp" class="p-button-outlined"
-              [disabled]="!s.notes || !s.parentPhone"
-              [pTooltip]="(!s.notes ? 'STUDENTS.DETAIL.SEND_NOTES_NO_NOTES' : (!s.parentPhone ? 'STUDENTS.DETAIL.SEND_NOTES_NO_PHONE' : 'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP')) | translate"
-              (click)="sendNotesToParent()"></button>
+              [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
+              (click)="openNotesDialog()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>
