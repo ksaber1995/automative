@@ -482,6 +482,25 @@
       "SUMMARY_FAILED": "فشل تحميل ملخص السحوبات",
       "UPDATE_FAILED": "فشل تحديث السحب",
       "DELETE_FAILED": "فشل حذف السحب"
+    },
+    "EXAMS": {
+      "NOT_FOUND": "الامتحان غير موجود",
+      "ACCESS_DENIED": "ليس لديك صلاحية على هذا الامتحان",
+      "ACCESS_DENIED_UPDATE": "ليس لديك صلاحية لتعديل هذا الامتحان",
+      "ACCESS_DENIED_DELETE": "ليس لديك صلاحية لحذف هذا الامتحان",
+      "STUDENT_NOT_IN_COURSE": "هذا الطالب غير مسجل في هذا الكورس",
+      "QR_STUDENT_NOT_FOUND": "لا يوجد طالب نشط لهذا الرمز",
+      "QR_TOKEN_REQUIRED": "امسح البطاقة أولاً",
+      "GRADE_REQUIRED": "أدخل الدرجة أولاً",
+      "COURSE_REQUIRED": "اختر كورسًا أو مجموعة",
+      "SESSION_CLASS_MISMATCH": "هذه الحصة تخص مجموعة أخرى",
+      "CREATE_FAILED": "تعذر إنشاء الامتحان",
+      "UPDATE_FAILED": "تعذر تعديل الامتحان",
+      "DELETE_FAILED": "تعذر حذف الامتحان",
+      "RECORD_FAILED": "تعذر رصد الدرجة",
+      "RESULTS_FAILED": "تعذر تحميل النتائج",
+      "LIST_FAILED": "تعذر تحميل الامتحانات",
+      "SEND_FAILED": "تعذر إرسال النتائج"
     }
   },
   "BREADCRUMBS": {

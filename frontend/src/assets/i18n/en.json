@@ -482,6 +482,25 @@
       "SUMMARY_FAILED": "Failed to load withdrawal summary",
       "UPDATE_FAILED": "Failed to update withdrawal",
       "DELETE_FAILED": "Failed to delete withdrawal"
+    },
+    "EXAMS": {
+      "NOT_FOUND": "Exam not found",
+      "ACCESS_DENIED": "You don't have access to this exam",
+      "ACCESS_DENIED_UPDATE": "You don't have access to update this exam",
+      "ACCESS_DENIED_DELETE": "You don't have access to delete this exam",
+      "STUDENT_NOT_IN_COURSE": "This student isn't enrolled in this course",
+      "QR_STUDENT_NOT_FOUND": "No active student matches this QR code",
+      "QR_TOKEN_REQUIRED": "Scan a card first",
+      "GRADE_REQUIRED": "Enter a mark first",
+      "COURSE_REQUIRED": "Pick a course or a class",
+      "SESSION_CLASS_MISMATCH": "That session belongs to a different class",
+      "CREATE_FAILED": "Could not create the exam",
+      "UPDATE_FAILED": "Could not update the exam",
+      "DELETE_FAILED": "Could not delete the exam",
+      "RECORD_FAILED": "Could not record the mark",
+      "RESULTS_FAILED": "Could not load the results",
+      "LIST_FAILED": "Could not load the exams",
+      "SEND_FAILED": "Could not send the results"
     }
   },
   "BREADCRUMBS": {

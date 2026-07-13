@@ -13,7 +13,6 @@ import { ConfirmationService } from 'primeng/api';
 import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Html5Qrcode } from 'html5-qrcode';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
 import { StudentService } from '../../students/services/student.service';
@@ -22,7 +21,6 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
-import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
@@ -88,7 +86,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
-  private scanPref = inject(ScanPreferenceService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
   // it and forwards to the homework panel while that's open — otherwise the two
@@ -105,14 +102,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   search = signal('');
   saveState = signal<'saving' | 'saved' | 'error' | undefined>(undefined);
 
-  // QR check-in
-  scannerOpen = signal(false);
-  scannerStarting = signal(false);
-  cameraStarted = signal(false);
-  // Per-device USB-scanner flag (exposed to the template).
-  usbDetected = () => this.scanPref.usbDetected();
-  manualToken = signal('');
-  // QR-less check-in: the unified search box resolves a typed code on Enter.
+  // Check-in has no scanner panel: a USB/keyboard-wedge scan arrives through the
+  // app-wide GlobalScanService handler, and the roster's search box resolves a
+  // typed student code on Enter.
   resolvingCode = signal(false);
   lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: 'NORMAL' | 'SUBSTITUTION'; homeClassName?: string | null } | null>(null);
 
@@ -120,15 +112,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   editingNumber = signal(false);
   numberDraft = signal<number | null>(null);
   savingNumber = signal(false);
-  private readonly SCANNER_ELEMENT_ID = 'qr-scanner-region';
-  private html5Qr?: Html5Qrcode;
-  // Web Audio context for the check-in beep. Created on the user gesture that
-  // opens the scanner (browsers block audio without one).
+  // Web Audio context for the check-in beep. Browsers block audio until a user
+  // gesture, so it is primed from the roster interactions (there is no scanner
+  // button to prime it any more).
   private audioCtx?: AudioContext;
-  // Suppress the rapid repeat decodes html5-qrcode fires for one physical scan.
-  private lastToken = '';
-  private lastTokenAt = 0;
-  private readonly SCAN_DEDUP_MS = 2500;
 
   private saveTimer?: ReturnType<typeof setTimeout>;
   private savedClearTimer?: ReturnType<typeof setTimeout>;
@@ -237,6 +224,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   }
 
   togglePresence(student: SessionAttendanceStudent, value: boolean) {
+    // Any click on the roster is a user gesture — enough for the browser to let the
+    // check-in beep play later, now that the scanner button isn't there to prime it.
+    this.ensureAudio();
     // SUBSTITUTION attendees aren't part of the enrolled roster the checkbox save
     // manages, so unchecking one removes their attendance row outright (undo a
     // wrong scan). They can't be toggled back on here — re-scan to re-add.
@@ -555,28 +545,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // QR check-in
   // ============================================================
 
-  /**
-   * Open the scanner panel. USB scanner is first priority: if one is known on
-   * this device, we don't start the camera (the always-on wedge handles scans);
-   * the camera is an explicit fallback (useCamera) for devices with no scanner.
-   */
-  async openScanner() {
-    this.scannerOpen.set(true);
-    this.lastScanResult.set(null);
-    // This click is the user gesture browsers require before audio can play.
-    this.ensureAudio();
-    if (this.usbDetected()) return;
-    this.cameraStarted.set(true);
-    // Wait a tick so the #qr-scanner-region element exists in the DOM.
-    setTimeout(() => this.startCamera(), 0);
-  }
-
-  /** Explicit fallback: start the camera even when a USB scanner exists. */
-  useCamera() {
-    this.cameraStarted.set(true);
-    setTimeout(() => this.startCamera(), 50);
-  }
-
   private ensureAudio() {
     if (!this.audioCtx) {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -611,70 +579,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  closeScanner() {
-    this.stopCamera();
-    this.scannerOpen.set(false);
-  }
-
-  private async startCamera() {
-    if (this.html5Qr) return;
-    this.scannerStarting.set(true);
-    try {
-      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
-      await this.html5Qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => this.handleScan(decodedText),
-        // Per-frame decode failures are normal (no QR in view) — ignore.
-        () => {},
-      );
-    } catch {
-      this.notificationService.error(this.translate.instant('SESSION_QR.CAMERA_FAILED'));
-      this.html5Qr = undefined;
-    } finally {
-      this.scannerStarting.set(false);
-    }
-  }
-
-  private stopCamera() {
-    this.cameraStarted.set(false);
-    const qr = this.html5Qr;
-    this.html5Qr = undefined;
-    if (!qr) return;
-    // stop() rejects if already stopped; swallow it.
-    qr.stop().then(() => qr.clear()).catch(() => {});
-  }
-
-  /** Extract the token from a scanned value: either a full profile URL or the raw token. */
-  private extractToken(text: string): string {
-    const raw = (text || '').trim();
-    const marker = '/p/s/';
-    const idx = raw.indexOf(marker);
-    if (idx >= 0) {
-      return raw.slice(idx + marker.length).split(/[/?#]/)[0];
-    }
-    return raw;
-  }
-
-  /** Camera decode callback. */
-  private handleScan(decodedText: string) {
-    const token = this.extractToken(decodedText);
-    if (!token) return;
-    const now = Date.now();
-    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
-    this.lastToken = token;
-    this.lastTokenAt = now;
-    this.checkin(token);
-  }
-
-  /** USB scanner / manual entry submit (Enter key). */
-  submitManualToken() {
-    const token = this.extractToken(this.manualToken());
-    this.manualToken.set('');
-    if (!token) return;
-    this.checkin(token);
-  }
-
   /**
    * Unified search box submit (Enter). One input searches the roster by name OR
    * student code, and pressing Enter "takes attendance":
@@ -685,6 +589,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
    *    student present.
    */
   submitSearch() {
+    this.ensureAudio();
     const q = this.search().trim();
     if (!q) return;
 
@@ -757,7 +662,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.globalScan.unregister(this.scanHandler);
-    this.stopCamera();
     this.audioCtx?.close().catch(() => {});
     if (this.saveTimer) clearTimeout(this.saveTimer);
     if (this.savedClearTimer) clearTimeout(this.savedClearTimer);
