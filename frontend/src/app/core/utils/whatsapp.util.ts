@@ -25,7 +25,7 @@ export const WHATSAPP_TEMPLATE_TYPES: WhatsappTemplateType[] = [
 /** Default Arabic bodies — mirrors DEFAULT_WHATSAPP_TEMPLATES on the backend. */
 export const DEFAULT_WHATSAPP_TEMPLATES: Record<WhatsappTemplateType, string> = {
   QR_STUDENT:
-    'مرحباً {studentName}، هذا رابط كود الـ QR الخاص بك في {academyName}:\n{link}',
+    'مرحباً {studentName}، هذا رابط كود الـ QR الخاص بك في {academyName}:\n{link}\n\nكود الطالب: {code}\nاستخدمه للحضور إذا لم تكن البطاقة معك.',
   FOLLOWUP_PARENT:
     'رسالة من {academyName}:\n\nعزيزي ولي أمر الطالب {studentName}، يمكنك متابعة بيانات وحضور ابنك/ابنتك عبر الرابط التالي:\n{link}',
   ABSENCE:

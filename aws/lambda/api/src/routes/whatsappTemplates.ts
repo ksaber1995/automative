@@ -24,7 +24,7 @@ type TemplateType = (typeof WHATSAPP_TEMPLATE_TYPES)[number];
 /** Default Arabic bodies. Placeholders use {name} and are substituted client-side. */
 export const DEFAULT_WHATSAPP_TEMPLATES: Record<TemplateType, string> = {
   QR_STUDENT:
-    'مرحباً {studentName}، هذا رابط كود الـ QR الخاص بك في {academyName}:\n{link}',
+    'مرحباً {studentName}، هذا رابط كود الـ QR الخاص بك في {academyName}:\n{link}\n\nكود الطالب: {code}\nاستخدمه للحضور إذا لم تكن البطاقة معك.',
   FOLLOWUP_PARENT:
     'رسالة من {academyName}:\n\nعزيزي ولي أمر الطالب {studentName}، يمكنك متابعة بيانات وحضور ابنك/ابنتك عبر الرابط التالي:\n{link}',
   ABSENCE:

@@ -30,7 +30,7 @@ export class WhatsappTemplatesComponent implements OnInit {
   private translate = inject(TranslateService);
 
   readonly defs: TemplateDef[] = [
-    { type: 'QR_STUDENT', placeholders: ['studentName', 'academyName', 'link'] },
+    { type: 'QR_STUDENT', placeholders: ['studentName', 'academyName', 'link', 'code'] },
     { type: 'FOLLOWUP_PARENT', placeholders: ['studentName', 'parentName', 'academyName', 'link'] },
     { type: 'ABSENCE', placeholders: ['studentName', 'parentName', 'academyName', 'className', 'courseName', 'sessionNumber', 'date'] },
     { type: 'PAYMENT_DELAY', placeholders: ['studentName', 'academyName', 'amount', 'currency', 'courseName', 'dueDate'] },

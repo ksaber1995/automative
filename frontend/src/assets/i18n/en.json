@@ -4671,6 +4671,7 @@
   },
   "WHATSAPP": {
     "TELEGRAM_CONNECT_LINE": "📲 Connect to our Telegram bot to get instant attendance notifications:\n{{link}}",
+    "STUDENT_CODE_LINE": "🔑 Your student code: {{code}}\nUse it to check in if you don't have your card with you.",
     "SEND": "Send via WhatsApp",
     "NO_PHONE": "No WhatsApp number on file",
     "NO_STUDENTS": "No students to message",

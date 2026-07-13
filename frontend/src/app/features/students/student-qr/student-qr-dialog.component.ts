@@ -103,15 +103,29 @@ export class StudentQrDialogComponent {
     return text + '\n\n' + this.translate.instant('WHATSAPP.TELEGRAM_CONNECT_LINE', { link: telegramUrl });
   }
 
-  /** Click-to-chat: open WhatsApp to the STUDENT with the profile + Telegram links. */
+  /**
+   * Click-to-chat: open WhatsApp to the STUDENT with the profile + Telegram links
+   * AND their student code — the code is the fallback for attendance when they
+   * turn up without their card, so it's useless to them if we never send it.
+   *
+   * The default template carries {code}, but a tenant who customised their
+   * template before that existed has a body without it — so if the rendered text
+   * doesn't already contain the code, it gets appended. Same shape as the Telegram
+   * line below.
+   */
   sendQrToStudent(): void {
     const s = this.student();
     if (!s?.qrToken) return;
+    const code = s.studentCode != null ? String(s.studentCode) : '';
     let text = renderWhatsappTemplate(this.templatesSvc.get('QR_STUDENT'), {
       studentName: this.studentName(),
       academyName: this.authService.getCompanyName(),
       link: this.profileUrl(s.qrToken),
+      code,
     });
+    if (code && !text.includes(code)) {
+      text += '\n\n' + this.translate.instant('WHATSAPP.STUDENT_CODE_LINE', { code });
+    }
     text = this.withTelegram(text, this.telegramStudentUrl());
     if (!openWhatsappChat(s.phone, text)) {
       this.notification.error(this.translate.instant('STUDENT_QR.NO_STUDENT_PHONE'));
