@@ -1085,7 +1085,7 @@
         <div class="flex justify-between items-center p-4">
           <h3 class="text-xl font-bold flex items-center gap-2">
             <i class="pi pi-file-edit text-indigo-600"></i>
-            {{ 'STUDENTS.DETAIL.EXAMS_TITLE' | translate }} ({{ examResults().length }})
+            {{ 'STUDENTS.DETAIL.EXAMS_TITLE' | translate }} ({{ examOnlyResults().length }})
           </h3>
         </div>
       </ng-template>
@@ -1095,13 +1095,13 @@
           <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
           <p>{{ 'STUDENTS.DETAIL.EXAMS_LOADING' | translate }}</p>
         </div>
-      } @else if (examResults().length === 0) {
+      } @else if (examOnlyResults().length === 0) {
         <div class="text-center py-6 text-gray-500">
           <i class="pi pi-file text-3xl mb-2"></i>
           <p>{{ 'STUDENTS.DETAIL.EXAMS_EMPTY' | translate }}</p>
         </div>
       } @else {
-        <p-table [value]="examResults()" [paginator]="examResults().length > 10" [rows]="10" responsiveLayout="scroll">
+        <p-table [value]="examOnlyResults()" [paginator]="examOnlyResults().length > 10" [rows]="10" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
               <th>{{ 'STUDENTS.DETAIL.EXAMS_COL_DATE' | translate }}</th>
@@ -1116,6 +1116,52 @@
               <td>{{ row.courseName }}</td>
               <td class="font-medium">{{ row.examName }}</td>
               <td><span class="font-semibold text-indigo-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span></td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </p-card>
+
+    <!-- Homework Card — same feed as exams, split by the isHomework flag -->
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-book text-purple-600"></i>
+            {{ 'STUDENTS.DETAIL.HOMEWORK_TITLE' | translate }} ({{ homeworkResults().length }})
+          </h3>
+        </div>
+      </ng-template>
+
+      @if (loadingExams()) {
+        <div class="text-center py-6 text-gray-500">
+          <i class="pi pi-spin pi-spinner text-2xl mb-2"></i>
+          <p>{{ 'STUDENTS.DETAIL.HOMEWORK_LOADING' | translate }}</p>
+        </div>
+      } @else if (homeworkResults().length === 0) {
+        <div class="text-center py-6 text-gray-500">
+          <i class="pi pi-book text-3xl mb-2"></i>
+          <p>{{ 'STUDENTS.DETAIL.HOMEWORK_EMPTY' | translate }}</p>
+        </div>
+      } @else {
+        <p-table [value]="homeworkResults()" [paginator]="homeworkResults().length > 10" [rows]="10" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'STUDENTS.DETAIL.HOMEWORK_COL_DATE' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.HOMEWORK_COL_COURSE' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.HOMEWORK_COL_NAME' | translate }}</th>
+              <th>{{ 'STUDENTS.DETAIL.HOMEWORK_COL_MARK' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-row>
+            <tr>
+              <td>{{ row.examDate | date: 'mediumDate' }}</td>
+              <td>
+                {{ row.courseName }}
+                @if (row.className) { <span class="text-gray-400 text-xs block">{{ row.className }}</span> }
+              </td>
+              <td class="font-medium">{{ row.examName }}</td>
+              <td><span class="font-semibold text-purple-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span></td>
             </tr>
           </ng-template>
         </p-table>

@@ -56,6 +56,17 @@ async function ensureExamTables(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_exam_results_exam    ON exam_results(exam_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_exam_results_student ON exam_results(student_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_exam_results_company ON exam_results(company_id)`);
+
+  // Homework (migration 059): rides on the exams table behind a flag. A homework
+  // belongs to a class; session_id is nullable because a teacher records homework
+  // when they want to, not necessarily on every session. Both FKs are SET NULL so
+  // deleting a session never destroys the marks recorded in it.
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_homework BOOLEAN NOT NULL DEFAULT false`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS class_id   UUID REFERENCES classes(id)  ON DELETE SET NULL`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES sessions(id) ON DELETE SET NULL`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exams_class    ON exams(class_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exams_session  ON exams(session_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exams_homework ON exams(company_id, is_homework)`);
   examTablesEnsured = true;
 }
 
@@ -73,6 +84,10 @@ function mapExamFromDB(row: any) {
     resultCount: row.result_count !== undefined && row.result_count !== null
       ? parseInt(row.result_count, 10)
       : undefined,
+    isHomework: row.is_homework === true,
+    classId: row.class_id ?? null,
+    className: row.class_name ?? undefined,
+    sessionId: row.session_id ?? null,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -109,24 +124,57 @@ export const examsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      // Homework is created from a session, which knows its class but not its
+      // course — so a classId stands in for a courseId and the course (and branch)
+      // are read off the class. An exam still comes in with a courseId.
+      let courseId: string | undefined = body.courseId;
+      let classId: string | null = body.classId ?? null;
+      if (classId) {
+        const cls = await queryOne<any>(
+          'SELECT id, course_id, branch_id FROM classes WHERE id = $1 AND company_id = $2',
+          [classId, context.companyId],
+        );
+        if (!cls) return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+        courseId = courseId ?? cls.course_id;
+      }
+      if (!courseId) return apiError(400, 'ERRORS.EXAMS.COURSE_REQUIRED', 'Course or class is required');
+
       // Resolve the course (company-scoped) to inherit branch + verify access.
       const course = await queryOne<any>(
         'SELECT id, branch_id FROM courses WHERE id = $1 AND company_id = $2',
-        [body.courseId, context.companyId],
+        [courseId, context.companyId],
       );
       if (!course) return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       if (course.branch_id && !canAccessBranch(context, course.branch_id)) {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
+      // A session only stamps the homework if it really belongs to this class —
+      // otherwise the mark would claim to have been taken in someone else's lesson.
+      let sessionId: string | null = body.sessionId ?? null;
+      if (sessionId) {
+        const session = await queryOne<any>(
+          'SELECT id, class_id FROM sessions WHERE id = $1 AND company_id = $2',
+          [sessionId, context.companyId],
+        );
+        if (!session) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+        if (classId && session.class_id !== classId) {
+          return apiError(400, 'ERRORS.EXAMS.SESSION_CLASS_MISMATCH', 'Session does not belong to this class');
+        }
+        classId = classId ?? session.class_id;
+      }
+
       const row = await insert('exams', {
         company_id: context.companyId,
         branch_id: course.branch_id,
-        course_id: body.courseId,
+        course_id: courseId,
         name: body.name,
         exam_date: body.examDate,
         max_grade: body.maxGrade ?? null,
         status: body.status || 'SCHEDULED',
+        is_homework: body.isHomework === true,
+        class_id: classId,
+        session_id: sessionId,
         is_active: true,
       });
 
@@ -137,7 +185,7 @@ export const examsRoutes = {
     }
   },
 
-  list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string; status?: string }; headers: AuthHeaders }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string; status?: string; classId?: string; isHomework?: string }; headers: AuthHeaders }) => {
     try {
       await ensureExamTables();
       const context = await extractTenantContext(headers.authorization);
@@ -146,12 +194,23 @@ export const examsRoutes = {
       }
 
       let sql = `
-        SELECT e.*, c.name AS course_name,
+        SELECT e.*, c.name AS course_name, cl.name AS class_name,
                (SELECT COUNT(*) FROM exam_results r WHERE r.exam_id = e.id) AS result_count
         FROM exams e
         JOIN courses c ON c.id = e.course_id
+        LEFT JOIN classes cl ON cl.id = e.class_id
         WHERE e.company_id = $1 AND e.is_active = true`;
       const params: any[] = [context.companyId];
+
+      // Exams and homework share the table but never share a screen: the exams
+      // list asks for neither and gets exams only, so homework can't leak into it.
+      params.push(queryParams.isHomework === 'true');
+      sql += ` AND e.is_homework = $${params.length}`;
+
+      if (queryParams.classId) {
+        params.push(queryParams.classId);
+        sql += ` AND e.class_id = $${params.length}`;
+      }
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
@@ -192,9 +251,11 @@ export const examsRoutes = {
       }
 
       const row = await queryOne(
-        `SELECT e.*, c.name AS course_name,
+        `SELECT e.*, c.name AS course_name, cl.name AS class_name,
                 (SELECT COUNT(*) FROM exam_results r WHERE r.exam_id = e.id) AS result_count
-         FROM exams e JOIN courses c ON c.id = e.course_id
+         FROM exams e
+         JOIN courses c ON c.id = e.course_id
+         LEFT JOIN classes cl ON cl.id = e.class_id
          WHERE e.id = $1 AND e.company_id = $2`,
         [params.id, context.companyId],
       );
@@ -306,22 +367,35 @@ export const examsRoutes = {
         return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
       }
 
+      // An exam is course-wide, but a homework is set for one class — so when the
+      // row carries a class_id the roster narrows to that class's students. The
+      // extra $4 is folded into both halves of the UNION.
+      const byClass = !!exam.class_id;
+      const enrolledSql = byClass
+        ? `SELECT student_id FROM enrollments
+             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status NOT IN ('DROPPED', 'CANCELLED')
+           UNION
+           SELECT student_id FROM master_class_enrollments
+             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status != 'DROPPED'`
+        : `SELECT student_id FROM enrollments
+             WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+           UNION
+           SELECT student_id FROM master_class_enrollments
+             WHERE course_id = $1 AND company_id = $2 AND status != 'DROPPED'`;
+
+      const rosterParams: any[] = [exam.course_id, context.companyId, params.id];
+      if (byClass) rosterParams.push(exam.class_id);
+
       const rows = await query<any>(
         `SELECT s.id AS student_id, s.first_name, s.last_name, s.student_code,
                 s.parent_name, s.parent_phone, s.phone,
                 r.grade, r.is_absent, r.recorded_at
          FROM students s
-         JOIN (
-               SELECT student_id FROM enrollments
-                 WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-               UNION
-               SELECT student_id FROM master_class_enrollments
-                 WHERE course_id = $1 AND company_id = $2 AND status != 'DROPPED'
-              ) en ON en.student_id = s.id
+         JOIN (${enrolledSql}) en ON en.student_id = s.id
          LEFT JOIN exam_results r ON r.exam_id = $3 AND r.student_id = s.id
          WHERE s.company_id = $2 AND s.is_active = true
          ORDER BY s.first_name, s.last_name`,
-        [exam.course_id, context.companyId, params.id],
+        rosterParams,
       );
 
       return {
@@ -683,23 +757,28 @@ export const examsRoutes = {
       }
 
       const rows = await query<any>(
-        `SELECT e.name AS exam_name, c.name AS course_name, e.exam_date, e.max_grade, r.grade
+        `SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
+                e.exam_date, e.max_grade, e.is_homework, r.grade
          FROM exam_results r
          JOIN exams e   ON e.id = r.exam_id AND e.is_active = true
          JOIN courses c ON c.id = e.course_id
+         LEFT JOIN classes cl ON cl.id = e.class_id
          WHERE r.student_id = $1 AND r.company_id = $2
          ORDER BY e.exam_date DESC`,
         [params.studentId, context.companyId],
       );
 
+      // Exams and homework come back in one feed; the student page splits them.
       return {
         status: 200 as const,
         body: rows.map((row) => ({
           examName: row.exam_name,
           courseName: row.course_name,
+          className: row.class_name ?? null,
           examDate: row.exam_date,
           grade: row.grade,
           maxGrade: row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null,
+          isHomework: row.is_homework === true,
         })),
       };
     } catch (error: any) {

@@ -238,9 +238,13 @@ export class StudentDetailComponent implements OnInit {
   // Books & Products purchases attributed to this student.
   bookPurchases = signal<ProductSale[]>([]);
 
-  // Exam grades
+  // Exam grades. Homework rides on the same table and arrives in this one feed,
+  // so the two cards below split it — otherwise homework would silently pad the
+  // exam results.
   examResults = signal<StudentExamResult[]>([]);
   loadingExams = signal(false);
+  examOnlyResults = computed(() => this.examResults().filter((r) => !r.isHomework));
+  homeworkResults = computed(() => this.examResults().filter((r) => r.isHomework));
 
   // Attendance
   attendanceRecords = signal<StudentAttendanceRecord[]>([]);

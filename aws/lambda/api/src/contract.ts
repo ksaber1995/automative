@@ -550,11 +550,16 @@ const EventPLSchema = z.object({
 const ExamStatusSchema = z.enum(['SCHEDULED', 'DONE']);
 
 const CreateExamSchema = z.object({
-  courseId: UUIDSchema,
+  // Homework is created from a session, where the class is known but the course
+  // is not: pass classId and the server derives courseId (and branch) from it.
+  courseId: OptionalUUIDSchema,
   name: z.string().min(1),
   examDate: z.string().min(1),
   maxGrade: z.number().nullable().optional(),
   status: ExamStatusSchema.optional(),
+  isHomework: z.boolean().optional(),
+  classId: OptionalUUIDSchema,
+  sessionId: OptionalUUIDSchema,
 });
 
 const UpdateExamSchema = CreateExamSchema.partial().extend({
@@ -572,6 +577,10 @@ const ExamSchema = z.object({
   maxGrade: z.number().nullable(),
   status: z.string(),
   resultCount: z.number().optional(),
+  isHomework: z.boolean(),
+  classId: UUIDSchema.nullable(),
+  className: z.string().optional(),
+  sessionId: UUIDSchema.nullable(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -605,6 +614,9 @@ const StudentExamResultSchema = z.object({
   examDate: z.string(),
   grade: z.string(),
   maxGrade: z.number().nullable().optional(),
+  /** Homework and exams share this table; the student page lists them separately. */
+  isHomework: z.boolean().optional(),
+  className: z.string().nullable().optional(),
 });
 
 const LinkedCourseSummarySchema = z.object({
@@ -2329,6 +2341,9 @@ export const contract = c.router({
         branchId: OptionalUUIDSchema,
         courseId: OptionalUUIDSchema,
         status: z.string().optional(),
+        classId: OptionalUUIDSchema,
+        // 'true' | 'false' — query params arrive as strings.
+        isHomework: z.string().optional(),
       }),
       responses: { 200: z.array(ExamSchema), 403: ApiErrorSchema },
     },

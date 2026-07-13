@@ -13,17 +13,30 @@ export interface ExamModel {
   status: ExamStatus | string;
   /** Number of students graded so far (populated by list/getById). */
   resultCount?: number;
+  /**
+   * Homework rides on the exams table. A homework is always tied to a class, and
+   * optionally stamped with the session it was marked in — a teacher records
+   * homework when they want to, not necessarily every session.
+   */
+  isHomework: boolean;
+  classId: string | null;
+  className?: string;
+  sessionId: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ExamCreateDto {
-  courseId: string;
+  /** Optional for homework: the server derives the course from classId. */
+  courseId?: string;
   name: string;
   examDate: string;
   maxGrade?: number | null;
   status?: ExamStatus;
+  isHomework?: boolean;
+  classId?: string | null;
+  sessionId?: string | null;
 }
 
 export interface ExamUpdateDto extends Partial<ExamCreateDto> {
@@ -62,4 +75,7 @@ export interface StudentExamResult {
   examDate: string;
   grade: string;
   maxGrade?: number | null;
+  /** Exams and homework share this feed; the student page splits them by this. */
+  isHomework?: boolean;
+  className?: string | null;
 }

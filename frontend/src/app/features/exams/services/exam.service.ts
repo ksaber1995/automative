@@ -14,8 +14,17 @@ import {
 export class ExamService {
   private api = inject(ApiService);
 
-  getAll(filters?: { branchId?: string; courseId?: string; status?: string }): Observable<ExamModel[]> {
+  /**
+   * Exams only, unless isHomework is passed — homework shares this table but
+   * never shares a screen with exams, so the API defaults to non-homework.
+   */
+  getAll(filters?: { branchId?: string; courseId?: string; status?: string; classId?: string; isHomework?: string }): Observable<ExamModel[]> {
     return this.api.get<ExamModel[]>('exams', filters);
+  }
+
+  /** Homework set for one class, newest first. */
+  getHomeworkForClass(classId: string): Observable<ExamModel[]> {
+    return this.api.get<ExamModel[]>('exams', { classId, isHomework: 'true' });
   }
 
   getById(id: string): Observable<ExamModel> {

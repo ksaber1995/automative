@@ -56,6 +56,12 @@
           (onClick)="confirmEndSession()"></p-button>
         <span class="text-gray-300">·</span>
       }
+      @if (session(); as s) {
+        <p-button icon="pi pi-book" severity="help" [outlined]="true" size="small"
+          [label]="'SESSION_HOMEWORK.BUTTON' | translate"
+          (onClick)="homeworkOpen.set(true)"></p-button>
+        <span class="text-gray-300">·</span>
+      }
       <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
       <span class="text-gray-300">·</span>
       <span class="text-red-500 font-semibold">{{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCount() } }}</span>
@@ -404,6 +410,15 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog (settled)="loadStudents()"></app-session-pay-dialog>
+
+@if (session(); as s) {
+  <app-session-homework-dialog
+    [(visible)]="homeworkOpen"
+    [sessionId]="sessionId"
+    [classId]="s.classId"
+    [className]="s.className || ''"
+  ></app-session-homework-dialog>
+}
 
 <!-- Confirm before un-checking deletes a per-session charge/payment -->
 <p-confirmDialog></p-confirmDialog>

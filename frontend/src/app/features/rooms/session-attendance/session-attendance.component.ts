@@ -27,6 +27,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
+import { SessionHomeworkDialogComponent } from '../session-homework/session-homework-dialog.component';
 
 interface TeacherRow {
   employeeId: string;
@@ -62,12 +63,16 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent, SessionHomeworkDialogComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
+  @ViewChild(SessionHomeworkDialogComponent) homeworkDialog?: SessionHomeworkDialogComponent;
+
+  /** Homework marking is open — scans record a mark instead of checking in. */
+  homeworkOpen = signal(false);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private sessionService = inject(SessionService);
@@ -85,7 +90,13 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private globalScan = inject(GlobalScanService);
   private scanPref = inject(ScanPreferenceService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
-  private readonly scanHandler = (token: string) => this.checkin(token);
+  // Only ONE global scan handler can be registered at a time, so this page keeps
+  // it and forwards to the homework dialog while that's open — otherwise the two
+  // would overwrite each other's handler and a scan would go to the wrong place.
+  private readonly scanHandler = (token: string) => {
+    if (this.homeworkOpen()) this.homeworkDialog?.handleScan(token);
+    else this.checkin(token);
+  };
 
   sessionId = '';
   session = signal<Session | null>(null);
