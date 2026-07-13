@@ -38,9 +38,16 @@ export type Ctx = CanvasRenderingContext2D;
 export type Align = 'right' | 'center' | 'left';
 export type Dir = 'rtl' | 'ltr';
 
-/** The academic year the card is printed for, e.g. "2025 - 2026" (rolls over in September). */
+/**
+ * The academic year the card is printed for, e.g. "2026 - 2027". One value for
+ * every tenant — it is not per-company configurable.
+ *
+ * Rolls over in JULY, not September: cards are printed over the summer for the
+ * year that is about to start, so a card made in July 2026 must read 2026 - 2027,
+ * not the year that just ended.
+ */
 export function currentAcademicYear(now: Date = new Date()): string {
-  const start = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
   return `${start} - ${start + 1}`;
 }
 
