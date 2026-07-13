@@ -39,7 +39,10 @@
     "SAVE": "حفظ التصميم",
     "SAVED": "تم حفظ تصميم البطاقة بنجاح",
     "DOWNLOAD": "تحميل صورة PNG",
-    "DOWNLOAD_ERROR": "تعذّر إنشاء صورة تصميم البطاقة"
+    "DOWNLOAD_ERROR": "تعذّر إنشاء صورة تصميم البطاقة",
+    "TEMPLATE_SAVE": "حفظ التصميم",
+    "TEMPLATE_UNSAVED": "لم يتم حفظ التصميم بعد",
+    "TEMPLATE_SAVED": "تم حفظ تصميم البطاقة"
   },
   "ERRORS": {
     "GENERIC": "حدث خطأ",
@@ -3479,7 +3482,11 @@
       "CHANGE_CLASS_NONE": "لا توجد مجموعات أخرى متاحة في هذا الكورس.",
       "CHANGE_CLASS_FULL": "ممتلئة",
       "CHANGE_CLASS_FULL_WARNING": "هذه المجموعة وصلت إلى الحد الأقصى أو تجاوزته. لا يزال بإمكانك نقل الطالب.",
-      "CLASS_CHANGED": "تم تغيير المجموعة بنجاح."
+      "CLASS_CHANGED": "تم تغيير المجموعة بنجاح.",
+      "SEND_NOTES": "إرسال الملاحظات",
+      "SEND_NOTES_TOOLTIP": "إرسال ملاحظات الطالب إلى ولي الأمر عبر واتساب",
+      "SEND_NOTES_NO_NOTES": "لا توجد ملاحظات لهذا الطالب.",
+      "SEND_NOTES_NO_PHONE": "لا يوجد رقم هاتف لولي أمر هذا الطالب."
     },
     "CREATED": "تم إنشاء الطالب بنجاح",
     "UPDATED": "تم تحديث الطالب بنجاح",
@@ -4681,7 +4688,8 @@
     "EXAM_RESULTS_DIALOG_DESC": "اضغط على كل ولي أمر لفتح واتساب برسالة جاهزة — تُرسل من رقمك الخاص.",
     "PAYMENT_DIALOG_TITLE": "إرسال تذكير الدفع",
     "PAYMENT_DIALOG_DESC": "اضغط على كل طالب لفتح واتساب برسالة جاهزة — تُرسل من رقمك الخاص.",
-    "CLOSE": "إغلاق"
+    "CLOSE": "إغلاق",
+    "NOTES_PARENT_BODY": "رسالة من {{academyName}}:\n\nعزيزي {{parentName}}، ملاحظات بخصوص {{studentName}}:\n\n{{notes}}"
   },
   "TELEGRAM": {
     "TITLE": "تليجرام",

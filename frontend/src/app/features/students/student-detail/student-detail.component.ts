@@ -20,7 +20,7 @@ import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
-import { TelegramConnectDialogComponent } from '../../telegram/telegram-connect-dialog.component';
+import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
 import { StudentService } from '../services/student.service';
 import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -75,7 +75,6 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     TranslateModule,
     AmountPipe,
     StudentQrDialogComponent,
-    TelegramConnectDialogComponent,
     SessionPayDialogComponent,
   ],
   templateUrl: './student-detail.component.html',
@@ -112,7 +111,28 @@ export class StudentDetailComponent implements OnInit {
 
   student = signal<Student | null>(null);
   showQrDialog = signal(false);
-  showTelegramDialog = signal(false);
+
+  /**
+   * Click-to-chat the student's notes to their parent, from the staff member's own
+   * WhatsApp. The notes are the whole point of the message, so the button is
+   * disabled when there are none (or no parent number to send them to) rather than
+   * sending an empty-bodied message.
+   */
+  sendNotesToParent(): void {
+    const s = this.student();
+    const notes = s?.notes?.trim();
+    if (!s || !notes) return;
+
+    const text = this.translate.instant('WHATSAPP.NOTES_PARENT_BODY', {
+      academyName: this.authService.getCompanyName(),
+      parentName: s.parentName || '',
+      studentName: `${s.firstName} ${s.lastName}`.trim(),
+      notes,
+    });
+    if (!openWhatsappChat(s.parentPhone, text)) {
+      this.notificationService.error(this.translate.instant('STUDENTS.DETAIL.SEND_NOTES_NO_PHONE'));
+    }
+  }
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   classDoneMap = signal<Map<string, boolean>>(new Map());

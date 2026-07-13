@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
@@ -46,8 +46,16 @@ export class CardDesignComponent implements OnInit {
 
   loading = signal(true);
   saving = signal(false);
+  savingTemplate = signal(false);
   downloading = signal(false);
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
+  /** Last design the server confirmed — the base for a template-only save. */
+  savedDesign = signal<CardDesign | null>(null);
+  /** The chosen template differs from what's stored, so it's worth saving. */
+  templateDirty = computed(() => {
+    const saved = this.savedDesign();
+    return !!saved && saved.template !== this.design().template;
+  });
 
   readonly templates = CARD_TEMPLATES;
   readonly maxInstructions = CARD_DESIGN_MAX.instructions;
@@ -57,6 +65,7 @@ export class CardDesignComponent implements OnInit {
     this.companyService.getCardDesign().subscribe({
       next: (d) => {
         this.design.set(this.pad(d));
+        this.savedDesign.set(d);
         this.loading.set(false);
         this.redraw();
       },
@@ -151,24 +160,50 @@ export class CardDesignComponent implements OnInit {
     }
   }
 
-  save() {
-    this.saving.set(true);
-    // Drop the empty slots the form pads out; the server re-applies defaults.
-    const d = this.design();
-    const payload: CardDesign = {
+  /** Strip the empty slots the form pads out; the server re-applies defaults. */
+  private payloadFrom(d: CardDesign): CardDesign {
+    return {
       ...d,
       instructions: d.instructions.map((s) => s.trim()).filter(Boolean),
       highlights: d.highlights.map((s) => s.trim()).filter(Boolean),
     };
-    this.companyService.updateCardDesign(payload).subscribe({
+  }
+
+  save() {
+    this.saving.set(true);
+    this.companyService.updateCardDesign(this.payloadFrom(this.design())).subscribe({
       next: (saved) => {
         this.design.set(this.pad(saved));
+        this.savedDesign.set(saved);
         this.notificationService.success(this.translate.instant('CARD_DESIGN.SAVED'));
         this.saving.set(false);
         this.redraw();
       },
       error: () => {
         this.saving.set(false);
+      },
+    });
+  }
+
+  /**
+   * Save ONLY the chosen template, leaving the back-face fields as they are on the
+   * server. Picking a template and hitting this shouldn't quietly commit half-typed
+   * edits elsewhere on the form, so it posts the last SAVED design with just the
+   * template swapped — not the current form state.
+   */
+  saveTemplate() {
+    this.savingTemplate.set(true);
+    const base = this.savedDesign() ?? this.design();
+    const payload = this.payloadFrom({ ...base, template: this.design().template });
+    this.companyService.updateCardDesign(payload).subscribe({
+      next: (saved) => {
+        this.savedDesign.set(saved);
+        // Keep whatever the user is currently editing; only the template is now saved.
+        this.notificationService.success(this.translate.instant('CARD_DESIGN.TEMPLATE_SAVED'));
+        this.savingTemplate.set(false);
+      },
+      error: () => {
+        this.savingTemplate.set(false);
       },
     });
   }

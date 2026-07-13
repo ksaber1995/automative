@@ -39,7 +39,10 @@
     "SAVE": "Save design",
     "SAVED": "Card design saved successfully",
     "DOWNLOAD": "Download PNG",
-    "DOWNLOAD_ERROR": "Failed to render the card design"
+    "DOWNLOAD_ERROR": "Failed to render the card design",
+    "TEMPLATE_SAVE": "Save template",
+    "TEMPLATE_UNSAVED": "Template not saved yet",
+    "TEMPLATE_SAVED": "Card template saved"
   },
   "ERRORS": {
     "GENERIC": "An error occurred",
@@ -3355,7 +3358,11 @@
       "CHANGE_CLASS_NONE": "No other classes available in this course.",
       "CHANGE_CLASS_FULL": "Full",
       "CHANGE_CLASS_FULL_WARNING": "This class is at or over its maximum capacity. You can still move the student.",
-      "CLASS_CHANGED": "Class changed successfully."
+      "CLASS_CHANGED": "Class changed successfully.",
+      "SEND_NOTES": "Send notes",
+      "SEND_NOTES_TOOLTIP": "Send this student's notes to their parent on WhatsApp",
+      "SEND_NOTES_NO_NOTES": "This student has no notes to send.",
+      "SEND_NOTES_NO_PHONE": "This student has no parent phone number."
     },
     "CREATED": "Student created successfully",
     "UPDATED": "Student updated successfully",
@@ -4681,7 +4688,8 @@
     "EXAM_RESULTS_DIALOG_DESC": "Tap each parent to open WhatsApp pre-filled — the message is sent from your own number.",
     "PAYMENT_DIALOG_TITLE": "Send Payment Reminder",
     "PAYMENT_DIALOG_DESC": "Tap each student to open WhatsApp pre-filled — the message is sent from your own number.",
-    "CLOSE": "Close"
+    "CLOSE": "Close",
+    "NOTES_PARENT_BODY": "Message from {{academyName}}:\n\nDear {{parentName}}, notes regarding {{studentName}}:\n\n{{notes}}"
   },
   "TELEGRAM": {
     "TITLE": "Telegram",

@@ -202,9 +202,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
     // People
     const people: NavLeaf[] = [
       { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
-      // Shared back face of the printed ID cards. isGlobalAdmin() covers ADMIN too,
-      // which is exactly who the API lets save the design.
-      { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.canRead('students') && auth.isGlobalAdmin() },
       { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') },
       { labelKey: 'NAV.ATTENDANCE_TEACHERS', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('academy') && !auth.isTeacher() },
     ].filter(c => c.visible);
@@ -285,6 +282,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.USERS', icon: 'pi pi-user-edit', routerLink: ['/users'], visible: auth.canRead('users') },
       { labelKey: 'NAV.MESSAGING', icon: 'pi pi-comments', routerLink: ['/messaging'], visible: true },
       { labelKey: 'NAV.SETTINGS', icon: 'pi pi-cog', routerLink: ['/settings'], visible: true },
+      // Shared back face of the printed ID cards — a company-wide setting, and
+      // isGlobalAdmin() (which gates this whole group) is exactly who the API lets
+      // save it, so it sits with Settings rather than with the students.
+      { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.canRead('students') },
     ].filter(c => c.visible) : [];
     if (admin.length) {
       entries.push({ kind: 'group', group: {
