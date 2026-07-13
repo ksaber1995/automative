@@ -147,9 +147,11 @@ export class StudentFormComponent implements OnInit {
       });
     } else {
       this.studentService.createStudent(studentData).subscribe({
-        next: () => {
+        next: (student) => {
           this.notificationService.success(this.translate.instant('STUDENTS.CREATED'));
-          this.router.navigate(['/students']);
+          // Land on the new student, so the next step (enrol, print the card) is
+          // one click away instead of a hunt through the list.
+          this.router.navigate(student?.id ? ['/students', student.id] : ['/students']);
         },
         error: (error) => {
           this.loading.set(false);

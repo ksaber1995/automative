@@ -28,8 +28,8 @@
     <p class="text-xs text-gray-400 mt-3">{{ 'STUDENT_QR.SCAN_HINT' | translate }}</p>
 
     <div class="flex items-center justify-center gap-2 mt-4 flex-wrap">
-      <p-button icon="pi pi-print" [label]="'STUDENT_QR.PRINT' | translate" size="small" [outlined]="true" (onClick)="print()" [disabled]="!dataUrl()"></p-button>
-      <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [disabled]="!dataUrl()"></p-button>
+      <p-button icon="pi pi-print" [label]="'STUDENT_QR.PRINT' | translate" size="small" [outlined]="true" (onClick)="print()" [loading]="cardBusy()" [disabled]="!dataUrl() || cardBusy()"></p-button>
+      <p-button icon="pi pi-download" [label]="'STUDENT_QR.DOWNLOAD' | translate" size="small" [outlined]="true" (onClick)="download()" [loading]="cardBusy()" [disabled]="!dataUrl() || cardBusy()"></p-button>
     </div>
 
     <!-- Click-to-chat: send from the staff member's own WhatsApp number -->
