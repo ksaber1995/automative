@@ -9,6 +9,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +55,7 @@ interface EnrollmentCounts {
     DialogModule,
     MultiSelectModule,
     RadioButtonModule,
+    ProgressBarModule,
     StudentImportDialogComponent
   ],
   providers: [ConfirmationService],
@@ -363,6 +365,19 @@ export class StudentListComponent implements OnInit {
   zipTeacherOptions = signal<LookupOption[]>([]);
   loadingZipOptions = signal(false);
 
+  // Export progress. Rendering and compressing are separate phases — each reports
+  // its own 0-100, so the bar never sits parked while work is still happening.
+  zipPhase = signal<'render' | 'zip' | null>(null);
+  zipPercent = signal(0);
+  zipDone = signal(0);
+  zipTotal = signal(0);
+
+  /**
+   * A TEACHER company IS the teacher — there are no colleagues to filter by, so the
+   * picker would be a dropdown of one (or none). Academies get it.
+   */
+  showTeacherFilter = computed(() => !this.authService.isTeacher());
+
   /** Nothing ticked under "selected only" — there'd be no cards to render. */
   zipFilterEmpty = computed(() =>
     this.zipScope() === 'filter' &&
@@ -398,8 +413,13 @@ export class StudentListComponent implements OnInit {
   }
 
   async downloadQrZip() {
-    this.zipDialogOpen.set(false);
+    // The dialog stays open so the progress bar has somewhere to live — a few
+    // thousand cards is a long wait with no feedback otherwise.
     this.downloadingZip.set(true);
+    this.zipPhase.set('render');
+    this.zipDone.set(0);
+    this.zipTotal.set(0);
+    this.zipPercent.set(0);
     try {
       const activatedStudents = this.qrDownloadableStudents();
       if (activatedStudents.length === 0) {
@@ -471,6 +491,7 @@ export class StudentListComponent implements OnInit {
       const canvas = document.createElement('canvas');   // reused for every card
       await document.fonts.ready;                        // Arabic must shape before we rasterise
       let rendered = 0;
+      this.zipTotal.set(exportStudents.length);
 
       for (const student of exportStudents) {
         const card: StudentCardData = {
@@ -510,8 +531,12 @@ export class StudentListComponent implements OnInit {
           }
         }
 
-        // Yield periodically so a large batch doesn't lock the main thread.
-        if (++rendered % 10 === 0) await new Promise((r) => setTimeout(r));
+        // Yield periodically so a large batch doesn't lock the main thread — and so
+        // the progress bar actually repaints. Every 5 keeps the bar moving without
+        // paying the ~4ms timer clamp on every single student.
+        this.zipDone.set(++rendered);
+        this.zipPercent.set(Math.round((rendered / exportStudents.length) * 100));
+        if (rendered % 5 === 0) await new Promise((r) => setTimeout(r));
       }
 
       // The back face is identical for every student, so it ships once at the ZIP
@@ -524,13 +549,21 @@ export class StudentListComponent implements OnInit {
         }
       }
 
-      const blob = await zip.generateAsync({ type: 'blob' });
+      // Compressing a few thousand PNGs is itself a long step, so it gets its own
+      // phase on the bar rather than leaving it parked at 100%.
+      this.zipPhase.set('zip');
+      this.zipPercent.set(0);
+      const blob = await zip.generateAsync({ type: 'blob' }, (meta) => {
+        this.zipPercent.set(Math.round(meta.percent));
+      });
       saveAs(blob, 'student-cards.zip');
       this.notificationService.success(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_SUCCESS', { count: exportStudents.length }));
+      this.zipDialogOpen.set(false);
     } catch {
       this.notificationService.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
     } finally {
       this.downloadingZip.set(false);
+      this.zipPhase.set(null);
     }
   }
 

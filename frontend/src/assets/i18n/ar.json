@@ -3227,7 +3227,11 @@
       "QR_ZIP_DOWNLOAD": "تحميل",
       "QR_ZIP_CANCEL": "إلغاء",
       "QR_ZIP_NO_MATCH": "لا يوجد طلاب مطابقون لهذا التحديد.",
-      "QR_NO_ACTIVATED": "لا توجد أكواد QR مفعّلة للتحميل"
+      "QR_NO_ACTIVATED": "لا توجد أكواد QR مفعّلة للتحميل",
+      "QR_ZIP_RENDERING": "جاري إنشاء البطاقات… {{done}} / {{total}} طالب",
+      "QR_ZIP_COMPRESSING": "جاري تجهيز الملف المضغوط…",
+      "QR_ZIP_WAIT": "أبقِ هذه الصفحة مفتوحة حتى يبدأ التحميل.",
+      "QR_ZIP_COMBINE_HINT_NO_TEACHER": "تُضاف المجموعة إذا اخترتها أو اخترت كورسها."
     },
     "FORM": {
       "EDIT_TITLE": "تعديل بيانات الطالب",

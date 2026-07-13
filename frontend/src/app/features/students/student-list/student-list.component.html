@@ -226,55 +226,79 @@
     (visibleChange)="zipDialogOpen.set($event)"
     [modal]="true"
     [draggable]="false"
-    [dismissableMask]="true"
+    [dismissableMask]="!downloadingZip()"
+    [closable]="!downloadingZip()"
+    [closeOnEscape]="!downloadingZip()"
     [style]="{ width: '34rem', maxWidth: '95vw' }"
     [header]="'STUDENTS.LIST.QR_ZIP_TITLE' | translate"
   >
-    <p class="text-sm text-gray-500 mb-4">{{ 'STUDENTS.LIST.QR_ZIP_HINT' | translate }}</p>
-
-    <div class="flex flex-col gap-3">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <p-radioButton name="zipScope" value="all" [ngModel]="zipScope()" (ngModelChange)="zipScope.set($event)"></p-radioButton>
-        <span class="font-medium">{{ 'STUDENTS.LIST.QR_ZIP_ALL' | translate }}</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <p-radioButton name="zipScope" value="filter" [ngModel]="zipScope()" (ngModelChange)="zipScope.set($event)"></p-radioButton>
-        <span class="font-medium">{{ 'STUDENTS.LIST.QR_ZIP_SELECTED' | translate }}</span>
-      </label>
-    </div>
-
-    @if (zipScope() === 'filter') {
-      <div class="mt-4 rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
-        @if (loadingZipOptions()) {
-          <div class="text-center py-3 text-gray-500"><i class="pi pi-spin pi-spinner text-xl"></i></div>
-        } @else {
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_COURSES' | translate }}</label>
-            <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
-              [options]="allCourses()" [ngModel]="zipCourseIds()" (ngModelChange)="zipCourseIds.set($event)"
-              [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_CLASSES' | translate }}</label>
-            <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
-              [options]="zipClassOptions()" [ngModel]="zipClassIds()" (ngModelChange)="zipClassIds.set($event)"
-              [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_TEACHERS' | translate }}</label>
-            <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
-              [options]="zipTeacherOptions()" [ngModel]="zipTeacherIds()" (ngModelChange)="zipTeacherIds.set($event)"
-              [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
-          </div>
-          <p class="text-xs text-gray-400">{{ 'STUDENTS.LIST.QR_ZIP_COMBINE_HINT' | translate }}</p>
-        }
+    @if (downloadingZip()) {
+      <!-- Rendering and compressing each report their own 0-100 -->
+      <div class="py-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">
+          @if (zipPhase() === 'zip') {
+            {{ 'STUDENTS.LIST.QR_ZIP_COMPRESSING' | translate }}
+          } @else {
+            {{ 'STUDENTS.LIST.QR_ZIP_RENDERING' | translate: { done: zipDone(), total: zipTotal() } }}
+          }
+        </p>
+        <p-progressBar [value]="zipPercent()"></p-progressBar>
+        <p class="text-xs text-gray-400 mt-2">{{ 'STUDENTS.LIST.QR_ZIP_WAIT' | translate }}</p>
       </div>
+    } @else {
+      <p class="text-sm text-gray-500 mb-4">{{ 'STUDENTS.LIST.QR_ZIP_HINT' | translate }}</p>
+
+      <div class="flex flex-col gap-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <p-radioButton name="zipScope" value="all" [ngModel]="zipScope()" (ngModelChange)="zipScope.set($event)"></p-radioButton>
+          <span class="font-medium">{{ 'STUDENTS.LIST.QR_ZIP_ALL' | translate }}</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <p-radioButton name="zipScope" value="filter" [ngModel]="zipScope()" (ngModelChange)="zipScope.set($event)"></p-radioButton>
+          <span class="font-medium">{{ 'STUDENTS.LIST.QR_ZIP_SELECTED' | translate }}</span>
+        </label>
+      </div>
+
+      @if (zipScope() === 'filter') {
+        <div class="mt-4 rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
+          @if (loadingZipOptions()) {
+            <div class="text-center py-3 text-gray-500"><i class="pi pi-spin pi-spinner text-xl"></i></div>
+          } @else {
+            <!-- Teachers first: picking the teacher is how a card print usually starts.
+                 Hidden for a TEACHER company, which has no colleagues to filter by. -->
+            @if (showTeacherFilter()) {
+              <div>
+                <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_TEACHERS' | translate }}</label>
+                <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
+                  [options]="zipTeacherOptions()" [ngModel]="zipTeacherIds()" (ngModelChange)="zipTeacherIds.set($event)"
+                  [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
+              </div>
+            }
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_COURSES' | translate }}</label>
+              <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
+                [options]="allCourses()" [ngModel]="zipCourseIds()" (ngModelChange)="zipCourseIds.set($event)"
+                [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">{{ 'STUDENTS.LIST.QR_ZIP_CLASSES' | translate }}</label>
+              <p-multiSelect class="w-full" styleClass="w-full" optionLabel="label" optionValue="id"
+                [options]="zipClassOptions()" [ngModel]="zipClassIds()" (ngModelChange)="zipClassIds.set($event)"
+                [filter]="true" [placeholder]="'STUDENTS.LIST.QR_ZIP_ANY' | translate"></p-multiSelect>
+            </div>
+            <p class="text-xs text-gray-400">
+              {{ (showTeacherFilter() ? 'STUDENTS.LIST.QR_ZIP_COMBINE_HINT' : 'STUDENTS.LIST.QR_ZIP_COMBINE_HINT_NO_TEACHER') | translate }}
+            </p>
+          }
+        </div>
+      }
     }
 
     <ng-template pTemplate="footer">
-      <p-button [label]="'STUDENTS.LIST.QR_ZIP_CANCEL' | translate" [text]="true" (onClick)="zipDialogOpen.set(false)"></p-button>
+      <p-button [label]="'STUDENTS.LIST.QR_ZIP_CANCEL' | translate" [text]="true"
+        [disabled]="downloadingZip()" (onClick)="zipDialogOpen.set(false)"></p-button>
       <p-button icon="pi pi-download" [label]="'STUDENTS.LIST.QR_ZIP_DOWNLOAD' | translate"
-        [disabled]="zipFilterEmpty()" [loading]="downloadingZip()" (onClick)="downloadQrZip()"></p-button>
+        [disabled]="zipFilterEmpty() || downloadingZip()" [loading]="downloadingZip()" (onClick)="downloadQrZip()"></p-button>
     </ng-template>
   </p-dialog>
 </div>

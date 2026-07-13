@@ -3103,7 +3103,11 @@
       "QR_ZIP_DOWNLOAD": "Download",
       "QR_ZIP_CANCEL": "Cancel",
       "QR_ZIP_NO_MATCH": "No students match that selection.",
-      "QR_NO_ACTIVATED": "No activated QR codes to download"
+      "QR_NO_ACTIVATED": "No activated QR codes to download",
+      "QR_ZIP_RENDERING": "Rendering cards… {{done}} / {{total}} students",
+      "QR_ZIP_COMPRESSING": "Building the ZIP…",
+      "QR_ZIP_WAIT": "Keep this tab open until the download starts.",
+      "QR_ZIP_COMBINE_HINT_NO_TEACHER": "A class is included if you picked it or its course."
     },
     "FORM": {
       "EDIT_TITLE": "Edit Student",
