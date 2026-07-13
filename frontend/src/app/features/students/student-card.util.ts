@@ -480,21 +480,17 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   });
 
   // --- subject banner (course name) ---
-  // Course names run long ("اللغة العربية الأول الإعدادي"), so the banner is
-  // widened to BANNER_R and the text is bounded on BOTH sides: it must not run
-  // into the quill on the left, and it keeps a clear right inset from the edge.
+  // The banner lives in the white content column and must stay there: it is filled
+  // with panelDark and drawn after drawPanel(), so any part of it that reaches left
+  // of the gold ribbon paints ON TOP of the navy side panel and reads as a dark bar
+  // bleeding out of it. BANNER_L therefore lines up with the icon-chip column above
+  // (rx = 360) and never crosses the ribbon (which ends at ~364).
+  const BANNER_L = 360;
   const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
   const TEXT_R = BANNER_R - 46;
-  const TEXT_L = 396;        // leaves a gap after the quill (ends at ~374)
+  const TEXT_L = 432;        // leaves a gap after the quill (ends at ~410)
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(200, 544);
-  ctx.lineTo(BANNER_R - 16, 544);
-  ctx.arcTo(BANNER_R, 544, BANNER_R, 560, 16);
-  ctx.lineTo(BANNER_R, 596);
-  ctx.arcTo(BANNER_R, 612, BANNER_R - 16, 612, 16);
-  ctx.lineTo(232, 612);
-  ctx.closePath();
+  roundRect(ctx, BANNER_L, 544, BANNER_R - BANNER_L, 68, 16);
   ctx.fillStyle = T.panelDark;
   ctx.fill();
   ctx.restore();
@@ -502,16 +498,16 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentLight, 'right', 'rtl');
 
   ctx.save();
-  ctx.strokeStyle = goldGrad(ctx, 332, 560, 376, 598);
+  ctx.strokeStyle = goldGrad(ctx, 368, 560, 412, 598);
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(334, 596);
-  ctx.quadraticCurveTo(354, 590, 374, 560);
+  ctx.moveTo(370, 596);
+  ctx.quadraticCurveTo(390, 590, 410, 560);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(343, 593);
-  ctx.quadraticCurveTo(363, 592, 372, 569);
+  ctx.moveTo(379, 593);
+  ctx.quadraticCurveTo(399, 592, 408, 569);
   ctx.stroke();
   ctx.restore();
 
