@@ -27,7 +27,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
-import { SessionHomeworkDialogComponent } from '../session-homework/session-homework-dialog.component';
+import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
 
 interface TeacherRow {
   employeeId: string;
@@ -63,13 +63,13 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent, SessionHomeworkDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
-  @ViewChild(SessionHomeworkDialogComponent) homeworkDialog?: SessionHomeworkDialogComponent;
+  @ViewChild(SessionHomeworkPanelComponent) homeworkPanel?: SessionHomeworkPanelComponent;
 
   /** Homework marking is open — scans record a mark instead of checking in. */
   homeworkOpen = signal(false);
@@ -91,10 +91,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private scanPref = inject(ScanPreferenceService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
-  // it and forwards to the homework dialog while that's open — otherwise the two
+  // it and forwards to the homework panel while that's open — otherwise the two
   // would overwrite each other's handler and a scan would go to the wrong place.
   private readonly scanHandler = (token: string) => {
-    if (this.homeworkOpen()) this.homeworkDialog?.handleScan(token);
+    if (this.homeworkOpen()) this.homeworkPanel?.handleScan(token);
     else this.checkin(token);
   };
 

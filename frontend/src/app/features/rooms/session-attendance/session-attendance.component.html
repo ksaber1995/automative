@@ -57,9 +57,9 @@
         <span class="text-gray-300">·</span>
       }
       @if (session(); as s) {
-        <p-button icon="pi pi-book" severity="help" [outlined]="true" size="small"
-          [label]="'SESSION_HOMEWORK.BUTTON' | translate"
-          (onClick)="homeworkOpen.set(true)"></p-button>
+        <p-button icon="pi pi-book" severity="help" [outlined]="!homeworkOpen()" size="small"
+          [label]="(homeworkOpen() ? 'SESSION_HOMEWORK.HIDE' : 'SESSION_HOMEWORK.BUTTON') | translate"
+          (onClick)="homeworkOpen.set(!homeworkOpen())"></p-button>
         <span class="text-gray-300">·</span>
       }
       <span class="text-green-600 font-semibold">{{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
@@ -225,6 +225,18 @@
           </div>
         }
       </p-card>
+    </div>
+  }
+
+  <!-- Homework marks — an inline card, so the roster stays on screen behind it -->
+  @if (homeworkOpen() && session(); as s) {
+    <div class="mb-4">
+      <app-session-homework-panel
+        [(visible)]="homeworkOpen"
+        [sessionId]="sessionId"
+        [classId]="s.classId"
+        [className]="s.className || ''"
+      ></app-session-homework-panel>
     </div>
   }
 
@@ -410,15 +422,6 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog (settled)="loadStudents()"></app-session-pay-dialog>
-
-@if (session(); as s) {
-  <app-session-homework-dialog
-    [(visible)]="homeworkOpen"
-    [sessionId]="sessionId"
-    [classId]="s.classId"
-    [className]="s.className || ''"
-  ></app-session-homework-dialog>
-}
 
 <!-- Confirm before un-checking deletes a per-session charge/payment -->
 <p-confirmDialog></p-confirmDialog>

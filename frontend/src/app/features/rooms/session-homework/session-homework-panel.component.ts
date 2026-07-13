@@ -2,7 +2,7 @@ import { Component, OnDestroy, effect, inject, input, model, signal, computed } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { DialogModule } from 'primeng/dialog';
+import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
@@ -14,7 +14,10 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
 /**
- * Record homework marks from a session, without leaving the attendance page.
+ * Record homework marks from a session — an inline card on the attendance page,
+ * sitting with the other cards rather than trapping the teacher in a modal: the
+ * roster stays visible behind it and scanning a queue of students is the main job
+ * here, so it wants room.
  *
  * Homework rides on the exams table (isHomework), so this reuses the exam
  * recording endpoints wholesale — record-by-qr, record-by-code and the per-student
@@ -23,23 +26,24 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
  *
  * Two steps: pick an existing homework for the class (or create one), then record.
  * Scans are NOT registered with GlobalScanService here — the attendance page owns
- * that single handler and forwards to `handleScan()` while this dialog is open,
+ * that single handler and forwards to `handleScan()` while this card is open,
  * which avoids the two of them fighting over it.
  */
 @Component({
-  selector: 'app-session-homework-dialog',
+  selector: 'app-session-homework-panel',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule, DialogModule, ButtonModule,
+    CommonModule, FormsModule, RouterModule, CardModule, ButtonModule,
     InputTextModule, TableModule, TooltipModule, TranslateModule,
   ],
-  templateUrl: './session-homework-dialog.component.html',
+  templateUrl: './session-homework-panel.component.html',
 })
-export class SessionHomeworkDialogComponent implements OnDestroy {
+export class SessionHomeworkPanelComponent implements OnDestroy {
   private service = inject(ExamService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
 
+  /** Open/closed, owned by the attendance page (its Homework button toggles it). */
   visible = model<boolean>(false);
   sessionId = input.required<string>();
   classId = input.required<string>();
@@ -81,6 +85,16 @@ export class SessionHomeworkDialogComponent implements OnDestroy {
   rowState = signal<Record<string, 'saving' | 'saved' | 'error'>>({});
   private readonly ROW_DEBOUNCE_MS = 600;
 
+  /**
+   * The marks currently in the roster's input boxes, keyed by student.
+   *
+   * Typing MUST NOT touch `roster` — rebuilding that array re-creates the table
+   * rows, which destroys the very <input> being typed in: focus is lost after the
+   * first digit and the row's spinner is left hanging on a dead element. Keeping
+   * the edits here leaves the row objects untouched, so the input survives.
+   */
+  grades = signal<Record<string, string>>({});
+
   filteredRoster = computed(() => {
     const q = this.search().trim().toLowerCase();
     const list = this.roster();
@@ -90,7 +104,13 @@ export class SessionHomeworkDialogComponent implements OnDestroy {
       (s.code != null && String(s.code).toLowerCase().includes(q)));
   });
 
-  markedCount = computed(() => this.roster().filter((s) => s.grade != null && s.grade !== '').length);
+  markedCount = computed(() => {
+    const g = this.grades();
+    return this.roster().filter((s) => (g[s.studentId] ?? '') !== '').length;
+  });
+
+  /** Rows are identified by student, so PrimeNG reuses them instead of re-creating. */
+  trackByStudent = (_: number, row: ExamResultRow) => row.studentId;
 
   constructor() {
     // Re-open always lands on the picker with a fresh list, so a homework created
@@ -175,7 +195,11 @@ export class SessionHomeworkDialogComponent implements OnDestroy {
     if (!hw) return;
     this.loadingRoster.set(true);
     this.service.getResults(hw.id).subscribe({
-      next: (rows) => { this.roster.set(rows); this.loadingRoster.set(false); },
+      next: (rows) => {
+        this.roster.set(rows);
+        this.grades.set(Object.fromEntries(rows.map((r) => [r.studentId, r.grade ?? ''])));
+        this.loadingRoster.set(false);
+      },
       error: () => this.loadingRoster.set(false),
     });
   }
@@ -258,12 +282,23 @@ export class SessionHomeworkDialogComponent implements OnDestroy {
   onGradeInput(row: ExamResultRow, value: string): void {
     const hw = this.active();
     if (!hw) return;
-    const grade = this.clampGrade(value);
-    this.roster.update((list) => list.map((r) => (r.studentId === row.studentId ? { ...r, grade } : r)));
+    // Don't clamp mid-typing: rewriting the value under the caret is what makes an
+    // input fight the user. It's clamped once, on save.
+    const raw = value ?? '';
+    this.grades.update((g) => ({ ...g, [row.studentId]: raw }));
 
     const existing = this.rowSaveTimers.get(row.studentId);
     if (existing) clearTimeout(existing);
-    this.rowSaveTimers.set(row.studentId, setTimeout(() => this.flushRowSave(row.studentId, grade), this.ROW_DEBOUNCE_MS));
+    this.rowSaveTimers.set(row.studentId, setTimeout(() => this.flushRowSave(row.studentId, raw), this.ROW_DEBOUNCE_MS));
+  }
+
+  /** Enter / leaving the box saves straight away instead of waiting out the debounce. */
+  flushNow(row: ExamResultRow): void {
+    const timer = this.rowSaveTimers.get(row.studentId);
+    if (!timer) return;               // nothing pending — already saved
+    clearTimeout(timer);
+    this.rowSaveTimers.delete(row.studentId);
+    this.flushRowSave(row.studentId, this.grades()[row.studentId] ?? '');
   }
 
   private flushRowSave(studentId: string, grade: string): void {
@@ -273,14 +308,27 @@ export class SessionHomeworkDialogComponent implements OnDestroy {
     this.rowState.update((s) => ({ ...s, [studentId]: 'saving' }));
 
     const done = (state: 'saved' | 'error') => this.rowState.update((s) => ({ ...s, [studentId]: state }));
-    const value = (grade ?? '').trim();
+    // Clamp here, not while typing — 12 in a /10 homework becomes 10 on save.
+    const value = this.clampGrade((grade ?? '').trim()).trim();
+    if (value !== (grade ?? '').trim()) {
+      this.grades.update((g) => ({ ...g, [studentId]: value }));
+    }
 
     // Clearing the box removes the mark rather than storing an empty one.
     const call = value
       ? this.service.saveResult(hw.id, studentId, value)
       : this.service.deleteResult(hw.id, studentId);
 
-    call.subscribe({ next: () => done('saved'), error: () => done('error') });
+    call.subscribe({
+      next: () => {
+        done('saved');
+        // Keep the row in step with what's stored, so markedCount and a later
+        // reload agree — but only now, when the user has stopped typing.
+        this.roster.update((list) =>
+          list.map((r) => (r.studentId === studentId ? { ...r, grade: value || null } : r)));
+      },
+      error: () => done('error'),
+    });
   }
 
   // ── Camera ────────────────────────────────────────────────────────────────

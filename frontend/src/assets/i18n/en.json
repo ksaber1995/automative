@@ -4199,7 +4199,9 @@
     "ENTER_MARK_FIRST": "Enter the mark first, then scan.",
     "MARK_RECORDED": "{{name}} — {{grade}} recorded",
     "MARK_UPDATED": "{{name}} — updated to {{grade}}",
-    "CAMERA_FAILED": "Could not start the camera. Use the code box instead."
+    "CAMERA_FAILED": "Could not start the camera. Use the code box instead.",
+    "CLOSE": "Close",
+    "HIDE": "Hide homework"
   },
   "SESSION_QR": {
     "SCAN_BUTTON": "Scan QR to check in",
