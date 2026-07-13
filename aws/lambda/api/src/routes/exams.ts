@@ -130,8 +130,13 @@ export const examsRoutes = {
       let courseId: string | undefined = body.courseId;
       let classId: string | null = body.classId ?? null;
       if (classId) {
+        // `classes` carries neither company_id nor branch_id — a class is scoped
+        // through its course, so the tenant check has to go via courses.
         const cls = await queryOne<any>(
-          'SELECT id, course_id, branch_id FROM classes WHERE id = $1 AND company_id = $2',
+          `SELECT cl.id, cl.course_id
+           FROM classes cl
+           JOIN courses co ON co.id = cl.course_id
+           WHERE cl.id = $1 AND co.company_id = $2`,
           [classId, context.companyId],
         );
         if (!cls) return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
