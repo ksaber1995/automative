@@ -80,6 +80,36 @@ async function ensureStartedColumn(): Promise<void> {
   return startedColumnInitPromise;
 }
 
+/**
+ * Ensure 'auto_started' exists (migration 064).
+ *
+ * Marks a session as the AUTOMATION's to close. Without it the auto-end swept up
+ * every running session whose class's scheduled end time had passed — including a
+ * make-up lesson on an unscheduled day, or a session started after a schedule
+ * change — and killed it within one poll (5 minutes), mid-lesson.
+ */
+let autoStartedColumnInitPromise: Promise<void> | null = null;
+async function ensureAutoStartedColumn(): Promise<void> {
+  if (!autoStartedColumnInitPromise) {
+    autoStartedColumnInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS auto_started BOOLEAN NOT NULL DEFAULT FALSE`);
+      } catch (e) {
+        autoStartedColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return autoStartedColumnInitPromise;
+}
+
+/**
+ * How long a running session is allowed to overrun its scheduled end before the
+ * automation closes it. A lesson that runs a few minutes over is normal, and
+ * attendance scanned during the overrun must still land on the right session.
+ */
+const AUTO_END_GRACE_MINUTES = 15;
+
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 /** Weekday name (UPPER) for a YYYY-MM-DD local date — matches classes.days_of_week. */
@@ -413,6 +443,7 @@ export const sessionsRoutes = {
       await ensureAttendanceMagicColumns();
       await ensureStartedColumn();
       await ensureAutoManageSessionsColumn();
+      await ensureAutoStartedColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -474,7 +505,7 @@ export const sessionsRoutes = {
         }
         let session: any;
         if (prepared) {
-          session = await update('sessions', prepared.id, { started: true });
+          session = await update('sessions', prepared.id, { started: true, auto_started: true });
         } else {
           const nextRow = await queryOne<any>(
             `SELECT COALESCE(MAX(session_number), 0) + 1 AS next FROM sessions WHERE class_id = $1`,
@@ -489,6 +520,8 @@ export const sessionsRoutes = {
             start_date: new Date().toISOString(),
             end_date: null,
             started: true,
+            // The automation opened it, so the automation may close it.
+            auto_started: true,
             notes: null,
           });
         }
@@ -505,16 +538,61 @@ export const sessionsRoutes = {
         started++;
       }
 
+      // ── Adopt: a session a human started inside its own scheduled window ─────
+      //
+      // The common case is the teacher pressing Start at 10:05 for the 10:00 class,
+      // because nobody had a tab open for the poll to fire. That session is exactly
+      // what the automation would have opened itself, so it takes ownership of it
+      // and will close it at the scheduled end like any other.
+      //
+      // A session started OUTSIDE the window — a make-up day, a rescheduled slot —
+      // is never adopted, so auto-end can never touch it. That is the whole fix.
+      const adoptParams: any[] = [context.companyId, dayName, localDate, localTime];
+      let adoptSql = `
+        UPDATE sessions s
+           SET auto_started = true, updated_at = NOW()
+          FROM classes c
+          JOIN courses co ON co.id = c.course_id
+         WHERE s.class_id = c.id
+           AND s.company_id = $1
+           AND co.company_id = $1
+           AND s.end_date IS NULL
+           AND s.started = true
+           AND s.auto_started = false
+           AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
+           AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
+           AND POSITION($2 IN UPPER(c.days_of_week)) > 0
+           AND (c.start_date IS NULL OR c.start_date <= $3::date)
+           AND (c.end_date IS NULL OR c.end_date >= $3::date)
+           AND c.start_time <= $4::time
+           AND c.end_time > $4::time
+      `;
+      const adoptBranch = appendBranchSqlFilter(context, adoptParams, 's.branch_id');
+      if (adoptBranch) adoptSql += ` AND ${adoptBranch}`;
+      await query(adoptSql, adoptParams);
+
       // ── Auto-end: running sessions whose scheduled end time has passed today ──
-      const endParams: any[] = [context.companyId, localDate, localTime];
+      const endParams: any[] = [context.companyId, localDate, localTime, dayName];
       let endSql = `
         SELECT s.id, c.instructor_id
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         JOIN courses co ON co.id = c.course_id
         WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+          -- ONLY sessions the automation owns (started or adopted). A session a
+          -- human opened outside its schedule is a human's to close.
+          AND s.auto_started = true
           AND s.start_date::date = $2::date
-          AND c.end_time IS NOT NULL AND c.end_time <= $3::time
+          -- and only on a day the class actually runs — auto-start checks this,
+          -- auto-end never did, so a Saturday make-up died on a Monday schedule.
+          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
+          AND POSITION($4 IN UPPER(c.days_of_week)) > 0
+          AND c.end_time IS NOT NULL
+          -- past the scheduled end, plus a grace period: a lesson that runs a few
+          -- minutes over is normal, and attendance scanned in the overrun has to
+          -- land on this session, not on nothing. Subtracting times gives an
+          -- interval and cannot wrap past midnight the way (end_time + interval) can.
+          AND EXTRACT(EPOCH FROM ($3::time - c.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60}
       `;
       const endBranch = appendBranchSqlFilter(context, endParams, 's.branch_id');
       if (endBranch) endSql += ` AND ${endBranch}`;
