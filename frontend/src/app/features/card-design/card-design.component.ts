@@ -2,6 +2,7 @@ import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
+import { TabsModule } from 'primeng/tabs';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
@@ -35,7 +36,7 @@ import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../stude
 @Component({
   selector: 'app-card-design',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, TabsModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
   templateUrl: './card-design.component.html',
 })
 export class CardDesignComponent implements OnInit {
@@ -62,6 +63,17 @@ export class CardDesignComponent implements OnInit {
   });
 
   readonly templates = CARD_TEMPLATES;
+
+  /**
+   * Which tab is open. The pool's canvases only exist while its panel is mounted,
+   * so switching to it has to repaint them — redraw() is a no-op for a canvas that
+   * isn't in the DOM, and the panel renders one tick after the value changes.
+   */
+  activeTab = signal<'students' | 'pool'>('students');
+  setTab(v: string): void {
+    this.activeTab.set(v === 'pool' ? 'pool' : 'students');
+    setTimeout(() => this.redraw());
+  }
   readonly agnosticTemplates = AGNOSTIC_TEMPLATES;
 
   /** The pool template in force — the design may predate the field. */
