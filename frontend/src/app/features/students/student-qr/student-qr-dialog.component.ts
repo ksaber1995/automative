@@ -1,4 +1,5 @@
 import { Component, inject, input, model, output, signal, effect } from '@angular/core';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 import { CommonModule } from '@angular/common';
 import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
@@ -116,7 +117,7 @@ export class StudentQrDialogComponent {
   sendQrToStudent(): void {
     const s = this.student();
     if (!s?.qrToken) return;
-    const code = s.studentCode != null ? String(s.studentCode) : '';
+    const code = formatStudentCode(s.studentCode);
     let text = renderWhatsappTemplate(this.templatesSvc.get('QR_STUDENT'), {
       studentName: this.studentName(),
       academyName: this.authService.getCompanyName(),
@@ -196,7 +197,7 @@ export class StudentQrDialogComponent {
     return renderStudentCardPng({
       companyName: this.authService.getCompanyName(),
       name: this.studentName(),
-      code: s.studentCode != null ? `#${s.studentCode}` : '',
+      code: formatStudentCode(s.studentCode),
       level: course?.levelName || '',
       group: cls?.name || '',
       year: currentAcademicYear(),

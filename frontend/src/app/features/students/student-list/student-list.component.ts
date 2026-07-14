@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { formatStudentCode, normalizeStudentCode } from '../../../core/utils/student-code.util';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
@@ -63,6 +64,9 @@ interface EnrollmentCounts {
   styleUrl: './student-list.component.scss'
 })
 export class StudentListComponent implements OnInit {
+  /** A card-derived code reads "A5", not 100005. */
+  code = formatStudentCode;
+
   private studentService = inject(StudentService);
   private lookupService = inject(LookupService);
   private enrollmentService = inject(EnrollmentService);
@@ -127,6 +131,7 @@ export class StudentListComponent implements OnInit {
         || (s.lastName ?? '').toLowerCase().includes(term)
         || (s.parentName ?? '').toLowerCase().includes(term)
         // Also match by student code and phone numbers (student / parent).
+        || formatStudentCode(s.studentCode).toLowerCase().includes(term)
         || String(s.studentCode ?? '').includes(term)
         || (s.phone ?? '').toLowerCase().includes(term)
         || (s.parentPhone ?? '').toLowerCase().includes(term);
@@ -499,7 +504,7 @@ export class StudentListComponent implements OnInit {
         const card: StudentCardData = {
           companyName,
           name: `${student.firstName} ${student.lastName}`.trim(),
-          code: student.studentCode != null ? `#${student.studentCode}` : '',
+          code: formatStudentCode(student.studentCode),
           level: '',
           group: '',
           year,

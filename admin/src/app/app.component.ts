@@ -434,9 +434,9 @@ type LicSortCol =
               <p class="modal-sub">{{ q.total }} cards so far · {{ q.linked }} linked to a student.</p>
             }
             <p class="modal-sub">
-              Blank cards, tied to no student. Serials are reserved above 100000 and print
-              with an <code>A-</code> prefix, so they can never be confused with a student's
-              own code. The academy downloads and prints them itself.
+              Blank cards, tied to no student. Serials are reserved above 100000 but print
+              short — <code>A1</code>, <code>A2</code>, … — so a card number can never be
+              confused with a student's own code. The academy downloads and prints them itself.
             </p>
             <input class="search" type="number" min="1" max="2000" [(ngModel)]="qrCount" placeholder="How many?" />
             <div class="modal-foot">
@@ -1296,7 +1296,10 @@ export class AppComponent implements OnInit {
         this.busyId.set(null);
         this.qrRow.set(null);
         // Serials continue from their last run, so say which ones these are.
-        this.showFlash(`${res.created} cards for ${r.company_name} (A-${String(res.from).padStart(5, '0')} … A-${String(res.to).padStart(5, '0')}).`);
+        // Cards print as "A5", not "A-100005": the serial is stored in the
+        // reserved range, but the base is dropped for the printed label.
+        const label = (serial: number) => `A${serial - 100000}`;
+        this.showFlash(`${res.created} cards for ${r.company_name} (${label(res.from)} … ${label(res.to)}).`);
         this.loadQrStats(r.company_id);
       },
       error: (err) => {

@@ -25,13 +25,39 @@ export function shouldShowStudentCode(
 }
 
 /**
- * Normalise a code a human typed or a scanner pushed into the box.
+ * Pool card serials start above this. Mirrors CARD_SERIAL_BASE in the API — the
+ * reserved range is what stops a card's number from ever colliding with a
+ * student's own code.
+ */
+export const CARD_SERIAL_BASE = 100000;
+
+/**
+ * A code as a human should SEE it.
  *
- * Pool cards print their number with an "A-" prefix (A-100001) so it can never be
- * mistaken for — or typed as — an organic student code. The code itself is still
- * an integer in the database, so strip the prefix (and any stray spaces or dashes)
- * before it goes to the API, which expects digits.
+ * A card's number is stored as 100005 but prints as "A5" — nobody wants to read
+ * six digits off a card, and the "A" is what makes it unmistakably a card rather
+ * than a student's own code. Organic codes print as they are.
+ */
+export function formatStudentCode(code: string | number | null | undefined): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  if (!Number.isFinite(n)) return String(code);
+  return n > CARD_SERIAL_BASE ? `A${n - CARD_SERIAL_BASE}` : String(n);
+}
+
+/**
+ * A code as TYPED, turned back into the integer the API stores.
+ *
+ * The leading "A" is not decoration — it IS the reserved range: "A5" means card
+ * 5, which is student_code 100005, and must never resolve to the student whose
+ * own code is 5. Cards printed before the short form ("A-100001") already carry
+ * the full number, so a value that is already in the reserved range is taken as
+ * absolute rather than shifted a second time.
  */
 export function normalizeStudentCode(code: string | number | null | undefined): string {
-  return String(code ?? '').replace(/\D/g, '');
+  const raw = String(code ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  const n = Number(digits);
+  return /^[Aa]/.test(raw) && n < CARD_SERIAL_BASE ? String(CARD_SERIAL_BASE + n) : digits;
 }

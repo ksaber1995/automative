@@ -58,6 +58,10 @@
           <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1">
             {{ 'QR_CARDS.LINKED_COUNT' | translate: { count: linkedCount() } }}
           </span>
+          <span class="p-input-icon-left">
+            <input pInputText type="text" class="w-56" [ngModel]="search()" (ngModelChange)="search.set($event)"
+                   [placeholder]="'QR_CARDS.SEARCH' | translate" />
+          </span>
           <p-button size="small" [text]="filter() !== 'all'" [label]="'QR_CARDS.F_ALL' | translate" (onClick)="filter.set('all')"></p-button>
           <p-button size="small" [text]="filter() !== 'free'" [label]="'QR_CARDS.F_FREE' | translate" (onClick)="filter.set('free')"></p-button>
           <p-button size="small" [text]="filter() !== 'linked'" [label]="'QR_CARDS.F_LINKED' | translate" (onClick)="filter.set('linked')"></p-button>
@@ -82,7 +86,7 @@
             @if (card.studentId) {
               <span class="font-medium text-gray-800">{{ card.studentName }}</span>
               @if (card.studentCode != null) {
-                <span class="text-gray-400 text-xs ms-1">#{{ card.studentCode }}</span>
+                <span class="text-gray-400 text-xs ms-1">{{ code(card.studentCode) }}</span>
               }
             } @else {
               <p-tag [value]="'QR_CARDS.FREE' | translate" severity="success"></p-tag>

@@ -112,12 +112,19 @@ const MAX_BATCH = 2000;
 export const CARD_SERIAL_BASE = 100000;
 
 /**
- * The digits of a code as typed. Pool cards print "A-100001"; student_code is an
- * integer. Staff (and barcode wedges) type what they see, so strip the prefix
- * rather than 404ing a card the student is holding.
+ * A code as typed, turned back into the integer stored in student_code.
+ *
+ * A card prints its number as "A5" — short, and unmistakably a card. The leading
+ * "A" IS the reserved range: A5 means card 5, i.e. student_code 100005, and must
+ * never resolve to the student whose own code happens to be 5. Cards printed
+ * before the short form ("A-100001") already carry the full number, so anything
+ * already inside the reserved range is taken as absolute, not shifted twice.
  */
 export function codeDigits(code: string | number): number {
-  return parseInt(String(code).replace(/\D/g, ''), 10);
+  const raw = String(code).trim();
+  const n = parseInt(raw.replace(/\D/g, ''), 10);
+  if (!Number.isFinite(n)) return NaN;
+  return /^[Aa]/.test(raw) && n < CARD_SERIAL_BASE ? CARD_SERIAL_BASE + n : n;
 }
 
 function mapCard(row: any) {

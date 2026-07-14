@@ -125,7 +125,7 @@
                       <td>
                         {{ buyer.studentName || '—' }}
                         @if (buyer.studentCode != null) {
-                          <span class="text-xs text-gray-400 font-mono ml-1">#{{ buyer.studentCode }}</span>
+                          <span class="text-xs text-gray-400 font-mono ml-1">{{ code(buyer.studentCode) }}</span>
                         }
                       </td>
                       <td>{{ buyer.quantity }}</td>
@@ -157,7 +157,7 @@
                       <td>
                         {{ student.studentName || '—' }}
                         @if (student.studentCode != null) {
-                          <span class="text-xs text-gray-400 font-mono ml-1">#{{ student.studentCode }}</span>
+                          <span class="text-xs text-gray-400 font-mono ml-1">{{ code(student.studentCode) }}</span>
                         }
                       </td>
                       <td class="text-right">
@@ -197,7 +197,7 @@
         <p class="text-xs text-blue-700 mt-1">
           {{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}: {{ sellingStudent()!.studentName || '—' }}
           @if (sellingStudent()!.studentCode != null) {
-            <span class="font-mono">(#{{ sellingStudent()!.studentCode }})</span>
+            <span class="font-mono">({{ code(sellingStudent()!.studentCode) }})</span>
           }
         </p>
       </div>

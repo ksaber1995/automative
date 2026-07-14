@@ -4940,6 +4940,7 @@
     "BAD_SERIAL": "أدخل الرقم المطبوع على البطاقة.",
     "LINKED_OK": "تم ربط {{serial}} بـ {{name}}",
     "ALREADY_ON_STUDENT": "{{serial}} مرتبطة بهذا الطالب بالفعل",
-    "ALREADY_LINKED_LIST": "بطاقات مرتبطة بهذا الطالب:"
+    "ALREADY_LINKED_LIST": "بطاقات مرتبطة بهذا الطالب:",
+    "SEARCH": "ابحث عن بطاقة أو طالب"
   }
 }

@@ -4940,6 +4940,7 @@
     "BAD_SERIAL": "Enter the serial printed on the card.",
     "LINKED_OK": "{{serial}} linked to {{name}}",
     "ALREADY_ON_STUDENT": "{{serial}} is already on this student",
-    "ALREADY_LINKED_LIST": "Cards already linked to this student:"
+    "ALREADY_LINKED_LIST": "Cards already linked to this student:",
+    "SEARCH": "Search a card or a student"
   }
 }

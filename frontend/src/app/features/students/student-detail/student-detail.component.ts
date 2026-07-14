@@ -25,7 +25,7 @@ import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
 import { StudentService } from '../services/student.service';
-import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
+import { formatStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -111,6 +111,8 @@ export class StudentDetailComponent implements OnInit {
 
   /** Show the student code only once the QR is active (see student-code.util). */
   showCode = (s: any) => shouldShowStudentCode(s, this.isTeacher());
+  /** A card-derived code reads "A5", not 100005. */
+  code = formatStudentCode;
 
   student = signal<Student | null>(null);
   showQrDialog = signal(false);

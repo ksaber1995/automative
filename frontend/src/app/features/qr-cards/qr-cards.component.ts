@@ -15,6 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { QrCard, QrCardService } from './qr-card.service';
+import { formatStudentCode } from '../../core/utils/student-code.util';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -22,16 +23,16 @@ import { loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng } from '..
 import { AgnosticCardData, AgnosticTemplate } from '../students/card-agnostic.util';
 
 /**
- * The serial as printed on the card — always starts with "A".
+ * The serial as printed on the card: "A5", not "A-100005".
  *
- * The letter is not decoration. Staff check a student in by TYPING their student
- * code, a bare number, and the code box only ever accepts digits. A card printed
- * as "#00123" is indistinguishable from student code #123, so typing it would
- * check in a completely different person. Leading with a letter makes a pool
- * serial impossible to confuse with — or type as — a student code.
+ * The number is STORED in the reserved range (100005) so it can never collide
+ * with a student's own code — but nobody wants to read six digits off a card, so
+ * the printed form drops the base and keeps the "A", which is what makes it
+ * unmistakably a card. Typing "A5" resolves back to 100005; see
+ * normalizeStudentCode.
  */
 export function serialLabel(serial: number): string {
-  return `A-${String(serial).padStart(5, '0')}`;
+  return formatStudentCode(serial);
 }
 
 /**
@@ -68,16 +69,25 @@ export class QrCardsComponent implements OnInit {
   count = 100;
 
   filter = signal<'all' | 'free' | 'linked'>('all');
+  /** Find one card in a box of a thousand: by its number, or by who holds it. */
+  search = signal('');
 
   freeCount = computed(() => this.cards().filter((c) => !c.studentId).length);
   linkedCount = computed(() => this.cards().filter((c) => !!c.studentId).length);
 
   visible = computed(() => {
     const f = this.filter();
-    const all = this.cards();
-    if (f === 'free') return all.filter((c) => !c.studentId);
-    if (f === 'linked') return all.filter((c) => !!c.studentId);
-    return all;
+    const q = this.search().trim().toLowerCase();
+    let rows = this.cards();
+    if (f === 'free') rows = rows.filter((c) => !c.studentId);
+    if (f === 'linked') rows = rows.filter((c) => !!c.studentId);
+    if (q) {
+      rows = rows.filter((c) =>
+        serialLabel(c.serial).toLowerCase().includes(q)
+        || (c.studentName ?? '').toLowerCase().includes(q)
+        || formatStudentCode(c.studentCode).toLowerCase().includes(q));
+    }
+    return rows;
   });
 
   // Print/export progress — a thousand cards is a long render.
@@ -87,6 +97,7 @@ export class QrCardsComponent implements OnInit {
   exportPercent = signal(0);
 
   label = serialLabel;
+  code = formatStudentCode;
 
   ngOnInit(): void {
     this.load();

@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, inject, computed } from '@angular/core';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -47,6 +48,9 @@ interface ScanSellOption {
   templateUrl: './educational-books-detail.component.html',
 })
 export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
+  /** A card-derived code reads "A5", not 100005. */
+  code = formatStudentCode;
+
   private educationalBooksService = inject(EducationalBooksService);
   private productSaleService = inject(ProductSaleService);
   private lookupService = inject(LookupService);
@@ -84,7 +88,7 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
     if (!q) return detail.products;
     const match = (s: { studentName: string | null; studentCode?: number | string | null }) => {
       const name = (s.studentName || '').toLowerCase();
-      const code = s.studentCode != null ? String(s.studentCode).toLowerCase() : '';
+      const code = formatStudentCode(s.studentCode).toLowerCase();
       return name.includes(q) || code.includes(q);
     };
     return detail.products

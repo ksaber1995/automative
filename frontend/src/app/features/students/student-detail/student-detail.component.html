@@ -160,7 +160,7 @@
               @if (showCode(s)) {
                 <span class="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1"
                   [pTooltip]="'STUDENTS.DETAIL.CODE_TOOLTIP' | translate">
-                  <i class="pi pi-hashtag"></i>{{ s.studentCode }}
+                  <i class="pi pi-hashtag"></i>{{ code(s.studentCode) }}
                 </span>
               }
             </div>

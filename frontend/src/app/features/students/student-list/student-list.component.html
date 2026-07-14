@@ -117,7 +117,7 @@
         <tr>
           <td>
             @if (showCode(student)) {
-              <span class="font-semibold text-indigo-700">#{{ student.studentCode }}</span>
+              <span class="font-semibold text-indigo-700">{{ code(student.studentCode) }}</span>
             } @else {
               <span class="text-gray-300">—</span>
             }

@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
@@ -66,6 +67,9 @@ function endTimeAfterStartValidator(startDate: string) {
   templateUrl: './session-attendance.component.html',
 })
 export class SessionAttendanceComponent implements OnInit, OnDestroy {
+  /** A card-derived code reads "A5", not 100005. */
+  code = formatStudentCode;
+
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   @ViewChild(SessionHomeworkPanelComponent) homeworkPanel?: SessionHomeworkPanelComponent;
 
@@ -127,7 +131,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     if (!q) return list;
     return list.filter((s) => {
       const name = `${s.studentFirstName} ${s.studentLastName}`.toLowerCase();
-      const code = s.studentCode != null ? String(s.studentCode) : '';
+      const code = formatStudentCode(s.studentCode);
       return name.includes(q) || (code !== '' && code.includes(q));
     });
   });
