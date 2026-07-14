@@ -131,6 +131,8 @@ export class CardDesignComponent implements OnInit {
   private readonly PHOTO_MAX = 700;   // px on the long edge — the frame is ~190px wide at 300dpi
   private readonly LOGO_MAX = 400;
   uploading = signal<'photo' | 'logo' | null>(null);
+  /** Which image is being saved — the upload persists itself, with no Save click. */
+  savingImage = signal<'photo' | 'logo' | null>(null);
 
   async onImagePicked(kind: 'photo' | 'logo', event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -147,6 +149,7 @@ export class CardDesignComponent implements OnInit {
     try {
       const dataUrl = await this.downscale(file, kind === 'photo' ? this.PHOTO_MAX : this.LOGO_MAX, kind === 'logo');
       this.set(kind, dataUrl);   // set() repaints the preview
+      this.saveImage(kind);      // picking a file IS the intent — no Save click needed
     } catch {
       this.notificationService.error(this.translate.instant('CARD_DESIGN.IMG_FAILED'));
     } finally {
@@ -156,6 +159,35 @@ export class CardDesignComponent implements OnInit {
 
   removeImage(kind: 'photo' | 'logo'): void {
     this.set(kind, '');
+    this.saveImage(kind);
+  }
+
+  /**
+   * Persist JUST this image, the moment it is picked or removed — uploading a file
+   * is already the decision, so there is nothing left to confirm with a Save click.
+   *
+   * Like saveTemplate(), it posts the last SAVED design with only this one field
+   * swapped, never the live form state: an upload must not quietly commit
+   * half-typed back-face edits sitting in the form next to it.
+   */
+  private saveImage(kind: 'photo' | 'logo'): void {
+    this.savingImage.set(kind);
+    const base = this.savedDesign() ?? this.design();
+    const payload = this.payloadFrom({ ...base, [kind]: this.design()[kind] });
+
+    this.companyService.updateCardDesign(payload).subscribe({
+      next: (saved) => {
+        this.savedDesign.set(saved);
+        this.savingImage.set(null);
+        this.notificationService.success(this.translate.instant('CARD_DESIGN.IMG_SAVED'));
+      },
+      error: () => {
+        // The interceptor toasts the reason (e.g. an image over the size cap). Put
+        // the previous image back, so what is on screen matches what is stored.
+        this.set(kind, (this.savedDesign()?.[kind] ?? '') as string);
+        this.savingImage.set(null);
+      },
+    });
   }
 
   /**

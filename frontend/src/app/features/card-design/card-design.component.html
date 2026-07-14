@@ -103,7 +103,7 @@
                 <div class="flex flex-col gap-2">
                   <label class="cursor-pointer">
                     <span class="p-button p-button-outlined p-button-sm inline-flex items-center gap-2">
-                      <i class="pi" [class.pi-upload]="uploading() !== 'photo'" [class.pi-spin]="uploading() === 'photo'" [class.pi-spinner]="uploading() === 'photo'"></i>
+                      <i class="pi" [class.pi-upload]="uploading() !== 'photo' && savingImage() !== 'photo'" [class.pi-spin]="uploading() === 'photo' || savingImage() === 'photo'" [class.pi-spinner]="uploading() === 'photo' || savingImage() === 'photo'"></i>
                       {{ (design().photo ? 'CARD_DESIGN.IMG_REPLACE' : 'CARD_DESIGN.IMG_UPLOAD') | translate }}
                     </span>
                     <input type="file" accept="image/*" class="hidden" (change)="onImagePicked('photo', $event)" />
@@ -130,7 +130,7 @@
                 <div class="flex flex-col gap-2">
                   <label class="cursor-pointer">
                     <span class="p-button p-button-outlined p-button-sm inline-flex items-center gap-2">
-                      <i class="pi" [class.pi-upload]="uploading() !== 'logo'" [class.pi-spin]="uploading() === 'logo'" [class.pi-spinner]="uploading() === 'logo'"></i>
+                      <i class="pi" [class.pi-upload]="uploading() !== 'logo' && savingImage() !== 'logo'" [class.pi-spin]="uploading() === 'logo' || savingImage() === 'logo'" [class.pi-spinner]="uploading() === 'logo' || savingImage() === 'logo'"></i>
                       {{ (design().logo ? 'CARD_DESIGN.IMG_REPLACE' : 'CARD_DESIGN.IMG_UPLOAD') | translate }}
                     </span>
                     <input type="file" accept="image/*" class="hidden" (change)="onImagePicked('logo', $event)" />
@@ -144,7 +144,10 @@
             </div>
           </div>
 
-          <p class="text-xs text-gray-400 mt-4">{{ 'CARD_DESIGN.IMAGES_NOTE' | translate }}</p>
+          <p class="text-xs text-gray-400 mt-4">
+            <i class="pi pi-check-circle text-green-500 me-1"></i>{{ 'CARD_DESIGN.IMAGES_AUTOSAVE' | translate }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">{{ 'CARD_DESIGN.IMAGES_NOTE' | translate }}</p>
         </p-card>
 
         <p-card>

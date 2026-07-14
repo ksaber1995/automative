@@ -52,7 +52,9 @@
     "IMG_REPLACE": "تغيير",
     "IMG_REMOVE": "حذف",
     "IMG_NOT_IMAGE": "اختر ملف صورة.",
-    "IMG_FAILED": "تعذر قراءة الصورة."
+    "IMG_FAILED": "تعذر قراءة الصورة.",
+    "IMG_SAVED": "تم الحفظ",
+    "IMAGES_AUTOSAVE": "تُحفظ الصورة والشعار تلقائيًا — لا حاجة للضغط على حفظ."
   },
   "ERRORS": {
     "GENERIC": "حدث خطأ",

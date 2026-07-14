@@ -52,7 +52,9 @@
     "IMG_REPLACE": "Replace",
     "IMG_REMOVE": "Remove",
     "IMG_NOT_IMAGE": "Pick an image file.",
-    "IMG_FAILED": "Could not read that image."
+    "IMG_FAILED": "Could not read that image.",
+    "IMG_SAVED": "Saved",
+    "IMAGES_AUTOSAVE": "Photo and logo save on their own — no need to press Save."
   },
   "ERRORS": {
     "GENERIC": "An error occurred",
