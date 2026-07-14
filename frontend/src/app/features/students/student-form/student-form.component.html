@@ -225,40 +225,6 @@
             }
           </div>
 
-          <!-- Parent Email -->
-          <div class="field">
-            <label for="parentEmail" class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.PARENT_EMAIL' | translate }}</label>
-            <input
-              id="parentEmail"
-              pInputText
-              formControlName="parentEmail"
-              class="w-full"
-              [placeholder]="'STUDENTS.FORM.PARENT_EMAIL_PLACEHOLDER' | translate"
-              [class.ng-invalid]="parentEmail?.invalid && parentEmail?.touched"
-            />
-            @if (parentEmail?.invalid && parentEmail?.touched) {
-              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.EMAIL_INVALID' | translate }}</small>
-            }
-          </div>
-
-          <!-- Enrollment Date -->
-          <div class="field">
-            <label for="enrollmentDate" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.ENROLL_DATE' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <p-datepicker
-              inputId="enrollmentDate"
-              formControlName="enrollmentDate"
-              dateFormat="yy-mm-dd"
-              [showIcon]="true"
-              [style]="{'width': '100%'}"
-              [placeholder]="'STUDENTS.FORM.ENROLL_DATE_PLACEHOLDER' | translate"
-              [class.ng-invalid]="enrollmentDate?.invalid && enrollmentDate?.touched"
-            />
-            @if (enrollmentDate?.invalid && enrollmentDate?.touched) {
-              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.ENROLL_DATE_REQUIRED' | translate }}</small>
-            }
-          </div>
         </div>
       </div>
 

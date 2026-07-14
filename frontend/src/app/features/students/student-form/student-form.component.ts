@@ -59,7 +59,6 @@ export class StudentFormComponent implements OnInit {
   ];
 
   constructor() {
-    const today = new Date();
     this.studentForm = this.fb.group({
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
@@ -69,10 +68,8 @@ export class StudentFormComponent implements OnInit {
       phone: [''],
       parentName: ['', [Validators.required]],
       parentPhone: ['', [Validators.required]],
-      parentEmail: ['', [Validators.email]],
       address: [''],
       branchId: ['', [Validators.required]],
-      enrollmentDate: [today, [Validators.required]],
       notes: [''],
       acquisitionChannel: [null]
     });
@@ -108,8 +105,7 @@ export class StudentFormComponent implements OnInit {
       next: (student) => {
         this.studentForm.patchValue({
           ...student,
-          dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth) : null,
-          enrollmentDate: student.enrollmentDate ? new Date(student.enrollmentDate) : null
+          dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth) : null
         });
         this.loading.set(false);
       },
@@ -130,8 +126,7 @@ export class StudentFormComponent implements OnInit {
     const formValue = this.studentForm.value;
     const studentData = {
       ...formValue,
-      dateOfBirth: formValue.dateOfBirth instanceof Date ? formValue.dateOfBirth.toISOString().split('T')[0] : formValue.dateOfBirth,
-      enrollmentDate: formValue.enrollmentDate instanceof Date ? formValue.enrollmentDate.toISOString().split('T')[0] : formValue.enrollmentDate
+      dateOfBirth: formValue.dateOfBirth instanceof Date ? formValue.dateOfBirth.toISOString().split('T')[0] : formValue.dateOfBirth
     };
 
     if (this.isEditMode() && this.studentId) {
@@ -172,7 +167,5 @@ export class StudentFormComponent implements OnInit {
   get email() { return this.studentForm.get('email'); }
   get parentName() { return this.studentForm.get('parentName'); }
   get parentPhone() { return this.studentForm.get('parentPhone'); }
-  get parentEmail() { return this.studentForm.get('parentEmail'); }
   get branchId() { return this.studentForm.get('branchId'); }
-  get enrollmentDate() { return this.studentForm.get('enrollmentDate'); }
 }

@@ -23,11 +23,9 @@ function mapStudentFromDB(row: any) {
     phone: row.phone,
     parentName: row.parent_name,
     parentPhone: row.parent_phone,
-    parentEmail: row.parent_email,
     address: row.address,
     branchId: row.branch_id,
     isActive: row.is_active,
-    enrollmentDate: row.enrollment_date,
     inactiveDate: row.inactive_date,
     inactiveReason: row.inactive_reason,
     notes: row.notes,
@@ -89,10 +87,8 @@ export const studentsRoutes = {
         phone: body.phone || null,
         parent_name: body.parentName,
         parent_phone: body.parentPhone,
-        parent_email: body.parentEmail || null,
         address: body.address || null,
         branch_id: body.branchId,
-        enrollment_date: body.enrollmentDate,
         notes: body.notes || null,
         acquisition_channel: body.acquisitionChannel || null,
         qr_token: generateQrToken(),
@@ -143,7 +139,6 @@ export const studentsRoutes = {
       );
       let nextCode = codeRow?.next ?? 1;
 
-      const today = new Date().toISOString().slice(0, 10);
       const errors: { row: number; message: string }[] = [];
       let created = 0;
 
@@ -175,10 +170,8 @@ export const studentsRoutes = {
             phone: emptyToNull(r.phone),
             parent_name: emptyToNull(r.parentName),
             parent_phone: emptyToNull(r.parentPhone),
-            parent_email: emptyToNull(r.parentEmail),
             address: emptyToNull(r.address),
             branch_id: body.branchId,
-            enrollment_date: today,
             notes: emptyToNull(r.notes),
             qr_token: generateQrToken(),
             student_code: nextCode,
@@ -301,7 +294,6 @@ export const studentsRoutes = {
       if (body.phone !== undefined) updateData.phone = body.phone;
       if (body.parentName !== undefined) updateData.parent_name = body.parentName;
       if (body.parentPhone !== undefined) updateData.parent_phone = body.parentPhone;
-      if (body.parentEmail !== undefined) updateData.parent_email = body.parentEmail;
       if (body.address !== undefined) updateData.address = body.address;
       if (body.branchId !== undefined) {
         if (!canAccessBranch(context, body.branchId)) {
@@ -309,7 +301,6 @@ export const studentsRoutes = {
         }
         updateData.branch_id = body.branchId;
       }
-      if (body.enrollmentDate !== undefined) updateData.enrollment_date = body.enrollmentDate;
       if (body.notes !== undefined) updateData.notes = body.notes;
       if (body.acquisitionChannel !== undefined) updateData.acquisition_channel = body.acquisitionChannel;
 

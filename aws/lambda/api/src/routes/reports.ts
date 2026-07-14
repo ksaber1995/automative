@@ -107,7 +107,9 @@ const ACTIVE_ENROLLMENT_EXISTS = `(
   )
 )`;
 // Present as of the end date: joined by then and not yet left by then.
-const PRESENT_AS_OF_END = `(s.enrollment_date <= $3::date
+// Join date = created_at (the row's creation): students.enrollment_date was
+// dropped, so the date the record was created is the only join date we keep.
+const PRESENT_AS_OF_END = `(s.created_at::date <= $3::date
   AND (s.inactive_date IS NULL OR s.inactive_date > $3::date))`;
 const LEFT_IN_RANGE = `(s.inactive_date IS NOT NULL
   AND s.inactive_date >= $2::date AND s.inactive_date <= $3::date)`;
@@ -410,11 +412,11 @@ export const reportsRoutes = {
            )::date AS month_start
          ),
          enrolled AS (
-           SELECT date_trunc('month', s.enrollment_date)::date AS m, COUNT(*) AS cnt
+           SELECT date_trunc('month', s.created_at::date)::date AS m, COUNT(*) AS cnt
            FROM students s
            INNER JOIN branches b ON b.id = s.branch_id
            WHERE b.company_id = $1
-             AND s.enrollment_date >= $2 AND s.enrollment_date <= $3 ${branchClause}
+             AND s.created_at::date >= $2 AND s.created_at::date <= $3 ${branchClause}
            GROUP BY 1
          ),
          churned AS (

@@ -30,11 +30,9 @@ export interface Student {
   phone?: string;
   parentName: string;
   parentPhone: string;
-  parentEmail?: string;
   address?: string;
   branchId: string;
   isActive: boolean;
-  enrollmentDate: string;
   inactiveDate?: string;
   inactiveReason?: string;
   notes?: string;
@@ -65,10 +63,8 @@ export interface StudentCreateDto {
   phone?: string;
   parentName: string;
   parentPhone: string;
-  parentEmail?: string;
   address?: string;
   branchId: string;
-  enrollmentDate: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel;
 }
@@ -83,7 +79,6 @@ export interface StudentImportRow {
   phone?: string | null;
   parentName?: string | null;
   parentPhone?: string | null;
-  parentEmail?: string | null;
   address?: string | null;
   notes?: string | null;
 }
@@ -103,7 +98,6 @@ export interface StudentUpdateDto {
   phone?: string;
   parentName?: string;
   parentPhone?: string;
-  parentEmail?: string;
   address?: string;
   branchId?: string;
   isActive?: boolean;

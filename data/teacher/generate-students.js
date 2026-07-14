@@ -123,10 +123,6 @@ function makeStudent(i) {
   const year = 2026 - age;
   const month = pad((i % 12) + 1, 2);
   const day = pad((i % 27) + 1, 2);
-  // Enrollment spread across the last ~24 months.
-  const enrYear = 2024 + Math.floor((i % 24) / 12);
-  const enrMonth = pad((i % 12) + 1, 2);
-  const enrDay = pad((i % 27) + 1, 2);
   const phoneTail = pad(10000000 + (i * 137) % 89999999, 8);
   return {
     handle,
@@ -137,9 +133,7 @@ function makeStudent(i) {
     phone: `+2010${phoneTail}`,
     parent_name: `${fatherFirst} ${last}`,
     parent_phone: `+2011${phoneTail}`,
-    parent_email: `parent.${pad(i, 4)}@example.com`,
     address: `${(i % 200) + 1} Street, Cairo`,
-    enrollment_date: `${enrYear}-${enrMonth}-${enrDay}`,
   };
 }
 
@@ -212,9 +206,9 @@ async function main() {
     const id = stableUuid(companyId, 'student', s.handle);
     const res = await runSql(
       `INSERT INTO students (id, company_id, first_name, last_name, date_of_birth, email, phone,
-         parent_name, parent_phone, parent_email, address, branch_id, enrollment_date, qr_token, is_active)
+         parent_name, parent_phone, address, branch_id, qr_token, is_active)
        VALUES (:id, :cid, :firstName, :lastName, :dob, :emailVal, :phone,
-         :parentName, :parentPhone, :parentEmail, :address, :branchId, :enrollmentDate, :qrToken, true)
+         :parentName, :parentPhone, :address, :branchId, :qrToken, true)
        ON CONFLICT (id) DO NOTHING`,
       [
         p.uuid('id', id),
@@ -227,10 +221,8 @@ async function main() {
         p.str('phone', s.phone),
         p.str('parentName', s.parent_name),
         p.str('parentPhone', s.parent_phone),
-        p.str('parentEmail', s.parent_email),
         p.str('address', s.address),
         p.uuid('branchId', branch.id),
-        p.date('enrollmentDate', s.enrollment_date),
       ]
     );
     if (res.numberOfRecordsUpdated) inserted++; else skipped++;

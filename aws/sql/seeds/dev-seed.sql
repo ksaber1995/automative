@@ -22,7 +22,7 @@ DECLARE
   v_enrollment_id UUID;
   v_first VARCHAR;
   v_last VARCHAR;
-  v_enrollment_date DATE;
+  v_enrollment_date DATE;  -- local "joined" date (drives inactive_date math); NOT a students column
   v_dob DATE;
   v_status VARCHAR;
   v_start_date DATE;
@@ -118,20 +118,23 @@ BEGIN
       v_is_active := true;
     END IF;
     v_student_id := gen_random_uuid();
+    -- created_at IS the join date now that students.enrollment_date is gone, so set it
+    -- explicitly from v_enrollment_date; the DEFAULT now() would flatten every seeded
+    -- student onto today and break the historical spread the reports rely on.
     INSERT INTO students (id, company_id, branch_id, first_name, last_name, date_of_birth,
-                          parent_name, parent_phone, parent_email,
-                          enrollment_date, is_active,
-                          inactive_date, inactive_reason, notes)
+                          parent_name, parent_phone,
+                          is_active,
+                          inactive_date, inactive_reason, notes, created_at)
     VALUES (
       v_student_id, v_company_id, v_branch_id,
       v_first, v_last, v_dob,
       'Parent of ' || v_first,
       '+201' || lpad(floor(random() * 999999999)::text, 9, '0'),
-      lower(v_first) || '.parent.' || i || '@example.com',
-      v_enrollment_date, v_is_active,
+      v_is_active,
       CASE WHEN NOT v_is_active THEN v_enrollment_date + (60 + floor(random() * 700))::int ELSE NULL END,
       CASE WHEN NOT v_is_active THEN 'Moved' ELSE NULL END,
-      '[seed]'
+      '[seed]',
+      v_enrollment_date::timestamptz
     );
   END LOOP;
 

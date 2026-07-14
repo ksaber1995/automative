@@ -104,7 +104,6 @@
           <th pSortableColumn="firstName">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
           <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
-          <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.LIST.COL_ENROLL_DATE' | translate }}</th>
           @if (!authService.isTeacher()) {
             <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
@@ -127,12 +126,8 @@
           <td>
             <div class="text-sm">
               <div>{{ student.parentPhone }}</div>
-              @if (student.parentEmail) {
-                <div class="text-gray-500">{{ student.parentEmail }}</div>
-              }
             </div>
           </td>
-          <td>{{ student.enrollmentDate | date: 'MMM d, y' }}</td>
           @if (!authService.isTeacher()) {
             <td>{{ getBranchName(student.branchId) }}</td>
           }

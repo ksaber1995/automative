@@ -110,6 +110,13 @@ async function ensureAutoStartedColumn(): Promise<void> {
  */
 const AUTO_END_GRACE_MINUTES = 15;
 
+/**
+ * Stamped on a session the automation had to close with nobody on record — its
+ * class has no instructor assigned, so there is no teacher it could mark present.
+ * Better a closed session that says why it has no teacher than one left running.
+ */
+const AUTO_END_NO_TEACHER_NOTE = 'Auto-closed with no teacher on record: this class has no instructor assigned.';
+
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 /** Weekday name (UPPER) for a YYYY-MM-DD local date — matches classes.days_of_week. */
@@ -574,7 +581,7 @@ export const sessionsRoutes = {
       // ── Auto-end: running sessions whose scheduled end time has passed today ──
       const endParams: any[] = [context.companyId, localDate, localTime, dayName];
       let endSql = `
-        SELECT s.id, c.instructor_id
+        SELECT s.id, s.notes, c.instructor_id
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         JOIN courses co ON co.id = c.course_id
@@ -600,24 +607,40 @@ export const sessionsRoutes = {
 
       let ended = 0;
       for (const s of overdue) {
-        // Company tenants require a present teacher to end. Ensure the instructor
-        // is recorded present; if none can be, skip and leave it for a manual end.
+        // An academy records who taught a session, so ending one normally requires a
+        // teacher marked present. The automation satisfies that by marking the class
+        // instructor present.
+        //
+        // But a class with NO instructor assigned cannot satisfy it at all, and this
+        // used to `continue` — leaving that session running for ever, which is the
+        // opposite of what the automation is for. It is now closed anyway, and says
+        // in its notes why it has no teacher, so the gap is visible in the record
+        // rather than silently absent.
+        let noTeacher = false;
         if (!isTeacherCompany) {
           const present = await queryOne(
             `SELECT 1 FROM session_teacher_attendance WHERE session_id = $1 AND status = 'PRESENT' LIMIT 1`,
             [s.id]
           );
           if (!present) {
-            if (!s.instructor_id) continue;
-            await query(
-              `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
-               VALUES ($1, $2, 'PRIMARY', 'PRESENT', NULL)
-               ON CONFLICT (session_id, employee_id) DO UPDATE SET status = 'PRESENT'`,
-              [s.id, s.instructor_id]
-            );
+            if (s.instructor_id) {
+              await query(
+                `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+                 VALUES ($1, $2, 'PRIMARY', 'PRESENT', NULL)
+                 ON CONFLICT (session_id, employee_id) DO UPDATE SET status = 'PRESENT'`,
+                [s.id, s.instructor_id]
+              );
+            } else {
+              noTeacher = true;
+            }
           }
         }
-        await update('sessions', s.id, { end_date: new Date().toISOString() });
+
+        const changes: Record<string, any> = { end_date: new Date().toISOString() };
+        if (noTeacher) {
+          changes.notes = [s.notes, AUTO_END_NO_TEACHER_NOTE].filter(Boolean).join(' ').trim();
+        }
+        await update('sessions', s.id, changes);
         // Best-effort Telegram present/absent notifications (no-op unless enabled).
         await notifySessionAttendance(context.companyId, s.id);
         ended++;

@@ -466,7 +466,6 @@ export const crmRoutes = {
         email: lead.email || null,
         phone: lead.phone || null,
         branch_id: branchId,
-        enrollment_date: new Date().toISOString().split('T')[0],
         acquisition_channel: lead.source || null,
         notes: lead.notes || null,
         qr_token: generateQrToken(),

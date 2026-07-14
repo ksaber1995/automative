@@ -346,8 +346,8 @@ async function seedStudents(companyId, branchByName) {
     }
     const id = stableUuid(companyId, 'student', `${r.first_name} ${r.last_name}`);
     const res = await runSql(
-      `INSERT INTO students (id, company_id, first_name, last_name, date_of_birth, email, phone, parent_name, parent_phone, parent_email, address, branch_id, enrollment_date, is_active)
-       VALUES (:id, :companyId, :firstName, :lastName, :dob, :emailVal, :phone, :parentName, :parentPhone, :parentEmail, :address, :branchId, :enrollmentDate, true)
+      `INSERT INTO students (id, company_id, first_name, last_name, date_of_birth, email, phone, parent_name, parent_phone, address, branch_id, is_active)
+       VALUES (:id, :companyId, :firstName, :lastName, :dob, :emailVal, :phone, :parentName, :parentPhone, :address, :branchId, true)
        ON CONFLICT (id) DO NOTHING`,
       [
         p.uuid('id', id),
@@ -359,10 +359,8 @@ async function seedStudents(companyId, branchByName) {
         p.str('phone', r.phone ?? null),
         p.str('parentName', r.parent_name ?? null),
         p.str('parentPhone', r.parent_phone ?? null),
-        p.str('parentEmail', r.parent_email ?? null),
         p.str('address', r.address ?? null),
         p.uuid('branchId', branchId),
-        p.date('enrollmentDate', r.enrollment_date),
       ]
     );
     trackResult('students', res);

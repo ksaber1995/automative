@@ -112,12 +112,14 @@ BEGIN
   SELECT array_agg(id ORDER BY id) INTO v_classes FROM ins;
 
   -- ─────────────── 5) STUDENTS (200) ───────────────
-  -- enrollment_date uniformly distributed across the 3-year window;
   -- ~10% are inactive (churned in the past year).
+  -- created_at IS the join date now that students.enrollment_date is gone, so set
+  -- it explicitly: leaving it to DEFAULT now() would land all 200 students on today
+  -- and flatten the 3-year history the demo reports are meant to show.
   WITH ins AS (
     INSERT INTO students (first_name, last_name, date_of_birth, email, phone,
-                          parent_name, parent_phone, parent_email, address,
-                          branch_id, company_id, is_active, enrollment_date, inactive_date)
+                          parent_name, parent_phone, address,
+                          branch_id, company_id, is_active, inactive_date, created_at)
     SELECT
       (ARRAY['Ali','Mariam','Youssef','Habiba','Adam','Lina','Zeyad','Jana','Malak','Selim',
              'Farida','Karim','Nour','Hassan','Salma','Mostafa','Yara','Hossam','Dina','Tamer'])[((g - 1) % 20) + 1],
@@ -126,14 +128,14 @@ BEGIN
       'student' || g || '.demo@netrofit-demo.local',
       '+2011' || LPAD(g::text, 8, '0'),
       'Parent ' || g, '+2012' || LPAD(g::text, 8, '0'),
-      'parent' || g || '.demo@netrofit-demo.local',
       'Apt ' || g || ', Demo Street',
       v_branch, v_company,
       CASE WHEN g % 10 = 0 THEN false ELSE true END,
-      v_start_date + ((random() * v_total_days)::int),
       CASE WHEN g % 10 = 0
            THEN v_today - ((random() * 365)::int)
-           ELSE NULL END
+           ELSE NULL END,
+      -- uniformly spread across the demo window (was enrollment_date)
+      (v_start_date + ((random() * v_total_days)::int))::timestamptz
     FROM generate_series(1, 200) AS g
     RETURNING id
   )
@@ -170,34 +172,36 @@ BEGIN
                            original_price, discount_percent, discount_amount, final_price,
                            payment_mode, down_payment, amount_paid, payment_status,
                            total_refunded, company_id)
+  -- The student's join date now comes from students.created_at (the
+  -- students.enrollment_date column no longer exists).
   SELECT
     s.id,
-    v_classes[((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 16) + 1)],
-    v_courses[((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 8) + 1)],
+    v_classes[((((row_number() OVER (ORDER BY s.created_at::date)) - 1) % 16) + 1)],
+    v_courses[((((row_number() OVER (ORDER BY s.created_at::date)) - 1) % 8) + 1)],
     v_branch,
-    s.enrollment_date,
+    s.created_at::date,
     CASE WHEN s.inactive_date IS NOT NULL THEN 'DROPPED'
-         WHEN s.enrollment_date + 90 < v_today THEN 'COMPLETED'
+         WHEN s.created_at::date + 90 < v_today THEN 'COMPLETED'
          ELSE 'ACTIVE' END,
     (ARRAY[1200,1800,1000,1600,2000,2200,1400,1500])[
-      ((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 8) + 1)
+      ((((row_number() OVER (ORDER BY s.created_at::date)) - 1) % 8) + 1)
     ]::numeric AS orig,
     0,
     0,
     (ARRAY[1200,1800,1000,1600,2000,2200,1400,1500])[
-      ((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 8) + 1)
+      ((((row_number() OVER (ORDER BY s.created_at::date)) - 1) % 8) + 1)
     ]::numeric,
     'FULL',
     0,
     (ARRAY[1200,1800,1000,1600,2000,2200,1400,1500])[
-      ((((row_number() OVER (ORDER BY s.enrollment_date)) - 1) % 8) + 1)
+      ((((row_number() OVER (ORDER BY s.created_at::date)) - 1) % 8) + 1)
     ]::numeric,
     'PAID',
     0,
     v_company
   FROM students s
   WHERE s.branch_id = v_branch
-  ORDER BY s.enrollment_date;
+  ORDER BY s.created_at::date;
 
   -- ─────────────── 8) REVENUES — one per enrollment ───────────────
   INSERT INTO revenues (branch_id, course_id, enrollment_id, student_id,

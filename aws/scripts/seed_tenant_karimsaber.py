@@ -283,7 +283,6 @@ def main():
         parent = f'{random.choice(MALE_FIRST)} {last}'
         birth_year = random.randint(2010, 2020)
         dob = dt.date(birth_year, random.randint(1, 12), random.randint(1, 28))
-        enroll = TODAY - dt.timedelta(days=random.randint(0, 540))
         tok = uuid.uuid4().hex
         while tok in seen_tokens:
             tok = uuid.uuid4().hex
@@ -294,7 +293,7 @@ def main():
             p_date('dob', dob.isoformat()), p_str('gen', gender),
             p_str('phone', eg_phone()), p_str('pname', parent), p_str('pphone', eg_phone()),
             p_uuid('bid', bid), p_uuid('cid', cid),
-            p_date('enr', enroll.isoformat()), p_str('tok', tok),
+            p_str('tok', tok),
             p_long('code', i + 1), p_str('acq', random.choice(ACQ)), p_str('notes', TAG),
         ])
 
@@ -380,9 +379,9 @@ def main():
 
     # 8) students
     run_batch("INSERT INTO students (id, first_name, last_name, date_of_birth, gender, phone, "
-              "parent_name, parent_phone, branch_id, company_id, is_active, enrollment_date, "
+              "parent_name, parent_phone, branch_id, company_id, is_active, "
               "qr_token, student_code, acquisition_channel, notes) "
-              "VALUES (:id, :fn, :ln, :dob, :gen, :phone, :pname, :pphone, :bid, :cid, true, :enr, "
+              "VALUES (:id, :fn, :ln, :dob, :gen, :phone, :pname, :pphone, :bid, :cid, true, "
               ":tok, :code, :acq, :notes)",
               student_rows)
     print(f"  inserted {len(student_rows)} students")

@@ -228,16 +228,6 @@
               <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_PHONE' | translate }}</span>
               <span>{{ s.parentPhone }}</span>
             </div>
-            @if (s.parentEmail) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_EMAIL' | translate }}</span>
-                <span>{{ s.parentEmail }}</span>
-              </div>
-            }
-            <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ENROLLED_DATE' | translate }}</span>
-              <span>{{ s.enrollmentDate | date: 'MMM d, y' }}</span>
-            </div>
             @if (s.acquisitionChannel) {
               <div class="flex">
                 <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.CHANNEL' | translate }}</span>

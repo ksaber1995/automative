@@ -21,17 +21,16 @@ import { StudentImportRow, StudentImportResult, Gender } from '@shared/interface
  *
  * Canonical column headers (English, matched case/space/underscore-insensitively,
  * with a few common aliases): student_name (required), parent_name,
- * student_phone, parent_phone, gender, date_of_birth, email, parent_email,
- * address, notes.
+ * student_phone, parent_phone, gender, date_of_birth, email, address, notes.
  */
 type Field =
   | 'student_name' | 'parent_name' | 'student_phone' | 'parent_phone'
-  | 'gender' | 'date_of_birth' | 'email' | 'parent_email' | 'address' | 'notes';
+  | 'gender' | 'date_of_birth' | 'email' | 'address' | 'notes';
 
 // The canonical columns shown in the downloadable template, in order.
 const TEMPLATE_COLUMNS: Field[] = [
   'student_name', 'parent_name', 'student_phone', 'parent_phone',
-  'gender', 'date_of_birth', 'email', 'parent_email', 'address', 'notes',
+  'gender', 'date_of_birth', 'email', 'address', 'notes',
 ];
 
 // Header alias → canonical field. Keys are normalized (lowercased, non-alnum
@@ -44,7 +43,6 @@ const HEADER_ALIASES: Record<string, Field> = {
   gender: 'gender', sex: 'gender',
   dateofbirth: 'date_of_birth', dob: 'date_of_birth', birthdate: 'date_of_birth', birthday: 'date_of_birth',
   email: 'email', studentemail: 'email',
-  parentemail: 'parent_email', guardianemail: 'parent_email',
   address: 'address',
   notes: 'notes', note: 'notes',
 };
@@ -122,7 +120,6 @@ export class StudentImportDialogComponent {
       gender: 'MALE',
       date_of_birth: '2010-05-20',
       email: '',
-      parent_email: '',
       address: '',
       notes: '',
     };
@@ -215,7 +212,6 @@ export class StudentImportDialogComponent {
         gender: this.normalizeGender(get('gender')),
         dateOfBirth: this.toDateStr(this.rawCell(cells, colMap, 'date_of_birth')),
         email: get('email') || null,
-        parentEmail: get('parent_email') || null,
         address: get('address') || null,
         notes: get('notes') || null,
       });

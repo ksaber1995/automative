@@ -385,12 +385,10 @@ CREATE TABLE students (
     phone VARCHAR(50),
     parent_name VARCHAR(200),
     parent_phone VARCHAR(50),
-    parent_email VARCHAR(255),
     address TEXT,
     branch_id UUID NOT NULL,
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT true,
-    enrollment_date DATE NOT NULL,
     inactive_date DATE,
     inactive_reason TEXT,
     notes TEXT,
@@ -422,7 +420,6 @@ CREATE UNIQUE INDEX idx_students_qr_token ON students(qr_token);
 -- One sequential code per company (codes repeat across companies).
 CREATE UNIQUE INDEX idx_students_company_code ON students(company_id, student_code);
 CREATE INDEX idx_students_company_id ON students(company_id);
-CREATE INDEX idx_students_enrollment_date ON students(enrollment_date);
 CREATE INDEX idx_students_inactive_date ON students(inactive_date);
 CREATE INDEX idx_students_email ON students(email);
 
