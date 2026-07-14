@@ -17,8 +17,63 @@
           <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.LISTS_TITLE' | translate }}</h1>
           <p class="text-gray-500 mt-1">{{ 'CRM.LISTS_SUBTITLE' | translate }}</p>
         </div>
-        <p-button icon="pi pi-plus" [label]="'CRM.LISTS_NEW' | translate" (onClick)="openCreate()"></p-button>
+        <div class="flex items-center gap-2">
+          <p-button [icon]="viewMode() === 'board' ? 'pi pi-list' : 'pi pi-th-large'"
+            severity="secondary" [outlined]="true"
+            [label]="(viewMode() === 'board' ? 'CRM.VIEW_LIST' : 'CRM.VIEW_BOARD') | translate"
+            (onClick)="setView(viewMode() === 'board' ? 'list' : 'board')"></p-button>
+          <p-button icon="pi pi-plus" [label]="'CRM.LISTS_NEW' | translate" (onClick)="openCreate()"></p-button>
+        </div>
       </div>
+
+      @if (viewMode() === 'board') {
+        <!-- Board: one column per list. Dragging a card into another column ADDS the
+             lead to that list — it stays in the one it came from, because a lead is
+             meant to belong to several lists. -->
+        @if (loadingBoard()) {
+          <div class="text-center py-12 text-gray-400"><i class="pi pi-spin pi-spinner text-3xl"></i></div>
+        } @else if (!lists().length) {
+          <p-card>
+            <div class="text-center py-10 text-gray-500">
+              <i class="pi pi-bookmark text-4xl mb-3 text-gray-300"></i>
+              <p class="font-medium">{{ 'CRM.LISTS_EMPTY' | translate }}</p>
+              <p class="text-sm text-gray-400">{{ 'CRM.LISTS_EMPTY_HINT' | translate }}</p>
+            </div>
+          </p-card>
+        } @else {
+          <p class="text-xs text-gray-400 mb-2">{{ 'CRM.LISTS_BOARD_HINT' | translate }}</p>
+          <div class="overflow-x-auto pb-2">
+            <div class="flex gap-3 items-start" style="min-width: 900px;">
+              @for (list of lists(); track list.id) {
+                <div class="flex-1 min-w-[200px] bg-gray-50 rounded-lg border border-gray-200"
+                     pDroppable (onDrop)="dropOn(list)">
+                  <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between gap-2">
+                    <button class="font-semibold text-gray-800 text-start hover:text-indigo-600 truncate"
+                      (click)="open(list)">{{ list.name }}</button>
+                    <span class="text-xs text-gray-400 shrink-0">{{ columnLeads(list.id).length }}</span>
+                  </div>
+                  <div class="p-2 flex flex-col gap-2 min-h-[100px]">
+                    @for (lead of columnLeads(list.id); track lead.id) {
+                      <div class="bg-white rounded-md border border-gray-200 p-2.5 shadow-sm cursor-move"
+                           pDraggable (onDragStart)="dragStart(lead, list.id)" (onDragEnd)="dragEnd()">
+                        <div class="font-medium text-gray-800">{{ lead.fullName }}</div>
+                        @if (lead.phone) {
+                          <div class="text-xs text-gray-500 mt-0.5"><i class="pi pi-phone"></i> {{ lead.phone }}</div>
+                        }
+                        <div class="mt-1">
+                          <p-tag [value]="stageLabel(lead.stage)" [severity]="stageSeverity(lead.stage)"></p-tag>
+                        </div>
+                      </div>
+                    } @empty {
+                      <div class="text-xs text-gray-300 text-center py-4">{{ 'CRM.LISTS_DROP_HERE' | translate }}</div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      } @else {
 
       <p-card>
         <p-table [value]="lists()" [loading]="loading()" responsiveLayout="scroll">
@@ -66,6 +121,7 @@
           </ng-template>
         </p-table>
       </p-card>
+      }
     }
 
     <!-- ───────────── One list: its members ───────────── -->

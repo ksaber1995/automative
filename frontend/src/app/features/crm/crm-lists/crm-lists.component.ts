@@ -9,9 +9,11 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
+import { DragDropModule } from 'primeng/dragdrop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { forkJoin } from 'rxjs';
 import { saveAs } from 'file-saver';
 import { CrmService } from '../services/crm.service';
 import { CrmNavComponent } from '../crm-nav/crm-nav.component';
@@ -37,7 +39,7 @@ import { CrmLead, CrmList } from '@shared/interfaces/crm.interface';
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TableModule, TagModule,
-    DialogModule, InputTextModule, TextareaModule, TooltipModule, ConfirmDialogModule,
+    DialogModule, InputTextModule, TextareaModule, TooltipModule, ConfirmDialogModule, DragDropModule,
     TranslateModule, CrmNavComponent,
   ],
   providers: [ConfirmationService],
@@ -52,6 +54,79 @@ export class CrmListsComponent implements OnInit {
 
   lists = signal<CrmList[]>([]);
   loading = signal(false);
+
+  // ── Board view ─────────────────────────────────────────────────────────────
+  // Columns are the lists; cards are the leads in them. Dragging a card into
+  // another column ADDS the lead there — it does not move it. A lead is meant to
+  // sit in several lists, so a drag must not silently drop it out of the one it
+  // came from; the card simply shows up in both columns.
+  viewMode = signal<'list' | 'board'>('list');
+  /** listId -> its leads, for the board. */
+  board = signal<Record<string, CrmLead[]>>({});
+  loadingBoard = signal(false);
+  private dragged: { lead: CrmLead; fromListId: string } | null = null;
+
+  setView(mode: 'list' | 'board'): void {
+    this.viewMode.set(mode);
+    if (mode === 'board') this.loadBoard();
+  }
+
+  private loadBoard(): void {
+    const lists = this.lists();
+    if (!lists.length) { this.board.set({}); return; }
+
+    // One request per column. Fine for the handful of lists an academy keeps, and
+    // it reuses the same members endpoint rather than inventing a bulk one.
+    this.loadingBoard.set(true);
+    forkJoin(lists.map((l) => this.crm.listMembers(l.id))).subscribe({
+      next: (results) => {
+        const map: Record<string, CrmLead[]> = {};
+        lists.forEach((l, i) => (map[l.id] = results[i]));
+        this.board.set(map);
+        this.loadingBoard.set(false);
+      },
+      error: () => this.loadingBoard.set(false),
+    });
+  }
+
+  columnLeads(listId: string): CrmLead[] {
+    return this.board()[listId] ?? [];
+  }
+
+  dragStart(lead: CrmLead, fromListId: string): void {
+    this.dragged = { lead, fromListId };
+  }
+
+  dragEnd(): void {
+    this.dragged = null;
+  }
+
+  dropOn(list: CrmList): void {
+    const drag = this.dragged;
+    this.dragged = null;
+    if (!drag || drag.fromListId === list.id) return;
+
+    // Already a member? Say so rather than firing a pointless request.
+    if (this.columnLeads(list.id).some((l) => l.id === drag.lead.id)) {
+      this.notify.info(this.translate.instant('CRM.LISTS_ALREADY_IN', { name: drag.lead.fullName, list: list.name }));
+      return;
+    }
+
+    // Optimistic: show it in the target column straight away, roll back on failure.
+    this.board.update((map) => ({ ...map, [list.id]: [drag.lead, ...(map[list.id] ?? [])] }));
+    this.crm.addMembers(list.id, [drag.lead.id]).subscribe({
+      next: () => {
+        this.notify.success(this.translate.instant('CRM.LISTS_ADDED_ONE', { name: drag.lead.fullName, list: list.name }));
+        this.load();   // member counts changed
+      },
+      error: () => {
+        this.board.update((map) => ({
+          ...map,
+          [list.id]: (map[list.id] ?? []).filter((l) => l.id !== drag.lead.id),
+        }));
+      },
+    });
+  }
 
   /** The list being viewed; null = the overview of all lists. */
   active = signal<CrmList | null>(null);
@@ -92,7 +167,12 @@ export class CrmListsComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.crm.listLists().subscribe({
-      next: (rows) => { this.lists.set(rows); this.loading.set(false); },
+      next: (rows) => {
+        this.lists.set(rows);
+        this.loading.set(false);
+        // A new or deleted list changes the board's columns.
+        if (this.viewMode() === 'board') this.loadBoard();
+      },
       error: () => this.loading.set(false),   // interceptor toasts the server error
     });
   }

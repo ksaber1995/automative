@@ -1075,7 +1075,9 @@
     "LISTS_EXPORT": "تصدير CSV",
     "LISTS_ADD_TO": "إضافة إلى قائمة",
     "LISTS_ADD_TO_HINT": "إضافة {{name}} إلى قائمة.",
-    "LISTS_CREATE_ADD": "إنشاء وإضافة"
+    "LISTS_CREATE_ADD": "إنشاء وإضافة",
+    "LISTS_BOARD_HINT": "اسحب العميل إلى قائمة أخرى لإضافته إليها — سيظل موجودًا في القائمة الأصلية أيضًا.",
+    "LISTS_DROP_HERE": "أفلت عميلاً هنا"
   },
   "NAV": {
     "DASHBOARD": "لوحة التحكم",
