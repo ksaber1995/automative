@@ -152,6 +152,7 @@
               <span class="text-red-500">*</span>
             </label>
             <p-datepicker formControlName="enrollmentDate" [showIcon]="true" dateFormat="yy-mm-dd"
+              [minDate]="classStartSig() || undefined"
               [placeholder]="'ENROLLMENT_FORM.PLACEHOLDER_DATE' | translate" [style]="{ width: '100%' }" (onSelect)="onEnrollmentDateChange()"></p-datepicker>
             @if (isMonthly()) {
               <small class="text-gray-500 block mt-1">{{ 'ENROLLMENT_FORM.START_DATE_HINT' | translate }}</small>
@@ -324,7 +325,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'ENROLLMENT_FORM.MONTHLY_PAY_OPTION' | translate }} <span class="text-red-500">*</span></label>
-            <div class="flex gap-8">
+            <div class="flex flex-col md:flex-row gap-4">
               <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
                 [class.border-green-500]="monthlyPayOptionSig() === 'PAY_NOW'"
                 [class.bg-green-50]="monthlyPayOptionSig() === 'PAY_NOW'">
@@ -332,6 +333,24 @@
                 <div>
                   <p class="font-medium">{{ 'ENROLLMENT_FORM.PAY_FIRST_MONTH' | translate }}</p>
                   <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.PAY_FIRST_MONTH_DESC' | translate: { amount: (finalPriceSig() | amount) } }}</p>
+                </div>
+              </div>
+              <!-- Part of the first month now, the rest owing — same as the package's
+                   down payment, which this mirrors. -->
+              <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"
+                [class.border-indigo-500]="monthlyPayOptionSig() === 'PAY_PARTIAL'"
+                [class.bg-indigo-50]="monthlyPayOptionSig() === 'PAY_PARTIAL'">
+                <p-radiobutton name="monthlyPayOption" value="PAY_PARTIAL" formControlName="monthlyPayOption" (onClick)="monthlyPayOptionSig.set('PAY_PARTIAL')"></p-radiobutton>
+                <div class="flex-1">
+                  <p class="font-medium">{{ 'ENROLLMENT_FORM.PAY_PART_FIRST_MONTH' | translate }}</p>
+                  <p class="text-sm text-gray-500">{{ 'ENROLLMENT_FORM.PAY_PART_FIRST_MONTH_DESC' | translate }}</p>
+                  @if (monthlyPayOptionSig() === 'PAY_PARTIAL') {
+                    <div class="mt-2 flex items-center gap-2">
+                      <p-inputnumber formControlName="monthlyDownPayment" [min]="0" [max]="finalPriceSig()"
+                        (onInput)="monthlyDownPaymentSig.set($event.value || 0)" mode="currency" currency="USD" [style]="{ width: '160px' }"></p-inputnumber>
+                      <small class="text-gray-500" [innerHTML]="'ENROLLMENT_FORM.REMAINING' | translate: { amount: ((finalPriceSig() || 0) - monthlyDownPaymentSig()) | amount }"></small>
+                    </div>
+                  }
                 </div>
               </div>
               <div class="flex items-center gap-3 p-4 border rounded-lg cursor-pointer flex-1"

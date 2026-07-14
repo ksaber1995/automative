@@ -133,6 +133,105 @@ async function recalcBillsForCourseMonth(
   return updated;
 }
 
+/**
+ * Make sure a month's bills EXIST.
+ *
+ * Bills used to appear only when an enrollment was created (which backfills up to
+ * that day) or when staff pressed a "Generate" button — and that button was removed
+ * from the UI, with no cron behind it. So on the 1st of a new month nothing created
+ * the new rows: the month showed no unpaid students, and scanning a card offered
+ * only the previous month's stale bill, because every read path can only return
+ * rows that already exist.
+ *
+ * The rows are now materialised on demand by the read paths themselves. One
+ * set-based statement, idempotent through the (enrollment_id, billing_year,
+ * billing_month) unique key, so calling it on every page load costs an insert that
+ * does nothing once the month is there.
+ *
+ * Only ACTIVE enrollments on active MONTHLY_SUBSCRIPTION courses are billed, and —
+ * unlike the old generate loop — never for a month that ENDS BEFORE the student
+ * enrolled, which would have invented debt for months they were not yet a student.
+ *
+ * amount_due mirrors the old JS maths: a course price override for the month is
+ * scaled by the enrollment's own discount ratio (final_price / course price).
+ * due_date is the last day of the billing month, computed in SQL — the old code
+ * built it from a LOCAL Date and then serialised with toISOString(), which on any
+ * server east of UTC lands a day early.
+ */
+export async function ensureBillsForMonth(
+  companyId: string,
+  billingYear: number,
+  billingMonth: number,
+): Promise<number> {
+  if (!Number.isInteger(billingYear) || !Number.isInteger(billingMonth)) return 0;
+  if (billingMonth < 1 || billingMonth > 12) return 0;
+
+  const rows = await query(
+    `WITH period AS (
+       SELECT make_date($2::int, $3::int, 1)                                  AS first_day,
+              (make_date($2::int, $3::int, 1) + INTERVAL '1 month - 1 day')::date AS last_day
+     )
+     INSERT INTO monthly_subscription_payments
+       (enrollment_id, company_id, student_id, course_id, branch_id,
+        billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+     SELECT
+       e.id, e.company_id, e.student_id, e.course_id, e.branch_id,
+       $2::int, $3::int,
+       CASE
+         WHEN ov.override_price IS NOT NULL AND c.price > 0
+           THEN ROUND(ov.override_price * (COALESCE(NULLIF(e.final_price, 0), c.price) / c.price), 2)
+         ELSE COALESCE(NULLIF(e.final_price, 0), c.price)
+       END,
+       0, 'PENDING', period.last_day
+     FROM enrollments e
+     JOIN courses c ON c.id = e.course_id
+     CROSS JOIN period
+     LEFT JOIN course_monthly_price_overrides ov
+       ON ov.course_id = e.course_id
+      AND ov.billing_year = $2::int
+      AND ov.billing_month = $3::int
+     WHERE e.company_id = $1
+       AND e.status = 'ACTIVE'
+       AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
+       AND c.is_active = true
+       -- never bill a month that ended before the student even enrolled
+       AND (e.enrollment_date IS NULL OR e.enrollment_date <= period.last_day)
+     ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
+     RETURNING id`,
+    [companyId, billingYear, billingMonth],
+  );
+  return (rows as any[]).length;
+}
+
+/** Today's year/month as the DATABASE sees it, so every caller agrees on "now". */
+async function currentPeriod(): Promise<{ year: number; month: number }> {
+  const row = await queryOne<any>(
+    `SELECT EXTRACT(YEAR FROM CURRENT_DATE)::int AS y, EXTRACT(MONTH FROM CURRENT_DATE)::int AS m`,
+  );
+  return { year: Number(row?.y), month: Number(row?.m) };
+}
+
+/**
+ * Materialise every month in an inclusive range (the page's filter range), so the
+ * table and its unpaid tab show the month you asked for — including the current one,
+ * and including a FUTURE month when you deliberately filter forward to collect early.
+ * Bounded: a filter can only ever ask for a handful of months.
+ */
+async function ensureBillsForRange(
+  companyId: string,
+  fromKey: number,
+  toKey: number,
+): Promise<void> {
+  if (!Number.isFinite(fromKey) || !Number.isFinite(toKey) || toKey < fromKey) return;
+  // A runaway range must not turn one page load into hundreds of writes.
+  if (toKey - fromKey > 23) return;
+  for (let key = fromKey; key <= toKey; key++) {
+    const year = Math.floor((key - 1) / 12);
+    const month = ((key - 1) % 12) + 1;
+    await ensureBillsForMonth(companyId, year, month);
+  }
+}
+
 export const monthlySubscriptionsRoutes = {
   /** POST /api/monthly-subscriptions/generate
    *  Idempotent: creates one row per active enrollment in monthly courses for the given month.
@@ -247,6 +346,11 @@ export const monthlySubscriptionsRoutes = {
       // across year boundaries (e.g. last 3 months ending in January).
       const fromKey = parseInt(q.fromYear, 10) * 12 + parseInt(q.fromMonth, 10);
       const toKey = parseInt(q.toYear, 10) * 12 + parseInt(q.toMonth, 10);
+
+      // The months being asked for might never have been billed — nothing rolls the
+      // bills over. Create them first, or the current month reads as "nobody owes
+      // anything" when in fact nobody has been charged.
+      await ensureBillsForRange(context.companyId, fromKey, toKey);
 
       const conditions: string[] = [
         'msp.company_id = $1',
@@ -394,6 +498,10 @@ export const monthlySubscriptionsRoutes = {
 
       const fromKey = parseInt(q.fromYear, 10) * 12 + parseInt(q.fromMonth, 10);
       const toKey = parseInt(q.toYear, 10) * 12 + parseInt(q.toMonth, 10);
+
+      // Same materialisation as list(): the summary runs in parallel with it, and
+      // counters that disagree with the table underneath them are worse than slow.
+      await ensureBillsForRange(context.companyId, fromKey, toKey);
 
       const conditions: string[] = [
         'msp.company_id = $1',
@@ -671,6 +779,12 @@ export const monthlySubscriptionsRoutes = {
       if (!token) {
         return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.STUDENT_NOT_FOUND', 'Student not found for this code');
       }
+
+      // Scan a card in July and July must be on offer. The due list can only return
+      // rows that exist, so make sure THIS month's bills exist before reading them —
+      // otherwise the picker shows June and takes the money for the wrong month.
+      const { year, month } = await currentPeriod();
+      await ensureBillsForMonth(context.companyId, year, month);
 
       // Scope the lookup to the caller's company — a token from another company
       // must not resolve.

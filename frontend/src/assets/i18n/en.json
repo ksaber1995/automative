@@ -2469,7 +2469,10 @@
     "BOOK_DISCOUNT_PERCENTAGE": "Percentage",
     "BOOK_DISCOUNT_FIXED": "Fixed amount",
     "BOOK_DISCOUNT_PCT": "Discount %",
-    "BOOK_DISCOUNT_AMT": "Discount amount"
+    "BOOK_DISCOUNT_AMT": "Discount amount",
+    "PAY_PART_FIRST_MONTH": "Pay part of the first month",
+    "PAY_PART_FIRST_MONTH_DESC": "Collect some of it now; the rest stays owing on the first month.",
+    "DATE_BEFORE_CLASS": "The start date cannot be before the class starts — moved to the class start date."
   },
   "DASHBOARD": {
     "TITLE": "Dashboard",

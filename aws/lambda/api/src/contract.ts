@@ -940,6 +940,9 @@ const CreateEnrollmentSchema = z.object({
   // Monthly-subscription enrollment fields (ignored for one-time courses):
   paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']).optional(),
   payFirstMonth: z.boolean().optional(),
+  // Part of the first month, collected at enrollment. Mirrors the package's
+  // PARTIAL down payment: the first bill is left PARTIAL with the rest owing.
+  firstMonthDownPayment: z.number().optional(),
   // Per-session enrollment fields (ignored unless the course is PER_SESSION):
   sessionBillingMode: z.enum(['PER_SESSION', 'PACKAGE']).optional(),
   buyPackage: z.boolean().optional(),

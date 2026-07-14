@@ -158,16 +158,29 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
       guard++;
     }
 
-    // Collect the first month up-front if requested.
-    if (payFirstMonth && monthlyFee > 0 && firstBillId) {
+    // Collect the first month up-front — in full, or in part.
+    //
+    // A part payment leaves the bill PARTIAL with the remainder still owing, so it
+    // shows up on the monthly dashboard exactly like any other half-paid month. It
+    // is clamped to the fee: paying "more than the month" would otherwise book a
+    // credit that nothing in the system knows how to give back.
+    const downPayment = Number((body as any).firstMonthDownPayment ?? 0);
+    const collect = payFirstMonth
+      ? monthlyFee
+      : (Number.isFinite(downPayment) && downPayment > 0 ? Math.min(downPayment, monthlyFee) : 0);
+
+    if (collect > 0 && monthlyFee > 0 && firstBillId) {
+      const status = collect >= monthlyFee ? 'PAID' : 'PARTIAL';
+      const note = status === 'PAID' ? 'First month paid at enrollment' : 'Part of the first month paid at enrollment';
       const payQuery = `UPDATE monthly_subscription_payments
-       SET amount_paid = $1, payment_status = 'PAID', paid_date = $2,
-           notes = 'First month paid at enrollment', updated_at = NOW()
+       SET amount_paid = $1, payment_status = $4, paid_date = $2,
+           notes = $5, updated_at = NOW()
        WHERE id = $3`;
+      const args = [collect, body.enrollmentDate, firstBillId, status, note];
       if (client) {
-        await client.query(payQuery, [monthlyFee, body.enrollmentDate, firstBillId]);
+        await client.query(payQuery, args);
       } else {
-        await query(payQuery, [monthlyFee, body.enrollmentDate, firstBillId]);
+        await query(payQuery, args);
       }
     }
 

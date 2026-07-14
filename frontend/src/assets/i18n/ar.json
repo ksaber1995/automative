@@ -2469,7 +2469,10 @@
     "BOOK_DISCOUNT_PERCENTAGE": "نسبة مئوية",
     "BOOK_DISCOUNT_FIXED": "مبلغ ثابت",
     "BOOK_DISCOUNT_PCT": "نسبة الخصم %",
-    "BOOK_DISCOUNT_AMT": "مبلغ الخصم"
+    "BOOK_DISCOUNT_AMT": "مبلغ الخصم",
+    "PAY_PART_FIRST_MONTH": "دفع جزء من الشهر الأول",
+    "PAY_PART_FIRST_MONTH_DESC": "يُحصَّل جزء الآن ويظل الباقي مستحقاً على الشهر الأول.",
+    "DATE_BEFORE_CLASS": "لا يمكن أن يبدأ الاشتراك قبل بداية الفصل — تم ضبطه على تاريخ بداية الفصل."
   },
   "DASHBOARD": {
     "TITLE": "لوحة التحكم",

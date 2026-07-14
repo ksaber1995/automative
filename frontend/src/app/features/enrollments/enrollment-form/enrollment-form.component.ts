@@ -114,7 +114,11 @@ export class EnrollmentFormComponent implements OnInit {
   downPaymentSig = signal(0);
   coverage = signal<CoverageInfo | null>(null);
   // Monthly-subscription enrollment: pay the start month now or defer it.
-  monthlyPayOptionSig = signal<'PAY_NOW' | 'PAY_LATER'>('PAY_LATER');
+  monthlyPayOptionSig = signal<'PAY_NOW' | 'PAY_PARTIAL' | 'PAY_LATER'>('PAY_LATER');
+  /** How much of the first month is being collected now (PAY_PARTIAL only). */
+  monthlyDownPaymentSig = signal<number>(0);
+  /** The chosen class's start date — the enrollment can never begin before it. */
+  classStartSig = signal<Date | null>(null);
   // Monthly price override info for display hint
   monthlyOverridePrice = signal<number | null>(null);
   monthlyOverrideMonth = signal<string>(''); // e.g. "June 2026"
@@ -231,6 +235,7 @@ export class EnrollmentFormComponent implements OnInit {
       paymentMode: [PaymentMode.FULL, [Validators.required]],
       downPayment: [0],
       monthlyPayOption: ['PAY_LATER'],
+      monthlyDownPayment: [0],
       sessionBillingMode: ['PER_SESSION'],
       sessionPackagePayMode: ['FULL'],
       sessionPackageDownPayment: [0],
@@ -516,21 +521,33 @@ export class EnrollmentFormComponent implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     classStart.setHours(0, 0, 0, 0);
-    // For monthly subscriptions, default to today so the start date can be
-    // before the class start date (billing begins from this date).
-    const enrollDate = this.isMonthly()
-      ? today
-      : (classStart > today ? classStart : today);
+    this.classStartSig.set(classStart);
+
+    // The enrollment can never begin before the class does — billing would start
+    // for months in which there was nothing to attend. So: a class that has not
+    // started yet begins on its start date; one already running begins today.
+    // (This used to force TODAY for monthly courses, which quietly back-dated the
+    // first bill to a month before the class existed.)
+    const enrollDate = classStart > today ? classStart : today;
     this.enrollmentForm.patchValue({ enrollmentDate: enrollDate });
     this.checkMonthlyPriceOverride(enrollDate);
   }
 
   /** When enrollment date changes manually via the date picker. */
   onEnrollmentDateChange() {
-    const d = this.enrollmentForm.get('enrollmentDate')?.value;
-    if (d instanceof Date) {
-      this.checkMonthlyPriceOverride(d);
+    let d = this.enrollmentForm.get('enrollmentDate')?.value;
+    if (!(d instanceof Date)) return;
+
+    // minDate stops the calendar offering an earlier day, but a typed date can
+    // still get through — so pull it back to the class start rather than billing
+    // the student for months before the class ran.
+    const start = this.classStartSig();
+    if (start && d < start) {
+      d = new Date(start);
+      this.enrollmentForm.patchValue({ enrollmentDate: d });
+      this.notificationService.warning(this.translate.instant("ENROLLMENT_FORM.DATE_BEFORE_CLASS"));
     }
+    this.checkMonthlyPriceOverride(d);
   }
 
   /**
@@ -728,6 +745,9 @@ export class EnrollmentFormComponent implements OnInit {
         : perSession ? 'PER_SESSION' as const
         : 'ONE_TIME' as const,
       payFirstMonth: monthly ? this.monthlyPayOptionSig() === 'PAY_NOW' : undefined,
+      firstMonthDownPayment: (monthly && this.monthlyPayOptionSig() === 'PAY_PARTIAL')
+        ? this.monthlyDownPaymentSig()
+        : undefined,
       // Per-session: pay each session (default) or prepay a package in advance.
       sessionBillingMode: perSession ? this.sessionBillingModeSig() : undefined,
       buyPackage: perSession ? this.sessionBillingModeSig() === 'PACKAGE' : undefined,
