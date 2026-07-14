@@ -36,8 +36,8 @@ export async function ensureCardDesignColumn(): Promise<void> {
   return cardDesignColumnInitPromise;
 }
 
-type CardTemplateId = 'navy' | 'maroon' | 'minimal';
-const CARD_TEMPLATES: CardTemplateId[] = ['navy', 'maroon', 'minimal'];
+type CardTemplateId = 'navy' | 'maroon' | 'minimal' | 'portrait';
+const CARD_TEMPLATES: CardTemplateId[] = ['navy', 'maroon', 'minimal', 'portrait'];
 
 interface CardDesign {
   template: CardTemplateId;

@@ -8,7 +8,7 @@
  *
  * Stored as JSONB on `companies.card_design`.
  */
-export type CardTemplateId = 'navy' | 'maroon' | 'minimal';
+export type CardTemplateId = 'navy' | 'maroon' | 'minimal' | 'portrait';
 
 export interface CardDesign {
   /**

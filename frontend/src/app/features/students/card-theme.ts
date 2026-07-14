@@ -8,10 +8,15 @@
  * card-back.util.ts) and differ only by palette and typeface. 'minimal' is a
  * structurally different flat design with its own renderer (card-minimal.util.ts),
  * but still uses this same theme shape so the shared text/shape primitives work.
+ *
+ * 'portrait' is the only template that puts the TEACHER'S photo and logo on the
+ * back — the side that is already about the teacher — leaving the student's side
+ * clean and giving its QR and details the whole width. Its renderer is
+ * card-portrait.util.ts.
  */
-export type CardTemplate = 'navy' | 'maroon' | 'minimal';
+export type CardTemplate = 'navy' | 'maroon' | 'minimal' | 'portrait';
 
-export const CARD_TEMPLATES: CardTemplate[] = ['navy', 'maroon', 'minimal'];
+export const CARD_TEMPLATES: CardTemplate[] = ['navy', 'maroon', 'minimal', 'portrait'];
 export const DEFAULT_TEMPLATE: CardTemplate = 'navy';
 
 export interface CardTheme {
@@ -104,5 +109,26 @@ export const CARD_THEMES: Record<CardTemplate, CardTheme> = {
     font: SANS,
     dot: '#eef2f6',
     dotDark: '#134e4a',
+  },
+
+  // Deep forest + soft gold: warm and formal, and clearly not a recolour of the
+  // navy/maroon pair.
+  portrait: {
+    panel: '#0f2b26',
+    panelDark: '#082019',
+    accent: '#c6a15b',
+    accentLight: '#eeddb4',
+    accentDeep: '#8a6b32',
+    accentInk: '#8a6b32',
+    page: '#ffffff',
+    quote: '#f5f2e9',
+    ink: '#0f2b26',
+    body: '#33403d',
+    muted: '#7d8a87',
+    line: '#e4e9e7',
+    wash: '#f4f8f6',
+    font: SANS,
+    dot: '#e9efec',
+    dotDark: '#1a4037',
   },
 };

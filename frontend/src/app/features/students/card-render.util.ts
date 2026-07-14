@@ -4,6 +4,7 @@ import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE } from './card-theme';
 import { CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardTheme } from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
+import { drawCardBackPortrait, drawStudentCardPortrait } from './card-portrait.util';
 
 /**
  * The one place that turns a template + data into a PNG. Both faces of a card
@@ -82,7 +83,10 @@ export async function renderStudentCardPng(
   const qr = await qrImage(data.qrUrl);
 
   setCardTheme(themeFor(template));
-  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
+  // 'portrait' takes no images on the front — the teacher's photo and logo are on
+  // its BACK, which is the whole point of that template.
+  if (template === 'portrait') drawStudentCardPortrait(ctx, data, qr);
+  else if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
   else drawStudentCard(ctx, data, qr, images);
 
   return canvas.toDataURL('image/png').split(',')[1];
@@ -99,8 +103,14 @@ export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasEl
 
   const template = design.template as CardTemplate | undefined;
   setCardTheme(themeFor(template));
-  if (template === 'minimal') drawCardBackMinimal(ctx, design, qr);
-  else drawCardBack(ctx, design, qr);
+  if (template === 'portrait') {
+    // The only back face that carries images: the teacher's photo and logo.
+    drawCardBackPortrait(ctx, design, qr, await loadCardImages(design));
+  } else if (template === 'minimal') {
+    drawCardBackMinimal(ctx, design, qr);
+  } else {
+    drawCardBack(ctx, design, qr);
+  }
 
   return canvas.toDataURL('image/png').split(',')[1];
 }
