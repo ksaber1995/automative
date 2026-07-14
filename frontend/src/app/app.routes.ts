@@ -119,6 +119,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/crm/leads-list/leads-list.component').then(m => m.LeadsListComponent)
       },
       {
+        path: 'crm/lists',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.CRM' },
+        loadComponent: () => import('./features/crm/crm-lists/crm-lists.component').then(m => m.CrmListsComponent)
+      },
+      {
         path: 'crm/insights',
         canActivate: [permissionGuard('students')],
         data: { breadcrumb: 'BREADCRUMBS.CRM' },

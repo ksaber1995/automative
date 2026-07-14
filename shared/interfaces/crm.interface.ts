@@ -108,3 +108,23 @@ export interface CrmLeadWriteDto {
   lostReason?: string | null;
   nextActionAt?: string | null;
 }
+
+/**
+ * A named group of leads — like a WhatsApp broadcast list. A lead can belong to
+ * many lists; membership lives in crm_list_leads, unique per (list, lead).
+ */
+export interface CrmList {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string | null;
+  /** How many leads are in the list (populated by the API). */
+  memberCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmListWriteDto {
+  name?: string;
+  description?: string | null;
+}

@@ -215,6 +215,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     // Client Management (CRM) — its own top-level group; each tab is a route.
     const clientMgmt: NavLeaf[] = [
       { labelKey: 'NAV.CRM_LEADS', icon: 'pi pi-filter', routerLink: ['/crm'], visible: auth.canUseCrm() },
+      { labelKey: 'NAV.CRM_LISTS', icon: 'pi pi-bookmark', routerLink: ['/crm/lists'], visible: auth.canUseCrm() },
       { labelKey: 'NAV.CRM_TASKS', icon: 'pi pi-check-square', routerLink: ['/crm/tasks'], visible: auth.canUseCrm() },
       { labelKey: 'NAV.CRM_INSIGHTS', icon: 'pi pi-chart-bar', routerLink: ['/crm/insights'], visible: auth.canUseCrm() },
       { labelKey: 'NAV.CRM_RETENTION', icon: 'pi pi-heart', routerLink: ['/crm/retention'], visible: auth.canUseCrm() },

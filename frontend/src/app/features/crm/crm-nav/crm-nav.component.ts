@@ -13,6 +13,10 @@ import { TranslateModule } from '@ngx-translate/core';
          class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
         <i class="pi pi-filter mr-1"></i>{{ 'CRM.NAV_LEADS' | translate }}
       </a>
+      <a routerLink="/crm/lists" routerLinkActive="!border-indigo-500 !text-indigo-600"
+         class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
+        <i class="pi pi-bookmark mr-1"></i>{{ 'CRM.NAV_LISTS' | translate }}
+      </a>
       <a routerLink="/crm/insights" routerLinkActive="!border-indigo-500 !text-indigo-600"
          class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
         <i class="pi pi-chart-bar mr-1"></i>{{ 'CRM.NAV_INSIGHTS' | translate }}

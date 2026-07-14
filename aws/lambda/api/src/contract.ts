@@ -1583,6 +1583,22 @@ const CrmActivityWriteSchema = z.object({
   done: z.boolean().optional(),
 });
 
+// CRM lists — named groups of leads (a lead can sit in many)
+const CrmListSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  name: z.string(),
+  description: z.string().nullable(),
+  memberCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const CrmListWriteSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+});
+
 // WhatsApp Cloud API (foundation)
 const WaSettingsSchema = z.object({
   autoSendOnCheckin: z.boolean(),
@@ -2667,6 +2683,64 @@ export const contract = c.router({
           reasons: z.array(z.string()),
         })),
         403: ApiErrorSchema,
+      },
+    },
+
+    // Lists — named groups of leads, like a WhatsApp broadcast list
+    listLists: {
+      method: 'GET',
+      path: '/api/crm/lists',
+      responses: { 200: z.array(CrmListSchema), 403: ApiErrorSchema },
+    },
+    createList: {
+      method: 'POST',
+      path: '/api/crm/lists',
+      body: CrmListWriteSchema,
+      responses: { 201: CrmListSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 409: ApiErrorSchema },
+    },
+    updateList: {
+      method: 'PATCH',
+      path: '/api/crm/lists/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CrmListWriteSchema,
+      responses: { 200: CrmListSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+    },
+    deleteList: {
+      method: 'DELETE',
+      path: '/api/crm/lists/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean(), code: z.string(), message: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    listMembers: {
+      method: 'GET',
+      path: '/api/crm/lists/:id/leads',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(CrmLeadSchema), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    addMembers: {
+      method: 'POST',
+      path: '/api/crm/lists/:id/leads',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ leadIds: z.array(UUIDSchema).min(1) }),
+      responses: {
+        200: z.object({ success: z.boolean(), added: z.number(), memberCount: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    removeMember: {
+      method: 'DELETE',
+      path: '/api/crm/lists/:id/leads/:leadId',
+      pathParams: z.object({ id: UUIDSchema, leadId: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean(), code: z.string(), message: z.string() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
       },
     },
   },

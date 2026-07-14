@@ -87,6 +87,41 @@ async function ensureCrmSchema(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_calls_lead ON crm_lead_calls(lead_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_calls_company ON crm_lead_calls(company_id)`);
 
+  // Lists (migration 061): named groups of leads, like a WhatsApp broadcast list.
+  // A lead can sit in many lists; membership is append-only, so no updated_at.
+  await query(`
+    CREATE TABLE IF NOT EXISTS crm_lists (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name        VARCHAR(120) NOT NULL,
+      description TEXT,
+      created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (company_id, name)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_lists_company ON crm_lists(company_id)`);
+  await query(`DROP TRIGGER IF EXISTS update_crm_lists_updated_at ON crm_lists`);
+  await query(`CREATE TRIGGER update_crm_lists_updated_at BEFORE UPDATE ON crm_lists
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS crm_list_leads (
+      id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      list_id    UUID NOT NULL REFERENCES crm_lists(id) ON DELETE CASCADE,
+      lead_id    UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+      added_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  // A lead belongs to a list once — re-adding is a no-op, not a duplicate row.
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_list_leads ON crm_list_leads(list_id, lead_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_list ON crm_list_leads(list_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_lead ON crm_list_leads(lead_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_company ON crm_list_leads(company_id)`);
+
   crmSchemaEnsured = true;
 }
 
@@ -151,6 +186,20 @@ function mapActivityFromDB(row: any) {
     assignedEmployeeId: row.assigned_employee_id ?? null,
     assigneeName: row.assignee_name ?? null,
     priority: row.priority ?? 'MEDIUM',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapListFromDB(row: any) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    name: row.name,
+    description: row.description ?? null,
+    memberCount: row.member_count !== undefined && row.member_count !== null
+      ? parseInt(row.member_count, 10)
+      : 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -922,6 +971,236 @@ export const crmRoutes = {
     } catch (error) {
       console.error('CRM at-risk error:', error);
       return mapThrownError(error, 'ERRORS.CRM.ATRISK_FAILED', 'Failed to load at-risk students');
+    }
+  },
+
+  // ── Lists ───────────────────────────────────────────────────────────────────
+  // Named groups of leads, like a WhatsApp broadcast list; a lead can sit in many.
+  // Every handler keeps the house order: permission -> ensureCrmSchema -> crmDenied
+  // (which is what makes this ACADEMY-only) -> company-scoped SQL.
+
+  listLists: async ({ headers }: { headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const rows = await query<any>(
+        `SELECT li.*,
+                (SELECT COUNT(*) FROM crm_list_leads m WHERE m.list_id = li.id) AS member_count
+         FROM crm_lists li
+         WHERE li.company_id = $1
+         ORDER BY li.created_at DESC`,
+        [context.companyId],
+      );
+      return { status: 200 as const, body: rows.map(mapListFromDB) };
+    } catch (error) {
+      console.error('CRM list lists error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_FAILED', 'Failed to load lists');
+    }
+  },
+
+  createList: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const name = String(body?.name ?? '').trim();
+      if (!name) return apiError(400, 'ERRORS.CRM.LIST_NAME_REQUIRED', 'List name is required');
+
+      // Names are unique per company, so a duplicate is a friendly 409 rather than
+      // a constraint violation surfacing as a 500.
+      const clash = await queryOne<any>(
+        'SELECT id FROM crm_lists WHERE company_id = $1 AND LOWER(name) = LOWER($2)',
+        [context.companyId, name],
+      );
+      if (clash) return apiError(409, 'ERRORS.CRM.LIST_NAME_TAKEN', 'A list with this name already exists');
+
+      const row = await insert('crm_lists', {
+        company_id: context.companyId,
+        name,
+        description: body?.description || null,
+        created_by: context.userId,
+      });
+      return { status: 201 as const, body: mapListFromDB({ ...row, member_count: 0 }) };
+    } catch (error) {
+      console.error('CRM create list error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_CREATE_FAILED', 'Failed to create the list', 400);
+    }
+  },
+
+  updateList: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const existing = await queryOne<any>(
+        'SELECT id FROM crm_lists WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!existing) return apiError(404, 'ERRORS.CRM.LIST_NOT_FOUND', 'List not found');
+
+      const patch: any = {};
+      if (body?.name !== undefined) {
+        const name = String(body.name).trim();
+        if (!name) return apiError(400, 'ERRORS.CRM.LIST_NAME_REQUIRED', 'List name is required');
+        const clash = await queryOne<any>(
+          'SELECT id FROM crm_lists WHERE company_id = $1 AND LOWER(name) = LOWER($2) AND id <> $3',
+          [context.companyId, name, params.id],
+        );
+        if (clash) return apiError(409, 'ERRORS.CRM.LIST_NAME_TAKEN', 'A list with this name already exists');
+        patch.name = name;
+      }
+      if (body?.description !== undefined) patch.description = body.description || null;
+
+      const row = await update('crm_lists', params.id, patch);
+      const count = await queryOne<any>('SELECT COUNT(*) AS n FROM crm_list_leads WHERE list_id = $1', [params.id]);
+      return { status: 200 as const, body: mapListFromDB({ ...row, member_count: count?.n ?? 0 }) };
+    } catch (error) {
+      console.error('CRM update list error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_UPDATE_FAILED', 'Failed to update the list', 400);
+    }
+  },
+
+  deleteList: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'delete')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const existing = await queryOne<any>(
+        'SELECT id FROM crm_lists WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!existing) return apiError(404, 'ERRORS.CRM.LIST_NOT_FOUND', 'List not found');
+
+      // Membership rows cascade with the list; the leads themselves are untouched.
+      await deleteById('crm_lists', params.id);
+      return { status: 200 as const, body: { success: true, code: 'CRM.LIST_DELETED', message: 'List deleted' } };
+    } catch (error) {
+      console.error('CRM delete list error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_DELETE_FAILED', 'Failed to delete the list');
+    }
+  },
+
+  /** The leads in a list — full lead rows, so the page can message or export them. */
+  listMembers: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const list = await queryOne<any>(
+        'SELECT id FROM crm_lists WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!list) return apiError(404, 'ERRORS.CRM.LIST_NOT_FOUND', 'List not found');
+
+      const rows = await query<any>(
+        `${LEAD_SELECT}
+         JOIN crm_list_leads m ON m.lead_id = l.id AND m.list_id = $1
+         WHERE l.company_id = $2
+         ORDER BY m.added_at DESC`,
+        [params.id, context.companyId],
+      );
+      return { status: 200 as const, body: rows.map(mapLeadFromDB) };
+    } catch (error) {
+      console.error('CRM list members error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_FAILED', 'Failed to load the list members');
+    }
+  },
+
+  /** Add leads to a list. Idempotent — re-adding an existing member changes nothing. */
+  addMembers: async ({ params, body, headers }: { params: { id: string }; body: { leadIds: string[] }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      const list = await queryOne<any>(
+        'SELECT id FROM crm_lists WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!list) return apiError(404, 'ERRORS.CRM.LIST_NOT_FOUND', 'List not found');
+
+      const ids = Array.isArray(body?.leadIds) ? body.leadIds.filter(Boolean) : [];
+      if (!ids.length) return apiError(400, 'ERRORS.CRM.LIST_NO_LEADS', 'Pick at least one lead');
+
+      // Re-resolve the ids against THIS company: an id from another tenant is
+      // dropped here rather than trusted because the request body said so.
+      const owned = await query<any>(
+        `SELECT id FROM crm_leads WHERE company_id = $1 AND id = ANY($2::uuid[])`,
+        [context.companyId, ids],
+      );
+      if (!owned.length) return apiError(404, 'ERRORS.CRM.LEAD_NOT_FOUND', 'No matching leads');
+
+      let added = 0;
+      for (const lead of owned) {
+        const res = await query<any>(
+          `INSERT INTO crm_list_leads (company_id, list_id, lead_id)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (list_id, lead_id) DO NOTHING
+           RETURNING id`,
+          [context.companyId, params.id, lead.id],
+        );
+        if (res.length) added++;
+      }
+
+      const count = await queryOne<any>('SELECT COUNT(*) AS n FROM crm_list_leads WHERE list_id = $1', [params.id]);
+      return {
+        status: 200 as const,
+        body: { success: true, added, memberCount: parseInt(count?.n ?? '0', 10) },
+      };
+    } catch (error) {
+      console.error('CRM add list members error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_ADD_FAILED', 'Failed to add leads to the list');
+    }
+  },
+
+  removeMember: async ({ params, headers }: { params: { id: string; leadId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCrmSchema();
+      const denied = await crmDenied(context.companyId);
+      if (denied) return denied;
+
+      await query(
+        'DELETE FROM crm_list_leads WHERE list_id = $1 AND lead_id = $2 AND company_id = $3',
+        [params.id, params.leadId, context.companyId],
+      );
+      return { status: 200 as const, body: { success: true, code: 'CRM.LIST_MEMBER_REMOVED', message: 'Removed from the list' } };
+    } catch (error) {
+      console.error('CRM remove list member error:', error);
+      return mapThrownError(error, 'ERRORS.CRM.LIST_REMOVE_FAILED', 'Failed to remove the lead from the list');
     }
   },
 };

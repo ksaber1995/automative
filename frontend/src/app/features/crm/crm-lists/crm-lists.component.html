@@ -1,0 +1,238 @@
+<div class="p-4">
+  @if (!authService.canUseCrm()) {
+    <p-card>
+      <div class="text-center py-12 text-gray-500">
+        <i class="pi pi-lock text-4xl mb-3 text-gray-300"></i>
+        <h2 class="text-xl font-bold text-gray-700">{{ 'CRM.LOCKED_TITLE' | translate }}</h2>
+        <p class="mt-1">{{ 'CRM.LOCKED_HINT' | translate }}</p>
+      </div>
+    </p-card>
+  } @else {
+    <app-crm-nav></app-crm-nav>
+
+    <!-- ───────────── All lists ───────────── -->
+    @if (!active()) {
+      <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.LISTS_TITLE' | translate }}</h1>
+          <p class="text-gray-500 mt-1">{{ 'CRM.LISTS_SUBTITLE' | translate }}</p>
+        </div>
+        <p-button icon="pi pi-plus" [label]="'CRM.LISTS_NEW' | translate" (onClick)="openCreate()"></p-button>
+      </div>
+
+      <p-card>
+        <p-table [value]="lists()" [loading]="loading()" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'CRM.LISTS_COL_NAME' | translate }}</th>
+              <th>{{ 'CRM.LISTS_COL_MEMBERS' | translate }}</th>
+              <th class="w-40 text-end">{{ 'CRM.LISTS_COL_ACTIONS' | translate }}</th>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="body" let-list>
+            <tr class="cursor-pointer hover:bg-gray-50" (click)="open(list)">
+              <td>
+                <span class="font-semibold text-gray-800">{{ list.name }}</span>
+                @if (list.description) {
+                  <span class="block text-xs text-gray-500">{{ list.description }}</span>
+                }
+              </td>
+              <td>
+                <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1">
+                  <i class="pi pi-users text-xs"></i>
+                  {{ 'CRM.LISTS_MEMBER_COUNT' | translate: { count: list.memberCount } }}
+                </span>
+              </td>
+              <td class="text-end" (click)="$event.stopPropagation()">
+                <p-button icon="pi pi-pencil" severity="secondary" [text]="true" size="small"
+                  [pTooltip]="'CRM.LISTS_RENAME' | translate" (onClick)="openRename(list)"></p-button>
+                <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                  [pTooltip]="'CRM.DELETE' | translate" (onClick)="confirmDelete(list)"></p-button>
+              </td>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="3">
+                <div class="text-center py-10 text-gray-500">
+                  <i class="pi pi-bookmark text-4xl mb-3 text-gray-300"></i>
+                  <p class="font-medium">{{ 'CRM.LISTS_EMPTY' | translate }}</p>
+                  <p class="text-sm text-gray-400">{{ 'CRM.LISTS_EMPTY_HINT' | translate }}</p>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    }
+
+    <!-- ───────────── One list: its members ───────────── -->
+    @if (active(); as list) {
+      <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <p-button icon="pi pi-arrow-left" [text]="true" size="small"
+            [label]="'CRM.LISTS_BACK' | translate" (onClick)="back()"></p-button>
+          <h1 class="text-2xl font-bold text-gray-800 mt-1">{{ list.name }}</h1>
+          <p class="text-gray-500">
+            {{ 'CRM.LISTS_MEMBER_COUNT' | translate: { count: members().length } }}
+            @if (list.description) { · {{ list.description }} }
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <p-button icon="pi pi-user-plus" [label]="'CRM.LISTS_ADD_LEADS' | translate"
+            severity="secondary" [outlined]="true" (onClick)="openPicker()"></p-button>
+          <p-button icon="pi pi-download" [label]="'CRM.LISTS_EXPORT' | translate"
+            severity="secondary" [outlined]="true"
+            [disabled]="!members().length" (onClick)="exportCsv()"></p-button>
+          <p-button icon="pi pi-whatsapp" [label]="'CRM.LISTS_MESSAGE' | translate"
+            severity="success" [disabled]="!members().length" (onClick)="openBulk()"></p-button>
+        </div>
+      </div>
+
+      <p-card>
+        <p-table [value]="members()" [loading]="loadingMembers()" responsiveLayout="scroll"
+          [paginator]="members().length > 15" [rows]="15">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'CRM.COL_NAME' | translate }}</th>
+              <th>{{ 'CRM.COL_PHONE' | translate }}</th>
+              <th>{{ 'CRM.COL_STAGE' | translate }}</th>
+              <th class="w-24 text-end">{{ 'CRM.LISTS_COL_ACTIONS' | translate }}</th>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="body" let-lead>
+            <tr>
+              <td class="font-medium">{{ lead.fullName }}</td>
+              <td>
+                @if (lead.phone) { {{ lead.phone }} } @else {
+                  <span class="text-gray-400 text-sm">{{ 'CRM.NO_PHONE' | translate }}</span>
+                }
+              </td>
+              <td><p-tag [value]="stageLabel(lead.stage)" [severity]="stageSeverity(lead.stage)"></p-tag></td>
+              <td class="text-end">
+                <p-button icon="pi pi-times" severity="danger" [text]="true" size="small"
+                  [pTooltip]="'CRM.LISTS_REMOVE' | translate" (onClick)="removeMember(lead)"></p-button>
+              </td>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="4">
+                <div class="text-center py-10 text-gray-500">
+                  <i class="pi pi-users text-4xl mb-3 text-gray-300"></i>
+                  <p class="font-medium">{{ 'CRM.LISTS_NO_MEMBERS' | translate }}</p>
+                  <p class="text-sm text-gray-400">{{ 'CRM.LISTS_NO_MEMBERS_HINT' | translate }}</p>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    }
+
+    <!-- Create / rename -->
+    <p-dialog
+      [visible]="formVisible()"
+      (visibleChange)="formVisible.set($event)"
+      [modal]="true"
+      [draggable]="false"
+      [style]="{ width: '30rem', maxWidth: '95vw' }"
+      [header]="(editing() ? 'CRM.LISTS_RENAME' : 'CRM.LISTS_NEW') | translate"
+    >
+      <label class="block text-sm text-gray-600 mb-1">{{ 'CRM.LISTS_NAME' | translate }}</label>
+      <input pInputText type="text" class="w-full" [(ngModel)]="formName" (keyup.enter)="saveList()" />
+
+      <label class="block text-sm text-gray-600 mt-3 mb-1">{{ 'CRM.LISTS_DESCRIPTION' | translate }}</label>
+      <textarea pTextarea rows="2" class="w-full" [(ngModel)]="formDescription"></textarea>
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'CRM.CANCEL' | translate" [text]="true" (onClick)="formVisible.set(false)"></p-button>
+        <p-button [label]="'CRM.SAVE' | translate" [loading]="saving()" (onClick)="saveList()"></p-button>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Add leads -->
+    <p-dialog
+      [visible]="pickerVisible()"
+      (visibleChange)="pickerVisible.set($event)"
+      [modal]="true"
+      [draggable]="false"
+      [style]="{ width: '34rem', maxWidth: '95vw' }"
+      [header]="'CRM.LISTS_ADD_LEADS' | translate"
+    >
+      <input pInputText type="text" class="w-full mb-3"
+        [ngModel]="pickerSearch()" (ngModelChange)="pickerSearch.set($event)"
+        [placeholder]="'CRM.SEARCH_PLACEHOLDER' | translate" />
+
+      @if (loadingLeads()) {
+        <div class="text-center py-6 text-gray-500"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
+      } @else if (!pickerLeads().length) {
+        <div class="text-center py-6 text-gray-500">
+          <i class="pi pi-inbox text-3xl mb-2 text-gray-300"></i>
+          <p>{{ 'CRM.LISTS_PICKER_EMPTY' | translate }}</p>
+        </div>
+      } @else {
+        <div class="max-h-80 overflow-y-auto flex flex-col gap-1">
+          @for (lead of pickerLeads(); track lead.id) {
+            <button type="button" (click)="togglePick(lead)"
+              class="flex items-center justify-between w-full rounded-lg border p-2 text-start transition"
+              [class.border-indigo-400]="isPicked(lead)"
+              [class.bg-indigo-50]="isPicked(lead)"
+              [class.border-gray-200]="!isPicked(lead)">
+              <span>
+                <span class="font-medium text-gray-800">{{ lead.fullName }}</span>
+                <span class="block text-xs text-gray-500">
+                  {{ lead.phone || ('CRM.NO_PHONE' | translate) }}
+                </span>
+              </span>
+              @if (isPicked(lead)) { <i class="pi pi-check-circle text-indigo-600"></i> }
+            </button>
+          }
+        </div>
+      }
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'CRM.CANCEL' | translate" [text]="true" (onClick)="pickerVisible.set(false)"></p-button>
+        <p-button icon="pi pi-plus"
+          [label]="'CRM.LISTS_ADD_SELECTED' | translate: { count: picked().size }"
+          [disabled]="!picked().size" [loading]="adding()" (onClick)="addPicked()"></p-button>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Message the list: one chat per click (browsers block a burst of popups) -->
+    <p-dialog
+      [visible]="bulkVisible()"
+      (visibleChange)="bulkVisible.set($event)"
+      [modal]="true"
+      [draggable]="false"
+      [style]="{ width: '32rem', maxWidth: '95vw' }"
+      [header]="'CRM.LISTS_MESSAGE' | translate"
+    >
+      <label class="block text-sm text-gray-600 mb-1">{{ 'CRM.BULK_MESSAGE' | translate }}</label>
+      <textarea pTextarea rows="4" class="w-full" [(ngModel)]="bulkMessage"></textarea>
+      <p class="text-xs text-gray-400 mt-1">{{ 'CRM.BULK_HINT' | translate }}</p>
+
+      @if (bulkCurrent(); as lead) {
+        <div class="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-3">
+          <p class="text-xs text-gray-500 mb-1">
+            {{ 'CRM.BULK_PROGRESS' | translate: { index: bulkIndex() + 1, total: bulkQueue().length } }}
+          </p>
+          <p class="font-semibold text-gray-800">{{ lead.fullName }}</p>
+          <p class="text-sm text-gray-500">{{ lead.phone }}</p>
+        </div>
+      }
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'CRM.BULK_SKIP' | translate" [text]="true" severity="secondary" (onClick)="bulkSkip()"></p-button>
+        <p-button icon="pi pi-whatsapp" severity="success"
+          [label]="'CRM.BULK_SEND_NEXT' | translate" (onClick)="bulkSendNext()"></p-button>
+      </ng-template>
+    </p-dialog>
+
+    <p-confirmDialog></p-confirmDialog>
+  }
+</div>

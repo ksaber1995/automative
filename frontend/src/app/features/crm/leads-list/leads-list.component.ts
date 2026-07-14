@@ -23,7 +23,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
-import { CrmLead, CrmActivity, LEAD_STAGES, LeadStage } from '@shared/interfaces/crm.interface';
+import { CrmLead, CrmActivity, CrmList, LEAD_STAGES, LeadStage } from '@shared/interfaces/crm.interface';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 
 type Sev = 'secondary' | 'info' | 'warn' | 'success' | 'danger' | 'contrast';
@@ -338,5 +338,62 @@ export class LeadsListComponent implements OnInit {
 
   private toDateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // ── Add to list ────────────────────────────────────────────────────────────
+  // Build a list without leaving the leads page: pick an existing list, or type a
+  // name to create one on the spot. Adding an existing member is a no-op serverside.
+  addToListVisible = signal(false);
+  addToListLead = signal<CrmLead | null>(null);
+  crmLists = signal<CrmList[]>([]);
+  loadingLists = signal(false);
+  newListName = '';
+  addingToList = signal(false);
+
+  openAddToList(lead: CrmLead) {
+    this.addToListLead.set(lead);
+    this.newListName = '';
+    this.addToListVisible.set(true);
+    this.loadingLists.set(true);
+    this.crm.listLists().subscribe({
+      next: (rows) => { this.crmLists.set(rows); this.loadingLists.set(false); },
+      error: () => this.loadingLists.set(false),
+    });
+  }
+
+  addLeadToList(list: CrmList) {
+    const lead = this.addToListLead();
+    if (!lead) return;
+    this.addingToList.set(true);
+    this.crm.addMembers(list.id, [lead.id]).subscribe({
+      next: (res) => {
+        this.addingToList.set(false);
+        this.addToListVisible.set(false);
+        // added === 0 means it was already a member — say so rather than claim a win.
+        this.notify.success(this.translate.instant(
+          res.added ? 'CRM.LISTS_ADDED_ONE' : 'CRM.LISTS_ALREADY_IN',
+          { name: lead.fullName, list: list.name },
+        ));
+      },
+      error: () => this.addingToList.set(false),
+    });
+  }
+
+  createListAndAdd() {
+    const name = this.newListName.trim();
+    const lead = this.addToListLead();
+    if (!name || !lead) return;
+    this.addingToList.set(true);
+    this.crm.createList({ name }).subscribe({
+      next: (list) => this.crm.addMembers(list.id, [lead.id]).subscribe({
+        next: () => {
+          this.addingToList.set(false);
+          this.addToListVisible.set(false);
+          this.notify.success(this.translate.instant('CRM.LISTS_ADDED_ONE', { name: lead.fullName, list: list.name }));
+        },
+        error: () => this.addingToList.set(false),
+      }),
+      error: () => this.addingToList.set(false),   // interceptor toasts a duplicate name
+    });
   }
 }

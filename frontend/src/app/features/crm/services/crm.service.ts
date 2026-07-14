@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { CrmLead, CrmLeadWriteDto, CrmActivity, CrmActivityWriteDto, CrmTaskWriteDto, CrmLeadCall, CrmCallWriteDto } from '@shared/interfaces/crm.interface';
+import { CrmLead, CrmLeadWriteDto, CrmActivity, CrmActivityWriteDto, CrmTaskWriteDto, CrmLeadCall, CrmCallWriteDto, CrmList, CrmListWriteDto } from '@shared/interfaces/crm.interface';
 
 export interface CrmAnalytics {
   totalLeads: number;
@@ -111,5 +111,37 @@ export class CrmService {
 
   getAtRisk(): Observable<AtRiskStudent[]> {
     return this.api.get<AtRiskStudent[]>('crm/at-risk');
+  }
+
+  // ── Lists — named groups of leads (a lead can be in many) ───────────────────
+
+  listLists(): Observable<CrmList[]> {
+    return this.api.get<CrmList[]>('crm/lists');
+  }
+
+  createList(dto: CrmListWriteDto): Observable<CrmList> {
+    return this.api.post<CrmList>('crm/lists', dto);
+  }
+
+  updateList(id: string, dto: CrmListWriteDto): Observable<CrmList> {
+    return this.api.patch<CrmList>(`crm/lists/${id}`, dto);
+  }
+
+  deleteList(id: string): Observable<{ success: boolean }> {
+    return this.api.delete<{ success: boolean }>(`crm/lists/${id}`);
+  }
+
+  /** The leads in a list — full lead rows, so they can be messaged or exported. */
+  listMembers(id: string): Observable<CrmLead[]> {
+    return this.api.get<CrmLead[]>(`crm/lists/${id}/leads`);
+  }
+
+  /** Add leads to a list. Idempotent — re-adding a member changes nothing. */
+  addMembers(id: string, leadIds: string[]): Observable<{ added: number; memberCount: number }> {
+    return this.api.post<{ added: number; memberCount: number }>(`crm/lists/${id}/leads`, { leadIds });
+  }
+
+  removeMember(id: string, leadId: string): Observable<{ success: boolean }> {
+    return this.api.delete<{ success: boolean }>(`crm/lists/${id}/leads/${leadId}`);
   }
 }
