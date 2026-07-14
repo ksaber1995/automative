@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { normalizeStudentCode } from '../../../core/utils/student-code.util';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import {
@@ -55,6 +56,7 @@ export class ExamService {
 
   /** Record/update a grade by the student's short code (resolved server-side). */
   recordByCode(id: string, code: string, grade: string): Observable<QrExamResult> {
+    code = normalizeStudentCode(code);   // cards print "A-100001"
     return this.api.post<QrExamResult>(`exams/${id}/record-by-code`, { code, grade });
   }
 

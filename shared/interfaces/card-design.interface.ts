@@ -10,6 +10,16 @@
  */
 export type CardTemplateId = 'navy' | 'maroon' | 'minimal' | 'portrait';
 
+/**
+ * The AGNOSTIC templates — used for the pre-printed QR card pool.
+ *
+ * A pool card is printed before anybody owns it, so it carries no student data at
+ * all: both faces are about the academy, and the only per-card content is the QR
+ * and the serial. Chosen independently of `template`, which governs the personal
+ * student cards.
+ */
+export type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave';
+
 export interface CardDesign {
   /**
    * Which of the three card designs to print. Governs BOTH faces: the shared
@@ -17,6 +27,8 @@ export interface CardDesign {
    * printed pair always matches.
    */
   template: CardTemplateId;
+  /** Which agnostic design the QR-card pool prints with. */
+  agnosticTemplate?: AgnosticTemplateId;
   /** Defaults to the company name when blank. */
   teacherName: string;
   /** The line under the name, e.g. "خبير اللغة العربية". */
@@ -51,6 +63,7 @@ export const CARD_DESIGN_MAX = {
 
 export const DEFAULT_CARD_DESIGN: CardDesign = {
   template: 'navy',
+  agnosticTemplate: 'aurora',
   teacherName: '',
   teacherTitle: '',
   phone: '',

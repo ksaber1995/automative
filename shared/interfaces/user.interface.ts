@@ -26,6 +26,8 @@ export interface SafeUser {
   role: UserRole;
   companyType?: 'ACADEMY' | 'TEACHER'; // Owning company's registration type
   plan?: 'SIMPLE' | 'ADVANCED';      // Feature plan; ADVANCED unlocks CRM & add-ons
+  /** The pre-printed QR card pool — sold per academy, off unless we switch it on. */
+  qrCardsEnabled?: boolean;
   qrFree?: boolean;                  // Teacher tenant in the free QR-activation launch tier
   branchId?: string | null;
   branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)
@@ -85,6 +87,7 @@ export interface RegisterDto {
   type?: 'ACADEMY' | 'TEACHER';
   // Feature plan chosen at signup (academies only).
   plan?: 'SIMPLE' | 'ADVANCED';
+  qrCardsEnabled?: boolean;
   industry?: string;
   timezone?: string;
 

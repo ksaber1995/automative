@@ -8,6 +8,7 @@ import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
 import { isCompanyQrFree } from '../utils/qr-pricing';
 import { DEFAULT_CARD_DESIGN, ensureCardDesignColumn } from './companies';
+import { ensureQrCardSchema } from './qr-cards';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -29,6 +30,9 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
   const trimmed = (identifier || '').trim();
   if (!trimmed) return null;
 
+  // The queries below read c.qr_cards_enabled, so the column has to exist.
+  await ensureQrCardSchema();
+
   if (trimmed.includes('@')) {
     return queryOne<any>(
       `SELECT u.*,
@@ -36,7 +40,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
               c.subscription_status,
               c.name as company_name,
               c.type as company_type,
-              c.plan as company_plan
+              c.plan as company_plan,
+              c.qr_cards_enabled as company_qr_cards
        FROM users u
        JOIN companies c ON u.company_id = c.id
        WHERE LOWER(u.email) = LOWER($1)`,
@@ -53,7 +58,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.subscription_status,
             c.name as company_name,
             c.type as company_type,
-            c.plan as company_plan
+            c.plan as company_plan,
+            c.qr_cards_enabled as company_qr_cards
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone = $1
@@ -68,7 +74,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.subscription_status,
             c.name as company_name,
             c.type as company_type,
-            c.plan as company_plan
+            c.plan as company_plan,
+            c.qr_cards_enabled as company_qr_cards
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone IS NOT NULL AND $1 LIKE '%' || u.phone
@@ -94,6 +101,8 @@ async function buildSafeUser(user: any, branchIds: string[]) {
     companyId: user.company_id,
     companyType: user.company_type ?? 'ACADEMY',
     plan: user.company_plan ?? 'SIMPLE',
+    /** The pre-printed QR card pool is sold per academy; off unless we switch it on. */
+    qrCardsEnabled: user.company_qr_cards === true,
     qrFree,
     branchId: user.branch_id,
     branchIds,
@@ -395,8 +404,11 @@ export const authRoutes = {
       const email = (body.email || '').trim().toLowerCase();
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
+      // Reads c.qr_cards_enabled below, so the column has to exist first.
+      await ensureQrCardSchema();
       const user = await queryOne<any>(
-        `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type, c.plan as company_plan
+        `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type, c.plan as company_plan,
+                c.qr_cards_enabled as company_qr_cards
          FROM users u
          JOIN companies c ON u.company_id = c.id
          WHERE LOWER(u.email) = LOWER($1)`,
@@ -635,8 +647,10 @@ export const authRoutes = {
 
       const decoded = await verifyToken(token);
 
+      await ensureQrCardSchema();
       const user = await queryOne<any>(
         `SELECT u.*, c.type as company_type, c.plan as company_plan,
+                c.qr_cards_enabled as company_qr_cards,
                 array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
          FROM users u
          JOIN companies c ON u.company_id = c.id

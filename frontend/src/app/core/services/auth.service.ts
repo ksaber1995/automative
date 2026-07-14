@@ -193,6 +193,15 @@ export class AuthService {
   }
 
   /** CRM is available to academies (not solo teachers) on the Advanced plan. */
+  /**
+   * The pre-printed QR card pool. Sold per academy and off by default, so the page
+   * and the student's Link-card button stay hidden until we enable it for them.
+   * The API enforces it too — this only decides what is worth showing.
+   */
+  canUseQrCards(): boolean {
+    return this.currentUser()?.qrCardsEnabled === true;
+  }
+
   canUseCrm(): boolean {
     return !this.isTeacher() && this.plan() === 'ADVANCED';
   }

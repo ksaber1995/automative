@@ -1127,6 +1127,8 @@ export class StudentDetailComponent implements OnInit {
   /** Takes over the app-wide scanner ONLY while the link dialog is open. */
   private readonly linkScanHandler = (token: string) => this.linkByToken(token);
 
+  /** Hidden unless the pool is enabled for this academy (the API enforces it too). */
+  canUseQrCards = computed(() => this.authService.canUseQrCards());
   linkCardVisible = signal(false);
   linkedCards = signal<QrCard[]>([]);
   linkingCard = signal(false);

@@ -5,6 +5,9 @@ import { CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardTh
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
 import { drawCardBackPortrait, drawStudentCardPortrait } from './card-portrait.util';
+import {
+  AgnosticCardData, AgnosticTemplate, DEFAULT_AGNOSTIC, drawAgnosticBack, drawAgnosticFront,
+} from './card-agnostic.util';
 
 /**
  * The one place that turns a template + data into a PNG. Both faces of a card
@@ -112,5 +115,42 @@ export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasEl
     drawCardBack(ctx, design, qr);
   }
 
+  return canvas.toDataURL('image/png').split(',')[1];
+}
+
+// ─────────────────────────── the QR card pool ────────────────────────────────
+
+/**
+ * A POOL card's front. No student data — just the card's own QR and its serial.
+ * The academy's agnostic template governs both faces, exactly as `template` does
+ * for the personal cards.
+ */
+export async function renderAgnosticCardPng(
+  data: AgnosticCardData,
+  canvas: HTMLCanvasElement,
+  template?: AgnosticTemplate,
+  images: CardImages = {},
+): Promise<string> {
+  const ctx = prepare(canvas);
+  const qr = await qrImage(data.qrUrl);
+  // The agnostic templates carry their own palettes; the shared text primitives
+  // still read T for the typeface, so give them a sans one.
+  setCardTheme(themeFor('navy'));
+  drawAgnosticFront(ctx, template ?? DEFAULT_AGNOSTIC, data, qr, images);
+  return canvas.toDataURL('image/png').split(',')[1];
+}
+
+/** A POOL card's back — one per academy, shared by the whole batch. */
+export async function renderAgnosticBackPng(
+  design: CardDesign,
+  companyName: string,
+  canvas: HTMLCanvasElement,
+  images: CardImages = {},
+): Promise<string> {
+  const ctx = prepare(canvas);
+  const link = (design.qrLink || '').trim();
+  const qr = link ? await qrImage(link) : null;
+  setCardTheme(themeFor('navy'));
+  drawAgnosticBack(ctx, (design.agnosticTemplate as AgnosticTemplate) ?? DEFAULT_AGNOSTIC, design, companyName, qr, images);
   return canvas.toDataURL('image/png').split(',')[1];
 }

@@ -1,4 +1,5 @@
 import { randomInt } from 'crypto';
+import { CARD_SERIAL_BASE, ensureQrCardSchema } from './qr-cards';
 import { query, queryOne } from '../db/connection';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
 
@@ -553,6 +554,101 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret delete license failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/qr-cards/enabled  { enabled }
+   * Turn the pre-printed QR card pool on or off for one client. Off by default —
+   * it is sold per academy, so nobody gets it until we switch it on.
+   */
+  setQrCardsEnabled: async ({ params, body }: { params: { companyId: string }; body: { enabled: boolean } }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const enabled = body?.enabled === true;
+      await query('UPDATE companies SET qr_cards_enabled = $2, updated_at = NOW() WHERE id = $1',
+        [params.companyId, enabled]);
+
+      return { status: 200 as const, body: { success: true, qr_cards_enabled: enabled } };
+    } catch (error: any) {
+      console.error('karim-admin-secret set qr cards failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set QR cards failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/qr-cards  { count }
+   * Mint a print run FOR a client, without signing in as them. Serials continue
+   * from their last run, so a batch we print never collides with a card already in
+   * one of their students' pockets.
+   */
+  generateQrCards: async ({ params, body }: { params: { companyId: string }; body: { count: number } }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const count = Math.floor(Number(body?.count));
+      if (!Number.isFinite(count) || count < 1 || count > 2000) {
+        return { status: 400 as const, body: { message: 'count must be between 1 and 2000' } };
+      }
+
+      const last = await queryOne<any>(
+        'SELECT COALESCE(MAX(serial), 0) AS last FROM qr_cards WHERE company_id = $1',
+        [params.companyId],
+      );
+      // Never below the reserved base — that range is what keeps card serials from
+      // colliding with the academy's own student codes. See CARD_SERIAL_BASE.
+      const from = Math.max(parseInt(last?.last ?? '0', 10), CARD_SERIAL_BASE) + 1;
+
+      const rows = await query<any>(
+        `INSERT INTO qr_cards (company_id, token, serial)
+         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g
+         FROM generate_series($2::int, $3::int) AS g
+         RETURNING serial`,
+        [params.companyId, from, from + count - 1],
+      );
+
+      return {
+        status: 200 as const,
+        body: { success: true, created: rows.length, from, to: from + count - 1 },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret generate qr cards failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Generate failed' } };
+    }
+  },
+
+  /**
+   * GET /api/karim-admin-secret/companies/:companyId/qr-cards
+   * How big is this client's pool, and how much of it is already handed out.
+   */
+  qrCardStats: async ({ params }: { params: { companyId: string } }) => {
+    try {
+      await ensureQrCardSchema();
+      const row = await queryOne<any>(
+        `SELECT c.qr_cards_enabled,
+                (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id) AS total,
+                (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.student_id IS NOT NULL) AS linked
+         FROM companies c WHERE c.id = $1`,
+        [params.companyId],
+      );
+      if (!row) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      return {
+        status: 200 as const,
+        body: {
+          qr_cards_enabled: row.qr_cards_enabled === true,
+          total: Number(row.total ?? 0),
+          linked: Number(row.linked ?? 0),
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret qr card stats failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Stats failed' } };
     }
   },
 };

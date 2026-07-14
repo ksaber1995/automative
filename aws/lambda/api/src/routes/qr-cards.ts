@@ -35,7 +35,42 @@ export async function ensureQrCardSchema(): Promise<void> {
   await query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_qr_cards_serial ON qr_cards(company_id, serial)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_company ON qr_cards(company_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_student ON qr_cards(student_id)`);
+  // Off by default: an academy only gets the pool once we switch it on for them.
+  await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS qr_cards_enabled BOOLEAN NOT NULL DEFAULT false`);
+
+  // Cards generated before the reserved range existed carry serials 1..N, which
+  // collide head-on with the students' own codes. Lift them out of the way. The
+  // predicate is self-limiting, so this is a no-op on every later boot.
+  const moved = await query<any>(
+    `UPDATE qr_cards SET serial = serial + ${CARD_SERIAL_BASE}
+     WHERE serial <= ${CARD_SERIAL_BASE} RETURNING id`,
+  );
+  if (moved.length) {
+    // A card already in a student's hand now has a new number, and the number on
+    // the card is the number staff type — so the student's code follows it.
+    await query(
+      `UPDATE students s SET student_code = c.serial, updated_at = NOW()
+       FROM qr_cards c
+       WHERE c.student_id = s.id
+         AND s.student_code IS DISTINCT FROM c.serial
+         AND NOT EXISTS (SELECT 1 FROM students o
+                         WHERE o.company_id = s.company_id AND o.student_code = c.serial AND o.id <> s.id)`,
+    );
+  }
   qrCardSchemaEnsured = true;
+}
+
+/**
+ * The pool is sold per academy, so it is off until we enable it for that company.
+ * Enforced here, not just hidden in the UI — a disabled tenant that posts straight
+ * at the API still gets nothing.
+ */
+async function qrCardsDenied(companyId: string): Promise<any | null> {
+  const c = await queryOne<any>('SELECT qr_cards_enabled FROM companies WHERE id = $1', [companyId]);
+  if (!c || c.qr_cards_enabled !== true) {
+    return apiError(403, 'ERRORS.QR_CARDS.DISABLED', 'QR cards are not enabled for this academy');
+  }
+  return null;
 }
 
 /**
@@ -64,6 +99,27 @@ export function qrStudentMatchPublic(tok: string, alias = 's'): string {
 /** A batch this size is already ~10 minutes of printing; anything more is a typo. */
 const MAX_BATCH = 2000;
 
+/**
+ * Card serials live in a RESERVED range, above every organic student code.
+ *
+ * Linking a card gives the student the card's number as their student_code, and a
+ * new student's code is MAX(student_code) + 1 — so without a reserved range the
+ * sequence would walk straight into the pool: link card 5, the next student gets
+ * code 6, and card 6 is now unusable. Keeping serials above 100000 (and computing
+ * the next student code only from codes BELOW it — see students.ts) keeps the two
+ * numbering spaces from ever meeting.
+ */
+export const CARD_SERIAL_BASE = 100000;
+
+/**
+ * The digits of a code as typed. Pool cards print "A-100001"; student_code is an
+ * integer. Staff (and barcode wedges) type what they see, so strip the prefix
+ * rather than 404ing a card the student is holding.
+ */
+export function codeDigits(code: string | number): number {
+  return parseInt(String(code).replace(/\D/g, ''), 10);
+}
+
 function mapCard(row: any) {
   return {
     id: row.id,
@@ -86,19 +142,22 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
 
       const count = Math.floor(Number(body?.count ?? 0));
       if (!Number.isFinite(count) || count < 1 || count > MAX_BATCH) {
         return apiError(400, 'ERRORS.QR_CARDS.BAD_COUNT', `Ask for between 1 and ${MAX_BATCH} cards`);
       }
 
-      // Serials continue from the last batch, so a reprint never collides with a
-      // card already in someone's pocket.
+      // Serials continue from the last batch (so a reprint never collides with a
+      // card already in someone's pocket) but never below the reserved base, which
+      // is what keeps them clear of the students' own codes.
       const last = await queryOne<any>(
         'SELECT COALESCE(MAX(serial), 0) AS last FROM qr_cards WHERE company_id = $1',
         [context.companyId],
       );
-      const from = parseInt(last?.last ?? '0', 10) + 1;
+      const from = Math.max(parseInt(last?.last ?? '0', 10), CARD_SERIAL_BASE) + 1;
 
       // One statement: generate_series makes the serials, uuid makes the tokens.
       const rows = await query<any>(
@@ -124,6 +183,8 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
 
       let sql = `
         SELECT c.*,
@@ -158,6 +219,8 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
 
       const student = await queryOne<any>(
         'SELECT id, first_name, last_name FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
@@ -192,6 +255,15 @@ export const qrCardsRoutes = {
         };
       }
 
+      // The student TAKES the card's number as their student code — the number on
+      // the card in their hand is the number staff type. Refuse if somebody else
+      // already holds it rather than corrupting two students onto one code.
+      const clash = await queryOne<any>(
+        'SELECT id FROM students WHERE student_code = $1 AND company_id = $2 AND id <> $3',
+        [card.serial, context.companyId, student.id],
+      );
+      if (clash) return apiError(409, 'ERRORS.QR_CARDS.CODE_TAKEN', 'Another student already has that code');
+
       const updated = await queryOne<any>(
         `UPDATE qr_cards SET student_id = $1, assigned_at = NOW()
          WHERE id = $2 AND company_id = $3 AND student_id IS NULL
@@ -200,6 +272,9 @@ export const qrCardsRoutes = {
       );
       // Someone linked it a moment ago, between the read and the write.
       if (!updated) return apiError(409, 'ERRORS.QR_CARDS.ALREADY_LINKED', 'That card is already linked to another student');
+
+      await query('UPDATE students SET student_code = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3',
+        [card.serial, student.id, context.companyId]);
 
       return {
         status: 200 as const,
@@ -219,6 +294,8 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
 
       const row = await queryOne<any>(
         `UPDATE qr_cards SET student_id = NULL, assigned_at = NULL

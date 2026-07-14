@@ -1,5 +1,5 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
+import { ensureQrCardSchema, qrStudentMatch, codeDigits } from './qr-cards';
 import {
   extractTenantContext,
   canAccessBranch,
@@ -518,7 +518,7 @@ export const examsRoutes = {
 
       const grade = (body?.grade ?? '').toString().trim();
       if (!grade) return apiError(400, 'ERRORS.EXAMS.GRADE_REQUIRED', 'Grade is required');
-      const code = parseInt((body?.code ?? '').toString().trim(), 10);
+      const code = codeDigits(body?.code ?? '');   // pool cards print "A-100001"
       if (!Number.isInteger(code) || code < 1) {
         return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
       }

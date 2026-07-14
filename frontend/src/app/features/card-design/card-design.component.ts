@@ -11,9 +11,11 @@ import { CardDesign, CARD_DESIGN_MAX, DEFAULT_CARD_DESIGN } from '@shared/interf
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
-  StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng,
+  StudentCardData, currentAcademicYear, loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng,
+  renderCardBackPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
+import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../students/card-agnostic.util';
 
 /**
  * Settings > Card Design.
@@ -43,6 +45,8 @@ export class CardDesignComponent implements OnInit {
 
   @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('previewPoolFront') previewPoolFrontCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('previewPoolBack') previewPoolBackCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
   saving = signal(false);
@@ -58,6 +62,12 @@ export class CardDesignComponent implements OnInit {
   });
 
   readonly templates = CARD_TEMPLATES;
+  readonly agnosticTemplates = AGNOSTIC_TEMPLATES;
+
+  /** The pool template in force — the design may predate the field. */
+  agnostic = computed<AgnosticTemplate>(() => (this.design().agnosticTemplate as AgnosticTemplate) ?? DEFAULT_AGNOSTIC);
+  /** Which pool template is being persisted — picking one saves it, no Save click. */
+  savingAgnostic = signal(false);
   readonly maxInstructions = CARD_DESIGN_MAX.instructions;
   readonly maxHighlights = CARD_DESIGN_MAX.highlights;
 
@@ -240,6 +250,22 @@ export class CardDesignComponent implements OnInit {
           const images = await loadCardImages(d);
           await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images);
         }
+
+        // The pool card, both faces. Its serial is a sample — the real ones come
+        // from the pool — but everything else is exactly what gets printed.
+        const poolFront = this.previewPoolFrontCanvas?.nativeElement;
+        const poolBack = this.previewPoolBackCanvas?.nativeElement;
+        if (poolFront || poolBack) {
+          const images = await loadCardImages(d);
+          const company = d.teacherName || '';
+          if (poolFront) {
+            await renderAgnosticCardPng(
+              { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
+              poolFront, this.agnostic(), images,
+            );
+          }
+          if (poolBack) await renderAgnosticBackPng(d, company, poolBack, images);
+        }
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }
@@ -309,6 +335,37 @@ export class CardDesignComponent implements OnInit {
       },
       error: () => {
         this.savingTemplate.set(false);
+      },
+    });
+  }
+
+  // ── The QR-card pool's design ───────────────────────────────────────────────
+  //
+  // A pool card is printed before any student owns it, so it carries no student
+  // data at all — both faces are about the academy. That makes it a separate
+  // choice from `template`, which governs the personal student cards.
+
+  /**
+   * Pick the pool design. Persists immediately: choosing it IS the decision, and
+   * like the image uploads it posts the last SAVED design with only this field
+   * swapped, so it can't quietly commit half-typed edits sitting in the form.
+   */
+  selectAgnostic(t: AgnosticTemplate): void {
+    if (this.agnostic() === t) return;
+    this.set('agnosticTemplate', t);
+
+    this.savingAgnostic.set(true);
+    const base = this.savedDesign() ?? this.design();
+    this.companyService.updateCardDesign(this.payloadFrom({ ...base, agnosticTemplate: t })).subscribe({
+      next: (saved) => {
+        this.savedDesign.set(saved);
+        this.savingAgnostic.set(false);
+        this.notificationService.success(this.translate.instant('CARD_DESIGN.AGNOSTIC_SAVED'));
+      },
+      error: () => {
+        // Put the stored choice back, so what's on screen matches what's stored.
+        this.set('agnosticTemplate', (this.savedDesign()?.agnosticTemplate as AgnosticTemplate) ?? DEFAULT_AGNOSTIC);
+        this.savingAgnostic.set(false);
       },
     });
   }

@@ -18,14 +18,20 @@ import { QrCard, QrCardService } from './qr-card.service';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
-import {
-  StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng,
-} from '../students/card-render.util';
-import { CardTemplate } from '../students/card-theme';
+import { loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng } from '../students/card-render.util';
+import { AgnosticCardData, AgnosticTemplate } from '../students/card-agnostic.util';
 
-/** The serial as printed on the card — padded, so a stack of them lines up. */
+/**
+ * The serial as printed on the card — always starts with "A".
+ *
+ * The letter is not decoration. Staff check a student in by TYPING their student
+ * code, a bare number, and the code box only ever accepts digits. A card printed
+ * as "#00123" is indistinguishable from student code #123, so typing it would
+ * check in a completely different person. Leading with a letter makes a pool
+ * serial impossible to confuse with — or type as — a student code.
+ */
 export function serialLabel(serial: number): string {
-  return `#${String(serial).padStart(5, '0')}`;
+  return `A-${String(serial).padStart(5, '0')}`;
 }
 
 /**
@@ -152,32 +158,26 @@ export class QrCardsComponent implements OnInit {
 
     try {
       const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
-      const template = design?.template as CardTemplate | undefined;
+      const template = design?.agnosticTemplate as AgnosticTemplate | undefined;
       const images = await loadCardImages(design);   // decoded once for the batch
 
       const zip = new JSZip();
       const origin = window.location.origin;
       const companyName = this.authService.getCompanyName();
-      const year = currentAcademicYear();
       const canvas = document.createElement('canvas');
       await document.fonts.ready;   // Arabic must shape before we rasterise
 
       let done = 0;
       for (const card of pool) {
-        // The academy's real template — but with every student field blank. The
-        // serial goes where the student code normally prints, so a card can be
-        // found in a box of a thousand.
-        const data: StudentCardData = {
+        // An AGNOSTIC card: nothing on it belongs to a student, because nobody owns
+        // it yet. Only its own QR and the serial printed under it — which is how it
+        // gets found in a box of a thousand, and how it gets linked.
+        const data: AgnosticCardData = {
           companyName,
-          name: '',
           code: this.label(card.serial),
-          level: '',
-          group: '',
-          year,
-          subject: '',
           qrUrl: `${origin}/p/s/${card.token}`,
         };
-        const png = await renderStudentCardPng(data, canvas, template, images);
+        const png = await renderAgnosticCardPng(data, canvas, template, images);
         zip.file(`${this.label(card.serial)}.png`, png, { base64: true });
 
         this.exportDone.set(++done);
@@ -186,10 +186,11 @@ export class QrCardsComponent implements OnInit {
         if (done % 5 === 0) await new Promise((r) => setTimeout(r));
       }
 
-      // The shared back face ships once, as it does for the student export.
+      // Both faces are agnostic, so the back is identical for the whole batch and
+      // ships once rather than a thousand times.
       if (design) {
         try {
-          zip.file('card-back.png', await renderCardBackPng(design, canvas), { base64: true });
+          zip.file('card-back.png', await renderAgnosticBackPng(design, companyName, canvas, images), { base64: true });
         } catch {
           console.warn('Card back skipped — could not render the design.');
         }

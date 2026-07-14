@@ -23,3 +23,15 @@ export function shouldShowStudentCode(
   if (student?.studentCode == null) return false;
   return !isTeacher || isStudentQrLive(student);
 }
+
+/**
+ * Normalise a code a human typed or a scanner pushed into the box.
+ *
+ * Pool cards print their number with an "A-" prefix (A-100001) so it can never be
+ * mistaken for — or typed as — an organic student code. The code itself is still
+ * an integer in the database, so strip the prefix (and any stray spaces or dashes)
+ * before it goes to the API, which expects digits.
+ */
+export function normalizeStudentCode(code: string | number | null | undefined): string {
+  return String(code ?? '').replace(/\D/g, '');
+}

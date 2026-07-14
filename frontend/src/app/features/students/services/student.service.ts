@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { normalizeStudentCode } from '../../../core/utils/student-code.util';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { Student, StudentCreateDto, StudentUpdateDto, StudentImportRow, StudentImportResult } from '@shared/interfaces/student.interface';
@@ -88,7 +89,8 @@ export class StudentService {
    */
   lookupByCode(code: string | number): Observable<{ id: string; qrToken: string }> {
     return this.api.get<{ id: string; qrToken: string }>(
-      `students/lookup-by-code/${encodeURIComponent(String(code))}`,
+      // Pool cards print their number as "A-100001"; the code is an integer.
+      `students/lookup-by-code/${encodeURIComponent(normalizeStudentCode(code))}`,
     );
   }
 

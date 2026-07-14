@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
+import { ensureQrCardSchema, qrStudentMatch, codeDigits } from './qr-cards';
 import { query, queryOne } from '../db/connection';
 import { extractTenantContext, checkGranularPermission, canAccessBranch } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -388,7 +388,7 @@ async function handleAttendanceCommand(settings: TgSettings, chatId: number, tex
   else if (bare) { codeStr = bare[0]; }
   else { await replyHelp(token, chatId); return; }
 
-  const code = parseInt(codeStr!, 10);
+  const code = codeDigits(codeStr!);   // pool cards print "A-100001"
   const student = await queryOne<any>(
     `SELECT id, first_name, last_name, student_code FROM students
      WHERE student_code = $1 AND company_id = $2 AND is_active = true`,

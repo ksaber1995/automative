@@ -58,6 +58,33 @@ export class SubscriptionsService {
     );
   }
 
+  // ── Pre-printed QR cards, per client ──────────────────────────────────────
+  // The pool is sold per academy: off until we switch it on, and we can mint a
+  // print run for them without signing in as them.
+
+  /** Is the pool on for this client, and how big is it. */
+  qrCardStats(companyId: string): Observable<{ qr_cards_enabled: boolean; total: number; linked: number }> {
+    return this.http.get<{ qr_cards_enabled: boolean; total: number; linked: number }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards`,
+    );
+  }
+
+  /** Turn the pool on or off for one client. */
+  setQrCardsEnabled(companyId: string, enabled: boolean): Observable<{ success: boolean; qr_cards_enabled: boolean }> {
+    return this.http.post<{ success: boolean; qr_cards_enabled: boolean }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards/enabled`,
+      { enabled },
+    );
+  }
+
+  /** Mint a print run for a client. Serials continue from their last one. */
+  generateQrCards(companyId: string, count: number): Observable<{ success: boolean; created: number; from: number; to: number }> {
+    return this.http.post<{ success: boolean; created: number; from: number; to: number }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards`,
+      { count },
+    );
+  }
+
   /** Promote a company's subscription to ACTIVE. */
   activate(companyId: string): Observable<{ success: boolean; subscription_type: string | null }> {
     return this.http.post<{ success: boolean; subscription_type: string | null }>(

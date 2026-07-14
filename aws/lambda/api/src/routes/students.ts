@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
+import { ensureQrCardSchema, qrStudentMatch, codeDigits, CARD_SERIAL_BASE } from './qr-cards';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -72,7 +72,10 @@ export const studentsRoutes = {
       // concurrent insert two rows could read the same MAX, and the loser fails
       // the insert (surfaced as a 400) rather than silently sharing a code.
       const codeRow = await queryOne<{ next: number }>(
-        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students WHERE company_id = $1`,
+        // Only codes BELOW the reserved card range count: a student who took a card's
+        // number must not drag the sequence up into the pool (see CARD_SERIAL_BASE).
+        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students
+         WHERE company_id = $1 AND student_code < ${CARD_SERIAL_BASE}`,
         [context.companyId]
       );
 
@@ -132,7 +135,10 @@ export const studentsRoutes = {
       // concurrent import could collide and that single row's insert fails
       // (recorded as a row error) rather than silently sharing a code.
       const codeRow = await queryOne<{ next: number }>(
-        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students WHERE company_id = $1`,
+        // Only codes BELOW the reserved card range count: a student who took a card's
+        // number must not drag the sequence up into the pool (see CARD_SERIAL_BASE).
+        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students
+         WHERE company_id = $1 AND student_code < ${CARD_SERIAL_BASE}`,
         [context.companyId]
       );
       let nextCode = codeRow?.next ?? 1;
@@ -515,7 +521,7 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const code = parseInt(params.code, 10);
+      const code = codeDigits(params.code);   // pool cards print "A-100001"
       if (!Number.isInteger(code) || code < 1) {
         return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
       }

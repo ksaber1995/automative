@@ -168,8 +168,10 @@
           </div>
           <div class="flex gap-2">
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
-            <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
-              [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
+            @if (canUseQrCards()) {
+              <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
+                [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
+            }
             <button pButton [label]="'STUDENTS.DETAIL.SEND_NOTES' | translate" icon="pi pi-whatsapp" class="p-button-outlined"
               [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
               (click)="openNotesDialog()"></button>

@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { CARD_SERIAL_BASE } from './qr-cards';
 import { insert, update, query, queryOne, deleteById } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -453,7 +454,8 @@ export const crmRoutes = {
       const lastName = parts.join(' ') || '-';
 
       const codeRow = await queryOne<{ next: number }>(
-        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students WHERE company_id = $1`,
+        `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students
+         WHERE company_id = $1 AND student_code < ${CARD_SERIAL_BASE}`,
         [context.companyId]
       );
 

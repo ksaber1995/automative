@@ -273,6 +273,7 @@ type LicSortCol =
                 <th>Start</th>
                 <th>End</th>
                 <th>Status</th>
+                <th>QR cards</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -314,6 +315,27 @@ type LicSortCol =
                   <td>
                     <span class="dot" [class.off]="!r.company_active"></span>
                     {{ r.company_active ? 'Active' : 'Inactive' }}
+                  </td>
+                  <td>
+                    @if (qrStats()[r.company_id]; as q) {
+                      <div class="qr-cell">
+                        <button class="act" [class.activate]="!q.qr_cards_enabled"
+                          [disabled]="busyId() === r.company_id"
+                          (click)="toggleQrCards(r)">
+                          {{ q.qr_cards_enabled ? 'Disable' : 'Enable' }}
+                        </button>
+                        @if (q.qr_cards_enabled) {
+                          <button class="act" [disabled]="busyId() === r.company_id" (click)="openQrCards(r)">
+                            + Cards
+                          </button>
+                          <span class="qr-count">{{ q.linked }} / {{ q.total }}</span>
+                        }
+                      </div>
+                    } @else {
+                      <button class="act" [disabled]="busyId() === r.company_id" (click)="loadQrStats(r.company_id)">
+                        Check
+                      </button>
+                    }
                   </td>
                   <td>
                     <div class="actions">
@@ -396,6 +418,32 @@ type LicSortCol =
             </div>
             <div class="modal-foot">
               <button class="act" [disabled]="busyId() === row.company_id" (click)="closeExtend()">Cancel</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Print a batch of blank QR cards FOR a client. The cards are pooled and
+           unowned until the academy scans one onto a student. -->
+      @if (qrRow(); as row) {
+        <div class="overlay" (click)="qrRow.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>Create QR cards</h2>
+            <p class="modal-sub"><strong>{{ row.company_name }}</strong></p>
+            @if (qrStats()[row.company_id]; as q) {
+              <p class="modal-sub">{{ q.total }} cards so far · {{ q.linked }} linked to a student.</p>
+            }
+            <p class="modal-sub">
+              Blank cards, tied to no student. Serials are reserved above 100000 and print
+              with an <code>A-</code> prefix, so they can never be confused with a student's
+              own code. The academy downloads and prints them itself.
+            </p>
+            <input class="search" type="number" min="1" max="2000" [(ngModel)]="qrCount" placeholder="How many?" />
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="qrRow.set(null)">Cancel</button>
+              <button class="act activate" [disabled]="busyId() === row.company_id" (click)="confirmQrCards()">
+                Create cards
+              </button>
             </div>
           </div>
         </div>
@@ -1187,6 +1235,73 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Delete failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  // ── Pre-printed QR cards, per client ────────────────────────────────────────
+  // The pool is sold per academy: off until we switch it on. Stats are fetched
+  // per row rather than in the big companies query, so the table stays cheap.
+  qrStats = signal<Record<string, { qr_cards_enabled: boolean; total: number; linked: number }>>({});
+  qrRow = signal<CompanySubscription | null>(null);
+  qrCount = 100;
+
+  loadQrStats(companyId: string) {
+    this.busyId.set(companyId);
+    this.service.qrCardStats(companyId).subscribe({
+      next: (stats) => {
+        this.busyId.set(null);
+        this.qrStats.update((m) => ({ ...m, [companyId]: stats }));
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`QR cards: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  toggleQrCards(r: CompanySubscription) {
+    const current = this.qrStats()[r.company_id];
+    const next = !(current?.qr_cards_enabled);
+    this.busyId.set(r.company_id);
+    this.service.setQrCardsEnabled(r.company_id, next).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.showFlash(`QR cards ${next ? 'enabled' : 'disabled'} for ${r.company_name}.`);
+        this.loadQrStats(r.company_id);
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`QR cards: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  openQrCards(r: CompanySubscription) {
+    this.qrCount = 100;
+    this.qrRow.set(r);
+  }
+
+  confirmQrCards() {
+    const r = this.qrRow();
+    if (!r) return;
+    const count = Math.floor(Number(this.qrCount));
+    if (!Number.isFinite(count) || count < 1 || count > 2000) {
+      this.error.set('Count must be between 1 and 2000.');
+      return;
+    }
+    this.busyId.set(r.company_id);
+    this.service.generateQrCards(r.company_id, count).subscribe({
+      next: (res) => {
+        this.busyId.set(null);
+        this.qrRow.set(null);
+        // Serials continue from their last run, so say which ones these are.
+        this.showFlash(`${res.created} cards for ${r.company_name} (A-${String(res.from).padStart(5, '0')} … A-${String(res.to).padStart(5, '0')}).`);
+        this.loadQrStats(r.company_id);
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Generate failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

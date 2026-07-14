@@ -96,6 +96,8 @@ const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD
 // Lengths are capped so a pasted essay can't blow up the rendered card.
 const CardDesignSchema = z.object({
   template: z.enum(['navy', 'maroon', 'minimal', 'portrait']),
+  // The pool cards' design — chosen separately from the personal student cards.
+  agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave']).optional(),
   teacherName: z.string().max(80),
   teacherTitle: z.string().max(80),
   phone: z.string().max(40),
@@ -1982,7 +1984,8 @@ export const contract = c.router({
     lookupByCode: {
       method: 'GET',
       path: '/api/students/lookup-by-code/:code',
-      pathParams: z.object({ code: z.string().regex(/^\d+$/) }),
+      // Digits, or the "A-100001" form printed on a pool card.
+      pathParams: z.object({ code: z.string().regex(/^[Aa]?-?\d+$/) }),
       responses: {
         200: z.object({ id: UUIDSchema, qrToken: z.string() }),
         403: ApiErrorSchema,
@@ -4860,6 +4863,39 @@ export const contract = c.router({
       },
     },
     // Switch a company's registration type between ACADEMY and TEACHER.
+    setQrCardsEnabled: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards/enabled',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ enabled: z.boolean() }),
+      responses: {
+        200: z.object({ success: z.boolean(), qr_cards_enabled: z.boolean() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    generateQrCards: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ count: z.number().int().min(1).max(2000) }),
+      responses: {
+        200: z.object({ success: z.boolean(), created: z.number(), from: z.number(), to: z.number() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    qrCardStats: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      responses: {
+        200: z.object({ qr_cards_enabled: z.boolean(), total: z.number(), linked: z.number() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     setCompanyType: {
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/type',

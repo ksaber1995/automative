@@ -56,7 +56,18 @@
     "IMG_SAVED": "Saved",
     "IMAGES_AUTOSAVE": "Photo and logo save on their own — no need to press Save.",
     "TEMPLATE_PORTRAIT": "Portrait",
-    "TEMPLATE_PORTRAIT_NOTE": "Teacher photo and logo on the teacher side; the student side stays clean."
+    "TEMPLATE_PORTRAIT_NOTE": "Teacher photo and logo on the teacher side; the student side stays clean.",
+    "AGNOSTIC_TITLE": "QR card pool design",
+    "AGNOSTIC_HINT": "The pre-printed cards you hand out and link later. No student data on either side — just the QR and its serial.",
+    "AGNOSTIC_NOTE": "Used when you download the cards from the QR cards page. Saved as soon as you pick one.",
+    "AGNOSTIC_SAVED": "Pool design saved",
+    "AGNOSTIC_AURORA": "Aurora",
+    "AGNOSTIC_RIBBON": "Ribbon",
+    "AGNOSTIC_MONO": "Mono",
+    "AGNOSTIC_WAVE": "Wave",
+    "PREVIEW_POOL_FRONT": "Pool card — QR side",
+    "PREVIEW_POOL_BACK": "Pool card — academy side",
+    "PREVIEW_POOL_NOTE": "The serial shown is an example; each printed card carries its own."
   },
   "ERRORS": {
     "GENERIC": "An error occurred",
@@ -523,7 +534,9 @@
       "GENERATE_FAILED": "Could not create the cards",
       "LINK_FAILED": "Could not link the card",
       "UNLINK_FAILED": "Could not unlink the card",
-      "LIST_FAILED": "Could not load the cards"
+      "LIST_FAILED": "Could not load the cards",
+      "CODE_TAKEN": "Another student already has that code",
+      "DISABLED": "QR cards are not enabled for this academy"
     }
   },
   "BREADCRUMBS": {
