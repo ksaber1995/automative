@@ -276,6 +276,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       },
       {
+        // The pool of pre-printed blank QR cards, and which student each is on.
+        path: 'qr-cards',
+        canActivate: [permissionGuard('students')],
+        data: { breadcrumb: 'BREADCRUMBS.QR_CARDS' },
+        loadComponent: () => import('./features/qr-cards/qr-cards.component').then(m => m.QrCardsComponent)
+      },
+      {
         // Shared back face of the printed student ID cards. Admin-gated to match
         // the API, which only lets ADMIN/GLOBAL_ADMIN write the design.
         path: 'card-design',

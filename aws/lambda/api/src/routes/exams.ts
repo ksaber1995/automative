@@ -1,4 +1,5 @@
 import { insert, update, query, queryOne } from '../db/connection';
+import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import {
   extractTenantContext,
   canAccessBranch,
@@ -451,8 +452,10 @@ export const examsRoutes = {
       const grade = (body?.grade ?? '').toString().trim();
       if (!grade) return apiError(400, 'ERRORS.EXAMS.GRADE_REQUIRED', 'Grade is required');
 
+      await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        'SELECT id, first_name, last_name FROM students WHERE qr_token = $1 AND company_id = $2 AND is_active = true',
+        `SELECT s.id, s.first_name, s.last_name FROM students s
+         WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId],
       );
       if (!student) {

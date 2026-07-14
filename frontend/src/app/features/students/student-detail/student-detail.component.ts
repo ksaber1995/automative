@@ -21,6 +21,9 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
 import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
+import { GlobalScanService } from '../../../core/services/global-scan.service';
+import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
+import { serialLabel } from '../../qr-cards/qr-cards.component';
 import { StudentService } from '../services/student.service';
 import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -321,6 +324,7 @@ export class StudentDetailComponent implements OnInit {
     this.loadAttendance(id);
     this.loadBookPurchases(id);
     this.loadExamResults(id);
+    this.loadLinkedCards(id);
   }
 
   /** Clear per-student state so data from a previously-viewed student
@@ -1112,5 +1116,74 @@ export class StudentDetailComponent implements OnInit {
 
   hasRefund(enrollment: any): boolean {
     return (enrollment.totalRefunded || 0) > 0;
+  }
+
+  // ── Link a pre-printed QR card ─────────────────────────────────────────────
+  // The academy prints a pool of blank cards; one is handed to this student and
+  // scanned here. It does NOT replace their own QR — both resolve to them — so a
+  // card printed the old way keeps working.
+  private qrCardService = inject(QrCardService);
+  private globalScan = inject(GlobalScanService);
+  /** Takes over the app-wide scanner ONLY while the link dialog is open. */
+  private readonly linkScanHandler = (token: string) => this.linkByToken(token);
+
+  linkCardVisible = signal(false);
+  linkedCards = signal<QrCard[]>([]);
+  linkingCard = signal(false);
+  linkSerial: number | null = null;
+  cardLabel = serialLabel;
+
+  openLinkCard(): void {
+    this.linkSerial = null;
+    this.linkCardVisible.set(true);
+    // While this is open a scan links the card, instead of falling through to the
+    // global "find student / take attendance" behaviour.
+    this.globalScan.register(this.linkScanHandler);
+  }
+
+  closeLinkCard(): void {
+    this.globalScan.unregister(this.linkScanHandler);
+    this.linkCardVisible.set(false);
+  }
+
+  private loadLinkedCards(studentId: string): void {
+    this.qrCardService.byStudent(studentId).subscribe({
+      next: (rows) => this.linkedCards.set(rows),
+      error: () => this.linkedCards.set([]),
+    });
+  }
+
+  /** A scan from the USB reader (or the camera) while the dialog is open. */
+  private linkByToken(token: string): void {
+    this.linkCard({ token });
+  }
+
+  linkBySerial(): void {
+    const serial = Number(this.linkSerial);
+    if (!Number.isInteger(serial) || serial < 1) {
+      this.notificationService.error(this.translate.instant('QR_CARDS.BAD_SERIAL'));
+      return;
+    }
+    this.linkCard({ serial });
+  }
+
+  private linkCard(by: { token?: string; serial?: number }): void {
+    const s = this.student();
+    if (!s || this.linkingCard()) return;
+
+    this.linkingCard.set(true);
+    this.qrCardService.link(s.id, by).subscribe({
+      next: (card) => {
+        this.linkingCard.set(false);
+        this.notificationService.success(this.translate.instant(
+          card.alreadyLinked ? 'QR_CARDS.ALREADY_ON_STUDENT' : 'QR_CARDS.LINKED_OK',
+          { serial: serialLabel(card.serial), name: `${s.firstName} ${s.lastName}` },
+        ));
+        this.closeLinkCard();
+        this.loadLinkedCards(s.id);
+      },
+      // Interceptor toasts the reason — unknown card, or already on someone else.
+      error: () => this.linkingCard.set(false),
+    });
   }
 }

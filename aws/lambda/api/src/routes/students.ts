@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -488,8 +489,9 @@ export const studentsRoutes = {
       if (!checkGranularPermission(context, 'students', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne(
-        `SELECT id FROM students WHERE qr_token = $1 AND company_id = $2`,
+        `SELECT s.id FROM students s WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2`,
         [params.qrToken, context.companyId]
       );
       if (!student) {

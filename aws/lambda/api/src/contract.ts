@@ -1587,6 +1587,18 @@ const CrmActivityWriteSchema = z.object({
   done: z.boolean().optional(),
 });
 
+// Pre-printed QR cards: a pool an academy prints blank and links to students later
+const QrCardSchema = z.object({
+  id: UUIDSchema,
+  serial: z.number(),
+  token: z.string(),
+  studentId: UUIDSchema.nullable(),
+  studentName: z.string().nullable(),
+  studentCode: z.number().nullable(),
+  assignedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
 // CRM lists — named groups of leads (a lead can sit in many)
 const CrmListSchema = z.object({
   id: UUIDSchema,
@@ -2465,6 +2477,50 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
+  // Pre-printed QR cards — a pool, printed blank, linked to a student by scanning
+  qrCards: {
+    generate: {
+      method: 'POST',
+      path: '/api/qr-cards/generate',
+      body: z.object({ count: z.number().int().min(1).max(2000) }),
+      responses: { 201: z.array(QrCardSchema), 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/qr-cards',
+      query: z.object({ status: z.string().optional() }),
+      responses: { 200: z.array(QrCardSchema), 403: ApiErrorSchema },
+    },
+    link: {
+      method: 'POST',
+      path: '/api/qr-cards/link',
+      body: z.object({
+        studentId: UUIDSchema,
+        token: z.string().optional(),
+        serial: z.number().int().optional(),
+      }),
+      responses: {
+        200: QrCardSchema.extend({ alreadyLinked: z.boolean() }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    unlink: {
+      method: 'POST',
+      path: '/api/qr-cards/:id/unlink',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}),
+      responses: { 200: QrCardSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    byStudent: {
+      method: 'GET',
+      path: '/api/qr-cards/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: { 200: z.array(QrCardSchema), 403: ApiErrorSchema },
     },
   },
 

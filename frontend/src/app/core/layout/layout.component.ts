@@ -293,6 +293,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // isGlobalAdmin() (which gates this whole group) is exactly who the API lets
       // save it, so it sits with Settings rather than with the students.
       { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.canRead('students') },
+      // The pool of pre-printed blank QR cards, and which student each one is on.
+      { labelKey: 'NAV.QR_CARDS', icon: 'pi pi-qrcode', routerLink: ['/qr-cards'], visible: auth.canRead('students') },
     ].filter(c => c.visible) : [];
     if (admin.length) {
       entries.push({ kind: 'group', group: {

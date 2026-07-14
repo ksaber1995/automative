@@ -1,4 +1,5 @@
 import { insert, query, queryOne } from '../db/connection';
+import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
@@ -673,8 +674,10 @@ export const monthlySubscriptionsRoutes = {
 
       // Scope the lookup to the caller's company — a token from another company
       // must not resolve.
+      await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        'SELECT id, first_name, last_name FROM students WHERE qr_token = $1 AND company_id = $2 AND is_active = true',
+        `SELECT s.id, s.first_name, s.last_name FROM students s
+         WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
       );
       if (!student) {

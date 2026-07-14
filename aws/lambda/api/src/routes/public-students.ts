@@ -1,4 +1,5 @@
 import { query, queryOne } from '../db/connection';
+import { ensureQrCardSchema, qrStudentMatchPublic } from './qr-cards';
 import { enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { apiError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
@@ -33,13 +34,14 @@ export const publicStudentsRoutes = {
         return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
       }
 
+      await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
         `SELECT s.id, s.first_name, s.last_name, s.company_id, s.branch_id,
                 b.name AS branch_name, co.name AS academy_name, co.type AS company_type
          FROM students s
          JOIN branches b ON b.id = s.branch_id
          JOIN companies co ON co.id = s.company_id
-         WHERE s.qr_token = $1 AND s.is_active = true`,
+         WHERE ${qrStudentMatchPublic('$1')} AND s.is_active = true`,
         [token]
       );
 

@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { query, queryOne } from '../db/connection';
 import { extractTenantContext, checkGranularPermission, canAccessBranch } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -330,8 +331,10 @@ async function handleStart(settings: TgSettings, chatId: number, username: strin
 
   if (prefix === 'S' || prefix === 'P') {
     const role = prefix === 'S' ? 'STUDENT' : 'PARENT';
+    await ensureQrCardSchema();   // the lookup below reads qr_cards
     const student = await queryOne<any>(
-      'SELECT id FROM students WHERE qr_token = $1 AND company_id = $2 AND is_active = true',
+      `SELECT s.id FROM students s
+       WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
       [tokenVal, settings.company_id]
     );
     if (!student) { await sendMessage(token, chatId, '❌ رابط غير صالح / Invalid link.'); return; }

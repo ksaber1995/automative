@@ -69,6 +69,54 @@
     <!-- QR code dialog -->
     <app-student-qr-dialog [(visible)]="showQrDialog" [student]="s" (regenerated)="onQrRegenerated($event)"></app-student-qr-dialog>
 
+    <!-- Link a pre-printed card: scan it, or type the serial printed on it -->
+    <p-dialog
+      [visible]="linkCardVisible()"
+      (visibleChange)="$event ? null : closeLinkCard()"
+      [modal]="true"
+      [draggable]="false"
+      [dismissableMask]="true"
+      [style]="{ width: '30rem', maxWidth: '95vw' }"
+      [header]="'QR_CARDS.LINK_TITLE' | translate"
+    >
+      <div class="rounded-xl bg-indigo-50 border border-indigo-100 p-4 text-center">
+        <i class="pi pi-qrcode text-3xl text-indigo-500"></i>
+        <p class="font-medium text-indigo-900 mt-2">{{ 'QR_CARDS.SCAN_NOW' | translate }}</p>
+        <p class="text-xs text-indigo-700/70 mt-1">{{ 'QR_CARDS.SCAN_HINT' | translate }}</p>
+        @if (linkingCard()) {
+          <i class="pi pi-spin pi-spinner text-indigo-600 mt-3"></i>
+        }
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.OR_SERIAL' | translate }}</label>
+        <div class="flex items-center gap-2">
+          <input pInputText type="number" min="1" class="flex-1"
+            [(ngModel)]="linkSerial" (keyup.enter)="linkBySerial()"
+            [placeholder]="'QR_CARDS.SERIAL_PLACEHOLDER' | translate" />
+          <p-button icon="pi pi-link" [label]="'QR_CARDS.LINK' | translate"
+            [disabled]="!linkSerial" [loading]="linkingCard()" (onClick)="linkBySerial()"></p-button>
+        </div>
+      </div>
+
+      @if (linkedCards().length) {
+        <div class="mt-4 border-t border-gray-200 pt-3">
+          <p class="text-sm text-gray-600 mb-2">{{ 'QR_CARDS.ALREADY_LINKED_LIST' | translate }}</p>
+          <div class="flex flex-wrap gap-2">
+            @for (c of linkedCards(); track c.id) {
+              <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1 font-mono">
+                <i class="pi pi-id-card text-xs"></i>{{ cardLabel(c.serial) }}
+              </span>
+            }
+          </div>
+        </div>
+      }
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" [text]="true" (onClick)="closeLinkCard()"></p-button>
+      </ng-template>
+    </p-dialog>
+
     <!-- Write the note here and send it — the student's saved notes only seed the box -->
     <p-dialog
       [visible]="notesDialogOpen()"
@@ -120,6 +168,8 @@
           </div>
           <div class="flex gap-2">
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
+            <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
+              [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.SEND_NOTES' | translate" icon="pi pi-whatsapp" class="p-button-outlined"
               [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
               (click)="openNotesDialog()"></button>

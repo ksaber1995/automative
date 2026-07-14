@@ -27,6 +27,7 @@ import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
 import { crmRoutes } from './routes/crm';
+import { qrCardsRoutes } from './routes/qr-cards';
 import { waCloudRoutes } from './routes/wa-cloud';
 import { expensePaymentsRoutes } from './routes/expense-payments';
 import { installmentsRoutes } from './routes/installments';
@@ -132,6 +133,7 @@ const router = {
   revenues: revenuesRoutes,
   expenses: expensesRoutes,
   crm: crmRoutes,
+  qrCards: qrCardsRoutes,
   waCloud: waCloudRoutes,
   expensePayments: expensePaymentsRoutes,
   installments: installmentsRoutes,

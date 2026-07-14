@@ -1,0 +1,115 @@
+<div class="container-custom py-6">
+  <div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{ 'QR_CARDS.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ 'QR_CARDS.SUBTITLE' | translate }}</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <p-button icon="pi pi-download" severity="secondary" [outlined]="true"
+        [label]="'QR_CARDS.DOWNLOAD' | translate"
+        [disabled]="!freeCount() || exporting()" (onClick)="downloadZip()"></p-button>
+    </div>
+  </div>
+
+  <!-- Print run -->
+  <p-card class="mb-4">
+    <ng-template pTemplate="header">
+      <div class="px-5 pt-5">
+        <h2 class="text-lg font-semibold text-gray-900">
+          <i class="pi pi-plus-circle mr-2 text-indigo-600"></i>{{ 'QR_CARDS.NEW_BATCH' | translate }}
+        </h2>
+        <p class="text-sm text-gray-500 mt-1">{{ 'QR_CARDS.NEW_BATCH_HINT' | translate }}</p>
+      </div>
+    </ng-template>
+
+    <div class="flex items-end gap-3 flex-wrap">
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.COUNT' | translate }}</label>
+        <input pInputText type="number" min="1" max="2000" class="w-32"
+          [(ngModel)]="count" (keyup.enter)="generate()" />
+      </div>
+      <p-button icon="pi pi-qrcode" [label]="'QR_CARDS.GENERATE' | translate"
+        [loading]="generating()" (onClick)="generate()"></p-button>
+      <span class="text-xs text-gray-400 ms-2">{{ 'QR_CARDS.MAX_HINT' | translate }}</span>
+    </div>
+
+    @if (exporting()) {
+      <div class="mt-5">
+        <p class="text-sm font-medium text-gray-700 mb-2">
+          {{ 'QR_CARDS.RENDERING' | translate: { done: exportDone(), total: exportTotal() } }}
+        </p>
+        <p-progressBar [value]="exportPercent()"></p-progressBar>
+        <p class="text-xs text-gray-400 mt-2">{{ 'QR_CARDS.RENDERING_HINT' | translate }}</p>
+      </div>
+    }
+  </p-card>
+
+  <!-- The pool -->
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex items-center justify-between gap-3 p-4 pb-0 flex-wrap">
+        <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <i class="pi pi-id-card text-indigo-600"></i>{{ 'QR_CARDS.POOL' | translate }}
+        </h2>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold px-3 py-1">
+            {{ 'QR_CARDS.FREE_COUNT' | translate: { count: freeCount() } }}
+          </span>
+          <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1">
+            {{ 'QR_CARDS.LINKED_COUNT' | translate: { count: linkedCount() } }}
+          </span>
+          <p-button size="small" [text]="filter() !== 'all'" [label]="'QR_CARDS.F_ALL' | translate" (onClick)="filter.set('all')"></p-button>
+          <p-button size="small" [text]="filter() !== 'free'" [label]="'QR_CARDS.F_FREE' | translate" (onClick)="filter.set('free')"></p-button>
+          <p-button size="small" [text]="filter() !== 'linked'" [label]="'QR_CARDS.F_LINKED' | translate" (onClick)="filter.set('linked')"></p-button>
+        </div>
+      </div>
+    </ng-template>
+
+    <p-table [value]="visible()" [loading]="loading()" responsiveLayout="scroll"
+      [paginator]="visible().length > 25" [rows]="25" [rowsPerPageOptions]="[25, 50, 100]">
+      <ng-template pTemplate="header">
+        <tr>
+          <th class="w-40">{{ 'QR_CARDS.COL_SERIAL' | translate }}</th>
+          <th>{{ 'QR_CARDS.COL_STATUS' | translate }}</th>
+          <th class="w-24 text-end">{{ 'QR_CARDS.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-card>
+        <tr>
+          <td class="font-mono font-semibold text-gray-800">{{ label(card.serial) }}</td>
+          <td>
+            @if (card.studentId) {
+              <span class="font-medium text-gray-800">{{ card.studentName }}</span>
+              @if (card.studentCode != null) {
+                <span class="text-gray-400 text-xs ms-1">#{{ card.studentCode }}</span>
+              }
+            } @else {
+              <p-tag [value]="'QR_CARDS.FREE' | translate" severity="success"></p-tag>
+            }
+          </td>
+          <td class="text-end">
+            @if (card.studentId) {
+              <p-button icon="pi pi-times" severity="danger" [text]="true" size="small"
+                [pTooltip]="'QR_CARDS.UNLINK' | translate" (onClick)="confirmUnlink(card)"></p-button>
+            }
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="3">
+            <div class="text-center py-10 text-gray-500">
+              <i class="pi pi-qrcode text-4xl mb-3 text-gray-300"></i>
+              <p class="font-medium">{{ 'QR_CARDS.EMPTY' | translate }}</p>
+              <p class="text-sm text-gray-400">{{ 'QR_CARDS.EMPTY_HINT' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

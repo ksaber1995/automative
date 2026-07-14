@@ -1,4 +1,5 @@
 import { query, queryOne } from '../db/connection';
+import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
@@ -278,10 +279,11 @@ export const attendanceRoutes = {
       // Resolve the student by token, scoped to this tenant — a token from
       // another company must not be accepted. Every student's QR works by
       // default (no activation gate).
+      await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
         `SELECT s.id, s.first_name, s.last_name
          FROM students s
-         WHERE s.qr_token = $1 AND s.company_id = $2 AND s.is_active = true`,
+         WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
       );
       if (!student) {

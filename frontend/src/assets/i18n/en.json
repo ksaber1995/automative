@@ -515,6 +515,15 @@
       "RESULTS_FAILED": "Could not load the results",
       "LIST_FAILED": "Could not load the exams",
       "SEND_FAILED": "Could not send the results"
+    },
+    "QR_CARDS": {
+      "NOT_FOUND": "That card is not in this pool",
+      "ALREADY_LINKED": "That card is already linked to another student",
+      "BAD_COUNT": "Ask for between 1 and 2000 cards",
+      "GENERATE_FAILED": "Could not create the cards",
+      "LINK_FAILED": "Could not link the card",
+      "UNLINK_FAILED": "Could not unlink the card",
+      "LIST_FAILED": "Could not load the cards"
     }
   },
   "BREADCRUMBS": {
@@ -564,7 +573,8 @@
     "EXAMS": "Exams",
     "EDUCATIONAL_BOOKS": "Educational Books",
     "EDUCATIONAL_BOOKS_DETAIL": "Course Books",
-    "MESSAGING": "Messaging"
+    "MESSAGING": "Messaging",
+    "QR_CARDS": "QR cards"
   },
   "MESSAGING": {
     "TAB_WHATSAPP": "WhatsApp Templates",
@@ -1148,7 +1158,8 @@
     "QR_USE_CAMERA": "No scanner? Use camera",
     "QR_LOOKING_UP": "Looking up student...",
     "QR_SCAN_INSTRUCTION": "Point your camera at a student's QR code to find them.",
-    "CRM_LISTS": "Lists"
+    "CRM_LISTS": "Lists",
+    "QR_CARDS": "QR cards"
   },
   "HEADER": {
     "LOGOUT": "Logout",
@@ -4864,5 +4875,50 @@
     "OCT": "October",
     "NOV": "November",
     "DEC": "December"
+  },
+  "QR_CARDS": {
+    "TITLE": "QR cards",
+    "SUBTITLE": "Print a batch of blank cards, then link one to a student by scanning it.",
+    "NEW_BATCH": "Print run",
+    "NEW_BATCH_HINT": "Mints blank cards, numbered on from your last run. Nobody owns them until one is scanned onto a student.",
+    "COUNT": "How many",
+    "GENERATE": "Create cards",
+    "MAX_HINT": "Up to 2000 at a time.",
+    "GENERATED": "{{count}} cards created",
+    "BAD_COUNT": "Enter how many cards to create.",
+    "DOWNLOAD": "Download blank cards",
+    "DOWNLOADED": "{{count}} cards downloaded",
+    "DOWNLOAD_FAILED": "Could not render the cards.",
+    "NONE_FREE": "No unlinked cards to print.",
+    "RENDERING": "Rendering cards… {{done}} / {{total}}",
+    "RENDERING_HINT": "Only unlinked cards are printed — reprinting a card someone already holds is how two students end up scanning as one.",
+    "POOL": "The pool",
+    "FREE": "Free",
+    "FREE_COUNT": "{{count}} free",
+    "LINKED_COUNT": "{{count}} linked",
+    "F_ALL": "All",
+    "F_FREE": "Free",
+    "F_LINKED": "Linked",
+    "COL_SERIAL": "Serial",
+    "COL_STATUS": "Linked to",
+    "COL_ACTIONS": "Actions",
+    "EMPTY": "No cards yet.",
+    "EMPTY_HINT": "Create a batch above, print them, and hand them out.",
+    "UNLINK": "Put back in the pool",
+    "UNLINK_TITLE": "Unlink card",
+    "UNLINK_MSG": "Unlink {{serial}} from {{name}}? The card goes back in the pool and stops scanning as them.",
+    "UNLINKED": "Card is back in the pool",
+    "LINK_BUTTON": "Link card",
+    "LINK_TOOLTIP": "Link a pre-printed QR card to this student",
+    "LINK_TITLE": "Link a QR card",
+    "SCAN_NOW": "Scan the card now",
+    "SCAN_HINT": "Scan it with your reader — the card links to this student straight away.",
+    "OR_SERIAL": "Or type the serial printed on it",
+    "SERIAL_PLACEHOLDER": "e.g. 123",
+    "LINK": "Link",
+    "BAD_SERIAL": "Enter the serial printed on the card.",
+    "LINKED_OK": "{{serial}} linked to {{name}}",
+    "ALREADY_ON_STUDENT": "{{serial}} is already on this student",
+    "ALREADY_LINKED_LIST": "Cards already linked to this student:"
   }
 }
