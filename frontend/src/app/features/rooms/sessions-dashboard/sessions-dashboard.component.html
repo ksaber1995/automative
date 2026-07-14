@@ -940,5 +940,50 @@
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog></app-session-pay-dialog>
 
+<!-- The timetable entry carries no room, and an academy's offline class needs one.
+     Ask, rather than failing with "Room is required" and no way to act on it. -->
+<p-dialog
+  [visible]="roomPickVisible()"
+  (visibleChange)="roomPickVisible.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  [dismissableMask]="true"
+  [style]="{ width: '28rem', maxWidth: '95vw' }"
+  [header]="'SESSIONS_DASHBOARD.PICK_ROOM_TITLE' | translate"
+>
+  @if (roomPickEntry(); as entry) {
+    <p class="text-sm text-gray-500 mb-3">
+      {{ 'SESSIONS_DASHBOARD.PICK_ROOM_HINT' | translate: { class: entry.className } }}
+    </p>
+  }
+
+  <label class="block text-sm text-gray-600 mb-1">{{ 'SESSIONS_DASHBOARD.ROOM' | translate }}</label>
+  <p-select
+    [options]="freeRooms()"
+    [(ngModel)]="roomPickRoomId"
+    [ngModelOptions]="{ standalone: true }"
+    optionLabel="name"
+    optionValue="id"
+    appendTo="body"
+    [filter]="true"
+    [style]="{ width: '100%' }"
+    [placeholder]="'SESSIONS_DASHBOARD.PICK_ROOM_PLACEHOLDER' | translate"
+  ></p-select>
+
+  @if (!freeRooms().length) {
+    <p class="text-sm text-red-500 mt-2">
+      <i class="pi pi-exclamation-circle"></i> {{ 'SESSIONS_DASHBOARD.NO_FREE_ROOMS' | translate }}
+    </p>
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSIONS_DASHBOARD.CANCEL' | translate" severity="secondary" [outlined]="true"
+      (onClick)="roomPickVisible.set(false)"></p-button>
+    <p-button icon="pi pi-play" [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate"
+      [disabled]="!roomPickRoomId || !freeRooms().length" [loading]="saving()"
+      (onClick)="confirmRoomAndStart()"></p-button>
+  </ng-template>
+</p-dialog>
+
 <!-- Confirm before un-checking deletes a per-session charge/payment -->
 <p-confirmDialog></p-confirmDialog>

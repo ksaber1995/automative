@@ -4411,7 +4411,7 @@
     "PLACEHOLDER_ROOM": "Select a free room",
     "PICK_BRANCH_FIRST": "Select a branch first",
     "ERR_ROOM_REQUIRED": "Room is required",
-    "NO_FREE_ROOMS": "No free rooms available in this branch",
+    "NO_FREE_ROOMS": "Every room is busy. End a running session first.",
     "ROOM_OPTIONAL_ONLINE": "optional for online classes",
     "FIELD_CLASS": "Class",
     "PLACEHOLDER_CLASS": "Select a class",
@@ -4480,7 +4480,11 @@
     "UPCOMING_STUDENTS": "students",
     "UPCOMING_ATTENDANCE": "Take Attendance",
     "UPCOMING_PRE_ATTENDANCE": "Pre-attendance",
-    "UPCOMING_SESSION_STARTED": "Session Started"
+    "UPCOMING_SESSION_STARTED": "Session Started",
+    "PICK_ROOM_TITLE": "Which room?",
+    "PICK_ROOM_HINT": "{{class}} has no room on the timetable. Pick one to start the session in.",
+    "PICK_ROOM_PLACEHOLDER": "Choose a room",
+    "PICK_ROOM_REQUIRED": "Pick a room first."
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "Teacher Attendance",

@@ -4535,7 +4535,7 @@
     "PLACEHOLDER_ROOM": "اختر غرفة متاحة",
     "PICK_BRANCH_FIRST": "اختر الفرع أولاً",
     "ERR_ROOM_REQUIRED": "الغرفة مطلوبة",
-    "NO_FREE_ROOMS": "لا توجد غرف متاحة في هذا الفرع",
+    "NO_FREE_ROOMS": "كل القاعات مشغولة. أنهِ حصة جارية أولاً.",
     "ROOM_OPTIONAL_ONLINE": "اختياري للفصول عبر الإنترنت",
     "FIELD_CLASS": "المجموعة",
     "PLACEHOLDER_CLASS": "اختر مجموعةاً",
@@ -4604,7 +4604,11 @@
     "UPCOMING_STUDENTS": "طالب",
     "UPCOMING_ATTENDANCE": "تسجيل الحضور",
     "UPCOMING_PRE_ATTENDANCE": "حضور مسبق",
-    "UPCOMING_SESSION_STARTED": "تم بدء الحصة"
+    "UPCOMING_SESSION_STARTED": "تم بدء الحصة",
+    "PICK_ROOM_TITLE": "أي قاعة؟",
+    "PICK_ROOM_HINT": "{{class}} ليس لها قاعة في الجدول. اختر قاعة لبدء الحصة فيها.",
+    "PICK_ROOM_PLACEHOLDER": "اختر قاعة",
+    "PICK_ROOM_REQUIRED": "اختر قاعة أولاً."
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "حضور المعلمين",

@@ -607,16 +607,44 @@ export class SessionsDashboardComponent implements OnInit {
     });
   }
 
-  /** Directly start a session from an upcoming entry (no dialog needed for teacher companies) */
-  startUpcomingSession(entry: TimetableEntry) {
-    // If there's already a prepared (started=false) session, just mark it as started
-    const prepared = this.upcomingSessionByClass()[entry.classId];
+  // ── Start an upcoming session ───────────────────────────────────────────────
+  // An academy's offline class must run in a room — the API rejects a start with
+  // no roomId. A timetable entry often carries none, which used to surface as a
+  // bare "Room is required" error with no way to act on it. Now it asks which
+  // room, and starts once you pick one. (A TEACHER company has no rooms concept,
+  // so it still starts straight away.)
+  roomPickVisible = signal(false);
+  roomPickEntry = signal<TimetableEntry | null>(null);
+  roomPickRoomId: string | null = null;
 
+  startUpcomingSession(entry: TimetableEntry) {
+    if (!this.isTeacher() && !entry.roomId) {
+      this.roomPickEntry.set(entry);
+      this.roomPickRoomId = null;
+      this.roomPickVisible.set(true);
+      return;
+    }
+    this.doStartUpcoming(entry, entry.roomId || undefined);
+  }
+
+  /** Confirm the picked room, then start. */
+  confirmRoomAndStart() {
+    const entry = this.roomPickEntry();
+    if (!entry) return;
+    if (!this.roomPickRoomId) {
+      this.notificationService.error(this.translate.instant('SESSIONS_DASHBOARD.PICK_ROOM_REQUIRED'));
+      return;
+    }
+    this.roomPickVisible.set(false);
+    this.doStartUpcoming(entry, this.roomPickRoomId);
+  }
+
+  private doStartUpcoming(entry: TimetableEntry, roomId: string | undefined) {
     this.saving.set(true);
     this.sessionService.start({
       classId: entry.classId,
       branchId: entry.branchId,
-      roomId: entry.roomId || undefined,
+      roomId,
     }).subscribe({
       next: () => {
         this.saving.set(false);
