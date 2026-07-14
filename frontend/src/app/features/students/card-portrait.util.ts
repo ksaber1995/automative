@@ -244,7 +244,8 @@ export function drawCardBackPortrait(
   }
 
   // Photo frame
-  const px = 48, py = 122, pw = 240, ph = 258;
+  // 15% taller (258 -> 297). The info QR below had to move down to make room.
+  const px = 48, py = 122, pw = 240, ph = 297;
   ctx.save();
   roundRect(ctx, px, py, pw, ph, 16);
   ctx.fillStyle = '#ffffff';
@@ -276,7 +277,7 @@ export function drawCardBackPortrait(
 
   // Info QR under the photo (hidden entirely when no link is configured)
   if (qr) {
-    const qs = 128, qx = colCx - qs / 2, qy = 408;
+    const qs = 120, qx = colCx - qs / 2, qy = 440;
     roundRect(ctx, qx - 8, qy - 8, qs + 16, qs + 16, 12);
     ctx.fillStyle = '#ffffff';
     ctx.fill();

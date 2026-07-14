@@ -87,7 +87,9 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   contentTransform(ctx);
 
-  photo(ctx, 46, 168, 186, 226, images.photo);
+  // 15% taller (226 -> 260). It grows upward: the code chip is at y=414, so the
+  // frame keeps its foot at 394 rather than running into it.
+  photo(ctx, 46, 134, 186, 260, images.photo);
 
   // student code chip under the photo
   roundRect(ctx, 46, 414, 186, 44, 10);

@@ -371,7 +371,8 @@ export function drawAgnosticBack(
   const L = 60;    // left column
 
   // ---- media column: the teacher's photo, and the academy's info QR ----
-  const pw = 190, ph = 224;
+  // 15% taller (224 -> 258); the info QR below starts at y=316, so it still clears.
+  const pw = 190, ph = 258;
   if (images.photo) {
     ctx.save();
     roundRect(ctx, L, 44, pw, ph, 16);

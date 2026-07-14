@@ -293,7 +293,9 @@ export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: nu
 
 /** The photo frame. With no upload, the grey silhouette placeholder is drawn instead. */
 function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
-  const x = 45, y = 208, w = 190, h = 232, r = 16;
+  // 15% taller than the original 232: the frame ends at 475, still clear of the
+  // gold sweeps that start at y=498.
+  const x = 45, y = 208, w = 190, h = 267, r = 16;
   ctx.save();
   roundRect(ctx, x, y, w, h, r);
   ctx.fillStyle = '#ffffff';
