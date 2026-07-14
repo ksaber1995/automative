@@ -265,7 +265,34 @@ function drawCrest(ctx: Ctx, cx: number, cy: number): void {
 }
 
 /** Empty gold-framed silhouette — students have no photo on file, so this is left blank to be filled in. */
-function drawPhoto(ctx: Ctx): void {
+/**
+ * Draw `img` to COVER the box: scaled to fill it and centre-cropped, never
+ * squashed. A portrait photo in a landscape frame gets its sides trimmed rather
+ * than the teacher's face stretched.
+ */
+export function drawCover(ctx: Ctx, img: CanvasImageSource, x: number, y: number, w: number, h: number): void {
+  const iw = (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width || w;
+  const ih = (img as HTMLImageElement).naturalHeight || (img as HTMLCanvasElement).height || h;
+  if (!iw || !ih) return;
+  const scale = Math.max(w / iw, h / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+/** Draw `img` to FIT inside the box, whole and un-cropped — a logo must not lose its edges. */
+export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: number, maxW: number, maxH: number): void {
+  const iw = (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width || maxW;
+  const ih = (img as HTMLImageElement).naturalHeight || (img as HTMLCanvasElement).height || maxH;
+  if (!iw || !ih) return;
+  const scale = Math.min(maxW / iw, maxH / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+/** The photo frame. With no upload, the grey silhouette placeholder is drawn instead. */
+function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
   const x = 45, y = 208, w = 190, h = 232, r = 16;
   ctx.save();
   roundRect(ctx, x, y, w, h, r);
@@ -279,6 +306,12 @@ function drawPhoto(ctx: Ctx): void {
   ctx.clip();
   ctx.fillStyle = '#eceef2';
   ctx.fillRect(x, y, w, h);
+
+  if (photo) {
+    drawCover(ctx, photo, x + 4, y + 4, w - 8, h - 8);
+    ctx.restore();
+    return;
+  }
 
   const cx = x + w / 2;
   ctx.fillStyle = '#c8ccd6';
@@ -411,7 +444,13 @@ function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: nu
   ctx.restore();
 }
 
-export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource): void {
+/** The teacher's photo and academy logo, already decoded. Both optional. */
+export interface CardImages {
+  photo?: CanvasImageSource | null;
+  logo?: CanvasImageSource | null;
+}
+
+export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource, images: CardImages = {}): void {
   ctx.save();
 
   // ── Background: bleeds off all four edges ────────────────────────────────────
@@ -441,8 +480,12 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // ── Content: inside the 0.5 cm safe margin, so nothing can be cut off ────────
   contentTransform(ctx);
 
-  drawCrest(ctx, 140, 106);
-  drawPhoto(ctx);
+  // An uploaded logo replaces the crest entirely — drawn to fit, so it keeps its
+  // own shape instead of being forced into the shield.
+  if (images.logo) drawContain(ctx, images.logo, 140, 106, 150, 128);
+  else drawCrest(ctx, 140, 106);
+
+  drawPhoto(ctx, images.photo);
 
   // --- header ---
   const hcx = 626;

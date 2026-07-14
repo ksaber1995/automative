@@ -42,7 +42,17 @@
     "DOWNLOAD_ERROR": "Failed to render the card design",
     "TEMPLATE_SAVE": "Save template",
     "TEMPLATE_UNSAVED": "Template not saved yet",
-    "TEMPLATE_SAVED": "Card template saved"
+    "TEMPLATE_SAVED": "Card template saved",
+    "IMAGES_TITLE": "Photo & logo",
+    "IMAGES_HINT": "Both appear on the student side of every card.",
+    "IMAGES_NOTE": "Images are resized in your browser before saving, so a big phone photo is fine. Leave one empty to keep the built-in placeholder.",
+    "PHOTO": "Teacher photo",
+    "LOGO": "Logo",
+    "IMG_UPLOAD": "Upload",
+    "IMG_REPLACE": "Replace",
+    "IMG_REMOVE": "Remove",
+    "IMG_NOT_IMAGE": "Pick an image file.",
+    "IMG_FAILED": "Could not read that image."
   },
   "ERRORS": {
     "GENERIC": "An error occurred",

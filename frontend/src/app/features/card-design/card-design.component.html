@@ -77,6 +77,76 @@
           </div>
         </p-card>
 
+        <!-- Photo + logo: both appear on the STUDENT side of every card -->
+        <p-card>
+          <ng-template pTemplate="header">
+            <div class="px-5 pt-5">
+              <h2 class="text-lg font-semibold text-gray-900">
+                <i class="pi pi-image mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.IMAGES_TITLE' | translate }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">{{ 'CARD_DESIGN.IMAGES_HINT' | translate }}</p>
+            </div>
+          </ng-template>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <!-- Teacher photo -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'CARD_DESIGN.PHOTO' | translate }}</label>
+              <div class="flex items-center gap-3">
+                <div class="w-20 h-24 rounded-lg border-2 border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                  @if (design().photo) {
+                    <img [src]="design().photo" alt="" class="w-full h-full object-cover" />
+                  } @else {
+                    <i class="pi pi-user text-2xl text-gray-300"></i>
+                  }
+                </div>
+                <div class="flex flex-col gap-2">
+                  <label class="cursor-pointer">
+                    <span class="p-button p-button-outlined p-button-sm inline-flex items-center gap-2">
+                      <i class="pi" [class.pi-upload]="uploading() !== 'photo'" [class.pi-spin]="uploading() === 'photo'" [class.pi-spinner]="uploading() === 'photo'"></i>
+                      {{ (design().photo ? 'CARD_DESIGN.IMG_REPLACE' : 'CARD_DESIGN.IMG_UPLOAD') | translate }}
+                    </span>
+                    <input type="file" accept="image/*" class="hidden" (change)="onImagePicked('photo', $event)" />
+                  </label>
+                  @if (design().photo) {
+                    <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                      [label]="'CARD_DESIGN.IMG_REMOVE' | translate" (onClick)="removeImage('photo')"></p-button>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- Academy logo -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'CARD_DESIGN.LOGO' | translate }}</label>
+              <div class="flex items-center gap-3">
+                <div class="w-20 h-24 rounded-lg border-2 border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                  @if (design().logo) {
+                    <img [src]="design().logo" alt="" class="w-full h-full object-contain p-1" />
+                  } @else {
+                    <i class="pi pi-shield text-2xl text-gray-300"></i>
+                  }
+                </div>
+                <div class="flex flex-col gap-2">
+                  <label class="cursor-pointer">
+                    <span class="p-button p-button-outlined p-button-sm inline-flex items-center gap-2">
+                      <i class="pi" [class.pi-upload]="uploading() !== 'logo'" [class.pi-spin]="uploading() === 'logo'" [class.pi-spinner]="uploading() === 'logo'"></i>
+                      {{ (design().logo ? 'CARD_DESIGN.IMG_REPLACE' : 'CARD_DESIGN.IMG_UPLOAD') | translate }}
+                    </span>
+                    <input type="file" accept="image/*" class="hidden" (change)="onImagePicked('logo', $event)" />
+                  </label>
+                  @if (design().logo) {
+                    <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                      [label]="'CARD_DESIGN.IMG_REMOVE' | translate" (onClick)="removeImage('logo')"></p-button>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-xs text-gray-400 mt-4">{{ 'CARD_DESIGN.IMAGES_NOTE' | translate }}</p>
+        </p-card>
+
         <p-card>
           <ng-template pTemplate="header">
             <div class="px-5 pt-5">

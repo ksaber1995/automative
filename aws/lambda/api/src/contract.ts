@@ -106,6 +106,10 @@ const CardDesignSchema = z.object({
   slogan: z.string().max(200),
   instructions: z.array(z.string().max(160)).max(5),
   highlights: z.array(z.string().max(60)).max(4),
+  // Data URLs (the page downscales before saving). Capped so one upload can't
+  // blow the Lambda request limit or bloat every card-design read.
+  photo: z.string().max(700_000).optional(),
+  logo: z.string().max(700_000).optional(),
 });
 
 // Debt Status

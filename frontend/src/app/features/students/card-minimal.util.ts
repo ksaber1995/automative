@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  DESIGN_H, DESIGN_W, Ctx, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap,
+  CardImages, DESIGN_H, DESIGN_W, Ctx, StudentCardData, T, bgTransform, contentTransform, drawCover, fitText, roundRect, wrap,
 } from './student-card.util';
 
 /**
@@ -39,7 +39,7 @@ function spine(ctx: Ctx): void {
   ctx.fillRect(0, 0, 12, DESIGN_H);
 }
 
-function photo(ctx: Ctx, x: number, y: number, w: number, h: number): void {
+function photo(ctx: Ctx, x: number, y: number, w: number, h: number, img?: CanvasImageSource | null): void {
   ctx.save();
   roundRect(ctx, x, y, w, h, 14);
   ctx.fillStyle = T.wash;
@@ -48,6 +48,13 @@ function photo(ctx: Ctx, x: number, y: number, w: number, h: number): void {
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.clip();
+
+  // An uploaded photo fills the frame; otherwise the silhouette placeholder.
+  if (img) {
+    drawCover(ctx, img, x, y, w, h);
+    ctx.restore();
+    return;
+  }
 
   const cx = x + w / 2;
   ctx.fillStyle = SILHOUETTE;
@@ -64,7 +71,7 @@ function photo(ctx: Ctx, x: number, y: number, w: number, h: number): void {
 
 // ─────────────────────────────── FRONT ───────────────────────────────────────
 
-export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasImageSource): void {
+export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasImageSource, images: CardImages = {}): void {
   ctx.save();
 
   // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
@@ -80,7 +87,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   contentTransform(ctx);
 
-  photo(ctx, 46, 168, 186, 226);
+  photo(ctx, 46, 168, 186, 226, images.photo);
 
   // student code chip under the photo
   roundRect(ctx, 46, 414, 186, 44, 10);

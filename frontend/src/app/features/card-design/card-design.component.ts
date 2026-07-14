@@ -11,7 +11,7 @@ import { CardDesign, CARD_DESIGN_MAX, DEFAULT_CARD_DESIGN } from '@shared/interf
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
-  StudentCardData, currentAcademicYear, renderCardBackPng, renderStudentCardPng,
+  StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 
@@ -120,6 +120,75 @@ export class CardDesignComponent implements OnInit {
     this.redraw();
   }
 
+  // ── Photo / logo upload ─────────────────────────────────────────────────────
+  // Stored as data URLs inside the card design, NOT as hosted files: the card is
+  // rasterised through canvas.toDataURL(), and an image loaded from another origin
+  // taints the canvas and makes that throw — the whole export would die.
+  //
+  // A phone photo is several megabytes, which would blow the request limit and
+  // bloat every card-design read, so each upload is downscaled and re-encoded
+  // here before it ever leaves the browser.
+  private readonly PHOTO_MAX = 700;   // px on the long edge — the frame is ~190px wide at 300dpi
+  private readonly LOGO_MAX = 400;
+  uploading = signal<'photo' | 'logo' | null>(null);
+
+  async onImagePicked(kind: 'photo' | 'logo', event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';           // let the same file be re-picked after a remove
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      this.notificationService.error(this.translate.instant('CARD_DESIGN.IMG_NOT_IMAGE'));
+      return;
+    }
+
+    this.uploading.set(kind);
+    try {
+      const dataUrl = await this.downscale(file, kind === 'photo' ? this.PHOTO_MAX : this.LOGO_MAX, kind === 'logo');
+      this.set(kind, dataUrl);   // set() repaints the preview
+    } catch {
+      this.notificationService.error(this.translate.instant('CARD_DESIGN.IMG_FAILED'));
+    } finally {
+      this.uploading.set(null);
+    }
+  }
+
+  removeImage(kind: 'photo' | 'logo'): void {
+    this.set(kind, '');
+  }
+
+  /**
+   * Downscale to `max` on the long edge and re-encode.
+   *
+   * A logo keeps PNG (transparency matters — a JPEG would give it a white box on
+   * the navy panel); a photo becomes JPEG, which is far smaller for a photograph.
+   */
+  private downscale(file: File, max: number, keepAlpha: boolean): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('decode failed'));
+        img.onload = () => {
+          const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+          const w = Math.round(img.naturalWidth * scale);
+          const h = Math.round(img.naturalHeight * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('no 2d context'));
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(keepAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   private redrawPending = false;
   /** Repaint on the next frame — typing fires per keystroke and a full card is ~15ms. */
   private redraw() {
@@ -133,8 +202,12 @@ export class CardDesignComponent implements OnInit {
       try {
         if (back) await renderCardBackPng(d, back);
         // The student side is not editable — it is rendered from sample data so
-        // you can see the look and feel the students will actually get.
-        if (front) await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate);
+        // you can see the look and feel the students will actually get. The photo
+        // and logo ARE the teacher's own, so the preview shows them for real.
+        if (front) {
+          const images = await loadCardImages(d);
+          await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images);
+        }
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }

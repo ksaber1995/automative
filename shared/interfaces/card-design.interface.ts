@@ -33,6 +33,15 @@ export interface CardDesign {
   instructions: string[];
   /** The four icon items along the bottom. */
   highlights: string[];
+  /**
+   * The teacher's photo, shown in the student-side photo frame. A data URL, not a
+   * hosted URL: the card is rasterised through canvas.toDataURL(), and an image
+   * from another origin taints the canvas and makes the export throw. Empty = the
+   * default silhouette placeholder. The card-design page downscales before saving.
+   */
+  photo: string;
+  /** The academy's logo, replacing the crest. Same data-URL rule as `photo`. */
+  logo: string;
 }
 
 export const CARD_DESIGN_MAX = {
@@ -63,4 +72,6 @@ export const DEFAULT_CARD_DESIGN: CardDesign = {
     'اختبارات دورية',
     'متابعة مستمرة وتقييم شامل',
   ],
+  photo: '',
+  logo: '',
 };

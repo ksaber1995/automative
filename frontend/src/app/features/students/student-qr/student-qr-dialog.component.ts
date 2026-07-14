@@ -17,7 +17,7 @@ import { TelegramService } from '../../telegram/telegram.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
-import { currentAcademicYear, renderStudentCardPng } from '../card-render.util';
+import { currentAcademicYear, loadCardImages, renderStudentCardPng } from '../card-render.util';
 import { EnrollmentStatus } from '@shared/enums/enrollment-status.enum';
 import { Student } from '@shared/interfaces/student.interface';
 
@@ -202,7 +202,7 @@ export class StudentQrDialogComponent {
       year: currentAcademicYear(),
       subject: course?.name || '',
       qrUrl: this.profileUrl(s.qrToken),
-    }, document.createElement('canvas'), design?.template);
+    }, document.createElement('canvas'), design?.template, await loadCardImages(design));
   }
 
   async download(): Promise<void> {

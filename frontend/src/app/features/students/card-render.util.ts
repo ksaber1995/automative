@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE } from './card-theme';
-import { CARD_H, CARD_W, StudentCardData, drawStudentCard, setCardTheme } from './student-card.util';
+import { CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardTheme } from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
 
@@ -41,21 +41,49 @@ function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 }
 
 /**
+ * Decode the design's photo/logo data URLs ONCE, so a 500-student export doesn't
+ * re-decode the same two images 500 times. A broken or empty value yields null and
+ * the card falls back to its built-in placeholder/crest.
+ *
+ * These must be data URLs, not hosted ones: an image from another origin taints
+ * the canvas, and canvas.toDataURL() then throws — the export would die.
+ */
+export async function loadCardImages(design?: CardDesign | null): Promise<CardImages> {
+  const decode = async (src?: string): Promise<HTMLImageElement | null> => {
+    if (!src) return null;
+    try {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      return img;
+    } catch {
+      return null;
+    }
+  };
+  return {
+    photo: await decode(design?.photo),
+    logo: await decode(design?.logo),
+  };
+}
+
+/**
  * FRONT face — one per student. Returns raw base64 PNG (no data-URL prefix), ready
- * for JSZip. Pass a canvas to reuse across a batch; a fresh 1016x638 canvas per
- * student would otherwise pin a lot of memory on a large export.
+ * for JSZip. Pass a canvas to reuse across a batch; a fresh canvas per student
+ * would otherwise pin a lot of memory on a large export. Pass `images` from
+ * loadCardImages() so the teacher's photo and logo are decoded once, not per card.
  */
 export async function renderStudentCardPng(
   data: StudentCardData,
   canvas: HTMLCanvasElement,
   template?: CardTemplate,
+  images: CardImages = {},
 ): Promise<string> {
   const ctx = prepare(canvas);
   const qr = await qrImage(data.qrUrl);
 
   setCardTheme(themeFor(template));
-  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr);
-  else drawStudentCard(ctx, data, qr);
+  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
+  else drawStudentCard(ctx, data, qr, images);
 
   return canvas.toDataURL('image/png').split(',')[1];
 }

@@ -51,6 +51,9 @@ interface CardDesign {
   slogan: string;
   instructions: string[];
   highlights: string[];
+  /** Teacher photo + academy logo, as data URLs ('' = use the built-in default). */
+  photo: string;
+  logo: string;
 }
 
 /**
@@ -82,6 +85,8 @@ export const DEFAULT_CARD_DESIGN: CardDesign = {
     'الالتزام بالقوانين دليل على احترامك لنفسك وللآخرين.',
   ],
   highlights: ['شرح مبسط وفهم عميق', 'مراجعات نهائية', 'اختبارات دورية', 'متابعة مستمرة وتقييم شامل'],
+  photo: '',
+  logo: '',
 };
 
 /**
@@ -111,6 +116,8 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
     slogan: str(d.slogan, DEFAULT_CARD_DESIGN.slogan),
     instructions: list(d.instructions, DEFAULT_CARD_DESIGN.instructions, 5),
     highlights: list(d.highlights, DEFAULT_CARD_DESIGN.highlights, 4),
+    photo: str(d.photo, ''),
+    logo: str(d.logo, ''),
   };
 }
 

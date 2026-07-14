@@ -19,7 +19,7 @@ import { firstValueFrom, forkJoin } from 'rxjs';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
-import { StudentCardData, currentAcademicYear, renderCardBackPng, renderStudentCardPng } from '../card-render.util';
+import { StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng } from '../card-render.util';
 import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -483,6 +483,8 @@ export class StudentListComponent implements OnInit {
       // fronts as well as the shared back, so a printed pair always matches.
       const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
       const template = design?.template;
+      // Decoded once for the whole batch — not once per student.
+      const images = await loadCardImages(design);
 
       const zip = new JSZip();
       const origin = window.location.origin;
@@ -509,7 +511,7 @@ export class StudentListComponent implements OnInit {
 
         const classIds = studentEnrollments.get(student.id) || [];
         if (classIds.length === 0) {
-          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template), { base64: true });
+          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template, images), { base64: true });
         } else {
           const addedPaths = new Set<string>();
           for (const classId of classIds) {
@@ -526,7 +528,7 @@ export class StudentListComponent implements OnInit {
               level: course?.levelName || '',
               group: classInfo?.name || '',
               subject: course?.name || '',
-            }, canvas, template);
+            }, canvas, template, images);
             zip.file(path, png, { base64: true });
           }
         }
