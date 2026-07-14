@@ -1701,6 +1701,20 @@ const LicenseValidateSchema = z.object({
 // =============================================
 // API Contract
 // =============================================
+/** A user account as the owner's admin console sees it — never a password. */
+const AdminUserSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  first_name: z.string(),
+  last_name: z.string(),
+  role: z.string(),
+  is_active: z.boolean(),
+  email_verified: z.boolean(),
+  company_id: z.string().nullable(),
+  company_name: z.string().nullable(),
+  created_at: z.string().nullable(),
+});
+
 export const contract = c.router({
   // Public, unauthenticated license validation for the offline desktop app.
   publicLicense: {
@@ -4851,6 +4865,58 @@ export const contract = c.router({
       },
     },
     // Promote a TRIAL (or any status) subscription to ACTIVE.
+    // Park a tenant who stopped paying: EXPIRED, ended today. Activate reverses it.
+    deactivateSubscription: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/deactivate',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean(), subscription_type: z.string().nullable() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // User accounts, per tenant. Passwords are never returned.
+    listUsers: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/users',
+      query: z.object({ companyId: z.string().optional() }),
+      responses: {
+        200: z.array(AdminUserSchema),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    createUser: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/users',
+      body: z.object({
+        companyId: UUIDSchema,
+        email: z.string().email(),
+        password: z.string().min(6),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        role: z.string().min(1),
+      }),
+      responses: {
+        201: AdminUserSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    deleteUser: {
+      method: 'DELETE',
+      path: '/api/karim-admin-secret/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        404: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     activateSubscription: {
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/activate',

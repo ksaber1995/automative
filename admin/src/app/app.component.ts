@@ -1,7 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService } from './subscriptions.service';
+import {
+  CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService, TenantUser, USER_ROLES,
+} from './subscriptions.service';
 
 type LicSortCol =
   | 'name' | 'tier' | 'status' | 'students' | 'courses' | 'lastSeen' | 'trialEnds' | 'renewal' | 'price';
@@ -20,6 +22,9 @@ type LicSortCol =
           </button>
           <button class="navitem" [class.on]="view() === 'licenses'" (click)="view.set('licenses')">
             <span>Desktop licenses</span><span class="navcount">{{ licenses().length }}</span>
+          </button>
+          <button class="navitem" [class.on]="view() === 'users'" (click)="showUsers()">
+            <span>Users</span><span class="navcount">{{ users().length }}</span>
           </button>
           <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
             <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
@@ -344,6 +349,11 @@ type LicSortCol =
                           Activate
                         </button>
                       }
+                      @if (r.subscription_type !== 'EXPIRED') {
+                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openDeactivate(r)">
+                          Deactivate
+                        </button>
+                      }
                       <button class="act" [disabled]="busyId() === r.company_id" (click)="openExtend(r)">
                         Extend
                       </button>
@@ -367,6 +377,146 @@ type LicSortCol =
         </div>
       }
 
+      }
+
+      @if (view() === 'users') {
+      <header>
+        <div>
+          <h1>Users</h1>
+          <p class="sub">Every account in every tenant · create and remove them here</p>
+        </div>
+        <button class="refresh" (click)="loadUsers()" [disabled]="usersLoading()">
+          {{ usersLoading() ? 'Loading…' : 'Refresh' }}
+        </button>
+      </header>
+
+      <div class="card" style="margin: 20px 0; padding: 16px;">
+        <div class="lic-toolbar">
+          <input class="search" type="text"
+            [ngModel]="userSearch()" (ngModelChange)="userSearch.set($event)"
+            placeholder="Search name, email or role…" />
+          <!-- Filter per tenant -->
+          <select class="search" style="max-width:260px;"
+            [ngModel]="userCompany()" (ngModelChange)="userCompany.set($event)">
+            <option value="">All tenants ({{ users().length }})</option>
+            @for (c of rows(); track c.company_id) {
+              <option [value]="c.company_id">{{ c.company_name }}</option>
+            }
+          </select>
+          <button class="act activate" (click)="openCreateUser()">+ New user</button>
+          <span class="count">{{ visibleUsers().length }} / {{ users().length }}</span>
+        </div>
+
+        @if (usersLoading()) {
+          <div class="state">Loading…</div>
+        } @else if (visibleUsers().length === 0) {
+          <div class="state">No users match.</div>
+        } @else {
+          <div style="margin-top:12px; overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Tenant</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (u of visibleUsers(); track u.id) {
+                  <tr>
+                    <td>{{ u.first_name }} {{ u.last_name }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.company_name || '—' }}</td>
+                    <td><span class="reg">{{ u.role }}</span></td>
+                    <td>
+                      <span class="reg" [class.academy]="u.is_active" [class.teacher]="!u.is_active">
+                        {{ u.is_active ? 'active' : 'inactive' }}
+                      </span>
+                    </td>
+                    <td>{{ formatDate(u.created_at) }}</td>
+                    <td>
+                      <button class="act danger" [disabled]="busyId() === u.id" (click)="openDeleteUser(u)">
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+      }
+
+      <!-- Create a user inside a tenant -->
+      @if (createUserOpen()) {
+        <div class="overlay" (click)="createUserOpen.set(false)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>New user</h2>
+            <p class="modal-sub">The account is created verified and active, so they can log in straight away.</p>
+            <select class="search" [ngModel]="newUser.companyId" (ngModelChange)="newUser.companyId = $event">
+              <option value="">Choose a tenant…</option>
+              @for (c of rows(); track c.company_id) {
+                <option [value]="c.company_id">{{ c.company_name }}</option>
+              }
+            </select>
+            <input class="search" type="text" [(ngModel)]="newUser.firstName" placeholder="First name" />
+            <input class="search" type="text" [(ngModel)]="newUser.lastName" placeholder="Last name" />
+            <input class="search" type="email" [(ngModel)]="newUser.email" placeholder="Email" />
+            <input class="search" type="text" [(ngModel)]="newUser.password" placeholder="Password (min 6 chars)" />
+            <select class="search" [ngModel]="newUser.role" (ngModelChange)="newUser.role = $event">
+              @for (r of roles; track r) {
+                <option [value]="r">{{ r }}</option>
+              }
+            </select>
+            <div class="modal-foot">
+              <button class="act" [disabled]="creatingUser()" (click)="createUserOpen.set(false)">Cancel</button>
+              <button class="act activate" [disabled]="creatingUser()" (click)="confirmCreateUser()">
+                {{ creatingUser() ? 'Creating…' : 'Create user' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Delete a user -->
+      @if (deleteUserRow(); as u) {
+        <div class="overlay" (click)="deleteUserRow.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2 class="danger-title">Delete user</h2>
+            <p class="modal-sub">
+              <strong>{{ u.first_name }} {{ u.last_name }}</strong> ({{ u.email }}) in
+              <strong>{{ u.company_name || 'no tenant' }}</strong>. This cannot be undone.
+            </p>
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === u.id" (click)="deleteUserRow.set(null)">Cancel</button>
+              <button class="act danger" [disabled]="busyId() === u.id" (click)="confirmDeleteUser(u)">Delete</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Park a tenant -->
+      @if (deactivateRow(); as row) {
+        <div class="overlay" (click)="deactivateRow.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>Deactivate subscription</h2>
+            <p class="modal-sub">
+              <strong>{{ row.company_name }}</strong> will be marked EXPIRED and ends today, so the app
+              locks them out. Nothing is deleted — Activate puts them straight back.
+            </p>
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === row.company_id" (click)="deactivateRow.set(null)">Cancel</button>
+              <button class="act danger" [disabled]="busyId() === row.company_id" (click)="confirmDeactivate(row)">
+                Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
       }
 
       @if (flash()) {
@@ -660,7 +810,7 @@ export class AppComponent implements OnInit {
   private service = inject(SubscriptionsService);
 
   /** Which section the sidebar is showing. */
-  view = signal<'companies' | 'licenses' | 'bots'>('companies');
+  view = signal<'companies' | 'licenses' | 'bots' | 'users'>('companies');
 
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
@@ -1305,6 +1455,129 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.error.set(`Generate failed: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+  // ── Users, per tenant ───────────────────────────────────────────────────────
+  // The vendor creates and removes accounts here. The API refuses to delete a
+  // tenant's last admin, which would lock the customer out of their own app.
+  readonly roles = USER_ROLES;
+  users = signal<TenantUser[]>([]);
+  usersLoading = signal(false);
+  userSearch = signal('');
+  userCompany = signal('');
+  createUserOpen = signal(false);
+  creatingUser = signal(false);
+  deleteUserRow = signal<TenantUser | null>(null);
+  newUser = { companyId: '', email: '', password: '', firstName: '', lastName: '', role: 'ADMIN' };
+
+  visibleUsers = computed(() => {
+    const q = this.userSearch().trim().toLowerCase();
+    const co = this.userCompany();
+    return this.users().filter((u) => {
+      if (co && u.company_id !== co) return false;
+      if (!q) return true;
+      return `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
+        || u.email.toLowerCase().includes(q)
+        || u.role.toLowerCase().includes(q);
+    });
+  });
+
+  showUsers() {
+    this.view.set('users');
+    if (!this.users().length) this.loadUsers();
+  }
+
+  loadUsers() {
+    this.usersLoading.set(true);
+    this.service.listUsers().subscribe({
+      next: (rows) => { this.users.set(rows); this.usersLoading.set(false); },
+      error: (err) => {
+        this.usersLoading.set(false);
+        this.error.set(`Users: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  openCreateUser() {
+    // Pre-select whatever tenant is being filtered on — that is almost always the
+    // one being added to.
+    this.newUser = {
+      companyId: this.userCompany(), email: '', password: '',
+      firstName: '', lastName: '', role: 'ADMIN',
+    };
+    this.createUserOpen.set(true);
+  }
+
+  confirmCreateUser() {
+    const u = this.newUser;
+    if (!u.companyId) { this.error.set('Choose a tenant.'); return; }
+    if (!u.firstName.trim() || !u.lastName.trim()) { this.error.set('First and last name are required.'); return; }
+    if (!u.email.trim()) { this.error.set('Email is required.'); return; }
+    if (u.password.length < 6) { this.error.set('Password must be at least 6 characters.'); return; }
+
+    this.creatingUser.set(true);
+    this.service.createUser({
+      companyId: u.companyId,
+      email: u.email.trim(),
+      password: u.password,
+      firstName: u.firstName.trim(),
+      lastName: u.lastName.trim(),
+      role: u.role,
+    }).subscribe({
+      next: () => {
+        this.creatingUser.set(false);
+        this.createUserOpen.set(false);
+        this.showFlash(`${u.email} created.`);
+        this.loadUsers();
+      },
+      error: (err) => {
+        this.creatingUser.set(false);
+        this.error.set(`Create user: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  openDeleteUser(u: TenantUser) {
+    this.deleteUserRow.set(u);
+  }
+
+  confirmDeleteUser(u: TenantUser) {
+    this.busyId.set(u.id);
+    this.service.deleteUser(u.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.deleteUserRow.set(null);
+        this.showFlash(`${u.email} deleted.`);
+        this.loadUsers();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        // e.g. "last admin" — keep the dialog open so the message is read in context.
+        this.error.set(`Delete user: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
+  }
+
+  // ── Park a tenant ───────────────────────────────────────────────────────────
+  deactivateRow = signal<CompanySubscription | null>(null);
+
+  openDeactivate(r: CompanySubscription) {
+    this.deactivateRow.set(r);
+  }
+
+  confirmDeactivate(r: CompanySubscription) {
+    this.busyId.set(r.company_id);
+    this.service.deactivate(r.company_id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.deactivateRow.set(null);
+        this.showFlash(`${r.company_name} deactivated.`);
+        this.load();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Deactivate: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

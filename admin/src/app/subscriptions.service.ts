@@ -31,6 +31,26 @@ export interface CompanySubscription {
 const ADMIN_ENDPOINT =
   'https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret';
 
+/** A user account inside a tenant, as this console sees it. Never a password. */
+export interface TenantUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+  email_verified: boolean;
+  company_id: string | null;
+  company_name: string | null;
+  created_at: string | null;
+}
+
+/** Mirrors the users.role CHECK constraint in the database. */
+export const USER_ROLES = [
+  'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
+  'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER',
+];
+
 @Injectable({ providedIn: 'root' })
 export class SubscriptionsService {
   private http = inject(HttpClient);
@@ -185,6 +205,30 @@ export class SubscriptionsService {
   /** Permanently delete a license row. */
   deleteLicense(id: string): Observable<{ deleted: true }> {
     return this.http.delete<{ deleted: true }>(`${ADMIN_ENDPOINT}/licenses/${id}`);
+  }
+
+  /** Park a tenant who stopped paying. Reversible: activate() puts them back. */
+  deactivate(companyId: string): Observable<{ success: boolean; subscription_type: string | null }> {
+    return this.http.post<{ success: boolean; subscription_type: string | null }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/deactivate`,
+      {},
+    );
+  }
+
+  /** Every user account, or just one tenant's. */
+  listUsers(companyId?: string): Observable<TenantUser[]> {
+    const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+    return this.http.get<TenantUser[]>(`${ADMIN_ENDPOINT}/users${qs}`);
+  }
+
+  createUser(body: {
+    companyId: string; email: string; password: string; firstName: string; lastName: string; role: string;
+  }): Observable<TenantUser> {
+    return this.http.post<TenantUser>(`${ADMIN_ENDPOINT}/users`, body);
+  }
+
+  deleteUser(id: string): Observable<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(`${ADMIN_ENDPOINT}/users/${id}`);
   }
 }
 

@@ -1,7 +1,14 @@
 import { randomInt } from 'crypto';
+import bcrypt from 'bcryptjs';
 import { CARD_SERIAL_BASE, ensureQrCardSchema } from './qr-cards';
 import { query, queryOne } from '../db/connection';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
+
+/** The roles a user account can hold (mirrors the users.role CHECK constraint). */
+export const ADMIN_ROLES = [
+  'GLOBAL_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
+  'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER',
+];
 
 // Human-friendly, unambiguous key alphabet (no 0/O/1/I).
 const KEY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -649,6 +656,166 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret qr card stats failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Stats failed' } };
+    }
+  },
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/deactivate
+   * The counterpart of activate: park a tenant who has stopped paying. Sets the
+   * subscription EXPIRED and ends it today, so the app's own subscription check
+   * locks them out. Nothing is deleted — activate puts them straight back.
+   */
+  deactivateSubscription: async ({ params }: { params: { companyId: string } }) => {
+    try {
+      const sub = await queryOne<any>('SELECT id FROM subscriptions WHERE company_id = $1', [params.companyId]);
+      if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this company' } };
+
+      const today = new Date().toISOString().split('T')[0];
+      await query(
+        `UPDATE subscriptions
+            SET status = 'EXPIRED',
+                subscription_end_date = LEAST(COALESCE(subscription_end_date, $2::date), $2::date),
+                updated_at = NOW()
+          WHERE id = $1`,
+        [sub.id, today],
+      );
+
+      return { status: 200 as const, body: { success: true, subscription_type: 'EXPIRED' } };
+    } catch (error: any) {
+      console.error('karim-admin-secret deactivate failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Deactivate failed' } };
+    }
+  },
+
+  /**
+   * GET /api/karim-admin-secret/users?companyId=...
+   * Every user account, with the tenant it belongs to. Passwords never leave here.
+   */
+  listUsers: async ({ query: q }: { query: { companyId?: string } }) => {
+    try {
+      const params: any[] = [];
+      let sql = `
+        SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.is_active,
+               u.email_verified, u.created_at,
+               u.company_id, c.name AS company_name
+          FROM users u
+          LEFT JOIN companies c ON c.id = u.company_id`;
+      if (q?.companyId) {
+        params.push(q.companyId);
+        sql += ' WHERE u.company_id = $1';
+      }
+      sql += ' ORDER BY c.name NULLS LAST, u.created_at DESC';
+
+      const rows = await query<any>(sql, params);
+      return {
+        status: 200 as const,
+        body: rows.map((r) => ({
+          id: r.id,
+          email: r.email,
+          first_name: r.first_name,
+          last_name: r.last_name,
+          role: r.role,
+          is_active: r.is_active !== false,
+          email_verified: r.email_verified === true,
+          company_id: r.company_id ?? null,
+          company_name: r.company_name ?? null,
+          created_at: toIso(r.created_at),
+        })),
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret list users failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List users failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/users
+   * Create a user inside a tenant. Verified on the spot — a vendor-created account
+   * has nobody to click an OTP, and an unverified account cannot log in.
+   */
+  createUser: async ({ body }: {
+    body: { companyId: string; email: string; password: string; firstName: string; lastName: string; role: string };
+  }) => {
+    try {
+      const email = (body?.email || '').trim().toLowerCase();
+      const password = body?.password || '';
+      const firstName = (body?.firstName || '').trim();
+      const lastName = (body?.lastName || '').trim();
+      const role = (body?.role || '').trim().toUpperCase();
+
+      if (!email || !password || !firstName || !lastName) {
+        return { status: 400 as const, body: { message: 'Email, password, first and last name are required' } };
+      }
+      if (password.length < 6) {
+        return { status: 400 as const, body: { message: 'Password must be at least 6 characters' } };
+      }
+      if (!ADMIN_ROLES.includes(role)) {
+        return { status: 400 as const, body: { message: `Role must be one of: ${ADMIN_ROLES.join(', ')}` } };
+      }
+
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [body?.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      // Email is UNIQUE across the whole table, not per tenant — say so plainly
+      // rather than letting the insert fail on a constraint name.
+      const taken = await queryOne<any>('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
+      if (taken) return { status: 409 as const, body: { message: 'That email already belongs to a user' } };
+
+      const hashed = await bcrypt.hash(password, 10);
+      const row = await queryOne<any>(
+        `INSERT INTO users (email, password, first_name, last_name, role, company_id, is_active, email_verified)
+         VALUES ($1, $2, $3, $4, $5, $6, true, true)
+         RETURNING id, email, first_name, last_name, role, is_active, email_verified, company_id, created_at`,
+        [email, hashed, firstName, lastName, role, body.companyId],
+      );
+
+      return {
+        status: 201 as const,
+        body: {
+          id: row.id,
+          email: row.email,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          role: row.role,
+          is_active: row.is_active !== false,
+          email_verified: row.email_verified === true,
+          company_id: row.company_id ?? null,
+          company_name: null,
+          created_at: toIso(row.created_at),
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret create user failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Create user failed' } };
+    }
+  },
+
+  /**
+   * DELETE /api/karim-admin-secret/users/:id
+   * Refuses to remove a tenant's LAST admin — that would lock the customer out of
+   * their own account, with no way back in except this console.
+   */
+  deleteUser: async ({ params }: { params: { id: string } }) => {
+    try {
+      const user = await queryOne<any>('SELECT id, role, company_id FROM users WHERE id = $1', [params.id]);
+      if (!user) return { status: 404 as const, body: { message: 'User not found' } };
+
+      if (user.company_id && ['ADMIN', 'GLOBAL_ADMIN'].includes(user.role)) {
+        const others = await queryOne<any>(
+          `SELECT COUNT(*) AS n FROM users
+            WHERE company_id = $1 AND id <> $2 AND is_active = true
+              AND role IN ('ADMIN', 'GLOBAL_ADMIN')`,
+          [user.company_id, user.id],
+        );
+        if (Number(others?.n ?? 0) === 0) {
+          return { status: 409 as const, body: { message: "This is the tenant's last admin — the company would be locked out" } };
+        }
+      }
+
+      await query('DELETE FROM users WHERE id = $1', [params.id]);
+      return { status: 200 as const, body: { success: true } };
+    } catch (error: any) {
+      console.error('karim-admin-secret delete user failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Delete user failed' } };
     }
   },
 };
