@@ -70,7 +70,8 @@
     "PREVIEW_POOL_NOTE": "The serial shown is an example; each printed card carries its own.",
     "TAB_STUDENTS": "Student cards",
     "TAB_POOL": "QR card pool",
-    "PREVIEW_POOL_TITLE": "Pool card preview"
+    "PREVIEW_POOL_TITLE": "Pool card preview",
+    "AGNOSTIC_DOWNLOAD": "Download both sides"
   },
   "ERRORS": {
     "GENERIC": "An error occurred",

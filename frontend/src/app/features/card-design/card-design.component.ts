@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { TabsModule } from 'primeng/tabs';
+import { TooltipModule } from 'primeng/tooltip';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
@@ -36,7 +37,7 @@ import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../stude
 @Component({
   selector: 'app-card-design',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TabsModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, TabsModule, TooltipModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
   templateUrl: './card-design.component.html',
 })
 export class CardDesignComponent implements OnInit {
@@ -356,6 +357,44 @@ export class CardDesignComponent implements OnInit {
   // A pool card is printed before any student owns it, so it carries no student
   // data at all — both faces are about the academy. That makes it a separate
   // choice from `template`, which governs the personal student cards.
+
+  /** Which pool design is being rendered for download. */
+  downloadingPool = signal<AgnosticTemplate | null>(null);
+
+  /**
+   * Both faces of one pool design, as the print-ready PNGs.
+   *
+   * Works on ANY of the four, not just the one in use — the point is to hold the
+   * designs side by side before committing to one. The serial on the front is a
+   * sample: the real cards, each with its own QR and serial, come from the QR
+   * cards page. Renders from the CURRENT form state, so unsaved edits show up.
+   */
+  async downloadPool(t: AgnosticTemplate): Promise<void> {
+    this.downloadingPool.set(t);
+    try {
+      const d = this.design();
+      const canvas = document.createElement('canvas');
+      const images = await loadCardImages(d);
+      const company = d.teacherName || '';
+      await document.fonts.ready;   // Arabic must shape before we rasterise
+
+      const save = (base64: string, name: string) => {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        saveAs(new Blob([bytes], { type: 'image/png' }), name);
+      };
+
+      save(await renderAgnosticCardPng(
+        { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
+        canvas, t, images,
+      ), `pool-${t}-front.png`);
+
+      save(await renderAgnosticBackPng({ ...d, agnosticTemplate: t }, company, canvas, images), `pool-${t}-back.png`);
+    } catch {
+      this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
+    } finally {
+      this.downloadingPool.set(null);
+    }
+  }
 
   /**
    * Pick the pool design. Persists immediately: choosing it IS the decision, and

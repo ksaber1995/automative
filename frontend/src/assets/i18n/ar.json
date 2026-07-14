@@ -70,7 +70,8 @@
     "PREVIEW_POOL_NOTE": "رقم البطاقة المعروض مثال؛ كل بطاقة مطبوعة تحمل رقمها الخاص.",
     "TAB_STUDENTS": "بطاقات الطلاب",
     "TAB_POOL": "بطاقات QR الجاهزة",
-    "PREVIEW_POOL_TITLE": "معاينة البطاقة الجاهزة"
+    "PREVIEW_POOL_TITLE": "معاينة البطاقة الجاهزة",
+    "AGNOSTIC_DOWNLOAD": "تنزيل الوجهين"
   },
   "ERRORS": {
     "GENERIC": "حدث خطأ",
