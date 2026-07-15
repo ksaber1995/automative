@@ -8,6 +8,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -28,6 +29,7 @@ import { Course } from '@shared/interfaces/course.interface';
     TextareaModule,
     InputNumberModule,
     SelectModule,
+    MultiSelectModule,
     TranslateModule
   ],
   templateUrl: './course-form.component.html'
@@ -61,7 +63,7 @@ export class CourseFormComponent implements OnInit {
       price: [0, [Validators.required, Validators.min(0)]],
       instructorId: [''],
       defaultRoomId: [null],
-      levelId: [null],
+      levelIds: [[] as string[]],
       // PER_SESSION settings:
       chargeAbsentSessions: [false],
       sessionPackageSize: [null],
@@ -136,7 +138,7 @@ export class CourseFormComponent implements OnInit {
           price: course.price,
           instructorId: course.instructorId || '',
           defaultRoomId: (course as any).defaultRoomId || null,
-          levelId: course.levelId || null,
+          levelIds: course.levels?.map(l => l.id) ?? (course.levelId ? [course.levelId] : []),
           chargeAbsentSessions: (course as any).chargeAbsentSessions ?? false,
           sessionPackageSize: (course as any).sessionPackageSize ?? null,
           sessionPackagePrice: (course as any).sessionPackagePrice ?? null,

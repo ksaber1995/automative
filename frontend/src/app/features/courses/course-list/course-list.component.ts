@@ -99,7 +99,8 @@ export class CourseListComponent implements OnInit {
         branch === null ? true :
         branch === '__global__' ? c.branchId === null :
         c.branchId === branch;
-      const levelMatch = level === null ? true : c.levelId === level;
+      const levelMatch = level === null ? true
+        : (c.levels?.length ? c.levels.some(l => l.id === level) : c.levelId === level);
       const paymentTypeMatch =
         paymentType === 'ALL' ? true : (c.paymentType ?? 'ONE_TIME') === paymentType;
       return branchMatch && levelMatch && paymentTypeMatch;
@@ -133,6 +134,12 @@ export class CourseListComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  // Comma-separated level names for the list, falling back to the legacy single name.
+  levelNames(course: CourseWithEnrollmentCount): string {
+    if (course.levels?.length) return course.levels.map(l => l.name).filter(Boolean).join(', ');
+    return course.levelName || '—';
   }
 
   getBranchName(branchId: string | null): string {

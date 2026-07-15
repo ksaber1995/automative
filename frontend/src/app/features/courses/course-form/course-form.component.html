@@ -189,21 +189,22 @@
           </div>
           }
 
-          <!-- Level -->
+          <!-- Levels (a course can be tagged with more than one) -->
           <div class="col-span-2">
-            <label for="levelId" class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="levelIds" class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'COURSES.FORM.LEVEL_LABEL' | translate }}
             </label>
-            <p-select
-              id="levelId"
-              formControlName="levelId"
+            <p-multiSelect
+              id="levelIds"
+              formControlName="levelIds"
               [options]="levels()"
               optionLabel="label"
               optionValue="id"
+              display="chip"
               [placeholder]="'COURSES.FORM.LEVEL_PLACEHOLDER' | translate"
               [style]="{ width: '100%' }"
               [showClear]="true"
-            ></p-select>
+            ></p-multiSelect>
           </div>
 
           <!-- Description -->

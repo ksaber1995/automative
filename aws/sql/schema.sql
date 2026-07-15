@@ -188,7 +188,9 @@ CREATE TABLE levels (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    age INTEGER,
+    age INTEGER,                 -- legacy single age (kept for back-compat)
+    from_age INTEGER,            -- optional age range start
+    to_age INTEGER,              -- optional age range end (must be > from_age)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -328,6 +330,19 @@ CREATE TABLE courses (
 CREATE INDEX idx_courses_branch_id ON courses(branch_id);
 CREATE INDEX idx_courses_company_id ON courses(company_id);
 CREATE INDEX idx_courses_level_id ON courses(level_id);
+
+-- A course can be tagged with several levels. This join table is the source of
+-- truth; courses.level_id is kept in sync as the first level for old readers.
+CREATE TABLE course_levels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    level_id UUID NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (course_id, level_id)
+);
+
+CREATE INDEX idx_course_levels_course ON course_levels(course_id);
+CREATE INDEX idx_course_levels_level ON course_levels(level_id);
 
 CREATE TABLE master_course_courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

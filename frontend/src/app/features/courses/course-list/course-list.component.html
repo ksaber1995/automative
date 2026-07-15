@@ -112,7 +112,7 @@
           @if (!authService.isTeacher()) {
             <td>{{ getBranchName(course.branchId) }}</td>
           }
-          <td>{{ course.levelName || '—' }}</td>
+          <td>{{ levelNames(course) }}</td>
           <td>{{ course.price | amount }}</td>
           <td>
             <div class="flex flex-col gap-1">

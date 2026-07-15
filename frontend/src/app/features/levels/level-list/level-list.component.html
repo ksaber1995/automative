@@ -17,14 +17,14 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'LEVELS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="age">{{ 'LEVELS.LIST.COL_AGE' | translate }} <p-sortIcon field="age"></p-sortIcon></th>
+          <th>{{ 'LEVELS.LIST.COL_AGE_RANGE' | translate }}</th>
           <th>{{ 'LEVELS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-level>
         <tr>
           <td>{{ level.name }}</td>
-          <td>{{ level.age ?? ('LEVELS.LIST.NO_AGE' | translate) }}</td>
+          <td>{{ ageDisplay(level) }}</td>
           <td>
             <div class="flex gap-2">
               @if (authService.canWrite('academy')) {
@@ -90,19 +90,37 @@
           }
         </div>
 
-        <div>
-          <label for="age" class="block text-sm font-medium text-gray-700 mb-2">
-            {{ 'LEVELS.FORM.AGE_LABEL' | translate }}
-          </label>
-          <p-inputnumber
-            id="age"
-            formControlName="age"
-            [min]="0"
-            [max]="120"
-            [placeholder]="'LEVELS.FORM.AGE_PLACEHOLDER' | translate"
-            [style]="{ width: '100%' }"
-          />
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="fromAge" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'LEVELS.FORM.FROM_AGE_LABEL' | translate }}
+            </label>
+            <p-inputnumber
+              id="fromAge"
+              formControlName="fromAge"
+              [min]="0"
+              [max]="120"
+              [placeholder]="'LEVELS.FORM.FROM_AGE_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+            />
+          </div>
+          <div>
+            <label for="toAge" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'LEVELS.FORM.TO_AGE_LABEL' | translate }}
+            </label>
+            <p-inputnumber
+              id="toAge"
+              formControlName="toAge"
+              [min]="0"
+              [max]="120"
+              [placeholder]="'LEVELS.FORM.TO_AGE_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+            />
+          </div>
         </div>
+        @if (rangeInvalid) {
+          <small class="text-red-500 -mt-2">{{ 'LEVELS.FORM.AGE_RANGE_INVALID' | translate }}</small>
+        }
       </div>
 
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t">

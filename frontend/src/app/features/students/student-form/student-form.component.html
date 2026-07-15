@@ -67,11 +67,7 @@
               [showIcon]="true"
               [style]="{'width': '100%'}"
               [placeholder]="'STUDENTS.FORM.DOB_PLACEHOLDER' | translate"
-              [class.ng-invalid]="dateOfBirth?.invalid && dateOfBirth?.touched"
             />
-            @if (dateOfBirth?.invalid && dateOfBirth?.touched) {
-              <small class="text-red-500 block mt-1">{{ 'STUDENTS.FORM.DOB_REQUIRED' | translate }}</small>
-            }
           </div>
 
           <!-- Gender -->

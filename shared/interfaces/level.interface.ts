@@ -3,6 +3,8 @@ export interface Level {
   companyId: string;
   name: string;
   age: number | null;
+  fromAge?: number | null;
+  toAge?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -10,9 +12,13 @@ export interface Level {
 export interface LevelCreateDto {
   name: string;
   age?: number | null;
+  fromAge?: number | null;
+  toAge?: number | null;
 }
 
 export interface LevelUpdateDto {
   name?: string;
   age?: number | null;
+  fromAge?: number | null;
+  toAge?: number | null;
 }

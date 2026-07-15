@@ -413,6 +413,9 @@ const BranchSchema = z.object({
 const CreateLevelSchema = z.object({
   name: z.string(),
   age: z.number().nullable().optional(),
+  // Optional age range. Both nullable; the route rejects toAge <= fromAge.
+  fromAge: z.number().nullable().optional(),
+  toAge: z.number().nullable().optional(),
 });
 
 const UpdateLevelSchema = CreateLevelSchema.partial();
@@ -422,8 +425,16 @@ const LevelSchema = z.object({
   companyId: UUIDSchema,
   name: z.string(),
   age: z.number().nullable(),
+  fromAge: z.number().nullable().optional(),
+  toAge: z.number().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+// A level as embedded on a course response (id + display name).
+const CourseLevelSchema = z.object({
+  id: UUIDSchema,
+  name: z.string().nullable(),
 });
 
 // =============================================
@@ -436,7 +447,9 @@ const CreateCourseSchema = z.object({
   price: z.number(),
   instructorId: OptionalUUIDSchema,
   defaultRoomId: OptionalUUIDSchema,
+  // Legacy single level (kept for back-compat) and the new multi-level array.
   levelId: OptionalUUIDSchema,
+  levelIds: z.array(UUIDSchema).optional(),
   // Payment model: ONE_TIME (default), MONTHLY_SUBSCRIPTION, or PER_SESSION. Without
   // this the field is stripped from the request body and every course saves as ONE_TIME.
   paymentType: CoursePaymentTypeSchema.optional(),
@@ -641,6 +654,8 @@ const CourseSchema = z.object({
   instructorId: UUIDSchema.nullable(),
   levelId: UUIDSchema.nullable().optional(),
   levelName: z.string().nullable().optional(),
+  levelIds: z.array(UUIDSchema).optional(),
+  levels: z.array(CourseLevelSchema).optional(),
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
   paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),

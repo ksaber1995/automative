@@ -9,6 +9,8 @@ export interface Course {
   defaultRoomId: string | null;
   levelId?: string | null;
   levelName?: string | null;
+  levelIds?: string[];
+  levels?: { id: string; name: string | null }[];
   isActive: boolean;
   paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
   // PER_SESSION settings (price holds the per-session fee):
@@ -32,6 +34,7 @@ export interface CourseCreateDto {
   price: number;
   instructorId?: string;
   levelId?: string | null;
+  levelIds?: string[];
   paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
   sessionPackageSize?: number | null;
   sessionPackagePrice?: number | null;
@@ -45,6 +48,7 @@ export interface CourseUpdateDto {
   price?: number;
   instructorId?: string;
   levelId?: string | null;
+  levelIds?: string[];
   isActive?: boolean;
   paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
   sessionPackageSize?: number | null;

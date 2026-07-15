@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
@@ -15,6 +15,16 @@ import { LevelService } from '../services/level.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Level } from '@shared/interfaces/level.interface';
+
+// "To" age must be strictly greater than "From" when both are filled in.
+function ageRangeValidator(group: AbstractControl): ValidationErrors | null {
+  const from = group.get('fromAge')?.value;
+  const to = group.get('toAge')?.value;
+  if (from !== null && from !== undefined && to !== null && to !== undefined && to <= from) {
+    return { ageRange: true };
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-level-list',
@@ -52,10 +62,23 @@ export class LevelListComponent implements OnInit {
 
   form: FormGroup = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
-    age: [null as number | null],
-  });
+    fromAge: [null as number | null],
+    toAge: [null as number | null],
+  }, { validators: ageRangeValidator });
 
   get name() { return this.form.get('name'); }
+  get rangeInvalid() { return this.form.errors?.['ageRange'] && this.form.get('toAge')?.touched; }
+
+  // Format a level's age range for the list, falling back to the legacy single age.
+  ageDisplay(level: Level): string {
+    const from = level.fromAge ?? null;
+    const to = level.toAge ?? null;
+    if (from !== null && to !== null) return `${from} - ${to}`;
+    if (from !== null) return `${from}+`;
+    if (to !== null) return `≤ ${to}`;
+    if (level.age !== null && level.age !== undefined) return `${level.age}`;
+    return this.translate.instant('LEVELS.LIST.NO_AGE');
+  }
 
   ngOnInit() {
     this.loadLevels();
@@ -78,14 +101,14 @@ export class LevelListComponent implements OnInit {
   openCreate() {
     this.isEditMode.set(false);
     this.editingId = null;
-    this.form.reset({ name: '', age: null });
+    this.form.reset({ name: '', fromAge: null, toAge: null });
     this.showDialog.set(true);
   }
 
   openEdit(level: Level) {
     this.isEditMode.set(true);
     this.editingId = level.id;
-    this.form.reset({ name: level.name, age: level.age });
+    this.form.reset({ name: level.name, fromAge: level.fromAge ?? null, toAge: level.toAge ?? null });
     this.showDialog.set(true);
   }
 
@@ -102,7 +125,8 @@ export class LevelListComponent implements OnInit {
     this.saving.set(true);
     const value = {
       name: this.form.value.name?.trim(),
-      age: this.form.value.age ?? null,
+      fromAge: this.form.value.fromAge ?? null,
+      toAge: this.form.value.toAge ?? null,
     };
 
     const done = () => {

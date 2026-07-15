@@ -2,8 +2,29 @@ import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensurePerSessionSchema } from './session-payments';
+import { ensureLevelSchema } from './levels';
+
+// Aggregates every level linked to a course (via the course_levels join) into a
+// JSON array. Aliased `c` must be the courses row in the surrounding query.
+const LEVELS_SUBQUERY = `COALESCE((
+  SELECT json_agg(json_build_object('id', l2.id, 'name', l2.name) ORDER BY l2.name ASC)
+  FROM course_levels cl2
+  JOIN levels l2 ON cl2.level_id = l2.id
+  WHERE cl2.course_id = c.id
+), '[]'::json) AS levels_json`;
 
 function mapCourseFromDB(row: any) {
+  let levels: { id: string; name: string | null }[] = [];
+  const raw = row.levels_json;
+  if (raw != null) {
+    levels = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  }
+  // Fall back to the legacy single link when the join has no rows yet (e.g. a
+  // course created from a master template before it was ever edited).
+  if (levels.length === 0 && row.level_id) {
+    levels = [{ id: row.level_id, name: row.level_name ?? null }];
+  }
+
   return {
     id: row.id,
     companyId: row.company_id,
@@ -12,8 +33,10 @@ function mapCourseFromDB(row: any) {
     description: row.description,
     price: parseFloat(row.price),
     instructorId: row.instructor_id,
-    levelId: row.level_id ?? null,
-    levelName: row.level_name ?? null,
+    levelId: row.level_id ?? (levels[0]?.id ?? null),
+    levelName: row.level_name ?? (levels[0]?.name ?? null),
+    levelIds: levels.map((l) => l.id),
+    levels,
     isActive: row.is_active,
     paymentType: row.payment_type || 'ONE_TIME',
     sessionPackageSize: row.session_package_size ?? null,
@@ -22,6 +45,41 @@ function mapCourseFromDB(row: any) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+// The level ids a create/update body wants on a course. Accepts the new
+// `levelIds` array and falls back to the legacy single `levelId`.
+function resolveLevelIds(body: any): string[] {
+  if (Array.isArray(body.levelIds)) {
+    return [...new Set(body.levelIds.filter(Boolean) as string[])];
+  }
+  if (body.levelId) return [body.levelId];
+  return [];
+}
+
+// Replace a course's level links with exactly `levelIds`.
+async function setCourseLevels(courseId: string, levelIds: string[]) {
+  await query('DELETE FROM course_levels WHERE course_id = $1', [courseId]);
+  const unique = [...new Set(levelIds.filter(Boolean))];
+  if (unique.length > 0) {
+    await query(
+      `INSERT INTO course_levels (course_id, level_id)
+       SELECT $1, unnest($2::uuid[])
+       ON CONFLICT (course_id, level_id) DO NOTHING`,
+      [courseId, unique]
+    );
+  }
+}
+
+// Re-read a course with its aggregated levels for a complete response body.
+async function fetchCourseWithLevels(id: string, companyId: string) {
+  return queryOne(
+    `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
+     FROM courses c
+     LEFT JOIN levels l ON c.level_id = l.id
+     WHERE c.id = $1 AND c.company_id = $2`,
+    [id, companyId]
+  );
 }
 
 function mapCourseWithEnrollmentCountFromDB(row: any) {
@@ -49,6 +107,9 @@ export const coursesRoutes = {
 
       // PER_SESSION courses need the widened payment_type CHECK + settings columns.
       if (body.paymentType === 'PER_SESSION') await ensurePerSessionSchema();
+      await ensureLevelSchema();
+
+      const levelIds = resolveLevelIds(body);
 
       const course = await insert('courses', {
         company_id: context.companyId,
@@ -57,7 +118,8 @@ export const coursesRoutes = {
         description: body.description || null,
         price: body.price,
         instructor_id: body.instructorId || null,
-        level_id: body.levelId || null,
+        // Keep the legacy single column pointed at the first level for old readers.
+        level_id: levelIds[0] ?? null,
         is_active: true,
         payment_type: body.paymentType || 'ONE_TIME',
         session_package_size: body.paymentType === 'PER_SESSION' ? (body.sessionPackageSize || null) : null,
@@ -65,9 +127,12 @@ export const coursesRoutes = {
         charge_absent_sessions: body.paymentType === 'PER_SESSION' ? !!body.chargeAbsentSessions : false,
       });
 
+      await setCourseLevels(course.id, levelIds);
+
+      const full = await fetchCourseWithLevels(course.id, context.companyId);
       return {
         status: 201 as const,
-        body: mapCourseFromDB(course),
+        body: mapCourseFromDB(full ?? course),
       };
     } catch (error) {
       console.error('Create course error:', error);
@@ -82,10 +147,13 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      await ensureLevelSchema();
+
       let sql = `
         SELECT
           c.*,
           l.name as level_name,
+          ${LEVELS_SUBQUERY},
           COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as direct_enrollment_count,
           COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
@@ -127,7 +195,12 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = 'SELECT * FROM courses WHERE company_id = $1 AND is_active = true';
+      await ensureLevelSchema();
+
+      let sql = `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
+        FROM courses c
+        LEFT JOIN levels l ON c.level_id = l.id
+        WHERE c.company_id = $1 AND c.is_active = true`;
       const params: any[] = [context.companyId];
 
       if (queryParams.branchId) {
@@ -135,13 +208,13 @@ export const coursesRoutes = {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
-        sql += ` AND branch_id = $${params.length}`;
+        sql += ` AND c.branch_id = $${params.length}`;
       } else {
-        const branchClause = appendBranchSqlFilter(context, params, 'branch_id');
+        const branchClause = appendBranchSqlFilter(context, params, 'c.branch_id');
         if (branchClause) sql += ` AND ${branchClause}`;
       }
 
-      sql += ' ORDER BY created_at DESC';
+      sql += ' ORDER BY c.created_at DESC';
 
       const courses = await query(sql, params);
       return {
@@ -161,8 +234,10 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      await ensureLevelSchema();
+
       const course = await queryOne(
-        `SELECT c.*, l.name as level_name
+        `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
          FROM courses c
          LEFT JOIN levels l ON c.level_id = l.id
          WHERE c.id = $1 AND c.company_id = $2`,
@@ -193,6 +268,10 @@ export const coursesRoutes = {
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+
+      // The response re-reads the course with its aggregated levels, so the join
+      // table must exist regardless of whether this request changes the levels.
+      await ensureLevelSchema();
 
       const existing = await queryOne(
         'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
@@ -225,21 +304,36 @@ export const coursesRoutes = {
       if (body.description !== undefined) updateData.description = body.description;
       if (body.price !== undefined) updateData.price = body.price;
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
-      if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.paymentType !== undefined) updateData.payment_type = body.paymentType;
       if (body.sessionPackageSize !== undefined) updateData.session_package_size = body.sessionPackageSize || null;
       if (body.sessionPackagePrice !== undefined) updateData.session_package_price = body.sessionPackagePrice ?? null;
       if (body.chargeAbsentSessions !== undefined) updateData.charge_absent_sessions = !!body.chargeAbsentSessions;
 
-      const course = await update('courses', params.id, updateData);
+      // Level links: accept the new `levelIds` array or the legacy single `levelId`.
+      // Keep courses.level_id pointed at the first level for backward compatibility.
+      const levelsProvided = body.levelIds !== undefined || body.levelId !== undefined;
+      let newLevelIds: string[] = [];
+      if (levelsProvided) {
+        newLevelIds = resolveLevelIds(body);
+        updateData.level_id = newLevelIds[0] ?? null;
+      }
+
+      const course = Object.keys(updateData).length > 0
+        ? await update('courses', params.id, updateData)
+        : existing;
 
       if (!course) {
         return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
       }
 
+      if (levelsProvided) {
+        await setCourseLevels(params.id, newLevelIds);
+      }
+
+      const full = await fetchCourseWithLevels(params.id, context.companyId);
       return {
         status: 200 as const,
-        body: mapCourseFromDB(course),
+        body: mapCourseFromDB(full ?? course),
       };
     } catch (error) {
       console.error('Update course error:', error);
