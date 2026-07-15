@@ -172,11 +172,16 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
     if (collect > 0 && monthlyFee > 0 && firstBillId) {
       const status = collect >= monthlyFee ? 'PAID' : 'PARTIAL';
       const note = status === 'PAID' ? 'First month paid at enrollment' : 'Part of the first month paid at enrollment';
+      // paid_date is WHEN the money was collected — that is now, at enrollment
+      // creation, NOT body.enrollmentDate. For a class that starts in a future
+      // month the enrollment (and its billing) is dated to the class start, so
+      // stamping paid_date with it would book a payment on a day that hasn't
+      // happened yet — e.g. "paid Jul 31" for cash taken on Jul 15.
       const payQuery = `UPDATE monthly_subscription_payments
-       SET amount_paid = $1, payment_status = $4, paid_date = $2,
-           notes = $5, updated_at = NOW()
-       WHERE id = $3`;
-      const args = [collect, body.enrollmentDate, firstBillId, status, note];
+       SET amount_paid = $1, payment_status = $3, paid_date = CURRENT_DATE,
+           notes = $4, updated_at = NOW()
+       WHERE id = $2`;
+      const args = [collect, firstBillId, status, note];
       if (client) {
         await client.query(payQuery, args);
       } else {

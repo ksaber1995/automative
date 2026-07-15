@@ -528,7 +528,7 @@ export class StudentDetailComponent implements OnInit {
     const payment = this.monthlyForAction();
     if (!payment || !this.monthlyDialogAmount || !this.monthlyDialogDate) return;
     this.actionLoading.set(true);
-    const dateStr = this.monthlyDialogDate.toISOString().split('T')[0];
+    const dateStr = this.ymdLocal(this.monthlyDialogDate);
     this.monthlyService.recordPayment(payment.id, {
       amount: this.monthlyDialogAmount,
       paymentDate: dateStr,
@@ -785,7 +785,7 @@ export class StudentDetailComponent implements OnInit {
     if (!enrollment || !this.dialogPaymentAmount || !this.dialogPaymentDate) return;
 
     this.actionLoading.set(true);
-    const dateStr = this.dialogPaymentDate.toISOString().split('T')[0];
+    const dateStr = this.ymdLocal(this.dialogPaymentDate);
 
     this.enrollmentService.addPayment(enrollment.id, {
       amount: this.dialogPaymentAmount,
@@ -830,7 +830,7 @@ export class StudentDetailComponent implements OnInit {
     if (!enrollment || !this.refundAmount || !this.refundDate) return;
 
     this.actionLoading.set(true);
-    const dateStr = this.refundDate.toISOString().split('T')[0];
+    const dateStr = this.ymdLocal(this.refundDate);
 
     this.enrollmentService.createRefund(enrollment.id, {
       type: this.refundType,
@@ -883,7 +883,7 @@ export class StudentDetailComponent implements OnInit {
     if (!me || !this.masterRefundAmount || !this.masterRefundDate) return;
 
     this.actionLoading.set(true);
-    const dateStr = this.masterRefundDate.toISOString().split('T')[0];
+    const dateStr = this.ymdLocal(this.masterRefundDate);
 
     this.masterEnrollmentService.createRefund(me.id, {
       type: this.masterRefundType,
@@ -1015,7 +1015,7 @@ export class StudentDetailComponent implements OnInit {
     const me = this.masterEnrollmentForAction();
     if (!me || !this.masterDialogPaymentAmount || !this.masterDialogPaymentDate) return;
     this.actionLoading.set(true);
-    const dateStr = this.masterDialogPaymentDate.toISOString().split('T')[0];
+    const dateStr = this.ymdLocal(this.masterDialogPaymentDate);
     this.masterEnrollmentService.addPayment(me.id, {
       amount: this.masterDialogPaymentAmount,
       paymentDate: dateStr,
@@ -1082,6 +1082,18 @@ export class StudentDetailComponent implements OnInit {
       month: 'short',
       day: 'numeric'
     });
+  }
+
+  /**
+   * Local YYYY-MM-DD for a picked date. toISOString() would convert the picker's
+   * local-midnight Date to UTC, landing a day early for any timezone east of UTC
+   * (e.g. Egypt) — so a payment picked for the 30th would be stored as the 29th.
+   */
+  private ymdLocal(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   getStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' {
