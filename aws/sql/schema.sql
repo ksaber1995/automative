@@ -378,6 +378,9 @@ CREATE TABLE classes (
     finished_at TIMESTAMP WITH TIME ZONE,
     -- Class delivery mode: OFFLINE (default, in-person) or ONLINE (no room required).
     type VARCHAR(16) NOT NULL DEFAULT 'OFFLINE',
+    -- Soft-delete marker: set when a class with payments is "deleted" — the row is
+    -- hidden from the tenant but kept for financial integrity. NULL = visible.
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,

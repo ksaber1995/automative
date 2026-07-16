@@ -78,7 +78,7 @@ export const lookupsRoutes = {
       return await runLookup(headers.authorization, (ctx, params) => {
         let sql = `SELECT cl.id, cl.name AS label FROM classes cl
                    JOIN courses co ON co.id = cl.course_id
-                   WHERE co.company_id = $1`;
+                   WHERE co.company_id = $1 AND cl.deleted_at IS NULL`;
         const clause = appendBranchSqlFilter(ctx, params, 'co.branch_id');
         if (clause) sql += ` AND ${clause}`;
         if (q?.courseId) { params.push(q.courseId); sql += ` AND cl.course_id = $${params.length}`; }

@@ -161,7 +161,7 @@
                   [pTooltip]="'CLASSES.LIST.EDIT' | translate"
                 ></p-button>
               }
-              @if (classItem.isActive && classItem.status !== 'DONE') {
+              @if ( classItem.status !== 'DONE') {
                 <p-button
                   icon="pi pi-trash"
                   [rounded]="true"

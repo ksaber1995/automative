@@ -10,6 +10,10 @@ async function ensureClassStatusColumns(): Promise<void> {
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`);
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`);
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS type VARCHAR(16) NOT NULL DEFAULT 'OFFLINE'`);
+        // Soft-delete marker: a class that has payments cannot be hard-deleted
+        // (that would destroy financial records), so it is hidden from the tenant
+        // by stamping deleted_at. Every tenant-facing class query filters it out.
+        await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
         // Drop redundant columns: branch_id and company_id are derivable from courses.
         // Drop the unique constraint and indexes that depend on company_id first.
         await query(`ALTER TABLE classes DROP CONSTRAINT IF EXISTS classes_company_id_code_key`);
@@ -80,7 +84,7 @@ async function loadClassForTenant(classId: string, companyId: string): Promise<a
     `SELECT c.*, co.company_id, co.branch_id
      FROM classes c
      INNER JOIN courses co ON c.course_id = co.id
-     WHERE c.id = $1 AND co.company_id = $2`,
+     WHERE c.id = $1 AND co.company_id = $2 AND c.deleted_at IS NULL`,
     [classId, companyId]
   );
 }
@@ -217,7 +221,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE co.company_id = $1
+        WHERE co.company_id = $1 AND c.deleted_at IS NULL
       `;
       const params: any[] = [context.companyId];
 
@@ -285,7 +289,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE co.company_id = $1 AND c.is_active = true
+        WHERE co.company_id = $1 AND c.is_active = true AND c.deleted_at IS NULL
       `;
       const params: any[] = [context.companyId];
 
@@ -363,6 +367,7 @@ export const classesRoutes = {
         WHERE co.company_id = $1
           ${instructorClause}
           AND c.is_active = true
+          AND c.deleted_at IS NULL
           AND COALESCE(c.is_finished, false) = false
           AND c.start_date <= $2
           AND c.end_date >= $3
@@ -436,7 +441,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
-        WHERE c.id = $1 AND co.company_id = $2
+        WHERE c.id = $1 AND co.company_id = $2 AND c.deleted_at IS NULL
       `;
 
       const result = await query(sql, [params.id, context.companyId]);
@@ -643,14 +648,43 @@ export const classesRoutes = {
         return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED_DELETE', 'Access denied to delete this class');
       }
 
-      if (existing.is_finished) {
-        return apiError(400, 'ERRORS.CLASSES.CANNOT_DEACTIVATE_FINISHED', 'Cannot deactivate a finished class.');
-      }
+      // Does the class carry any financial footprint? If so, a hard delete would
+      // cascade-destroy payment/salary records, so we soft-delete instead. We
+      // check paid enrollments, monthly/per-session payments, teacher salary
+      // payments, and any master-bundle enrollment (a paid bundle link).
+      const footprint = await queryOne<{ has_payments: boolean }>(
+        `SELECT (
+            EXISTS (SELECT 1 FROM enrollments e
+                     WHERE e.class_id = $1 AND (COALESCE(e.amount_paid,0) > 0 OR COALESCE(e.down_payment,0) > 0))
+         OR EXISTS (SELECT 1 FROM master_class_enrollments mce WHERE mce.class_id = $1)
+         OR EXISTS (SELECT 1 FROM monthly_subscription_payments msp
+                      JOIN enrollments e ON msp.enrollment_id = e.id
+                     WHERE e.class_id = $1 AND COALESCE(msp.amount_paid,0) > 0)
+         OR EXISTS (SELECT 1 FROM session_payments sp
+                      JOIN enrollments e ON sp.enrollment_id = e.id
+                     WHERE e.class_id = $1)
+         OR EXISTS (SELECT 1 FROM session_packages spk
+                      JOIN enrollments e ON spk.enrollment_id = e.id
+                     WHERE e.class_id = $1)
+         OR EXISTS (SELECT 1 FROM session_salary_payments ssp
+                      JOIN sessions s ON ssp.session_id = s.id
+                     WHERE s.class_id = $1)
+         ) AS has_payments`,
+        [params.id]
+      );
 
-      const classRecord = await update('classes', params.id, { is_active: false });
-
-      if (!classRecord) {
-        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      if (footprint?.has_payments) {
+        // Soft delete: hide the class from the tenant, drop its enrollments so
+        // nothing keeps billing or shows the student as active, but keep the row
+        // and all payment records intact for financial integrity.
+        await update('classes', params.id, { is_active: false, deleted_at: new Date().toISOString() });
+        await query(`UPDATE enrollments SET status = 'DROPPED' WHERE class_id = $1 AND status != 'DROPPED'`, [params.id]);
+        await query(`UPDATE master_class_enrollments SET status = 'DROPPED' WHERE class_id = $1 AND status != 'DROPPED'`, [params.id]);
+      } else {
+        // No money involved: hard-delete the class. Foreign keys cascade to its
+        // enrollments, sessions, attendance and teacher-attendance rows, removing
+        // every reference to it.
+        await query('DELETE FROM classes WHERE id = $1', [params.id]);
       }
 
       return {
