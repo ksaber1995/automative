@@ -11,6 +11,15 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
 } from '@shared/interfaces/permissions.interface';
 
+/**
+ * Tenants trialling WhatsApp Cloud API messaging, by company id:
+ * `netrofit` (teacher) and `Karim` (academy). See `canUseWhatsapp`.
+ */
+const WHATSAPP_TRIAL_COMPANIES = [
+  'b6420df6-74fc-4d9d-ab56-78106b376f06',
+  '07d91513-9a21-478c-ba46-4a8d6aa84150',
+];
+
 @Injectable({
   providedIn: 'root'
 })
@@ -204,6 +213,25 @@ export class AuthService {
 
   canUseCrm(): boolean {
     return !this.isTeacher() && this.plan() === 'ADVANCED';
+  }
+
+  /**
+   * WhatsApp (Cloud API) messaging, limited to the tenants trialling it while the
+   * Meta onboarding — business verification, display name, template approval — is
+   * still being worked through per company. Everyone else would land on a Connect
+   * page they cannot finish.
+   *
+   * The allowlist is by company, so any user in these tenants sees it, and it is
+   * hardcoded on purpose: this is a temporary trial gate, not a sellable feature.
+   * When WhatsApp ships to customers, replace this with a server-driven per-tenant
+   * flag on SafeUser (see `canUseQrCards`) rather than growing the list.
+   *
+   * Cosmetic only — it decides what is worth showing. The /whatsapp routes stay
+   * reachable by URL and the API does not gate these endpoints.
+   */
+  canUseWhatsapp(): boolean {
+    const companyId = this.currentUser()?.companyId;
+    return !!companyId && WHATSAPP_TRIAL_COMPANIES.includes(companyId);
   }
 
   /**

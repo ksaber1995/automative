@@ -227,14 +227,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
 
     // WhatsApp (Cloud API) — company messaging config + inbox.
-    // Hidden from the sidebar until the Meta setup is finished (flip to enable).
+    // Shown to the tenants trialling it while the Meta setup is worked through
+    // per company (see AuthService.canUseWhatsapp).
     // Routes/pages stay reachable by URL; only the nav group is hidden.
-    const WHATSAPP_ENABLED = false;
+    const whatsappEnabled = auth.canUseWhatsapp();
     const whatsapp: NavLeaf[] = [
-      { labelKey: 'NAV.WA_CONNECT', icon: 'pi pi-link', routerLink: ['/whatsapp/connect'], visible: WHATSAPP_ENABLED && auth.canRead('academy') },
-      { labelKey: 'NAV.WA_INBOX', icon: 'pi pi-inbox', routerLink: ['/whatsapp/inbox'], visible: WHATSAPP_ENABLED && auth.canRead('academy') },
-      { labelKey: 'NAV.WA_SETTINGS', icon: 'pi pi-cog', routerLink: ['/whatsapp/settings'], visible: WHATSAPP_ENABLED && auth.canWrite('academy') },
-      { labelKey: 'NAV.WA_TEMPLATES', icon: 'pi pi-file-edit', routerLink: ['/whatsapp/templates'], visible: WHATSAPP_ENABLED && auth.canWrite('academy') },
+      { labelKey: 'NAV.WA_CONNECT', icon: 'pi pi-link', routerLink: ['/whatsapp/connect'], visible: whatsappEnabled && auth.canRead('academy') },
+      { labelKey: 'NAV.WA_INBOX', icon: 'pi pi-inbox', routerLink: ['/whatsapp/inbox'], visible: whatsappEnabled && auth.canRead('academy') },
+      { labelKey: 'NAV.WA_SETTINGS', icon: 'pi pi-cog', routerLink: ['/whatsapp/settings'], visible: whatsappEnabled && auth.canWrite('academy') },
+      { labelKey: 'NAV.WA_TEMPLATES', icon: 'pi pi-file-edit', routerLink: ['/whatsapp/templates'], visible: whatsappEnabled && auth.canWrite('academy') },
     ].filter(c => c.visible);
     if (whatsapp.length) {
       entries.push({ kind: 'group', group: {
