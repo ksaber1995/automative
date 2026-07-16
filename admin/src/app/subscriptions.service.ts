@@ -230,6 +230,15 @@ export class SubscriptionsService {
   deleteUser(id: string): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`${ADMIN_ENDPOINT}/users/${id}`);
   }
+
+  /**
+   * Move an account into another tenant (for a debugging login). Drops the
+   * user's branch, linked employee and permissions — they belong to the old
+   * tenant. The moved account must log in again before it sees the new one.
+   */
+  moveUserCompany(id: string, companyId: string): Observable<TenantUser> {
+    return this.http.patch<TenantUser>(`${ADMIN_ENDPOINT}/users/${id}/company`, { companyId });
+  }
 }
 
 /** One offline (desktop) license key. Dates are ISO strings or null. */

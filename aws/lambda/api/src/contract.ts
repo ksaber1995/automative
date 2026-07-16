@@ -5000,6 +5000,23 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    // Move an account to another tenant, for a debugging login that needs to see
+    // a customer's data. The user's old branch/employee/permission links point at
+    // rows the new tenant doesn't own, so the move clears them rather than
+    // carrying them across.
+    moveUserCompany: {
+      method: 'PATCH',
+      path: '/api/karim-admin-secret/users/:id/company',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ companyId: UUIDSchema }),
+      responses: {
+        200: AdminUserSchema,
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     activateSubscription: {
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/activate',

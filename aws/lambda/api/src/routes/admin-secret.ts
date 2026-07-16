@@ -1,7 +1,7 @@
 import { randomInt } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { CARD_SERIAL_BASE, ensureQrCardSchema } from './qr-cards';
-import { query, queryOne } from '../db/connection';
+import { query, queryOne, getClient } from '../db/connection';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
@@ -816,6 +816,94 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret delete user failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Delete user failed' } };
+    }
+  },
+
+  /**
+   * PATCH /api/karim-admin-secret/users/:id/company
+   * Move an account into another tenant — for a debugging login that needs to
+   * sit inside a customer's data.
+   *
+   * A user's branch, linked employee and granular permissions all name rows the
+   * OLD company owns, and none of those columns has a company-aware constraint
+   * to catch it: `users.branch_id` has no FK at all. Carrying them over would
+   * leave the account silently pointing across the tenant boundary, so the move
+   * clears them and the new tenant re-grants what it wants. Same reason
+   * `user_branches` rows go — they each carry their own `company_id`.
+   *
+   * Leaves the old tenant's history (CRM ownership, audit trails) alone: those
+   * rows record who did something, and rewriting them to fit a debug move would
+   * falsify the customer's records.
+   *
+   * NOTE: the caller's existing JWT still carries the OLD companyId and is good
+   * for up to a year — tokens are stateless with no revocation list. The moved
+   * account must log out and back in before it sees the new tenant.
+   */
+  moveUserCompany: async ({ params, body }: {
+    params: { id: string };
+    body: { companyId: string };
+  }) => {
+    const client = await getClient();
+    try {
+      const user = await queryOne<any>('SELECT id, role, company_id FROM users WHERE id = $1', [params.id]);
+      if (!user) return { status: 404 as const, body: { message: 'User not found' } };
+
+      const target = await queryOne<any>('SELECT id, name FROM companies WHERE id = $1', [body?.companyId]);
+      if (!target) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      if (user.company_id === target.id) {
+        return { status: 400 as const, body: { message: 'That user is already in this tenant' } };
+      }
+
+      // Moving a tenant's last admin out locks the customer out of their own
+      // account exactly as deleting them would — same guard as deleteUser.
+      if (user.company_id && ['ADMIN', 'GLOBAL_ADMIN'].includes(user.role)) {
+        const others = await queryOne<any>(
+          `SELECT COUNT(*) AS n FROM users
+            WHERE company_id = $1 AND id <> $2 AND is_active = true
+              AND role IN ('ADMIN', 'GLOBAL_ADMIN')`,
+          [user.company_id, user.id],
+        );
+        if (Number(others?.n ?? 0) === 0) {
+          return { status: 409 as const, body: { message: "This is the tenant's last admin — the company would be locked out" } };
+        }
+      }
+
+      await client.query('BEGIN');
+      await client.query('DELETE FROM user_branches WHERE user_id = $1', [user.id]);
+      const moved = await client.query(
+        `UPDATE users
+            SET company_id = $1, branch_id = NULL, linked_employee_id = NULL,
+                permissions = NULL, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+          RETURNING id, email, first_name, last_name, role, is_active,
+                    email_verified, company_id, created_at`,
+        [target.id, user.id],
+      );
+      await client.query('COMMIT');
+
+      const r = moved.rows[0];
+      return {
+        status: 200 as const,
+        body: {
+          id: r.id,
+          email: r.email,
+          first_name: r.first_name,
+          last_name: r.last_name,
+          role: r.role,
+          is_active: r.is_active !== false,
+          email_verified: r.email_verified === true,
+          company_id: r.company_id ?? null,
+          company_name: target.name ?? null,
+          created_at: toIso(r.created_at),
+        },
+      };
+    } catch (error: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('karim-admin-secret move user failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Move user failed' } };
+    } finally {
+      client.release();
     }
   },
 };

@@ -439,6 +439,9 @@ type LicSortCol =
                     </td>
                     <td>{{ formatDate(u.created_at) }}</td>
                     <td>
+                      <button class="act" [disabled]="busyId() === u.id" (click)="openMoveUser(u)">
+                        Move
+                      </button>
                       <button class="act danger" [disabled]="busyId() === u.id" (click)="openDeleteUser(u)">
                         Delete
                       </button>
@@ -495,6 +498,35 @@ type LicSortCol =
             <div class="modal-foot">
               <button class="act" [disabled]="busyId() === u.id" (click)="deleteUserRow.set(null)">Cancel</button>
               <button class="act danger" [disabled]="busyId() === u.id" (click)="confirmDeleteUser(u)">Delete</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Move a user to another tenant -->
+      @if (moveUserRow(); as u) {
+        <div class="overlay" (click)="moveUserRow.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>Move user</h2>
+            <p class="modal-sub">
+              <strong>{{ u.first_name }} {{ u.last_name }}</strong> ({{ u.email }}) is in
+              <strong>{{ u.company_name || 'no tenant' }}</strong>. Their branch, linked employee
+              and permissions are dropped — they belong to the old tenant. They must log out and
+              back in before they see the new one.
+            </p>
+            <select class="search" [ngModel]="moveTarget()" (ngModelChange)="moveTarget.set($event)">
+              <option value="">Choose a tenant…</option>
+              @for (c of rows(); track c.company_id) {
+                @if (c.company_id !== u.company_id) {
+                  <option [value]="c.company_id">{{ c.company_name }}</option>
+                }
+              }
+            </select>
+            <div class="modal-foot">
+              <button class="act" [disabled]="busyId() === u.id" (click)="moveUserRow.set(null)">Cancel</button>
+              <button class="act activate" [disabled]="busyId() === u.id || !moveTarget()" (click)="confirmMoveUser(u)">
+                {{ busyId() === u.id ? 'Moving…' : 'Move user' }}
+              </button>
             </div>
           </div>
         </div>
@@ -1540,6 +1572,37 @@ export class AppComponent implements OnInit {
 
   openDeleteUser(u: TenantUser) {
     this.deleteUserRow.set(u);
+  }
+
+  // Moving an account between tenants — for a debugging login that needs to sit
+  // inside a customer's data. The API refuses to move a tenant's last admin out,
+  // for the same reason it refuses to delete them.
+  moveUserRow = signal<TenantUser | null>(null);
+  moveTarget = signal('');
+
+  openMoveUser(u: TenantUser) {
+    this.moveTarget.set('');
+    this.moveUserRow.set(u);
+  }
+
+  confirmMoveUser(u: TenantUser) {
+    const companyId = this.moveTarget();
+    if (!companyId) { this.error.set('Choose a tenant.'); return; }
+
+    this.busyId.set(u.id);
+    this.service.moveUserCompany(u.id, companyId).subscribe({
+      next: (moved) => {
+        this.busyId.set(null);
+        this.moveUserRow.set(null);
+        this.showFlash(`${u.email} moved to ${moved.company_name || 'the new tenant'} — they must log in again.`);
+        this.loadUsers();
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        // e.g. "last admin" — keep the dialog open so the message is read in context.
+        this.error.set(`Move user: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
   }
 
   confirmDeleteUser(u: TenantUser) {
