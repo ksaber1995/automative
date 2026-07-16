@@ -2,7 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  CompanySubscription, OfflineLicense, PoolBot, SubscriptionsService, TenantUser, USER_ROLES,
+  CompanySubscription, OfflineLicense, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
+  TenantUser, USER_ROLES,
 } from './subscriptions.service';
 
 type LicSortCol =
@@ -621,6 +622,15 @@ type LicSortCol =
               confused with a student's own code. The academy downloads and prints them itself.
             </p>
             <input class="search" type="number" min="1" max="2000" [(ngModel)]="qrCount" placeholder="How many?" />
+            <select class="search" [ngModel]="qrPoolType()" (ngModelChange)="qrPoolType.set(+$event)">
+              @for (t of poolTypes; track t) {
+                <option [value]="t">Type {{ t }}</option>
+              }
+            </select>
+            <p class="modal-sub">
+              The type stamps this run so it can be told apart later. Nothing behaves
+              differently yet, and it does not change the serials.
+            </p>
             <div class="modal-foot">
               <button class="act" [disabled]="busyId() === row.company_id" (click)="qrRow.set(null)">Cancel</button>
               <button class="act activate" [disabled]="busyId() === row.company_id" (click)="confirmQrCards()">
@@ -1427,6 +1437,10 @@ export class AppComponent implements OnInit {
   qrStats = signal<Record<string, { qr_cards_enabled: boolean; total: number; linked: number }>>({});
   qrRow = signal<CompanySubscription | null>(null);
   qrCount = 100;
+  // Stamped on the run being minted. Defaults to 1, which is what every card
+  // printed before types existed reads as.
+  readonly poolTypes = POOL_TYPES;
+  qrPoolType = signal<PoolType>(1);
 
   loadQrStats(companyId: string) {
     this.busyId.set(companyId);
@@ -1473,7 +1487,7 @@ export class AppComponent implements OnInit {
       return;
     }
     this.busyId.set(r.company_id);
-    this.service.generateQrCards(r.company_id, count).subscribe({
+    this.service.generateQrCards(r.company_id, count, this.qrPoolType()).subscribe({
       next: (res) => {
         this.busyId.set(null);
         this.qrRow.set(null);
@@ -1481,7 +1495,7 @@ export class AppComponent implements OnInit {
         // Cards print as "A5", not "A-100005": the serial is stored in the
         // reserved range, but the base is dropped for the printed label.
         const label = (serial: number) => `A${serial - 100000}`;
-        this.showFlash(`${res.created} cards for ${r.company_name} (${label(res.from)} … ${label(res.to)}).`);
+        this.showFlash(`${res.created} type ${res.poolType} cards for ${r.company_name} (${label(res.from)} … ${label(res.to)}).`);
         this.loadQrStats(r.company_id);
       },
       error: (err) => {

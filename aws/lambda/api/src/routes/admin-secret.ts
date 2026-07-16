@@ -587,12 +587,19 @@ export const adminSecretRoutes = {
   },
 
   /**
-   * POST /api/karim-admin-secret/companies/:companyId/qr-cards  { count }
+   * POST /api/karim-admin-secret/companies/:companyId/qr-cards  { count, poolType }
    * Mint a print run FOR a client, without signing in as them. Serials continue
    * from their last run, so a batch we print never collides with a card already in
    * one of their students' pockets.
+   *
+   * poolType (1/2/3) stamps the run. It labels the cards and nothing else — it
+   * does NOT partition serials, which stay one continuous per-company sequence
+   * because a linked card's serial becomes the student's code.
    */
-  generateQrCards: async ({ params, body }: { params: { companyId: string }; body: { count: number } }) => {
+  generateQrCards: async ({ params, body }: {
+    params: { companyId: string };
+    body: { count: number; poolType?: number };
+  }) => {
     try {
       await ensureQrCardSchema();
       const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
@@ -601,6 +608,12 @@ export const adminSecretRoutes = {
       const count = Math.floor(Number(body?.count));
       if (!Number.isFinite(count) || count < 1 || count > 2000) {
         return { status: 400 as const, body: { message: 'count must be between 1 and 2000' } };
+      }
+
+      // Unstamped runs are type 1, same as the cards minted before types existed.
+      const poolType = body?.poolType === undefined ? 1 : Math.floor(Number(body.poolType));
+      if (![1, 2, 3].includes(poolType)) {
+        return { status: 400 as const, body: { message: 'poolType must be 1, 2 or 3' } };
       }
 
       const last = await queryOne<any>(
@@ -612,16 +625,16 @@ export const adminSecretRoutes = {
       const from = Math.max(parseInt(last?.last ?? '0', 10), CARD_SERIAL_BASE) + 1;
 
       const rows = await query<any>(
-        `INSERT INTO qr_cards (company_id, token, serial)
-         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g
+        `INSERT INTO qr_cards (company_id, token, serial, pool_type)
+         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g, $4
          FROM generate_series($2::int, $3::int) AS g
          RETURNING serial`,
-        [params.companyId, from, from + count - 1],
+        [params.companyId, from, from + count - 1, poolType],
       );
 
       return {
         status: 200 as const,
-        body: { success: true, created: rows.length, from, to: from + count - 1 },
+        body: { success: true, created: rows.length, from, to: from + count - 1, poolType },
       };
     } catch (error: any) {
       console.error('karim-admin-secret generate qr cards failed:', error);

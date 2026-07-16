@@ -1607,12 +1607,18 @@ const QrCardSchema = z.object({
   id: UUIDSchema,
   serial: z.number(),
   token: z.string(),
+  // Which print run this card belongs to (1, 2 or 3). Stamped by the vendor when
+  // minting; nothing branches on it yet.
+  poolType: z.number(),
   studentId: UUIDSchema.nullable(),
   studentName: z.string().nullable(),
   studentCode: z.number().nullable(),
   assignedAt: z.string().nullable(),
   createdAt: z.string(),
 });
+
+/** The pool types a print run can be stamped with. Mirrors qr_cards_pool_type_check. */
+const PoolTypeSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
 // CRM lists — named groups of leads (a lead can sit in many)
 const CrmListSchema = z.object({
@@ -5085,9 +5091,17 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/qr-cards',
       pathParams: z.object({ companyId: UUIDSchema }),
-      body: z.object({ count: z.number().int().min(1).max(2000) }),
+      body: z.object({
+        count: z.number().int().min(1).max(2000),
+        // Optional so an older caller still mints a run; omitted means type 1,
+        // matching the column default and the cards minted before types existed.
+        poolType: PoolTypeSchema.optional(),
+      }),
       responses: {
-        200: z.object({ success: z.boolean(), created: z.number(), from: z.number(), to: z.number() }),
+        200: z.object({
+          success: z.boolean(), created: z.number(), from: z.number(), to: z.number(),
+          poolType: z.number(),
+        }),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),

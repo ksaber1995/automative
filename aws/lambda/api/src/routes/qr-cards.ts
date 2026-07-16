@@ -35,6 +35,20 @@ export async function ensureQrCardSchema(): Promise<void> {
   await query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_qr_cards_serial ON qr_cards(company_id, serial)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_company ON qr_cards(company_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_student ON qr_cards(student_id)`);
+
+  // Pool type (migration 066) — stamped on a print run when the vendor mints it.
+  // Nothing branches on it: it exists so runs can be told apart later, and the
+  // meaning of 1/2/3 is deliberately not encoded here.
+  //
+  // NOT NULL DEFAULT 1, so cards minted before types existed read as type 1
+  // rather than NULL. That is a choice: it means whatever consumes this can
+  // always group by a value instead of carrying a "no type" branch forever, and
+  // "1" is the honest name for the only run there has ever been.
+  await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS pool_type SMALLINT NOT NULL DEFAULT 1`);
+  await query(`DO $$ BEGIN
+    ALTER TABLE qr_cards ADD CONSTRAINT qr_cards_pool_type_check CHECK (pool_type IN (1, 2, 3));
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END $$`);
   // Off by default: an academy only gets the pool once we switch it on for them.
   await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS qr_cards_enabled BOOLEAN NOT NULL DEFAULT false`);
 
@@ -132,6 +146,7 @@ function mapCard(row: any) {
     id: row.id,
     serial: row.serial,
     token: row.token,
+    poolType: row.pool_type ?? 1,
     studentId: row.student_id ?? null,
     studentName: row.student_name ?? null,
     studentCode: row.student_code ?? null,

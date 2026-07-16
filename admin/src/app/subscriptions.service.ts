@@ -97,11 +97,14 @@ export class SubscriptionsService {
     );
   }
 
-  /** Mint a print run for a client. Serials continue from their last one. */
-  generateQrCards(companyId: string, count: number): Observable<{ success: boolean; created: number; from: number; to: number }> {
-    return this.http.post<{ success: boolean; created: number; from: number; to: number }>(
+  /**
+   * Mint a print run for a client. Serials continue from their last one.
+   * poolType (1/2/3) labels the run; it does not affect serials.
+   */
+  generateQrCards(companyId: string, count: number, poolType: PoolType): Observable<GenerateQrCardsResult> {
+    return this.http.post<GenerateQrCardsResult>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards`,
-      { count },
+      { count, poolType },
     );
   }
 
@@ -239,6 +242,18 @@ export class SubscriptionsService {
   moveUserCompany(id: string, companyId: string): Observable<TenantUser> {
     return this.http.patch<TenantUser>(`${ADMIN_ENDPOINT}/users/${id}/company`, { companyId });
   }
+}
+
+/** The types a QR card print run can be stamped with. Meaning is not fixed yet. */
+export type PoolType = 1 | 2 | 3;
+export const POOL_TYPES: PoolType[] = [1, 2, 3];
+
+export interface GenerateQrCardsResult {
+  success: boolean;
+  created: number;
+  from: number;
+  to: number;
+  poolType: number;
 }
 
 /** One offline (desktop) license key. Dates are ISO strings or null. */
