@@ -859,9 +859,8 @@
     "QUALITY": "Quality rating",
     "DISCONNECT": "Disconnect",
     "DISCONNECTED": "WhatsApp disconnected.",
-    "CONNECT_HINT": "Connecting uses Meta's Embedded Signup and needs the platform's Meta app to be configured first (see whatsapp-platform-setup.md).",
+    "CONNECT_HINT": "Connecting opens Meta's Embedded Signup, where you sign in and pick your WhatsApp Business number.",
     "CONNECT_BTN": "Connect WhatsApp",
-    "CONNECT_PENDING": "Embedded Signup isn't wired yet — it will be available once the Meta app is configured.",
     "SETTINGS_TITLE": "Auto-send settings",
     "SETTINGS_SUBTITLE": "Choose which messages send automatically. Requires a connected number and approved templates.",
     "SAVE": "Save",
@@ -896,7 +895,10 @@
     "INBOX_EMPTY": "No conversations yet",
     "INBOX_EMPTY_HINT": "Once your number is connected and people reply, their messages appear here.",
     "INBOX_PICK": "Select a conversation to read it.",
-    "INBOX_REPLY_PENDING": "Replying from the app becomes available once a number is connected."
+    "CONNECTED": "WhatsApp connected.",
+    "CONNECT_FAILED": "Couldn't connect WhatsApp.",
+    "INBOX_REPLY_PLACEHOLDER": "Write a reply…",
+    "INBOX_WINDOW_CLOSED": "More than 24 hours since their last message — WhatsApp only allows an approved template now."
   },
   "CRM": {
     "TITLE": "CRM — Leads",

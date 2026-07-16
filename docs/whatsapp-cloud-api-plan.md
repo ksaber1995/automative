@@ -1,6 +1,8 @@
 # WhatsApp Cloud API — Integration Plan (per-teacher number + two-way chat)
 
-> **Status: plan only — nothing here is built yet.**
+> **Status: phases 1–2 built (connect, send, inbox, webhook); phases 3–4 (auto-send,
+> CRM drips + scheduler) not started. The Meta-side setup is tracked in
+> `whatsapp-meta-setup.md`.**
 > This document supersedes the single-WABA model in `messaging-feature-plan.md`
 > for the parts that differ. The big change requested: **each teacher/academy
 > sends from their OWN WhatsApp number** (not one shared Netrofit number), plus
@@ -286,8 +288,8 @@ Chat (two-way)
   POST /api/whatsapp/conversations/:id/read
 
 Webhook (public, no auth)
-  GET  /api/public/whatsapp/webhook       -> Meta verify challenge
-  POST /api/public/whatsapp/webhook       -> inbound messages + status callbacks
+  GET  /api/public/wa/webhook             -> Meta verify challenge
+  POST /api/public/wa/webhook             -> inbound messages + status callbacks
 ```
 
 ---

@@ -131,6 +131,35 @@ export class CoreStack extends cdk.Stack {
       },
     });
 
+    // WhatsApp Cloud API platform credentials — Netrofit's own Meta app, shared
+    // by every tenant (each tenant's number and token live in their own secret,
+    // see the tenant policy below).
+    //
+    // The three meta_* fields are placeholders filled in by hand from the Meta
+    // dashboard after App Review; CloudFormation only writes generateSecretString
+    // on CREATE, so redeploys never clobber what was pasted in. That is the whole
+    // reason these are a secret and not a `process.env.X ?? ''` env var — that
+    // pattern silently blanks the value on any deploy that forgets the variable,
+    // which is exactly how the licence signing key was lost once already.
+    //
+    // webhook_verify_token is generated here rather than invented by a human: it
+    // is an arbitrary shared string, and Meta only ever echoes it back.
+    const whatsappSecret = new secretsmanager.Secret(this, 'WhatsAppPlatformSecret', {
+      secretName: `/${stage}/automate-magic/whatsapp/platform`,
+      description: 'Meta WhatsApp Cloud API app credentials + webhook verify token',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          meta_app_id: '',
+          meta_app_secret: '',
+          meta_config_id: '',
+        }),
+        generateStringKey: 'webhook_verify_token',
+        excludePunctuation: true,
+        includeSpace: false,
+        passwordLength: 48,
+      },
+    });
+
     // Aurora Serverless v2 Cluster
     this.database = new rds.DatabaseCluster(this, 'AutomateMagicAuroraDB', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
@@ -175,6 +204,35 @@ export class CoreStack extends cdk.Stack {
     dbCredentialsSecret.grantRead(lambdaRole);
     jwtSecret.grantRead(lambdaRole);
     jwtRefreshSecret.grantRead(lambdaRole);
+    whatsappSecret.grantRead(lambdaRole);
+
+    // Per-tenant WhatsApp credentials. Unlike every other secret here these are
+    // created at runtime — a tenant connects their number through Embedded Signup
+    // and the API writes the resulting token — so the Lambda needs write access,
+    // scoped to this one path and nothing else. Secrets Manager appends a random
+    // 6-char suffix to every ARN, hence the trailing wildcard.
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'secretsmanager:CreateSecret',
+        'secretsmanager:PutSecretValue',
+        'secretsmanager:GetSecretValue',
+        'secretsmanager:DescribeSecret',
+        'secretsmanager:DeleteSecret',
+        'secretsmanager:TagResource',
+      ],
+      resources: [
+        `arn:aws:secretsmanager:${this.region}:${this.account}:secret:/${stage}/automate-magic/whatsapp/tenant/*`,
+      ],
+    }));
+
+    // Where to paste the Meta app credentials after App Review, and the verify
+    // token Meta asks for when subscribing the webhook. See
+    // docs/whatsapp-meta-setup.md.
+    new cdk.CfnOutput(this, 'WhatsAppPlatformSecretName', {
+      value: whatsappSecret.secretName,
+      description: 'Secret holding meta_app_id / meta_app_secret / meta_config_id / webhook_verify_token',
+    });
 
     // Grant Lambda permission to send emails via SES
     lambdaRole.addToPolicy(new iam.PolicyStatement({
@@ -247,6 +305,12 @@ export class CoreStack extends cdk.Stack {
         // tokens. Set via env at deploy; the matching public key is embedded in
         // the Electron app. Without it, /api/public/license/validate returns 500.
         LICENSE_SIGNING_KEY: process.env.LICENSE_SIGNING_KEY ?? '',
+        // WhatsApp Cloud API. Only the ARN travels as env — the app id/secret and
+        // the webhook verify token are read from the secret at runtime, so a
+        // deploy can never blank them.
+        WA_PLATFORM_SECRET_ARN: whatsappSecret.secretArn,
+        // Per-tenant secret path prefix; the API appends `{company_id}`.
+        WA_TENANT_SECRET_PREFIX: `/${stage}/automate-magic/whatsapp/tenant/`,
       },
       vpc,
       vpcSubnets: {

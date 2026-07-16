@@ -2859,6 +2859,45 @@ export const contract = c.router({
       body: z.object({}).optional(),
       responses: { 200: z.object({ message: z.string(), code: z.string() }), 400: ApiErrorSchema, 403: ApiErrorSchema },
     },
+    // Embedded Signup, step 1: hand the browser the public ids it needs to open
+    // Meta's dialog. Server-side so the app id and config id are not baked into
+    // the bundle, and so a tenant gets a clear error when Meta is not set up yet
+    // rather than a dialog that fails on Meta's side.
+    connectStart: {
+      method: 'POST',
+      path: '/api/wa/connect/start',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ appId: z.string(), configId: z.string(), graphVersion: z.string() }),
+        403: ApiErrorSchema,
+        501: ApiErrorSchema,
+      },
+    },
+    // Embedded Signup, step 2: trade the code for a token, verify the WABA the
+    // browser claims really belongs to it, subscribe our webhook, store the token.
+    connectComplete: {
+      method: 'POST',
+      path: '/api/wa/connect/complete',
+      body: z.object({
+        code: z.string().min(1),
+        wabaId: z.string().optional(),
+        phoneNumberId: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          status: z.string(),
+          wabaId: z.string().nullable(),
+          phoneNumberId: z.string().nullable(),
+          displayPhoneNumber: z.string().nullable(),
+          verifiedName: z.string().nullable(),
+          qualityRating: z.string().nullable(),
+          connectedAt: z.string().nullable(),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        501: ApiErrorSchema,
+      },
+    },
     getSettings: {
       method: 'GET',
       path: '/api/wa/settings',
@@ -2895,10 +2934,12 @@ export const contract = c.router({
         to: z.string().optional(),
         templateKey: z.string().optional(),
         text: z.string().optional(),
+        // Positional {{1}}, {{2}}… values, template sends only.
+        templateParams: z.array(z.string()).optional(),
         studentId: UUIDSchema.optional(),
         leadId: UUIDSchema.optional(),
       }),
-      responses: { 200: z.any(), 400: ApiErrorSchema, 403: ApiErrorSchema, 501: ApiErrorSchema },
+      responses: { 200: WaMessageSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 501: ApiErrorSchema },
     },
     listConversations: {
       method: 'GET',

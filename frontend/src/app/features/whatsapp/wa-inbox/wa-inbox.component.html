@@ -55,7 +55,26 @@
               }
             }
           </div>
-          <div class="border-t border-gray-200 p-3 text-xs text-gray-400 text-center">{{ 'WA.INBOX_REPLY_PENDING' | translate }}</div>
+          <!-- Composer. Meta only allows free text within 24h of their last
+               message; outside that the input is disabled and the tenant is told
+               why, rather than letting a send fail against Meta. -->
+          <div class="border-t border-gray-200 p-3">
+            @if (canReplyFreeform()) {
+              <div class="flex items-center gap-2">
+                <input type="text" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                       [(ngModel)]="draft" [disabled]="sending()"
+                       [placeholder]="'WA.INBOX_REPLY_PLACEHOLDER' | translate"
+                       (keyup.enter)="send()" />
+                <p-button icon="pi pi-send" [rounded]="true" severity="success"
+                          [disabled]="!draft.trim() || sending()" [loading]="sending()"
+                          (onClick)="send()"></p-button>
+              </div>
+            } @else {
+              <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-center">
+                <i class="pi pi-clock"></i> {{ 'WA.INBOX_WINDOW_CLOSED' | translate }}
+              </div>
+            }
+          </div>
         }
       </div>
     </div>

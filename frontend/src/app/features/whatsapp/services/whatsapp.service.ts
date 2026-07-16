@@ -77,4 +77,29 @@ export class WhatsappService {
 
   listConversations(): Observable<WaConversation[]> { return this.api.get<WaConversation[]>('wa/conversations'); }
   getMessages(id: string): Observable<WaMessage[]> { return this.api.get<WaMessage[]>(`wa/conversations/${id}/messages`); }
+
+  /** Ids for Meta's Embedded Signup dialog. 501 when the platform has no Meta app yet. */
+  connectStart(): Observable<WaConnectConfig> { return this.api.post<WaConnectConfig>('wa/connect/start', {}); }
+
+  /** Hand Meta's authorisation code to the API, which trades it for the tenant's token. */
+  connectComplete(dto: { code: string; wabaId?: string; phoneNumberId?: string }): Observable<WaAccount> {
+    return this.api.post<WaAccount>('wa/connect/complete', dto);
+  }
+
+  send(dto: WaSendRequest): Observable<WaMessage> { return this.api.post<WaMessage>('wa/send', dto); }
+}
+
+export interface WaConnectConfig {
+  appId: string;
+  configId: string;
+  graphVersion: string;
+}
+
+export interface WaSendRequest {
+  to?: string;
+  text?: string;
+  templateKey?: string;
+  templateParams?: string[];
+  studentId?: string;
+  leadId?: string;
 }

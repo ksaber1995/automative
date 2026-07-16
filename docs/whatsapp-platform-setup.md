@@ -15,7 +15,7 @@ numbers. Companion to `whatsapp-cloud-api-plan.md`; the per-academy steps are in
 
 ## 2. AWS infrastructure
 - [ ] **Secrets Manager** — per-tenant secret path `/prod/automate-magic/whatsapp/{company_id}` holding `phone_number_id`, `waba_id`, `access_token`, `display_phone_number`. Grant the API Lambda read/write.
-- [ ] **Webhook** — public route `POST/GET /api/public/whatsapp/webhook`; set a **verify token** (store in Secrets); subscribe the app to the `messages` webhook field (inbound messages **and** delivery statuses).
+- [ ] **Webhook** — public route `POST/GET /api/public/wa/webhook` (`/wa/`, not `/whatsapp/` — that path does not exist); the **verify token** is generated into the platform secret by the CDK stack, no need to invent one; subscribe the app to the `messages` webhook field (inbound messages **and** delivery statuses).
 - [ ] **Scheduler** — EventBridge rule (~every 15 min) → Lambda for CRM drips, retries, and idle-lead/retention nudges (needed in Phase 4).
 
 ## 3. Billing & cost model

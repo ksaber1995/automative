@@ -286,6 +286,21 @@ const lambdaHandler = createLambdaHandler(contract, router, {
     return undefined;
   },
   responseHandlers: [
+    // Meta verifies a webhook by GETting it with a `hub.challenge` and comparing
+    // the response body to that value byte for byte. The route declares a string
+    // response, which ts-rest serialises as JSON — so the body goes out as
+    // `"1234"`, quotes included, and Meta rejects the subscription with no
+    // useful explanation. Re-emit it as text/plain. Only on 200: the 403 body is
+    // never read, and every other route wants its JSON.
+    (response, request) => {
+      if (request.method !== 'GET' || response.status !== 200) return;
+      const url = new URL(request.url);
+      if (url.pathname !== '/api/public/wa/webhook') return;
+      return TsRestResponse.fromText(url.searchParams.get('hub.challenge') ?? '', {
+        status: 200,
+        headers: { 'content-type': 'text/plain' },
+      });
+    },
     (response, request) => {
       const origin = getAllowedOrigin(request.headers.get('origin'));
       if (origin) {

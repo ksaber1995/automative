@@ -1,14 +1,60 @@
 import { insert, update, query, queryOne, deleteById } from '../db/connection';
 import { extractTenantContext, checkGranularPermission } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import {
+  getWaPlatformConfig,
+  isWaPlatformConfigured,
+  getWaTenantCredentials,
+  putWaTenantCredentials,
+  deleteWaTenantCredentials,
+} from '../utils/secrets';
+import {
+  MetaGraphError,
+  exchangeCodeForToken,
+  getWabaIdsForToken,
+  getPhoneNumbers,
+  subscribeAppToWaba,
+  sendText,
+  sendTemplate,
+} from '../utils/meta-graph';
 
 // ============================================================
-// WhatsApp Cloud API — FOUNDATION (Phase 1, no Meta creds required yet).
-// Per-tenant connected number, auto-send settings, templates, two-way inbox.
+// WhatsApp Cloud API — per-tenant connected number, auto-send settings,
+// templates, two-way inbox.
+//
 // Tables are wa_* to avoid colliding with the existing click-to-chat
-// `whatsapp_templates` (migration 044). Tokens live in Secrets Manager, not here.
-// Actual Graph API sending is stubbed until a tenant connects a number.
+// `whatsapp_templates` (migration 044). Tenant access tokens live in Secrets
+// Manager under WA_TENANT_SECRET_PREFIX, never in the DB — wa_accounts holds
+// only the non-secret linkage (waba_id, phone_number_id, status).
+//
+// Reaching Meta needs the platform app credentials to have been pasted into the
+// platform secret by hand after App Review; until then connect/send answer 501
+// rather than failing obscurely against Meta. See docs/whatsapp-meta-setup.md.
 // ============================================================
+
+/** Free-form text is only allowed within 24h of the contact's last inbound message. */
+const FREE_FORM_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Meta rejects anything that is not E.164 digits. Egyptian numbers are stored
+ * locally as 01xxxxxxxxx, which Meta reads as an invalid country code, so the
+ * leading zero becomes 20. Numbers already carrying a country code are left be.
+ */
+function toE164(raw: string): string | null {
+  const digits = String(raw || '').replace(/[^\d]/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('20')) return digits;
+  if (digits.startsWith('0')) return `20${digits.slice(1)}`;
+  return digits;
+}
+
+/** Turn a Meta failure into the tenant's error, keeping Meta's own wording. */
+function mapMetaError(error: unknown, fallbackCode: string, fallbackMessage: string) {
+  if (error instanceof MetaGraphError) {
+    return apiError(400, 'ERRORS.WA.META_REJECTED', error.message);
+  }
+  return mapThrownError(error, fallbackCode, fallbackMessage, 400);
+}
 
 let waSchemaEnsured = false;
 export async function ensureWaSchema(): Promise<void> {
@@ -164,12 +210,135 @@ export const waCloudRoutes = {
         return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can disconnect');
       }
       await ensureWaSchema();
-      // Foundation: clears the local link. (Secrets Manager cleanup happens when Meta is wired.)
       await query(`DELETE FROM wa_accounts WHERE company_id = $1`, [context.companyId]);
+      // The token outlives the row unless it is destroyed too — a disconnected
+      // tenant whose credentials linger is a live sending key for a number the
+      // app no longer admits to having.
+      await deleteWaTenantCredentials(context.companyId);
       return { status: 200 as const, body: { message: 'Disconnected', code: 'WA.DISCONNECTED' } };
     } catch (error) {
       console.error('WA disconnect error:', error);
       return mapThrownError(error, 'ERRORS.WA.DISCONNECT_FAILED', 'Failed to disconnect', 400);
+    }
+  },
+
+  /**
+   * Embedded Signup, step 1 — the public ids the browser needs to open Meta's
+   * dialog. Kept server-side so they are not baked into the bundle and so an
+   * unconfigured platform fails here, with an explanation, instead of inside
+   * Meta's popup.
+   */
+  connectStart: async ({ headers }: { headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can connect a number');
+      }
+      const config = await getWaPlatformConfig();
+      if (!isWaPlatformConfigured(config)) {
+        return apiError(501, 'ERRORS.WA.PLATFORM_NOT_CONFIGURED', 'WhatsApp is not set up on this platform yet');
+      }
+      return {
+        status: 200 as const,
+        body: {
+          appId: config.meta_app_id,
+          configId: config.meta_config_id,
+          graphVersion: process.env.META_GRAPH_VERSION || 'v22.0',
+        },
+      };
+    } catch (error) {
+      console.error('WA connectStart error:', error);
+      return mapThrownError(error, 'ERRORS.WA.CONNECT_FAILED', 'Failed to start connection', 400);
+    }
+  },
+
+  /**
+   * Embedded Signup, step 2 — trade the code for the tenant's token, then store
+   * it and mark the number ACTIVE.
+   *
+   * wabaId and phoneNumberId arrive from the browser (Meta posts them to the
+   * opener) and are treated as a claim, not a fact: the WABA is checked against
+   * the ones the token actually grants, so a tenant cannot name a WABA that is
+   * not theirs. Where the browser missed the message, the WABA is read back from
+   * the token instead.
+   */
+  connectComplete: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can connect a number');
+      }
+      await ensureWaSchema();
+
+      const config = await getWaPlatformConfig();
+      if (!isWaPlatformConfigured(config)) {
+        return apiError(501, 'ERRORS.WA.PLATFORM_NOT_CONFIGURED', 'WhatsApp is not set up on this platform yet');
+      }
+
+      const token = await exchangeCodeForToken(config.meta_app_id, config.meta_app_secret, body.code);
+
+      const grantedWabaIds = await getWabaIdsForToken(config.meta_app_id, config.meta_app_secret, token);
+      if (!grantedWabaIds.length) {
+        return apiError(400, 'ERRORS.WA.NO_WABA', 'That Meta account granted no WhatsApp business account');
+      }
+      const claimedWabaId = body.wabaId ? String(body.wabaId) : null;
+      if (claimedWabaId && !grantedWabaIds.includes(claimedWabaId)) {
+        return apiError(400, 'ERRORS.WA.WABA_NOT_GRANTED', 'That WhatsApp business account was not granted to this app');
+      }
+      const wabaId = claimedWabaId || grantedWabaIds[0];
+
+      const numbers = await getPhoneNumbers(wabaId, token);
+      if (!numbers.length) {
+        return apiError(400, 'ERRORS.WA.NO_PHONE_NUMBER', 'That WhatsApp business account has no phone number yet');
+      }
+      const claimedPhoneId = body.phoneNumberId ? String(body.phoneNumberId) : null;
+      const phone = (claimedPhoneId && numbers.find((n) => n.id === claimedPhoneId)) || numbers[0];
+
+      // phone_number_id is how the webhook finds the tenant, so it is UNIQUE.
+      // Two companies claiming one number would silently steer inbound messages
+      // to whichever row was found first.
+      const clash = await queryOne<any>(
+        'SELECT company_id FROM wa_accounts WHERE phone_number_id = $1 AND company_id <> $2',
+        [phone.id, context.companyId],
+      );
+      if (clash) {
+        return apiError(409, 'ERRORS.WA.NUMBER_IN_USE', 'That number is already connected to another account');
+      }
+
+      // Without this Meta has nowhere to deliver this tenant's messages. Do it
+      // before storing anything, so a failure leaves the tenant disconnected
+      // rather than connected-but-deaf.
+      await subscribeAppToWaba(wabaId, token);
+
+      await putWaTenantCredentials(context.companyId, {
+        phone_number_id: phone.id,
+        waba_id: wabaId,
+        access_token: token,
+        display_phone_number: phone.display_phone_number,
+      });
+
+      await query(
+        `INSERT INTO wa_accounts (company_id, waba_id, phone_number_id, display_phone_number,
+                                  verified_name, status, quality_rating, connected_at)
+         VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6, NOW())
+         ON CONFLICT (company_id) DO UPDATE SET
+           waba_id = EXCLUDED.waba_id,
+           phone_number_id = EXCLUDED.phone_number_id,
+           display_phone_number = EXCLUDED.display_phone_number,
+           verified_name = EXCLUDED.verified_name,
+           status = 'ACTIVE',
+           quality_rating = EXCLUDED.quality_rating,
+           connected_at = NOW(),
+           updated_at = NOW()`,
+        [context.companyId, wabaId, phone.id, phone.display_phone_number || null,
+         phone.verified_name || null, phone.quality_rating || null],
+      );
+
+      const row = await queryOne<any>('SELECT * FROM wa_accounts WHERE company_id = $1', [context.companyId]);
+      return { status: 200 as const, body: mapAccount(row) };
+    } catch (error) {
+      console.error('WA connectComplete error:', error);
+      return mapMetaError(error, 'ERRORS.WA.CONNECT_FAILED', 'Failed to connect');
     }
   },
 
@@ -271,8 +440,15 @@ export const waCloudRoutes = {
     }
   },
 
-  // ── Sending (scaffold — real Graph API call added once a tenant connects) ──
-  send: async ({ headers }: { body: any; headers: { authorization: string } }) => {
+  /**
+   * Send one message from the tenant's own number.
+   *
+   * Text vs template is not a preference, it is Meta's rule: outside 24 hours
+   * from the contact's last inbound message only an approved template may be
+   * sent. Rather than let Meta reject a free-form send with an opaque error, the
+   * window is checked here first and the caller is told to use a template.
+   */
+  send: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
@@ -283,11 +459,120 @@ export const waCloudRoutes = {
       if (!account || account.status !== 'ACTIVE') {
         return apiError(400, 'ERRORS.WA.NOT_CONNECTED', 'Connect a WhatsApp number first');
       }
-      // TODO(meta): read creds from Secrets Manager, call Graph API, insert wa_messages(OUT).
-      return apiError(501, 'ERRORS.WA.SENDING_NOT_ENABLED', 'Sending will be enabled once Meta is configured');
+
+      const creds = await getWaTenantCredentials(context.companyId);
+      if (!creds?.access_token || !creds?.phone_number_id) {
+        // The row says ACTIVE but the token is gone — a half-finished disconnect,
+        // or a secret deleted by hand. Say so rather than throwing a null deref.
+        return apiError(400, 'ERRORS.WA.CREDENTIALS_MISSING', 'This number needs reconnecting');
+      }
+
+      // Recipient: an explicit number, or the student's/lead's number on file.
+      let to = body.to ? String(body.to) : '';
+      if (!to && body.studentId) {
+        const student = await queryOne<any>(
+          'SELECT parent_phone, phone FROM students WHERE id = $1 AND company_id = $2',
+          [body.studentId, context.companyId],
+        );
+        to = student?.parent_phone || student?.phone || '';
+      }
+      if (!to && body.leadId) {
+        const lead = await queryOne<any>('SELECT phone FROM crm_leads WHERE id = $1 AND company_id = $2',
+          [body.leadId, context.companyId]);
+        to = lead?.phone || '';
+      }
+      const e164 = toE164(to);
+      if (!e164) {
+        return apiError(400, 'ERRORS.WA.NO_RECIPIENT', 'No phone number to send to');
+      }
+
+      // The conversation is keyed on the normalised number, so an outbound send
+      // lands in the same thread as the reply that comes back.
+      let conv = await queryOne<any>(
+        'SELECT id, last_inbound_at FROM wa_conversations WHERE company_id = $1 AND contact_phone = $2',
+        [context.companyId, e164],
+      );
+
+      const lastInbound = conv?.last_inbound_at ? new Date(conv.last_inbound_at).getTime() : 0;
+      const withinWindow = lastInbound > 0 && Date.now() - lastInbound < FREE_FORM_WINDOW_MS;
+
+      let result: { messageId: string | null };
+      let messageBody: string;
+      let messageType: string;
+      let templateKey: string | null = null;
+
+      if (body.templateKey) {
+        const tpl = await queryOne<any>(
+          'SELECT * FROM wa_templates WHERE company_id = $1 AND key = $2',
+          [context.companyId, body.templateKey],
+        );
+        if (!tpl) return apiError(400, 'ERRORS.WA.BAD_TEMPLATE_KEY', 'Unknown template key');
+        if (tpl.is_active === false) return apiError(400, 'ERRORS.WA.TEMPLATE_INACTIVE', 'That template is switched off');
+        if (!tpl.meta_template_name) {
+          // The local body is only a preview; Meta sends by approved name.
+          return apiError(400, 'ERRORS.WA.TEMPLATE_NOT_APPROVED', 'That template has no approved Meta name yet');
+        }
+        result = await sendTemplate({
+          phoneNumberId: creds.phone_number_id,
+          token: creds.access_token,
+          to: e164,
+          templateName: tpl.meta_template_name,
+          language: tpl.language || 'ar',
+          bodyParams: Array.isArray(body.templateParams) ? body.templateParams.map(String) : undefined,
+        });
+        messageType = 'template';
+        templateKey = tpl.key;
+        messageBody = tpl.body || '';
+      } else {
+        const text = String(body.text || '').trim();
+        if (!text) return apiError(400, 'ERRORS.WA.EMPTY_MESSAGE', 'Write a message first');
+        if (!withinWindow) {
+          return apiError(400, 'ERRORS.WA.WINDOW_CLOSED',
+            'More than 24 hours since their last message — send an approved template instead');
+        }
+        result = await sendText({
+          phoneNumberId: creds.phone_number_id,
+          token: creds.access_token,
+          to: e164,
+          text,
+        });
+        messageType = 'text';
+        messageBody = text;
+      }
+
+      if (!conv) {
+        conv = await insert('wa_conversations', {
+          company_id: context.companyId,
+          contact_phone: e164,
+          student_id: body.studentId || null,
+          lead_id: body.leadId || null,
+          last_message_at: new Date().toISOString(),
+          unread_count: 0,
+        });
+      } else {
+        await query('UPDATE wa_conversations SET last_message_at = NOW() WHERE id = $1', [conv.id]);
+      }
+
+      // Recorded only after Meta accepted it: a row here means it was really
+      // sent, so the inbox is not decorated with messages that never left.
+      const row = await insert('wa_messages', {
+        company_id: context.companyId,
+        conversation_id: conv.id,
+        direction: 'OUT',
+        type: messageType,
+        template_key: templateKey,
+        body: messageBody,
+        meta_message_id: result.messageId,
+        status: 'SENT',
+        student_id: body.studentId || null,
+        lead_id: body.leadId || null,
+        sent_by: context.userId,
+      });
+
+      return { status: 200 as const, body: mapMessage(row) };
     } catch (error) {
       console.error('WA send error:', error);
-      return mapThrownError(error, 'ERRORS.WA.SEND_FAILED', 'Failed to send', 400);
+      return mapMetaError(error, 'ERRORS.WA.SEND_FAILED', 'Failed to send');
     }
   },
 
@@ -332,12 +617,20 @@ export const waCloudRoutes = {
   // ── Webhook (public, no auth) ──
   webhookVerify: async ({ query: q }: { query: any }) => {
     // Meta sends hub.mode/hub.verify_token/hub.challenge; echo the challenge on match.
-    const token = process.env.WA_WEBHOOK_VERIFY_TOKEN;
-    const mode = q?.['hub.mode'];
-    const verify = q?.['hub.verify_token'];
-    const challenge = q?.['hub.challenge'];
-    if (mode === 'subscribe' && token && verify === token) {
-      return { status: 200 as const, body: String(challenge ?? '') };
+    // The token comes from the platform secret, not an env var: it used to read
+    // process.env.WA_WEBHOOK_VERIFY_TOKEN, which was never set by the stack, so
+    // this always answered 403 and Meta could never complete the subscription.
+    try {
+      const config = await getWaPlatformConfig();
+      const token = config?.webhook_verify_token;
+      const mode = q?.['hub.mode'];
+      const verify = q?.['hub.verify_token'];
+      const challenge = q?.['hub.challenge'];
+      if (mode === 'subscribe' && token && verify === token) {
+        return { status: 200 as const, body: String(challenge ?? '') };
+      }
+    } catch (error) {
+      console.error('WA webhookVerify error:', error);
     }
     return { status: 403 as const, body: 'forbidden' };
   },
