@@ -2,6 +2,7 @@ import { randomInt } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { CARD_SERIAL_BASE, ensureQrCardSchema } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
+import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
@@ -848,6 +849,15 @@ export const adminSecretRoutes = {
    * rows record who did something, and rewriting them to fit a debug move would
    * falsify the customer's records.
    *
+   * Only the debug account may be moved. Everything this does is right for a
+   * login that is meant to hop tenants and wrong for a real one: a customer's
+   * user would be stripped of their branch, linked employee and permissions, and
+   * land in a company that is not theirs, with their old token still working
+   * against the old tenant. There is no legitimate reason to do that to someone,
+   * so the endpoint refuses rather than trusting the caller to aim carefully.
+   * These routes have no auth at all — the obscure path is the only gate — which
+   * makes the guard belong here and not only on the button.
+   *
    * NOTE: the caller's existing JWT still carries the OLD companyId and is good
    * for up to a year — tokens are stateless with no revocation list. The moved
    * account must log out and back in before it sees the new tenant.
@@ -858,8 +868,15 @@ export const adminSecretRoutes = {
   }) => {
     const client = await getClient();
     try {
-      const user = await queryOne<any>('SELECT id, role, company_id FROM users WHERE id = $1', [params.id]);
+      const user = await queryOne<any>('SELECT id, email, role, company_id FROM users WHERE id = $1', [params.id]);
       if (!user) return { status: 404 as const, body: { message: 'User not found' } };
+
+      if (!isDebugAccount(user.email)) {
+        return {
+          status: 403 as const,
+          body: { message: `Only ${DEBUG_ACCOUNT_EMAIL} can be moved between tenants` },
+        };
+      }
 
       const target = await queryOne<any>('SELECT id, name FROM companies WHERE id = $1', [body?.companyId]);
       if (!target) return { status: 404 as const, body: { message: 'Company not found' } };

@@ -5059,6 +5059,8 @@ export const contract = c.router({
       responses: {
         200: AdminUserSchema,
         400: z.object({ message: z.string() }),
+        // Anything but the debug account.
+        403: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         409: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),

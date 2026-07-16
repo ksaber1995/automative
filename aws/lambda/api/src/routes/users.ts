@@ -5,6 +5,7 @@ import {
   isGlobalAdmin,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { DEBUG_ACCOUNT_EMAIL } from '../utils/debug-account';
 
 /** Convenience: build a parameterised UPDATE returning the updated row */
 async function updateUser(
@@ -27,14 +28,6 @@ async function updateUser(
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * The vendor's debugging login. It gets parked inside a customer's tenant to
- * reproduce what they see, so it would otherwise show up as a stranger in their
- * own user list. Hidden from the tenant-facing list; the admin console still
- * sees it (that list is a separate handler in admin-secret.ts).
- */
-const HIDDEN_DEBUG_EMAIL = 'master@master.com';
 
 function mapUserRow(u: any) {
   return {
@@ -115,9 +108,11 @@ export const usersRoutes = {
         FROM users u
         LEFT JOIN user_branches ub ON ub.user_id = u.id AND ub.company_id = u.company_id
         WHERE u.company_id = $1
+          -- The vendor's debug login is parked in this tenant to reproduce what
+          -- they see; it is not their staff and must not appear in their list.
           AND LOWER(u.email) <> $2
       `;
-      const params: any[] = [context.companyId, HIDDEN_DEBUG_EMAIL];
+      const params: any[] = [context.companyId, DEBUG_ACCOUNT_EMAIL];
       let idx = 3;
 
       if (q?.branchId) {
