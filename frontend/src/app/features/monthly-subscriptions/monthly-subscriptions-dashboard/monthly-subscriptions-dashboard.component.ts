@@ -33,6 +33,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { formatStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription, RefundMonthlyPaymentDto } from '@shared/interfaces/monthly-subscription.interface';
@@ -165,6 +166,16 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     return this.auth.isTeacher();
   }
 
+  /** Same rule as the students list: a TEACHER company reveals the code only once the QR is live. */
+  showCode = (row: { studentCode?: number | string | null; qrActivated?: boolean; qrExpiration?: string | null }) =>
+    shouldShowStudentCode(
+      { studentCode: row.studentCode, qrActivated: row.qrActivated, qrExpiration: row.qrExpiration } as any,
+      this.auth.isTeacher(),
+    );
+
+  /** A card serial prints as "A5"; an organic code prints as it is. */
+  code = (value: number | string | null | undefined) => formatStudentCode(value);
+
   constructor(
     private fb: FormBuilder,
     private svc: MonthlySubscriptionsService,
@@ -199,6 +210,19 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       courseId: [null],
     });
 
+    const saved = this.readSavedFilters();
+    if (saved) {
+      // Month/mode are safe to restore blind. branchId/courseId are NOT — they are
+      // validated against the lookups below, once we know what this user can see.
+      this.filterForm.patchValue({
+        filterMode: saved.filterMode ?? 'MONTH',
+        billingYear: saved.billingYear ?? now.getFullYear(),
+        billingMonth: saved.billingMonth ?? now.getMonth() + 1,
+        lastN: saved.lastN ?? 3,
+      }, { emitEvent: false });
+      if (saved.statusFilter) this.statusFilter.set(saved.statusFilter);
+    }
+
     // Warm the click-to-chat template cache (fire-and-forget).
     this.templatesSvc.load().subscribe({ error: () => {} });
 
@@ -212,9 +236,58 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     }).pipe(takeUntil(this.destroy$)).subscribe(({ branches, courses }) => {
       this.branches.set(branches);
       // Only show monthly-subscription courses in the filter
-      this.courses.set(courses.filter((c: Course) => c.paymentType === 'MONTHLY_SUBSCRIPTION'));
+      const monthlyCourses = courses.filter((c: Course) => c.paymentType === 'MONTHLY_SUBSCRIPTION');
+      this.courses.set(monthlyCourses);
+
+      // Only restore a branch/course the user can actually still pick. A saved id
+      // may name a branch that was deleted, or one this user has no access to —
+      // restoring it blind would filter the page down to nothing, or 403.
+      if (saved) {
+        this.filterForm.patchValue({
+          branchId: branches.some((b) => b.id === saved.branchId) ? saved.branchId : null,
+          courseId: monthlyCourses.some((c: Course) => c.id === saved.courseId) ? saved.courseId : null,
+        }, { emitEvent: false });
+      }
+
       this.loadData();
     });
+  }
+
+  /**
+   * The filters survive a reload — this page is a working surface, and being
+   * thrown back to the current month on every refresh loses the collector's place.
+   *
+   * Keyed by company: one browser can log into more than one tenant, and another
+   * tenant's branch/course ids mean nothing here.
+   */
+  private filtersKey(): string {
+    return `netrofit.monthly-subs.filters.${this.auth.currentUser()?.companyId ?? 'anon'}`;
+  }
+
+  private readSavedFilters(): any | null {
+    try {
+      const raw = localStorage.getItem(this.filtersKey());
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;   // corrupt or unavailable storage must never break the page
+    }
+  }
+
+  private saveFilters(): void {
+    try {
+      const v = this.filterForm.value;
+      localStorage.setItem(this.filtersKey(), JSON.stringify({
+        filterMode: v.filterMode,
+        billingYear: v.billingYear,
+        billingMonth: v.billingMonth,
+        lastN: v.lastN,
+        branchId: v.branchId ?? null,
+        courseId: v.courseId ?? null,
+        statusFilter: this.statusFilter(),
+      }));
+    } catch {
+      // Private mode / quota: not worth surfacing, the page still works.
+    }
   }
 
   ngOnDestroy(): void {
@@ -414,6 +487,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   loadData(): void {
+    // Every filter control reloads through here, so this is the one place that
+    // sees a settled filter state worth remembering.
+    this.saveFilters();
     const r = this.computeRange();
     const { branchId, courseId } = this.filterForm.value;
     if (!r.fromYear || !r.fromMonth) return;
@@ -449,6 +525,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   onStatusFilterChange(status: string): void {
     this.statusFilter.set(status);
+    this.saveFilters();   // the status tab is a filter too, and reloads no data
     this.applyStatusFilter();
   }
 

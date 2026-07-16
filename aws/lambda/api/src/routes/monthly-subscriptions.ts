@@ -32,6 +32,11 @@ function mapPaymentWithDetailsFromDB(row: any) {
     ...mapPaymentFromDB(row),
     studentFirstName: row.student_first_name,
     studentLastName: row.student_last_name,
+    // The code, plus what the UI needs to decide whether it may be shown yet:
+    // a TEACHER company only reveals it once the student's QR is live.
+    studentCode: row.student_code ?? null,
+    qrActivated: row.qr_activated ?? false,
+    qrExpiration: row.qr_expiration ?? null,
     courseName: row.course_name,
     branchName: row.branch_name,
     className: row.class_name || null,
@@ -59,6 +64,10 @@ function mapOverrideFromDB(row: any) {
 function resolveStatus(row: any): string {
   // REFUNDED is terminal — never re-derive it to OVERDUE on read.
   if (row.payment_status === 'REFUNDED') return 'REFUNDED';
+  // A bill that owes nothing (100% discount) is settled the moment it exists.
+  // Left as PENDING it would fall through to OVERDUE below and chase a free
+  // student for money they were never charged.
+  if (row.amount_due != null && parseFloat(row.amount_due) === 0) return 'PAID';
   if (row.payment_status === 'PAID' || row.payment_status === 'PARTIAL') return row.payment_status;
   const due = new Date(row.due_date);
   const today = new Date();
@@ -92,7 +101,7 @@ async function recalcBillsForCourseMonth(
   // Find all non-fully-paid bills for this course+month
   const bills = await query(
     `SELECT msp.id, msp.amount_paid,
-            COALESCE(NULLIF(e.final_price, 0), $5) AS enrollment_fee
+            COALESCE(e.final_price, $5) AS enrollment_fee
      FROM monthly_subscription_payments msp
      JOIN enrollments e ON msp.enrollment_id = e.id
      WHERE msp.company_id = $1
@@ -179,8 +188,8 @@ export async function ensureBillsForMonth(
        $2::int, $3::int,
        CASE
          WHEN ov.override_price IS NOT NULL AND c.price > 0
-           THEN ROUND(ov.override_price * (COALESCE(NULLIF(e.final_price, 0), c.price) / c.price), 2)
-         ELSE COALESCE(NULLIF(e.final_price, 0), c.price)
+           THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
+         ELSE COALESCE(e.final_price, c.price)
        END,
        0, 'PENDING', period.last_day
      FROM enrollments e
@@ -261,7 +270,7 @@ export const monthlySubscriptionsRoutes = {
           e.course_id,
           e.branch_id,
           e.company_id,
-          COALESCE(NULLIF(e.final_price, 0), c.price) AS enrollment_fee,
+          COALESCE(e.final_price, c.price) AS enrollment_fee,
           c.price AS course_price,
           ov.override_price
         FROM enrollments e
@@ -379,6 +388,9 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.first_name   AS student_first_name,
            s.last_name    AS student_last_name,
+           s.student_code AS student_code,
+           s.qr_activated AS qr_activated,
+           s.qr_expiration AS qr_expiration,
            s.phone        AS student_phone,
            s.parent_phone AS parent_phone,
            s.parent_name  AS parent_name,
@@ -454,6 +466,9 @@ export const monthlySubscriptionsRoutes = {
            e.hold_start_year,
            s.first_name   AS student_first_name,
            s.last_name    AS student_last_name,
+           s.student_code AS student_code,
+           s.qr_activated AS qr_activated,
+           s.qr_expiration AS qr_expiration,
            c.name         AS course_name,
            b.name         AS branch_name,
            cl.name        AS class_name
@@ -474,6 +489,9 @@ export const monthlySubscriptionsRoutes = {
         branchId: r.branch_id,
         studentFirstName: r.student_first_name,
         studentLastName: r.student_last_name,
+        studentCode: r.student_code ?? null,
+        qrActivated: r.qr_activated ?? false,
+        qrExpiration: r.qr_expiration ?? null,
         courseName: r.course_name,
         branchName: r.branch_name,
         className: r.class_name || null,
@@ -520,9 +538,17 @@ export const monthlySubscriptionsRoutes = {
         if (branchClause) conditions.push(branchClause);
       }
 
+      // is_live_billing marks a bill that still represents a real billing
+      // relationship. A bill outlives the thing that created it: drop the
+      // enrollment or deactivate the student and the row stays, so counting rows
+      // over-reports. The money columns are read from EVERY row regardless —
+      // cash already collected does not stop existing because someone left.
       const rows = await query(
-        `SELECT payment_status, due_date, amount_due, amount_paid
+        `SELECT msp.student_id, msp.payment_status, msp.due_date, msp.amount_due, msp.amount_paid,
+                (e.status = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing
          FROM monthly_subscription_payments msp
+         JOIN enrollments e ON e.id = msp.enrollment_id
+         JOIN students s ON s.id = msp.student_id
          WHERE ${conditions.join(' AND ')}`,
         params
       );
@@ -532,8 +558,12 @@ export const monthlySubscriptionsRoutes = {
 
       let paidCount = 0, pendingCount = 0, overdueCount = 0, partialCount = 0;
       let totalRevenue = 0, totalExpected = 0;
+      // Students, not bills: one student enrolled on two monthly courses is one
+      // student with two bills, and used to be counted twice.
+      const billedStudents = new Set<string>();
 
       for (const r of rows) {
+        if (r.is_live_billing) billedStudents.add(r.student_id);
         const status = resolveStatus(r);
         // Refunded bills count only their net retained revenue (gross amount_paid
         // minus what was refunded); they are not "expected" and don't belong in
@@ -556,7 +586,7 @@ export const monthlySubscriptionsRoutes = {
           // Echo the range end so the client can label the period.
           billingYear: parseInt(q.toYear, 10),
           billingMonth: parseInt(q.toMonth, 10),
-          totalStudents: rows.length,
+          totalStudents: billedStudents.size,
           paidCount,
           pendingCount,
           overdueCount,
@@ -803,6 +833,9 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.first_name AS student_first_name,
            s.last_name  AS student_last_name,
+           s.student_code AS student_code,
+           s.qr_activated AS qr_activated,
+           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
@@ -868,6 +901,9 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.first_name AS student_first_name,
            s.last_name  AS student_last_name,
+           s.student_code AS student_code,
+           s.qr_activated AS qr_activated,
+           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
@@ -912,6 +948,9 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.first_name AS student_first_name,
            s.last_name  AS student_last_name,
+           s.student_code AS student_code,
+           s.qr_activated AS qr_activated,
+           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
