@@ -790,7 +790,7 @@ export class EnrollmentFormComponent implements OnInit {
         if (products.length > 0) createData.products = products;
       }
       this.enrollmentService.createEnrollment(createData).subscribe({
-        next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_CREATED')); this.router.navigate(['/students']); },
+        next: () => { this.notificationService.success(this.translate.instant('ENROLLMENT_FORM.MSG_ENROLLMENT_CREATED')); this.router.navigate(['/students', enrollmentData.studentId]); },
         error: () => {
           // Interceptor toasted the translated error.
           this.loading.set(false);

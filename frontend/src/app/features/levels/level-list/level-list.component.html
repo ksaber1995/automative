@@ -68,7 +68,7 @@
     [visible]="showDialog()"
     (visibleChange)="showDialog.set($event)"
     [modal]="true"
-    [style]="{ width: '420px' }"
+    [style]="{ width: '480px' }"
     [header]="(isEditMode() ? 'LEVELS.FORM.EDIT_TITLE' : 'LEVELS.FORM.CREATE_TITLE') | translate"
   >
     <form [formGroup]="form" (ngSubmit)="save()">
