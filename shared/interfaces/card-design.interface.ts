@@ -18,7 +18,7 @@ export type CardTemplateId = 'navy' | 'maroon' | 'minimal' | 'portrait';
  * and the serial. Chosen independently of `template`, which governs the personal
  * student cards.
  */
-export type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave';
+export type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave' | 'crest';
 
 export interface CardDesign {
   /**

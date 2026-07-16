@@ -15,20 +15,24 @@ import {
  * student template with the fields left blank prints as a card full of empty rules
  * and dashes. These are composed around the QR from the start.
  *
- * Four of them, deliberately different in structure — not a recolour of each other:
+ * Five of them, deliberately different in structure — not a recolour of each other:
  *   aurora  dark indigo field, QR tile left, brand rail right
  *   ribbon  light page, diagonal corner ribbon, QR framed dead centre
  *   mono    black on white, oversized QR, nothing else
  *   wave    teal header curving over a white body, QR tile on the curve
+ *   crest   maroon on cream, bound top/bottom, QR centred on a symmetric axis
+ *
+ * `crest` is the only one built on a CENTRED axis — the other four all split the
+ * card left/right. That is what keeps it from reading as a recoloured ribbon.
  *
  * NOTE ON GRADIENTS: flat fills only, as everywhere else in the card code. A pool
  * export is a THOUSAND fronts; a dithered gradient turns a 15 KB PNG into ~350 KB
  * and the ZIP into 100 MB+. See the note in student-card.util.ts.
  */
 
-export type AgnosticTemplate = 'aurora' | 'ribbon' | 'mono' | 'wave';
+export type AgnosticTemplate = 'aurora' | 'ribbon' | 'mono' | 'wave' | 'crest';
 
-export const AGNOSTIC_TEMPLATES: AgnosticTemplate[] = ['aurora', 'ribbon', 'mono', 'wave'];
+export const AGNOSTIC_TEMPLATES: AgnosticTemplate[] = ['aurora', 'ribbon', 'mono', 'wave', 'crest'];
 export const DEFAULT_AGNOSTIC: AgnosticTemplate = 'aurora';
 
 interface Palette {
@@ -50,6 +54,9 @@ interface Palette {
 
 const SANS = '"Segoe UI", Tahoma, Arial, sans-serif';
 const MONO = '"Consolas", "SF Mono", "Courier New", monospace';
+// Arabic needs a face that actually has Arabic glyphs; the latin serif only takes
+// effect for latin runs. Matches the ornate student templates' typeface.
+const SERIF = '"Traditional Arabic", "Times New Roman", Georgia, serif';
 
 const PALETTES: Record<AgnosticTemplate, Palette> = {
   aurora: {
@@ -67,6 +74,12 @@ const PALETTES: Record<AgnosticTemplate, Palette> = {
   wave: {
     bg: '#ffffff', ink: '#0f172a', sub: '#64748b', accent: '#0d9488', accentInk: '#0f766e',
     tile: '#ffffff', line: '#e2e8f0', font: SANS, dark: false,
+  },
+  // Maroon on cream. `bg` is the cream page, `accent` the maroon it is bound and
+  // ruled in — the inverse of aurora, where the field is the dark colour.
+  crest: {
+    bg: '#f7efdf', ink: '#4d1620', sub: '#7d5a4b', accent: '#7b1e2b', accentInk: '#7b1e2b',
+    tile: '#ffffff', line: '#e0cdae', font: SERIF, dark: false,
   },
 };
 
@@ -206,6 +219,16 @@ export function drawAgnosticFront(
     ctx.closePath();
     ctx.fillStyle = p.accent;
     ctx.fill();
+  } else if (kind === 'crest') {
+    // Bound top and bottom in maroon, like the head and tail of a ledger. Runs
+    // full-bleed, so the cream page reads as inlaid between two solid edges.
+    ctx.fillStyle = p.accent;
+    ctx.fillRect(0, 0, DESIGN_W, 30);
+    ctx.fillRect(0, DESIGN_H - 30, DESIGN_W, 30);
+    // A cream hairline inside each band lifts it off the page edge.
+    ctx.fillStyle = p.bg;
+    ctx.fillRect(0, 34, DESIGN_W, 3);
+    ctx.fillRect(0, DESIGN_H - 37, DESIGN_W, 3);
   }
 
   contentTransform(ctx);
@@ -280,7 +303,7 @@ export function drawAgnosticFront(
 
     fitText(ctx, 'امسح الرمز لتسجيل الحضور', R, 408, 400, 19, 'bold', p.ink, 'right', 'rtl');
     fitText(ctx, 'البطاقة ملك للأكاديمية', R, 444, 400, 15, 'bold', p.sub, 'right', 'rtl');
-  } else {
+  } else if (kind === 'wave') {
     // wave — the QR straddles the curve, half on teal and half on white, which is
     // the whole idea of the template; the brand sits in the header above it.
     fitText(ctx, d.companyName || '—', 952, 74, 540, 30, 'bold', '#ffffff', 'right', 'rtl');
@@ -305,6 +328,52 @@ export function drawAgnosticFront(
       ctx.fill();
       fitText(ctx, n, R - 26, y, 460, 18, 'bold', p.sub, 'right', 'rtl');
     });
+  } else {
+    // crest — everything hangs off the card's vertical centreline: brand, QR,
+    // serial, title. The flanks are held by symmetric rules rather than a second
+    // column, which is what keeps a centred card from looking half-printed.
+    const CX = DESIGN_W / 2;
+
+    brandMark(ctx, p, d.companyName, CX, 72, 38, images.logo);
+    fitText(ctx, d.companyName || '—', CX, 138, 620, 28, 'bold', p.ink, 'center', 'rtl');
+
+    const qs = 256, qx = CX - qs / 2, qy = 182;
+    qrTile(ctx, p, qr, qx, qy, qs, 10);
+    // Double frame — a wide maroon rule with a hairline inside it.
+    ctx.strokeStyle = p.accent;
+    ctx.lineWidth = 4;
+    roundRect(ctx, qx - 13, qy - 13, qs + 26, qs + 26, 14);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    roundRect(ctx, qx - 22, qy - 22, qs + 44, qs + 44, 18);
+    ctx.stroke();
+
+    // Flanking rules, each ending in a small diamond that points at the QR.
+    [-1, 1].forEach((dir) => {
+      const near = CX + dir * (qs / 2 + 46);
+      const far = CX + dir * (DESIGN_W / 2 - 64);
+      const y = qy + qs / 2;
+      // A tanned rule, not `line` — the pale hairline read as a printing slip
+      // against cream rather than as ornament.
+      ctx.strokeStyle = '#c9ab82';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(near, y);
+      ctx.lineTo(far, y);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(near - dir * 14, y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = p.accent;
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.restore();
+    });
+
+    // Clears the QR's outer frame (which ends at qy + qs + 22) before the chip starts.
+    serialChip(ctx, p, d.code, CX, qy + qs + 36, 300, 54, p.accent, '#fbf4e6');
+
+    fitText(ctx, 'بطاقة الحضور', CX, 566, 520, 28, 'bold', p.ink, 'center', 'rtl');
+    caps(ctx, 'ATTENDANCE CARD', CX, 600, 12, p.sub, p, 'center');
   }
 
   ctx.restore();
@@ -355,6 +424,14 @@ export function drawAgnosticBack(
     ctx.closePath();
     ctx.fillStyle = p.accent;
     ctx.fill();
+  } else if (kind === 'crest') {
+    // Same binding as the front, so a printed pair reads as one card.
+    ctx.fillStyle = p.accent;
+    ctx.fillRect(0, 0, DESIGN_W, 30);
+    ctx.fillRect(0, DESIGN_H - 30, DESIGN_W, 30);
+    ctx.fillStyle = p.bg;
+    ctx.fillRect(0, 34, DESIGN_W, 3);
+    ctx.fillRect(0, DESIGN_H - 37, DESIGN_W, 3);
   } else {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, DESIGN_W, 8);

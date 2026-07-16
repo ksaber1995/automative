@@ -97,7 +97,7 @@ const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD
 const CardDesignSchema = z.object({
   template: z.enum(['navy', 'maroon', 'minimal', 'portrait']),
   // The pool cards' design — chosen separately from the personal student cards.
-  agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave']).optional(),
+  agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave', 'crest']).optional(),
   teacherName: z.string().max(80),
   teacherTitle: z.string().max(80),
   phone: z.string().max(40),
