@@ -646,6 +646,46 @@ type LicSortCol =
                 Create cards
               </button>
             </div>
+
+            <!-- Throwing the pool away. Deliberately below the fold and behind a
+                 second click: emptying a pool renumbers the next run back to A1,
+                 so any card already printed is dead paper. -->
+            @if (qrStats()[row.company_id]; as q) {
+              @if (q.total > 0) {
+                <hr style="margin:16px 0;border:none;border-top:1px solid #eee" />
+                @if (!qrDeleteArmed()) {
+                  <button class="act danger" [disabled]="busyId() === row.company_id" (click)="qrDeleteArmed.set(true)">
+                    Delete pool…
+                  </button>
+                } @else {
+                  <p class="modal-sub">
+                    Delete <strong>{{ q.total - q.linked }}</strong> unassigned
+                    {{ q.total - q.linked === 1 ? 'card' : 'cards' }}.
+                    @if (q.linked > 0) {
+                      <strong>{{ q.linked }}</strong> {{ q.linked === 1 ? 'card is' : 'cards are' }} linked to a
+                      student and will be kept unless you tick below.
+                    }
+                    The next run starts again from <code>A1</code>, so anything already printed stops working.
+                  </p>
+                  @if (q.linked > 0) {
+                    <label class="modal-sub" style="display:flex;gap:8px;align-items:center">
+                      <input type="checkbox" [ngModel]="qrDeleteLinked()" (ngModelChange)="qrDeleteLinked.set($event)" />
+                      Also delete the {{ q.linked }} linked {{ q.linked === 1 ? 'card' : 'cards' }} —
+                      {{ q.linked === 1 ? 'that student loses' : 'those students lose' }} the card in
+                      {{ q.linked === 1 ? 'their' : 'their' }} pocket.
+                    </label>
+                  }
+                  <div class="modal-foot">
+                    <button class="act" [disabled]="busyId() === row.company_id" (click)="qrDeleteArmed.set(false)">
+                      Keep them
+                    </button>
+                    <button class="act danger" [disabled]="busyId() === row.company_id" (click)="confirmDeleteQrCards()">
+                      Delete
+                    </button>
+                  </div>
+                }
+              }
+            }
           </div>
         </div>
       }
@@ -1450,6 +1490,9 @@ export class AppComponent implements OnInit {
   // printed before types existed reads as.
   readonly poolTypes = POOL_TYPES;
   qrPoolType = signal<PoolType>(1);
+  // Two-step, and reset every time the dialog opens: this one is not undoable.
+  qrDeleteArmed = signal(false);
+  qrDeleteLinked = signal(false);
 
   loadQrStats(companyId: string) {
     this.busyId.set(companyId);
@@ -1484,7 +1527,35 @@ export class AppComponent implements OnInit {
 
   openQrCards(r: CompanySubscription) {
     this.qrCount = 100;
+    this.qrPoolType.set(1);
+    // Never inherit an armed delete from the last company looked at.
+    this.qrDeleteArmed.set(false);
+    this.qrDeleteLinked.set(false);
     this.qrRow.set(r);
+  }
+
+  confirmDeleteQrCards() {
+    const r = this.qrRow();
+    if (!r) return;
+    const includeLinked = this.qrDeleteLinked();
+    this.busyId.set(r.company_id);
+    this.service.deleteQrCards(r.company_id, includeLinked).subscribe({
+      next: (res) => {
+        this.busyId.set(null);
+        this.qrDeleteArmed.set(false);
+        this.qrDeleteLinked.set(false);
+        const unlinked = res.unlinkedStudents
+          ? `, ${res.unlinkedStudents} student ${res.unlinkedStudents === 1 ? 'card' : 'cards'} unlinked`
+          : '';
+        const kept = res.keptLinked ? `, ${res.keptLinked} linked kept` : '';
+        this.showFlash(`${res.deleted} cards deleted for ${r.company_name}${unlinked}${kept}.`);
+        this.loadQrStats(r.company_id);
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.error.set(`Delete cards: ${err?.error?.message || err?.message || 'Request failed'}`);
+      },
+    });
   }
 
   confirmQrCards() {

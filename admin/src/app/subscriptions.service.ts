@@ -108,6 +108,16 @@ export class SubscriptionsService {
     );
   }
 
+  /**
+   * Throw away a client's pool. Cards already linked to a student are kept
+   * unless includeLinked is set — those are in a student's pocket.
+   */
+  deleteQrCards(companyId: string, includeLinked: boolean): Observable<DeleteQrCardsResult> {
+    return this.http.delete<DeleteQrCardsResult>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards?includeLinked=${includeLinked}`,
+    );
+  }
+
   /** Promote a company's subscription to ACTIVE. */
   activate(companyId: string): Observable<{ success: boolean; subscription_type: string | null }> {
     return this.http.post<{ success: boolean; subscription_type: string | null }>(
@@ -254,6 +264,14 @@ export interface GenerateQrCardsResult {
   from: number;
   to: number;
   poolType: number;
+}
+
+export interface DeleteQrCardsResult {
+  success: boolean;
+  deleted: number;
+  unlinkedStudents: number;
+  keptLinked: number;
+  remaining: number;
 }
 
 /** One offline (desktop) license key. Dates are ISO strings or null. */

@@ -672,6 +672,61 @@ export const adminSecretRoutes = {
       return { status: 500 as const, body: { message: error?.message || 'Stats failed' } };
     }
   },
+
+  /**
+   * DELETE /api/karim-admin-secret/companies/:companyId/qr-cards?includeLinked=
+   * Throw away a client's pool — a run minted by mistake, or a test batch.
+   *
+   * Linked cards are KEPT unless includeLinked=true. A linked card is physically
+   * in a student's pocket; deleting it stops that card scanning, and the student
+   * keeps the card's number as their student_code, so the number on the plastic
+   * now belongs to nobody. Their own qr_token still resolves, so they are not
+   * locked out — the card is.
+   *
+   * This does not renumber anything. Serials are allocated as MAX(serial)+1, so
+   * emptying a pool means the next run starts over from A1 and mints those
+   * numbers again with NEW tokens. Any card from the old run that was already
+   * printed then shows a number that belongs to a different card and a QR that
+   * resolves to nothing. Only delete a run that has not gone to the printer.
+   */
+  deleteQrCards: async ({ params, query: q }: {
+    params: { companyId: string };
+    query?: { includeLinked?: string };
+  }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const includeLinked = q?.includeLinked === 'true';
+
+      const rows = await query<any>(
+        includeLinked
+          ? `DELETE FROM qr_cards WHERE company_id = $1 RETURNING student_id`
+          : `DELETE FROM qr_cards WHERE company_id = $1 AND student_id IS NULL RETURNING student_id`,
+        [params.companyId],
+      );
+
+      const remaining = await queryOne<any>(
+        `SELECT COUNT(*) AS n, COUNT(student_id) AS linked FROM qr_cards WHERE company_id = $1`,
+        [params.companyId],
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          deleted: rows.length,
+          unlinkedStudents: rows.filter((r) => r.student_id).length,
+          keptLinked: Number(remaining?.linked ?? 0),
+          remaining: Number(remaining?.n ?? 0),
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret delete qr cards failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Delete failed' } };
+    }
+  },
   /**
    * POST /api/karim-admin-secret/companies/:companyId/deactivate
    * The counterpart of activate: park a tenant who has stopped paying. Sets the

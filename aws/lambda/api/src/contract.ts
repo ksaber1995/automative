@@ -5119,6 +5119,27 @@ export const contract = c.router({
         500: z.object({ message: z.string() }),
       },
     },
+    // Throw away a client's pool. Linked cards are kept unless includeLinked is
+    // asked for explicitly — they are in a student's pocket.
+    deleteQrCards: {
+      method: 'DELETE',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      query: z.object({ includeLinked: z.enum(['true', 'false']).optional() }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          deleted: z.number(),
+          /** How many of the deleted cards had a student on them. */
+          unlinkedStudents: z.number(),
+          /** Linked cards left behind because includeLinked was not asked for. */
+          keptLinked: z.number(),
+          remaining: z.number(),
+        }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     setCompanyType: {
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/type',

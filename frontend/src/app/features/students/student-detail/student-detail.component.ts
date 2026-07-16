@@ -1223,6 +1223,20 @@ export class StudentDetailComponent implements OnInit {
         ));
         this.closeLinkCard();
         this.loadLinkedCards(s.id);
+
+        // Linking copies the card's serial into the student's code, server-side.
+        // The header renders that code straight off the `student` signal, which
+        // the line above does not touch — so it kept showing the old code until
+        // the page was reloaded. Re-pull the student and patch the signal.
+        //
+        // Deliberately not loadStudent(): that flips `loading`, blanking the
+        // page under the success toast, and on failure it navigates back to the
+        // list — losing the page over a refresh that only cosmetics depend on.
+        // Failing quietly here just leaves the stale code, which is where we
+        // started, and the linked-cards list already reflects the truth.
+        this.studentService.getStudentById(s.id).subscribe({
+          next: (updated) => this.student.set(updated),
+        });
       },
       // Interceptor toasts the reason — unknown card, or already on someone else.
       error: () => this.linkingCard.set(false),
