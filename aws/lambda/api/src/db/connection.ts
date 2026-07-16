@@ -56,6 +56,22 @@ export async function getClient(): Promise<PoolClient> {
   return await pool.connect();
 }
 
+// Postgres has no CREATE TRIGGER IF NOT EXISTS, so the ensure*Schema() helpers
+// used to emit DROP TRIGGER IF EXISTS + CREATE TRIGGER as two statements. Those
+// don't run in one transaction, so two Lambdas self-applying the schema at once
+// could both DROP, then both CREATE — the loser died with "trigger ... already
+// exists" and surfaced as a 500. Creating inside a DO block that swallows
+// duplicate_object is safe under that race and, unlike the drop-first pair,
+// never leaves a window where an UPDATE misses the trigger entirely.
+// SECURITY: `name` and `spec` are interpolated as SQL — developer-controlled
+// literals only, never request data. See aws/lambda/api/SECURITY.md.
+export async function ensureTrigger(name: string, spec: string): Promise<void> {
+  await query(`DO $$ BEGIN
+    CREATE TRIGGER ${name} ${spec};
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END $$`);
+}
+
 // Utility functions for common operations.
 // SECURITY: `table` and the keys of `data` are interpolated as SQL identifiers.
 // Callers MUST pass developer-controlled values — never `req.body` directly.

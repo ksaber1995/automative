@@ -1,14 +1,28 @@
 import { randomBytes } from 'crypto';
 import { CARD_SERIAL_BASE } from './qr-cards';
-import { insert, update, query, queryOne, deleteById } from '../db/connection';
+import { insert, update, query, queryOne, deleteById, ensureTrigger } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 // CRM is a Phase-1 lead pipeline, gated to ACADEMY companies on the ADVANCED
 // plan. Schema mirrors migration 053 and self-applies idempotently at runtime.
-let crmSchemaEnsured = false;
-async function ensureCrmSchema(): Promise<void> {
-  if (crmSchemaEnsured) return;
+// Cache the in-flight promise, not a done flag: the flag only flipped after the
+// last statement, so two concurrent requests hitting a cold container both ran
+// the whole body and raced each other statement by statement. Awaiting one
+// shared promise means the second caller waits for the first instead. A failed
+// run clears the cache so the next request retries rather than inheriting it.
+let crmSchemaEnsured: Promise<void> | null = null;
+function ensureCrmSchema(): Promise<void> {
+  if (!crmSchemaEnsured) {
+    crmSchemaEnsured = applyCrmSchema().catch((err) => {
+      crmSchemaEnsured = null;
+      throw err;
+    });
+  }
+  return crmSchemaEnsured;
+}
+
+async function applyCrmSchema(): Promise<void> {
   await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'SIMPLE'`);
   await query(`DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companies_plan_check') THEN
@@ -38,8 +52,7 @@ async function ensureCrmSchema(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_leads_branch ON crm_leads(branch_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_leads_stage ON crm_leads(stage)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_leads_owner ON crm_leads(owner_user_id)`);
-  await query(`DROP TRIGGER IF EXISTS update_crm_leads_updated_at ON crm_leads`);
-  await query(`CREATE TRIGGER update_crm_leads_updated_at BEFORE UPDATE ON crm_leads
+  await ensureTrigger('update_crm_leads_updated_at', `BEFORE UPDATE ON crm_leads
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
 
   // Phase 2 (migration 054): activities/tasks on the timeline of a lead.
@@ -68,8 +81,7 @@ async function ensureCrmSchema(): Promise<void> {
   await query(`ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM'`);
   await query(`ALTER TABLE crm_activities ALTER COLUMN lead_id DROP NOT NULL`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_assignee ON crm_activities(assigned_employee_id)`);
-  await query(`DROP TRIGGER IF EXISTS update_crm_activities_updated_at ON crm_activities`);
-  await query(`CREATE TRIGGER update_crm_activities_updated_at BEFORE UPDATE ON crm_activities
+  await ensureTrigger('update_crm_activities_updated_at', `BEFORE UPDATE ON crm_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
 
   // Call log (migration 056): one row per outreach/call attempt to a lead, with
@@ -103,8 +115,7 @@ async function ensureCrmSchema(): Promise<void> {
     )
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_lists_company ON crm_lists(company_id)`);
-  await query(`DROP TRIGGER IF EXISTS update_crm_lists_updated_at ON crm_lists`);
-  await query(`CREATE TRIGGER update_crm_lists_updated_at BEFORE UPDATE ON crm_lists
+  await ensureTrigger('update_crm_lists_updated_at', `BEFORE UPDATE ON crm_lists
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
 
   await query(`
@@ -122,8 +133,6 @@ async function ensureCrmSchema(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_list ON crm_list_leads(list_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_lead ON crm_list_leads(lead_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_list_leads_company ON crm_list_leads(company_id)`);
-
-  crmSchemaEnsured = true;
 }
 
 // CRM is Advanced-plan + Academy only. Returns an apiError response when denied.
