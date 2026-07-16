@@ -39,8 +39,16 @@ export async function ensureCardDesignColumn(): Promise<void> {
 type CardTemplateId = 'navy' | 'maroon' | 'minimal' | 'portrait';
 const CARD_TEMPLATES: CardTemplateId[] = ['navy', 'maroon', 'minimal', 'portrait'];
 
+// The pool (agnostic) card designs, chosen separately from the personal student
+// cards above. Mirrors AGNOSTIC_TEMPLATES in the frontend's card-agnostic.util
+// and the enum in CardDesignSchema — this file keeps its own copy of the card
+// types because the Lambda has no path alias to shared/.
+type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave' | 'crest';
+const AGNOSTIC_TEMPLATES: AgnosticTemplateId[] = ['aurora', 'ribbon', 'mono', 'wave', 'crest'];
+
 interface CardDesign {
   template: CardTemplateId;
+  agnosticTemplate: AgnosticTemplateId;
   teacherName: string;
   teacherTitle: string;
   phone: string;
@@ -69,6 +77,7 @@ interface CardDesign {
  */
 export const DEFAULT_CARD_DESIGN: CardDesign = {
   template: 'navy',
+  agnosticTemplate: 'aurora',
   teacherName: '',
   teacherTitle: '',
   phone: '',
@@ -104,8 +113,17 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
     ? d.template
     : DEFAULT_CARD_DESIGN.template;
 
+  // Every field the tenant sends has to be named here to survive: updateCardDesign
+  // persists this return value, so anything left out is silently dropped on save.
+  // agnosticTemplate was missing, which is why the pool-design picker never stuck
+  // — the choice validated, then vanished, and every read fell back to 'aurora'.
+  const agnosticTemplate: AgnosticTemplateId = AGNOSTIC_TEMPLATES.includes(d.agnosticTemplate)
+    ? d.agnosticTemplate
+    : DEFAULT_CARD_DESIGN.agnosticTemplate;
+
   return {
     template,
+    agnosticTemplate,
     teacherName: str(d.teacherName, '').trim() || companyName,
     teacherTitle: str(d.teacherTitle, DEFAULT_CARD_DESIGN.teacherTitle),
     phone: str(d.phone, DEFAULT_CARD_DESIGN.phone),

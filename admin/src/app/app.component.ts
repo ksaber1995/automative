@@ -6,6 +6,13 @@ import {
   TenantUser, USER_ROLES,
 } from './subscriptions.service';
 
+/**
+ * The vendor's debugging login. It is the reason the move-between-tenants
+ * feature exists, and the only account offered a Move button. Hidden from the
+ * customer's own /users page by the API (see HIDDEN_DEBUG_EMAIL).
+ */
+const DEBUG_EMAIL = 'master@master.com';
+
 type LicSortCol =
   | 'name' | 'tier' | 'status' | 'students' | 'courses' | 'lastSeen' | 'trialEnds' | 'renewal' | 'price';
 
@@ -440,9 +447,11 @@ type LicSortCol =
                     </td>
                     <td>{{ formatDate(u.created_at) }}</td>
                     <td>
-                      <button class="act" [disabled]="busyId() === u.id" (click)="openMoveUser(u)">
-                        Move
-                      </button>
+                      @if (isDebugUser(u)) {
+                        <button class="act" [disabled]="busyId() === u.id" (click)="openMoveUser(u)">
+                          Move
+                        </button>
+                      }
                       <button class="act danger" [disabled]="busyId() === u.id" (click)="openDeleteUser(u)">
                         Delete
                       </button>
@@ -1591,8 +1600,17 @@ export class AppComponent implements OnInit {
   // Moving an account between tenants — for a debugging login that needs to sit
   // inside a customer's data. The API refuses to move a tenant's last admin out,
   // for the same reason it refuses to delete them.
+  //
+  // Offered for the debug login only. Moving a real customer's account is not a
+  // thing anyone here means to do: it strips their branch, linked employee and
+  // permissions, and drops them into a company that isn't theirs. The button sat
+  // on every row, one misclick from doing that quietly.
   moveUserRow = signal<TenantUser | null>(null);
   moveTarget = signal('');
+
+  isDebugUser(u: TenantUser): boolean {
+    return u.email.trim().toLowerCase() === DEBUG_EMAIL;
+  }
 
   openMoveUser(u: TenantUser) {
     this.moveTarget.set('');
