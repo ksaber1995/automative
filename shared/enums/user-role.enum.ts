@@ -19,9 +19,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SALES_MANAGER]: 'Sales Manager',
   [UserRole.VIEWER]: 'Viewer',
   // Legacy
-  [UserRole.ADMIN]: 'Administrator (Legacy)',
-  [UserRole.BRANCH_MANAGER]: 'Branch Manager (Legacy)',
-  [UserRole.ACCOUNTANT]: 'Accountant (Legacy)',
+  [UserRole.ADMIN]: 'Administrator',
+  [UserRole.BRANCH_MANAGER]: 'Branch Manager',
+  [UserRole.ACCOUNTANT]: 'Accountant',
 };
 
 export const NEW_ROLES: UserRole[] = [
