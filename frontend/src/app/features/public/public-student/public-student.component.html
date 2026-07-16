@@ -91,7 +91,14 @@
                       <span class="ml-1 text-xs font-semibold text-indigo-600">{{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: r.sessionNumber } }}</span>
                     }
                   </div>
-                  <div class="text-xs text-gray-500">{{ formatDate(r.sessionStartDate) }}</div>
+                  <div class="text-xs text-gray-500">
+                    {{ formatDate(r.sessionStartDate) }}
+                    <!-- Arrival time, when there is one. An absence has none. -->
+                    @if (r.checkedInAt) {
+                      <span class="text-gray-400">·</span>
+                      <span class="font-medium text-gray-600">{{ formatTime(r.checkedInAt) }}</span>
+                    }
+                  </div>
                 </div>
                 @if (r.status === 'SUBSTITUTED') {
                   <span class="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full whitespace-nowrap">
@@ -127,6 +134,206 @@
             }
           </div>
         </div>
+      }
+
+      <!-- ── Payments ─────────────────────────────────────────────────────────
+           Every billing model the student is on. A student can be on more than
+           one at a time, so each section stands alone and hides when empty. -->
+      @if (p.payments) {
+        <!-- Totals first: the question a parent actually opened this to answer. -->
+        <div class="bg-white rounded-xl shadow-sm p-5 mt-6 mb-6">
+          <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            <i class="pi pi-wallet text-xs"></i> {{ 'PUBLIC_PROFILE.PAYMENTS' | translate }}
+          </h2>
+          <div class="grid grid-cols-2 gap-3"
+               [class.grid-cols-3]="p.payments.totalRefunded > 0">
+            <div class="text-center bg-green-50 rounded-lg py-3">
+              <div class="text-lg font-bold text-green-700">{{ money(p.payments.totalPaid) }}</div>
+              <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_PAID' | translate }}</div>
+            </div>
+            <div class="text-center rounded-lg py-3"
+                 [class]="p.payments.totalOutstanding > 0 ? 'bg-amber-50' : 'bg-gray-50'">
+              <div class="text-lg font-bold"
+                   [class]="p.payments.totalOutstanding > 0 ? 'text-amber-700' : 'text-gray-500'">
+                {{ money(p.payments.totalOutstanding) }}
+              </div>
+              <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_OUTSTANDING' | translate }}</div>
+            </div>
+            @if (p.payments.totalRefunded > 0) {
+              <div class="text-center bg-red-50 rounded-lg py-3">
+                <div class="text-lg font-bold text-red-700">{{ money(p.payments.totalRefunded) }}</div>
+                <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_REFUNDED' | translate }}</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Monthly subscription: one row per billed month, newest first. -->
+        @if (p.payments.monthly.length > 0) {
+          <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <i class="pi pi-calendar-clock text-xs"></i> {{ 'PUBLIC_PROFILE.MONTHLY_BILLS' | translate }}
+            </h2>
+            <div class="divide-y divide-gray-100">
+              @for (m of p.payments.monthly; track $index) {
+                <div class="py-2.5 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-800">{{ monthLabel(m.billingYear, m.billingMonth) }}</div>
+                    <div class="text-xs text-gray-500 truncate">
+                      {{ m.courseName }}@if (m.className) { · {{ m.className }} }
+                    </div>
+                    <div class="text-xs text-gray-400">
+                      {{ 'PUBLIC_PROFILE.DUE_ON' | translate }} {{ formatDate(m.dueDate) }}
+                      @if (m.paidDate) {
+                        · {{ 'PUBLIC_PROFILE.PAID_ON' | translate }} {{ formatDate(m.paidDate) }}
+                      }
+                    </div>
+                  </div>
+                  <div class="text-right whitespace-nowrap">
+                    <div class="text-sm font-semibold text-gray-800">
+                      {{ money(m.amountPaid) }} <span class="text-gray-400">/ {{ money(m.amountDue) }}</span>
+                    </div>
+                    <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(m.status)">
+                      {{ paymentLabel(m.status) }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Prepaid session bundles. -->
+        @if (p.payments.packages.length > 0) {
+          <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <i class="pi pi-box text-xs"></i> {{ 'PUBLIC_PROFILE.SESSION_PACKAGES' | translate }}
+            </h2>
+            <div class="divide-y divide-gray-100">
+              @for (pk of p.payments.packages; track $index) {
+                <div class="py-2.5 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-800 truncate">{{ pk.courseName }}</div>
+                    <div class="text-xs text-gray-500">
+                      {{ 'PUBLIC_PROFILE.SESSIONS_USED' | translate: { used: pk.sessionsUsed, total: pk.sessionsTotal } }}
+                      · {{ formatDate(pk.purchasedAt) }}
+                    </div>
+                  </div>
+                  <div class="text-right whitespace-nowrap">
+                    <div class="text-sm font-semibold text-gray-800">
+                      {{ money(pk.amountPaid) }} <span class="text-gray-400">/ {{ money(pk.amountDue) }}</span>
+                    </div>
+                    <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(pk.status)">
+                      {{ paymentLabel(pk.status) }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Per-session charges. -->
+        @if (p.payments.sessions.length > 0) {
+          <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <i class="pi pi-ticket text-xs"></i> {{ 'PUBLIC_PROFILE.SESSION_CHARGES' | translate }}
+            </h2>
+            <div class="divide-y divide-gray-100">
+              @for (s of p.payments.sessions; track $index) {
+                <div class="py-2.5 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-800 truncate">
+                      {{ s.courseName }}
+                      @if (s.sessionNumber != null) {
+                        <span class="ml-1 text-xs font-semibold text-indigo-600">{{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: s.sessionNumber } }}</span>
+                      }
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      {{ formatDate(s.sessionStartDate) }}
+                      @if (s.paidDate) { · {{ 'PUBLIC_PROFILE.PAID_ON' | translate }} {{ formatDate(s.paidDate) }} }
+                    </div>
+                  </div>
+                  <div class="text-right whitespace-nowrap">
+                    <div class="text-sm font-semibold text-gray-800">
+                      {{ money(s.amountPaid) }} <span class="text-gray-400">/ {{ money(s.amountDue) }}</span>
+                    </div>
+                    <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(s.status)">
+                      {{ paymentLabel(s.status) }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- One-time / instalment courses, each with what was actually handed over. -->
+        @if (p.payments.oneTime.length > 0) {
+          <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <i class="pi pi-book text-xs"></i> {{ 'PUBLIC_PROFILE.COURSE_PAYMENTS' | translate }}
+            </h2>
+            <div class="divide-y divide-gray-100">
+              @for (o of p.payments.oneTime; track $index) {
+                <div class="py-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="text-sm font-medium text-gray-800 truncate">
+                        {{ o.courseName }}@if (o.className) { · {{ o.className }} }
+                      </div>
+                      <div class="text-xs text-gray-500">{{ formatDate(o.enrollmentDate) }}</div>
+                    </div>
+                    <div class="text-right whitespace-nowrap">
+                      <div class="text-sm font-semibold text-gray-800">
+                        {{ money(o.amountPaid) }} <span class="text-gray-400">/ {{ money(o.finalPrice) }}</span>
+                      </div>
+                      <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(o.status)">
+                        {{ paymentLabel(o.status) }}
+                      </span>
+                    </div>
+                  </div>
+                  @if (o.remaining > 0) {
+                    <div class="text-xs text-amber-700 mt-1">
+                      {{ 'PUBLIC_PROFILE.REMAINING' | translate }}: {{ money(o.remaining) }}
+                    </div>
+                  }
+                  <!-- Each instalment actually handed over. -->
+                  @if (o.instalments.length > 0) {
+                    <div class="mt-2 ltr:pl-3 rtl:pr-3 ltr:border-l-2 rtl:border-r-2 border-gray-100">
+                      @for (i of o.instalments; track $index) {
+                        <div class="flex items-center justify-between text-xs text-gray-500 py-0.5">
+                          <span>{{ formatDate(i.paymentDate) }}</span>
+                          <span class="font-medium text-gray-700">{{ money(i.amount) }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Money given back. -->
+        @if (p.payments.refunds.length > 0) {
+          <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <i class="pi pi-replay text-xs"></i> {{ 'PUBLIC_PROFILE.REFUNDS' | translate }}
+            </h2>
+            <div class="divide-y divide-gray-100">
+              @for (rf of p.payments.refunds; track $index) {
+                <div class="py-2.5 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-800 truncate">{{ rf.courseName || '—' }}</div>
+                    <div class="text-xs text-gray-500">{{ formatDate(rf.refundDate) }}</div>
+                  </div>
+                  <span class="text-sm font-semibold text-red-700 whitespace-nowrap">− {{ money(rf.amount) }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
       }
 
       <p class="text-center text-xs text-gray-400 mt-6">{{ 'PUBLIC_PROFILE.POWERED_BY' | translate: { name: p.student.academyName } }}</p>

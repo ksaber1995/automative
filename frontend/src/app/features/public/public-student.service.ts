@@ -17,7 +17,81 @@ export interface PublicStudentAttendanceRecent {
   roomCode: string | null;
   isPresent: boolean;
   status?: 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
+  /** When the student was marked in; null for an absence. */
+  checkedInAt?: string | null;
   substitutedInClassName?: string | null;
+}
+
+/** A billed month of a monthly subscription. */
+export interface PublicMonthlyPayment {
+  courseName: string;
+  className: string | null;
+  billingYear: number;
+  billingMonth: number;
+  amountDue: number;
+  amountPaid: number;
+  status: string;
+  dueDate: string | null;
+  paidDate: string | null;
+}
+
+/** A per-session charge. */
+export interface PublicSessionPayment {
+  courseName: string;
+  className: string | null;
+  sessionNumber: number | null;
+  sessionStartDate: string | null;
+  attendanceState: string | null;
+  amountDue: number;
+  amountPaid: number;
+  status: string;
+  paidDate: string | null;
+}
+
+/** A prepaid bundle of sessions. */
+export interface PublicSessionPackage {
+  courseName: string;
+  sessionsTotal: number;
+  sessionsUsed: number;
+  amountDue: number;
+  amountPaid: number;
+  status: string;
+  purchasedAt: string | null;
+}
+
+/** A one-time (or instalment) course purchase. */
+export interface PublicOneTimePayment {
+  courseName: string;
+  className: string | null;
+  paymentMode: string;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  downPayment: number;
+  amountPaid: number;
+  totalRefunded: number;
+  remaining: number;
+  status: string;
+  enrollmentDate: string | null;
+  instalments: { amount: number; paymentDate: string | null }[];
+}
+
+export interface PublicRefund {
+  courseName: string | null;
+  amount: number;
+  refundDate: string | null;
+  type: string | null;
+}
+
+export interface PublicStudentPayments {
+  monthly: PublicMonthlyPayment[];
+  sessions: PublicSessionPayment[];
+  packages: PublicSessionPackage[];
+  oneTime: PublicOneTimePayment[];
+  refunds: PublicRefund[];
+  totalPaid: number;
+  totalOutstanding: number;
+  totalRefunded: number;
 }
 
 export interface PublicStudentExam {
@@ -44,6 +118,7 @@ export interface PublicStudentProfile {
     recent: PublicStudentAttendanceRecent[];
   };
   exams?: PublicStudentExam[];
+  payments?: PublicStudentPayments;
 }
 
 /**

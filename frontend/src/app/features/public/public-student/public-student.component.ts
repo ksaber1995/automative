@@ -15,9 +15,12 @@ import { PublicStudentService, PublicStudentProfile } from '../public-student.se
  * singleton) flips document direction to RTL for Arabic, so the whole page
  * mirrors automatically.
  *
- * Shows only low-sensitivity data (name, academy/branch, course list with
- * coarse status, attendance summary). Financial amounts, contact info, and
- * notes are deliberately NOT exposed here — see routes/public-students.ts.
+ * Shows the student's academy/branch, courses, attendance, exam grades and — at
+ * the owner's explicit request — their full payment history across all three
+ * billing models. Contact info, address and notes are still withheld.
+ *
+ * NOTE: the payment history is behind nothing but the QR token, which is printed
+ * on a card the student carries. See the PRIVACY note on routes/public-students.ts.
  */
 @Component({
   selector: 'app-public-student',
@@ -63,6 +66,39 @@ export class PublicStudentComponent implements OnInit {
     return d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  /** Date + time of day, for a check-in ("14 Jul 2026, 16:32"). */
+  formatDateTime(value: string | null | undefined): string {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '—';
+    const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
+    return d.toLocaleString(locale, {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  /** Time of day only, for the arrival time beside a session's date. */
+  formatTime(value: string | null | undefined): string {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
+    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /** "August 2026" for a billing period. */
+  monthLabel(year: number, month: number): string {
+    const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
+    return new Date(year, month - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  }
+
+  /** Money as the parent should read it. Kept plain — no currency guessing. */
+  money(value: number | null | undefined): string {
+    const n = Number(value ?? 0);
+    const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
+    return n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   /** Translate a payment-status enum, falling back to the raw value. */
   paymentLabel(status: string): string {
     return this.enumLabel('PUBLIC_PROFILE.PAYMENT.', status);
@@ -83,10 +119,18 @@ export class PublicStudentComponent implements OnInit {
   statusClass(status: string): string {
     switch ((status || '').toUpperCase()) {
       case 'PAID':
+      // A session covered by a prepaid bundle, or waived, is settled as far as the
+      // parent is concerned — nothing more to hand over.
+      case 'COVERED':
+      case 'WAIVED':
+      case 'ACTIVE':
         return 'bg-green-100 text-green-700';
       case 'PARTIAL':
         return 'bg-amber-100 text-amber-700';
+      case 'OVERDUE':
+        return 'bg-red-100 text-red-700';
       case 'PENDING':
+      case 'EXHAUSTED':
         return 'bg-gray-100 text-gray-600';
       case 'REFUNDED':
         return 'bg-red-100 text-red-700';

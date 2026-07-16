@@ -61,7 +61,7 @@ function mapOverrideFromDB(row: any) {
 }
 
 /** Resolve overdue status on-read: any PENDING row past its due_date becomes OVERDUE */
-function resolveStatus(row: any): string {
+export function resolveStatus(row: any): string {
   // REFUNDED is terminal — never re-derive it to OVERDUE on read.
   if (row.payment_status === 'REFUNDED') return 'REFUNDED';
   // A bill that owes nothing (100% discount) is settled the moment it exists.

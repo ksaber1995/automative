@@ -3,6 +3,7 @@ import { ensureQrCardSchema, qrStudentMatchPublic } from './qr-cards';
 import { enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { apiError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
+import { resolveStatus } from './monthly-subscriptions';
 
 type AuthHeaders = { authorization?: string };
 
@@ -15,12 +16,24 @@ type AuthHeaders = { authorization?: string };
  * scopes the result to exactly one student. Tenant (company/branch) is read
  * FROM the resolved student, never from a JWT.
  *
- * PRIVACY: this page has no login, so it exposes only low-sensitivity data —
- * name, branch/academy, course list with high-level status, and an
- * attendance summary. It intentionally omits contact info, address, notes,
- * and all financial amounts. Payment is surfaced as a coarse status label
- * only. If full financials are ever wanted here, gate them behind an
- * additional check (e.g. date of birth) — do not just add the columns.
+ * PRIVACY: this page has no login, so the QR token is the ONLY thing standing
+ * between a passer-by and everything below — and that token is printed on a card
+ * the student carries in their pocket.
+ *
+ * It exposes name, branch/academy, courses, attendance, exam grades, and the
+ * student's FULL payment history across all three billing models: every billed
+ * month with its amounts and dates, every per-session charge, every course
+ * instalment, and every refund.
+ *
+ * The financials are here at the owner's explicit instruction, with that
+ * exposure spelled out and accepted. This file previously said the opposite —
+ * that amounts were deliberately withheld and should only ever be added behind a
+ * second check such as date of birth. That gate was considered and rejected as
+ * unworkable: barely half of some tenants' students have a date of birth on
+ * record, so it would lock those parents out entirely.
+ *
+ * Contact info, address and notes are still withheld. Adding anything more
+ * sensitive here is a product decision, not a refactor.
  */
 export const publicStudentsRoutes = {
   profile: async ({ params }: { params: { qrToken: string }; headers: AuthHeaders }) => {
@@ -54,7 +67,9 @@ export const publicStudentsRoutes = {
       // Courses the student is enrolled in (regular enrollments). Coarse
       // status only — no prices, no payment amounts.
       const courses = await query<any>(
-        `SELECT c.name AS course_name,
+        `SELECT e.id AS enrollment_id,
+                e.payment_type AS payment_type,
+                c.name AS course_name,
                 cl.name AS class_name,
                 e.status AS status,
                 e.payment_status AS payment_status,
@@ -76,14 +91,17 @@ export const publicStudentsRoutes = {
             cl.name AS class_name,
             r.code AS room_code,
             CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
-            sub.sub_class_name AS substituted_in_class_name
+            sub.sub_class_name AS substituted_in_class_name,
+            -- When the student was actually marked in, which is not the same as
+            -- when the session started: a parent wants to see the arrival time.
+            COALESCE(sa.created_at, sub.sub_checked_in_at) AS checked_in_at
          FROM sessions s
          JOIN classes cl ON s.class_id = cl.id
          LEFT JOIN rooms r ON s.room_id = r.id
          LEFT JOIN session_attendance sa
            ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
          LEFT JOIN LATERAL (
-           SELECT c2.name AS sub_class_name
+           SELECT c2.name AS sub_class_name, sub2.created_at AS sub_checked_in_at
            FROM session_attendance sub2
            JOIN sessions s2 ON s2.id = sub2.session_id
            JOIN classes c2 ON c2.id = s2.class_id
@@ -115,7 +133,8 @@ export const publicStudentsRoutes = {
             c2.name AS class_name,
             r2.code AS room_code,
             false AS is_present_normal,
-            c2.name AS substituted_in_class_name
+            c2.name AS substituted_in_class_name,
+            sub.created_at AS checked_in_at
          FROM session_attendance sub
          JOIN sessions s2 ON s2.id = sub.session_id
          JOIN classes c2 ON c2.id = s2.class_id
@@ -137,6 +156,93 @@ export const publicStudentsRoutes = {
                  WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
                )
            )`,
+        [student.id, student.company_id]
+      );
+
+      // ── Payments ────────────────────────────────────────────────────────────
+      // The three billing models are separate tables and a student can be on more
+      // than one at once, so all three are read and merged. Every query is scoped
+      // by the resolved student AND company, same as everything above.
+
+      // MONTHLY_SUBSCRIPTION: one row per billed month.
+      const monthlyRows = await query<any>(
+        `SELECT m.billing_year, m.billing_month, m.amount_due, m.amount_paid,
+                m.payment_status, m.due_date, m.paid_date, m.enrollment_id,
+                c.name AS course_name, cl.name AS class_name
+         FROM monthly_subscription_payments m
+         JOIN courses c ON c.id = m.course_id
+         LEFT JOIN enrollments e ON e.id = m.enrollment_id
+         LEFT JOIN classes cl ON cl.id = e.class_id
+         WHERE m.student_id = $1 AND m.company_id = $2
+         ORDER BY m.billing_year DESC, m.billing_month DESC`,
+        [student.id, student.company_id]
+      );
+
+      // PER_SESSION: a charge per attended session, plus any prepaid bundles.
+      // Tolerant of a DB where the per-session schema has not self-applied yet.
+      let sessionCharges: any[] = [];
+      let sessionPackages: any[] = [];
+      try {
+        sessionCharges = await query<any>(
+          `SELECT sp.attendance_state, sp.amount_due, sp.amount_paid, sp.payment_status,
+                  sp.paid_date, sp.enrollment_id,
+                  ss.start_date AS session_start_date, ss.session_number,
+                  c.name AS course_name, cl.name AS class_name
+           FROM session_payments sp
+           JOIN courses c ON c.id = sp.course_id
+           LEFT JOIN sessions ss ON ss.id = sp.session_id
+           LEFT JOIN classes cl ON cl.id = ss.class_id
+           WHERE sp.student_id = $1 AND sp.company_id = $2
+           ORDER BY ss.start_date DESC NULLS LAST`,
+          [student.id, student.company_id]
+        );
+        sessionPackages = await query<any>(
+          `SELECT pk.sessions_total, pk.sessions_used, pk.amount_due, pk.amount_paid,
+                  pk.status, pk.purchased_at, pk.enrollment_id, c.name AS course_name
+           FROM session_packages pk
+           JOIN courses c ON c.id = pk.course_id
+           WHERE pk.student_id = $1 AND pk.company_id = $2
+           ORDER BY pk.purchased_at DESC`,
+          [student.id, student.company_id]
+        );
+      } catch {
+        sessionCharges = [];
+        sessionPackages = [];
+      }
+
+      // ONE_TIME / INSTALLMENTS: the money lives on the enrollment itself, and
+      // each instalment actually handed over is a row in enrollment_payments.
+      const oneTimeRows = await query<any>(
+        `SELECT e.id AS enrollment_id, e.payment_mode, e.original_price, e.discount_amount,
+                e.final_price, e.down_payment, e.amount_paid, e.total_refunded,
+                e.payment_status, e.enrollment_date,
+                c.name AS course_name, cl.name AS class_name
+         FROM enrollments e
+         JOIN courses c ON c.id = e.course_id
+         LEFT JOIN classes cl ON cl.id = e.class_id
+         WHERE e.student_id = $1 AND e.company_id = $2 AND e.payment_type = 'ONE_TIME'
+         ORDER BY e.enrollment_date DESC`,
+        [student.id, student.company_id]
+      );
+
+      const instalments = await query<any>(
+        `SELECT p.enrollment_id, p.amount, p.payment_date
+         FROM enrollment_payments p
+         JOIN enrollments e ON e.id = p.enrollment_id
+         WHERE e.student_id = $1 AND e.company_id = $2
+         ORDER BY p.payment_date DESC`,
+        [student.id, student.company_id]
+      );
+
+      // Money given back. Shown so a parent can reconcile what they handed over
+      // against what the academy kept.
+      const refundRows = await query<any>(
+        `SELECT r.amount, r.refund_date, r.type, c.name AS course_name
+         FROM refunds r
+         LEFT JOIN enrollments e ON e.id = r.enrollment_id
+         LEFT JOIN courses c ON c.id = e.course_id
+         WHERE r.student_id = $1 AND r.company_id = $2
+         ORDER BY r.refund_date DESC`,
         [student.id, student.company_id]
       );
 
@@ -169,6 +275,108 @@ export const publicStudentsRoutes = {
       const absentCount = totalSessions - presentCount;
       const attendanceRate = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
 
+      const num = (v: any) => (v === null || v === undefined ? 0 : parseFloat(v));
+
+      const monthly = monthlyRows.map((row: any) => ({
+        courseName: row.course_name,
+        className: row.class_name || null,
+        billingYear: parseInt(row.billing_year, 10),
+        billingMonth: parseInt(row.billing_month, 10),
+        amountDue: num(row.amount_due),
+        amountPaid: num(row.amount_paid),
+        // Same derivation the dashboard uses, so the parent and the office never
+        // disagree: overdue is resolved on read, and a 0-due month reads as paid.
+        status: resolveStatus(row),
+        dueDate: row.due_date,
+        paidDate: row.paid_date || null,
+        enrollmentId: row.enrollment_id,
+      }));
+
+      const sessions = sessionCharges.map((row: any) => ({
+        courseName: row.course_name,
+        className: row.class_name || null,
+        sessionNumber: row.session_number === null || row.session_number === undefined
+          ? null : parseInt(row.session_number, 10),
+        sessionStartDate: row.session_start_date || null,
+        attendanceState: row.attendance_state,
+        amountDue: num(row.amount_due),
+        amountPaid: num(row.amount_paid),
+        status: row.payment_status,
+        paidDate: row.paid_date || null,
+        enrollmentId: row.enrollment_id,
+      }));
+
+      const packages = sessionPackages.map((row: any) => ({
+        courseName: row.course_name,
+        sessionsTotal: parseInt(row.sessions_total, 10),
+        sessionsUsed: parseInt(row.sessions_used, 10),
+        amountDue: num(row.amount_due),
+        amountPaid: num(row.amount_paid),
+        status: row.status,
+        purchasedAt: row.purchased_at,
+        enrollmentId: row.enrollment_id,
+      }));
+
+      const oneTime = oneTimeRows.map((row: any) => ({
+        courseName: row.course_name,
+        className: row.class_name || null,
+        paymentMode: row.payment_mode,
+        originalPrice: num(row.original_price),
+        discountAmount: num(row.discount_amount),
+        finalPrice: num(row.final_price),
+        downPayment: num(row.down_payment),
+        amountPaid: num(row.amount_paid),
+        totalRefunded: num(row.total_refunded),
+        remaining: Math.max(0, num(row.final_price) - num(row.amount_paid)),
+        status: row.payment_status,
+        enrollmentDate: row.enrollment_date,
+        // The instalments actually handed over for this course.
+        instalments: instalments
+          .filter((p: any) => p.enrollment_id === row.enrollment_id)
+          .map((p: any) => ({ amount: num(p.amount), paymentDate: p.payment_date })),
+      }));
+
+      const refunds = refundRows.map((row: any) => ({
+        courseName: row.course_name || null,
+        amount: num(row.amount),
+        refundDate: row.refund_date,
+        type: row.type,
+      }));
+
+      /**
+       * The real payment state of one enrollment.
+       *
+       * enrollments.payment_status is only meaningful for ONE_TIME: monthly and
+       * per-session enrollments deliberately leave it PENDING with amount_paid 0,
+       * because their money lives in the other tables. Reading it blind told every
+       * paid-up monthly parent that they owed money.
+       */
+      const statusFor = (enrollmentId: string, paymentType: string, fallback: string): string => {
+        const rows: { due: number; paid: number; status: string }[] =
+          paymentType === 'MONTHLY_SUBSCRIPTION'
+            ? monthly.filter((m) => m.enrollmentId === enrollmentId)
+                .map((m) => ({ due: m.amountDue, paid: m.amountPaid, status: m.status }))
+            : paymentType === 'PER_SESSION'
+              ? sessions.filter((s) => s.enrollmentId === enrollmentId)
+                  .map((s) => ({ due: s.amountDue, paid: s.amountPaid, status: s.status }))
+              : [];
+        if (!rows.length) return fallback;
+        if (rows.some((r) => r.status === 'OVERDUE')) return 'OVERDUE';
+        const due = rows.reduce((t, r) => t + r.due, 0);
+        const paid = rows.reduce((t, r) => t + r.paid, 0);
+        if (paid <= 0) return due > 0 ? 'PENDING' : 'PAID';
+        return paid >= due ? 'PAID' : 'PARTIAL';
+      };
+
+      const totalPaid = monthly.reduce((t, m) => t + m.amountPaid, 0)
+        + sessions.reduce((t, s) => t + s.amountPaid, 0)
+        + oneTime.reduce((t, o) => t + o.amountPaid, 0);
+      // What is still owed right now — future months a student has not reached are
+      // real bills, so they count, but nothing already settled does.
+      const totalOutstanding = monthly.reduce((t, m) => t + Math.max(0, m.amountDue - m.amountPaid), 0)
+        + sessions.reduce((t, s) => t + Math.max(0, s.amountDue - s.amountPaid), 0)
+        + oneTime.reduce((t, o) => t + o.remaining, 0);
+
       return {
         status: 200 as const,
         body: {
@@ -182,9 +390,19 @@ export const publicStudentsRoutes = {
             courseName: row.course_name,
             className: row.class_name,
             status: row.status,
-            paymentStatus: row.payment_status,
+            paymentStatus: statusFor(row.enrollment_id, row.payment_type, row.payment_status),
             enrollmentDate: row.enrollment_date,
           })),
+          payments: {
+            monthly,
+            sessions,
+            packages,
+            oneTime,
+            refunds,
+            totalPaid,
+            totalOutstanding,
+            totalRefunded: refunds.reduce((t, r) => t + r.amount, 0),
+          },
           attendance: {
             totalSessions,
             presentCount,
@@ -198,6 +416,9 @@ export const publicStudentsRoutes = {
               className: row.class_name,
               roomCode: row.room_code,
               status: row.status,
+              // When the student was actually marked in. Null for an absence —
+              // there is no arrival time for someone who never arrived.
+              checkedInAt: row.checked_in_at || null,
               substitutedInClassName: row.substituted_in_class_name || null,
               // Backward-compatible: present OR substituted.
               isPresent: row.status !== 'ABSENT',
