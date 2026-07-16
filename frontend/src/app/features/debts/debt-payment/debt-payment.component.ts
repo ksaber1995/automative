@@ -11,6 +11,7 @@ import { DebtService, CreatePaymentDto } from '../../../core/services/debt.servi
 import { Debt } from '@shared/interfaces/debt.interface';
 import { PaymentMethod } from '@shared/interfaces/withdrawal.interface';
 import { NotificationService } from '../../../core/services/notification.service';
+import { todayYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-debt-payment',
@@ -55,7 +56,7 @@ export class DebtPaymentComponent implements OnInit {
   }
 
   initForm() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayYmd();
     this.paymentForm = this.fb.group({
       paymentDate: [today, Validators.required],
       totalAmount: [null, [Validators.required, Validators.min(0.01)]],

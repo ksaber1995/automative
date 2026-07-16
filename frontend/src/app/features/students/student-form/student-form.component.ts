@@ -14,6 +14,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-student-form',
@@ -126,7 +127,7 @@ export class StudentFormComponent implements OnInit {
     const formValue = this.studentForm.value;
     const studentData = {
       ...formValue,
-      dateOfBirth: formValue.dateOfBirth instanceof Date ? formValue.dateOfBirth.toISOString().split('T')[0] : formValue.dateOfBirth
+      dateOfBirth: toLocalYmd(formValue.dateOfBirth)
     };
 
     if (this.isEditMode() && this.studentId) {

@@ -21,6 +21,7 @@ import { MasterEnrollmentService } from '../../master-courses/services/master-en
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-dues-list',
@@ -113,7 +114,7 @@ export class DuesListComponent implements OnInit {
     if (!due || !this.paymentAmount || !this.paymentDate) return;
 
     this.actionLoading.set(true);
-    const dateStr = this.paymentDate.toISOString().split('T')[0];
+    const dateStr = toLocalYmd(this.paymentDate);
     const dto = { amount: this.paymentAmount, paymentDate: dateStr, notes: this.paymentNotes || undefined };
 
     const request$ = due.type === 'MASTER_ENROLLMENT'

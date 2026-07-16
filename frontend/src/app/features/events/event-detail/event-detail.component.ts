@@ -34,6 +34,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { EventModel, EventPL } from '@shared/interfaces/event.interface';
 import { Student } from '@shared/interfaces/student.interface';
 import { ExpenseCategory, ExpenseType } from '@shared/enums/expense-type.enum';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-event-detail',
@@ -226,7 +227,7 @@ export class EventDetailComponent implements OnInit {
         ? {
             studentId: this.subStudentId!,
             amount: this.subAmount,
-            paymentDate: this.subPaymentDate.toISOString().split('T')[0],
+            paymentDate: toLocalYmd(this.subPaymentDate),
             paymentMethod: this.subPaymentMethod || undefined,
             notes: this.subNotes || undefined,
           }
@@ -236,7 +237,7 @@ export class EventDetailComponent implements OnInit {
             externalAge: this.subAge ?? undefined,
             externalMobile: this.subMobile || undefined,
             amount: this.subAmount,
-            paymentDate: this.subPaymentDate.toISOString().split('T')[0],
+            paymentDate: toLocalYmd(this.subPaymentDate),
             paymentMethod: this.subPaymentMethod || undefined,
             notes: this.subNotes || undefined,
           };
@@ -299,7 +300,7 @@ export class EventDetailComponent implements OnInit {
       return;
     }
     this.saving.set(true);
-    const dateStr = this.expDate.toISOString().split('T')[0];
+    const dateStr = toLocalYmd(this.expDate);
     const expenseData: any = {
       type: ExpenseType.VARIABLE,
       category: this.expCategory,
@@ -398,7 +399,7 @@ export class EventDetailComponent implements OnInit {
       .createRefund(this.id, {
         subscriptionId: this.refSubscription.id,
         amount: this.refAmount,
-        refundDate: this.refDate.toISOString().split('T')[0],
+        refundDate: toLocalYmd(this.refDate),
         type: this.refType,
         reason: this.refReason || undefined,
       })

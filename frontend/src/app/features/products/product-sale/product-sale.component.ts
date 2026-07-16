@@ -18,6 +18,7 @@ import { Product } from '@shared/interfaces/product.interface';
 import { EventModel } from '@shared/interfaces/event.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
+import { todayYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-product-sale',
@@ -126,7 +127,7 @@ export class ProductSaleComponent implements OnInit {
   }
 
   initForm() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayYmd();
     this.saleForm = this.fb.group({
       branchId: [''],
       productId: ['', Validators.required],

@@ -14,6 +14,7 @@ import { EventService } from '../services/event.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-event-form',
@@ -166,7 +167,7 @@ export class EventFormComponent implements OnInit {
   }
 
   private toIsoDate(d: any): string {
-    if (d instanceof Date) return d.toISOString().split('T')[0];
+    if (d instanceof Date) return toLocalYmd(d);
     return d;
   }
 }

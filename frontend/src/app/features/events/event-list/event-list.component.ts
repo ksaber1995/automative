@@ -16,6 +16,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { EventModel } from '@shared/interfaces/event.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+import { todayYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-event-list',
@@ -72,7 +73,7 @@ export class EventListComponent implements OnInit {
   filteredItems = computed(() => {
     const branch = this.selectedBranchId();
     const status = this.selectedStatus();
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = todayYmd();
 
     return this.items().filter((e) => {
       if (branch === '__global__' && e.branchId !== null) return false;
@@ -89,7 +90,7 @@ export class EventListComponent implements OnInit {
   });
 
   isFinished(item: EventModel): boolean {
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = todayYmd();
     return !!item.endDate && item.endDate < todayKey;
   }
 

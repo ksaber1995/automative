@@ -12,6 +12,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../services/exam.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-exam-form',
@@ -139,7 +140,7 @@ export class ExamFormComponent implements OnInit {
   }
 
   private toIsoDate(d: any): string {
-    if (d instanceof Date) return d.toISOString().split('T')[0];
+    if (d instanceof Date) return toLocalYmd(d);
     return d;
   }
 }

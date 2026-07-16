@@ -18,6 +18,7 @@ import { Revenue } from '@shared/interfaces/revenue.interface';
 import { Student } from '@shared/interfaces/student.interface';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-revenue-form',
@@ -136,7 +137,7 @@ export class RevenueFormComponent implements OnInit {
     const formValue = this.revenueForm.value;
     const revenueData = {
       ...formValue,
-      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date,
+      date: toLocalYmd(formValue.date),
       courseId: formValue.courseId || null,
       studentId: formValue.studentId || null
     };

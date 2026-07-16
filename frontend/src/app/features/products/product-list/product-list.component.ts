@@ -22,6 +22,7 @@ import { BranchStateService } from '../../../core/services/branch-state.service'
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { Product } from '@shared/interfaces/product.interface';
 import { ProductCategory } from '@shared/enums/product.enum';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-product-list',
@@ -214,9 +215,7 @@ export class ProductListComponent implements OnInit {
         return;
       }
       this.stockSubmitting.set(true);
-      const date = this.restockForm.date instanceof Date
-        ? this.restockForm.date.toISOString().split('T')[0]
-        : this.restockForm.date;
+      const date = toLocalYmd(this.restockForm.date);
 
       this.productService.restockProduct(product.id, {
         quantity: this.restockForm.quantity,

@@ -19,6 +19,7 @@ import { BranchStateService } from '../../../core/services/branch-state.service'
 import { Expense } from '@shared/interfaces/expense.interface';
 import { ExpenseType, ExpenseCategory, DistributionMethod } from '@shared/enums/expense-type.enum';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-expense-form',
@@ -193,7 +194,7 @@ export class ExpenseFormComponent implements OnInit {
     const expenseData = {
       ...formValue,
       branchId: formValue.branchId || null,
-      date: formValue.date instanceof Date ? formValue.date.toISOString().split('T')[0] : formValue.date,
+      date: toLocalYmd(formValue.date),
       assetName: formValue.type === 'CAPITAL' ? (formValue.assetName || null) : null,
       amortizationMonths: formValue.type === 'CAPITAL' ? (formValue.amortizationMonths || null) : null,
     };
@@ -214,9 +215,7 @@ export class ExpenseFormComponent implements OnInit {
       const create$ = this.expenseService.createExpense(expenseData);
 
       if (this.payImmediately()) {
-        const payDate = this.paymentDate instanceof Date
-          ? this.paymentDate.toISOString().split('T')[0]
-          : this.paymentDate;
+        const payDate = toLocalYmd(this.paymentDate);
 
         create$.pipe(
           switchMap(expense =>

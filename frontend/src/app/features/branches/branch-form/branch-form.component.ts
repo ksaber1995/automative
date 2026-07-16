@@ -10,6 +10,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BranchService } from '../services/branch.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Branch } from '@shared/interfaces/branch.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-branch-form',
@@ -92,9 +93,7 @@ export class BranchFormComponent implements OnInit {
     // Convert Date object to ISO string for API
     const branchData = {
       ...formValue,
-      openingDate: formValue.openingDate instanceof Date
-        ? formValue.openingDate.toISOString().split('T')[0]
-        : formValue.openingDate,
+      openingDate: toLocalYmd(formValue.openingDate),
     };
 
     if (this.isEditMode() && this.branchId) {

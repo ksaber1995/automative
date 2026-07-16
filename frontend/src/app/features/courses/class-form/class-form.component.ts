@@ -193,9 +193,7 @@ export class ClassFormComponent implements OnInit {
       return;
     }
 
-    const startDate = v.startDate instanceof Date
-      ? v.startDate.toISOString().split('T')[0]
-      : v.startDate;
+    const startDate = this.toLocalYmd(v.startDate);
 
     let endDate: string;
     if (v.numberOfSessions && v.numberOfSessions > 0) {
@@ -204,11 +202,9 @@ export class ClassFormComponent implements OnInit {
         days,
         v.numberOfSessions
       );
-      endDate = calc.toISOString().split('T')[0];
+      endDate = this.toLocalYmd(calc);
     } else if (v.endDate) {
-      endDate = v.endDate instanceof Date
-        ? v.endDate.toISOString().split('T')[0]
-        : v.endDate;
+      endDate = this.toLocalYmd(v.endDate);
     } else {
       this.availabilityConflicts.set([]);
       return;
@@ -383,6 +379,19 @@ export class ClassFormComponent implements OnInit {
     return days.includes(day);
   }
 
+  /**
+   * Local YYYY-MM-DD for a picked date. toISOString() would convert the picker's
+   * local-midnight Date to UTC, which lands on the previous day for any timezone
+   * east of UTC (Egypt) — pick the 25th, store the 24th.
+   */
+  private toLocalYmd(value: Date | string): string {
+    if (!(value instanceof Date)) return value;
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   calculateEndDate(startDate: Date, daysOfWeek: string[], numberOfSessions: number): Date {
     if (!startDate || !daysOfWeek || daysOfWeek.length === 0 || !numberOfSessions) {
       return startDate;
@@ -438,10 +447,7 @@ export class ClassFormComponent implements OnInit {
       return;
     }
 
-    // Convert start date to ISO string
-    const startDate = formValue.startDate instanceof Date
-      ? formValue.startDate.toISOString().split('T')[0]
-      : formValue.startDate;
+    const startDate = this.toLocalYmd(formValue.startDate);
 
     // Calculate end date if numberOfSessions is provided
     let endDate: string;
@@ -451,11 +457,9 @@ export class ClassFormComponent implements OnInit {
         formValue.daysOfWeek,
         formValue.numberOfSessions
       );
-      endDate = calculatedEndDate.toISOString().split('T')[0];
+      endDate = this.toLocalYmd(calculatedEndDate);
     } else if (formValue.endDate) {
-      endDate = formValue.endDate instanceof Date
-        ? formValue.endDate.toISOString().split('T')[0]
-        : formValue.endDate;
+      endDate = this.toLocalYmd(formValue.endDate);
     } else {
       this.notificationService.error(this.translate.instant('CLASSES.END_DATE_OR_SESSIONS_REQUIRED'));
       this.loading.set(false);

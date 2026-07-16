@@ -20,6 +20,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProductSale } from '@shared/interfaces/product-sale.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-sales-history',
@@ -210,9 +211,7 @@ export class SalesHistoryComponent implements OnInit {
     if (!sale || !this.canSubmitRefund()) return;
 
     this.processingRefund.set(true);
-    const dateStr = this.refundDate instanceof Date
-      ? this.refundDate.toISOString().split('T')[0]
-      : this.refundDate;
+    const dateStr = toLocalYmd(this.refundDate);
 
     this.productSaleService.createRefund(sale.id, {
       type: this.refundType,

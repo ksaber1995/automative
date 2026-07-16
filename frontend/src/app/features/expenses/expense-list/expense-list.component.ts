@@ -25,6 +25,7 @@ import { Employee } from '@shared/interfaces/employee.interface';
 import { InstallmentPlan } from '@shared/interfaces/installment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 type ExpenseTab = 'all' | 'due' | 'direct' | 'salaries' | 'installments' | 'events';
 
@@ -309,9 +310,7 @@ export class ExpenseListComponent implements OnInit {
     if (!expense) return;
 
     this.recordingPayment.set(true);
-    const dateStr = this.paymentDate instanceof Date
-      ? this.paymentDate.toISOString().split('T')[0]
-      : this.paymentDate;
+    const dateStr = toLocalYmd(this.paymentDate);
 
     this.expenseService.recordPayment({
       expenseId: expense.id,
@@ -361,9 +360,7 @@ export class ExpenseListComponent implements OnInit {
 
   confirmPaySalaries() {
     this.payingSalaries.set(true);
-    const dateStr = this.salariesDate instanceof Date
-      ? this.salariesDate.toISOString().split('T')[0]
-      : this.salariesDate;
+    const dateStr = toLocalYmd(this.salariesDate);
 
     this.expenseService.paySalaries(dateStr, this.salariesBranchId || undefined).subscribe({
       next: () => {

@@ -23,6 +23,7 @@ import {
 } from '@shared/interfaces/installment.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-installment-detail',
@@ -115,9 +116,7 @@ export class InstallmentDetailComponent implements OnInit {
     const t = this.payTarget();
     if (!t) return;
     this.paying.set(true);
-    const dateStr = this.payDate instanceof Date
-      ? this.payDate.toISOString().split('T')[0]
-      : this.payDate;
+    const dateStr = toLocalYmd(this.payDate);
 
     this.installmentService.pay(this.planId, t.id, {
       date: dateStr,

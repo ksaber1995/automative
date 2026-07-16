@@ -35,6 +35,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
 import { CourseMonthlyPriceOverride } from '@shared/interfaces/monthly-subscription.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-course-detail',
@@ -488,7 +489,7 @@ export class CourseDetailComponent implements OnInit {
     this.paymentLoading.set(true);
     this.enrollmentService.addPayment(enrollmentId, {
       amount: this.paymentAmount,
-      paymentDate: this.paymentDate.toISOString().split('T')[0],
+      paymentDate: toLocalYmd(this.paymentDate),
       notes: this.paymentNotes || undefined
     }).subscribe({
       next: () => {
@@ -528,7 +529,7 @@ export class CourseDetailComponent implements OnInit {
     this.refundLoading.set(true);
     this.enrollmentService.createRefund(enrollmentId, {
       amount: this.refundAmount,
-      refundDate: this.refundDate.toISOString().split('T')[0],
+      refundDate: toLocalYmd(this.refundDate),
       type: this.refundType,
       reason: this.refundReason || undefined
     }).subscribe({

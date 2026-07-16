@@ -14,6 +14,7 @@ import { BranchService } from '../../branches/services/branch.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DebtType, CompoundingFrequency, PaymentSchedule } from '@shared/interfaces/debt.interface';
 import { NotificationService } from '../../../core/services/notification.service';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-debt-form',
@@ -168,8 +169,8 @@ export class DebtFormComponent implements OnInit {
       principalAmount: formValue.principalAmount,
       interestRate: formValue.interestRate,
       compoundingFrequency: formValue.compoundingFrequency as CompoundingFrequency,
-      takenDate: formValue.takenDate instanceof Date ? formValue.takenDate.toISOString().split('T')[0] : formValue.takenDate,
-      dueDate: formValue.dueDate instanceof Date ? formValue.dueDate.toISOString().split('T')[0] : formValue.dueDate,
+      takenDate: toLocalYmd(formValue.takenDate),
+      dueDate: toLocalYmd(formValue.dueDate),
       paymentSchedule: formValue.paymentSchedule as PaymentSchedule,
       branchId: formValue.branchId || undefined,
       collateral: formValue.collateral || undefined,

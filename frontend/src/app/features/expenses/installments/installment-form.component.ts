@@ -15,6 +15,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ExpenseCategory } from '@shared/enums/expense-type.enum';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-installment-form',
@@ -98,7 +99,7 @@ export class InstallmentFormComponent implements OnInit {
       this.notificationService.error(this.translate.instant('INSTALLMENTS.FORM.MSG_DOWNPAYMENT_INVALID'));
       return;
     }
-    const startStr = v.startDate instanceof Date ? v.startDate.toISOString().split('T')[0] : v.startDate;
+    const startStr = toLocalYmd(v.startDate);
 
     this.submitting.set(true);
     this.installmentService.create({

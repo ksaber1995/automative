@@ -26,6 +26,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 interface SalaryAdjustment {
   bonusAmount: number;
@@ -343,7 +344,7 @@ export class SalariesComponent implements OnInit {
   }
 
   formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return toLocalYmd(date);
   }
 
   goBack() {

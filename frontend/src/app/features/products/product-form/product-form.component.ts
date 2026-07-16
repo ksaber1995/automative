@@ -16,6 +16,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ProductCategory } from '@shared/enums/product.enum';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-product-form',
@@ -176,9 +177,7 @@ export class ProductFormComponent implements OnInit {
 
     const productData = {
       ...formValue,
-      purchaseDate: formValue.purchaseDate instanceof Date
-        ? formValue.purchaseDate.toISOString().split('T')[0]
-        : formValue.purchaseDate,
+      purchaseDate: toLocalYmd(formValue.purchaseDate),
     };
 
     const request = this.isEditMode()

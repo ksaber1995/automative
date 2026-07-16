@@ -17,6 +17,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { AuthService } from '../../../core/services/auth.service';
 import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+import { todayYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-expense-detail',
@@ -77,7 +78,7 @@ export class ExpenseDetailComponent implements OnInit {
     const e = this.expense();
     this.newPayment = {
       amount: e?.amount ?? 0,
-      date: new Date().toISOString().split('T')[0],
+      date: todayYmd(),
       vendor: e?.vendor ?? '',
       invoiceNumber: '',
       notes: '',

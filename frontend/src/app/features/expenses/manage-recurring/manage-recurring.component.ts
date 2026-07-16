@@ -19,6 +19,7 @@ import { ExpenseService } from '../services/expense.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 interface RecurringRow {
   template: Expense;
@@ -112,7 +113,7 @@ export class ManageRecurringComponent implements OnInit {
     const month = this.formatMonth(this.selectedMonth);
     const monthStart = `${month}-01`;
     const d = new Date(this.selectedMonth.getFullYear(), this.selectedMonth.getMonth() + 1, 0);
-    const monthEnd = d.toISOString().split('T')[0];
+    const monthEnd = toLocalYmd(d);
 
     forkJoin({
       templates: this.expenseService.getAllExpenses({ isRecurring: 'true' }),
@@ -215,7 +216,7 @@ export class ManageRecurringComponent implements OnInit {
   }
 
   formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return toLocalYmd(date);
   }
 
   goBack() {

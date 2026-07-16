@@ -17,6 +17,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { AuthService } from '../../../core/services/auth.service';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 const ALL = '__ALL__';
 const COMPANY = '__COMPANY__';
@@ -204,7 +205,7 @@ export class CashManagementComponent implements OnInit {
     const dto: any = {
       type: this.dialogType,
       branchId: this.dialogBranchId || undefined,
-      date: this.date.toISOString().split('T')[0],
+      date: toLocalYmd(this.date),
       notes: this.notes || undefined,
     };
     if (this.dialogType === 'ADJUSTMENT') {

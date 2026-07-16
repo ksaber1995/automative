@@ -14,6 +14,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { todayYmd } from '../../../core/utils/date.util';
 
 @Component({
   selector: 'app-employee-form',
@@ -54,7 +55,7 @@ export class EmployeeFormComponent implements OnInit {
     this.rebuildSalaryTypeOptions();
     this.translate.onLangChange.subscribe(() => this.rebuildSalaryTypeOptions());
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayYmd();
     this.employeeForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
       lastName: ['', [Validators.required, Validators.minLength(2)]],
