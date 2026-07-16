@@ -468,11 +468,30 @@ export class StudentDetailComponent implements OnInit {
 
   // ─── Monthly subscriptions ──────────────────────────────────────────────────
 
+  /**
+   * Bills for months the student has not reached yet exist in the table: the
+   * dashboard materialises a whole company's months whenever someone filters
+   * forward, and the generate action writes an explicit month. An UNPAID future
+   * bill is not a debt — nobody owes November in July — so it is noise here.
+   * One that carries money is a deliberate early payment and must stay visible,
+   * or the student's money would vanish from their own page.
+   *
+   * This hides rows; it never deletes them. The row still exists for the
+   * dashboard's collect-early flow, which is where a future month gets paid.
+   */
+  private isBillVisible(p: MonthlyPaymentWithDetails, currentKey: number): boolean {
+    const billKey = p.billingYear * 12 + p.billingMonth;
+    return billKey <= currentKey || Number(p.amountPaid) > 0;
+  }
+
   loadMonthlySubscriptions(studentId: string) {
     this.monthlyService.listByStudent(studentId).subscribe({
       next: (rows) => {
+        const now = new Date();
+        const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
         const map = new Map<string, MonthlyPaymentWithDetails[]>();
         for (const r of rows) {
+          if (!this.isBillVisible(r, currentKey)) continue;
           const list = map.get(r.enrollmentId) || [];
           list.push(r);
           map.set(r.enrollmentId, list);
@@ -1036,9 +1055,18 @@ export class StudentDetailComponent implements OnInit {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-  getAge(dateOfBirth: string): number {
+  // Date of birth is optional, and a missing one makes `new Date(null)` fall back
+  // to the epoch — which reads as a plausible ~56 rather than an obvious error.
+  // Very young ages usually mean a placeholder/typo'd date, so treat those as unset too.
+  hasAge(dateOfBirth: string | null | undefined): boolean {
+    if (!dateOfBirth) return false;
+    const age = this.getAge(dateOfBirth);
+    return !isNaN(age) && age >= 2;
+  }
+
+  getAge(dateOfBirth: string | null | undefined): number {
     const today = new Date();
-    const birthDate = new Date(dateOfBirth);
+    const birthDate = new Date(dateOfBirth ?? NaN);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -1141,8 +1169,6 @@ export class StudentDetailComponent implements OnInit {
   /** Takes over the app-wide scanner ONLY while the link dialog is open. */
   private readonly linkScanHandler = (token: string) => this.linkByToken(token);
 
-  /** Hidden unless the pool is enabled for this academy (the API enforces it too). */
-  canUseQrCards = computed(() => this.authService.canUseQrCards());
   linkCardVisible = signal(false);
   linkedCards = signal<QrCard[]>([]);
   linkingCard = signal(false);

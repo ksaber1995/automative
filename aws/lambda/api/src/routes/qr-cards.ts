@@ -226,8 +226,11 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
-      const denied = await qrCardsDenied(context.companyId);
-      if (denied) return denied;
+      // Deliberately NOT gated on qr_cards_enabled. That flag is about CREATING a
+      // pool, and a tenant who cannot create one may still have been given cards
+      // by an admin — those cards are useless if they cannot be linked. The lookup
+      // below is already scoped to the caller's company, so a tenant can only ever
+      // link a card that belongs to them.
 
       const student = await queryOne<any>(
         'SELECT id, first_name, last_name FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
@@ -301,8 +304,8 @@ export const qrCardsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       await ensureQrCardSchema();
-      const denied = await qrCardsDenied(context.companyId);
-      if (denied) return denied;
+      // Ungated for the same reason as link(): whoever can link a card must be
+      // able to undo it, or a card handed to the wrong student is stuck there.
 
       const row = await queryOne<any>(
         `UPDATE qr_cards SET student_id = NULL, assigned_at = NULL

@@ -164,14 +164,19 @@
                 </span>
               }
             </div>
-            <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
+            @if (hasAge(s.dateOfBirth)) {
+              <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
+            }
           </div>
           <div class="flex gap-2">
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
-            @if (canUseQrCards()) {
-              <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
-                [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
-            }
+            <!-- Always offered. qrCardsEnabled decides whether a tenant may CREATE a
+                 pool, not whether they may use one: an admin can hand cards to a
+                 teacher who cannot generate their own, and those cards are worthless
+                 if there is no way to link them. The API scopes the lookup to the
+                 caller's company, so only their own cards can ever be linked. -->
+            <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
+              [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.SEND_NOTES' | translate" icon="pi pi-whatsapp" class="p-button-outlined"
               [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
               (click)="openNotesDialog()"></button>
@@ -185,10 +190,12 @@
         <div>
           <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'STUDENTS.DETAIL.PERSONAL' | translate }}</h3>
           <div class="space-y-2">
-            <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.DOB' | translate }}</span>
-              <span>{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
-            </div>
+            @if (s.dateOfBirth) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.DOB' | translate }}</span>
+                <span>{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
+              </div>
+            }
             @if (s.email) {
               <div class="flex">
                 <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.EMAIL' | translate }}</span>
@@ -722,7 +729,11 @@
                       [pTooltip]="'STUDENTS.DETAIL.RESUME_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
-                  @if (enrollment.status !== 'DROPPED' && (getMonthlyPayments(enrollment.id).length === 0 || !hasAnyMonthlyPayment(enrollment.id))) {
+                  <!-- Also offered for a DROPPED subscription: a student added to the
+                       wrong class is usually dropped first, and until now that left the
+                       mistake on their profile with no way to remove it. The API only
+                       deletes outright when no money ever touched the enrollment. -->
+                  @if (!hasAnyMonthlyPayment(enrollment.id)) {
                     <p-button
                       icon="pi pi-trash"
                       [rounded]="true"

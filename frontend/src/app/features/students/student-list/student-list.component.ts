@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { formatStudentCode, normalizeStudentCode } from '../../../core/utils/student-code.util';
+import { matchesSearchTokens } from '../../../core/utils/search.util';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CardModule } from 'primeng/card';
@@ -122,20 +123,22 @@ export class StudentListComponent implements OnInit {
       const map = this.studentCourseMap();
       filtered = filtered.filter(s => map.get(s.id)?.has(courseId));
     }
-    const term = this.searchTerm().trim().toLowerCase();
-    if (!term) return filtered;
-    return filtered.filter(s => {
-      const full = `${s.firstName ?? ''} ${s.lastName ?? ''}`.toLowerCase();
-      return full.includes(term)
-        || (s.firstName ?? '').toLowerCase().includes(term)
-        || (s.lastName ?? '').toLowerCase().includes(term)
-        || (s.parentName ?? '').toLowerCase().includes(term)
-        // Also match by student code and phone numbers (student / parent).
-        || formatStudentCode(s.studentCode).toLowerCase().includes(term)
-        || String(s.studentCode ?? '').includes(term)
-        || (s.phone ?? '').toLowerCase().includes(term)
-        || (s.parentPhone ?? '').toLowerCase().includes(term);
-    });
+    const term = this.searchTerm();
+    if (!term.trim()) return filtered;
+    // Every word of the term must appear somewhere across these fields, in any
+    // order — a name is searched by the parts people remember. Matching the term
+    // as one contiguous run of "first last" used to miss anyone with a middle
+    // name, which is most of the roster.
+    return filtered.filter(s => matchesSearchTokens(term, [
+      s.firstName,
+      s.lastName,
+      s.parentName,
+      // Student code and phone numbers (student / parent) stay searchable.
+      formatStudentCode(s.studentCode),
+      s.studentCode,
+      s.phone,
+      s.parentPhone,
+    ]));
   });
 
   activeCount = computed(() => this.students().filter(s => s.isActive).length);
@@ -350,6 +353,15 @@ export class StudentListComponent implements OnInit {
       age--;
     }
     return age;
+  }
+
+  // Age for the list. Date of birth is optional, and very young ages usually mean
+  // a placeholder/typo'd date — so show nothing unless the age is a real 2+.
+  ageDisplay(dateOfBirth: string | null | undefined): string {
+    if (!dateOfBirth) return '—';
+    const age = this.getAge(dateOfBirth);
+    if (isNaN(age) || age < 2) return '—';
+    return `${age} ${this.translate.instant('STUDENTS.LIST.YEARS')}`;
   }
 
   // --- Download student ID cards as a ZIP ---

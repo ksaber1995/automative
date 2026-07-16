@@ -993,12 +993,44 @@ export const enrollmentsRoutes = {
         return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED_DELETE', 'Access denied to delete this enrollment');
       }
 
-      // Soft delete by setting status to DROPPED
-      const enrollment = await update('enrollments', params.id, { status: 'DROPPED' });
+      // A student added to the wrong class must be able to disappear completely —
+      // dropping them leaves a subscription on the profile forever. But deleting
+      // the row CASCADES to enrollment_payments, refunds, monthly bills and
+      // session payments, so it is only safe when no money ever touched it.
+      // Same rule as deleting a class: money means keep the record.
+      const footprint = await queryOne<{ has_money: boolean }>(
+        `SELECT (
+            COALESCE(e.amount_paid, 0) > 0
+         OR COALESCE(e.down_payment, 0) > 0
+         OR COALESCE(e.total_refunded, 0) > 0
+         OR e.master_enrollment_id IS NOT NULL
+         OR EXISTS (SELECT 1 FROM enrollment_payments p WHERE p.enrollment_id = e.id)
+         OR EXISTS (SELECT 1 FROM refunds r WHERE r.enrollment_id = e.id)
+         OR EXISTS (SELECT 1 FROM monthly_subscription_payments m
+                     WHERE m.enrollment_id = e.id AND COALESCE(m.amount_paid, 0) > 0)
+         OR EXISTS (SELECT 1 FROM session_payments sp WHERE sp.enrollment_id = e.id)
+         OR EXISTS (SELECT 1 FROM session_packages spk WHERE spk.enrollment_id = e.id)
+         OR EXISTS (SELECT 1 FROM revenues rv WHERE rv.enrollment_id = e.id)
+         ) AS has_money
+         FROM enrollments e WHERE e.id = $1`,
+        [params.id]
+      );
 
-      if (!enrollment) {
-        return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (footprint?.has_money) {
+        // Money is involved: keep the row and its records, just take it out of use.
+        const enrollment = await update('enrollments', params.id, { status: 'DROPPED' });
+        if (!enrollment) {
+          return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+        }
+        return {
+          status: 200 as const,
+          body: { message: 'Enrollment dropped', code: 'ENROLLMENTS.DROPPED' },
+        };
       }
+
+      // Nothing was ever paid: remove it outright. The FKs cascade its (unpaid)
+      // bills away with it, so no phantom debt or stale row is left behind.
+      await query('DELETE FROM enrollments WHERE id = $1', [params.id]);
 
       return {
         status: 200 as const,
