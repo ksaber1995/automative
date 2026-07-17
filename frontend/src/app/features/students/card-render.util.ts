@@ -1,13 +1,16 @@
 import QRCode from 'qrcode';
-import { CardDesign } from '@shared/interfaces/card-design.interface';
-import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE } from './card-theme';
-import { CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardTheme } from './student-card.util';
+import { CardDesign, composeAdjust } from '@shared/interfaces/card-design.interface';
+import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE, tuneTheme } from './card-theme';
+import {
+  CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
+} from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
 import { drawCardBackPortrait, drawStudentCardPortrait } from './card-portrait.util';
 import {
   AgnosticCardData, AgnosticTemplate, DEFAULT_AGNOSTIC, drawAgnosticBack, drawAgnosticFront,
 } from './card-agnostic.util';
+import { drawCustomBack, drawCustomFront } from './card-custom.util';
 
 /**
  * The one place that turns a template + data into a PNG. Both faces of a card
@@ -15,12 +18,41 @@ import {
  * come from the same template.
  */
 
-export { CARD_W, CARD_H } from './student-card.util';
+export { CARD_W, CARD_H, DESIGN_W, DESIGN_H } from './student-card.util';
+export { canExportCustom } from './card-custom.util';
 export type { StudentCardData } from './student-card.util';
 export { currentAcademicYear } from './student-card.util';
 
-function themeFor(template?: CardTemplate) {
-  return CARD_THEMES[template ?? DEFAULT_TEMPLATE] ?? CARD_THEMES[DEFAULT_TEMPLATE];
+function themeFor(template?: CardTemplate, design?: CardDesign | null) {
+  const base = CARD_THEMES[template ?? DEFAULT_TEMPLATE] ?? CARD_THEMES[DEFAULT_TEMPLATE];
+  return tuneTheme(base, design?.student);
+}
+
+/**
+ * Arm the module-level palette + tuning for the draw that follows.
+ *
+ * Both must be set on EVERY entry point, never just the first: the bulk export
+ * reuses one canvas and one module, so a card rendered after a differently-tuned
+ * one would otherwise inherit its neighbour's colours and logo offset.
+ *
+ * The pool is armed per FACE. Both of its faces carry a logo, so one set of offsets
+ * moved both at once; placement therefore comes from that face's own record while
+ * the palette still comes from `pool` for both — see composeAdjust.
+ */
+function arm(
+  design: CardDesign | null | undefined,
+  which: 'student' | 'pool-front' | 'pool-back',
+  template?: CardTemplate,
+) {
+  setCardTheme(themeFor(template, which === 'student' ? design : null));
+  if (which === 'student') {
+    setCardAdjust(design?.student);
+    return;
+  }
+  // `?? pool` on the back: designs saved before the split placed both logos with
+  // `pool`, and have to keep rendering exactly as they did.
+  const placement = which === 'pool-back' ? (design?.poolBack ?? design?.pool) : design?.pool;
+  setCardAdjust(composeAdjust(placement, design?.pool));
 }
 
 async function qrImage(url: string): Promise<HTMLImageElement> {
@@ -45,9 +77,9 @@ function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 }
 
 /**
- * Decode the design's photo/logo data URLs ONCE, so a 500-student export doesn't
- * re-decode the same two images 500 times. A broken or empty value yields null and
- * the card falls back to its built-in placeholder/crest.
+ * Decode the design's photo/logo/artwork data URLs ONCE, so a 500-student export
+ * doesn't re-decode the same images 500 times. A broken or empty value yields null
+ * and the card falls back to its built-in placeholder/crest.
  *
  * These must be data URLs, not hosted ones: an image from another origin taints
  * the canvas, and canvas.toDataURL() then throws — the export would die.
@@ -67,6 +99,8 @@ export async function loadCardImages(design?: CardDesign | null): Promise<CardIm
   return {
     photo: await decode(design?.photo),
     logo: await decode(design?.logo),
+    artFront: await decode(design?.artFront),
+    artBack: await decode(design?.artBack),
   };
 }
 
@@ -81,11 +115,12 @@ export async function renderStudentCardPng(
   canvas: HTMLCanvasElement,
   template?: CardTemplate,
   images: CardImages = {},
+  design?: CardDesign | null,
 ): Promise<string> {
   const ctx = prepare(canvas);
   const qr = await qrImage(data.qrUrl);
 
-  setCardTheme(themeFor(template));
+  arm(design, 'student', template);
   // 'portrait' takes no images on the front — the teacher's photo and logo are on
   // its BACK, which is the whole point of that template.
   if (template === 'portrait') drawStudentCardPortrait(ctx, data, qr);
@@ -105,7 +140,7 @@ export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasEl
   const qr = link ? await qrImage(link) : null;
 
   const template = design.template as CardTemplate | undefined;
-  setCardTheme(themeFor(template));
+  arm(design, 'student', template);
   if (template === 'portrait') {
     // The only back face that carries images: the teacher's photo and logo.
     drawCardBackPortrait(ctx, design, qr, await loadCardImages(design));
@@ -130,13 +165,18 @@ export async function renderAgnosticCardPng(
   canvas: HTMLCanvasElement,
   template?: AgnosticTemplate,
   images: CardImages = {},
+  design?: CardDesign | null,
 ): Promise<string> {
   const ctx = prepare(canvas);
   const qr = await qrImage(data.qrUrl);
-  // The agnostic templates carry their own palettes; the shared text primitives
-  // still read T for the typeface, so give them a sans one.
-  setCardTheme(themeFor('navy'));
-  drawAgnosticFront(ctx, template ?? DEFAULT_AGNOSTIC, data, qr, images);
+  // The agnostic templates carry their own palettes (tuned in drawAgnosticFront);
+  // the shared text primitives still read T for the typeface, so give them a sans
+  // one — and NOT the tenant's student colours, which do not apply to a pool card.
+  arm(design, 'pool-front', 'navy');
+  // 'custom' is the academy's own artwork — a different job entirely, and none of
+  // the palette tuning above applies to somebody else's JPEG.
+  if (template === 'custom') drawCustomFront(ctx, design ?? ({} as CardDesign), data.code, qr, images);
+  else drawAgnosticFront(ctx, template ?? DEFAULT_AGNOSTIC, data, qr, images);
   return canvas.toDataURL('image/png').split(',')[1];
 }
 
@@ -150,7 +190,9 @@ export async function renderAgnosticBackPng(
   const ctx = prepare(canvas);
   const link = (design.qrLink || '').trim();
   const qr = link ? await qrImage(link) : null;
-  setCardTheme(themeFor('navy'));
-  drawAgnosticBack(ctx, (design.agnosticTemplate as AgnosticTemplate) ?? DEFAULT_AGNOSTIC, design, companyName, qr, images);
+  arm(design, 'pool-back', 'navy');
+  const kind = (design.agnosticTemplate as AgnosticTemplate) ?? DEFAULT_AGNOSTIC;
+  if (kind === 'custom') drawCustomBack(ctx, design, images);
+  else drawAgnosticBack(ctx, kind, design, companyName, qr, images);
   return canvas.toDataURL('image/png').split(',')[1];
 }

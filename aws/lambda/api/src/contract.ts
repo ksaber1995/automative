@@ -94,10 +94,41 @@ const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD
 
 // Student ID card — the shared back face, configured once per company.
 // Lengths are capped so a pasted essay can't blow up the rendered card.
+// Per-card-set tuning: logo size/offset, photo offset, and the three colours the
+// palette is derived from. All optional and all deltas — absent means "the template
+// as designed". Bounds mirror CARD_ADJUST_BOUNDS; the renderer clamps again, since
+// this schema is the only thing between a client and the stored blob.
+const CardAdjustSchema = z.object({
+  logoScale: z.number().min(50).max(200),
+  logoDx: z.number().min(-120).max(120),
+  logoDy: z.number().min(-120).max(120),
+  photoDx: z.number().min(-120).max(120),
+  photoDy: z.number().min(-120).max(120),
+  // '' = keep the template's own colour; otherwise a 6-digit hex.
+  bg: z.string().regex(/^(#[0-9a-fA-F]{6})?$/),
+  text: z.string().regex(/^(#[0-9a-fA-F]{6})?$/),
+  accent: z.string().regex(/^(#[0-9a-fA-F]{6})?$/),
+});
+
+// Where the QR and serial sit on a tenant's own pool artwork ('custom'). Bounds
+// mirror DEFAULT_POOL_ART/POOL_ART_SAFE; the renderer clamps again, since this is
+// the only thing between a client and the stored blob.
+const PoolArtLayoutSchema = z.object({
+  qrX: z.number().min(0).max(1016),
+  qrY: z.number().min(0).max(638),
+  qrSize: z.number().min(90).max(460),
+  qrTile: z.boolean(),
+  codeX: z.number().min(0).max(1016),
+  codeY: z.number().min(0).max(638),
+  codeSize: z.number().min(12).max(80),
+  codeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  codeChip: z.boolean(),
+});
+
 const CardDesignSchema = z.object({
   template: z.enum(['navy', 'maroon', 'minimal', 'portrait']),
   // The pool cards' design — chosen separately from the personal student cards.
-  agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave', 'crest']).optional(),
+  agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave', 'crest', 'custom']).optional(),
   teacherName: z.string().max(80),
   teacherTitle: z.string().max(80),
   phone: z.string().max(40),
@@ -112,6 +143,15 @@ const CardDesignSchema = z.object({
   // blow the Lambda request limit or bloat every card-design read.
   photo: z.string().max(700_000).optional(),
   logo: z.string().max(700_000).optional(),
+  student: CardAdjustSchema.optional(),
+  pool: CardAdjustSchema.optional(),
+  poolBack: CardAdjustSchema.optional(),
+  // The academy's own pool artwork. A full-bleed card image is heavier than a logo,
+  // so the cap is higher — the page downscales to card size and encodes JPEG before
+  // saving, which lands these around 150 KB each rather than near the cap.
+  artFront: z.string().max(1_400_000).optional(),
+  artBack: z.string().max(1_400_000).optional(),
+  poolArt: PoolArtLayoutSchema.optional(),
 });
 
 // Debt Status

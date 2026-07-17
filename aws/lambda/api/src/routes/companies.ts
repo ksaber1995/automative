@@ -43,8 +43,46 @@ const CARD_TEMPLATES: CardTemplateId[] = ['navy', 'maroon', 'minimal', 'portrait
 // cards above. Mirrors AGNOSTIC_TEMPLATES in the frontend's card-agnostic.util
 // and the enum in CardDesignSchema — this file keeps its own copy of the card
 // types because the Lambda has no path alias to shared/.
-type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave' | 'crest';
-const AGNOSTIC_TEMPLATES: AgnosticTemplateId[] = ['aurora', 'ribbon', 'mono', 'wave', 'crest'];
+type AgnosticTemplateId = 'aurora' | 'ribbon' | 'mono' | 'wave' | 'crest' | 'custom';
+const AGNOSTIC_TEMPLATES: AgnosticTemplateId[] = ['aurora', 'ribbon', 'mono', 'wave', 'crest', 'custom'];
+
+/**
+ * Per-card-set tuning: logo width/offset, photo offset, and the three colours the
+ * card's palette is derived from. Mirrors CardAdjust in shared/interfaces — this
+ * file keeps its own copy because the Lambda has no path alias to shared/.
+ */
+interface CardAdjust {
+  logoScale: number;
+  logoDx: number;
+  logoDy: number;
+  photoDx: number;
+  photoDy: number;
+  bg: string;
+  text: string;
+  accent: string;
+}
+
+/** Where the QR and serial sit on a tenant's own pool artwork. Mirrors PoolArtLayout. */
+interface PoolArtLayout {
+  qrX: number;
+  qrY: number;
+  qrSize: number;
+  qrTile: boolean;
+  codeX: number;
+  codeY: number;
+  codeSize: number;
+  codeColor: string;
+  codeChip: boolean;
+}
+
+const DEFAULT_CARD_ADJUST: CardAdjust = {
+  logoScale: 100, logoDx: 0, logoDy: 0, photoDx: 0, photoDy: 0, bg: '', text: '', accent: '',
+};
+
+const DEFAULT_POOL_ART: PoolArtLayout = {
+  qrX: 235, qrY: 290, qrSize: 268, qrTile: true,
+  codeX: 235, codeY: 470, codeSize: 34, codeColor: '#111827', codeChip: false,
+};
 
 interface CardDesign {
   template: CardTemplateId;
@@ -62,6 +100,15 @@ interface CardDesign {
   /** Teacher photo + academy logo, as data URLs ('' = use the built-in default). */
   photo: string;
   logo: string;
+  /** Logo/photo placement + colours, tuned separately per card set. */
+  student: CardAdjust;
+  pool: CardAdjust;
+  /** The pool's academy side places its logo independently of its student side. */
+  poolBack: CardAdjust;
+  /** The academy's own pool artwork ('custom' design), as data URLs. */
+  artFront: string;
+  artBack: string;
+  poolArt: PoolArtLayout;
 }
 
 /**
@@ -96,6 +143,12 @@ export const DEFAULT_CARD_DESIGN: CardDesign = {
   highlights: ['شرح مبسط وفهم عميق', 'مراجعات نهائية', 'اختبارات دورية', 'متابعة مستمرة وتقييم شامل'],
   photo: '',
   logo: '',
+  student: { ...DEFAULT_CARD_ADJUST },
+  pool: { ...DEFAULT_CARD_ADJUST },
+  poolBack: { ...DEFAULT_CARD_ADJUST },
+  artFront: '',
+  artBack: '',
+  poolArt: { ...DEFAULT_POOL_ART },
 };
 
 /**
@@ -108,6 +161,46 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
   const str = (v: any, fallback: string) => (typeof v === 'string' ? v : fallback);
   const list = (v: any, fallback: string[], cap: number) =>
     Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, cap) : fallback;
+  const num = (v: any, lo: number, hi: number, fallback: number) =>
+    (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : fallback);
+  const bool = (v: any, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+  // '' means "use the design's own colour", so a blank has to survive as a blank —
+  // only a real hex is honoured, and anything else falls back rather than to black.
+  const hex = (v: any, fallback: string) =>
+    (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim() : fallback);
+
+  const adjust = (v: any): CardAdjust => {
+    const a = v && typeof v === 'object' ? v : {};
+    return {
+      logoScale: num(a.logoScale, 50, 200, 100),
+      logoDx: num(a.logoDx, -120, 120, 0),
+      logoDy: num(a.logoDy, -120, 120, 0),
+      photoDx: num(a.photoDx, -120, 120, 0),
+      photoDy: num(a.photoDy, -120, 120, 0),
+      bg: hex(a.bg, ''),
+      text: hex(a.text, ''),
+      accent: hex(a.accent, ''),
+    };
+  };
+
+  const poolArt = (v: any): PoolArtLayout => {
+    const a = v && typeof v === 'object' ? v : {};
+    const p = DEFAULT_POOL_ART;
+    // Size first: what has to stay inside the card is the QR's BOX, not its centre.
+    const qrSize = num(a.qrSize, 90, 460, p.qrSize);
+    const half = qrSize / 2;
+    return {
+      qrSize,
+      qrX: num(a.qrX, 56 + half, 1016 - 56 - half, p.qrX),
+      qrY: num(a.qrY, 56 + half, 638 - 56 - half, p.qrY),
+      qrTile: bool(a.qrTile, p.qrTile),
+      codeX: num(a.codeX, 56, 1016 - 56, p.codeX),
+      codeY: num(a.codeY, 56, 638 - 56, p.codeY),
+      codeSize: num(a.codeSize, 12, 80, p.codeSize),
+      codeColor: hex(a.codeColor, p.codeColor),
+      codeChip: bool(a.codeChip, p.codeChip),
+    };
+  };
 
   const template: CardTemplateId = CARD_TEMPLATES.includes(d.template)
     ? d.template
@@ -136,6 +229,18 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
     highlights: list(d.highlights, DEFAULT_CARD_DESIGN.highlights, 4),
     photo: str(d.photo, ''),
     logo: str(d.logo, ''),
+    // NAMED HERE ON PURPOSE — see the note above. updateCardDesign persists exactly
+    // what this returns, so a field missing from this list validates on the way in
+    // and is then dropped on the way to the row, which is what silently reset the
+    // pool picker for every tenant until agnosticTemplate was added.
+    student: adjust(d.student),
+    pool: adjust(d.pool),
+    // Falls back to `pool`, not to the defaults: a design saved before the two pool
+    // faces were split placed both logos with `pool`, and must keep rendering that way.
+    poolBack: adjust(d.poolBack ?? d.pool),
+    artFront: str(d.artFront, ''),
+    artBack: str(d.artBack, ''),
+    poolArt: poolArt(d.poolArt),
   };
 }
 

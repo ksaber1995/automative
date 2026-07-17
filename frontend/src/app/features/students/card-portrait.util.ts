@@ -1,7 +1,7 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  CardImages, DESIGN_H, DESIGN_W, Ctx, StudentCardData, T,
-  bgTransform, contentTransform, drawContain, drawCover, fitText, roundRect, wrap,
+  A, CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, drawCover,
+  drawLogo, fitText, roundRect, wrap,
 } from './student-card.util';
 
 /**
@@ -137,7 +137,7 @@ export function drawStudentCardPortrait(ctx: Ctx, d: StudentCardData, qr: Canvas
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '4px';
-  ctx.font = `bold 15px ${T.font}`;
+  ctx.font = `900 15px ${T.font}`;
   ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hR, 128);
   ctx.restore();
@@ -179,13 +179,13 @@ export function drawStudentCardPortrait(ctx: Ctx, d: StudentCardData, qr: Canvas
   roundRect(ctx, rR - 200, 494, 200, 54, 12);
   ctx.fillStyle = T.panel;
   ctx.fill();
-  fitText(ctx, d.code || '—', rR - 100, 522, 170, 24, 'bold', T.accentLight, 'center', 'ltr');
+  fitText(ctx, d.code || '—', rR - 100, 522, 170, 24, 'bold', T.accentOnPanel, 'center', 'ltr');
 
   // Subject pill fills the rest of that row
   roundRect(ctx, rL, 494, rR - rL - 216, 54, 12);
   ctx.fillStyle = T.accent;
   ctx.fill();
-  fitText(ctx, d.subject || '—', (rL + rR - 216) / 2, 522, rR - rL - 250, 23, 'bold', '#ffffff', 'center', 'rtl');
+  fitText(ctx, d.subject || '—', (rL + rR - 216) / 2, 522, rR - rL - 250, 23, 'bold', T.onAccent, 'center', 'rtl');
 
   // ── QR: bigger, because nothing else competes for this side ──
   const qs = 240, qx = 110, qy = 216;
@@ -237,16 +237,18 @@ export function drawCardBackPortrait(
   const colCx = 168;
 
   if (images.logo) {
-    drawContain(ctx, images.logo, colCx, 62, 220, 84);
+    drawLogo(ctx, images.logo, colCx, 62, 220, 84);
   } else {
     // No logo uploaded — the academy name carries the top of the column instead.
-    fitText(ctx, d.teacherName || '', colCx, 62, 240, 22, 'bold', T.accentLight, 'center', 'rtl');
+    fitText(ctx, d.teacherName || '', colCx, 62, 240, 22, 'bold', T.accentOnPanel, 'center', 'rtl');
   }
 
   // Photo frame
   // 15% taller (258 -> 297). The info QR below had to move down to make room.
   const px = 48, py = 122, pw = 240, ph = 297;
   ctx.save();
+  // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
+  ctx.translate(A.photoDx, A.photoDy);
   roundRect(ctx, px, py, pw, ph, 16);
   ctx.fillStyle = '#ffffff';
   ctx.fill();
@@ -282,16 +284,16 @@ export function drawCardBackPortrait(
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.drawImage(qr, qx, qy, qs, qs);
-    fitText(ctx, 'امسح للاطلاع على المعلومات', colCx, qy + qs + 28, 260, 14, 'bold', T.accentLight, 'center', 'rtl');
+    fitText(ctx, 'امسح للاطلاع على المعلومات', colCx, qy + qs + 28, 260, 14, 'bold', T.accentOnPanel, 'center', 'rtl');
   }
 
   // ── Right column: who the teacher is, and how to reach them ──
   const tR = 968;   // right edge of the RTL text column
   const tL = 372;
 
-  fitText(ctx, d.teacherName || '', tR, 64, tR - tL, 34, 'bold', '#ffffff', 'right', 'rtl');
+  fitText(ctx, d.teacherName || '', tR, 64, tR - tL, 34, 'bold', T.onPanel, 'right', 'rtl');
   if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 102, tR - tL, 20, 'bold', T.accentLight, 'right', 'rtl');
+    fitText(ctx, d.teacherTitle, tR, 102, tR - tL, 20, 'bold', T.accentOnPanel, 'right', 'rtl');
   }
 
   ctx.strokeStyle = T.accent;
@@ -316,7 +318,7 @@ export function drawCardBackPortrait(
     const right = tR - col * colW;         // RTL: first item on the right
     const y = 168 + row * 44;
     glyph(ctx, c.kind, right - 14, y, T.accent);
-    fitText(ctx, c.text, right - 34, y, colW - 54, 16, 'bold', '#ffffff', 'right', 'ltr');
+    fitText(ctx, c.text, right - 34, y, colW - 54, 16, 'bold', T.onPanel, 'right', 'ltr');
   });
 
   const afterContacts = 168 + Math.ceil(contacts.length / 2) * 44 + 8;
@@ -337,11 +339,11 @@ export function drawCardBackPortrait(
   const insTop = afterContacts + ((d.slogan || '').includes('\n') ? 96 : 72);
   const instructions = (d.instructions || []).filter((x) => !!(x || '').trim()).slice(0, 5);
   if (instructions.length) {
-    fitText(ctx, 'تعليمات للطالب', tR, insTop, tR - tL, 18, 'bold', T.accentLight, 'right', 'rtl');
+    fitText(ctx, 'تعليمات للطالب', tR, insTop, tR - tL, 18, 'bold', T.accentOnPanel, 'right', 'rtl');
     instructions.forEach((line, i) => {
       const y = insTop + 32 + i * 28;
       tick(ctx, tR - 10, y);
-      fitText(ctx, line, tR - 30, y, tR - tL - 44, 14, 'bold', '#ffffff', 'right', 'rtl');
+      fitText(ctx, line, tR - 30, y, tR - tL - 44, 14, 'bold', T.onPanel, 'right', 'rtl');
     });
   }
 
@@ -358,7 +360,7 @@ export function drawCardBackPortrait(
       ctx.fill();
       const lines = wrap(ctx, h, slot - 16, 13, 'bold', 2);
       lines.forEach((line, li) => {
-        fitText(ctx, line, cx, hy + li * 17, slot - 12, 13, 'bold', T.accentLight, 'center', 'rtl');
+        fitText(ctx, line, cx, hy + li * 17, slot - 12, 13, 'bold', T.accentOnPanel, 'center', 'rtl');
       });
     });
   }

@@ -9,15 +9,30 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { saveAs } from 'file-saver';
-import { CardDesign, CARD_DESIGN_MAX, DEFAULT_CARD_DESIGN } from '@shared/interfaces/card-design.interface';
+import {
+  CardAdjust, CardDesign, CARD_ADJUST_BOUNDS, CARD_DESIGN_MAX, DEFAULT_CARD_ADJUST, DEFAULT_CARD_DESIGN,
+  DEFAULT_POOL_ART, POOL_ART_SAFE, PoolArtLayout, clampPoolArt,
+} from '@shared/interfaces/card-design.interface';
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
-  StudentCardData, currentAcademicYear, loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng,
-  renderCardBackPng, renderStudentCardPng,
+  DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
+  renderAgnosticBackPng, renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../students/card-agnostic.util';
+
+/** Every image an academy can upload for its cards. */
+type ImageKind = 'photo' | 'logo' | 'artFront' | 'artBack';
+
+/**
+ * Which tuning record a control writes to.
+ *
+ * The pool has TWO, one per face: both pool faces carry a logo, so a single record
+ * moved both at once. Colours still live on `pool` alone and apply to both faces —
+ * they are two sides of one card. See composeAdjust in the shared interface.
+ */
+type AdjustKey = 'student' | 'pool' | 'poolBack';
 
 /**
  * Settings > Card Design.
@@ -84,6 +99,65 @@ export class CardDesignComponent implements OnInit {
   readonly maxInstructions = CARD_DESIGN_MAX.instructions;
   readonly maxHighlights = CARD_DESIGN_MAX.highlights;
 
+  // ── Logo / photo placement + colours ────────────────────────────────────────
+  // Held separately per card set: the pool cards and the student cards are
+  // different designs printed for different reasons, so one shared offset would be
+  // wrong on one of them. `which` is the tab the control belongs to.
+  readonly bounds = CARD_ADJUST_BOUNDS;
+
+  /**
+   * The three colour roles a tenant can set, and the swatch the picker shows while a
+   * role is still "as designed". The fallbacks are display-only — a BLANK value is
+   * what reaches the renderer, and blank is what makes it keep the template's own.
+   */
+  readonly colorFields: { key: 'bg' | 'text' | 'accent'; label: string; fallback: string }[] = [
+    { key: 'bg', label: 'CARD_DESIGN.TUNE_BG', fallback: '#141d55' },
+    { key: 'text', label: 'CARD_DESIGN.TUNE_TEXT', fallback: '#111827' },
+    { key: 'accent', label: 'CARD_DESIGN.TUNE_ACCENT', fallback: '#c9992f' },
+  ];
+
+  adjust(which: AdjustKey): CardAdjust {
+    return this.design()[which] ?? DEFAULT_CARD_ADJUST;
+  }
+
+  setAdjust<K extends keyof CardAdjust>(which: AdjustKey, key: K, value: CardAdjust[K]): void {
+    this.design.update((d) => ({
+      ...d,
+      [which]: { ...DEFAULT_CARD_ADJUST, ...(d[which] ?? {}), [key]: value },
+    }));
+    this.redraw();
+  }
+
+  /** Sliders hand back strings; a NaN would poison the stored design. */
+  setAdjustNum(which: AdjustKey, key: 'logoScale' | 'logoDx' | 'logoDy' | 'photoDx' | 'photoDy', value: unknown): void {
+    const n = Number(value);
+    this.setAdjust(which, key, Number.isFinite(n) ? n : DEFAULT_CARD_ADJUST[key]);
+  }
+
+  /**
+   * A colour input can never be empty — it reports '#000000' when cleared — so
+   * "use the template's own" needs its own explicit control, not a blank value.
+   */
+  clearColor(which: AdjustKey, key: 'bg' | 'text' | 'accent'): void {
+    this.setAdjust(which, key, '');
+  }
+
+  /** The swatch needs SOME value to show; the template's own is what blank means. */
+  colorOr(which: AdjustKey, key: 'bg' | 'text' | 'accent', fallback: string): string {
+    return this.adjust(which)[key] || fallback;
+  }
+
+  hasAnyAdjust(which: AdjustKey): boolean {
+    const a = this.adjust(which);
+    return a.logoScale !== 100 || !!a.logoDx || !!a.logoDy || !!a.photoDx || !!a.photoDy
+      || !!a.bg || !!a.text || !!a.accent;
+  }
+
+  resetAdjust(which: AdjustKey): void {
+    this.design.update((d) => ({ ...d, [which]: { ...DEFAULT_CARD_ADJUST } }));
+    this.redraw();
+  }
+
   ngOnInit() {
     this.companyService.getCardDesign().subscribe({
       next: (d) => {
@@ -125,6 +199,14 @@ export class CardDesignComponent implements OnInit {
       ...d,
       instructions: fill(d.instructions || [], this.maxInstructions),
       highlights: fill(d.highlights || [], this.maxHighlights),
+      // Every design saved before these existed has neither, and the form binds
+      // straight onto their fields — an absent block would blow up on first paint.
+      student: { ...DEFAULT_CARD_ADJUST, ...(d.student ?? {}) },
+      pool: { ...DEFAULT_CARD_ADJUST, ...(d.pool ?? {}) },
+      // Seeded from `pool` when absent, matching the renderer's own fallback: a
+      // design saved before the two pool faces were split placed BOTH logos with
+      // `pool`, so the back's sliders have to open where its logo actually is.
+      poolBack: { ...DEFAULT_CARD_ADJUST, ...(d.poolBack ?? d.pool ?? {}) },
     };
   }
 
@@ -153,11 +235,15 @@ export class CardDesignComponent implements OnInit {
   // here before it ever leaves the browser.
   private readonly PHOTO_MAX = 700;   // px on the long edge — the frame is ~190px wide at 300dpi
   private readonly LOGO_MAX = 400;
-  uploading = signal<'photo' | 'logo' | null>(null);
+  // The artworks ARE the whole card, so they need the card's own resolution — the
+  // print bitmap is 1063 x 673. Anything under that prints soft; much over it is
+  // pixels the printer throws away in exchange for a heavier design blob.
+  private readonly ART_MAX = 1300;
+  uploading = signal<ImageKind | null>(null);
   /** Which image is being saved — the upload persists itself, with no Save click. */
-  savingImage = signal<'photo' | 'logo' | null>(null);
+  savingImage = signal<ImageKind | null>(null);
 
-  async onImagePicked(kind: 'photo' | 'logo', event: Event): Promise<void> {
+  async onImagePicked(kind: ImageKind, event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';           // let the same file be re-picked after a remove
@@ -170,7 +256,10 @@ export class CardDesignComponent implements OnInit {
 
     this.uploading.set(kind);
     try {
-      const dataUrl = await this.downscale(file, kind === 'photo' ? this.PHOTO_MAX : this.LOGO_MAX, kind === 'logo');
+      // A logo keeps its alpha (it sits on a coloured panel); a photo and a
+      // full-card artwork are photographic, so JPEG saves several times the bytes.
+      const max = kind === 'photo' ? this.PHOTO_MAX : kind === 'logo' ? this.LOGO_MAX : this.ART_MAX;
+      const dataUrl = await this.downscale(file, max, kind === 'logo');
       this.set(kind, dataUrl);   // set() repaints the preview
       this.saveImage(kind);      // picking a file IS the intent — no Save click needed
     } catch {
@@ -180,7 +269,7 @@ export class CardDesignComponent implements OnInit {
     }
   }
 
-  removeImage(kind: 'photo' | 'logo'): void {
+  removeImage(kind: ImageKind): void {
     this.set(kind, '');
     this.saveImage(kind);
   }
@@ -193,7 +282,7 @@ export class CardDesignComponent implements OnInit {
    * swapped, never the live form state: an upload must not quietly commit
    * half-typed back-face edits sitting in the form next to it.
    */
-  private saveImage(kind: 'photo' | 'logo'): void {
+  private saveImage(kind: ImageKind): void {
     this.savingImage.set(kind);
     const base = this.savedDesign() ?? this.design();
     const payload = this.payloadFrom({ ...base, [kind]: this.design()[kind] });
@@ -244,6 +333,199 @@ export class CardDesignComponent implements OnInit {
     });
   }
 
+  // ── The academy's own pool artwork ('custom') ───────────────────────────────
+
+  /** True while the pool design in force is the academy's own artwork. */
+  isCustomPool = computed(() => this.agnostic() === 'custom');
+
+  /** The placement in force, clamped — a stored design may predate the field. */
+  artLayout = computed<PoolArtLayout>(() => clampPoolArt(this.design().poolArt));
+
+  /** Both faces are required before a pool ZIP can be printed. */
+  customReady = computed(() => canExportCustom(this.design()));
+
+  /** The two artwork slots, so the upload block is written once rather than twice. */
+  readonly artFields: { key: 'artFront' | 'artBack'; label: string }[] = [
+    { key: 'artFront', label: 'CARD_DESIGN.ART_FRONT' },
+    { key: 'artBack', label: 'CARD_DESIGN.ART_BACK' },
+  ];
+
+  setArt<K extends keyof PoolArtLayout>(key: K, value: PoolArtLayout[K]): void {
+    this.design.update((d) => ({
+      ...d,
+      poolArt: clampPoolArt({ ...DEFAULT_POOL_ART, ...(d.poolArt ?? {}), [key]: value }),
+    }));
+    this.redraw();
+  }
+
+  setArtNum(key: 'qrSize' | 'codeSize', value: unknown): void {
+    const n = Number(value);
+    this.setArt(key, Number.isFinite(n) ? n : DEFAULT_POOL_ART[key]);
+  }
+
+  resetArt(): void {
+    this.design.update((d) => ({ ...d, poolArt: { ...DEFAULT_POOL_ART } }));
+    this.redraw();
+    this.savePoolArt();
+  }
+
+  /**
+   * Persist JUST the placement. Like the uploads and the design picker, dragging
+   * something into place IS the decision — but it posts the last SAVED design with
+   * only this field swapped, so a drag can't quietly commit half-typed back-face
+   * edits sitting in the form next to it.
+   */
+  private savePoolArt(): void {
+    const base = this.savedDesign() ?? this.design();
+    const payload = this.payloadFrom({ ...base, poolArt: this.design().poolArt });
+    this.companyService.updateCardDesign(payload).subscribe({
+      next: (saved) => this.savedDesign.set(saved),
+      error: () => {
+        // The interceptor toasts the reason. Put the stored placement back, so what
+        // is on screen is what would actually print.
+        this.design.update((d) => ({ ...d, poolArt: this.savedDesign()?.poolArt ?? { ...DEFAULT_POOL_ART } }));
+        this.redraw();
+      },
+    });
+  }
+
+  /**
+   * What the pointer is moving. Held here rather than in the DOM because a drag has
+   * to survive the pointer leaving the canvas — releasing outside it must still end
+   * the drag and save, or the placement silently diverges from what is stored.
+   */
+  private drag: 'qr' | 'qr-size' | 'code' | null = null;
+  /** Grab offset, so a drag moves the object BY the pointer rather than snapping its centre to it. */
+  private grabDx = 0;
+  private grabDy = 0;
+  /** True once a pointerdown has actually moved something worth saving. */
+  private dragMoved = false;
+
+  /** Client px -> design px. The artwork is full-bleed, so the canvas IS design space. */
+  private toDesign(ev: PointerEvent): { x: number; y: number } {
+    const el = this.previewPoolFrontCanvas!.nativeElement;
+    const r = el.getBoundingClientRect();
+    return {
+      x: ((ev.clientX - r.left) / r.width) * DESIGN_W,
+      y: ((ev.clientY - r.top) / r.height) * DESIGN_H,
+    };
+  }
+
+  onArtPointerDown(ev: PointerEvent): void {
+    if (!this.isCustomPool()) return;
+    const L = this.artLayout();
+    const { x, y } = this.toDesign(ev);
+    const half = L.qrSize / 2;
+
+    // The resize handle is tested FIRST: it sits on the QR's corner, so hit-testing
+    // the box first would swallow every grab of the handle.
+    const hx = L.qrX + half;
+    const hy = L.qrY + half;
+    if (Math.abs(x - hx) <= 26 && Math.abs(y - hy) <= 26) {
+      this.drag = 'qr-size';
+    } else if (Math.abs(x - L.qrX) <= half && Math.abs(y - L.qrY) <= half) {
+      this.drag = 'qr';
+      this.grabDx = L.qrX - x;
+      this.grabDy = L.qrY - y;
+    } else if (Math.abs(x - L.codeX) <= L.codeSize * 3.2 && Math.abs(y - L.codeY) <= L.codeSize) {
+      this.drag = 'code';
+      this.grabDx = L.codeX - x;
+      this.grabDy = L.codeY - y;
+    } else {
+      return;
+    }
+
+    this.dragMoved = false;
+    (ev.target as Element).setPointerCapture?.(ev.pointerId);
+    ev.preventDefault();
+  }
+
+  onArtPointerMove(ev: PointerEvent): void {
+    if (!this.drag) return;
+    const { x, y } = this.toDesign(ev);
+    this.dragMoved = true;
+
+    if (this.drag === 'qr') {
+      this.design.update((d) => ({
+        ...d,
+        poolArt: clampPoolArt({ ...this.artLayout(), qrX: x + this.grabDx, qrY: y + this.grabDy }),
+      }));
+    } else if (this.drag === 'qr-size') {
+      // Square: the handle drives the side length off whichever axis moved further,
+      // so a diagonal drag does what it looks like it should.
+      const L = this.artLayout();
+      const size = Math.max(Math.abs(x - L.qrX), Math.abs(y - L.qrY)) * 2;
+      this.design.update((d) => ({ ...d, poolArt: clampPoolArt({ ...L, qrSize: size }) }));
+    } else {
+      this.design.update((d) => ({
+        ...d,
+        poolArt: clampPoolArt({ ...this.artLayout(), codeX: x + this.grabDx, codeY: y + this.grabDy }),
+      }));
+    }
+    this.redraw();
+    ev.preventDefault();
+  }
+
+  onArtPointerUp(ev: PointerEvent): void {
+    if (!this.drag) return;
+    (ev.target as Element).releasePointerCapture?.(ev.pointerId);
+    const moved = this.dragMoved;
+    this.drag = null;
+    this.dragMoved = false;
+    if (moved) this.savePoolArt();   // a click that moved nothing is not a change
+  }
+
+  /**
+   * The drag handles, painted ON TOP of the finished preview.
+   *
+   * Deliberately drawn here and not in the renderer: the renderer is what the
+   * printer gets, and a dashed outline baked into a thousand exported PNGs is not
+   * recoverable. The export calls the renderer with its own canvas and never comes
+   * through here, so these marks cannot escape the editor.
+   */
+  private paintArtHandles(canvas: HTMLCanvasElement): void {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const L = this.artLayout();
+
+    ctx.save();
+    // The renderer leaves its own transform behind; take the canvas back to design
+    // space so these coordinates mean the same thing as the placement's do.
+    ctx.setTransform(canvas.width / DESIGN_W, 0, 0, canvas.height / DESIGN_H, 0, 0);
+
+    const half = L.qrSize / 2;
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([9, 7]);
+    ctx.strokeRect(L.qrX - half, L.qrY - half, L.qrSize, L.qrSize);
+
+    const cw = L.codeSize * 6.4;
+    const chh = L.codeSize * 2;
+    ctx.strokeRect(L.codeX - cw / 2, L.codeY - chh / 2, cw, chh);
+    ctx.setLineDash([]);
+
+    // The resize grip, on the QR's bottom-right corner.
+    ctx.fillStyle = '#6366f1';
+    ctx.beginPath();
+    ctx.arc(L.qrX + half, L.qrY + half, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(L.qrX + half - 5, L.qrY + half + 2);
+    ctx.lineTo(L.qrX + half + 2, L.qrY + half - 5);
+    ctx.moveTo(L.qrX + half - 5, L.qrY + half + 6);
+    ctx.lineTo(L.qrX + half + 6, L.qrY + half - 5);
+    ctx.stroke();
+
+    // The guillotine's margin of error — the reason the placement is clamped.
+    ctx.strokeStyle = 'rgba(99,102,241,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.strokeRect(POOL_ART_SAFE, POOL_ART_SAFE, DESIGN_W - POOL_ART_SAFE * 2, DESIGN_H - POOL_ART_SAFE * 2);
+    ctx.restore();
+  }
+
   private redrawPending = false;
   /** Repaint on the next frame — typing fires per keystroke and a full card is ~15ms. */
   private redraw() {
@@ -261,7 +543,7 @@ export class CardDesignComponent implements OnInit {
         // and logo ARE the teacher's own, so the preview shows them for real.
         if (front) {
           const images = await loadCardImages(d);
-          await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images);
+          await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images, d);
         }
 
         // The pool card, both faces. Its serial is a sample — the real ones come
@@ -274,10 +556,12 @@ export class CardDesignComponent implements OnInit {
           if (poolFront) {
             await renderAgnosticCardPng(
               { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
-              poolFront, this.agnostic(), images,
+              poolFront, this.agnostic(), images, d,
             );
           }
           if (poolBack) await renderAgnosticBackPng(d, company, poolBack, images);
+          // AFTER the render, and only in the editor — see paintArtHandles.
+          if (poolFront && this.isCustomPool()) this.paintArtHandles(poolFront);
         }
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
@@ -383,9 +667,11 @@ export class CardDesignComponent implements OnInit {
         saveAs(new Blob([bytes], { type: 'image/png' }), name);
       };
 
+      // `{ ...d, agnosticTemplate: t }`, not `d`: this downloads ANY design, not
+      // just the one in force, and 'custom' reads its artwork off the design.
       save(await renderAgnosticCardPng(
         { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
-        canvas, t, images,
+        canvas, t, images, { ...d, agnosticTemplate: t },
       ), `pool-${t}-front.png`);
 
       save(await renderAgnosticBackPng({ ...d, agnosticTemplate: t }, company, canvas, images), `pool-${t}-back.png`);

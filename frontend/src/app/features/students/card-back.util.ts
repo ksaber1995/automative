@@ -1,5 +1,7 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
-import { DESIGN_H, DESIGN_W, Ctx, T, bgTransform, contentTransform, fitText, goldGrad, roundRect, wrap } from './student-card.util';
+import {
+  Ctx, DESIGN_H, DESIGN_W, T, bgTransform, contentTransform, fitText, goldGrad, roundRect, wrap, wrapFit,
+} from './student-card.util';
 
 /**
  * The ORNATE BACK face of the student ID card — identical for every student, so
@@ -177,10 +179,10 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
   ctx.fill();
   ctx.restore();
 
-  fitText(ctx, d.teacherName || '—', tR, 60, 232, 32, 'bold', '#ffffff', 'right', 'rtl');
+  fitText(ctx, d.teacherName || '—', tR, 60, 232, 32, 'bold', T.onPanel, 'right', 'rtl');
 
   if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 100, 210, 19, 'bold', T.accentLight, 'right', 'rtl');
+    fitText(ctx, d.teacherTitle, tR, 100, 210, 19, 'bold', T.accentOnPanel, 'right', 'rtl');
     ctx.save();
     ctx.strokeStyle = T.accent;
     ctx.lineWidth = 2;
@@ -207,7 +209,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     contactIcon(ctx, c.icon, iconR - 17, cy);
     // Phone numbers and emails are latin -> LTR, right-aligned against the chip.
     const isLatin = c.icon !== 'pin';
-    fitText(ctx, c.value, tR, cy, 222, 18, 'bold', '#ffffff', 'right', isLatin ? 'ltr' : 'rtl');
+    fitText(ctx, c.value, tR, cy, 222, 18, 'bold', T.onPanel, 'right', isLatin ? 'ltr' : 'rtl');
   });
 
   // divider between the teacher column and the instructions
@@ -231,7 +233,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
   ctx.fillStyle = goldGrad(ctx, pillCx - 100, 44, pillCx + 100, 80);
   ctx.fill();
   ctx.restore();
-  fitText(ctx, 'تعليمات للطالب', pillCx + 62, 62, 130, 19, 'bold', T.panelDark, 'right', 'rtl');
+  fitText(ctx, 'تعليمات للطالب', pillCx + 62, 62, 130, 19, 'bold', T.onAccent, 'right', 'rtl');
   highlightIcon(ctx, 'clipboard', pillCx - 74, 62);
 
   ctx.save();
@@ -249,8 +251,14 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
   ctx.restore();
 
   const rules = d.instructions.filter((s) => !!s && s.trim()).slice(0, 5);
-  rules.forEach((rule, i) => {
-    const cy = 118 + i * 38;
+  // WRAPPED over two lines, not run through fitText on one. The column is only 348
+  // wide, so a real full-length instruction shrank all the way to fitText's 9px
+  // floor and printed as an unreadable thread — the size is fixed at 16 here and
+  // the text breaks instead. Worst case (5 rules x 2 lines) puts the last line at
+  // y=327, still clear of the divider at 350.
+  let cy = 118;
+  rules.forEach((rule) => {
+    const { lines, size } = wrapFit(ctx, rule, 348, 16, 'bold', 2, 12);
     // gold check bubble
     ctx.fillStyle = goldGrad(ctx, insR + 6, cy - 11, insR + 28, cy + 11);
     ctx.beginPath();
@@ -268,9 +276,13 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     ctx.stroke();
     ctx.restore();
 
-    // The column runs from just right of the QR (ends at 250) to insR, so the
-    // longest rule still renders near full size instead of shrinking to nothing.
-    fitText(ctx, rule, insR - 6, cy, 348, 16, 'bold', '#ffffff', 'right', 'rtl');
+    // The column runs from just right of the QR (which ends at 250) to insR.
+    lines.forEach((line, li) => {
+      fitText(ctx, line, insR - 6, cy + li * 21, 348, size, 'bold', T.onPanel, 'right', 'rtl');
+    });
+    // Advance on the full 21 whatever `size` came back as, so the block's worst
+    // case stays a fixed, checkable height rather than one that moves per tenant.
+    cy += lines.length * 21 + 5;
   });
 
   // ================= info QR (left) =================
@@ -292,8 +304,8 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentLight, 'right', 'rtl');
-    fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, 'bold', '#ffffff', 'right', 'rtl');
+    fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentOnPanel, 'right', 'rtl');
+    fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, 'bold', T.onPanel, 'right', 'rtl');
 
     // globe glyph
     ctx.save();
@@ -333,7 +345,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
 
     ctx.save();
     ctx.fillStyle = goldGrad(ctx, sx, sy, sx + sw, sy + sh);
-    ctx.font = `bold 54px ${T.font}`;
+    ctx.font = `900 54px ${T.font}`;
     ctx.textBaseline = 'top';
     ctx.direction = 'ltr';
     ctx.textAlign = 'left';
@@ -345,7 +357,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     const startY = sy + sh / 2 - (lines.length - 1) * 20;
     lines.forEach((line, i) => {
       // narrower than the box so a long line can't run under the quote glyphs
-      fitText(ctx, line, sx + sw / 2, startY + i * 40, sw - 118, 23, 'bold', T.panelDark, 'center', 'rtl');
+      fitText(ctx, line, sx + sw / 2, startY + i * 40, sw - 118, 23, 'bold', T.ink, 'center', 'rtl');
     });
   }
 
@@ -360,7 +372,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
       highlightIcon(ctx, icons[i % icons.length], cx, 434);
       const lines = wrap(ctx, label, slot - 18, 15, 'bold', 2);
       lines.forEach((line, li) => {
-        fitText(ctx, line, cx, 484 + li * 24, slot - 12, 15, 'bold', '#ffffff', 'center', 'rtl');
+        fitText(ctx, line, cx, 484 + li * 24, slot - 12, 15, 'bold', T.onPanel, 'center', 'rtl');
       });
       if (i < hi.length - 1) {
         ctx.save();

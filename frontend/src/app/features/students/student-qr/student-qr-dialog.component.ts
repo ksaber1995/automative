@@ -203,7 +203,7 @@ export class StudentQrDialogComponent {
       year: currentAcademicYear(),
       subject: course?.name || '',
       qrUrl: this.profileUrl(s.qrToken),
-    }, document.createElement('canvas'), design?.template, await loadCardImages(design));
+    }, document.createElement('canvas'), design?.template, await loadCardImages(design), design);
   }
 
   async download(): Promise<void> {

@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  CardImages, DESIGN_H, DESIGN_W, Ctx, StudentCardData, T, bgTransform, contentTransform, drawCover, fitText, roundRect, wrap,
+  A, CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, drawCover, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -41,6 +41,8 @@ function spine(ctx: Ctx): void {
 
 function photo(ctx: Ctx, x: number, y: number, w: number, h: number, img?: CanvasImageSource | null): void {
   ctx.save();
+  // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
+  ctx.translate(A.photoDx, A.photoDy);
   roundRect(ctx, x, y, w, h, 14);
   ctx.fillStyle = T.wash;
   ctx.fill();
@@ -109,7 +111,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
-  ctx.font = `bold 14px ${T.font}`;
+  ctx.font = `900 14px ${T.font}`;
   ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hR, 122);
   ctx.restore();
@@ -161,7 +163,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   roundRect(ctx, rL, 528, rR - rL, 58, 12);
   ctx.fillStyle = T.accent;
   ctx.fill();
-  fitText(ctx, d.subject || '—', (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', '#ffffff', 'center', 'rtl');
+  fitText(ctx, d.subject || '—', (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', T.onAccent, 'center', 'rtl');
 
   // ---- QR ----
   const qs = 196, qx = 750, qy = 176;
@@ -305,8 +307,13 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
   ctx.stroke();
 
   const rules = d.instructions.filter((s) => !!s && s.trim()).slice(0, 5);
-  rules.forEach((rule, i) => {
-    const cy = 112 + i * 38;
+  // WRAPPED over two lines, not run through fitText on one — see the same note in
+  // card-back.util.ts. In a 340-wide column a full-length instruction shrank to
+  // fitText's 9px floor. Worst case (5 rules x 2 lines) lands the last line at
+  // y=321, clear of the divider at 352.
+  let cy = 112;
+  rules.forEach((rule) => {
+    const { lines, size } = wrapFit(ctx, rule, 340, 16, 'bold', 2, 12);
     // hollow teal tick
     ctx.strokeStyle = T.accent;
     ctx.lineWidth = 1.6;
@@ -322,7 +329,10 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
     ctx.lineTo(667, cy - 3.5);
     ctx.stroke();
 
-    fitText(ctx, rule, 640, cy, 340, 16, 'bold', T.body, 'right', 'rtl');
+    lines.forEach((line, li) => {
+      fitText(ctx, line, 640, cy + li * 21, 340, size, 'bold', T.body, 'right', 'rtl');
+    });
+    cy += lines.length * 21 + 5;
   });
 
   // ---- info QR (left) ----

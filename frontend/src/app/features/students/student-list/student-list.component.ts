@@ -528,7 +528,7 @@ export class StudentListComponent implements OnInit {
 
         const classIds = studentEnrollments.get(student.id) || [];
         if (classIds.length === 0) {
-          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template, images), { base64: true });
+          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template, images, design), { base64: true });
         } else {
           const addedPaths = new Set<string>();
           for (const classId of classIds) {
@@ -545,7 +545,7 @@ export class StudentListComponent implements OnInit {
               level: course?.levelName || '',
               group: classInfo?.name || '',
               subject: course?.name || '',
-            }, canvas, template, images);
+            }, canvas, template, images, design);
             zip.file(path, png, { base64: true });
           }
         }

@@ -1,3 +1,115 @@
+<!--
+  Logo / photo placement + colours. ONE template, rendered once per card set with
+  `which` = 'student' | 'pool' — they are tuned separately (a logo offset that suits
+  `crest` has no meaning on `navy`), but the controls are identical, so writing the
+  markup twice would just be two things to keep in sync.
+-->
+<ng-template #tuning let-which let-title="title" let-hint="hint" let-showPhoto="showPhoto" let-showColors="showColors">
+  <p-card styleClass="mt-6">
+    <ng-template pTemplate="header">
+      <div class="px-5 pt-5 flex items-start justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">
+            <i class="pi pi-sliders-h mr-2 text-indigo-600"></i>{{ title | translate }}
+          </h2>
+          <p class="text-sm text-gray-500 mt-1">{{ hint | translate }}</p>
+        </div>
+        @if (hasAnyAdjust(which)) {
+          <p-button [label]="'CARD_DESIGN.TUNE_RESET' | translate" icon="pi pi-undo"
+                    severity="secondary" [text]="true" size="small"
+                    (onClick)="resetAdjust(which)"></p-button>
+        }
+      </div>
+    </ng-template>
+
+    <!-- logo -->
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      {{ 'CARD_DESIGN.TUNE_LOGO' | translate }}
+    </p>
+    @if (!design().logo) {
+      <p class="text-xs text-gray-400 mb-4">{{ 'CARD_DESIGN.TUNE_NO_LOGO' | translate }}</p>
+    }
+    <div class="space-y-3 mb-6">
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.TUNE_LOGO_WIDTH' | translate }}</label>
+        <input type="range" class="flex-1 accent-indigo-600" [min]="bounds.scaleMin" [max]="bounds.scaleMax" step="5"
+               [ngModel]="adjust(which).logoScale"
+               (ngModelChange)="setAdjustNum(which, 'logoScale', $event)" />
+        <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ adjust(which).logoScale }}%</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.TUNE_MOVE_X' | translate }}</label>
+        <input type="range" class="flex-1 accent-indigo-600" [min]="-bounds.offset" [max]="bounds.offset" step="2"
+               [ngModel]="adjust(which).logoDx"
+               (ngModelChange)="setAdjustNum(which, 'logoDx', $event)" />
+        <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ adjust(which).logoDx }}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.TUNE_MOVE_Y' | translate }}</label>
+        <input type="range" class="flex-1 accent-indigo-600" [min]="-bounds.offset" [max]="bounds.offset" step="2"
+               [ngModel]="adjust(which).logoDy"
+               (ngModelChange)="setAdjustNum(which, 'logoDy', $event)" />
+        <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ adjust(which).logoDy }}</span>
+      </div>
+    </div>
+
+    <!-- teacher photo. Hidden for the pool's QR side, which has no photo on it —
+         a slider that moves nothing is worse than no slider. -->
+    @if (showPhoto) {
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      {{ 'CARD_DESIGN.TUNE_PHOTO' | translate }}
+    </p>
+    <div class="space-y-3 mb-6">
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.TUNE_MOVE_X' | translate }}</label>
+        <input type="range" class="flex-1 accent-indigo-600" [min]="-bounds.offset" [max]="bounds.offset" step="2"
+               [ngModel]="adjust(which).photoDx"
+               (ngModelChange)="setAdjustNum(which, 'photoDx', $event)" />
+        <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ adjust(which).photoDx }}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.TUNE_MOVE_Y' | translate }}</label>
+        <input type="range" class="flex-1 accent-indigo-600" [min]="-bounds.offset" [max]="bounds.offset" step="2"
+               [ngModel]="adjust(which).photoDy"
+               (ngModelChange)="setAdjustNum(which, 'photoDy', $event)" />
+        <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ adjust(which).photoDy }}</span>
+      </div>
+    </div>
+    }
+
+    <!-- colours. ONE set for the whole card: the pool's two faces are two sides of
+         the same card, so they share a palette even though each places its own logo. -->
+    @if (showColors) {
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      {{ 'CARD_DESIGN.TUNE_COLORS' | translate }}
+    </p>
+    <div class="space-y-3">
+      @for (c of colorFields; track c.key) {
+        <div class="flex items-center gap-3">
+          <label class="text-sm text-gray-600 w-28 shrink-0">{{ c.label | translate }}</label>
+          <!--
+            A colour input reports '#000000' when it has no value, so it cannot express
+            "use the design's own". The tag + clear button carry that state instead.
+          -->
+          <input type="color" class="h-8 w-12 rounded border border-gray-300 cursor-pointer bg-white p-0.5"
+                 [ngModel]="colorOr(which, c.key, c.fallback)"
+                 (ngModelChange)="setAdjust(which, c.key, $event)" />
+          @if (adjust(which)[c.key]) {
+            <span class="text-xs text-gray-500 tabular-nums flex-1">{{ adjust(which)[c.key] }}</span>
+            <p-button icon="pi pi-times" severity="secondary" [text]="true" size="small"
+                      [pTooltip]="'CARD_DESIGN.TUNE_USE_DEFAULT' | translate"
+                      (onClick)="clearColor(which, c.key)"></p-button>
+          } @else {
+            <span class="text-xs text-gray-400 flex-1">{{ 'CARD_DESIGN.TUNE_DEFAULT_TAG' | translate }}</span>
+          }
+        </div>
+      }
+    </div>
+    <p class="text-xs text-gray-400 mt-3">{{ 'CARD_DESIGN.TUNE_CONTRAST_NOTE' | translate }}</p>
+    }
+  </p-card>
+</ng-template>
+
 <div class="container mx-auto p-6">
   <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900">{{ 'CARD_DESIGN.TITLE' | translate }}</h1>
@@ -317,6 +429,14 @@
           <p class="text-xs text-gray-400 mt-2">{{ 'CARD_DESIGN.PREVIEW_FRONT_NOTE' | translate }}</p>
           <p class="text-xs text-gray-400 mt-4">{{ 'CARD_DESIGN.PREVIEW_NOTE' | translate }}</p>
 
+          <ng-container *ngTemplateOutlet="tuning; context: {
+            $implicit: 'student',
+            title: 'CARD_DESIGN.TUNE_TITLE_STUDENT',
+            hint: 'CARD_DESIGN.TUNE_HINT',
+            showPhoto: true,
+            showColors: true
+          }"></ng-container>
+
           <ng-template pTemplate="footer">
             <div class="flex justify-end pt-2">
               <p-button [label]="'CARD_DESIGN.DOWNLOAD' | translate" icon="pi pi-download"
@@ -395,10 +515,21 @@
                         <span class="flex-1" style="background:#0d9488"></span>
                         <span class="w-1/3" style="background:#ffffff"></span>
                         <span class="w-1/4" style="background:#0f172a"></span>
-                      } @else {
+                      } @else if (t === 'crest') {
                         <span class="flex-1" style="background:#f7efdf"></span>
                         <span class="w-1/3" style="background:#7b1e2b"></span>
                         <span class="w-1/4" style="background:#4d1620"></span>
+                      } @else {
+                        <!-- 'custom': the academy's own artwork, so there is no palette
+                             to show. A thumbnail of their upload once they have one. -->
+                        @if (design().artFront) {
+                          <span class="flex-1 bg-center bg-cover"
+                                [style.background-image]="'url(' + design().artFront + ')'"></span>
+                        } @else {
+                          <span class="flex-1 flex items-center justify-center bg-gray-100 border border-dashed border-gray-300">
+                            <i class="pi pi-image text-gray-400"></i>
+                          </span>
+                        }
                       }
                     </span>
                     <span class="block mt-2 text-sm font-semibold text-gray-800">
@@ -420,6 +551,103 @@
               <p class="text-xs text-gray-500 mt-3">
                 <i class="pi pi-info-circle"></i> {{ 'CARD_DESIGN.AGNOSTIC_NOTE' | translate }}
               </p>
+
+              <!--
+                Only for 'custom'. The other five designs compose the card themselves,
+                so there is nothing here for them to upload or place.
+              -->
+              @if (isCustomPool()) {
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                  <h3 class="text-base font-semibold text-gray-900">
+                    <i class="pi pi-images mr-2 text-indigo-600"></i>{{ 'CARD_DESIGN.ART_TITLE' | translate }}
+                  </h3>
+                  <p class="text-sm text-gray-500 mt-1 mb-4">{{ 'CARD_DESIGN.ART_HINT' | translate }}</p>
+
+                  @if (!customReady()) {
+                    <div class="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                      <i class="pi pi-exclamation-triangle mr-1"></i>{{ 'CARD_DESIGN.ART_MISSING' | translate }}
+                    </div>
+                  }
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    @for (a of artFields; track a.key) {
+                      <div>
+                        <p class="text-sm font-medium text-gray-700 mb-2">{{ a.label | translate }}</p>
+                        <div class="rounded-lg border border-gray-200 h-28 flex items-center justify-center overflow-hidden bg-gray-50">
+                          @if (design()[a.key]) {
+                            <img [src]="design()[a.key]" class="w-full h-full object-cover" alt="" />
+                          } @else {
+                            <i class="pi pi-image text-2xl text-gray-300"></i>
+                          }
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                          <label class="flex-1">
+                            <span class="p-button p-component p-button-outlined p-button-sm w-full justify-center cursor-pointer">
+                              @if (uploading() === a.key || savingImage() === a.key) {
+                                <i class="pi pi-spin pi-spinner"></i>
+                              } @else {
+                                <i class="pi pi-upload mr-2"></i>
+                                {{ (design()[a.key] ? 'CARD_DESIGN.IMG_REPLACE' : 'CARD_DESIGN.IMG_UPLOAD') | translate }}
+                              }
+                            </span>
+                            <input type="file" accept="image/*" class="hidden" (change)="onImagePicked(a.key, $event)" />
+                          </label>
+                          @if (design()[a.key]) {
+                            <p-button icon="pi pi-trash" severity="secondary" [text]="true" size="small"
+                                      [pTooltip]="'CARD_DESIGN.IMG_REMOVE' | translate"
+                                      (onClick)="removeImage(a.key)"></p-button>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- ── QR ── -->
+                  <div class="flex items-center justify-between mt-6 mb-3">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {{ 'CARD_DESIGN.ART_QR' | translate }}
+                    </p>
+                    <p-button [label]="'CARD_DESIGN.ART_RESET' | translate" icon="pi pi-undo"
+                              severity="secondary" [text]="true" size="small" (onClick)="resetArt()"></p-button>
+                  </div>
+                  <div class="flex items-center gap-3 mb-3">
+                    <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.ART_QR_SIZE' | translate }}</label>
+                    <input type="range" class="flex-1 accent-indigo-600" min="90" max="460" step="4"
+                           [ngModel]="artLayout().qrSize" (ngModelChange)="setArtNum('qrSize', $event)" />
+                    <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ artLayout().qrSize }}</span>
+                  </div>
+                  <label class="flex items-start gap-2 mb-1 cursor-pointer">
+                    <input type="checkbox" class="mt-1 accent-indigo-600"
+                           [ngModel]="artLayout().qrTile" (ngModelChange)="setArt('qrTile', $event)" />
+                    <span>
+                      <span class="text-sm text-gray-700">{{ 'CARD_DESIGN.ART_QR_TILE' | translate }}</span>
+                      <span class="block text-xs text-gray-400">{{ 'CARD_DESIGN.ART_QR_TILE_HINT' | translate }}</span>
+                    </span>
+                  </label>
+
+                  <!-- ── serial ── -->
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-6 mb-3">
+                    {{ 'CARD_DESIGN.ART_CODE' | translate }}
+                  </p>
+                  <div class="flex items-center gap-3 mb-3">
+                    <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.ART_CODE_SIZE' | translate }}</label>
+                    <input type="range" class="flex-1 accent-indigo-600" min="12" max="80" step="2"
+                           [ngModel]="artLayout().codeSize" (ngModelChange)="setArtNum('codeSize', $event)" />
+                    <span class="text-xs text-gray-500 w-14 text-right tabular-nums">{{ artLayout().codeSize }}</span>
+                  </div>
+                  <div class="flex items-center gap-3 mb-3">
+                    <label class="text-sm text-gray-600 w-28 shrink-0">{{ 'CARD_DESIGN.ART_CODE_COLOR' | translate }}</label>
+                    <input type="color" class="h-8 w-12 rounded border border-gray-300 cursor-pointer bg-white p-0.5"
+                           [ngModel]="artLayout().codeColor" (ngModelChange)="setArt('codeColor', $event)" />
+                    <span class="text-xs text-gray-500 tabular-nums flex-1">{{ artLayout().codeColor }}</span>
+                  </div>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" class="accent-indigo-600"
+                           [ngModel]="artLayout().codeChip" (ngModelChange)="setArt('codeChip', $event)" />
+                    <span class="text-sm text-gray-700">{{ 'CARD_DESIGN.ART_CODE_CHIP' | translate }}</span>
+                  </label>
+                </div>
+              }
             </p-card>
           </div>
 
@@ -437,13 +665,50 @@
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                 {{ 'CARD_DESIGN.PREVIEW_POOL_FRONT' | translate }}
               </p>
-              <canvas #previewPoolFront class="w-full h-auto rounded-xl shadow-lg border border-gray-200"></canvas>
+              <!--
+                The drag surface for 'custom'. touch-action:none is what stops a phone
+                from scrolling the page instead of moving the QR; the pointer events
+                are inert for every other design (onArtPointerDown returns early).
+              -->
+              <canvas #previewPoolFront
+                      class="w-full h-auto rounded-xl shadow-lg border border-gray-200"
+                      [class.cursor-move]="isCustomPool()"
+                      [style.touch-action]="isCustomPool() ? 'none' : null"
+                      (pointerdown)="onArtPointerDown($event)"
+                      (pointermove)="onArtPointerMove($event)"
+                      (pointerup)="onArtPointerUp($event)"
+                      (pointercancel)="onArtPointerUp($event)"></canvas>
 
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-6 mb-2">
                 {{ 'CARD_DESIGN.PREVIEW_POOL_BACK' | translate }}
               </p>
               <canvas #previewPoolBack class="w-full h-auto rounded-xl shadow-lg border border-gray-200"></canvas>
               <p class="text-xs text-gray-400 mt-2">{{ 'CARD_DESIGN.PREVIEW_POOL_NOTE' | translate }}</p>
+
+              @if (isCustomPool()) {
+                <p class="text-xs text-gray-500 mt-2">
+                  <i class="pi pi-arrows-alt"></i> {{ 'CARD_DESIGN.ART_PLACE_HINT' | translate }}
+                </p>
+              }
+
+              <!-- Two panels, one per FACE. Both pool faces carry a logo, so a single
+                   set of offsets moved both at once. Colours hang off the front's panel
+                   and apply to the whole card. -->
+              <ng-container *ngTemplateOutlet="tuning; context: {
+                $implicit: 'pool',
+                title: 'CARD_DESIGN.TUNE_TITLE_POOL_FRONT',
+                hint: 'CARD_DESIGN.TUNE_HINT_POOL_FRONT',
+                showPhoto: false,
+                showColors: true
+              }"></ng-container>
+
+              <ng-container *ngTemplateOutlet="tuning; context: {
+                $implicit: 'poolBack',
+                title: 'CARD_DESIGN.TUNE_TITLE_POOL_BACK',
+                hint: 'CARD_DESIGN.TUNE_HINT_POOL_BACK',
+                showPhoto: true,
+                showColors: false
+              }"></ng-container>
             </div>
             </p-card>
           </div>

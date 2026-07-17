@@ -1,3 +1,4 @@
+import { CardAdjust, DEFAULT_CARD_ADJUST, clampAdjust } from '@shared/interfaces/card-design.interface';
 import { CardTheme, CARD_THEMES } from './card-theme';
 
 /**
@@ -52,6 +53,35 @@ export function setCardTheme(theme: CardTheme): void {
   T = theme;
 }
 
+/**
+ * The tenant's tuning for the draw currently in flight, on the same footing as `T`
+ * and for the same reason: a draw is fully synchronous, so a module-level binding
+ * cannot interleave between cards, and threading an extra argument through every
+ * one of the ~15 draw functions would have touched every call site for nothing.
+ *
+ * Always CLAMPED on the way in — the API stores whatever a client posted, and an
+ * un-clamped offset is how a logo ends up off the card or sitting on the QR's quiet
+ * zone across a print run of a thousand.
+ */
+export let A: CardAdjust = { ...DEFAULT_CARD_ADJUST };
+export function setCardAdjust(adj?: CardAdjust | null): void {
+  A = clampAdjust(adj);
+}
+
+/**
+ * Draw the academy's logo into the box a template reserved for it, honouring the
+ * tenant's width and nudge.
+ *
+ * Every logo site goes through here so the three templates that show one can't
+ * drift apart. drawContain keeps the aspect ratio, so `logoScale` grows the BOX and
+ * the logo fills as much of it as its own shape allows — a wide logo and a square
+ * one at 150% both stay themselves.
+ */
+export function drawLogo(ctx: Ctx, img: CanvasImageSource, cx: number, cy: number, maxW: number, maxH: number): void {
+  const s = A.logoScale / 100;
+  drawContain(ctx, img, cx + A.logoDx, cy + A.logoDy, maxW * s, maxH * s);
+}
+
 export interface StudentCardData {
   companyName: string;
   name: string;
@@ -100,21 +130,38 @@ export function goldGrad(ctx: Ctx, x0: number, y0: number, x1: number, y1: numbe
   return g;
 }
 
+/**
+ * Every `bold` the card code asks for is drawn at 900 instead.
+ *
+ * These are printed at 300 dpi and then read off a small piece of card in a room
+ * with whatever light it has. Plain `bold` came back thin and grey — legible on
+ * screen at 4x, not on the card. 900 picks up the family's Black face where there
+ * is one (Segoe UI Black) and is synthesised where there isn't; either way the
+ * stroke gains weight, which is the whole point.
+ *
+ * Routed through here rather than changed at the ~60 call sites so the two faces,
+ * the four student templates and the five pool templates cannot drift apart.
+ */
+export function cardWeight(weight: string): string {
+  return weight === 'bold' ? '900' : weight;
+}
+
 /** Draw text, shrinking the font until it fits maxW — names and course titles vary wildly in length. */
 export function fitText(
   ctx: Ctx, text: string, x: number, y: number, maxW: number,
   size: number, weight: string, color: string, align: Align, dir: Dir,
 ): void {
+  const w = cardWeight(weight);
   ctx.save();
   ctx.direction = dir;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
   let s = size;
-  ctx.font = `${weight} ${s}px ${T.font}`;
+  ctx.font = `${w} ${s}px ${T.font}`;
   while (s > 9 && ctx.measureText(text).width > maxW) {
     s -= 1;
-    ctx.font = `${weight} ${s}px ${T.font}`;
+    ctx.font = `${w} ${s}px ${T.font}`;
   }
   ctx.fillText(text, x, y);
   ctx.restore();
@@ -123,7 +170,9 @@ export function fitText(
 /** Wrap `text` to at most `maxLines` lines that each fit `maxW`; returns the lines. */
 export function wrap(ctx: Ctx, text: string, maxW: number, size: number, weight: string, maxLines: number): string[] {
   ctx.save();
-  ctx.font = `${weight} ${size}px ${T.font}`;
+  // Must escalate exactly as fitText does — 900 is wider than bold, and measuring
+  // the lighter weight would break them where the drawn text then overruns maxW.
+  ctx.font = `${cardWeight(weight)} ${size}px ${T.font}`;
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = '';
@@ -140,6 +189,31 @@ export function wrap(ctx: Ctx, text: string, maxW: number, size: number, weight:
   if (line && lines.length < maxLines) lines.push(line);
   ctx.restore();
   return lines;
+}
+
+/**
+ * Wrap `text` into at most `maxLines`, stepping the size DOWN from `size` (never
+ * below `min`) until the WHOLE string fits. Returns the lines and the size they
+ * must be drawn at.
+ *
+ * This is what tenant-entered text needs, and neither primitive above does it
+ * alone. fitText squeezes a rule onto one line and hits its 9px floor — a thread
+ * nobody can read off a printed card. wrap holds the size but silently drops the
+ * words past `maxLines`, so an instruction loses its last clause and still looks
+ * deliberate. Wrapping first and only then shrinking keeps the whole rule and
+ * keeps it legible; `min` is the point below which we would rather it overflow
+ * than pretend it is readable.
+ */
+export function wrapFit(
+  ctx: Ctx, text: string, maxW: number, size: number, weight: string, maxLines: number, min: number,
+): { lines: string[]; size: number } {
+  for (let s = size; s > min; s--) {
+    // maxLines + 1 so a text that needs one more line reports it instead of
+    // coming back silently truncated at exactly maxLines.
+    const lines = wrap(ctx, text, maxW, s, weight, maxLines + 1);
+    if (lines.length <= maxLines) return { lines, size: s };
+  }
+  return { lines: wrap(ctx, text, maxW, min, weight, maxLines), size: min };
 }
 
 export function star(ctx: Ctx, cx: number, cy: number, r: number): void {
@@ -237,7 +311,7 @@ function drawCrest(ctx: Ctx, cx: number, cy: number): void {
   ctx.lineWidth = 5;
   ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = T.onPanel;
   ctx.beginPath();
   ctx.moveTo(cx - 27, cy + 4);
   ctx.quadraticCurveTo(cx - 13, cy - 4, cx - 1, cy + 2);
@@ -297,6 +371,9 @@ function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
   // gold sweeps that start at y=498.
   const x = 45, y = 208, w = 190, h = 267, r = 16;
   ctx.save();
+  // The nudge is a translate, not an offset on x/y: the frame, its gold border and
+  // the clip that holds the photo inside it all have to move as one piece.
+  ctx.translate(A.photoDx, A.photoDy);
   roundRect(ctx, x, y, w, h, r);
   ctx.fillStyle = '#ffffff';
   ctx.fill();
@@ -332,8 +409,8 @@ type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
 
 function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
   ctx.save();
-  ctx.strokeStyle = '#ffffff';
-  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = T.onPanel;
+  ctx.fillStyle = T.onPanel;
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -348,7 +425,7 @@ function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
     ctx.closePath();
     ctx.fill();
   } else if (kind === 'id') {
-    ctx.font = `bold 15px ${T.font}`;
+    ctx.font = `900 15px ${T.font}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.direction = 'ltr';
@@ -450,6 +527,14 @@ function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: nu
 export interface CardImages {
   photo?: CanvasImageSource | null;
   logo?: CanvasImageSource | null;
+  /**
+   * The academy's own full-card artwork for the POOL cards ('custom' pool design).
+   * Front = the students' side the QR and serial are placed on; back = the academy's
+   * side, printed exactly as uploaded. Decoded here with photo/logo so a thousand-card
+   * export decodes them once, not a thousand times.
+   */
+  artFront?: CanvasImageSource | null;
+  artBack?: CanvasImageSource | null;
 }
 
 export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImageSource, images: CardImages = {}): void {
@@ -484,7 +569,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
 
   // An uploaded logo replaces the crest entirely — drawn to fit, so it keeps its
   // own shape instead of being forced into the shield.
-  if (images.logo) drawContain(ctx, images.logo, 140, 106, 150, 128);
+  if (images.logo) drawLogo(ctx, images.logo, 140, 106, 150, 128);
   else drawCrest(ctx, 140, 106);
 
   drawPhoto(ctx, images.photo);
@@ -501,7 +586,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
-  ctx.font = `bold 19px ${T.font}`;
+  ctx.font = `900 19px ${T.font}`;
   ctx.fillStyle = T.muted;
   ctx.fillText('STUDENT ID CARD', hcx, 124);
   const tw = ctx.measureText('STUDENT ID CARD').width;
@@ -531,7 +616,12 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   const rx = 360;      // left edge — clears the gold ribbon on the navy panel
   const chip = 42;
   const labelR = 766;
-  const valueR = 640;
+  // The label runs right-to-left from labelR and is capped at 124 wide, so it can
+  // reach x=642. valueR must leave a real gutter before that: label and value are
+  // now the same navy (see `muted` in card-theme.ts), and at 640 a long value like
+  // "الثالث الثانوي" butted straight onto "الصف الدراسي" and read as one word. The
+  // grey used to hide this; the gutter has to do it now.
+  const valueR = 626;
   const valueMaxW = valueR - (rx + chip + 14);
   const rowH = 66;
 
@@ -583,7 +673,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.fill();
   ctx.restore();
 
-  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentLight, 'right', 'rtl');
+  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
 
   ctx.save();
   ctx.strokeStyle = goldGrad(ctx, 368, 560, 412, 598);
@@ -619,8 +709,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentLight, 'right', 'rtl');
-  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, 'bold', '#ffffff', 'right', 'rtl');
+  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentOnPanel, 'right', 'rtl');
+  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, 'bold', T.onPanel, 'right', 'rtl');
 
   ctx.save();
   ctx.strokeStyle = goldGrad(ctx, qx + 14, capTop + 14, qx + 50, capTop + 50);

@@ -19,7 +19,7 @@ import { formatStudentCode } from '../../core/utils/student-code.util';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng } from '../students/card-render.util';
+import { canExportCustom, loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng } from '../students/card-render.util';
 import { AgnosticCardData, AgnosticTemplate } from '../students/card-agnostic.util';
 
 /**
@@ -170,6 +170,16 @@ export class QrCardsComponent implements OnInit {
     try {
       const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
       const template = design?.agnosticTemplate as AgnosticTemplate | undefined;
+
+      // 'custom' prints the academy's OWN artwork, and a missing side renders a
+      // placeholder that says so. Refuse the batch instead: this ZIP goes to an
+      // outside printer, and a thousand cards with a blank face is not something
+      // anybody recovers from once they are printed.
+      if (template === 'custom' && (!design || !canExportCustom(design))) {
+        this.notify.error(this.translate.instant('QR_CARDS.CUSTOM_ART_MISSING'));
+        return;
+      }
+
       const images = await loadCardImages(design);   // decoded once for the batch
 
       const zip = new JSZip();
@@ -188,7 +198,7 @@ export class QrCardsComponent implements OnInit {
           code: this.label(card.serial),
           qrUrl: `${origin}/p/s/${card.token}`,
         };
-        const png = await renderAgnosticCardPng(data, canvas, template, images);
+        const png = await renderAgnosticCardPng(data, canvas, template, images, design);
         zip.file(`${this.label(card.serial)}.png`, png, { base64: true });
 
         this.exportDone.set(++done);
