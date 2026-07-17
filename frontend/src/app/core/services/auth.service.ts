@@ -211,6 +211,20 @@ export class AuthService {
     return this.currentUser()?.qrCardsEnabled === true;
   }
 
+  /**
+   * The vendor's debugging login (master@master.com), parked inside a tenant to
+   * reproduce what a customer sees. Some tools are for the vendor only and stay
+   * hidden from every real user; this decides who they are worth showing to.
+   *
+   * The backend owns the canonical copy (aws/.../utils/debug-account.ts, and the
+   * admin app keeps its own) — the frontend can't import across those builds, so
+   * the address is repeated here. Cosmetic only: it hides UI, it does not gate any
+   * route or endpoint.
+   */
+  isDebugUser(): boolean {
+    return (this.currentUser()?.email ?? '').trim().toLowerCase() === 'master@master.com';
+  }
+
   canUseCrm(): boolean {
     return !this.isTeacher() && this.plan() === 'ADVANCED';
   }
