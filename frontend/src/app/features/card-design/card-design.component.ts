@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -56,7 +56,7 @@ type AdjustKey = 'student' | 'pool' | 'poolBack';
   imports: [CommonModule, FormsModule, CardModule, TabsModule, TooltipModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
   templateUrl: './card-design.component.html',
 })
-export class CardDesignComponent implements OnInit {
+export class CardDesignComponent implements OnInit, OnDestroy {
   private companyService = inject(CompanyService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
@@ -189,6 +189,13 @@ export class CardDesignComponent implements OnInit {
         this.paint();
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    // Leaving within the debounce window must still land the change: there is no
+    // Save button on this tab to fall back on, and the request outlives the
+    // component. Without this the fix would only make the loss less frequent.
+    if (this.artSaveTimer) this.savePoolArt();
   }
 
   /**
@@ -387,6 +394,9 @@ export class CardDesignComponent implements OnInit {
       poolArt: clampPoolArt({ ...DEFAULT_POOL_ART, ...(d.poolArt ?? {}), [key]: value }),
     }));
     this.redraw();
+    // These controls ARE the decision, exactly as a drag is: this tab has no Save
+    // button, so a change that only redraws is a change that never happened.
+    this.queuePoolArtSave();
   }
 
   setArtNum(key: 'qrSize' | 'codeSize', value: unknown): void {
@@ -406,7 +416,27 @@ export class CardDesignComponent implements OnInit {
    * only this field swapped, so a drag can't quietly commit half-typed back-face
    * edits sitting in the form next to it.
    */
+  private artSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Coalesce a burst of changes into one save.
+   *
+   * A colour picker and the size sliders fire on every tick of a drag, and each
+   * tick would otherwise post the whole card_design row — artwork included, which
+   * is the heaviest thing this page stores. So persist once the control settles.
+   */
+  private queuePoolArtSave(): void {
+    if (this.artSaveTimer) clearTimeout(this.artSaveTimer);
+    this.artSaveTimer = setTimeout(() => this.savePoolArt(), 500);
+  }
+
   private savePoolArt(): void {
+    // Any explicit save (a drag landing, a reset) supersedes a queued one; letting
+    // both run would post the same row twice, the later one for no reason.
+    if (this.artSaveTimer) {
+      clearTimeout(this.artSaveTimer);
+      this.artSaveTimer = null;
+    }
     const base = this.savedDesign() ?? this.design();
     const payload = this.payloadFrom({ ...base, poolArt: this.design().poolArt });
     this.companyService.updateCardDesign(payload).subscribe({
