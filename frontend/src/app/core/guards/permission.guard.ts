@@ -82,6 +82,29 @@ export const notTeacherGuard = () => {
 };
 
 /**
+ * Vendor-only guard. Admits nobody but the debugging login (master@master.com),
+ * so a page can be reached only when that account is parked in the tenant. The
+ * matching sidebar entry hides on the same check; this stops a direct URL. Anyone
+ * else is bounced to their first accessible page, exactly like the other guards.
+ */
+export const debugOnlyGuard = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/auth/login']);
+    return false;
+  }
+
+  if (authService.isDebugUser()) {
+    return true;
+  }
+
+  router.navigate([getFirstAccessiblePath(authService)]);
+  return false;
+};
+
+/**
  * Role-restricted guard. Only allows users whose role is in the allowed list.
  * Used for admin-only pages that don't map to a granular resource.
  */

@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { permissionGuard, roleGuard, notTeacherGuard } from './core/guards/permission.guard';
+import { permissionGuard, roleGuard, notTeacherGuard, debugOnlyGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
 import { UserRole } from '@shared/enums/user-role.enum';
 
@@ -277,8 +277,10 @@ export const routes: Routes = [
       },
       {
         // The pool of pre-printed blank QR cards, and which student each is on.
+        // Vendor tool: hidden from the sidebar and blocked by URL for everyone but
+        // the debug login (master@master.com), matching that nav entry's visibility.
         path: 'qr-cards',
-        canActivate: [permissionGuard('students')],
+        canActivate: [debugOnlyGuard],
         data: { breadcrumb: 'BREADCRUMBS.QR_CARDS' },
         loadComponent: () => import('./features/qr-cards/qr-cards.component').then(m => m.QrCardsComponent)
       },
