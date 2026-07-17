@@ -4693,6 +4693,7 @@ export const contract = c.router({
           unallocatedAdjustments: z.number().optional(),
           unallocatedRevenue: z.number().optional(),
           unallocatedExpenses: z.number().optional(),
+          unattributedRefunds: z.number().optional(),
           unallocatedNet: z.number().optional(),
           sumBranchCash: z.number().optional(),
           byBranch: z.array(z.object({

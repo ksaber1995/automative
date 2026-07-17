@@ -5,6 +5,7 @@ import {
   isGlobalAdmin,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { computeTotalCash } from './cash';
 import { ensurePerSessionSchema } from './session-payments';
 
 export const analyticsRoutes = {
@@ -201,33 +202,11 @@ export const analyticsRoutes = {
       const inventoryValue = parseFloat(inventoryData[0]?.inventory_value || '0');
 
       // --- Cash & debts ---
-      // Global admins see the canonical company cash_state. Scoped users see
-      // base cash computed from their accessible branches only (mirrors the
-      // formula in cash.ts: enrollments + products + master − expenses
-      // − refunds − withdrawals).
-      let currentCash = 0;
-      if (!scopedBranchIds) {
-        const cashState = await query('SELECT current_balance FROM cash_state WHERE company_id = $1 LIMIT 1', [context.companyId]);
-        currentCash = parseFloat(cashState[0]?.current_balance || '0');
-      } else if (scopedBranchIds.length > 0) {
-        const cashParams: any[] = [context.companyId];
-        const cashBc = buildBranchClause('branch_id', cashParams);
-        const [enrollAll, prodAll, mastAll, expAll, refAll, wAll] = await Promise.all([
-          query(`SELECT COALESCE(SUM(amount_paid), 0) as t FROM enrollments WHERE company_id = $1 AND payment_status IN ('PAID','PARTIAL','REFUNDED') ${cashBc}`, [...cashParams]),
-          query(`SELECT COALESCE(SUM(total_amount), 0) as t FROM product_sales WHERE company_id = $1 ${cashBc}`, [...cashParams]),
-          query(`SELECT COALESCE(SUM(amount_paid), 0) as t FROM master_enrollments WHERE company_id = $1 AND amount_paid > 0 ${cashBc}`, [...cashParams]),
-          query(`SELECT COALESCE(SUM(amount), 0) as t FROM expense_payments WHERE company_id = $1 ${cashBc}`, [...cashParams]),
-          query(`SELECT COALESCE(SUM(amount), 0) as t FROM refunds WHERE company_id = $1 ${cashBc}`, [...cashParams]),
-          query(`SELECT COALESCE(SUM(amount), 0) as t FROM withdrawals WHERE company_id = $1 AND is_active = true ${cashBc}`, [...cashParams]),
-        ]);
-        currentCash =
-          parseFloat(enrollAll[0]?.t || '0') +
-          parseFloat(prodAll[0]?.t || '0') +
-          parseFloat(mastAll[0]?.t || '0') -
-          parseFloat(expAll[0]?.t || '0') -
-          parseFloat(refAll[0]?.t || '0') -
-          parseFloat(wAll[0]?.t || '0');
-      }
+      // Cash comes from the cash route's own computation so this summary and the
+      // dashboard's cash card are always the same number. It is all-time by
+      // design (cash on hand doesn't belong to a reporting period), unlike the
+      // revenue/expense figures above, which are scoped to startDate..endDate.
+      const currentCash = await computeTotalCash(context.companyId, scopedBranchIds);
       const debtParams: any[] = [context.companyId];
       const debtsData = await query(
         `SELECT COALESCE(SUM(remaining_amount), 0) as total_debts

@@ -331,10 +331,10 @@ export const authRoutes = {
         `UPDATE branches SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         [user.id, branch.id]
       );
-      await client.query(
-        `INSERT INTO cash_state (company_id, current_balance, updated_by) VALUES ($1,$2,$3)`,
-        [company.id, 0, user.id]
-      );
+      // No cash_state row is seeded here: nothing maintains that table's
+      // current_balance, so the 0 it was seeded with stayed 0 forever. Cash is
+      // computed from the underlying payments instead — see computeTotalCash in
+      // routes/cash.ts.
 
       const trialStart = new Date();
       const trialEnd = new Date();

@@ -30,6 +30,23 @@ function buildBranchInClause(alias: string, params: any[], ids: string[]): strin
   return ` AND ${alias} IN (${placeholders})`;
 }
 
+// A refund carries a link to exactly one of six payment kinds, and usually only
+// that link knows which branch the money came from — refunds.branch_id is often
+// NULL (product-sale refunds never set it). Resolving through every link and
+// falling back to the refund's own branch_id is what keeps a refund on the same
+// branch as the payment it reverses. Used for both the company total and the
+// per-branch rows so the two can't disagree about which refunds belong where.
+const REFUNDS_JOINED = `
+  FROM refunds r
+  LEFT JOIN enrollments e ON r.enrollment_id = e.id
+  LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+  LEFT JOIN product_sales ps ON r.product_sale_id = ps.id
+  LEFT JOIN event_subscriptions es ON r.subscription_id = es.id
+  LEFT JOIN monthly_subscription_payments mp ON r.monthly_payment_id = mp.id
+  LEFT JOIN session_payments sp ON r.session_payment_id = sp.id`;
+
+const REFUND_BRANCH = `COALESCE(e.branch_id, me.branch_id, ps.branch_id, es.branch_id, mp.branch_id, sp.branch_id, r.branch_id)`;
+
 let cashSchemaInitPromise: Promise<void> | null = null;
 async function ensureCashAdjustmentsTable(): Promise<void> {
   if (!cashSchemaInitPromise) {
@@ -65,6 +82,10 @@ async function ensureCashAdjustmentsTable(): Promise<void> {
 // `scoped` is null for global admins (no branch filter) or a list of branch UUIDs
 // for branch-scoped users. When scoped, branch_id IS NULL rows (unallocated
 // revenue/expenses) are excluded — those are company-level and not visible.
+//
+// The revenue sources here must stay in step with the ones analytics.ts sums for
+// netProfit. Money collected through a channel that only one of the two knows
+// about makes cash and profit disagree by exactly that amount.
 async function fetchCashAggregates(companyId: string, scoped: string[] | null) {
   const bp = (alias: string) => {
     if (scoped === null) return { clause: '', params: [companyId] };
@@ -76,9 +97,16 @@ async function fetchCashAggregates(companyId: string, scoped: string[] | null) {
   const a2 = bp('branch_id');
   const a3 = bp('branch_id');
   const a4 = bp('branch_id');
-  const a5 = bp('branch_id');
+  // Scope refunds by the branch the refund resolves to, not by refunds.branch_id
+  // — that column is NULL on product-sale refunds, which would drop them from a
+  // scoped user's total while still showing them on a branch row.
+  const a5 = bp(REFUND_BRANCH);
   const a6 = bp('branch_id');
-  const [enrollPaid, productSales, masterPaid, expenses, refunds, withdrawals] = await Promise.all([
+  const a7 = bp('branch_id');
+  const a8 = bp('branch_id');
+  const a9 = bp('branch_id');
+  const a10 = bp('branch_id');
+  const [enrollPaid, productSales, masterPaid, expenses, refunds, withdrawals, subscriptionPaid, eventPaid, packagePaid, sessionPaid] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(amount_paid), 0) as total
        FROM enrollments WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')${a1.clause}`,
@@ -100,14 +128,34 @@ async function fetchCashAggregates(companyId: string, scoped: string[] | null) {
       a4.params
     ),
     query(
-      `SELECT COALESCE(SUM(amount), 0) as total
-       FROM refunds WHERE company_id = $1${a5.clause}`,
+      `SELECT COALESCE(SUM(r.amount), 0) as total${REFUNDS_JOINED}
+       WHERE r.company_id = $1${a5.clause}`,
       a5.params
     ),
     query(
       `SELECT COALESCE(SUM(amount), 0) as total
        FROM withdrawals WHERE company_id = $1 AND is_active = true${a6.clause}`,
       a6.params
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount_paid), 0) as total
+       FROM monthly_subscription_payments WHERE company_id = $1 AND amount_paid > 0${a7.clause}`,
+      a7.params
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM event_subscriptions WHERE company_id = $1 AND amount > 0${a8.clause}`,
+      a8.params
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount_paid), 0) as total
+       FROM session_packages WHERE company_id = $1 AND amount_paid > 0${a9.clause}`,
+      a9.params
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount_paid), 0) as total
+       FROM session_payments WHERE company_id = $1 AND amount_paid > 0${a10.clause}`,
+      a10.params
     ),
   ]);
 
@@ -118,6 +166,11 @@ async function fetchCashAggregates(companyId: string, scoped: string[] | null) {
     totalExpenses: parseFloat(expenses[0]?.total || 0),
     totalRefunds: parseFloat(refunds[0]?.total || 0),
     totalWithdrawals: parseFloat(withdrawals[0]?.total || 0),
+    totalSubscriptionPaid: parseFloat(subscriptionPaid[0]?.total || 0),
+    totalEventPaid: parseFloat(eventPaid[0]?.total || 0),
+    // COVERED session charges carry amount_paid = 0 (their cash sits on the
+    // package row), so summing packages and payments never double-counts.
+    totalSessionPaid: parseFloat(packagePaid[0]?.total || 0) + parseFloat(sessionPaid[0]?.total || 0),
   };
 }
 
@@ -148,6 +201,32 @@ async function fetchAdjustmentTotals(companyId: string, scoped: string[] | null)
     branchAdjustments: branchMap,
     unallocatedAdjustments: unallocated,
   };
+}
+
+/** The cash the aggregates add up to, before cash_adjustments are applied. */
+function baseCashOf(aggs: Awaited<ReturnType<typeof fetchCashAggregates>>): number {
+  return aggs.totalEnrollPaid + aggs.totalProductSales + aggs.totalMasterPaid
+    + aggs.totalSubscriptionPaid + aggs.totalEventPaid + aggs.totalSessionPaid
+    - aggs.totalExpenses - aggs.totalRefunds - aggs.totalWithdrawals;
+}
+
+/**
+ * A company's cash on hand — the same number GET /api/cash/current reports as
+ * totalCash. Exported so the analytics dashboard reports cash through this one
+ * computation rather than keeping its own copy: the two drifting apart is what
+ * made net profit and current cash disagree for tenants collecting subscription,
+ * event or per-session money.
+ *
+ * `scoped` follows scopedBranchIdsFor(): null = see everything, [] = no branch
+ * access (yields 0), otherwise the accessible branch IDs.
+ */
+export async function computeTotalCash(companyId: string, scoped: string[] | null): Promise<number> {
+  await ensureCashAdjustmentsTable();
+  const [aggs, adj] = await Promise.all([
+    fetchCashAggregates(companyId, scoped),
+    fetchAdjustmentTotals(companyId, scoped),
+  ]);
+  return baseCashOf(aggs) + adj.overall;
 }
 
 function mapAdjustmentRow(row: any) {
@@ -181,29 +260,39 @@ export const cashRoutes = {
 
       const scoped = scopedBranchIdsFor(context);
       const aggs = await fetchCashAggregates(context.companyId, scoped);
-      const baseCash = aggs.totalEnrollPaid + aggs.totalProductSales + aggs.totalMasterPaid
-        - aggs.totalExpenses - aggs.totalRefunds - aggs.totalWithdrawals;
+      const baseCash = baseCashOf(aggs);
 
-      // Surface activity that isn't tagged to any branch — product_sales with no
-      // branch_id and expense_payments with no branch_id. These are part of the
-      // company total but never roll up into a branch row, so callers need to
-      // know about them to reconcile sum(byBranch) with totalCash. Scoped users
-      // don't see unallocated activity (it's company-level overhead).
+      // Surface activity that isn't tagged to any branch — product_sales,
+      // event_subscriptions and expense_payments with no branch_id. These are
+      // part of the company total but never roll up into a branch row, so
+      // callers need to know about them to reconcile sum(byBranch) with
+      // totalCash. Scoped users don't see unallocated activity (it's
+      // company-level overhead). The other revenue sources are absent here
+      // because their branch_id is NOT NULL — they always land on a branch.
       let unallocatedRevenue = 0;
       let unallocatedExpenses = 0;
+      let unattributedRefunds = 0;
       if (scoped === null) {
         const unallocActivity = await query(
           `SELECT
              COALESCE((SELECT SUM(total_amount) FROM product_sales
-                       WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_revenue,
+                       WHERE company_id = $1 AND branch_id IS NULL), 0)
+             + COALESCE((SELECT SUM(amount) FROM event_subscriptions
+                       WHERE company_id = $1 AND amount > 0 AND branch_id IS NULL), 0) AS unalloc_revenue,
              COALESCE((SELECT SUM(amount) FROM expense_payments
-                       WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_expenses`,
+                       WHERE company_id = $1 AND branch_id IS NULL), 0) AS unalloc_expenses,
+             COALESCE((SELECT SUM(r.amount)${REFUNDS_JOINED}
+                       WHERE r.company_id = $1 AND ${REFUND_BRANCH} IS NULL), 0) AS unattributed_refunds`,
           [context.companyId]
         );
         unallocatedRevenue = parseFloat(unallocActivity[0]?.unalloc_revenue || '0');
         unallocatedExpenses = parseFloat(unallocActivity[0]?.unalloc_expenses || '0');
+        // A refund whose every link is dangling reduces the company total but
+        // lands on no branch row. Netting it here keeps the reconciliation
+        // identity totalCash = sumBranchCash + unallocatedNet + adjustments true.
+        unattributedRefunds = parseFloat(unallocActivity[0]?.unattributed_refunds || '0');
       }
-      const unallocatedNet = unallocatedRevenue - unallocatedExpenses;
+      const unallocatedNet = unallocatedRevenue - unallocatedExpenses - unattributedRefunds;
 
       const adj = await fetchAdjustmentTotals(context.companyId, scoped);
       const totalCash = baseCash + adj.overall;
@@ -221,7 +310,11 @@ export const cashRoutes = {
           COALESCE(mast.total, 0)   AS master_paid,
           COALESCE(exp.total, 0)    AS expenses,
           COALESCE(ref.total, 0)    AS refunds,
-          COALESCE(w.total, 0)      AS withdrawals
+          COALESCE(w.total, 0)      AS withdrawals,
+          COALESCE(subs.total, 0)   AS subscription_paid,
+          COALESCE(ev.total, 0)     AS event_paid,
+          COALESCE(spkg.total, 0)   AS package_paid,
+          COALESCE(spay.total, 0)   AS session_paid
         FROM branches b
         LEFT JOIN (
           SELECT branch_id, SUM(amount_paid) AS total FROM enrollments
@@ -244,18 +337,35 @@ export const cashRoutes = {
           GROUP BY branch_id
         ) exp ON exp.branch_id = b.id
         LEFT JOIN (
-          SELECT COALESCE(e.branch_id, me.branch_id) AS branch_id, SUM(r.amount) AS total
-          FROM refunds r
-          LEFT JOIN enrollments e ON r.enrollment_id = e.id
-          LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+          SELECT ${REFUND_BRANCH} AS branch_id, SUM(r.amount) AS total${REFUNDS_JOINED}
           WHERE r.company_id = $1
-          GROUP BY COALESCE(e.branch_id, me.branch_id)
+          GROUP BY ${REFUND_BRANCH}
         ) ref ON ref.branch_id = b.id
         LEFT JOIN (
           SELECT branch_id, SUM(amount) AS total FROM withdrawals
           WHERE company_id = $1 AND is_active = true
           GROUP BY branch_id
         ) w ON w.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) AS total FROM monthly_subscription_payments
+          WHERE company_id = $1 AND amount_paid > 0
+          GROUP BY branch_id
+        ) subs ON subs.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount) AS total FROM event_subscriptions
+          WHERE company_id = $1 AND amount > 0
+          GROUP BY branch_id
+        ) ev ON ev.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) AS total FROM session_packages
+          WHERE company_id = $1 AND amount_paid > 0
+          GROUP BY branch_id
+        ) spkg ON spkg.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount_paid) AS total FROM session_payments
+          WHERE company_id = $1 AND amount_paid > 0
+          GROUP BY branch_id
+        ) spay ON spay.branch_id = b.id
         WHERE b.company_id = $1 AND b.is_active = true ${branchAggClause}
         ORDER BY b.name ASC
         `,
@@ -267,6 +377,8 @@ export const cashRoutes = {
 
       const byBranch = branchAggs.map((r: any) => {
         const baseBranch = parseFloat(r.enroll_paid) + parseFloat(r.product_sales) + parseFloat(r.master_paid)
+          + parseFloat(r.subscription_paid) + parseFloat(r.event_paid)
+          + parseFloat(r.package_paid) + parseFloat(r.session_paid)
           - parseFloat(r.expenses) - parseFloat(r.refunds) - parseFloat(r.withdrawals);
         const branchAdj = adj.branchAdjustments.get(r.id) || 0;
         const cash = baseBranch + branchAdj + distributedShare;
@@ -291,6 +403,7 @@ export const cashRoutes = {
           unallocatedAdjustments: Math.round(adj.unallocatedAdjustments * 100) / 100,
           unallocatedRevenue: Math.round(unallocatedRevenue * 100) / 100,
           unallocatedExpenses: Math.round(unallocatedExpenses * 100) / 100,
+          unattributedRefunds: Math.round(unattributedRefunds * 100) / 100,
           unallocatedNet: Math.round(unallocatedNet * 100) / 100,
           sumBranchCash: Math.round(sumBranchCash * 100) / 100,
           byBranch,
