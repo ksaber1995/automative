@@ -75,7 +75,14 @@
       </p-tablist>
     </p-tabs>
 
-    <!-- Student ID cards: one PNG per student per class, bundled in a ZIP -->
+    <!--
+      Student ID cards: one PNG per student per class, bundled in a ZIP.
+
+      Hidden on request. This button is the dialog's only way in, so commenting it
+      out is enough to take the feature off the page; the dialog below and
+      downloadQrZip() are left intact, and uncommenting this block brings it back.
+    -->
+    <!--
     <div class="flex gap-2 my-3 flex-wrap items-center">
       <button
         pButton
@@ -87,6 +94,7 @@
         (click)="openZipDialog()"
       ></button>
     </div>
+    -->
 
     <!-- Students Table -->
     <p-table
