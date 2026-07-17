@@ -140,6 +140,10 @@ export class CardDesignComponent implements OnInit, OnDestroy {
       [which]: { ...DEFAULT_CARD_ADJUST, ...(d[which] ?? {}), [key]: value },
     }));
     this.redraw();
+    // The pool's two tuners sit on a tab with no Save button, so they persist
+    // themselves. `student` sits on the students tab, where the Save button is the
+    // save — auto-saving it there would commit edits the user hasn't hit Save on.
+    if (which !== 'student') this.queuePoolSave();
   }
 
   /** Sliders hand back strings; a NaN would poison the stored design. */
@@ -170,6 +174,7 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   resetAdjust(which: AdjustKey): void {
     this.design.update((d) => ({ ...d, [which]: { ...DEFAULT_CARD_ADJUST } }));
     this.redraw();
+    if (which !== 'student') this.savePoolFacets();
   }
 
   ngOnInit() {
@@ -195,7 +200,7 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     // Leaving within the debounce window must still land the change: there is no
     // Save button on this tab to fall back on, and the request outlives the
     // component. Without this the fix would only make the loss less frequent.
-    if (this.artSaveTimer) this.savePoolArt();
+    if (this.poolSaveTimer) this.savePoolFacets();
   }
 
   /**
@@ -396,7 +401,7 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     this.redraw();
     // These controls ARE the decision, exactly as a drag is: this tab has no Save
     // button, so a change that only redraws is a change that never happened.
-    this.queuePoolArtSave();
+    this.queuePoolSave();
   }
 
   setArtNum(key: 'qrSize' | 'codeSize', value: unknown): void {
@@ -407,44 +412,58 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   resetArt(): void {
     this.design.update((d) => ({ ...d, poolArt: { ...DEFAULT_POOL_ART } }));
     this.redraw();
-    this.savePoolArt();
+    this.savePoolFacets();
   }
 
   /**
-   * Persist JUST the placement. Like the uploads and the design picker, dragging
-   * something into place IS the decision — but it posts the last SAVED design with
-   * only this field swapped, so a drag can't quietly commit half-typed back-face
-   * edits sitting in the form next to it.
+   * Persist what the pool tab owns: both tuners and the artwork placement.
+   *
+   * This tab has no Save button — every control on it is its own decision, the way
+   * an upload or the design picker is. It posts the last SAVED design with only
+   * these three swapped, so a change here can't quietly commit half-typed back-face
+   * edits sitting on the students tab.
+   *
+   * All three ride along on every post rather than each control sending only its
+   * own field: two controls touched inside one save's round-trip would otherwise
+   * each build on a `savedDesign` that predates the other, and the second would
+   * reinstate the first's old value.
    */
-  private artSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private poolSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Coalesce a burst of changes into one save.
    *
-   * A colour picker and the size sliders fire on every tick of a drag, and each
+   * The colour pickers and the size sliders fire on every tick of a drag, and each
    * tick would otherwise post the whole card_design row — artwork included, which
    * is the heaviest thing this page stores. So persist once the control settles.
    */
-  private queuePoolArtSave(): void {
-    if (this.artSaveTimer) clearTimeout(this.artSaveTimer);
-    this.artSaveTimer = setTimeout(() => this.savePoolArt(), 500);
+  private queuePoolSave(): void {
+    if (this.poolSaveTimer) clearTimeout(this.poolSaveTimer);
+    this.poolSaveTimer = setTimeout(() => this.savePoolFacets(), 500);
   }
 
-  private savePoolArt(): void {
+  private savePoolFacets(): void {
     // Any explicit save (a drag landing, a reset) supersedes a queued one; letting
     // both run would post the same row twice, the later one for no reason.
-    if (this.artSaveTimer) {
-      clearTimeout(this.artSaveTimer);
-      this.artSaveTimer = null;
+    if (this.poolSaveTimer) {
+      clearTimeout(this.poolSaveTimer);
+      this.poolSaveTimer = null;
     }
     const base = this.savedDesign() ?? this.design();
-    const payload = this.payloadFrom({ ...base, poolArt: this.design().poolArt });
+    const d = this.design();
+    const payload = this.payloadFrom({ ...base, pool: d.pool, poolBack: d.poolBack, poolArt: d.poolArt });
     this.companyService.updateCardDesign(payload).subscribe({
       next: (saved) => this.savedDesign.set(saved),
       error: () => {
-        // The interceptor toasts the reason. Put the stored placement back, so what
-        // is on screen is what would actually print.
-        this.design.update((d) => ({ ...d, poolArt: this.savedDesign()?.poolArt ?? { ...DEFAULT_POOL_ART } }));
+        // The interceptor toasts the reason. Put the stored values back, so what is
+        // on screen is what would actually print.
+        const s = this.savedDesign();
+        this.design.update((x) => ({
+          ...x,
+          pool: s?.pool ?? { ...DEFAULT_CARD_ADJUST },
+          poolBack: s?.poolBack ?? { ...DEFAULT_CARD_ADJUST },
+          poolArt: s?.poolArt ?? { ...DEFAULT_POOL_ART },
+        }));
         this.redraw();
       },
     });
@@ -533,7 +552,7 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     const moved = this.dragMoved;
     this.drag = null;
     this.dragMoved = false;
-    if (moved) this.savePoolArt();   // a click that moved nothing is not a change
+    if (moved) this.savePoolFacets();   // a click that moved nothing is not a change
   }
 
   /**
