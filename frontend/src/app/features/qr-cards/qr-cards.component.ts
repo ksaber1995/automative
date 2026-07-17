@@ -155,7 +155,16 @@ export class QrCardsComponent implements OnInit {
    * Only the FREE ones — a card already in a student's hand doesn't need
    * reprinting, and printing it twice is how two people end up scanning as one.
    */
-  async downloadZip(): Promise<void> {
+  /**
+   * The blank pool cards, as print-ready PNGs.
+   *
+   * `studentSideOnly` drops the shared academy face. The two faces are printed on
+   * different runs as often as not — the student side is one PNG per card because
+   * each carries its own QR, while the academy side is one image for the whole
+   * batch — so a printer doing only the fronts should not be handed a back to
+   * mistake for card number 1001.
+   */
+  async downloadZip(studentSideOnly = false): Promise<void> {
     const pool = this.cards().filter((c) => !c.studentId);
     if (!pool.length) {
       this.notify.warning(this.translate.instant('QR_CARDS.NONE_FREE'));
@@ -209,7 +218,7 @@ export class QrCardsComponent implements OnInit {
 
       // Both faces are agnostic, so the back is identical for the whole batch and
       // ships once rather than a thousand times.
-      if (design) {
+      if (design && !studentSideOnly) {
         try {
           zip.file('card-back.png', await renderAgnosticBackPng(design, companyName, canvas, images), { base64: true });
         } catch {
@@ -218,7 +227,7 @@ export class QrCardsComponent implements OnInit {
       }
 
       const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, 'qr-cards.zip');
+      saveAs(blob, studentSideOnly ? 'qr-cards-student-side.zip' : 'qr-cards.zip');
       this.notify.success(this.translate.instant('QR_CARDS.DOWNLOADED', { count: pool.length }));
     } catch {
       this.notify.error(this.translate.instant('QR_CARDS.DOWNLOAD_FAILED'));

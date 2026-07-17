@@ -8,6 +8,11 @@
       <p-button icon="pi pi-download" severity="secondary" [outlined]="true"
         [label]="'QR_CARDS.DOWNLOAD' | translate"
         [disabled]="!freeCount() || exporting()" (onClick)="downloadZip()"></p-button>
+      <!-- The fronts on their own: one PNG per card, no shared academy face. -->
+      <p-button icon="pi pi-id-card" severity="secondary" [text]="true"
+        [label]="'QR_CARDS.DOWNLOAD_FRONT_ONLY' | translate"
+        [pTooltip]="'QR_CARDS.DOWNLOAD_FRONT_ONLY_HINT' | translate"
+        [disabled]="!freeCount() || exporting()" (onClick)="downloadZip(true)"></p-button>
     </div>
   </div>
 

@@ -5004,6 +5004,8 @@
     "ALREADY_ON_STUDENT": "{{serial}} is already on this student",
     "ALREADY_LINKED_LIST": "Cards already linked to this student:",
     "SEARCH": "Search a card or a student",
-    "CUSTOM_ART_MISSING": "Your own card design is missing one of its sides. Upload both on the Card Design page before downloading."
+    "CUSTOM_ART_MISSING": "Your own card design is missing one of its sides. Upload both on the Card Design page before downloading.",
+    "DOWNLOAD_FRONT_ONLY": "Student side only",
+    "DOWNLOAD_FRONT_ONLY_HINT": "Just the QR side — one image per card, without the shared academy side."
   }
 }

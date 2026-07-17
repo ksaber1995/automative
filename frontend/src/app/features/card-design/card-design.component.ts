@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
@@ -59,6 +60,8 @@ export class CardDesignComponent implements OnInit {
   private companyService = inject(CompanyService);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
@@ -85,9 +88,20 @@ export class CardDesignComponent implements OnInit {
    * so switching to it has to repaint them — redraw() is a no-op for a canvas that
    * isn't in the DOM, and the panel renders one tick after the value changes.
    */
+  // Mirrored into ?tab= so a refresh lands back where you were, and so the tab can
+  // be linked to. Read once on init rather than subscribed: nothing outside this
+  // component changes the tab, and a subscription would fight setTab's own write.
   activeTab = signal<'students' | 'pool'>('students');
   setTab(v: string): void {
-    this.activeTab.set(v === 'pool' ? 'pool' : 'students');
+    const tab = v === 'pool' ? 'pool' : 'students';
+    this.activeTab.set(tab);
+    // replaceUrl: a tab is a view preference, not a place. Pushing history would
+    // make Back walk through every tab you clicked instead of leaving the page.
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      replaceUrl: true,
+    });
     setTimeout(() => this.redraw());
   }
   readonly agnosticTemplates = AGNOSTIC_TEMPLATES;
@@ -159,19 +173,36 @@ export class CardDesignComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Restore the tab before the first paint, so a refresh lands where you were.
+    if (this.route.snapshot.queryParamMap.get('tab') === 'pool') this.activeTab.set('pool');
+
     this.companyService.getCardDesign().subscribe({
       next: (d) => {
         this.design.set(this.pad(d));
         this.savedDesign.set(d);
         this.loading.set(false);
-        this.redraw();
+        this.paint();
       },
       error: () => {
         // Interceptor toasted the translated error.
         this.loading.set(false);
-        this.redraw();
+        this.paint();
       },
     });
+  }
+
+  /**
+   * First paint after the design lands.
+   *
+   * The tab panels only exist once `loading` is false, and the pool's panel renders
+   * a tick after that — the same reason setTab defers. redraw() is a no-op for a
+   * canvas that is not in the DOM yet, so a refresh straight onto ?tab=pool would
+   * paint nothing and leave two blank cards. Draw now for the students tab, and
+   * again next tick for whichever panel has just mounted.
+   */
+  private paint(): void {
+    this.redraw();
+    setTimeout(() => this.redraw());
   }
 
   /**
