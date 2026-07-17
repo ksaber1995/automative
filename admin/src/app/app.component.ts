@@ -631,7 +631,13 @@ type LicSortCol =
               confused with a student's own code. The academy downloads and prints them itself.
             </p>
             <input class="search" type="number" min="1" max="2000" [(ngModel)]="qrCount" placeholder="How many?" />
-            <select class="search" [ngModel]="qrPoolType()" (ngModelChange)="qrPoolType.set(+$event)">
+            <!--
+              setPoolType, not qrPoolType.set(+$event): <option [value]="t"> hands back
+              a STRING and PoolType is 1 | 2 | 3, so the inline version needed a widening
+              the compiler rejects (TS2345) — which is what got the whole handler deleted,
+              taking the picker's only effect with it. The narrowing lives in the class.
+            -->
+            <select class="search" [ngModel]="qrPoolType()" (ngModelChange)="setPoolType($event)">
               @for (t of poolTypes; track t) {
                 <option [value]="t">Type {{ t }}</option>
               }
@@ -1490,6 +1496,21 @@ export class AppComponent implements OnInit {
   // printed before types existed reads as.
   readonly poolTypes = POOL_TYPES;
   qrPoolType = signal<PoolType>(1);
+
+  /**
+   * Narrow the <select>'s value to a real PoolType.
+   *
+   * The select hands back a STRING, and PoolType is 1 | 2 | 3, so the obvious inline
+   * `qrPoolType.set(+$event)` does not compile — it widens to number. Validating here
+   * against POOL_TYPES rather than casting means an unexpected value falls back to 1
+   * (what every card printed before types existed reads as) instead of stamping the
+   * run with something the API will reject.
+   */
+  setPoolType(value: unknown): void {
+    const n = Number(value);
+    const match = POOL_TYPES.find((t) => t === n);
+    this.qrPoolType.set(match ?? 1);
+  }
   // Two-step, and reset every time the dialog opens: this one is not undoable.
   qrDeleteArmed = signal(false);
   qrDeleteLinked = signal(false);
