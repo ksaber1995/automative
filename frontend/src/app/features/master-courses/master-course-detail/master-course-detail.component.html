@@ -212,7 +212,12 @@
     [header]="'MASTER_COURSES.ADD_COURSE.TITLE' | translate"
     [style]="{ width: '480px' }"
   >
-    <p class="text-gray-600 mb-4">{{ 'MASTER_COURSES.ADD_COURSE.DESC' | translate }}</p>
+    <p class="text-gray-600 mb-2">{{ 'MASTER_COURSES.ADD_COURSE.DESC' | translate }}</p>
+    <!-- Says WHY the list is short, rather than leaving a monthly course looking
+         mislaid. The API filters the list and rejects the save; this is the reason. -->
+    <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+      <i class="pi pi-info-circle mr-1"></i>{{ 'MASTER_COURSES.ADD_COURSE.ONE_TIME_ONLY' | translate }}
+    </p>
     @if (loadingAvailable()) {
       <div class="text-center py-4"><i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i></div>
     } @else if ((available()?.length || 0) === 0) {

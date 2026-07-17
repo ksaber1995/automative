@@ -403,7 +403,8 @@
       "REMOVE_COURSE_FAILED": "Failed to remove course",
       "INSUFFICIENT_COURSES_PERMISSION": "You do not have permission to manage courses",
       "HAS_ENROLLMENTS": "This master course has subscribers and cannot be deleted. Deactivate it instead.",
-      "HAS_ACTIVE_COURSES": "Deactivate the linked courses (or finish their classes) before deactivating this bundle."
+      "HAS_ACTIVE_COURSES": "Deactivate the linked courses (or finish their classes) before deactivating this bundle.",
+      "COURSE_PAYMENT_TYPE": "Only one-time payment courses can be grouped into a master course. Monthly and per-session courses are billed on their own schedule, so they can't share a bundle price."
     },
     "MASTER_ENROLLMENTS": {
       "NOT_FOUND": "Master enrollment not found",
@@ -1908,7 +1909,8 @@
       "PLACEHOLDER": "Select a course",
       "NONE": "No eligible courses available.",
       "CANCEL": "Cancel",
-      "CONFIRM": "Add"
+      "CONFIRM": "Add",
+      "ONE_TIME_ONLY": "Only one-time payment courses can be added. A master course sells its courses as one bundle for one price, so monthly and per-session courses can't join yet."
     },
     "DELETED": "Master course deleted",
     "COURSE_ADDED": "Course added",

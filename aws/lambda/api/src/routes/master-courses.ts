@@ -37,6 +37,30 @@ function mapWithCounts(row: any) {
   };
 }
 
+/**
+ * The only payment type a master course can group, for now.
+ *
+ * A master sells its members as one bundle for one price (see master_enrollments),
+ * which only has meaning if every member is charged the same way. A
+ * MONTHLY_SUBSCRIPTION course renews on its own clock and a PER_SESSION course
+ * bills off attendance — neither can answer "what does this bundle cost", so a
+ * bundle mixing them has no single price to sell.
+ *
+ * Widening this is the whole job of supporting other types: give a master its own
+ * payment_type and require its members to match it, rather than deleting the check.
+ *
+ * NOTE: enforced for NEW links only. Links made before this rule existed are left
+ * alone — a live master with a paid enrolment is not something to rewrite from a
+ * deploy. Prod had exactly one such master ("diploma of robotics", all three types)
+ * when this landed.
+ */
+const BUNDLEABLE_PAYMENT_TYPE = 'ONE_TIME';
+
+function isBundleable(paymentType: unknown): boolean {
+  // Legacy rows predate the column's NOT NULL DEFAULT and read as one-time.
+  return (paymentType ?? 'ONE_TIME') === BUNDLEABLE_PAYMENT_TYPE;
+}
+
 export const masterCoursesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -374,6 +398,21 @@ export const masterCoursesRoutes = {
         return apiError(400, 'ERRORS.MASTER_COURSES.COURSE_BRANCH_MISMATCH', 'Course must be in the same branch as the master course');
       }
 
+      // A master course sells its members as ONE bundle for ONE price, so its
+      // members have to be charged the same way — and today that way is one-time.
+      // A monthly course renews on its own schedule and a per-session course bills
+      // off attendance; neither has an answer to "what did this bundle cost".
+      // Mixing them is what this rejects. See availableCourses, which does not
+      // offer them in the first place — this is the guard that actually holds,
+      // because the picker is not the only thing that can call this.
+      if (!isBundleable(course.payment_type)) {
+        return apiError(
+          400,
+          'ERRORS.MASTER_COURSES.COURSE_PAYMENT_TYPE',
+          'Only one-time payment courses can be grouped into a master course'
+        );
+      }
+
       await query(
         `INSERT INTO master_course_courses (master_course_id, course_id)
          VALUES ($1, $2)
@@ -433,15 +472,19 @@ export const masterCoursesRoutes = {
         return apiError(403, 'ERRORS.MASTER_COURSES.ACCESS_DENIED', 'Access denied to this master course');
       }
 
+      // payment_type filtered here as well as in addCourse: this list is what the
+      // picker shows, and offering a course that the save would then reject is a
+      // worse experience than not offering it. addCourse stays the real guard.
       const rows = await query(
         `SELECT id, name, price
          FROM courses
          WHERE company_id = $1 AND branch_id = $2 AND is_active = true
+           AND payment_type = $4
            AND id NOT IN (
              SELECT course_id FROM master_course_courses WHERE master_course_id = $3
            )
          ORDER BY name ASC`,
-        [context.companyId, master.branch_id, master.id]
+        [context.companyId, master.branch_id, master.id, BUNDLEABLE_PAYMENT_TYPE]
       );
       return {
         status: 200 as const,
