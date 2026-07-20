@@ -1172,11 +1172,17 @@ export class StudentDetailComponent implements OnInit {
   linkCardVisible = signal(false);
   linkedCards = signal<QrCard[]>([]);
   linkingCard = signal(false);
-  linkSerial: number | null = null;
+  /**
+   * The one link field. It takes anything printed on the card: the serial number,
+   * the raw QR token, OR a full scanned profile URL. The dialog autofocuses it, so
+   * a USB scanner (which the global capture ignores while a field is focused —
+   * see the layout's keydown guard) types straight into here and Enter submits.
+   */
+  linkInput = '';
   cardLabel = serialLabel;
 
   openLinkCard(): void {
-    this.linkSerial = null;
+    this.linkInput = '';
     this.linkCardVisible.set(true);
     // While this is open a scan links the card, instead of falling through to the
     // global "find student / take attendance" behaviour.
@@ -1200,13 +1206,30 @@ export class StudentDetailComponent implements OnInit {
     this.linkCard({ token });
   }
 
-  linkBySerial(): void {
-    const serial = Number(this.linkSerial);
-    if (!Number.isInteger(serial) || serial < 1) {
-      this.notificationService.error(this.translate.instant('QR_CARDS.BAD_SERIAL'));
+  /**
+   * Link from whatever is in the field — typed or scanned. A scanned QR is the
+   * profile URL, so reduce it to its token; a bare number is the printed serial;
+   * anything else is treated as a raw token.
+   */
+  linkByInput(): void {
+    const raw = (this.linkInput || '').trim();
+    if (!raw || this.linkingCard()) return;
+
+    if (raw.includes('/p/s/')) {
+      const token = this.globalScan.extractToken(raw);
+      if (token) this.linkCard({ token });
       return;
     }
-    this.linkCard({ serial });
+    if (/^\d+$/.test(raw)) {
+      const serial = Number(raw);
+      if (serial < 1) {
+        this.notificationService.error(this.translate.instant('QR_CARDS.BAD_SERIAL'));
+        return;
+      }
+      this.linkCard({ serial });
+      return;
+    }
+    this.linkCard({ token: raw });
   }
 
   private linkCard(by: { token?: string; serial?: number }): void {
