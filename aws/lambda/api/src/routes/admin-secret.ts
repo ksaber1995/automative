@@ -1,6 +1,6 @@
 import { randomInt } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { CARD_SERIAL_BASE, ensureQrCardSchema } from './qr-cards';
+import { ensureQrCardSchema, nextCardSerial } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
 import { ensureOfflineLicenseTable } from '../utils/ensure-offline-license';
@@ -617,13 +617,9 @@ export const adminSecretRoutes = {
         return { status: 400 as const, body: { message: 'poolType must be 1, 2 or 3' } };
       }
 
-      const last = await queryOne<any>(
-        'SELECT COALESCE(MAX(serial), 0) AS last FROM qr_cards WHERE company_id = $1',
-        [params.companyId],
-      );
-      // Never below the reserved base — that range is what keeps card serials from
-      // colliding with the academy's own student codes. See CARD_SERIAL_BASE.
-      const from = Math.max(parseInt(last?.last ?? '0', 10), CARD_SERIAL_BASE) + 1;
+      // New cards mint in the V2 range and print "0N"; the number continues from
+      // the last card. The reserved range keeps serials clear of student codes.
+      const from = await nextCardSerial(params.companyId);
 
       const rows = await query<any>(
         `INSERT INTO qr_cards (company_id, token, serial, pool_type)

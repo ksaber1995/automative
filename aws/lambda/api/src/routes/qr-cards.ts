@@ -126,19 +126,45 @@ const MAX_BATCH = 2000;
 export const CARD_SERIAL_BASE = 100000;
 
 /**
+ * NEW-style pool cards live in a SECOND reserved range and print their number with
+ * a leading zero ("05") instead of the "A" prefix. Cards minted from now on land
+ * here; the "A" cards already printed (100000+) are left exactly as they were, so
+ * nothing in anyone's pocket changes meaning. Kept clear of both the organic codes
+ * (< 100000) and the old card range. Mirrors CARD_SERIAL_BASE_V2 in the frontend.
+ */
+export const CARD_SERIAL_BASE_V2 = 900000;
+
+/**
  * A code as typed, turned back into the integer stored in student_code.
  *
- * A card prints its number as "A5" — short, and unmistakably a card. The leading
- * "A" IS the reserved range: A5 means card 5, i.e. student_code 100005, and must
- * never resolve to the student whose own code happens to be 5. Cards printed
- * before the short form ("A-100001") already carry the full number, so anything
- * already inside the reserved range is taken as absolute, not shifted twice.
+ * A card prints its number short and unmistakable: "A5" for an old card, "05" for
+ * a new one. The prefix IS the reserved range — "A5" means card 5 = 100005, "05"
+ * means card 5 = 900005 — and must never resolve to the student whose own code is
+ * 5. A value already at/above a base is taken as absolute, not shifted twice.
  */
 export function codeDigits(code: string | number): number {
   const raw = String(code).trim();
   const n = parseInt(raw.replace(/\D/g, ''), 10);
   if (!Number.isFinite(n)) return NaN;
-  return /^[Aa]/.test(raw) && n < CARD_SERIAL_BASE ? CARD_SERIAL_BASE + n : n;
+  if (/^[Aa]/.test(raw) && n < CARD_SERIAL_BASE) return CARD_SERIAL_BASE + n;
+  if (/^0\d/.test(raw) && n < CARD_SERIAL_BASE) return CARD_SERIAL_BASE_V2 + n;
+  return n;
+}
+
+/**
+ * The serial the next minted card should get. New cards are minted in the V2 range
+ * (they print "0N"); the card NUMBER continues on from the highest existing card,
+ * old or new, so a company that had "A50" gets "051" next — the count never resets.
+ */
+export async function nextCardSerial(companyId: string): Promise<number> {
+  const row = await queryOne<any>(
+    `SELECT COALESCE(MAX(CASE WHEN serial >= ${CARD_SERIAL_BASE_V2} THEN serial - ${CARD_SERIAL_BASE_V2}
+                              WHEN serial >  ${CARD_SERIAL_BASE}    THEN serial - ${CARD_SERIAL_BASE}
+                              ELSE 0 END), 0) AS lastn
+     FROM qr_cards WHERE company_id = $1`,
+    [companyId],
+  );
+  return CARD_SERIAL_BASE_V2 + parseInt(row?.lastn ?? '0', 10) + 1;
 }
 
 function mapCard(row: any) {
@@ -172,14 +198,9 @@ export const qrCardsRoutes = {
         return apiError(400, 'ERRORS.QR_CARDS.BAD_COUNT', `Ask for between 1 and ${MAX_BATCH} cards`);
       }
 
-      // Serials continue from the last batch (so a reprint never collides with a
-      // card already in someone's pocket) but never below the reserved base, which
-      // is what keeps them clear of the students' own codes.
-      const last = await queryOne<any>(
-        'SELECT COALESCE(MAX(serial), 0) AS last FROM qr_cards WHERE company_id = $1',
-        [context.companyId],
-      );
-      const from = Math.max(parseInt(last?.last ?? '0', 10), CARD_SERIAL_BASE) + 1;
+      // New cards are minted in the V2 range (they print "0N"); the number continues
+      // from the last card so a reprint never collides with one already in a pocket.
+      const from = await nextCardSerial(context.companyId);
 
       // One statement: generate_series makes the serials, uuid makes the tokens.
       const rows = await query<any>(

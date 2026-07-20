@@ -25,7 +25,7 @@ import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
 import { StudentService } from '../services/student.service';
-import { formatStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
+import { CARD_SERIAL_BASE, formatStudentCode, normalizeStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -1215,20 +1215,21 @@ export class StudentDetailComponent implements OnInit {
     const raw = (this.linkInput || '').trim();
     if (!raw || this.linkingCard()) return;
 
+    // A scanned card QR is the profile URL — reduce it to its token.
     if (raw.includes('/p/s/')) {
       const token = this.globalScan.extractToken(raw);
       if (token) this.linkCard({ token });
       return;
     }
-    if (/^\d+$/.test(raw)) {
-      const serial = Number(raw);
-      if (serial < 1) {
-        this.notificationService.error(this.translate.instant('QR_CARDS.BAD_SERIAL'));
-        return;
-      }
+    // Otherwise it's the code printed on the card — "A5", "05", "051", or the full
+    // serial. normalizeStudentCode turns any of those into the stored serial.
+    const serial = Number(normalizeStudentCode(raw));
+    if (Number.isInteger(serial) && serial > CARD_SERIAL_BASE) {
       this.linkCard({ serial });
       return;
     }
+    // Not a recognisable card number — treat the raw value as a token (a hand-typed
+    // token from a damaged QR); the API will reject it if it isn't one.
     this.linkCard({ token: raw });
   }
 
