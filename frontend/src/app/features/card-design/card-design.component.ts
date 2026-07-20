@@ -18,7 +18,7 @@ import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
   DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
-  renderAgnosticBackPng, renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
+  renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../students/card-agnostic.util';
@@ -66,7 +66,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewPoolFront') previewPoolFrontCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('previewPoolBack') previewPoolBackCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
   saving = signal(false);
@@ -384,13 +383,12 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   /** The placement in force, clamped — a stored design may predate the field. */
   artLayout = computed<PoolArtLayout>(() => clampPoolArt(this.design().poolArt));
 
-  /** Both faces are required before a pool ZIP can be printed. */
+  /** The front artwork is required before a pool ZIP can be printed. */
   customReady = computed(() => canExportCustom(this.design()));
 
-  /** The two artwork slots, so the upload block is written once rather than twice. */
+  /** The artwork slot(s). Pool cards are front-only, so just the front. */
   readonly artFields: { key: 'artFront' | 'artBack'; label: string }[] = [
     { key: 'artFront', label: 'CARD_DESIGN.ART_FRONT' },
-    { key: 'artBack', label: 'CARD_DESIGN.ART_BACK' },
   ];
 
   setArt<K extends keyof PoolArtLayout>(key: K, value: PoolArtLayout[K]): void {
@@ -626,22 +624,18 @@ export class CardDesignComponent implements OnInit, OnDestroy {
           await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images, d);
         }
 
-        // The pool card, both faces. Its serial is a sample — the real ones come
+        // The pool card is front-only. Its serial is a sample — the real ones come
         // from the pool — but everything else is exactly what gets printed.
         const poolFront = this.previewPoolFrontCanvas?.nativeElement;
-        const poolBack = this.previewPoolBackCanvas?.nativeElement;
-        if (poolFront || poolBack) {
+        if (poolFront) {
           const images = await loadCardImages(d);
           const company = d.teacherName || '';
-          if (poolFront) {
-            await renderAgnosticCardPng(
-              { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
-              poolFront, this.agnostic(), images, d,
-            );
-          }
-          if (poolBack) await renderAgnosticBackPng(d, company, poolBack, images);
+          await renderAgnosticCardPng(
+            { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
+            poolFront, this.agnostic(), images, d,
+          );
           // AFTER the render, and only in the editor — see paintArtHandles.
-          if (poolFront && this.isCustomPool()) this.paintArtHandles(poolFront);
+          if (this.isCustomPool()) this.paintArtHandles(poolFront);
         }
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
@@ -753,8 +747,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
         { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
         canvas, t, images, { ...d, agnosticTemplate: t },
       ), `pool-${t}-front.png`);
-
-      save(await renderAgnosticBackPng({ ...d, agnosticTemplate: t }, company, canvas, images), `pool-${t}-back.png`);
     } catch {
       this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
     } finally {

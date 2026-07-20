@@ -527,35 +527,20 @@
                       (pointerup)="onArtPointerUp($event)"
                       (pointercancel)="onArtPointerUp($event)"></canvas>
 
-              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-6 mb-2">
-                {{ 'CARD_DESIGN.PREVIEW_POOL_BACK' | translate }}
-              </p>
-              <canvas #previewPoolBack class="w-full h-auto rounded-xl shadow-lg border border-gray-200"></canvas>
-              <p class="text-xs text-gray-400 mt-2">{{ 'CARD_DESIGN.PREVIEW_POOL_NOTE' | translate }}</p>
-
               @if (isCustomPool()) {
                 <p class="text-xs text-gray-500 mt-2">
                   <i class="pi pi-arrows-alt"></i> {{ 'CARD_DESIGN.ART_PLACE_HINT' | translate }}
                 </p>
               }
 
-              <!-- Two panels, one per FACE. Both pool faces carry a logo, so a single
-                   set of offsets moved both at once. Colours hang off the front's panel
-                   and apply to the whole card. -->
+              <!-- The pool card is front-only; one tuning panel for that face.
+                   Colours hang off it and apply to the whole card. -->
               <ng-container *ngTemplateOutlet="tuning; context: {
                 $implicit: 'pool',
                 title: 'CARD_DESIGN.TUNE_TITLE_POOL_FRONT',
                 hint: 'CARD_DESIGN.TUNE_HINT_POOL_FRONT',
                 showPhoto: false,
                 showColors: true
-              }"></ng-container>
-
-              <ng-container *ngTemplateOutlet="tuning; context: {
-                $implicit: 'poolBack',
-                title: 'CARD_DESIGN.TUNE_TITLE_POOL_BACK',
-                hint: 'CARD_DESIGN.TUNE_HINT_POOL_BACK',
-                showPhoto: true,
-                showColors: false
               }"></ng-container>
             </div>
             </p-card>

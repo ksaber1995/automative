@@ -19,7 +19,7 @@ import { formatStudentCode } from '../../core/utils/student-code.util';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { canExportCustom, loadCardImages, renderAgnosticBackPng, renderAgnosticCardPng } from '../students/card-render.util';
+import { canExportCustom, loadCardImages, renderAgnosticCardPng } from '../students/card-render.util';
 import { AgnosticCardData, AgnosticTemplate } from '../students/card-agnostic.util';
 
 /**
@@ -156,15 +156,10 @@ export class QrCardsComponent implements OnInit {
    * reprinting, and printing it twice is how two people end up scanning as one.
    */
   /**
-   * The blank pool cards, as print-ready PNGs.
-   *
-   * `studentSideOnly` drops the shared academy face. The two faces are printed on
-   * different runs as often as not — the student side is one PNG per card because
-   * each carries its own QR, while the academy side is one image for the whole
-   * batch — so a printer doing only the fronts should not be handed a back to
-   * mistake for card number 1001.
+   * The blank pool cards, as print-ready PNGs — one per card, each carrying its
+   * own QR and serial. Pool cards are front-only, so there is no shared back face.
    */
-  async downloadZip(studentSideOnly = false): Promise<void> {
+  async downloadZip(): Promise<void> {
     const pool = this.cards().filter((c) => !c.studentId);
     if (!pool.length) {
       this.notify.warning(this.translate.instant('QR_CARDS.NONE_FREE'));
@@ -216,18 +211,8 @@ export class QrCardsComponent implements OnInit {
         if (done % 5 === 0) await new Promise((r) => setTimeout(r));
       }
 
-      // Both faces are agnostic, so the back is identical for the whole batch and
-      // ships once rather than a thousand times.
-      if (design && !studentSideOnly) {
-        try {
-          zip.file('card-back.png', await renderAgnosticBackPng(design, companyName, canvas, images), { base64: true });
-        } catch {
-          console.warn('Card back skipped — could not render the design.');
-        }
-      }
-
       const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, studentSideOnly ? 'qr-cards-student-side.zip' : 'qr-cards.zip');
+      saveAs(blob, 'qr-cards.zip');
       this.notify.success(this.translate.instant('QR_CARDS.DOWNLOADED', { count: pool.length }));
     } catch {
       this.notify.error(this.translate.instant('QR_CARDS.DOWNLOAD_FAILED'));
