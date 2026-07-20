@@ -612,10 +612,28 @@ export class CourseDetailComponent implements OnInit {
     }
   }
 
-  formatSchedule(schedule: any): string {
-    if (!schedule) return 'N/A';
-    const days = schedule.days.join(', ');
-    return `${days} ${schedule.startTime} - ${schedule.endTime}`;
+  formatSchedule(cls: any): string {
+    const short = (d: string) => (d || '').trim().slice(0, 3);
+    const hm = (t: string) => (t || '').slice(0, 5);
+    const dayTimes = cls?.dayTimes as { day: string; startTime: string; endTime: string }[] | undefined;
+
+    if (dayTimes && dayTimes.length) {
+      const distinct = new Set(dayTimes.map(d => `${d.startTime}-${d.endTime}`));
+      // All days share one time → "SAT, MON 10:00 - 11:00".
+      if (distinct.size === 1) {
+        const days = dayTimes.map(d => short(d.day)).join(', ');
+        return `${days} ${hm(dayTimes[0].startTime)} - ${hm(dayTimes[0].endTime)}`;
+      }
+      // Different time per day → list each: "SAT 10:00-11:00, MON 12:00-13:00".
+      return dayTimes.map(d => `${short(d.day)} ${hm(d.startTime)}-${hm(d.endTime)}`).join(', ');
+    }
+
+    // Fallback to the legacy envelope fields when no per-day rows are present.
+    if (cls?.daysOfWeek && cls?.startTime) {
+      const days = String(cls.daysOfWeek).split(',').map((d: string) => short(d)).join(', ');
+      return `${days} ${hm(cls.startTime)} - ${hm(cls.endTime)}`;
+    }
+    return this.translate.instant('CLASSES.DETAIL.NOT_AVAILABLE');
   }
 
   formatDate(date: string): string {
