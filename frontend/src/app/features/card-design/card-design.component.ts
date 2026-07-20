@@ -18,7 +18,7 @@ import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
   DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
-  renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
+  renderAgnosticCardPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../students/card-agnostic.util';
@@ -63,14 +63,12 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
-  @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewPoolFront') previewPoolFrontCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
   saving = signal(false);
   savingTemplate = signal(false);
-  downloading = signal(false);
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
   /** Last design the server confirmed — the base for a template-only save. */
   savedDesign = signal<CardDesign | null>(null);
@@ -255,15 +253,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   /** Any field edit -> patch the model and repaint the preview. */
   set<K extends keyof CardDesign>(key: K, value: CardDesign[K]) {
     this.design.update((d) => ({ ...d, [key]: value }));
-    this.redraw();
-  }
-
-  setListItem(key: 'instructions' | 'highlights', index: number, value: string) {
-    this.design.update((d) => {
-      const list = [...d[key]];
-      list[index] = value;
-      return { ...d, [key]: list };
-    });
     this.redraw();
   }
 
@@ -612,13 +601,10 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     requestAnimationFrame(async () => {
       this.redrawPending = false;
       const d = this.design();
-      const back = this.previewCanvas?.nativeElement;
       const front = this.previewFrontCanvas?.nativeElement;
       try {
-        if (back) await renderCardBackPng(d, back);
         // The student side is not editable — it is rendered from sample data so
-        // you can see the look and feel the students will actually get. The photo
-        // and logo ARE the teacher's own, so the preview shows them for real.
+        // you can see the look and feel the students will actually get.
         if (front) {
           const images = await loadCardImages(d);
           await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images, d);
@@ -641,25 +627,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }
     });
-  }
-
-  /**
-   * Download the back face on its own, as the print-ready PNG. Renders from the
-   * CURRENT form state (not the saved copy), so what you see is what you get
-   * even with unsaved edits.
-   */
-  async downloadPng() {
-    this.downloading.set(true);
-    try {
-      const canvas = document.createElement('canvas');
-      const base64 = await renderCardBackPng(this.design(), canvas);
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      saveAs(new Blob([bytes], { type: 'image/png' }), 'card-back.png');
-    } catch {
-      this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
-    } finally {
-      this.downloading.set(false);
-    }
   }
 
   /** Strip the empty slots the form pads out; the server re-applies defaults. */
