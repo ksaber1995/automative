@@ -139,8 +139,9 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
     let firstBillId: string | null = null;
     let guard = 0; // safety bound: never loop more than 120 months
     while ((y < endY || (y === endY && m <= endM)) && guard < 120) {
-      const due = new Date(y, m, 0); // day 0 of next month = last day of month m
-      const dueStr = due.toISOString().split('T')[0];
+      // Due date is the first day of the billing month (y = year, m = 1-based month).
+      // Built as a plain string so it is never shifted a day by a UTC conversion.
+      const dueStr = `${y}-${String(m).padStart(2, '0')}-01`;
       const qFn = client || { query: (s: string, p: any[]) => query(s, p).then(r => ({ rows: r })) };
       const billRes = await (qFn as any).query(
         `INSERT INTO monthly_subscription_payments

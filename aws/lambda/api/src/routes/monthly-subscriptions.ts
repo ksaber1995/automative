@@ -163,9 +163,9 @@ async function recalcBillsForCourseMonth(
  *
  * amount_due mirrors the old JS maths: a course price override for the month is
  * scaled by the enrollment's own discount ratio (final_price / course price).
- * due_date is the last day of the billing month, computed in SQL — the old code
- * built it from a LOCAL Date and then serialised with toISOString(), which on any
- * server east of UTC lands a day early.
+ * due_date is the first day of the billing month, computed in SQL — building it
+ * from a LOCAL Date and serialising with toISOString() would, on any server east
+ * of UTC, land a day early.
  */
 export async function ensureBillsForMonth(
   companyId: string,
@@ -191,7 +191,7 @@ export async function ensureBillsForMonth(
            THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
          ELSE COALESCE(e.final_price, c.price)
        END,
-       0, 'PENDING', period.last_day
+       0, 'PENDING', period.first_day
      FROM enrollments e
      JOIN courses c ON c.id = e.course_id
      CROSS JOIN period
@@ -256,9 +256,9 @@ export const monthlySubscriptionsRoutes = {
 
       const { billingYear, billingMonth, courseId, branchId } = body;
 
-      // due_date = last day of the billing month
-      const dueDate = new Date(billingYear, billingMonth, 0); // day 0 = last day of prev month
-      const dueDateStr = dueDate.toISOString().split('T')[0];
+      // due_date = first day of the billing month (built as a plain string so a
+      // UTC conversion can never shift it a day early on servers east of UTC).
+      const dueDateStr = `${billingYear}-${String(billingMonth).padStart(2, '0')}-01`;
 
       // Build query to find active enrollments in monthly-subscription courses.
       // If a price override exists for this course+month, scale the enrollment fee
