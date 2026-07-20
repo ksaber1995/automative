@@ -127,12 +127,19 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
     }
 
     // Generate one bill per calendar month from the start month → current month.
+    // A future enrollment (the class starts next month) still needs its FIRST month
+    // billed, so the up-front payment has a bill to land on — never end before the
+    // start month.
     const start = new Date(body.enrollmentDate);
     const startY = start.getFullYear();
     const startM = start.getMonth() + 1; // 1-based
     const now = new Date();
-    const endY = now.getFullYear();
-    const endM = now.getMonth() + 1;
+    let endY = now.getFullYear();
+    let endM = now.getMonth() + 1;
+    if (startY > endY || (startY === endY && startM > endM)) {
+      endY = startY;
+      endM = startM;
+    }
 
     let y = startY;
     let m = startM;
