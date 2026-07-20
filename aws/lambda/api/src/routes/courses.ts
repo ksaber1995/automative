@@ -3,6 +3,7 @@ import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPerm
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensurePerSessionSchema } from './session-payments';
 import { ensureLevelSchema } from './levels';
+import { ensureSubjectSchema } from './subjects';
 
 // Aggregates every level linked to a course (via the course_levels join) into a
 // JSON array. Aliased `c` must be the courses row in the surrounding query.
@@ -12,6 +13,15 @@ const LEVELS_SUBQUERY = `COALESCE((
   JOIN levels l2 ON cl2.level_id = l2.id
   WHERE cl2.course_id = c.id
 ), '[]'::json) AS levels_json`;
+
+// Aggregates every subject linked to a course (via the course_subjects join) into
+// a JSON array. Aliased `c` must be the courses row in the surrounding query.
+const SUBJECTS_SUBQUERY = `COALESCE((
+  SELECT json_agg(json_build_object('id', s2.id, 'name', s2.name) ORDER BY s2.name ASC)
+  FROM course_subjects cs2
+  JOIN subjects s2 ON cs2.subject_id = s2.id
+  WHERE cs2.course_id = c.id
+), '[]'::json) AS subjects_json`;
 
 function mapCourseFromDB(row: any) {
   let levels: { id: string; name: string | null }[] = [];
@@ -23,6 +33,12 @@ function mapCourseFromDB(row: any) {
   // course created from a master template before it was ever edited).
   if (levels.length === 0 && row.level_id) {
     levels = [{ id: row.level_id, name: row.level_name ?? null }];
+  }
+
+  let subjects: { id: string; name: string | null }[] = [];
+  const rawSubjects = row.subjects_json;
+  if (rawSubjects != null) {
+    subjects = typeof rawSubjects === 'string' ? JSON.parse(rawSubjects) : rawSubjects;
   }
 
   return {
@@ -37,6 +53,8 @@ function mapCourseFromDB(row: any) {
     levelName: row.level_name ?? (levels[0]?.name ?? null),
     levelIds: levels.map((l) => l.id),
     levels,
+    subjectIds: subjects.map((s) => s.id),
+    subjects,
     isActive: row.is_active,
     paymentType: row.payment_type || 'ONE_TIME',
     sessionPackageSize: row.session_package_size ?? null,
@@ -71,10 +89,32 @@ async function setCourseLevels(courseId: string, levelIds: string[]) {
   }
 }
 
-// Re-read a course with its aggregated levels for a complete response body.
+// The subject ids a create/update body wants on a course.
+function resolveSubjectIds(body: any): string[] {
+  if (Array.isArray(body.subjectIds)) {
+    return [...new Set(body.subjectIds.filter(Boolean) as string[])];
+  }
+  return [];
+}
+
+// Replace a course's subject links with exactly `subjectIds`.
+async function setCourseSubjects(courseId: string, subjectIds: string[]) {
+  await query('DELETE FROM course_subjects WHERE course_id = $1', [courseId]);
+  const unique = [...new Set(subjectIds.filter(Boolean))];
+  if (unique.length > 0) {
+    await query(
+      `INSERT INTO course_subjects (course_id, subject_id)
+       SELECT $1, unnest($2::uuid[])
+       ON CONFLICT (course_id, subject_id) DO NOTHING`,
+      [courseId, unique]
+    );
+  }
+}
+
+// Re-read a course with its aggregated levels + subjects for a complete response body.
 async function fetchCourseWithLevels(id: string, companyId: string) {
   return queryOne(
-    `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
+    `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}, ${SUBJECTS_SUBQUERY}
      FROM courses c
      LEFT JOIN levels l ON c.level_id = l.id
      WHERE c.id = $1 AND c.company_id = $2`,
@@ -108,8 +148,10 @@ export const coursesRoutes = {
       // PER_SESSION courses need the widened payment_type CHECK + settings columns.
       if (body.paymentType === 'PER_SESSION') await ensurePerSessionSchema();
       await ensureLevelSchema();
+      await ensureSubjectSchema();
 
       const levelIds = resolveLevelIds(body);
+      const subjectIds = resolveSubjectIds(body);
 
       const course = await insert('courses', {
         company_id: context.companyId,
@@ -128,6 +170,7 @@ export const coursesRoutes = {
       });
 
       await setCourseLevels(course.id, levelIds);
+      await setCourseSubjects(course.id, subjectIds);
 
       const full = await fetchCourseWithLevels(course.id, context.companyId);
       return {
@@ -148,12 +191,14 @@ export const coursesRoutes = {
       }
 
       await ensureLevelSchema();
+      await ensureSubjectSchema();
 
       let sql = `
         SELECT
           c.*,
           l.name as level_name,
           ${LEVELS_SUBQUERY},
+          ${SUBJECTS_SUBQUERY},
           COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as direct_enrollment_count,
           COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
@@ -196,8 +241,9 @@ export const coursesRoutes = {
       }
 
       await ensureLevelSchema();
+      await ensureSubjectSchema();
 
-      let sql = `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
+      let sql = `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}, ${SUBJECTS_SUBQUERY}
         FROM courses c
         LEFT JOIN levels l ON c.level_id = l.id
         WHERE c.company_id = $1 AND c.is_active = true`;
@@ -235,9 +281,10 @@ export const coursesRoutes = {
       }
 
       await ensureLevelSchema();
+      await ensureSubjectSchema();
 
       const course = await queryOne(
-        `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}
+        `SELECT c.*, l.name as level_name, ${LEVELS_SUBQUERY}, ${SUBJECTS_SUBQUERY}
          FROM courses c
          LEFT JOIN levels l ON c.level_id = l.id
          WHERE c.id = $1 AND c.company_id = $2`,
@@ -269,9 +316,10 @@ export const coursesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      // The response re-reads the course with its aggregated levels, so the join
-      // table must exist regardless of whether this request changes the levels.
+      // The response re-reads the course with its aggregated levels + subjects, so
+      // the join tables must exist regardless of whether this request changes them.
       await ensureLevelSchema();
+      await ensureSubjectSchema();
 
       const existing = await queryOne(
         'SELECT * FROM courses WHERE id = $1 AND company_id = $2',
@@ -318,6 +366,9 @@ export const coursesRoutes = {
         updateData.level_id = newLevelIds[0] ?? null;
       }
 
+      // Subject links: only rewritten when `subjectIds` is present in the body.
+      const subjectsProvided = body.subjectIds !== undefined;
+
       const course = Object.keys(updateData).length > 0
         ? await update('courses', params.id, updateData)
         : existing;
@@ -328,6 +379,10 @@ export const coursesRoutes = {
 
       if (levelsProvided) {
         await setCourseLevels(params.id, newLevelIds);
+      }
+
+      if (subjectsProvided) {
+        await setCourseSubjects(params.id, resolveSubjectIds(body));
       }
 
       const full = await fetchCourseWithLevels(params.id, context.companyId);

@@ -544,7 +544,7 @@ export const monthlySubscriptionsRoutes = {
       // over-reports. The money columns are read from EVERY row regardless —
       // cash already collected does not stop existing because someone left.
       const rows = await query(
-        `SELECT msp.student_id, msp.payment_status, msp.due_date, msp.amount_due, msp.amount_paid,
+        `SELECT msp.student_id, msp.payment_status, msp.due_date, msp.amount_due, msp.amount_paid, msp.refunded_amount,
                 (e.status = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing
          FROM monthly_subscription_payments msp
          JOIN enrollments e ON e.id = msp.enrollment_id
@@ -557,7 +557,7 @@ export const monthlySubscriptionsRoutes = {
       today.setHours(0, 0, 0, 0);
 
       let paidCount = 0, pendingCount = 0, overdueCount = 0, partialCount = 0;
-      let totalRevenue = 0, totalExpected = 0;
+      let totalRevenue = 0, totalExpected = 0, totalRefunded = 0;
       // Students, not bills: one student enrolled on two monthly courses is one
       // student with two bills, and used to be counted twice.
       const billedStudents = new Set<string>();
@@ -565,15 +565,18 @@ export const monthlySubscriptionsRoutes = {
       for (const r of rows) {
         if (r.is_live_billing) billedStudents.add(r.student_id);
         const status = resolveStatus(r);
+        const refunded = parseFloat(r.refunded_amount || 0);
+        totalRefunded += refunded;
         // Refunded bills count only their net retained revenue (gross amount_paid
         // minus what was refunded); they are not "expected" and don't belong in
         // the pending/overdue buckets.
         if (status === 'REFUNDED') {
-          totalRevenue += parseFloat(r.amount_paid || 0) - parseFloat(r.refunded_amount || 0);
+          totalRevenue += parseFloat(r.amount_paid || 0) - refunded;
           continue;
         }
         totalExpected += parseFloat(r.amount_due);
-        totalRevenue += parseFloat(r.amount_paid || 0);
+        // Net of any partial refund recorded against a still-active bill.
+        totalRevenue += parseFloat(r.amount_paid || 0) - refunded;
         if (status === 'PAID') paidCount++;
         else if (status === 'PARTIAL') partialCount++;
         else if (status === 'OVERDUE') overdueCount++;
@@ -593,6 +596,7 @@ export const monthlySubscriptionsRoutes = {
           partialCount,
           totalRevenue,
           totalExpected,
+          totalRefunded,
         },
       };
     } catch (error) {
@@ -623,13 +627,18 @@ export const monthlySubscriptionsRoutes = {
       const currentPaid = parseFloat(row.amount_paid || 0);
       const newPaid = currentPaid + parseFloat(body.amount);
 
+      // Any cash collected needs a paid_date: dashboard/report revenue is bucketed by
+      // it, so a PARTIAL payment left with a null date is money that never surfaces as
+      // revenue. Stamp both PAID and PARTIAL, defaulting to today when the client omits it.
+      const effectiveDate = body.paymentDate || new Date().toISOString().split('T')[0];
       let newStatus: string;
       let paidDate: string | null = null;
       if (newPaid >= amountDue) {
         newStatus = 'PAID';
-        paidDate = body.paymentDate;
+        paidDate = effectiveDate;
       } else if (newPaid > 0) {
         newStatus = 'PARTIAL';
+        paidDate = effectiveDate;
       } else {
         newStatus = 'PENDING';
       }

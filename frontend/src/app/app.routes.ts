@@ -71,6 +71,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/levels/level-list/level-list.component').then(m => m.LevelListComponent)
       },
       {
+        path: 'subjects',
+        // Academy-only feature: notTeacherGuard bounces TEACHER companies, matching
+        // the sidebar entry (hidden for teachers) and the course-form dropdown.
+        canActivate: [notTeacherGuard],
+        data: { breadcrumb: 'BREADCRUMBS.SUBJECTS' },
+        loadComponent: () => import('./features/subjects/subject-list/subject-list.component').then(m => m.SubjectListComponent)
+      },
+      {
         path: 'events',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.EVENTS' },

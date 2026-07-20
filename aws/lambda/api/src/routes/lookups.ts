@@ -99,6 +99,15 @@ export const lookupsRoutes = {
     }
   },
 
+  subjects: async ({ headers }: { headers: { authorization: string } }) => {
+    try {
+      return await runLookup(headers.authorization, () =>
+        `SELECT id, name AS label FROM subjects WHERE company_id = $1 ORDER BY name ASC`);
+    } catch (error) {
+      return mapThrownError(error, 'ERRORS.LOOKUPS.FAILED', 'Failed to load lookups');
+    }
+  },
+
   rooms: async ({ headers, query: q }: { headers: { authorization: string }; query?: { branchId?: string } }) => {
     try {
       return await runLookup(headers.authorization, (ctx, params) => {

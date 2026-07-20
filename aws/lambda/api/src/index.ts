@@ -17,6 +17,7 @@ import { studentsRoutes } from './routes/students';
 import { branchesRoutes } from './routes/branches';
 import { coursesRoutes } from './routes/courses';
 import { levelsRoutes } from './routes/levels';
+import { subjectsRoutes } from './routes/subjects';
 import { masterCoursesRoutes } from './routes/master-courses';
 import { masterEnrollmentsRoutes } from './routes/master-enrollments';
 import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments';
@@ -76,6 +77,7 @@ const router = {
   branches: branchesRoutes,
   courses: coursesRoutes,
   levels: levelsRoutes,
+  subjects: subjectsRoutes,
   masterCourses: { ...masterCoursesRoutes, listEnrollments: masterEnrollmentsRoutes.listByMaster },
   // Route order matters — specific paths first, before `/:id`.
   masterEnrollments: {
@@ -232,6 +234,7 @@ const router = {
     courses: lookupsRoutes.courses,
     classes: lookupsRoutes.classes,
     levels: lookupsRoutes.levels,
+    subjects: lookupsRoutes.subjects,
     rooms: lookupsRoutes.rooms,
     masterCourses: lookupsRoutes.masterCourses,
     students: lookupsRoutes.students,

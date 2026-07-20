@@ -1151,6 +1151,57 @@ async function createLevelsFeature() {
   return { success: true, message: 'levels table created; level_id added to courses and master_courses' };
 }
 
+async function createSubjectsFeature() {
+  console.log('Starting migration: subjects table + course_subjects join');
+
+  // 0) Ensure the shared updated_at trigger function exists. Idempotent.
+  await query(`
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql'
+  `);
+
+  // 1) subjects table (id + name only)
+  await query(`
+    CREATE TABLE IF NOT EXISTS subjects (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_subjects_company_id ON subjects(company_id)`);
+  await query(`DROP TRIGGER IF EXISTS update_subjects_updated_at ON subjects`);
+  await query(`
+    CREATE TRIGGER update_subjects_updated_at
+      BEFORE UPDATE ON subjects
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+  `);
+  console.log('✓ subjects table ready');
+
+  // 2) course_subjects join (a course can be tagged with several subjects)
+  await query(`
+    CREATE TABLE IF NOT EXISTS course_subjects (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (course_id, subject_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_course_subjects_course ON course_subjects(course_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_course_subjects_subject ON course_subjects(subject_id)`);
+  console.log('✓ course_subjects join ready');
+
+  console.log('✅ subjects migration completed!');
+  return { success: true, message: 'subjects table + course_subjects join created' };
+}
+
 async function addGenderToStudents() {
   console.log('Starting migration: add gender to students');
 
@@ -1660,6 +1711,21 @@ export const migrationsRoutes = {
   addGenderToStudents: async () => {
     try {
       const result = await addGenderToStudents();
+      return { status: 200 as const, body: result };
+    } catch (error) {
+      return {
+        status: 500 as const,
+        body: {
+          success: false,
+          message: 'Migration failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  },
+  createSubjectsFeature: async () => {
+    try {
+      const result = await createSubjectsFeature();
       return { status: 200 as const, body: result };
     } catch (error) {
       return {

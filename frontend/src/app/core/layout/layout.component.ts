@@ -290,6 +290,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // permission check of its own — the Admin group is already global-admin gated.
       { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: true },
+      // Subjects are academy-only — hidden for teacher accounts (same gate as the
+      // /subjects route's notTeacherGuard and the course-form dropdown).
+      { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/subjects'], visible: !auth.isTeacher() },
       // Shared back face of the printed ID cards — a company-wide setting, and
       // isGlobalAdmin() (which gates this whole group) is exactly who the API lets
       // save it, so it sits with Settings rather than with the students.

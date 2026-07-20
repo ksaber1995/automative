@@ -594,6 +594,7 @@
     "COURSE_CLASSES": "المجموعات",
     "MASTER_COURSES": "عروض الكورسات",
     "LEVELS": "المراحل الدراسية",
+    "SUBJECTS": "المواد الدراسية",
     "EVENTS": "الفعاليات",
     "CLASSES": "المجموعات",
     "CLASSES_CREATE": "إنشاء مجموعة",
@@ -755,6 +756,8 @@
     "PAID": "مدفوع",
     "OVERDUE": "متأخر",
     "COLLECTED": "المحصّل",
+    "COLLECTED_NET": "المحصّل (بعد الاسترداد)",
+    "REFUNDED_TOTAL": "المسترد",
     "DUE_DATE": "تاريخ الاستحقاق",
     "AMOUNT_DUE": "المبلغ المستحق",
     "AMOUNT_PAID": "المبلغ المدفوع",
@@ -1170,6 +1173,7 @@
     "SESSION_PAYMENTS": "مدفوعات الحصص",
     "MASTER_COURSES": "عروض الكورسات",
     "LEVELS": "المراحل الدراسية",
+    "SUBJECTS": "المواد الدراسية",
     "EVENTS": "الفعاليات",
     "CLASSES": "المجموعات",
     "ROOMS": "الغرف",
@@ -1805,6 +1809,33 @@
       "UPDATE_SUCCESS": "تم تحديث المرحلة الدراسية"
     }
   },
+  "SUBJECTS": {
+    "LIST": {
+      "TITLE": "المواد الدراسية",
+      "ADD": "إضافة مادة",
+      "COL_NAME": "الاسم",
+      "COL_ACTIONS": "الإجراءات",
+      "EDIT": "تعديل",
+      "DELETE": "حذف",
+      "NO_SUBJECTS": "لا توجد مواد بعد. أضف مادة لتصنيف الكورسات حسب المادة.",
+      "DELETE_TITLE": "حذف المادة",
+      "DELETE_MSG": "حذف \"{{name}}\"؟ سيتم فقط إلغاء ربط الكورسات المرتبطة بهذه المادة.",
+      "DELETED": "تم حذف المادة",
+      "LOAD_ERROR": "فشل تحميل المواد الدراسية"
+    },
+    "FORM": {
+      "CREATE_TITLE": "إضافة مادة",
+      "EDIT_TITLE": "تعديل المادة",
+      "NAME_LABEL": "الاسم",
+      "NAME_PLACEHOLDER": "مثال: الرياضيات",
+      "NAME_REQUIRED": "الاسم مطلوب (حرفان على الأقل)",
+      "CANCEL": "إلغاء",
+      "CREATE": "إنشاء",
+      "UPDATE": "تحديث",
+      "CREATE_SUCCESS": "تم إنشاء المادة",
+      "UPDATE_SUCCESS": "تم تحديث المادة"
+    }
+  },
   "MASTER_COURSES": {
     "WEEKS": "أسابيع",
     "ACTIVE": "نشط",
@@ -2096,6 +2127,9 @@
       "LEVEL_LABEL": "المراحل الدراسية (اختياري)",
       "LEVEL_PLACEHOLDER": "اختر مرحلة أو أكثر",
       "LEVELS_SELECTED": "تم اختيار {0} مراحل",
+      "SUBJECT_LABEL": "المواد الدراسية (اختياري)",
+      "SUBJECT_PLACEHOLDER": "اختر مادة أو أكثر",
+      "SUBJECTS_SELECTED": "تم اختيار {0} مواد",
       "DESCRIPTION_LABEL": "الوصف",
       "DESCRIPTION_PLACEHOLDER": "وصف الكورس...",
       "CANCEL": "إلغاء",

@@ -208,6 +208,27 @@
             ></p-multiSelect>
           </div>
 
+          <!-- Subjects (academy only — hidden for teacher accounts) -->
+          @if (!authService.isTeacher()) {
+          <div class="col-span-2">
+            <label for="subjectIds" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'COURSES.FORM.SUBJECT_LABEL' | translate }}
+            </label>
+            <p-multiSelect
+              id="subjectIds"
+              formControlName="subjectIds"
+              [options]="subjects()"
+              optionLabel="label"
+              optionValue="id"
+              [maxSelectedLabels]="2"
+              [selectedItemsLabel]="'COURSES.FORM.SUBJECTS_SELECTED' | translate"
+              [placeholder]="'COURSES.FORM.SUBJECT_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+            ></p-multiSelect>
+          </div>
+          }
+
           <!-- Description -->
           <div class="col-span-2">
             <label for="description" class="block text-sm font-medium text-gray-700 mb-2">

@@ -478,6 +478,29 @@ const CourseLevelSchema = z.object({
 });
 
 // =============================================
+// Subject Schemas
+// =============================================
+const CreateSubjectSchema = z.object({
+  name: z.string(),
+});
+
+const UpdateSubjectSchema = CreateSubjectSchema.partial();
+
+const SubjectSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// A subject as embedded on a course response (id + display name).
+const CourseSubjectSchema = z.object({
+  id: UUIDSchema,
+  name: z.string().nullable(),
+});
+
+// =============================================
 // Course Schemas
 // =============================================
 const CreateCourseSchema = z.object({
@@ -490,6 +513,8 @@ const CreateCourseSchema = z.object({
   // Legacy single level (kept for back-compat) and the new multi-level array.
   levelId: OptionalUUIDSchema,
   levelIds: z.array(UUIDSchema).optional(),
+  // Subjects a course is tagged with (academy-only in the UI).
+  subjectIds: z.array(UUIDSchema).optional(),
   // Payment model: ONE_TIME (default), MONTHLY_SUBSCRIPTION, or PER_SESSION. Without
   // this the field is stripped from the request body and every course saves as ONE_TIME.
   paymentType: CoursePaymentTypeSchema.optional(),
@@ -696,6 +721,8 @@ const CourseSchema = z.object({
   levelName: z.string().nullable().optional(),
   levelIds: z.array(UUIDSchema).optional(),
   levels: z.array(CourseLevelSchema).optional(),
+  subjectIds: z.array(UUIDSchema).optional(),
+  subjects: z.array(CourseSubjectSchema).optional(),
   isActive: z.boolean(),
   enrollmentCount: z.number().optional(),
   paymentType: CoursePaymentTypeSchema.default('ONE_TIME'),
@@ -769,6 +796,7 @@ const MonthlyPaymentSummarySchema = z.object({
   partialCount: z.number(),
   totalRevenue: z.number(),
   totalExpected: z.number(),
+  totalRefunded: z.number(),
 });
 
 const RecordMonthlyPaymentSchema = z.object({
@@ -1850,6 +1878,10 @@ export const contract = c.router({
       method: 'GET', path: '/api/lookups/levels',
       responses: { 200: LookupListSchema },
     },
+    subjects: {
+      method: 'GET', path: '/api/lookups/subjects',
+      responses: { 200: LookupListSchema },
+    },
     rooms: {
       method: 'GET', path: '/api/lookups/rooms',
       query: z.object({ branchId: OptionalUUIDSchema }),
@@ -2313,6 +2345,55 @@ export const contract = c.router({
     delete: {
       method: 'DELETE',
       path: '/api/levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Subjects routes
+  subjects: {
+    create: {
+      method: 'POST',
+      path: '/api/subjects',
+      body: CreateSubjectSchema,
+      responses: {
+        201: SubjectSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/subjects',
+      responses: {
+        200: z.array(SubjectSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/subjects/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SubjectSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/subjects/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateSubjectSchema,
+      responses: {
+        200: SubjectSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/subjects/:id',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
@@ -5384,6 +5465,22 @@ export const contract = c.router({
     addGenderToStudents: {
       method: 'POST',
       path: '/api/migrations/add-gender-to-students',
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        500: z.object({
+          success: z.boolean(),
+          message: z.string(),
+          error: z.string().optional(),
+        }),
+      },
+    },
+    createSubjectsFeature: {
+      method: 'POST',
+      path: '/api/migrations/create-subjects',
       body: z.object({}).optional(),
       responses: {
         200: z.object({

@@ -55,6 +55,10 @@ export class LookupService {
     return this.api.get<LookupOption[]>('lookups/levels');
   }
 
+  subjects(): Observable<LookupOption[]> {
+    return this.api.get<LookupOption[]>('lookups/subjects');
+  }
+
   rooms(branchId?: string): Observable<LookupOption[]> {
     return this.api.get<LookupOption[]>('lookups/rooms', branchId ? { branchId } : undefined);
   }

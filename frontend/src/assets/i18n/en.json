@@ -594,6 +594,7 @@
     "COURSE_CLASSES": "Classes",
     "MASTER_COURSES": "Master Courses",
     "LEVELS": "Levels",
+    "SUBJECTS": "Subjects",
     "EVENTS": "Events",
     "CLASSES": "Classes",
     "CLASSES_CREATE": "Create Class",
@@ -755,6 +756,8 @@
     "PAID": "Paid",
     "OVERDUE": "Overdue",
     "COLLECTED": "Collected",
+    "COLLECTED_NET": "Collected (after refund)",
+    "REFUNDED_TOTAL": "Refunded",
     "DUE_DATE": "Due Date",
     "AMOUNT_DUE": "Amount Due",
     "AMOUNT_PAID": "Amount Paid",
@@ -1168,6 +1171,7 @@
     "COURSES": "Courses",
     "MASTER_COURSES": "Master Courses",
     "LEVELS": "Levels",
+    "SUBJECTS": "Subjects",
     "EVENTS": "Events",
     "CLASSES": "Classes",
     "ROOMS": "Rooms",
@@ -1805,6 +1809,33 @@
       "UPDATE_SUCCESS": "Level updated"
     }
   },
+  "SUBJECTS": {
+    "LIST": {
+      "TITLE": "Subjects",
+      "ADD": "Add Subject",
+      "COL_NAME": "Name",
+      "COL_ACTIONS": "Actions",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "NO_SUBJECTS": "No subjects yet. Add one to tag courses by subject.",
+      "DELETE_TITLE": "Delete Subject",
+      "DELETE_MSG": "Delete \"{{name}}\"? Courses linked to this subject will simply be unlinked.",
+      "DELETED": "Subject deleted",
+      "LOAD_ERROR": "Failed to load subjects"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Subject",
+      "EDIT_TITLE": "Edit Subject",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g., Mathematics",
+      "NAME_REQUIRED": "Name is required (min 2 characters)",
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "CREATE_SUCCESS": "Subject created",
+      "UPDATE_SUCCESS": "Subject updated"
+    }
+  },
   "MASTER_COURSES": {
     "WEEKS": "weeks",
     "ACTIVE": "Active",
@@ -2096,6 +2127,9 @@
       "LEVEL_LABEL": "Levels (Optional)",
       "LEVEL_PLACEHOLDER": "Select one or more levels",
       "LEVELS_SELECTED": "{0} levels selected",
+      "SUBJECT_LABEL": "Subjects (Optional)",
+      "SUBJECT_PLACEHOLDER": "Select one or more subjects",
+      "SUBJECTS_SELECTED": "{0} subjects selected",
       "DESCRIPTION_LABEL": "Description",
       "DESCRIPTION_PLACEHOLDER": "Course description...",
       "CANCEL": "Cancel",

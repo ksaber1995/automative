@@ -68,6 +68,7 @@ export interface MonthlyPaymentSummary {
   partialCount: number;
   totalRevenue: number;
   totalExpected: number;
+  totalRefunded: number;
 }
 
 export interface RecordMonthlyPaymentDto {

@@ -53,6 +53,7 @@ export class CourseFormComponent implements OnInit {
   employees = signal<LookupOption[]>([]);
   rooms = signal<LookupOption[]>([]);
   levels = signal<LookupOption[]>([]);
+  subjects = signal<LookupOption[]>([]);
 
   constructor() {
     this.courseForm = this.fb.group({
@@ -64,6 +65,7 @@ export class CourseFormComponent implements OnInit {
       instructorId: [''],
       defaultRoomId: [null],
       levelIds: [[] as string[]],
+      subjectIds: [[] as string[]],
       // PER_SESSION settings:
       chargeAbsentSessions: [false],
       sessionPackageSize: [null],
@@ -75,6 +77,9 @@ export class CourseFormComponent implements OnInit {
     this.loadBranches();
     this.loadEmployees();
     this.loadLevels();
+    // Subjects are an academy-only concept — teachers never see the dropdown, so
+    // don't bother fetching the lookup for them.
+    if (!this.authService.isTeacher()) this.loadSubjects();
     this.courseId = this.route.snapshot.paramMap.get('id');
     if (this.courseId) {
       this.isEditMode.set(true);
@@ -96,6 +101,13 @@ export class CourseFormComponent implements OnInit {
   loadLevels() {
     this.lookupService.levels().subscribe({
       next: (l) => this.levels.set(l),
+      error: () => {},
+    });
+  }
+
+  loadSubjects() {
+    this.lookupService.subjects().subscribe({
+      next: (s) => this.subjects.set(s),
       error: () => {},
     });
   }
@@ -139,6 +151,7 @@ export class CourseFormComponent implements OnInit {
           instructorId: course.instructorId || '',
           defaultRoomId: (course as any).defaultRoomId || null,
           levelIds: course.levels?.map(l => l.id) ?? (course.levelId ? [course.levelId] : []),
+          subjectIds: course.subjects?.map(s => s.id) ?? course.subjectIds ?? [],
           chargeAbsentSessions: (course as any).chargeAbsentSessions ?? false,
           sessionPackageSize: (course as any).sessionPackageSize ?? null,
           sessionPackagePrice: (course as any).sessionPackagePrice ?? null,
