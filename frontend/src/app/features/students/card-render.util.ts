@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import { CardDesign, composeAdjust } from '@shared/interfaces/card-design.interface';
 import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE, tuneTheme } from './card-theme';
 import {
-  CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
+  CardImages, PRINT_H, PRINT_W, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
 } from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
@@ -18,7 +18,7 @@ import { drawCustomBack, drawCustomFront } from './card-custom.util';
  * come from the same template.
  */
 
-export { CARD_W, CARD_H, DESIGN_W, DESIGN_H } from './student-card.util';
+export { CARD_W, CARD_H, CARD_BLEED, PRINT_W, PRINT_H, DESIGN_W, DESIGN_H } from './student-card.util';
 export { canExportCustom } from './card-custom.util';
 export type { StudentCardData } from './student-card.util';
 export { currentAcademicYear } from './student-card.util';
@@ -64,15 +64,21 @@ async function qrImage(url: string): Promise<HTMLImageElement> {
 }
 
 function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
+  // The image is the card PLUS a 0.5 cm white cut margin on every side; the draw
+  // functions place the card centred in it via the bleed offset baked into
+  // bgTransform/contentTransform.
+  canvas.width = PRINT_W;
+  canvas.height = PRINT_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable');
   // The bulk export reuses ONE canvas for every student, and the draw functions
   // leave a scale transform behind. Reset it, or the next card would be drawn
   // through it a second time.
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, CARD_W, CARD_H);
+  // Paint the whole sheet white first: that IS the cut margin, and it also fills
+  // the rounded-corner gaps the card leaves at its edges.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, PRINT_W, PRINT_H);
   return ctx;
 }
 

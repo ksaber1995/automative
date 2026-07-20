@@ -17,7 +17,7 @@ import {
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
-  DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
+  CARD_BLEED, DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
   renderAgnosticBackPng, renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
@@ -481,13 +481,20 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   /** True once a pointerdown has actually moved something worth saving. */
   private dragMoved = false;
 
-  /** Client px -> design px. The artwork is full-bleed, so the canvas IS design space. */
+  /**
+   * Client px -> design px. The canvas is the card wrapped in a 0.5 cm white cut
+   * margin (CARD_BLEED px on every side), so back out that margin before scaling
+   * the remaining card region onto design space. Canvas bitmaps stretch to fill
+   * the element, so each axis maps independently regardless of display size.
+   */
   private toDesign(ev: PointerEvent): { x: number; y: number } {
     const el = this.previewPoolFrontCanvas!.nativeElement;
     const r = el.getBoundingClientRect();
+    const cx = ((ev.clientX - r.left) / r.width) * el.width;   // -> canvas px
+    const cy = ((ev.clientY - r.top) / r.height) * el.height;
     return {
-      x: ((ev.clientX - r.left) / r.width) * DESIGN_W,
-      y: ((ev.clientY - r.top) / r.height) * DESIGN_H,
+      x: ((cx - CARD_BLEED) / (el.width - 2 * CARD_BLEED)) * DESIGN_W,
+      y: ((cy - CARD_BLEED) / (el.height - 2 * CARD_BLEED)) * DESIGN_H,
     };
   }
 
@@ -570,8 +577,13 @@ export class CardDesignComponent implements OnInit, OnDestroy {
 
     ctx.save();
     // The renderer leaves its own transform behind; take the canvas back to design
-    // space so these coordinates mean the same thing as the placement's do.
-    ctx.setTransform(canvas.width / DESIGN_W, 0, 0, canvas.height / DESIGN_H, 0, 0);
+    // space so these coordinates mean the same thing as the placement's do. The
+    // card sits inside a CARD_BLEED white cut margin, so match the renderer's
+    // offset — otherwise the handles drift off the artwork.
+    ctx.setTransform(
+      (canvas.width - 2 * CARD_BLEED) / DESIGN_W, 0, 0,
+      (canvas.height - 2 * CARD_BLEED) / DESIGN_H, CARD_BLEED, CARD_BLEED,
+    );
 
     const half = L.qrSize / 2;
     ctx.strokeStyle = '#6366f1';

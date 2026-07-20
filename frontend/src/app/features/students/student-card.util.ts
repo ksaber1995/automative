@@ -12,35 +12,47 @@ import { CardTheme, CARD_THEMES } from './card-theme';
  * side that no content may enter — a guillotined card loses a millimetre or two,
  * and a name or QR clipped off the edge makes the card useless.
  *
+ * The exported image is bigger than the card: a 0.5 cm WHITE cut margin (bleed)
+ * wraps the whole card on every side, so a sheet of these can be guillotined apart
+ * with room for the blade to wander without biting into the artwork. So there are
+ * three concentric bands — outer white cut margin, then the card edge, then the
+ * inner 0.5 cm content safe zone.
+ *
  * The artwork is still authored in the ORIGINAL 1016 × 638 space (every
  * coordinate below is in it). Two transforms map that space onto the print
- * canvas, so nothing had to be re-measured by hand:
+ * canvas, so nothing had to be re-measured by hand — both are shifted by the cut
+ * margin so the card sits centred in the white:
  *
- *   background → fills the whole card, bleeding off all four edges
- *   content    → fits inside the card minus the 0.5 cm margin
+ *   background → fills the whole card, bleeding off all four card edges
+ *   content    → fits inside the card minus the 0.5 cm safe zone
  *
- * So the panel and ribbons still run to the edge, while the text, photo, crest
+ * So the panel and ribbons still run to the card edge, while the text, photo, crest
  * and QR are guaranteed to sit inside the safe zone.
  */
 const CM = 300 / 2.54;                       // px per cm at 300 dpi ≈ 118.11
 export const CARD_W = Math.round(9 * CM);    // 1063 px = 9 cm
 export const CARD_H = Math.round(5.7 * CM);  //  673 px = 5.7 cm
 export const CARD_SAFE = Math.round(0.5 * CM); // 59 px = 0.5 cm
+export const CARD_BLEED = Math.round(0.5 * CM); // 59 px = 0.5 cm white cut margin
+
+/** Full exported image = card + a 0.5 cm white cut margin on every side. */
+export const PRINT_W = CARD_W + 2 * CARD_BLEED; // 1181 px = 10 cm
+export const PRINT_H = CARD_H + 2 * CARD_BLEED; //  791 px = 6.7 cm
 
 /** The space every drawing coordinate in these files is written in. */
 export const DESIGN_W = 1016;
 export const DESIGN_H = 638;
 
-/** Map design space onto the full card — art bleeds off every edge. */
+/** Map design space onto the full card — art bleeds off every card edge, inside the white margin. */
 export function bgTransform(ctx: CanvasRenderingContext2D): void {
-  ctx.setTransform(CARD_W / DESIGN_W, 0, 0, CARD_H / DESIGN_H, 0, 0);
+  ctx.setTransform(CARD_W / DESIGN_W, 0, 0, CARD_H / DESIGN_H, CARD_BLEED, CARD_BLEED);
 }
 
-/** Map design space inside the safe margin — no content can reach an edge. */
+/** Map design space inside the safe margin — no content can reach a card edge. */
 export function contentTransform(ctx: CanvasRenderingContext2D): void {
   const w = CARD_W - 2 * CARD_SAFE;
   const h = CARD_H - 2 * CARD_SAFE;
-  ctx.setTransform(w / DESIGN_W, 0, 0, h / DESIGN_H, CARD_SAFE, CARD_SAFE);
+  ctx.setTransform(w / DESIGN_W, 0, 0, h / DESIGN_H, CARD_BLEED + CARD_SAFE, CARD_BLEED + CARD_SAFE);
 }
 
 /**
