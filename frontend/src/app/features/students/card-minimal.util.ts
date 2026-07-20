@@ -19,16 +19,8 @@ function page(ctx: Ctx): void {
   ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 }
 
-function border(ctx: Ctx): void {
-  // Called after restore(), so it re-establishes the full-card transform itself —
-  // the hairline frame traces the card's real edge.
-  ctx.save();
-  bgTransform(ctx);
-  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 26);
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+function border(_ctx: Ctx): void {
+  // Outer card border removed on request — the card prints without an edge frame.
 }
 
 /** The teal spine down the left edge — the one strong colour on the front. */

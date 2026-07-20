@@ -660,14 +660,5 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   }
 
   ctx.restore();
-
-  // The card's edge frame — drawn after restore(), so it re-establishes the
-  // full-card transform and traces the real 9 x 5.7 cm edge.
-  ctx.save();
-  bgTransform(ctx);
-  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 30);
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+  // No outer edge frame — the card prints without a border.
 }

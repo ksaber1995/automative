@@ -184,15 +184,9 @@ function field(ctx: Ctx, p: Palette): void {
   ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 }
 
-/** The hairline edge, traced on the card's real border after the content restore. */
-function border(ctx: Ctx, p: Palette): void {
-  ctx.save();
-  bgTransform(ctx);
-  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 26);
-  ctx.strokeStyle = p.dark ? p.line : p.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+/** Outer card border removed on request — the card prints without an edge frame. */
+function border(_ctx: Ctx, _p: Palette): void {
+  /* no-op */
 }
 
 /**
