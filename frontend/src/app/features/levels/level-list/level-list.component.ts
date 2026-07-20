@@ -77,7 +77,8 @@ export class LevelListComponent implements OnInit {
     if (from !== null) return `${from}+`;
     if (to !== null) return `≤ ${to}`;
     if (level.age !== null && level.age !== undefined) return `${level.age}`;
-    return this.translate.instant('LEVELS.LIST.NO_AGE');
+    // No age set — show nothing rather than a placeholder.
+    return '';
   }
 
   ngOnInit() {
