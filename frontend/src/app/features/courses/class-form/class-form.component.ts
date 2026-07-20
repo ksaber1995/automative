@@ -73,6 +73,11 @@ export class ClassFormComponent implements OnInit {
   availabilityConflicts = signal<TeacherAvailabilityConflict[]>([]);
   checkingAvailability = signal(false);
 
+  // Per-day times. When sameTime is true the two single time inputs apply to every
+  // selected day; when false each selected day carries its own start/end in perDay.
+  sameTime = signal(true);
+  perDay: { [day: string]: { startTime: string; endTime: string } } = {};
+
   daysOfWeek = [
     { label: 'CLASSES.FORM.DAY_SUNDAY', value: 'SUNDAY' },
     { label: 'CLASSES.FORM.DAY_MONDAY', value: 'MONDAY' },
@@ -332,6 +337,18 @@ export class ClassFormComponent implements OnInit {
         // Parse daysOfWeek string (e.g., "MONDAY,WEDNESDAY") to array
         const daysArray = classData.daysOfWeek ? classData.daysOfWeek.split(',') : [];
 
+        // Per-day times: seed perDay and decide whether every day shares one time.
+        const dts = classData.dayTimes || [];
+        this.perDay = {};
+        for (const dt of dts) {
+          this.perDay[dt.day] = { startTime: (dt.startTime || '').slice(0, 5), endTime: (dt.endTime || '').slice(0, 5) };
+        }
+        const distinct = new Set(dts.map((d: any) => `${d.startTime}-${d.endTime}`));
+        this.sameTime.set(dts.length === 0 || distinct.size <= 1);
+        const shared = dts[0];
+        const sharedStart = shared ? (shared.startTime || '').slice(0, 5) : (classData.startTime || '');
+        const sharedEnd = shared ? (shared.endTime || '').slice(0, 5) : (classData.endTime || '');
+
         // If editing, set the courseId for potential display
         if (!this.courseId) {
           this.courseId = classData.courseId;
@@ -345,8 +362,8 @@ export class ClassFormComponent implements OnInit {
           instructorId: classData.instructorId,
           type: classData.type || 'OFFLINE',
           daysOfWeek: daysArray,
-          startTime: classData.startTime,
-          endTime: classData.endTime,
+          startTime: sharedStart,
+          endTime: sharedEnd,
           startDate: new Date(classData.startDate),
           endDate: new Date(classData.endDate),
           maxStudents: classData.maxStudents,
@@ -369,6 +386,14 @@ export class ClassFormComponent implements OnInit {
       if (!days.includes(day)) {
         this.classForm.patchValue({ daysOfWeek: [...days, day] });
       }
+      // Seed a newly-checked day from the single time inputs so per-day mode
+      // starts from the common time rather than blank.
+      if (!this.perDay[day]) {
+        this.perDay[day] = {
+          startTime: this.classForm.get('startTime')?.value || '',
+          endTime: this.classForm.get('endTime')?.value || '',
+        };
+      }
     } else {
       this.classForm.patchValue({ daysOfWeek: days.filter((d: string) => d !== day) });
     }
@@ -377,6 +402,39 @@ export class ClassFormComponent implements OnInit {
   isDaySelected(day: string): boolean {
     const days = this.classForm.get('daysOfWeek')?.value || [];
     return days.includes(day);
+  }
+
+  /** Selected days in weekday order (not click order). */
+  selectedDays(): string[] {
+    const days = this.classForm.get('daysOfWeek')?.value || [];
+    return this.daysOfWeek.map(d => d.value).filter(v => days.includes(v));
+  }
+
+  dayLabel(day: string): string {
+    return this.daysOfWeek.find(d => d.value === day)?.label || day;
+  }
+
+  perDayStart(day: string): string { return this.perDay[day]?.startTime || ''; }
+  perDayEnd(day: string): string { return this.perDay[day]?.endTime || ''; }
+  setPerDayStart(day: string, v: string) {
+    this.perDay[day] = { startTime: v, endTime: this.perDay[day]?.endTime || '' };
+  }
+  setPerDayEnd(day: string, v: string) {
+    this.perDay[day] = { startTime: this.perDay[day]?.startTime || '', endTime: v };
+  }
+
+  /** The per-day times to send: single time expanded across days, or each day's own. */
+  private buildDayTimes(): { day: string; startTime: string; endTime: string }[] {
+    const days = this.selectedDays();
+    if (this.sameTime()) {
+      const st = this.classForm.get('startTime')?.value;
+      const et = this.classForm.get('endTime')?.value;
+      if (!st || !et) return [];
+      return days.map(day => ({ day, startTime: st, endTime: et }));
+    }
+    return days
+      .filter(day => this.perDay[day]?.startTime && this.perDay[day]?.endTime)
+      .map(day => ({ day, startTime: this.perDay[day].startTime, endTime: this.perDay[day].endTime }));
   }
 
   /**
@@ -471,6 +529,14 @@ export class ClassFormComponent implements OnInit {
       ? formValue.daysOfWeek.join(',')
       : undefined;
 
+    // Per-day times. In per-day mode every selected day must carry a time.
+    const dayTimes = this.buildDayTimes();
+    if (!this.sameTime() && this.selectedDays().length > 0 && dayTimes.length !== this.selectedDays().length) {
+      this.notificationService.error(this.translate.instant('CLASSES.FORM.DAY_TIMES_REQUIRED'));
+      this.loading.set(false);
+      return;
+    }
+
     const classData: any = {
       courseId: targetCourseId,
       // branchId no longer sent — backend derives it from the course.
@@ -482,6 +548,7 @@ export class ClassFormComponent implements OnInit {
       startTime: formValue.startTime || undefined,
       endTime: formValue.endTime || undefined,
       daysOfWeek,
+      dayTimes: dayTimes.length ? dayTimes : undefined,
       maxStudents: formValue.maxStudents || undefined,
       notes: formValue.notes || undefined
     };

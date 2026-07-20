@@ -160,35 +160,84 @@
           <small class="text-gray-500">{{ 'CLASSES.FORM.DAYS_HINT' | translate }}</small>
         </div>
 
-        <!-- Start Time -->
-        <div class="field">
-          <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">
-            {{ 'CLASSES.FORM.START_TIME' | translate }}
-          </label>
-          <input
-            pInputText
-            type="time"
-            id="startTime"
-            formControlName="startTime"
-            class="w-full"
-            [class.ng-invalid]="classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched"
-            [class.ng-dirty]="classForm.get('startTime')?.touched" />
-        </div>
+        <!-- Same time for all days, or a time per day -->
+        @if (selectedDays().length > 0) {
+          <div class="field md:col-span-2">
+            <div class="flex items-center gap-2">
+              <p-checkbox
+                [ngModel]="sameTime()"
+                (ngModelChange)="sameTime.set($event)"
+                [ngModelOptions]="{standalone: true}"
+                [binary]="true"
+                inputId="sameTime">
+              </p-checkbox>
+              <label for="sameTime" class="text-sm">{{ 'CLASSES.FORM.SAME_TIME_ALL' | translate }}</label>
+            </div>
+          </div>
+        }
 
-        <!-- End Time -->
-        <div class="field">
-          <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">
-            {{ 'CLASSES.FORM.END_TIME' | translate }}
-          </label>
-          <input
-            pInputText
-            type="time"
-            id="endTime"
-            formControlName="endTime"
-            class="w-full"
-            [class.ng-invalid]="classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched"
-            [class.ng-dirty]="classForm.get('endTime')?.touched" />
-        </div>
+        @if (sameTime()) {
+          <!-- Start Time -->
+          <div class="field">
+            <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'CLASSES.FORM.START_TIME' | translate }}
+            </label>
+            <input
+              pInputText
+              type="time"
+              id="startTime"
+              formControlName="startTime"
+              class="w-full"
+              [class.ng-invalid]="classForm.get('startTime')?.invalid && classForm.get('startTime')?.touched"
+              [class.ng-dirty]="classForm.get('startTime')?.touched" />
+          </div>
+
+          <!-- End Time -->
+          <div class="field">
+            <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'CLASSES.FORM.END_TIME' | translate }}
+            </label>
+            <input
+              pInputText
+              type="time"
+              id="endTime"
+              formControlName="endTime"
+              class="w-full"
+              [class.ng-invalid]="classForm.get('endTime')?.invalid && classForm.get('endTime')?.touched"
+              [class.ng-dirty]="classForm.get('endTime')?.touched" />
+          </div>
+        } @else {
+          <!-- A start/end per selected day -->
+          <div class="field md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'CLASSES.FORM.PER_DAY_TIMES' | translate }}
+            </label>
+            <div class="flex flex-col gap-3">
+              @for (day of selectedDays(); track day) {
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:items-center">
+                  <span class="text-sm font-medium text-gray-700">{{ dayLabel(day) | translate }}</span>
+                  <input
+                    pInputText
+                    type="time"
+                    class="w-full"
+                    [ngModel]="perDayStart(day)"
+                    (ngModelChange)="setPerDayStart(day, $event)"
+                    [ngModelOptions]="{standalone: true}"
+                    [attr.aria-label]="('CLASSES.FORM.START_TIME' | translate) + ' — ' + (dayLabel(day) | translate)" />
+                  <input
+                    pInputText
+                    type="time"
+                    class="w-full"
+                    [ngModel]="perDayEnd(day)"
+                    (ngModelChange)="setPerDayEnd(day, $event)"
+                    [ngModelOptions]="{standalone: true}"
+                    [attr.aria-label]="('CLASSES.FORM.END_TIME' | translate) + ' — ' + (dayLabel(day) | translate)" />
+                </div>
+              }
+            </div>
+            <small class="text-gray-500">{{ 'CLASSES.FORM.PER_DAY_HINT' | translate }}</small>
+          </div>
+        }
 
         <!-- Start Date -->
         <div class="field">

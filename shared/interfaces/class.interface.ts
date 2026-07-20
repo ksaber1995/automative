@@ -1,6 +1,13 @@
 export type ClassStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'DONE';
 export type ClassType = 'ONLINE' | 'OFFLINE';
 
+// Per-day start/end time for a class. `day` is an UPPER weekday name (e.g. MONDAY).
+export interface ClassDayTime {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
 export interface Class {
   id: string;
   companyId: string;
@@ -13,6 +20,7 @@ export interface Class {
   startTime?: string;
   endTime?: string;
   daysOfWeek?: string;
+  dayTimes?: ClassDayTime[];
   maxStudents?: number;
   currentEnrollment: number;
   notes?: string;
@@ -35,6 +43,7 @@ export interface ClassCreateDto {
   startTime?: string;
   endTime?: string;
   daysOfWeek?: string;
+  dayTimes?: ClassDayTime[];
   maxStudents?: number;
   notes?: string;
   type?: ClassType;
@@ -50,6 +59,7 @@ export interface ClassUpdateDto {
   startTime?: string;
   endTime?: string;
   daysOfWeek?: string;
+  dayTimes?: ClassDayTime[];
   maxStudents?: number;
   notes?: string;
   type?: ClassType;

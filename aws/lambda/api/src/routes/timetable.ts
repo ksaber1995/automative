@@ -7,6 +7,7 @@ import {
   appendBranchSqlFilter,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensureClassDayTimesSchema } from './classes';
 
 const DAY_NAMES = [
   'SUNDAY',
@@ -102,8 +103,8 @@ export const timetableRoutes = {
           c.course_id,
           co.branch_id,
           c.instructor_id,
-          c.start_time,
-          c.end_time,
+          cdt.start_time AS start_time,
+          cdt.end_time AS end_time,
           c.days_of_week,
           c.start_date,
           c.end_date,
@@ -127,6 +128,8 @@ export const timetableRoutes = {
           r.code AS session_room_code
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
+        -- One row per day the class runs, carrying that day's own start/end time.
+        INNER JOIN class_day_times cdt ON cdt.class_id = c.id AND cdt.day_of_week = $3
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
         LEFT JOIN LATERAL (
@@ -140,11 +143,6 @@ export const timetableRoutes = {
         LEFT JOIN rooms r ON s.room_id = r.id
         WHERE co.company_id = $1
           AND c.is_active = true
-          AND c.start_time IS NOT NULL
-          AND c.end_time IS NOT NULL
-          AND c.days_of_week IS NOT NULL
-          AND c.days_of_week <> ''
-          AND POSITION($3 IN UPPER(c.days_of_week)) > 0
           AND (c.start_date IS NULL OR c.start_date <= $2::date)
           AND (c.end_date IS NULL OR c.end_date >= $2::date)
       `;
@@ -171,8 +169,9 @@ export const timetableRoutes = {
         sql += ` AND c.course_id = $${params.length}`;
       }
 
-      sql += ' ORDER BY c.start_time ASC, c.name ASC';
+      sql += ' ORDER BY cdt.start_time ASC, c.name ASC';
 
+      await ensureClassDayTimesSchema();
       const rows = await query(sql, params);
       const entries = rows.map((r: any) => mapEntry(r, date));
 

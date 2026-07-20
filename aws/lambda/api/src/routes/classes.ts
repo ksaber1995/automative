@@ -39,6 +39,108 @@ function normalizeClassType(value: any): 'ONLINE' | 'OFFLINE' {
   return upper === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
 }
 
+// ---- Per-day class times ------------------------------------------------
+// A class can run at a different start/end on each of its days. class_day_times
+// is the source of truth (one row per day); classes.days_of_week + start_time/
+// end_time are kept in sync (the day set, and the min-start/max-end envelope) so
+// legacy readers still work. Idempotent-runtime schema, mirrors ensureLevelSchema.
+let classDayTimesInitPromise: Promise<void> | null = null;
+export async function ensureClassDayTimesSchema(): Promise<void> {
+  if (!classDayTimesInitPromise) {
+    classDayTimesInitPromise = (async () => {
+      try {
+        await query(`CREATE TABLE IF NOT EXISTS class_day_times (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+          day_of_week VARCHAR(16) NOT NULL,
+          start_time TIME NOT NULL,
+          end_time TIME NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (class_id, day_of_week)
+        )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_class_day_times_class ON class_day_times(class_id)`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_class_day_times_day ON class_day_times(day_of_week)`);
+        // Backfill one row per (class, day) from the legacy single time so nothing
+        // changes until a class is edited. Idempotent via UNIQUE + DO NOTHING.
+        await query(`INSERT INTO class_day_times (class_id, day_of_week, start_time, end_time)
+          SELECT c.id, UPPER(TRIM(d)) AS day_of_week, c.start_time, c.end_time
+          FROM classes c,
+               LATERAL unnest(string_to_array(c.days_of_week, ',')) AS d
+          WHERE c.start_time IS NOT NULL AND c.end_time IS NOT NULL
+            AND c.days_of_week IS NOT NULL AND c.days_of_week <> '' AND TRIM(d) <> ''
+          ON CONFLICT (class_id, day_of_week) DO NOTHING`);
+      } catch (e) {
+        classDayTimesInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return classDayTimesInitPromise;
+}
+
+type DayTime = { day: string; startTime: string; endTime: string };
+
+// Aggregates a class's per-day times into a JSON array for the response body.
+// Aliased `c` must be the classes row in the surrounding query.
+const DAY_TIMES_SUBQUERY = `COALESCE((
+  SELECT json_agg(json_build_object('day', cdt.day_of_week, 'startTime', cdt.start_time, 'endTime', cdt.end_time) ORDER BY cdt.start_time ASC)
+  FROM class_day_times cdt
+  WHERE cdt.class_id = c.id
+), '[]'::json) AS day_times_json`;
+
+// The per-day times a create/update body wants. Prefers the explicit `dayTimes`
+// array; falls back to the legacy "one time for all listed days" shape.
+function resolveDayTimes(body: any): DayTime[] | null {
+  if (Array.isArray(body.dayTimes)) {
+    const seen = new Set<string>();
+    const out: DayTime[] = [];
+    for (const dt of body.dayTimes) {
+      const day = String(dt?.day || '').toUpperCase().trim();
+      if (!day || seen.has(day) || !dt?.startTime || !dt?.endTime) continue;
+      seen.add(day);
+      out.push({ day, startTime: dt.startTime, endTime: dt.endTime });
+    }
+    return out;
+  }
+  if (body.daysOfWeek && body.startTime && body.endTime) {
+    const days = String(body.daysOfWeek).split(',').map((d: string) => d.toUpperCase().trim()).filter(Boolean);
+    return days.map((day) => ({ day, startTime: body.startTime, endTime: body.endTime }));
+  }
+  return null;
+}
+
+// Replace a class's day-time rows with exactly `dayTimes`.
+async function setClassDayTimes(classId: string, dayTimes: DayTime[]) {
+  await query('DELETE FROM class_day_times WHERE class_id = $1', [classId]);
+  for (const dt of dayTimes) {
+    await query(
+      `INSERT INTO class_day_times (class_id, day_of_week, start_time, end_time)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (class_id, day_of_week) DO UPDATE SET start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time`,
+      [classId, dt.day, dt.startTime, dt.endTime]
+    );
+  }
+}
+
+// Current per-day times for a class, ordered by start.
+async function getClassDayTimes(classId: string): Promise<DayTime[]> {
+  const rows = await query(
+    `SELECT day_of_week, start_time, end_time FROM class_day_times WHERE class_id = $1 ORDER BY start_time ASC`,
+    [classId]
+  );
+  return rows.map((r: any) => ({ day: r.day_of_week, startTime: r.start_time, endTime: r.end_time }));
+}
+
+// Legacy class columns derived from the per-day times: the full day set, and the
+// overall time envelope (earliest start, latest end) for readers not yet migrated.
+function legacyColumnsFromDayTimes(dayTimes: DayTime[]) {
+  if (dayTimes.length === 0) return { days_of_week: null, start_time: null, end_time: null };
+  const days = dayTimes.map((d) => d.day).join(',');
+  const start = dayTimes.reduce((m, d) => (timeToMinutes(d.startTime) < timeToMinutes(m) ? d.startTime : m), dayTimes[0].startTime);
+  const end = dayTimes.reduce((m, d) => (timeToMinutes(d.endTime) > timeToMinutes(m) ? d.endTime : m), dayTimes[0].endTime);
+  return { days_of_week: days, start_time: start, end_time: end };
+}
+
 function timeToMinutes(time: string | null | undefined): number {
   if (!time) return 0;
   const [hh, mm] = String(time).split(':').map(Number);
@@ -89,6 +191,14 @@ async function loadClassForTenant(classId: string, companyId: string): Promise<a
   );
 }
 
+// Parse the aggregated day_times_json (string or already-parsed) into an array.
+function parseDayTimes(raw: any): DayTime[] {
+  if (raw == null) return [];
+  const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (!Array.isArray(arr)) return [];
+  return arr.map((d: any) => ({ day: d.day, startTime: d.startTime, endTime: d.endTime }));
+}
+
 function mapClassFromDB(row: any) {
   return {
     id: row.id,
@@ -102,6 +212,7 @@ function mapClassFromDB(row: any) {
     startTime: row.start_time,
     endTime: row.end_time,
     daysOfWeek: row.days_of_week,
+    dayTimes: parseDayTimes(row.day_times_json),
     maxStudents: row.max_students,
     currentEnrollment: row.current_enrollment || 0,
     notes: row.notes,
@@ -151,15 +262,24 @@ export const classesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
+      await ensureClassDayTimesSchema();
+
+      // Per-day times drive the legacy columns (day set + time envelope) so old
+      // readers stay correct; fall back to the raw body when no times are given.
+      const dayTimes = resolveDayTimes(body);
+      const legacy = dayTimes
+        ? legacyColumnsFromDayTimes(dayTimes)
+        : { days_of_week: body.daysOfWeek || null, start_time: body.startTime || null, end_time: body.endTime || null };
+
       const insertData = {
         course_id: body.courseId,
         instructor_id: body.instructorId || null,
         name: body.name,
         start_date: body.startDate,
         end_date: body.endDate,
-        start_time: body.startTime || null,
-        end_time: body.endTime || null,
-        days_of_week: body.daysOfWeek || null,
+        start_time: legacy.start_time,
+        end_time: legacy.end_time,
+        days_of_week: legacy.days_of_week,
         max_students: body.maxStudents || null,
         current_enrollment: 0,
         notes: body.notes || null,
@@ -168,6 +288,7 @@ export const classesRoutes = {
       };
 
       const classRecord = await insert('classes', insertData);
+      if (dayTimes) await setClassDayTimes(classRecord.id, dayTimes);
 
       return {
         status: 201 as const,
@@ -175,6 +296,7 @@ export const classesRoutes = {
           ...classRecord,
           company_id: course.company_id,
           branch_id: course.branch_id,
+          day_times_json: JSON.stringify(dayTimes ?? []),
         }),
       };
     } catch (error) {
@@ -436,7 +558,8 @@ export const classesRoutes = {
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
-          ) AS student_count
+          ) AS student_count,
+          ${DAY_TIMES_SUBQUERY}
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
@@ -444,6 +567,7 @@ export const classesRoutes = {
         WHERE c.id = $1 AND co.company_id = $2 AND c.deleted_at IS NULL
       `;
 
+      await ensureClassDayTimesSchema();
       const result = await query(sql, [params.id, context.companyId]);
 
       if (!result || result.length === 0) {
@@ -482,6 +606,7 @@ export const classesRoutes = {
         return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED_UPDATE', 'Access denied to update this class');
       }
 
+      await ensureClassDayTimesSchema();
       const updateData: any = {};
 
       if (body.courseId !== undefined) {
@@ -502,12 +627,30 @@ export const classesRoutes = {
       if (body.name !== undefined) updateData.name = body.name;
       if (body.startDate !== undefined) updateData.start_date = body.startDate;
       if (body.endDate !== undefined) updateData.end_date = body.endDate;
-      if (body.startTime !== undefined) updateData.start_time = body.startTime;
-      if (body.endTime !== undefined) updateData.end_time = body.endTime;
-      if (body.daysOfWeek !== undefined) updateData.days_of_week = body.daysOfWeek;
       if (body.maxStudents !== undefined) updateData.max_students = body.maxStudents;
       if (body.notes !== undefined) updateData.notes = body.notes;
       if (body.type !== undefined) updateData.type = normalizeClassType(body.type);
+
+      // Per-day times: recompute whenever any day/time field is present, then keep
+      // the legacy columns (day set + envelope) in sync with them.
+      const timesTouched = body.dayTimes !== undefined || body.daysOfWeek !== undefined
+        || body.startTime !== undefined || body.endTime !== undefined;
+      let effectiveDayTimes: DayTime[] | null = null;
+      if (timesTouched) {
+        if (Array.isArray(body.dayTimes)) {
+          effectiveDayTimes = resolveDayTimes(body) ?? [];
+        } else {
+          const days = (body.daysOfWeek !== undefined ? String(body.daysOfWeek) : String(existing.days_of_week || ''))
+            .split(',').map((d: string) => d.toUpperCase().trim()).filter(Boolean);
+          const st = body.startTime !== undefined ? body.startTime : existing.start_time;
+          const et = body.endTime !== undefined ? body.endTime : existing.end_time;
+          effectiveDayTimes = (st && et) ? days.map((day) => ({ day, startTime: st, endTime: et })) : [];
+        }
+        const legacy = legacyColumnsFromDayTimes(effectiveDayTimes);
+        updateData.days_of_week = legacy.days_of_week;
+        updateData.start_time = legacy.start_time;
+        updateData.end_time = legacy.end_time;
+      }
 
       const classRecord = await update('classes', params.id, updateData);
 
@@ -515,11 +658,14 @@ export const classesRoutes = {
         return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
       }
 
-      // Reload to include the (possibly-updated) joined branch/company.
+      if (effectiveDayTimes !== null) await setClassDayTimes(params.id, effectiveDayTimes);
+
+      // Reload to include the (possibly-updated) joined branch/company + day times.
       const reloaded = await loadClassForTenant(params.id, context.companyId);
+      const dayTimesJson = JSON.stringify(effectiveDayTimes ?? await getClassDayTimes(params.id));
       return {
         status: 200 as const,
-        body: mapClassFromDB(reloaded || classRecord),
+        body: mapClassFromDB({ ...(reloaded || classRecord), day_times_json: dayTimesJson }),
       };
     } catch (error) {
       console.error('Update class error:', error);

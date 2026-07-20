@@ -4,6 +4,7 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { notifySessionAttendance } from './telegram';
 import { ensureAutoManageSessionsColumn } from './companies';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
+import { ensureClassDayTimesSchema } from './classes';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -472,6 +473,7 @@ export const sessionsRoutes = {
       }
       const isTeacherCompany = (comp.type || '').toUpperCase() === 'TEACHER';
       const dayName = dayNameForDate(localDate);
+      await ensureClassDayTimesSchema();
 
       // ── Auto-start: classes scheduled in-window now with no running session ──
       const startParams: any[] = [context.companyId, dayName, localDate, localTime];
@@ -482,13 +484,13 @@ export const sessionsRoutes = {
         WHERE co.company_id = $1
           AND c.is_active = true
           AND (c.is_finished IS NULL OR c.is_finished = false)
-          AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
-          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
-          AND POSITION($2 IN UPPER(c.days_of_week)) > 0
           AND (c.start_date IS NULL OR c.start_date <= $3::date)
           AND (c.end_date IS NULL OR c.end_date >= $3::date)
-          AND c.start_time <= $4::time
-          AND c.end_time > $4::time
+          AND EXISTS (
+            SELECT 1 FROM class_day_times cdt
+            WHERE cdt.class_id = c.id AND cdt.day_of_week = $2
+              AND cdt.start_time <= $4::time AND cdt.end_time > $4::time
+          )
           AND NOT EXISTS (
             SELECT 1 FROM sessions s
             WHERE s.class_id = c.id AND s.company_id = $1 AND s.end_date IS NULL AND s.started = true
@@ -566,13 +568,13 @@ export const sessionsRoutes = {
            AND s.end_date IS NULL
            AND s.started = true
            AND s.auto_started = false
-           AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
-           AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
-           AND POSITION($2 IN UPPER(c.days_of_week)) > 0
            AND (c.start_date IS NULL OR c.start_date <= $3::date)
            AND (c.end_date IS NULL OR c.end_date >= $3::date)
-           AND c.start_time <= $4::time
-           AND c.end_time > $4::time
+           AND EXISTS (
+             SELECT 1 FROM class_day_times cdt
+             WHERE cdt.class_id = c.id AND cdt.day_of_week = $2
+               AND cdt.start_time <= $4::time AND cdt.end_time > $4::time
+           )
       `;
       const adoptBranch = appendBranchSqlFilter(context, adoptParams, 's.branch_id');
       if (adoptBranch) adoptSql += ` AND ${adoptBranch}`;
@@ -590,16 +592,17 @@ export const sessionsRoutes = {
           -- human opened outside its schedule is a human's to close.
           AND s.auto_started = true
           AND s.start_date::date = $2::date
-          -- and only on a day the class actually runs — auto-start checks this,
-          -- auto-end never did, so a Saturday make-up died on a Monday schedule.
-          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
-          AND POSITION($4 IN UPPER(c.days_of_week)) > 0
-          AND c.end_time IS NOT NULL
-          -- past the scheduled end, plus a grace period: a lesson that runs a few
-          -- minutes over is normal, and attendance scanned in the overrun has to
-          -- land on this session, not on nothing. Subtracting times gives an
-          -- interval and cannot wrap past midnight the way (end_time + interval) can.
-          AND EXTRACT(EPOCH FROM ($3::time - c.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60}
+          -- and only on a day the class actually runs, at that day's own end time —
+          -- auto-start checks this, auto-end never did, so a Saturday make-up died
+          -- on a Monday schedule. Subtracting times gives an interval and cannot
+          -- wrap past midnight the way (end_time + interval) can. Grace: a lesson
+          -- that runs a few minutes over is normal, and attendance scanned in the
+          -- overrun has to land on this session, not on nothing.
+          AND EXISTS (
+            SELECT 1 FROM class_day_times cdt
+            WHERE cdt.class_id = c.id AND cdt.day_of_week = $4
+              AND EXTRACT(EPOCH FROM ($3::time - cdt.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60}
+          )
       `;
       const endBranch = appendBranchSqlFilter(context, endParams, 's.branch_id');
       if (endBranch) endSql += ` AND ${endBranch}`;
@@ -1012,6 +1015,7 @@ export const sessionsRoutes = {
         return { status: 200 as const, body: null };
       }
       const dayName = dayNameForDate(q.localDate);
+      await ensureClassDayTimesSchema();
 
       const schedParams: any[] = [context.companyId, params.studentId, dayName, q.localDate, q.localTime];
       let schedSql = `
@@ -1020,13 +1024,14 @@ export const sessionsRoutes = {
         JOIN courses co ON co.id = c.course_id
         WHERE co.company_id = $1
           AND c.is_active = true
-          AND c.start_time IS NOT NULL AND c.end_time IS NOT NULL
-          AND c.days_of_week IS NOT NULL AND c.days_of_week <> ''
-          AND POSITION($3 IN UPPER(c.days_of_week)) > 0
           AND (c.start_date IS NULL OR c.start_date <= $4::date)
           AND (c.end_date IS NULL OR c.end_date >= $4::date)
-          AND c.start_time <= ($5::time + interval '30 minutes')
-          AND c.end_time >= $5::time
+          AND EXISTS (
+            SELECT 1 FROM class_day_times cdt
+            WHERE cdt.class_id = c.id AND cdt.day_of_week = $3
+              AND cdt.start_time <= ($5::time + interval '30 minutes')
+              AND cdt.end_time >= $5::time
+          )
           AND c.id IN ${enrolledClassesSubquery}
       `;
       const schedBranch = appendBranchSqlFilter(context, schedParams, 'co.branch_id');

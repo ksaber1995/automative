@@ -941,6 +941,13 @@ const BuySessionPackageSchema = z.object({
 // =============================================
 const ClassTypeSchema = z.enum(['ONLINE', 'OFFLINE']);
 
+// Per-day start/end time for a class. `day` is an UPPER weekday name (e.g. MONDAY).
+const ClassDayTimeSchema = z.object({
+  day: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+});
+
 const CreateClassSchema = z.object({
   courseId: UUIDSchema,
   // Class branch/company are derived from the linked course. Keep `branchId` optional
@@ -953,6 +960,9 @@ const CreateClassSchema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   daysOfWeek: z.string().optional(),
+  // Per-day times. When present, it is the source of truth and drives
+  // daysOfWeek/startTime/endTime. Omit to keep the legacy one-time-for-all shape.
+  dayTimes: z.array(ClassDayTimeSchema).optional(),
   maxStudents: z.number().optional(),
   notes: z.string().optional(),
   type: ClassTypeSchema.optional(),
@@ -966,6 +976,7 @@ const UpdateClassSchema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   daysOfWeek: z.string().optional(),
+  dayTimes: z.array(ClassDayTimeSchema).optional(),
   maxStudents: z.number().optional(),
   notes: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
@@ -986,6 +997,7 @@ const ClassSchema = z.object({
   startTime: z.string().nullable(),
   endTime: z.string().nullable(),
   daysOfWeek: z.string().nullable(),
+  dayTimes: z.array(ClassDayTimeSchema).optional(),
   maxStudents: z.number().nullable(),
   currentEnrollment: z.number(),
   notes: z.string().nullable(),
