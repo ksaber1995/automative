@@ -231,6 +231,9 @@ export function star(ctx: Ctx, cx: number, cy: number, r: number): void {
 
 function drawPanel(ctx: Ctx): void {
   ctx.save();
+  // Narrow the whole left panel: every x below is compressed toward the left edge,
+  // so the coloured side is thinner (it carries no crest/photo any more).
+  ctx.scale(0.78, 1);
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(320, 0);
@@ -319,6 +322,11 @@ type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
 
 function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
   ctx.save();
+  // Drawn larger than the original glyph metrics — scaled about the chip centre.
+  const s = 1.3;
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  ctx.translate(-cx, -cy);
   ctx.strokeStyle = T.onPanel;
   ctx.fillStyle = T.onPanel;
   ctx.lineWidth = 2.2;
@@ -396,6 +404,11 @@ function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
 
 function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: number): void {
   ctx.save();
+  // Drawn larger than the original glyph metrics — scaled about the icon centre.
+  const s = 1.25;
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  ctx.translate(-cx, -cy);
   ctx.strokeStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
   ctx.fillStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
   ctx.lineWidth = 2.4;
@@ -508,16 +521,18 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.restore();
 
   // --- info rows ---
+  // The level row is dropped entirely when no level is set — a lone "—" on a
+  // printed card reads as a mistake, so the row reflows away instead.
   const rows: { icon: RowIcon; label: string; value: string; dir: Dir; gold?: boolean }[] = [
     { icon: 'user', label: 'اسم الطالب', value: data.name, dir: 'rtl' },
     { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
-    { icon: 'cap', label: 'الصف الدراسي', value: data.level, dir: 'rtl' },
+    ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
     { icon: 'group', label: 'المجموعة', value: data.group, dir: 'rtl' },
     { icon: 'cal', label: 'العام الدراسي', value: data.year, dir: 'ltr' },
   ];
 
-  const rx = 360;      // left edge — clears the gold ribbon on the navy panel
-  const chip = 42;
+  const rx = 300;      // left edge — clears the (now narrower) gold ribbon on the navy panel
+  const chip = 46;
   const labelR = 766;
   // The label runs right-to-left from labelR and is capped at 124 wide, so it can
   // reach x=642. valueR must leave a real gutter before that: label and value are
@@ -566,10 +581,10 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // of the gold ribbon paints ON TOP of the navy side panel and reads as a dark bar
   // bleeding out of it. BANNER_L therefore lines up with the icon-chip column above
   // (rx = 360) and never crosses the ribbon (which ends at ~364).
-  const BANNER_L = 360;
+  const BANNER_L = 300;      // lines up with the icon-chip column (rx), left of the narrowed panel's ribbon
   const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
   const TEXT_R = BANNER_R - 46;
-  const TEXT_L = 432;        // leaves a gap after the quill (ends at ~410)
+  const TEXT_L = 372;        // leaves a gap after the quill
   ctx.save();
   roundRect(ctx, BANNER_L, 544, BANNER_R - BANNER_L, 68, 16);
   ctx.fillStyle = T.panelDark;
@@ -579,16 +594,16 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
 
   ctx.save();
-  ctx.strokeStyle = goldGrad(ctx, 368, 560, 412, 598);
+  ctx.strokeStyle = goldGrad(ctx, 310, 560, 354, 598);
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(370, 596);
-  ctx.quadraticCurveTo(390, 590, 410, 560);
+  ctx.moveTo(312, 596);
+  ctx.quadraticCurveTo(332, 590, 352, 560);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(379, 593);
-  ctx.quadraticCurveTo(399, 592, 408, 569);
+  ctx.moveTo(321, 593);
+  ctx.quadraticCurveTo(341, 592, 350, 569);
   ctx.stroke();
   ctx.restore();
 
@@ -602,7 +617,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.strokeStyle = goldGrad(ctx, qx, qy, qx + qs, qy + qs);
   ctx.lineWidth = 5;
   ctx.stroke();
-  ctx.drawImage(qr, qx + 12, qy + 12, qs - 24, qs - 24);
+  // Wider quiet zone around the QR — more white padding inside the frame.
+  ctx.drawImage(qr, qx + 24, qy + 24, qs - 48, qs - 48);
 
   const capTop = qy + qs + 14;
   roundRect(ctx, qx, capTop, qs, 64, 12);
