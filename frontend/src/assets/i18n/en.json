@@ -5010,6 +5010,8 @@
     "GENERATED": "{{count}} cards created",
     "BAD_COUNT": "Enter how many cards to create.",
     "DOWNLOAD": "Download blank cards",
+    "DOWNLOAD_RAW": "QR codes only",
+    "DOWNLOAD_RAW_HINT": "The plain QR codes — one PNG per card, no card design. The serial is the filename.",
     "DOWNLOADED": "{{count}} cards downloaded",
     "DOWNLOAD_FAILED": "Could not render the cards.",
     "NONE_FREE": "No unlinked cards to print.",

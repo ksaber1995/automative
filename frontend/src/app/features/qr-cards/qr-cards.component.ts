@@ -13,6 +13,7 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 import JSZip from 'jszip';
+import QRCode from 'qrcode';
 import { saveAs } from 'file-saver';
 import { QrCard, QrCardService } from './qr-card.service';
 import { formatStudentCode } from '../../core/utils/student-code.util';
@@ -213,6 +214,46 @@ export class QrCardsComponent implements OnInit {
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, 'qr-cards.zip');
+      this.notify.success(this.translate.instant('QR_CARDS.DOWNLOADED', { count: pool.length }));
+    } catch {
+      this.notify.error(this.translate.instant('QR_CARDS.DOWNLOAD_FAILED'));
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  /**
+   * The RAW QR codes only — one PNG per free card, just the black/white QR with no
+   * card template or design at all. The serial goes in the filename so a card can
+   * still be identified and linked. Encodes the same profile URL the pool card
+   * front would (/p/s/<token>).
+   */
+  async downloadRawZip(): Promise<void> {
+    const pool = this.cards().filter((c) => !c.studentId);
+    if (!pool.length) {
+      this.notify.warning(this.translate.instant('QR_CARDS.NONE_FREE'));
+      return;
+    }
+
+    this.exporting.set(true);
+    this.exportDone.set(0);
+    this.exportTotal.set(pool.length);
+    this.exportPercent.set(0);
+
+    try {
+      const zip = new JSZip();
+      const origin = window.location.origin;
+      let done = 0;
+      for (const card of pool) {
+        const dataUrl = await QRCode.toDataURL(`${origin}/p/s/${card.token}`, { width: 600, margin: 2 });
+        zip.file(`${this.label(card.serial)}.png`, dataUrl.split(',')[1], { base64: true });
+        this.exportDone.set(++done);
+        this.exportPercent.set(Math.round((done / pool.length) * 100));
+        if (done % 5 === 0) await new Promise((r) => setTimeout(r));
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, 'qr-codes.zip');
       this.notify.success(this.translate.instant('QR_CARDS.DOWNLOADED', { count: pool.length }));
     } catch {
       this.notify.error(this.translate.instant('QR_CARDS.DOWNLOAD_FAILED'));

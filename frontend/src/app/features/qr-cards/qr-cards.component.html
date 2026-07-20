@@ -8,6 +8,11 @@
       <p-button icon="pi pi-download" severity="secondary" [outlined]="true"
         [label]="'QR_CARDS.DOWNLOAD' | translate"
         [disabled]="!freeCount() || exporting()" (onClick)="downloadZip()"></p-button>
+      <!-- The plain QR codes only — one PNG per card, no card template/design. -->
+      <p-button icon="pi pi-qrcode" severity="secondary" [text]="true"
+        [label]="'QR_CARDS.DOWNLOAD_RAW' | translate"
+        [pTooltip]="'QR_CARDS.DOWNLOAD_RAW_HINT' | translate"
+        [disabled]="!freeCount() || exporting()" (onClick)="downloadRawZip()"></p-button>
     </div>
   </div>
 
