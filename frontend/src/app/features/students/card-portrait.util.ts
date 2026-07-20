@@ -16,8 +16,6 @@ import {
  * student-card.util.ts — big gradients bloat the exported PNG).
  */
 
-const SILHOUETTE = '#c3ccc9';
-
 /** Small stroked glyphs. Kept local: the ornate/minimal icon sets aren't exported. */
 type Glyph = 'phone' | 'whatsapp' | 'mail' | 'pin';
 
@@ -257,23 +255,15 @@ export function drawCardBackPortrait(
   ctx.stroke();
   roundRect(ctx, px + 4, py + 4, pw - 8, ph - 8, 12);
   ctx.clip();
-  ctx.fillStyle = '#eef1f0';
-  ctx.fillRect(px, py, pw, ph);
 
   if (images.photo) {
+    ctx.fillStyle = '#eef1f0';   // neutral backdrop behind a transparent photo
+    ctx.fillRect(px, py, pw, ph);
     drawCover(ctx, images.photo, px + 4, py + 4, pw - 8, ph - 8);
   } else {
-    // Placeholder silhouette, same idea as the other templates.
-    const cx = px + pw / 2;
-    ctx.fillStyle = SILHOUETTE;
-    ctx.beginPath();
-    ctx.arc(cx, py + 96, 46, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx - 82, py + ph);
-    ctx.bezierCurveTo(cx - 82, py + 170, cx + 82, py + 170, cx + 82, py + ph);
-    ctx.closePath();
-    ctx.fill();
+    // No placeholder: left blank white so a photo can be attached by hand.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px, py, pw, ph);
   }
   ctx.restore();
 

@@ -13,8 +13,6 @@ import {
  * gradient note in student-card.util.ts; that constraint is a feature here.
  */
 
-const SILHOUETTE = '#cbd5e1';   // slate 300
-
 /** Rounded page + hairline border, shared by both faces. */
 function page(ctx: Ctx): void {
   ctx.fillStyle = T.page;
@@ -44,30 +42,15 @@ function photo(ctx: Ctx, x: number, y: number, w: number, h: number, img?: Canva
   // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
   ctx.translate(A.photoDx, A.photoDy);
   roundRect(ctx, x, y, w, h, 14);
-  ctx.fillStyle = T.wash;
+  // An uploaded photo fills the frame; an empty frame is left blank white (no placeholder).
+  ctx.fillStyle = img ? T.wash : '#ffffff';
   ctx.fill();
   ctx.strokeStyle = T.line;
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.clip();
 
-  // An uploaded photo fills the frame; otherwise the silhouette placeholder.
-  if (img) {
-    drawCover(ctx, img, x, y, w, h);
-    ctx.restore();
-    return;
-  }
-
-  const cx = x + w / 2;
-  ctx.fillStyle = SILHOUETTE;
-  ctx.beginPath();
-  ctx.arc(cx, y + 82, 38, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 68, y + h);
-  ctx.bezierCurveTo(cx - 68, y + 140, cx + 68, y + 140, cx + 68, y + h);
-  ctx.closePath();
-  ctx.fill();
+  if (img) drawCover(ctx, img, x, y, w, h);
   ctx.restore();
 }
 

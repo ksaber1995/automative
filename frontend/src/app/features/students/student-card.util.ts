@@ -350,7 +350,6 @@ function drawCrest(ctx: Ctx, cx: number, cy: number): void {
   ctx.restore();
 }
 
-/** Empty gold-framed silhouette — students have no photo on file, so this is left blank to be filled in. */
 /**
  * Draw `img` to COVER the box: scaled to fill it and centre-cropped, never
  * squashed. A portrait photo in a landscape frame gets its sides trimmed rather
@@ -377,7 +376,7 @@ export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: nu
   ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
 }
 
-/** The photo frame. With no upload, the grey silhouette placeholder is drawn instead. */
+/** The photo frame. With no upload, the box is left blank white for a photo to be attached by hand. */
 function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
   // 15% taller than the original 232: the frame ends at 475, still clear of the
   // gold sweeps that start at y=498.
@@ -395,25 +394,16 @@ function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
 
   roundRect(ctx, x + 4, y + 4, w - 8, h - 8, r - 4);
   ctx.clip();
-  ctx.fillStyle = '#eceef2';
-  ctx.fillRect(x, y, w, h);
 
   if (photo) {
+    ctx.fillStyle = '#eceef2';   // neutral backdrop behind a transparent photo
+    ctx.fillRect(x, y, w, h);
     drawCover(ctx, photo, x + 4, y + 4, w - 8, h - 8);
-    ctx.restore();
-    return;
+  } else {
+    // No placeholder: left blank white so a photo can be attached by hand.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, y, w, h);
   }
-
-  const cx = x + w / 2;
-  ctx.fillStyle = '#c8ccd6';
-  ctx.beginPath();
-  ctx.arc(cx, y + 84, 42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 74, y + h);
-  ctx.bezierCurveTo(cx - 74, y + 150, cx + 74, y + 150, cx + 74, y + h);
-  ctx.closePath();
-  ctx.fill();
   ctx.restore();
 }
 
