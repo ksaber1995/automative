@@ -12,47 +12,35 @@ import { CardTheme, CARD_THEMES } from './card-theme';
  * side that no content may enter — a guillotined card loses a millimetre or two,
  * and a name or QR clipped off the edge makes the card useless.
  *
- * The exported image is bigger than the card: a 0.5 cm WHITE cut margin (bleed)
- * wraps the whole card on every side, so a sheet of these can be guillotined apart
- * with room for the blade to wander without biting into the artwork. So there are
- * three concentric bands — outer white cut margin, then the card edge, then the
- * inner 0.5 cm content safe zone.
+ * The artwork is authored in the ORIGINAL 1016 × 638 space (every coordinate below
+ * is in it). Two transforms map that space onto the card canvas, so nothing had to
+ * be re-measured by hand:
  *
- * The artwork is still authored in the ORIGINAL 1016 × 638 space (every
- * coordinate below is in it). Two transforms map that space onto the print
- * canvas, so nothing had to be re-measured by hand — both are shifted by the cut
- * margin so the card sits centred in the white:
+ *   background → fills the whole card, bleeding off all four edges
+ *   content    → fits inside the card minus the 0.5 cm safe margin
  *
- *   background → fills the whole card, bleeding off all four card edges
- *   content    → fits inside the card minus the 0.5 cm safe zone
- *
- * So the panel and ribbons still run to the card edge, while the text, photo, crest
- * and QR are guaranteed to sit inside the safe zone.
+ * So the panel and ribbons still run to the edge, while the text and QR are
+ * guaranteed to sit inside the safe zone.
  */
 const CM = 300 / 2.54;                       // px per cm at 300 dpi ≈ 118.11
 export const CARD_W = Math.round(9 * CM);    // 1063 px = 9 cm
 export const CARD_H = Math.round(5.7 * CM);  //  673 px = 5.7 cm
 export const CARD_SAFE = Math.round(0.5 * CM); // 59 px = 0.5 cm
-export const CARD_BLEED = Math.round(0.5 * CM); // 59 px = 0.5 cm white cut margin
-
-/** Full exported image = card + a 0.5 cm white cut margin on every side. */
-export const PRINT_W = CARD_W + 2 * CARD_BLEED; // 1181 px = 10 cm
-export const PRINT_H = CARD_H + 2 * CARD_BLEED; //  791 px = 6.7 cm
 
 /** The space every drawing coordinate in these files is written in. */
 export const DESIGN_W = 1016;
 export const DESIGN_H = 638;
 
-/** Map design space onto the full card — art bleeds off every card edge, inside the white margin. */
+/** Map design space onto the full card — art bleeds off every edge. */
 export function bgTransform(ctx: CanvasRenderingContext2D): void {
-  ctx.setTransform(CARD_W / DESIGN_W, 0, 0, CARD_H / DESIGN_H, CARD_BLEED, CARD_BLEED);
+  ctx.setTransform(CARD_W / DESIGN_W, 0, 0, CARD_H / DESIGN_H, 0, 0);
 }
 
-/** Map design space inside the safe margin — no content can reach a card edge. */
+/** Map design space inside the safe margin — no content can reach an edge. */
 export function contentTransform(ctx: CanvasRenderingContext2D): void {
   const w = CARD_W - 2 * CARD_SAFE;
   const h = CARD_H - 2 * CARD_SAFE;
-  ctx.setTransform(w / DESIGN_W, 0, 0, h / DESIGN_H, CARD_BLEED + CARD_SAFE, CARD_BLEED + CARD_SAFE);
+  ctx.setTransform(w / DESIGN_W, 0, 0, h / DESIGN_H, CARD_SAFE, CARD_SAFE);
 }
 
 /**
@@ -300,56 +288,6 @@ function drawPanel(ctx: Ctx): void {
   ctx.restore();
 }
 
-function drawCrest(ctx: Ctx, cx: number, cy: number): void {
-  ctx.save();
-  ctx.fillStyle = goldGrad(ctx, cx - 60, cy - 70, cx + 60, cy - 50);
-  for (let i = 0; i < 5; i++) {
-    const a = -Math.PI / 2 + (i - 2) * 0.235;
-    star(ctx, cx + Math.cos(a) * 74, cy + 12 + Math.sin(a) * 74, 8.5);
-  }
-
-  const w = 47;
-  const top = cy - 44;
-  ctx.beginPath();
-  ctx.moveTo(cx - w, top);
-  ctx.lineTo(cx + w, top);
-  ctx.lineTo(cx + w, cy + 12);
-  ctx.bezierCurveTo(cx + w, cy + 42, cx + 22, cy + 54, cx, cy + 62);
-  ctx.bezierCurveTo(cx - 22, cy + 54, cx - w, cy + 42, cx - w, cy + 12);
-  ctx.closePath();
-  ctx.fillStyle = T.panelDark;
-  ctx.fill();
-  ctx.strokeStyle = goldGrad(ctx, cx - w, top, cx + w, cy + 62);
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  ctx.fillStyle = T.onPanel;
-  ctx.beginPath();
-  ctx.moveTo(cx - 27, cy + 4);
-  ctx.quadraticCurveTo(cx - 13, cy - 4, cx - 1, cy + 2);
-  ctx.lineTo(cx - 1, cy + 25);
-  ctx.quadraticCurveTo(cx - 13, cy + 19, cx - 27, cy + 27);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 27, cy + 4);
-  ctx.quadraticCurveTo(cx + 13, cy - 4, cx + 1, cy + 2);
-  ctx.lineTo(cx + 1, cy + 25);
-  ctx.quadraticCurveTo(cx + 13, cy + 19, cx + 27, cy + 27);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = goldGrad(ctx, cx - 8, cy - 30, cx + 8, cy + 2);
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 32);
-  ctx.lineTo(cx + 8, cy - 12);
-  ctx.lineTo(cx, cy - 2);
-  ctx.lineTo(cx - 8, cy - 12);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
 /**
  * Draw `img` to COVER the box: scaled to fill it and centre-cropped, never
  * squashed. A portrait photo in a landscape frame gets its sides trimmed rather
@@ -376,36 +314,6 @@ export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: nu
   ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
 }
 
-/** The photo frame. With no upload, the box is left blank white for a photo to be attached by hand. */
-function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
-  // 15% taller than the original 232: the frame ends at 475, still clear of the
-  // gold sweeps that start at y=498.
-  const x = 45, y = 208, w = 190, h = 267, r = 16;
-  ctx.save();
-  // The nudge is a translate, not an offset on x/y: the frame, its gold border and
-  // the clip that holds the photo inside it all have to move as one piece.
-  ctx.translate(A.photoDx, A.photoDy);
-  roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.strokeStyle = goldGrad(ctx, x, y, x + w, y + h);
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
-  roundRect(ctx, x + 4, y + 4, w - 8, h - 8, r - 4);
-  ctx.clip();
-
-  if (photo) {
-    ctx.fillStyle = '#eceef2';   // neutral backdrop behind a transparent photo
-    ctx.fillRect(x, y, w, h);
-    drawCover(ctx, photo, x + 4, y + 4, w - 8, h - 8);
-  } else {
-    // No placeholder: left blank white so a photo can be attached by hand.
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x, y, w, h);
-  }
-  ctx.restore();
-}
 
 type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
 
@@ -568,13 +476,6 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
 
   // ── Content: inside the 0.5 cm safe margin, so nothing can be cut off ────────
   contentTransform(ctx);
-
-  // An uploaded logo replaces the crest entirely — drawn to fit, so it keeps its
-  // own shape instead of being forced into the shield.
-  if (images.logo) drawLogo(ctx, images.logo, 140, 106, 150, 128);
-  else drawCrest(ctx, 140, 106);
-
-  drawPhoto(ctx, images.photo);
 
   // --- header ---
   const hcx = 626;

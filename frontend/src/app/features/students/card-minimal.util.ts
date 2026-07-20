@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  A, CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, drawCover, fitText, roundRect, wrap, wrapFit,
+  CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -37,23 +37,6 @@ function spine(ctx: Ctx): void {
   ctx.fillRect(0, 0, 12, DESIGN_H);
 }
 
-function photo(ctx: Ctx, x: number, y: number, w: number, h: number, img?: CanvasImageSource | null): void {
-  ctx.save();
-  // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
-  ctx.translate(A.photoDx, A.photoDy);
-  roundRect(ctx, x, y, w, h, 14);
-  // An uploaded photo fills the frame; an empty frame is left blank white (no placeholder).
-  ctx.fillStyle = img ? T.wash : '#ffffff';
-  ctx.fill();
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.clip();
-
-  if (img) drawCover(ctx, img, x, y, w, h);
-  ctx.restore();
-}
-
 // ─────────────────────────────── FRONT ───────────────────────────────────────
 
 export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasImageSource, images: CardImages = {}): void {
@@ -72,11 +55,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   contentTransform(ctx);
 
-  // 15% taller (226 -> 260). It grows upward: the code chip is at y=414, so the
-  // frame keeps its foot at 394 rather than running into it.
-  photo(ctx, 46, 134, 186, 260, images.photo);
-
-  // student code chip under the photo
+  // student code chip in the left column
   roundRect(ctx, 46, 414, 186, 44, 10);
   ctx.fillStyle = T.accentLight;
   ctx.fill();
@@ -252,13 +231,8 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
 
   contentTransform(ctx);
 
-  // ---- teacher block (right) ----
+  // ---- contact block (right) ----
   const tR = 968;
-  fitText(ctx, d.teacherName || '—', tR, 58, 300, 30, 'bold', T.ink, 'right', 'rtl');
-  if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 92, 300, 18, 'bold', T.accent, 'right', 'rtl');
-  }
-
   const contacts = ([
     { k: 'phone', v: d.phone },
     { k: 'whatsapp', v: d.whatsapp },

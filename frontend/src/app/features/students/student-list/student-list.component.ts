@@ -22,6 +22,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
 import { StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng } from '../card-render.util';
+import { CardTemplate } from '../card-theme';
 import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -499,7 +500,7 @@ export class StudentListComponent implements OnInit {
       // Load the card design first: it picks the template for the per-student
       // fronts as well as the shared back, so a printed pair always matches.
       const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
-      const template = design?.template;
+      const template = design?.template as CardTemplate | undefined;
       // Decoded once for the whole batch — not once per student.
       const images = await loadCardImages(design);
 

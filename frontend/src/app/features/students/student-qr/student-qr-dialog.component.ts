@@ -19,6 +19,7 @@ import { EnrollmentService } from '../../enrollments/services/enrollment.service
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
 import { currentAcademicYear, loadCardImages, renderStudentCardPng } from '../card-render.util';
+import { CardTemplate } from '../card-theme';
 import { EnrollmentStatus } from '@shared/enums/enrollment-status.enum';
 import { Student } from '@shared/interfaces/student.interface';
 
@@ -203,7 +204,7 @@ export class StudentQrDialogComponent {
       year: currentAcademicYear(),
       subject: course?.name || '',
       qrUrl: this.profileUrl(s.qrToken),
-    }, document.createElement('canvas'), design?.template, await loadCardImages(design), design);
+    }, document.createElement('canvas'), design?.template as CardTemplate | undefined, await loadCardImages(design), design);
   }
 
   async download(): Promise<void> {

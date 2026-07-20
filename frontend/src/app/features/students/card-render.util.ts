@@ -2,11 +2,10 @@ import QRCode from 'qrcode';
 import { CardDesign, composeAdjust } from '@shared/interfaces/card-design.interface';
 import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE, tuneTheme } from './card-theme';
 import {
-  CardImages, PRINT_H, PRINT_W, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
+  CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
 } from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
-import { drawCardBackPortrait, drawStudentCardPortrait } from './card-portrait.util';
 import {
   AgnosticCardData, AgnosticTemplate, DEFAULT_AGNOSTIC, drawAgnosticBack, drawAgnosticFront,
 } from './card-agnostic.util';
@@ -18,7 +17,7 @@ import { drawCustomBack, drawCustomFront } from './card-custom.util';
  * come from the same template.
  */
 
-export { CARD_W, CARD_H, CARD_BLEED, PRINT_W, PRINT_H, DESIGN_W, DESIGN_H } from './student-card.util';
+export { CARD_W, CARD_H, DESIGN_W, DESIGN_H } from './student-card.util';
 export { canExportCustom } from './card-custom.util';
 export type { StudentCardData } from './student-card.util';
 export { currentAcademicYear } from './student-card.util';
@@ -64,28 +63,23 @@ async function qrImage(url: string): Promise<HTMLImageElement> {
 }
 
 function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  // The image is the card PLUS a 0.5 cm white cut margin on every side; the draw
-  // functions place the card centred in it via the bleed offset baked into
-  // bgTransform/contentTransform.
-  canvas.width = PRINT_W;
-  canvas.height = PRINT_H;
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable');
   // The bulk export reuses ONE canvas for every student, and the draw functions
   // leave a scale transform behind. Reset it, or the next card would be drawn
   // through it a second time.
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // Paint the whole sheet white first: that IS the cut margin, and it also fills
-  // the rounded-corner gaps the card leaves at its edges.
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, PRINT_W, PRINT_H);
+  ctx.clearRect(0, 0, CARD_W, CARD_H);
   return ctx;
 }
 
 /**
- * Decode the design's photo/logo/artwork data URLs ONCE, so a 500-student export
- * doesn't re-decode the same images 500 times. A broken or empty value yields null
- * and the card falls back to its built-in placeholder/crest.
+ * Decode the design's artwork data URLs ONCE, so a 500-student export doesn't
+ * re-decode the same images 500 times. A broken or empty value yields null.
+ * Only the custom-pool artwork is used now — teacher photo and academy logo were
+ * removed from every card.
  *
  * These must be data URLs, not hosted ones: an image from another origin taints
  * the canvas, and canvas.toDataURL() then throws — the export would die.
@@ -103,8 +97,6 @@ export async function loadCardImages(design?: CardDesign | null): Promise<CardIm
     }
   };
   return {
-    photo: await decode(design?.photo),
-    logo: await decode(design?.logo),
     artFront: await decode(design?.artFront),
     artBack: await decode(design?.artBack),
   };
@@ -127,10 +119,7 @@ export async function renderStudentCardPng(
   const qr = await qrImage(data.qrUrl);
 
   arm(design, 'student', template);
-  // 'portrait' takes no images on the front — the teacher's photo and logo are on
-  // its BACK, which is the whole point of that template.
-  if (template === 'portrait') drawStudentCardPortrait(ctx, data, qr);
-  else if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
+  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
   else drawStudentCard(ctx, data, qr, images);
 
   return canvas.toDataURL('image/png').split(',')[1];
@@ -147,10 +136,7 @@ export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasEl
 
   const template = design.template as CardTemplate | undefined;
   arm(design, 'student', template);
-  if (template === 'portrait') {
-    // The only back face that carries images: the teacher's photo and logo.
-    drawCardBackPortrait(ctx, design, qr, await loadCardImages(design));
-  } else if (template === 'minimal') {
+  if (template === 'minimal') {
     drawCardBackMinimal(ctx, design, qr);
   } else {
     drawCardBack(ctx, design, qr);

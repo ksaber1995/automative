@@ -9,17 +9,13 @@
  * structurally different flat design with its own renderer (card-minimal.util.ts),
  * but still uses this same theme shape so the shared text/shape primitives work.
  *
- * 'portrait' is the only template that puts the TEACHER'S photo and logo on the
- * back — the side that is already about the teacher — leaving the student's side
- * clean and giving its QR and details the whole width. Its renderer is
- * card-portrait.util.ts.
  */
 import { CardAdjust } from '@shared/interfaces/card-design.interface';
 import { darken, isDark, lighten, mix, readableOn, readableOnBoth, tint, tintBoth } from './card-color.util';
 
-export type CardTemplate = 'navy' | 'maroon' | 'minimal' | 'portrait';
+export type CardTemplate = 'navy' | 'maroon' | 'minimal';
 
-export const CARD_TEMPLATES: CardTemplate[] = ['navy', 'maroon', 'minimal', 'portrait'];
+export const CARD_TEMPLATES: CardTemplate[] = ['navy', 'maroon', 'minimal'];
 export const DEFAULT_TEMPLATE: CardTemplate = 'navy';
 
 export interface CardTheme {
@@ -152,29 +148,6 @@ export const CARD_THEMES: Record<CardTemplate, CardTheme> = {
     dotDark: '#134e4a',
   },
 
-  // Deep forest + soft gold: warm and formal, and clearly not a recolour of the
-  // navy/maroon pair.
-  portrait: {
-    panel: '#0f2b26',
-    panelDark: '#082019',
-    accent: '#c6a15b',
-    accentLight: '#eeddb4',
-    accentDeep: '#8a6b32',
-    accentInk: '#8a6b32',
-    page: '#ffffff',
-    quote: '#f5f2e9',
-    onPanel: '#ffffff',
-    onAccent: '#082019',
-    accentOnPanel: '#eeddb4',
-    ink: '#0f2b26',
-    body: '#0f2b26',
-    muted: '#0f2b26',
-    line: '#e4e9e7',
-    wash: '#f4f8f6',
-    font: SANS,
-    dot: '#e9efec',
-    dotDark: '#1a4037',
-  },
 };
 
 /**

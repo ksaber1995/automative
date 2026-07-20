@@ -1,7 +1,7 @@
 import { CardAdjust, CardDesign } from '@shared/interfaces/card-design.interface';
 import { darken, isDark, lighten, mix, readableOn, tint } from './card-color.util';
 import {
-  A, CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, contentTransform, drawContain, drawCover, drawLogo, fitText, roundRect, wrap, wrapFit,
+  A, CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, contentTransform, drawContain, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -243,15 +243,8 @@ function caps(ctx: Ctx, text: string, x: number, y: number, size: number, colour
   ctx.restore();
 }
 
-/** The academy's logo, or its initial in an accent disc when none is uploaded. */
-function brandMark(ctx: Ctx, p: Palette, name: string, cx: number, cy: number, r: number, logo?: CanvasImageSource | null): void {
-  if (logo) {
-    drawLogo(ctx, logo, cx, cy, r * 2, r * 2);
-    return;
-  }
-  // No logo: the accent disc carrying the academy's initial IS the brand mark here,
-  // so it takes the same nudge and width the logo would have — otherwise a tenant's
-  // tuning would silently apply or not depending on whether they had uploaded yet.
+/** The academy's initial in an accent disc — the brand mark on pool cards. */
+function brandMark(ctx: Ctx, p: Palette, name: string, cx: number, cy: number, r: number): void {
   const s = A.logoScale / 100;
   const dx = cx + A.logoDx;
   const dy = cy + A.logoDy;
@@ -329,7 +322,7 @@ export function drawAgnosticFront(
     serialChip(ctx, p, d.code, 235, 448, 278, 56, p.accent, p.onAccent);
 
     const R = 952;
-    brandMark(ctx, p, d.companyName, R - 40, 104, 42, images.logo);
+    brandMark(ctx, p, d.companyName, R - 40, 104, 42);
     fitText(ctx, d.companyName || '—', R - 104, 104, 400, 32, 'bold', p.ink, 'right', 'rtl');
 
     ctx.fillStyle = p.accent;
@@ -360,7 +353,7 @@ export function drawAgnosticFront(
     serialChip(ctx, p, d.code, qx + qs / 2, qy + qs + 34, qs + 24, 58, p.accent, p.onAccent);
 
     const L = 74;
-    brandMark(ctx, p, d.companyName, L + 42, 190, 42, images.logo);
+    brandMark(ctx, p, d.companyName, L + 42, 190, 42);
     fitText(ctx, d.companyName || '—', L, 268, 480, 38, 'bold', p.ink, 'left', 'rtl');
     ctx.fillStyle = p.accent;
     ctx.fillRect(L, 302, 140, 5);
@@ -396,7 +389,7 @@ export function drawAgnosticFront(
     // the whole idea of the template; the brand sits in the header above it.
     fitText(ctx, d.companyName || '—', 952, 72, 540, 36, 'bold', p.onAccent, 'right', 'rtl');
     caps(ctx, 'ATTENDANCE CARD', 952, 118, 18, p.onAccent, p, 'right');
-    brandMark(ctx, p, d.companyName, 96, 88, 44, images.logo);
+    brandMark(ctx, p, d.companyName, 96, 88, 44);
 
     const qs = 268, qx = 88, qy = 214;
     qrTile(ctx, p, qr, qx, qy, qs, 18);
@@ -422,7 +415,7 @@ export function drawAgnosticFront(
     // column, which is what keeps a centred card from looking half-printed.
     const CX = DESIGN_W / 2;
 
-    brandMark(ctx, p, d.companyName, CX, 72, 38, images.logo);
+    brandMark(ctx, p, d.companyName, CX, 72, 38);
     fitText(ctx, d.companyName || '—', CX, 138, 620, 34, 'bold', p.ink, 'center', 'rtl');
 
     const qs = 256, qx = CX - qs / 2, qy = 182;
@@ -538,23 +531,9 @@ export function drawAgnosticBack(
   const R = 952;   // right edge — the RTL start
   const L = 60;    // left column
 
-  // ---- media column: the teacher's photo, and the academy's info QR ----
-  // 15% taller (224 -> 258); the info QR below starts at y=316, so it still clears.
-  const pw = 190, ph = 258;
-  if (images.photo) {
-    ctx.save();
-    // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
-    ctx.translate(A.photoDx, A.photoDy);
-    roundRect(ctx, L, 44, pw, ph, 16);
-    ctx.strokeStyle = p.dark ? 'rgba(255,255,255,0.25)' : p.line;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.clip();
-    drawCover(ctx, images.photo, L, 44, pw, ph);
-    ctx.restore();
-  } else {
-    brandMark(ctx, p, design.teacherName || companyName, L + pw / 2, 150, 76, images.logo);
-  }
+  // ---- media column: the academy's brand mark, and its info QR ----
+  const pw = 190;
+  brandMark(ctx, p, companyName, L + pw / 2, 150, 76);
 
   if (qr) {
     const qs = 190;
@@ -563,11 +542,7 @@ export function drawAgnosticBack(
   }
 
   // ---- the academy, right column ----
-  fitText(ctx, design.teacherName || companyName || '—', R, 72, 600, 36, 'bold', headInk, 'right', 'rtl');
-  if (design.teacherTitle) {
-    fitText(ctx, design.teacherTitle, R, 120, 600, 25, 'bold',
-      kind === 'wave' ? p.onAccent : p.accentInk, 'right', 'rtl');
-  }
+  fitText(ctx, companyName || '—', R, 72, 600, 36, 'bold', headInk, 'right', 'rtl');
 
   const contacts = [design.phone, design.whatsapp, design.email, design.location]
     .filter((v) => !!v && v.trim()).slice(0, 4);
