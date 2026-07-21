@@ -337,7 +337,9 @@ CREATE TABLE classes (
     course_id UUID NOT NULL,
     -- branch_id / company_id were removed: both are derivable from courses.
     instructor_id UUID,
-    name VARCHAR(255) NOT NULL,
+    -- TEXT, not VARCHAR(n): a class name has no meaningful length limit
+    -- (migration 069).
+    name TEXT NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     start_time TIME,
