@@ -121,10 +121,10 @@
             placeholder="None"
             styleClass="w-full">
             <ng-template pTemplate="item" let-student>
-              {{ student.firstName }} {{ student.lastName }}
+              {{ student.name }}
             </ng-template>
             <ng-template pTemplate="selectedItem" let-student>
-              {{ student.firstName }} {{ student.lastName }}
+              {{ student.name }}
             </ng-template>
           </p-select>
         </div>

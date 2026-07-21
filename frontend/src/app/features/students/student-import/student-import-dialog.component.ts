@@ -197,15 +197,13 @@ export class StudentImportDialogComponent {
         return '';
       };
 
-      const fullName = get('student_name');
-      if (!fullName) { skipped++; continue; }
-      const parts = fullName.split(/\s+/);
-      const firstName = parts.shift() || fullName;
-      const lastName = parts.join(' ');
+      // The sheet always held one name; we used to chop it into first/last on
+      // the way in. Students carry a single `name` now, so it goes straight in.
+      const name = get('student_name');
+      if (!name) { skipped++; continue; }
 
       out.push({
-        firstName,
-        lastName,
+        name,
         parentName: get('parent_name') || null,
         phone: get('student_phone') || null,
         parentPhone: get('parent_phone') || null,

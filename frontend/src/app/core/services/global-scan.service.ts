@@ -115,7 +115,7 @@ export class GlobalScanService {
         if (!target) { open(); return; }
         this.attendanceService.checkinByQr(target.sessionId, token).subscribe({
           next: (res) => {
-            const name = `${res.studentFirstName} ${res.studentLastName}`;
+            const name = `${res.studentName}`;
             if (res.attendanceType === 'SUBSTITUTION') {
               this.notify.success(this.translate.instant('SESSION_QR.SUBSTITUTION_CHECKED_IN', { name, className: res.homeClassName }));
             } else if (res.alreadyPresent) {

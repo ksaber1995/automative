@@ -131,8 +131,7 @@ export class StudentListComponent implements OnInit {
     // as one contiguous run of "first last" used to miss anyone with a middle
     // name, which is most of the roster.
     return filtered.filter(s => matchesSearchTokens(term, [
-      s.firstName,
-      s.lastName,
+      s.name,
       s.parentName,
       // Student code and phone numbers (student / parent) stay searchable.
       formatStudentCode(s.studentCode),
@@ -278,7 +277,7 @@ export class StudentListComponent implements OnInit {
   deleteStudent(student: Student) {
     this.confirmationService.confirm({
       message: this.translate.instant('STUDENTS.DEACTIVATE_CONFIRM', {
-        name: `${student.firstName} ${student.lastName}`,
+        name: student.name,
       }),
       header: this.translate.instant('STUDENTS.DEACTIVATE_HEADER'),
       icon: 'pi pi-exclamation-triangle',
@@ -296,7 +295,7 @@ export class StudentListComponent implements OnInit {
   activateStudent(student: Student) {
     this.confirmationService.confirm({
       message: this.translate.instant('STUDENTS.ACTIVATE_CONFIRM', {
-        name: `${student.firstName} ${student.lastName}`,
+        name: student.name,
       }),
       header: this.translate.instant('STUDENTS.ACTIVATE_HEADER'),
       icon: 'pi pi-check-circle',
@@ -314,7 +313,7 @@ export class StudentListComponent implements OnInit {
   hardDeleteStudent(student: Student) {
     this.confirmationService.confirm({
       message: this.translate.instant('STUDENTS.HARD_DELETE_CONFIRM', {
-        name: `${student.firstName} ${student.lastName}`,
+        name: student.name,
       }),
       header: this.translate.instant('STUDENTS.HARD_DELETE_HEADER'),
       icon: 'pi pi-exclamation-triangle',
@@ -516,7 +515,7 @@ export class StudentListComponent implements OnInit {
       for (const student of exportStudents) {
         const card: StudentCardData = {
           companyName,
-          name: `${student.firstName} ${student.lastName}`.trim(),
+          name: student.name,
           code: formatStudentCode(student.studentCode),
           level: '',
           group: '',

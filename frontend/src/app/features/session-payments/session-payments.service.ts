@@ -105,14 +105,12 @@ export class SessionPaymentsService {
 
   getDueByToken(qrToken: string): Observable<{
     studentId: string;
-    studentFirstName: string;
-    studentLastName: string;
+    studentName: string;
     dueSessions: SessionPaymentWithDetails[];
   }> {
     return this.http.get<{
       studentId: string;
-      studentFirstName: string;
-      studentLastName: string;
+      studentName: string;
       dueSessions: SessionPaymentWithDetails[];
     }>(`${this.base}/by-token/${encodeURIComponent(qrToken)}`);
   }

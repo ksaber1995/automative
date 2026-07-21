@@ -15,8 +15,7 @@ function mapStudentFromDB(row: any) {
   return {
     id: row.id,
     companyId: row.company_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    name: row.name,
     dateOfBirth: row.date_of_birth,
     gender: row.gender,
     email: row.email,
@@ -79,14 +78,13 @@ export const studentsRoutes = {
 
       const student = await insert('students', {
         company_id: context.companyId,
-        first_name: body.firstName,
-        last_name: body.lastName,
+        name: body.name.trim(),
         date_of_birth: body.dateOfBirth || null,
         gender: body.gender || null,
         email: body.email || null,
         phone: body.phone || null,
-        parent_name: body.parentName,
-        parent_phone: body.parentPhone,
+        parent_name: body.parentName || null,
+        parent_phone: body.parentPhone || null,
         address: body.address || null,
         branch_id: body.branchId,
         notes: body.notes || null,
@@ -147,8 +145,8 @@ export const studentsRoutes = {
         // 1-based row number matching the spreadsheet's first data row.
         const rowNum = i + 1;
 
-        const firstName = String(r.firstName ?? '').trim();
-        if (!firstName) {
+        const name = String(r.name ?? '').trim();
+        if (!name) {
           errors.push({ row: rowNum, message: 'MISSING_NAME' });
           continue;
         }
@@ -162,8 +160,7 @@ export const studentsRoutes = {
         try {
           await insert('students', {
             company_id: context.companyId,
-            first_name: firstName,
-            last_name: String(r.lastName ?? '').trim(),
+            name,
             date_of_birth: emptyToNull(r.dateOfBirth),
             gender,
             email: emptyToNull(r.email),
@@ -286,8 +283,7 @@ export const studentsRoutes = {
 
       const updateData: any = {};
 
-      if (body.firstName !== undefined) updateData.first_name = body.firstName;
-      if (body.lastName !== undefined) updateData.last_name = body.lastName;
+      if (body.name !== undefined) updateData.name = body.name.trim();
       if (body.dateOfBirth !== undefined) updateData.date_of_birth = body.dateOfBirth;
       if (body.gender !== undefined) updateData.gender = body.gender || null;
       if (body.email !== undefined) updateData.email = body.email;

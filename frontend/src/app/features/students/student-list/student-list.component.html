@@ -102,13 +102,13 @@
       [paginator]="true"
       [rows]="10"
       [rowsPerPageOptions]="[10, 25, 50]"
-      [globalFilterFields]="['firstName', 'lastName', 'email']"
+      [globalFilterFields]="['name', 'email']"
       responsiveLayout="scroll"
     >
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="studentCode">{{ 'STUDENTS.LIST.COL_CODE' | translate }} <p-sortIcon field="studentCode"></p-sortIcon></th>
-          <th pSortableColumn="firstName">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
+          <th pSortableColumn="name">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
           @if (!authService.isTeacher()) {
@@ -128,7 +128,7 @@
               <span class="text-gray-300">—</span>
             }
           </td>
-          <td>{{ student.firstName }} {{ student.lastName }}</td>
+          <td>{{ student.name }}</td>
           <td>{{ ageDisplay(student.dateOfBirth) }}</td>
           <td>
             <div class="text-sm">

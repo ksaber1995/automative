@@ -166,7 +166,7 @@ export class StudentQrDialogComponent {
 
   studentName(): string {
     const s = this.student();
-    return s ? `${s.firstName} ${s.lastName}` : '';
+    return s ? s.name : '';
   }
 
   /**
@@ -215,7 +215,7 @@ export class StudentQrDialogComponent {
       const s = this.student();
       if (!base64 || !s) return;
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      const name = `card-${s.firstName}-${s.lastName}.png`.replace(/\s+/g, '_');
+      const name = `card-${s.name}.png`.replace(/\s+/g, '_');
       saveAs(new Blob([bytes], { type: 'image/png' }), name);
     } catch {
       this.notification.error(this.translate.instant('STUDENTS.LIST.QR_DOWNLOAD_ERROR'));
@@ -238,7 +238,7 @@ export class StudentQrDialogComponent {
       w.document.write(`
         <html>
           <head>
-            <title>${s.firstName} ${s.lastName}</title>
+            <title>${s.name}</title>
             <style>
               @page { margin: 12mm; }
               body { margin: 0; text-align: center; }

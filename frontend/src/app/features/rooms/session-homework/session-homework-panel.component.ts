@@ -91,7 +91,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     const list = this.roster();
     if (!q) return list;
     return list.filter((s) =>
-      `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
+      s.name.toLowerCase().includes(q) ||
       (s.code != null && String(s.code).toLowerCase().includes(q)));
   });
 
@@ -252,7 +252,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     if (!hw || !token) return;
     const grade = this.clampGrade(this.currentGrade().trim());
     this.service.recordByQr(hw.id, token, grade).subscribe({
-      next: (res) => this.afterRecord(`${res.studentFirstName} ${res.studentLastName}`, res.grade, res.alreadyRecorded),
+      next: (res) => this.afterRecord(`${res.studentName}`, res.grade, res.alreadyRecorded),
       error: () => this.lastScanResult.set(null), // interceptor toasts the server error
     });
   }
@@ -265,7 +265,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     this.service.recordByCode(hw.id, code, grade).subscribe({
       next: (res) => {
         this.resolvingCode.set(false);
-        this.afterRecord(`${res.studentFirstName} ${res.studentLastName}`, res.grade, res.alreadyRecorded);
+        this.afterRecord(`${res.studentName}`, res.grade, res.alreadyRecorded);
       },
       error: () => { this.resolvingCode.set(false); this.lastScanResult.set(null); },
     });

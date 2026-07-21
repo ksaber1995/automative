@@ -178,7 +178,7 @@ export const productSalesRoutes = {
       }
 
       let sql = `SELECT ps.*, p.name AS product_name,
-                        NULLIF(TRIM(COALESCE(st.first_name,'') || ' ' || COALESCE(st.last_name,'')), '') AS student_name,
+                        NULLIF(TRIM(COALESCE(st.name,'')), '') AS student_name,
                         COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
                  FROM product_sales ps
                  LEFT JOIN products p ON ps.product_id = p.id
@@ -382,7 +382,7 @@ export const productSalesRoutes = {
 
       const sale = await queryOne(
         `SELECT ps.*, p.name AS product_name,
-                NULLIF(TRIM(COALESCE(st.first_name,'') || ' ' || COALESCE(st.last_name,'')), '') AS student_name,
+                NULLIF(TRIM(COALESCE(st.name,'')), '') AS student_name,
                 COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
          FROM product_sales ps
          LEFT JOIN products p ON ps.product_id = p.id

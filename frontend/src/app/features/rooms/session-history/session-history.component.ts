@@ -307,7 +307,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
           this.attendanceService.getBySession(sess.id).subscribe({
             next: (rows) => {
               for (const r of rows) {
-                if (!studentMap.has(r.studentId)) studentMap.set(r.studentId, `${r.studentFirstName} ${r.studentLastName}`);
+                if (!studentMap.has(r.studentId)) studentMap.set(r.studentId, `${r.studentName}`);
                 att.set(`${r.studentId}|${sess.id}`, r.isPresent);
               }
             },

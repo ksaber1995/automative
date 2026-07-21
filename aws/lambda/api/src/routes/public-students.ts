@@ -49,7 +49,7 @@ export const publicStudentsRoutes = {
 
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name, s.company_id, s.branch_id,
+        `SELECT s.id, s.name, s.company_id, s.branch_id,
                 b.name AS branch_name, co.name AS academy_name, co.type AS company_type
          FROM students s
          JOIN branches b ON b.id = s.branch_id

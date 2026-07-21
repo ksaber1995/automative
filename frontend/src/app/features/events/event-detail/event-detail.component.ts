@@ -189,7 +189,7 @@ export class EventDetailComponent implements OnInit {
       next: (list) => {
         this.students.set(list);
         this.studentOptions.set(
-          list.map((s) => ({ label: `${s.firstName} ${s.lastName}`, value: s.id }))
+          list.map((s) => ({ label: s.name, value: s.id }))
         );
       },
     });

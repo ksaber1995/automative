@@ -414,7 +414,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.svc.getDueByToken(token).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.resolvingToken.set(false);
-        this.scannedStudentName.set(`${res.studentFirstName} ${res.studentLastName}`.trim());
+        this.scannedStudentName.set(`${res.studentName}`.trim());
         this.dueMonths.set(res.dueMonths);
         // Find an in-progress session for this student so the pay dialog can
         // offer to mark them present at the same time (default checked).
@@ -519,7 +519,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     const q = this.nameSearch().trim().toLowerCase();
     let rows = this.payments();
     if (status !== 'ALL') rows = rows.filter(p => p.paymentStatus === status);
-    if (q) rows = rows.filter(p => `${p.studentFirstName} ${p.studentLastName}`.toLowerCase().includes(q));
+    if (q) rows = rows.filter(p => `${p.studentName}`.toLowerCase().includes(q));
     this.filteredPayments.set([...rows]);
   }
 
@@ -620,7 +620,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   private markPresentForSession(session: ActiveSessionInfo, token: string): void {
     this.attendanceService.checkinByQr(session.sessionId, token).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
-        const name = `${res.studentFirstName} ${res.studentLastName}`.trim();
+        const name = `${res.studentName}`.trim();
         this.notify.success(
           this.translate.instant('MONTHLY_SUBSCRIPTIONS.ATTENDANCE_MARKED', { name, class: session.className })
         );
@@ -877,7 +877,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
    */
   sendPaymentReminder(p: MonthlyPaymentWithDetails): void {
     const text = renderWhatsappTemplate(this.templatesSvc.get('PAYMENT_DELAY'), {
-      studentName: `${p.studentFirstName} ${p.studentLastName}`,
+      studentName: `${p.studentName}`,
       academyName: this.auth.getCompanyName(),
       amount: String(p.amountDue - p.amountPaid),
       currency: '',

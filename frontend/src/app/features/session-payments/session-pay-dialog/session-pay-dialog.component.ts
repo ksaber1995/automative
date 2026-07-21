@@ -45,7 +45,7 @@ export class SessionPayDialogComponent {
   current = computed(() => this.queue()[0] ?? null);
   currentName = computed(() => {
     const c = this.current();
-    return c ? `${c.studentFirstName} ${c.studentLastName}` : '';
+    return c ? `${c.studentName}` : '';
   });
   visible = signal(false);
 
@@ -68,7 +68,7 @@ export class SessionPayDialogComponent {
         const remaining = c.packageRemaining;
         this.notify.info(
           this.translate.instant('SESSION_PAYMENTS.COVERED_TOAST', {
-            name: `${c.studentFirstName} ${c.studentLastName}`,
+            name: `${c.studentName}`,
             remaining: remaining != null ? remaining : '',
           })
         );

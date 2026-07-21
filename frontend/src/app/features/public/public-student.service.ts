@@ -104,8 +104,7 @@ export interface PublicStudentExam {
 
 export interface PublicStudentProfile {
   student: {
-    firstName: string;
-    lastName: string;
+    name: string;
     branchName: string;
     academyName: string;
   };

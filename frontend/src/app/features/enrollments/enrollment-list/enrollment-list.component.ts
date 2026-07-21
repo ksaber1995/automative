@@ -92,7 +92,7 @@ export class EnrollmentListComponent implements OnInit {
 
           return {
             ...e,
-            studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+            studentName: student ? student.name : 'Unknown',
             courseName: course?.name || 'Unknown',
           };
         });

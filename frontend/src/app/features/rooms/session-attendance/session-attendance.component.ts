@@ -130,7 +130,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     const list = this.students();
     if (!q) return list;
     return list.filter((s) => {
-      const name = `${s.studentFirstName} ${s.studentLastName}`.toLowerCase();
+      const name = `${s.studentName}`.toLowerCase();
       const code = formatStudentCode(s.studentCode);
       return name.includes(q) || (code !== '' && code.includes(q));
     });
@@ -270,7 +270,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private confirmChargeThen(student: SessionAttendanceStudent, onAccept: () => void) {
     const c = student.charge;
     if (!c) { onAccept(); return; }
-    const name = `${student.studentFirstName} ${student.studentLastName}`.trim();
+    const name = `${student.studentName}`.trim();
     const detail = c.amountPaid > 0
       ? this.translate.instant('SESSION_ATTENDANCE.UNCHECK_PAID', { amount: c.amountPaid })
       : this.translate.instant('SESSION_ATTENDANCE.UNCHECK_UNPAID', { amount: c.amountDue });
@@ -291,7 +291,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.attendanceService.removeAttendee(this.sessionId, student.studentId).subscribe({
       next: () => {
         this.students.update((list) => list.filter((s) => s.studentId !== student.studentId));
-        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.ATTENDEE_REMOVED', { name: `${student.studentFirstName} ${student.studentLastName}`.trim() }));
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.ATTENDEE_REMOVED', { name: `${student.studentName}`.trim() }));
       },
       error: () => {
         // Interceptor toasts the translated error.
@@ -498,7 +498,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
           this.absentStudentsForMessage.set(
             absent.map(st => ({
               studentId: st.studentId,
-              name: `${st.studentFirstName} ${st.studentLastName}`.trim(),
+              name: `${st.studentName}`.trim(),
               parentName: st.parentName ?? null,
               parentPhone: st.parentPhone ?? null,
               studentPhone: st.studentPhone ?? null,
@@ -624,7 +624,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private checkin(token: string) {
     this.attendanceService.checkinByQr(this.sessionId, token).subscribe({
       next: (res) => {
-        const name = `${res.studentFirstName} ${res.studentLastName}`;
+        const name = `${res.studentName}`;
         const isSub = res.attendanceType === 'SUBSTITUTION';
         this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent, attendanceType: res.attendanceType, homeClassName: res.homeClassName });
         this.playBeep(!res.alreadyPresent);
@@ -639,8 +639,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
           }
           return [...list, {
             studentId: res.studentId,
-            studentFirstName: res.studentFirstName,
-            studentLastName: res.studentLastName,
+            studentName: res.studentName,
             isPresent: true,
             attendanceType: res.attendanceType ?? null,
             homeClassName: res.homeClassName ?? null,

@@ -37,8 +37,7 @@ export const attendanceRoutes = {
       const students = await query(
         `SELECT
             s.id AS student_id,
-            s.first_name AS student_first_name,
-            s.last_name AS student_last_name,
+            s.name AS student_name,
             s.student_code AS student_code,
             s.parent_name AS parent_name,
             s.parent_phone AS parent_phone,
@@ -62,8 +61,7 @@ export const attendanceRoutes = {
 
          SELECT
             s.id AS student_id,
-            s.first_name AS student_first_name,
-            s.last_name AS student_last_name,
+            s.name AS student_name,
             s.student_code AS student_code,
             s.parent_name AS parent_name,
             s.parent_phone AS parent_phone,
@@ -83,7 +81,7 @@ export const attendanceRoutes = {
              SELECT student_id FROM master_class_enrollments
              WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
            )
-         ORDER BY student_first_name, student_last_name`,
+         ORDER BY student_name`,
         [session.class_id, context.companyId, params.sessionId]
       );
 
@@ -114,8 +112,7 @@ export const attendanceRoutes = {
         status: 200 as const,
         body: students.map((row: any) => ({
           studentId: row.student_id,
-          studentFirstName: row.student_first_name,
-          studentLastName: row.student_last_name,
+          studentName: row.student_name,
           studentCode: row.student_code ?? null,
           parentName: row.parent_name || null,
           parentPhone: row.parent_phone || null,
@@ -281,7 +278,7 @@ export const attendanceRoutes = {
       // default (no activation gate).
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name
+        `SELECT s.id, s.name
          FROM students s
          WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
@@ -332,8 +329,7 @@ export const attendanceRoutes = {
           status: 200 as const,
           body: {
             studentId: student.id,
-            studentFirstName: student.first_name,
-            studentLastName: student.last_name,
+            studentName: student.name,
             attendanceType: 'NORMAL' as const,
             homeClassName: null,
             sessionNumber: session.session_number ?? null,
@@ -394,8 +390,7 @@ export const attendanceRoutes = {
         status: 200 as const,
         body: {
           studentId: student.id,
-          studentFirstName: student.first_name,
-          studentLastName: student.last_name,
+          studentName: student.name,
           attendanceType: 'SUBSTITUTION' as const,
           homeClassName: siblingClass.name,
           sessionNumber: session.session_number ?? null,

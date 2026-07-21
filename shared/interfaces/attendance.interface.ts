@@ -8,8 +8,7 @@ export interface SessionAttendance {
 
 export interface SessionAttendanceStudent {
   studentId: string;
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   parentName?: string | null;
   parentPhone?: string | null;
   studentPhone?: string | null;

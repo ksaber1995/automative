@@ -642,7 +642,7 @@ export const enrollmentsRoutes = {
         query(
           `SELECT e.id, e.student_id, e.course_id AS course_id, e.branch_id, e.enrollment_date,
                   e.final_price, e.amount_paid, e.payment_status, e.status,
-                  s.first_name || ' ' || s.last_name AS student_name,
+                  s.name AS student_name,
                   c.name AS course_name,
                   b.name AS branch_name
            FROM enrollments e
@@ -656,7 +656,7 @@ export const enrollmentsRoutes = {
         query(
           `SELECT me.id, me.student_id, me.master_course_id AS course_id, me.branch_id, me.enrollment_date,
                   me.final_price, me.amount_paid, me.payment_status, me.status,
-                  s.first_name || ' ' || s.last_name AS student_name,
+                  s.name AS student_name,
                   mc.name AS course_name,
                   b.name AS branch_name
            FROM master_enrollments me
@@ -745,7 +745,7 @@ export const enrollmentsRoutes = {
       // event-only, or product sale) in a single global list.
       const refunds = await query(
         `SELECT r.*,
-                CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name ELSE NULL END AS student_name,
+                CASE WHEN s.id IS NOT NULL THEN s.name ELSE NULL END AS student_name,
                 COALESCE(c.name, mc.name) AS course_name,
                 COALESCE(b.name, mcb.name, evb.name, psb.name) AS branch_name,
                 COALESCE(e.branch_id, me.branch_id, ev.branch_id, ps.branch_id) AS branch_id,

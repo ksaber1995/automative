@@ -190,8 +190,7 @@ function mapSessionPaymentFromDB(row: any) {
 function mapSessionPaymentWithDetailsFromDB(row: any) {
   return {
     ...mapSessionPaymentFromDB(row),
-    studentFirstName: row.student_first_name,
-    studentLastName: row.student_last_name,
+    studentName: row.student_name,
     courseName: row.course_name,
     branchName: row.branch_name,
     className: row.class_name || null,
@@ -235,8 +234,7 @@ function mapPackageFromDB(row: any) {
 function mapPackageWithDetailsFromDB(row: any) {
   return {
     ...mapPackageFromDB(row),
-    studentFirstName: row.student_first_name,
-    studentLastName: row.student_last_name,
+    studentName: row.student_name,
     courseName: row.course_name,
     branchName: row.branch_name,
   };
@@ -245,8 +243,7 @@ function mapPackageWithDetailsFromDB(row: any) {
 // Columns + joins used to return "with details" rows.
 const DETAILS_SELECT = `
   sp.*,
-  s.first_name   AS student_first_name,
-  s.last_name    AS student_last_name,
+  s.name AS student_name,
   s.phone        AS student_phone,
   s.parent_phone AS parent_phone,
   s.parent_name  AS parent_name,
@@ -592,7 +589,7 @@ export const sessionPaymentsRoutes = {
       const rows = await query(
         `SELECT ${DETAILS_SELECT} ${DETAILS_FROM}
          WHERE ${conditions.join(' AND ')}
-         ORDER BY se.start_date DESC NULLS LAST, s.first_name, s.last_name`,
+         ORDER BY se.start_date DESC NULLS LAST, s.name`,
         params
       );
 
@@ -746,7 +743,7 @@ export const sessionPaymentsRoutes = {
       const rows = await query(
         `SELECT ${DETAILS_SELECT} ${DETAILS_FROM}
          WHERE ${conditions.join(' AND ')}
-         ORDER BY se.start_date ASC NULLS LAST, s.first_name, s.last_name`,
+         ORDER BY se.start_date ASC NULLS LAST, s.name`,
         params
       );
       return { status: 200 as const, body: rows.map(mapSessionPaymentWithDetailsFromDB) };
@@ -1088,8 +1085,7 @@ export const sessionPaymentsRoutes = {
 
       const rows = await query(
         `SELECT spkg.*,
-                s.first_name AS student_first_name,
-                s.last_name  AS student_last_name,
+                s.name AS student_name,
                 c.name       AS course_name,
                 b.name       AS branch_name
          FROM session_packages spkg
@@ -1149,8 +1145,7 @@ export const sessionPaymentsRoutes = {
         `SELECT
            e.id AS enrollment_id,
            e.student_id, e.branch_id, e.course_id,
-           s.first_name AS student_first_name,
-           s.last_name  AS student_last_name,
+           s.name AS student_name,
            c.name       AS course_name,
            c.session_package_size  AS package_size,
            c.session_package_price AS package_price,
@@ -1184,8 +1179,7 @@ export const sessionPaymentsRoutes = {
           studentId: r.student_id,
           branchId: r.branch_id,
           courseId: r.course_id,
-          studentFirstName: r.student_first_name,
-          studentLastName: r.student_last_name,
+          studentName: r.student_name,
           courseName: r.course_name,
           branchName: r.branch_name,
           packageSize: r.package_size != null ? Number(r.package_size) : null,
@@ -1268,7 +1262,7 @@ export const sessionPaymentsRoutes = {
       }
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name FROM students s
+        `SELECT s.id, s.name FROM students s
          WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
       );
@@ -1290,8 +1284,7 @@ export const sessionPaymentsRoutes = {
         status: 200 as const,
         body: {
           studentId: student.id,
-          studentFirstName: student.first_name,
-          studentLastName: student.last_name,
+          studentName: student.name,
           dueSessions,
         },
       };

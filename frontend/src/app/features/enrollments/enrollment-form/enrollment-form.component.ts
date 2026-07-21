@@ -329,7 +329,7 @@ export class EnrollmentFormComponent implements OnInit {
       this.classService.getAllClasses().subscribe({ next: (c) => { this.classes.set(c.filter(x => x.isActive)); check(); }, error: () => check() });
       this.masterCourseService.getAll().subscribe({ next: (m) => { this.masters.set(m); check(); }, error: () => check() });
       this.studentService.getAllStudents().subscribe({
-        next: (s) => { this.students.set(s.filter(x => x.isActive).map(x => ({ ...x, fullName: `${x.firstName} ${x.lastName}` }))); check(); },
+        next: (s) => { this.students.set(s.filter(x => x.isActive).map(x => ({ ...x, fullName: x.name }))); check(); },
         error: () => check()
       });
     });

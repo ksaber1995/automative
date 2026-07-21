@@ -286,7 +286,7 @@ export const qrCardsRoutes = {
 
       let sql = `
         SELECT c.*,
-               TRIM(CONCAT(s.first_name, ' ', s.last_name)) AS student_name,
+               s.name AS student_name,
                s.student_code
         FROM qr_cards c
         LEFT JOIN students s ON s.id = c.student_id

@@ -69,7 +69,7 @@ export class ClassDetailComponent implements OnInit {
     const term = this.studentFilter().trim().toLowerCase();
     if (!term) return this.enrollments();
     return this.enrollments().filter(e =>
-      `${e.studentFirstName ?? ''} ${e.studentLastName ?? ''}`.toLowerCase().includes(term)
+      `${e.studentName ?? ''}`.toLowerCase().includes(term)
     );
   });
   sessions = signal<Session[]>([]);

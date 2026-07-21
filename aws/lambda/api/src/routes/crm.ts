@@ -458,9 +458,9 @@ export const crmRoutes = {
       }
       if (!branchId) return apiError(400, 'ERRORS.CRM.NO_BRANCH', 'No branch available to place the student');
 
-      const parts = String(lead.full_name).trim().split(/\s+/);
-      const firstName = parts.shift() || lead.full_name;
-      const lastName = parts.join(' ') || '-';
+      // A lead already carries one full name, and so does a student now — no
+      // splitting on the way across (migration 070).
+      const name = String(lead.full_name).trim();
 
       const codeRow = await queryOne<{ next: number }>(
         `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students
@@ -470,8 +470,7 @@ export const crmRoutes = {
 
       const student = await insert('students', {
         company_id: context.companyId,
-        first_name: firstName,
-        last_name: lastName,
+        name,
         email: lead.email || null,
         phone: lead.phone || null,
         branch_id: branchId,
@@ -945,13 +944,13 @@ export const crmRoutes = {
 
       // Outstanding balance on active enrollments (unpaid dues).
       const dues = await query<any>(
-        `SELECT e.student_id, s.first_name, s.last_name, s.phone, s.parent_name, s.parent_phone, e.branch_id,
+        `SELECT e.student_id, s.name, s.phone, s.parent_name, s.parent_phone, e.branch_id,
                 SUM(GREATEST(COALESCE(e.final_price,0) - COALESCE(e.amount_paid,0), 0))::numeric AS balance
          FROM enrollments e JOIN students s ON s.id = e.student_id
          WHERE e.company_id = $1 AND s.is_active = true
            AND e.status IN ('ACTIVE', 'PENDING', 'ON_HOLD')
            AND COALESCE(e.final_price,0) > COALESCE(e.amount_paid,0)
-         GROUP BY e.student_id, s.first_name, s.last_name, s.phone, s.parent_name, s.parent_phone, e.branch_id`,
+         GROUP BY e.student_id, s.name, s.phone, s.parent_name, s.parent_phone, e.branch_id`,
         [cid]
       );
       for (const r of dues) add(r, 'DUES', parseFloat(r.balance) || 0);
@@ -960,13 +959,13 @@ export const crmRoutes = {
       const hasMsp = await queryOne<any>(`SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS ok`);
       if (hasMsp?.ok) {
         const subs = await query<any>(
-          `SELECT msp.student_id, s.first_name, s.last_name, s.phone, s.parent_name, s.parent_phone, s.branch_id,
+          `SELECT msp.student_id, s.name, s.phone, s.parent_name, s.parent_phone, s.branch_id,
                   SUM(GREATEST(COALESCE(msp.amount_due,0) - COALESCE(msp.amount_paid,0), 0))::numeric AS balance
            FROM monthly_subscription_payments msp JOIN students s ON s.id = msp.student_id
            WHERE s.company_id = $1 AND s.is_active = true
              AND msp.payment_status IN ('PENDING', 'PARTIAL', 'OVERDUE')
              AND msp.due_date < CURRENT_DATE
-           GROUP BY msp.student_id, s.first_name, s.last_name, s.phone, s.parent_name, s.parent_phone, s.branch_id`,
+           GROUP BY msp.student_id, s.name, s.phone, s.parent_name, s.parent_phone, s.branch_id`,
           [cid]
         );
         for (const r of subs) add(r, 'SUBSCRIPTION', parseFloat(r.balance) || 0);

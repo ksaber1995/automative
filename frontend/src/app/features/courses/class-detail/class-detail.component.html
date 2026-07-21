@@ -132,7 +132,7 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="studentFirstName">{{ 'CLASSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentFirstName"></p-sortIcon></th>
+                <th pSortableColumn="studentName">{{ 'CLASSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
                 <th pSortableColumn="enrollmentDate">{{ 'CLASSES.DETAIL.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
                 <th pSortableColumn="status">{{ 'CLASSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                 <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
@@ -141,7 +141,7 @@
             <ng-template pTemplate="body" let-row>
               <tr>
                 <td class="font-medium">
-                  <div>{{ row.studentFirstName }} {{ row.studentLastName }}</div>
+                  <div>{{ row.studentName }}</div>
                   @if (row.enrollmentType === 'MASTER') {
                     <div class="text-xs text-purple-600 font-normal mt-0.5">{{ 'CLASSES.DETAIL.BUNDLE_PREFIX' | translate }} {{ row.masterCourseName }}</div>
                   }
@@ -402,7 +402,7 @@
               [inputId]="'att-' + student.studentId"
             ></p-checkbox>
             <label [for]="'att-' + student.studentId" class="cursor-pointer font-medium text-gray-800">
-              {{ student.studentFirstName }} {{ student.studentLastName }}
+              {{ student.studentName }}
             </label>
           </div>
           <span class="text-xs font-semibold px-2 py-0.5 rounded-full"

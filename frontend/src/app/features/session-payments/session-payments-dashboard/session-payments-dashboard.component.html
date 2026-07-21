@@ -149,7 +149,7 @@
         </ng-template>
         <ng-template pTemplate="body" let-row>
           <tr [class.bg-yellow-50]="row.paymentStatus === 'PENDING'">
-            <td>{{ row.studentFirstName }} {{ row.studentLastName }}</td>
+            <td>{{ row.studentName }}</td>
             <td>{{ row.courseName }}</td>
             <td>
               <div class="flex items-center gap-2 flex-wrap">
@@ -218,7 +218,7 @@
         <ng-template pTemplate="body" let-row>
           @if (row.kind === 'renewal') {
             <tr class="bg-amber-50">
-              <td>{{ row.r.studentFirstName }} {{ row.r.studentLastName }}</td>
+              <td>{{ row.r.studentName }}</td>
               <td>{{ row.r.courseName }}</td>
               <td>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -240,7 +240,7 @@
             </tr>
           } @else {
             <tr>
-              <td>{{ row.p.studentFirstName }} {{ row.p.studentLastName }}</td>
+              <td>{{ row.p.studentName }}</td>
               <td>{{ row.p.courseName }}</td>
               <td>{{ row.p.sessionsUsed }} / {{ row.p.sessionsTotal }}</td>
               <td>{{ row.p.sessionsTotal - row.p.sessionsUsed }}</td>
@@ -292,7 +292,7 @@
   @if (selectedRenewal(); as r) {
     <div class="flex flex-col gap-3 pt-2">
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
-        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ r.studentFirstName }} {{ r.studentLastName }}</span></div>
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ r.studentName }}</span></div>
         <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</span><span class="font-medium text-gray-800">{{ r.courseName }}</span></div>
         <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.PKG_LABEL' | translate }}</span><span class="font-medium text-gray-800">{{ 'SESSION_PAYMENTS.PKG_SESSIONS_OF' | translate: { count: r.packageSize } }} — {{ (r.packagePrice || 0) | amount }}</span></div>
       </div>
@@ -387,9 +387,9 @@
         <span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span>
         <span class="font-medium text-gray-800">
           @if (refundPackageTarget(); as p) {
-            {{ p.studentFirstName }} {{ p.studentLastName }}
+            {{ p.studentName }}
           } @else {
-            {{ selected()?.studentFirstName }} {{ selected()?.studentLastName }}
+            {{ selected()?.studentName }}
           }
         </span>
       </div>
@@ -426,7 +426,7 @@
   @if (selectedPackage(); as p) {
     <div class="flex flex-col gap-3 pt-2">
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
-        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ p.studentFirstName }} {{ p.studentLastName }}</span></div>
+        <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</span><span class="font-medium text-gray-800">{{ p.studentName }}</span></div>
         <div class="flex justify-between"><span>{{ 'SESSION_PAYMENTS.COL_PKG_REMAINING' | translate }}</span><span class="font-medium text-red-600">{{ packageRemaining(p) | amount }}</span></div>
       </div>
       <div class="flex flex-col gap-1">

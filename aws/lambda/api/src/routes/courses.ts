@@ -420,8 +420,7 @@ export const coursesRoutes = {
         `SELECT
           e.id as enrollment_id,
           e.student_id,
-          s.first_name as student_first_name,
-          s.last_name as student_last_name,
+          s.name AS student_name,
           e.class_id,
           cl.name as class_name,
           e.enrollment_date,
@@ -450,8 +449,7 @@ export const coursesRoutes = {
         body: enrollments.map((row: any) => ({
           enrollmentId: row.enrollment_id,
           studentId: row.student_id,
-          studentFirstName: row.student_first_name,
-          studentLastName: row.student_last_name,
+          studentName: row.student_name,
           classId: row.class_id,
           className: row.class_name,
           enrollmentDate: row.enrollment_date,

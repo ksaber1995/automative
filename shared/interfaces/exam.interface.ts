@@ -46,8 +46,7 @@ export interface ExamUpdateDto extends Partial<ExamCreateDto> {
 /** One row of the grading roster: an enrolled student + their grade (if any). */
 export interface ExamResultRow {
   studentId: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   /** Short student code (for search / manual entry). */
   code?: number | string | null;
   parentName?: string | null;
@@ -62,8 +61,7 @@ export interface ExamResultRow {
 /** Result of a QR scan grade recording. */
 export interface QrExamResult {
   studentId: string;
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   grade: string;
   alreadyRecorded: boolean;
 }

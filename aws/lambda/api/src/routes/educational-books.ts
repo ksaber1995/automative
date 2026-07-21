@@ -103,7 +103,7 @@ export const educationalBooksRoutes = {
       const roster = await query(
         `SELECT DISTINCT ON (e.student_id)
                 e.student_id, e.id AS enrollment_id, s.student_code,
-                NULLIF(TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')), '') AS student_name
+                NULLIF(TRIM(COALESCE(s.name,'')), '') AS student_name
          FROM enrollments e
          JOIN students s ON e.student_id = s.id
          WHERE e.course_id = $1 AND e.company_id = $2 AND e.status IN ${ENROLLED_STATUSES}

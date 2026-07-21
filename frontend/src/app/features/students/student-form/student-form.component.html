@@ -5,52 +5,23 @@
       <div class="mb-6">
         <h3 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">{{ 'STUDENTS.FORM.STUDENT_SECTION' | translate }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- First Name -->
-          <div class="field">
-            <label for="firstName" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
+          <!-- Name: one field. The old first/last split made adding a
+               student a four-box chore and bought nothing (migration 070). -->
+          <div class="field md:col-span-2">
+            <label for="name" class="block text-sm font-medium mb-2">
+              {{ 'STUDENTS.FORM.NAME' | translate }} <span class="text-red-500">*</span>
             </label>
             <input
-              id="firstName"
+              id="name"
               pInputText
-              formControlName="firstName"
+              formControlName="name"
               class="w-full"
-              [placeholder]="'STUDENTS.FORM.FIRST_NAME_PLACEHOLDER' | translate"
-              [class.ng-invalid]="firstName?.invalid && firstName?.touched"
+              [placeholder]="'STUDENTS.FORM.NAME_PLACEHOLDER' | translate"
+              [class.ng-invalid]="name?.invalid && name?.touched"
             />
-            @if (firstName?.invalid && firstName?.touched) {
+            @if (name?.invalid && name?.touched) {
               <small class="text-red-500 block mt-1">
-                @if (firstName?.errors?.['required']) {
-                  {{ 'STUDENTS.FORM.FIRST_NAME_REQUIRED' | translate }}
-                }
-                @if (firstName?.errors?.['minlength']) {
-                  {{ 'STUDENTS.FORM.FIRST_NAME_MIN' | translate }}
-                }
-              </small>
-            }
-          </div>
-
-          <!-- Last Name -->
-          <div class="field">
-            <label for="lastName" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.LAST_NAME' | translate }} <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="lastName"
-              pInputText
-              formControlName="lastName"
-              class="w-full"
-              [placeholder]="'STUDENTS.FORM.LAST_NAME_PLACEHOLDER' | translate"
-              [class.ng-invalid]="lastName?.invalid && lastName?.touched"
-            />
-            @if (lastName?.invalid && lastName?.touched) {
-              <small class="text-red-500 block mt-1">
-                @if (lastName?.errors?.['required']) {
-                  {{ 'STUDENTS.FORM.LAST_NAME_REQUIRED' | translate }}
-                }
-                @if (lastName?.errors?.['minlength']) {
-                  {{ 'STUDENTS.FORM.LAST_NAME_MIN' | translate }}
-                }
+                {{ 'STUDENTS.FORM.NAME_REQUIRED' | translate }}
               </small>
             }
           </div>
@@ -181,7 +152,7 @@
           <!-- Parent Name -->
           <div class="field">
             <label for="parentName" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.PARENT_NAME' | translate }} <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.PARENT_NAME' | translate }}
             </label>
             <input
               id="parentName"
@@ -206,7 +177,7 @@
           <!-- Parent Phone -->
           <div class="field">
             <label for="parentPhone" class="block text-sm font-medium mb-2">
-              {{ 'STUDENTS.FORM.PARENT_PHONE' | translate }} <span class="text-red-500">*</span>
+              {{ 'STUDENTS.FORM.PARENT_PHONE' | translate }}
             </label>
             <input
               id="parentPhone"

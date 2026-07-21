@@ -393,14 +393,14 @@ export const examsRoutes = {
       if (byClass) rosterParams.push(exam.class_id);
 
       const rows = await query<any>(
-        `SELECT s.id AS student_id, s.first_name, s.last_name, s.student_code,
+        `SELECT s.id AS student_id, s.name, s.student_code,
                 s.parent_name, s.parent_phone, s.phone,
                 r.grade, r.is_absent, r.recorded_at
          FROM students s
          JOIN (${enrolledSql}) en ON en.student_id = s.id
          LEFT JOIN exam_results r ON r.exam_id = $3 AND r.student_id = s.id
          WHERE s.company_id = $2 AND s.is_active = true
-         ORDER BY s.first_name, s.last_name`,
+         ORDER BY s.name`,
         rosterParams,
       );
 
@@ -454,7 +454,7 @@ export const examsRoutes = {
 
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name FROM students s
+        `SELECT s.id, s.name FROM students s
          WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId],
       );
@@ -480,8 +480,7 @@ export const examsRoutes = {
         status: 200 as const,
         body: {
           studentId: student.id,
-          studentFirstName: student.first_name,
-          studentLastName: student.last_name,
+          studentName: student.name,
           grade,
           alreadyRecorded,
           code: alreadyRecorded ? 'EXAMS.GRADE_UPDATED' : 'EXAMS.GRADE_RECORDED',
@@ -548,8 +547,7 @@ export const examsRoutes = {
         status: 200 as const,
         body: {
           studentId: student.id,
-          studentFirstName: student.first_name,
-          studentLastName: student.last_name,
+          studentName: student.name,
           grade,
           alreadyRecorded,
           code: alreadyRecorded ? 'EXAMS.GRADE_UPDATED' : 'EXAMS.GRADE_RECORDED',

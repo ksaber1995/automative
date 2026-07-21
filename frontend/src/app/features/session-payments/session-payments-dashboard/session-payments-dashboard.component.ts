@@ -470,7 +470,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.resolvingToken.set(false);
         this.closeScanner();
-        const name = `${res.studentFirstName} ${res.studentLastName}`.trim();
+        const name = `${res.studentName}`.trim();
         if (!res.dueSessions.length) {
           this.notify.info(this.translate.instant('SESSION_PAYMENTS.SCAN_NO_DUE', { name }));
           return;

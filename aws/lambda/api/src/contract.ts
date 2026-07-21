@@ -338,14 +338,15 @@ const AcquisitionChannelSchema = z.enum(ACQUISITION_CHANNELS);
 const GenderSchema = z.enum(['MALE', 'FEMALE']);
 
 const CreateStudentSchema = z.object({
-  firstName: z.string(),
-  lastName: z.string(),
+  // One name field. The old first/last split bought nothing and made adding a
+  // student a four-box chore (migration 070).
+  name: z.string().min(1),
   dateOfBirth: z.string().nullable().optional(),
   gender: GenderSchema.nullable().optional(),
   email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
   phone: z.string().nullable().optional(),
-  parentName: z.string(),
-  parentPhone: z.string(),
+  parentName: z.string().nullable().optional(),
+  parentPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   branchId: UUIDSchema,
   notes: z.string().nullable().optional(),
@@ -355,12 +356,11 @@ const CreateStudentSchema = z.object({
 const UpdateStudentSchema = CreateStudentSchema.partial();
 
 // One parsed row from the bulk-import spreadsheet. Kept deliberately lenient
-// (only firstName is required; email/phone are free strings, not format-checked)
+// (only name is required; email/phone are free strings, not format-checked)
 // so a single malformed cell can't reject the whole batch — the frontend has
 // already validated/previewed the rows, and the backend records per-row errors.
 const BulkImportStudentRowSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().optional(),
+  name: z.string().min(1),
   gender: GenderSchema.nullable().optional(),
   dateOfBirth: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
@@ -385,14 +385,13 @@ const BulkImportResultSchema = z.object({
 const StudentSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
-  firstName: z.string(),
-  lastName: z.string(),
+  name: z.string(),
   dateOfBirth: z.string().nullable(),
   gender: GenderSchema.nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
-  parentName: z.string(),
-  parentPhone: z.string(),
+  parentName: z.string().nullable(),
+  parentPhone: z.string().nullable(),
   address: z.string().nullable(),
   branchId: UUIDSchema,
   isActive: z.boolean(),
@@ -667,8 +666,7 @@ const ExamSchema = z.object({
 
 const ExamResultRowSchema = z.object({
   studentId: UUIDSchema,
-  firstName: z.string(),
-  lastName: z.string(),
+  name: z.string(),
   parentName: z.string().nullable().optional(),
   parentPhone: z.string().nullable().optional(),
   studentPhone: z.string().nullable().optional(),
@@ -679,8 +677,7 @@ const ExamResultRowSchema = z.object({
 
 const QrExamResultSchema = z.object({
   studentId: UUIDSchema,
-  studentFirstName: z.string(),
-  studentLastName: z.string(),
+  studentName: z.string(),
   grade: z.string(),
   alreadyRecorded: z.boolean(),
   code: z.string(),
@@ -761,8 +758,7 @@ const MonthlySubscriptionPaymentSchema = z.object({
 });
 
 const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend({
-  studentFirstName: z.string(),
-  studentLastName: z.string(),
+  studentName: z.string(),
   courseName: z.string(),
   branchName: z.string(),
   className: z.string().nullable().optional(),
@@ -777,8 +773,7 @@ const HeldSubscriptionSchema = z.object({
   studentId: z.string(),
   courseId: z.string(),
   branchId: z.string(),
-  studentFirstName: z.string(),
-  studentLastName: z.string(),
+  studentName: z.string(),
   courseName: z.string(),
   branchName: z.string(),
   className: z.string().nullable().optional(),
@@ -858,8 +853,7 @@ const SessionPaymentSchema = z.object({
 });
 
 const SessionPaymentWithDetailsSchema = SessionPaymentSchema.extend({
-  studentFirstName: z.string(),
-  studentLastName: z.string(),
+  studentName: z.string(),
   courseName: z.string(),
   branchName: z.string(),
   className: z.string().nullable().optional(),
@@ -908,8 +902,7 @@ const SessionPackageSchema = z.object({
 });
 
 const SessionPackageWithDetailsSchema = SessionPackageSchema.extend({
-  studentFirstName: z.string(),
-  studentLastName: z.string(),
+  studentName: z.string(),
   courseName: z.string(),
   branchName: z.string(),
 });
@@ -3066,8 +3059,7 @@ export const contract = c.router({
       responses: {
         200: z.object({
           student: z.object({
-            firstName: z.string(),
-            lastName: z.string(),
+            name: z.string(),
             branchName: z.string(),
             academyName: z.string(),
           }),
@@ -3497,8 +3489,7 @@ export const contract = c.router({
         200: z.array(z.object({
           enrollmentId: UUIDSchema,
           studentId: UUIDSchema,
-          studentFirstName: z.string(),
-          studentLastName: z.string(),
+          studentName: z.string(),
           enrollmentDate: z.string(),
           status: EnrollmentStatusSchema,
           paymentMode: PaymentModeSchema,
@@ -5893,8 +5884,7 @@ export const contract = c.router({
       responses: {
         200: z.array(z.object({
           studentId: UUIDSchema,
-          studentFirstName: z.string(),
-          studentLastName: z.string(),
+          studentName: z.string(),
           studentCode: z.number().nullable().optional(),
           parentName: z.string().nullable().optional(),
           parentPhone: z.string().nullable().optional(),
@@ -5946,8 +5936,7 @@ export const contract = c.router({
       responses: {
         200: z.object({
           studentId: UUIDSchema,
-          studentFirstName: z.string(),
-          studentLastName: z.string(),
+          studentName: z.string(),
           alreadyPresent: z.boolean(),
           attendanceType: z.enum(['NORMAL', 'SUBSTITUTION']).optional(),
           homeClassName: z.string().nullable().optional(),
@@ -6400,8 +6389,7 @@ export const contract = c.router({
       responses: {
         200: z.object({
           studentId: z.string(),
-          studentFirstName: z.string(),
-          studentLastName: z.string(),
+          studentName: z.string(),
           dueMonths: z.array(MonthlyPaymentWithDetailsSchema),
         }),
         403: ApiErrorSchema,
@@ -6629,8 +6617,7 @@ export const contract = c.router({
       responses: {
         200: z.object({
           studentId: z.string(),
-          studentFirstName: z.string(),
-          studentLastName: z.string(),
+          studentName: z.string(),
           dueSessions: z.array(SessionPaymentWithDetailsSchema),
         }),
         403: ApiErrorSchema,

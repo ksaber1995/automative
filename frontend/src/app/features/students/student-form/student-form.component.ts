@@ -61,14 +61,14 @@ export class StudentFormComponent implements OnInit {
 
   constructor() {
     this.studentForm = this.fb.group({
-      firstName: ['', [Validators.required]],
-      lastName: ['', [Validators.required]],
+      name: ['', [Validators.required]],
       dateOfBirth: [null],
       gender: [null, [Validators.required]],
       email: ['', [Validators.email]],
       phone: [''],
-      parentName: ['', [Validators.required]],
-      parentPhone: ['', [Validators.required]],
+      // Guardian details are optional: a student needs a name, nothing more.
+      parentName: [''],
+      parentPhone: [''],
       address: [''],
       branchId: ['', [Validators.required]],
       notes: [''],
@@ -161,8 +161,7 @@ export class StudentFormComponent implements OnInit {
     this.router.navigate(['/students']);
   }
 
-  get firstName() { return this.studentForm.get('firstName'); }
-  get lastName() { return this.studentForm.get('lastName'); }
+  get name() { return this.studentForm.get('name'); }
   get dateOfBirth() { return this.studentForm.get('dateOfBirth'); }
   get gender() { return this.studentForm.get('gender'); }
   get email() { return this.studentForm.get('email'); }

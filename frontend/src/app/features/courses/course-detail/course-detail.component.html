@@ -134,7 +134,7 @@
       >
         <ng-template pTemplate="header">
           <tr>
-            <th pSortableColumn="studentFirstName">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentFirstName"></p-sortIcon></th>
+            <th pSortableColumn="studentName">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
             <th pSortableColumn="className">{{ 'COURSES.DETAIL.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
             <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
             <th pSortableColumn="status">{{ 'COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
@@ -147,7 +147,7 @@
 
         <ng-template pTemplate="body" let-row>
           <tr>
-            <td class="font-medium">{{ row.studentFirstName }} {{ row.studentLastName }}</td>
+            <td class="font-medium">{{ row.studentName }}</td>
             <td class="text-sm text-gray-600">{{ row.className || '—' }}</td>
             <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
             <td>
@@ -497,14 +497,14 @@
                   <p-table [value]="cls.students" responsiveLayout="scroll">
                     <ng-template pTemplate="header">
                       <tr>
-                        <th pSortableColumn="firstName">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="firstName"></p-sortIcon></th>
+                        <th pSortableColumn="name">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
                         <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
                         <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
                       </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-student>
                       <tr>
-                        <td>{{ student.firstName }} {{ student.lastName }}</td>
+                        <td>{{ student.name }}</td>
                         <td>{{ formatDate(student.enrollmentDate) }}</td>
                         <td>
                           <p-tag
@@ -539,7 +539,7 @@
 <!-- Add Payment Dialog -->
 <p-dialog
   [(visible)]="showPaymentDialog"
-  [header]="'COURSES.DETAIL.PAYMENT_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '') }"
+  [header]="'COURSES.DETAIL.PAYMENT_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentName || '') }"
   [modal]="true"
   [style]="{ width: '450px' }"
   [closable]="true"
@@ -609,7 +609,7 @@
 <!-- Refund Dialog -->
 <p-dialog
   [(visible)]="showRefundDialog"
-  [header]="'COURSES.DETAIL.REFUND_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentFirstName || '') + ' ' + (selectedEnrollment()?.studentLastName || '') }"
+  [header]="'COURSES.DETAIL.REFUND_DIALOG_TITLE' | translate: { name: (selectedEnrollment()?.studentName || '') }"
   [modal]="true"
   [style]="{ width: '480px' }"
   [closable]="true"

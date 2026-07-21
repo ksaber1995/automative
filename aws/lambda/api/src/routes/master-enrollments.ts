@@ -75,7 +75,7 @@ function mapWithProgress(row: any) {
 const SELECT_WITH_PROGRESS = `
   SELECT
     me.*,
-    CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+    s.name AS student_name,
     mc.name AS master_course_name,
     mc.default_price AS master_course_price,
     b.name AS branch_name,

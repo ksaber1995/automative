@@ -8,8 +8,7 @@ export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
 
 export interface SessionAttendanceStudent {
   studentId: string;
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   studentCode?: number | null;
   parentName?: string | null;
   parentPhone?: string | null;
@@ -38,8 +37,7 @@ export interface StudentAttendanceRecord {
 
 export interface QrCheckinResult {
   studentId: string;
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   alreadyPresent: boolean;
   attendanceType?: AttendanceType;
   homeClassName?: string | null;

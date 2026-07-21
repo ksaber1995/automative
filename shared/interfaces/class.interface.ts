@@ -89,8 +89,7 @@ export interface ClassWithDetails extends Class {
   };
   students?: Array<{
     id: string;
-    firstName: string;
-    lastName: string;
+    name: string;
     email?: string;
     enrollmentStatus?: string;
   }>;

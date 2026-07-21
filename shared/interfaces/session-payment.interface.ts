@@ -23,8 +23,7 @@ export interface SessionPayment {
 }
 
 export interface SessionPaymentWithDetails extends SessionPayment {
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   courseName: string;
   branchName: string;
   className?: string | null;
@@ -54,8 +53,7 @@ export interface PackageRenewalDue {
   studentId: string;
   branchId: string;
   courseId: string;
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   courseName: string;
   branchName: string;
   packageSize: number | null;
@@ -104,8 +102,7 @@ export interface SessionPackage {
 }
 
 export interface SessionPackageWithDetails extends SessionPackage {
-  studentFirstName: string;
-  studentLastName: string;
+  studentName: string;
   courseName: string;
   branchName: string;
 }

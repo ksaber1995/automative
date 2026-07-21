@@ -201,7 +201,7 @@
       </ng-template>
       <ng-template pTemplate="body" let-h>
         <tr>
-          <td class="font-medium">{{ h.studentFirstName }} {{ h.studentLastName }}</td>
+          <td class="font-medium">{{ h.studentName }}</td>
           <td>{{ h.courseName }}</td>
           @if (!isTeacher) {
           <td>{{ h.branchName }}</td>
@@ -285,7 +285,7 @@
               <span class="text-gray-300">—</span>
             }
           </td>
-          <td class="font-medium">{{ p.studentFirstName }} {{ p.studentLastName }}</td>
+          <td class="font-medium">{{ p.studentName }}</td>
           <td>{{ p.courseName }}</td>
           @if (!isTeacher) {
           <td>{{ p.branchName }}</td>
@@ -443,7 +443,7 @@
   @if (selectedPayment(); as sel) {
     <div class="flex flex-col gap-4 pt-2">
       <div class="text-sm text-gray-700">
-        <strong>{{ sel.studentFirstName }} {{ sel.studentLastName }}</strong>
+        <strong>{{ sel.studentName }}</strong>
         &mdash; {{ sel.courseName }} &middot; {{ periodLabel(sel) }}
       </div>
 
@@ -515,7 +515,7 @@
   @if (voidTarget(); as v) {
     <div class="flex flex-col gap-4 pt-2">
       <div class="text-sm text-gray-700">
-        <strong>{{ v.studentFirstName }} {{ v.studentLastName }}</strong>
+        <strong>{{ v.studentName }}</strong>
         &mdash; {{ v.courseName }} &middot; {{ periodLabel(v) }}
       </div>
       <p class="text-sm text-gray-500">{{ 'MONTHLY_SUBSCRIPTIONS.VOID_HELP' | translate }}</p>
@@ -545,7 +545,7 @@
   @if (refundTarget(); as r) {
     <div class="flex flex-col gap-4 pt-2">
       <div class="text-sm text-gray-700">
-        <strong>{{ r.studentFirstName }} {{ r.studentLastName }}</strong>
+        <strong>{{ r.studentName }}</strong>
         &mdash; {{ r.courseName }} &middot; {{ periodLabel(r) }}
       </div>
       <div class="text-sm text-gray-500">

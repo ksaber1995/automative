@@ -245,7 +245,7 @@
                                 ></p-checkbox>
                                 <label [for]="'uatt-' + sessionId + '-' + student.studentId"
                                   class="cursor-pointer text-sm font-medium text-gray-800">
-                                  {{ student.studentFirstName }} {{ student.studentLastName }}
+                                  {{ student.studentName }}
                                 </label>
                               </div>
                               <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -507,7 +507,7 @@
                                 ></p-checkbox>
                                 <label [for]="'att-' + session.id + '-' + student.studentId"
                                   class="cursor-pointer text-sm font-medium text-gray-800">
-                                  {{ student.studentFirstName }} {{ student.studentLastName }}
+                                  {{ student.studentName }}
                                   @if (student.attendanceType === 'SUBSTITUTION') {
                                     <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                                       {{ 'SESSIONS_DASHBOARD.SUBSTITUTION_FROM' | translate: { className: student.homeClassName } }}

@@ -279,7 +279,7 @@
                   @if (d.present.length) {
                     <ul class="list-disc ms-5 text-sm text-gray-700">
                       @for (s of d.present; track s.studentId) {
-                        <li>{{ s.studentFirstName }} {{ s.studentLastName }}</li>
+                        <li>{{ s.studentName }}</li>
                       }
                     </ul>
                   } @else {
@@ -293,7 +293,7 @@
                   @if (d.absent.length) {
                     <ul class="list-disc ms-5 text-sm text-gray-700">
                       @for (s of d.absent; track s.studentId) {
-                        <li>{{ s.studentFirstName }} {{ s.studentLastName }}</li>
+                        <li>{{ s.studentName }}</li>
                       }
                     </ul>
                   } @else {

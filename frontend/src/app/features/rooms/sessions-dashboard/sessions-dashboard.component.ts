@@ -852,7 +852,7 @@ export class SessionsDashboardComponent implements OnInit {
     // PER_SESSION: un-checking a student who already has a charge deletes it (and
     // any payment). Confirm before the destructive save; cancel snaps the box back.
     if (!value && student.charge) {
-      const name = `${student.studentFirstName} ${student.studentLastName}`.trim();
+      const name = `${student.studentName}`.trim();
       const detail = student.charge.amountPaid > 0
         ? this.translate.instant('SESSION_ATTENDANCE.UNCHECK_PAID', { amount: student.charge.amountPaid })
         : this.translate.instant('SESSION_ATTENDANCE.UNCHECK_UNPAID', { amount: student.charge.amountDue });

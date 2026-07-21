@@ -30,8 +30,7 @@ function mapPaymentFromDB(row: any) {
 function mapPaymentWithDetailsFromDB(row: any) {
   return {
     ...mapPaymentFromDB(row),
-    studentFirstName: row.student_first_name,
-    studentLastName: row.student_last_name,
+    studentName: row.student_name,
     // The code, plus what the UI needs to decide whether it may be shown yet:
     // a TEACHER company only reveals it once the student's QR is live.
     studentCode: row.student_code ?? null,
@@ -386,8 +385,7 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query(
         `SELECT
            msp.*,
-           s.first_name   AS student_first_name,
-           s.last_name    AS student_last_name,
+           s.name AS student_name,
            s.student_code AS student_code,
            s.qr_activated AS qr_activated,
            s.qr_expiration AS qr_expiration,
@@ -405,7 +403,7 @@ export const monthlySubscriptionsRoutes = {
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
          WHERE ${conditions.join(' AND ')}
-         ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.first_name, s.last_name`,
+         ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.name`,
         params
       );
 
@@ -464,8 +462,7 @@ export const monthlySubscriptionsRoutes = {
            e.branch_id,
            e.hold_start_month,
            e.hold_start_year,
-           s.first_name   AS student_first_name,
-           s.last_name    AS student_last_name,
+           s.name AS student_name,
            s.student_code AS student_code,
            s.qr_activated AS qr_activated,
            s.qr_expiration AS qr_expiration,
@@ -478,7 +475,7 @@ export const monthlySubscriptionsRoutes = {
          JOIN branches b ON e.branch_id  = b.id
          LEFT JOIN classes cl ON e.class_id = cl.id
          WHERE ${conditions.join(' AND ')}
-         ORDER BY s.first_name, s.last_name`,
+         ORDER BY s.name`,
         params
       );
 
@@ -487,8 +484,7 @@ export const monthlySubscriptionsRoutes = {
         studentId: r.student_id,
         courseId: r.course_id,
         branchId: r.branch_id,
-        studentFirstName: r.student_first_name,
-        studentLastName: r.student_last_name,
+        studentName: r.student_name,
         studentCode: r.student_code ?? null,
         qrActivated: r.qr_activated ?? false,
         qrExpiration: r.qr_expiration ?? null,
@@ -829,7 +825,7 @@ export const monthlySubscriptionsRoutes = {
       // must not resolve.
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.first_name, s.last_name FROM students s
+        `SELECT s.id, s.name FROM students s
          WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
       );
@@ -840,8 +836,7 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query(
         `SELECT
            msp.*,
-           s.first_name AS student_first_name,
-           s.last_name  AS student_last_name,
+           s.name AS student_name,
            s.student_code AS student_code,
            s.qr_activated AS qr_activated,
            s.qr_expiration AS qr_expiration,
@@ -874,8 +869,7 @@ export const monthlySubscriptionsRoutes = {
         status: 200 as const,
         body: {
           studentId: student.id,
-          studentFirstName: student.first_name,
-          studentLastName: student.last_name,
+          studentName: student.name,
           dueMonths,
         },
       };
@@ -908,8 +902,7 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query(
         `SELECT
            msp.*,
-           s.first_name AS student_first_name,
-           s.last_name  AS student_last_name,
+           s.name AS student_name,
            s.student_code AS student_code,
            s.qr_activated AS qr_activated,
            s.qr_expiration AS qr_expiration,
@@ -923,7 +916,7 @@ export const monthlySubscriptionsRoutes = {
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
          WHERE ${conditions.join(' AND ')}
-         ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.first_name`,
+         ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.name`,
         sqlParams
       );
 
@@ -955,8 +948,7 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query(
         `SELECT
            msp.*,
-           s.first_name AS student_first_name,
-           s.last_name  AS student_last_name,
+           s.name AS student_name,
            s.student_code AS student_code,
            s.qr_activated AS qr_activated,
            s.qr_expiration AS qr_expiration,

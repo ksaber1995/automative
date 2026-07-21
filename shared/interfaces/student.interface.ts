@@ -22,14 +22,14 @@ export type Gender = 'MALE' | 'FEMALE';
 export interface Student {
   id: string;
   companyId: string;
-  firstName: string;
-  lastName: string;
+  /** The student's full name, as one field. Split first/last was removed. */
+  name: string;
   dateOfBirth: string;
   gender?: Gender | null;
   email?: string;
   phone?: string;
-  parentName: string;
-  parentPhone: string;
+  parentName?: string | null;
+  parentPhone?: string | null;
   address?: string;
   branchId: string;
   isActive: boolean;
@@ -55,14 +55,13 @@ export interface Student {
 }
 
 export interface StudentCreateDto {
-  firstName: string;
-  lastName: string;
+  name: string;
   dateOfBirth: string;
   gender?: Gender;
   email?: string;
   phone?: string;
-  parentName: string;
-  parentPhone: string;
+  parentName?: string;
+  parentPhone?: string;
   address?: string;
   branchId: string;
   notes?: string;
@@ -71,8 +70,7 @@ export interface StudentCreateDto {
 
 /** One parsed spreadsheet row sent to the bulk-import endpoint. */
 export interface StudentImportRow {
-  firstName: string;
-  lastName?: string;
+  name: string;
   gender?: Gender | null;
   dateOfBirth?: string | null;
   email?: string | null;
@@ -90,8 +88,7 @@ export interface StudentImportResult {
 }
 
 export interface StudentUpdateDto {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   dateOfBirth?: string;
   gender?: Gender | null;
   email?: string;

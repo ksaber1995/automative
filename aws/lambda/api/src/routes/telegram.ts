@@ -222,7 +222,7 @@ export async function notifySessionAttendance(companyId: string, sessionId: stri
 
     // Enrolled roster for this class + whether each has a present row this session.
     const roster = await query<any>(
-      `SELECT st.id, st.first_name, st.last_name,
+      `SELECT st.id, st.name,
               (sa.id IS NOT NULL) AS is_present
        FROM students st
        JOIN (
@@ -275,7 +275,7 @@ export async function sendExamResultNotifications(
   const maxGrade = exam.max_grade;
 
   const rows = await query<any>(
-    `SELECT r.student_id, r.grade, r.is_absent, s.first_name, s.last_name
+    `SELECT r.student_id, r.grade, r.is_absent, s.name
      FROM exam_results r JOIN students s ON s.id = r.student_id
      WHERE r.exam_id = $1 AND r.company_id = $2 AND (r.grade IS NOT NULL OR r.is_absent = true)`,
     [examId, companyId]

@@ -150,7 +150,7 @@ export class StudentDetailComponent implements OnInit {
     const text = this.translate.instant('WHATSAPP.NOTES_PARENT_BODY', {
       academyName: this.authService.getCompanyName(),
       parentName: s.parentName || '',
-      studentName: `${s.firstName} ${s.lastName}`.trim(),
+      studentName: s.name,
       notes,
     });
     if (openWhatsappChat(s.parentPhone, text)) {
@@ -1248,7 +1248,7 @@ export class StudentDetailComponent implements OnInit {
         this.linkingCard.set(false);
         this.notificationService.success(this.translate.instant(
           card.alreadyLinked ? 'QR_CARDS.ALREADY_ON_STUDENT' : 'QR_CARDS.LINKED_OK',
-          { serial: serialLabel(card.serial), name: `${s.firstName} ${s.lastName}` },
+          { serial: serialLabel(card.serial), name: s.name },
         ));
         this.closeLinkCard();
         this.loadLinkedCards(s.id);

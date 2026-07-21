@@ -90,7 +90,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     const list = this.roster();
     if (!q) return list;
     return list.filter((s) =>
-      `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
+      s.name.toLowerCase().includes(q) ||
       (s.code != null && String(s.code).toLowerCase().includes(q)));
   });
 
@@ -102,8 +102,6 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   showResultsDialog = signal(false);
   resultsStudents = signal<{
     studentId: string;
-    firstName: string;
-    lastName: string;
     name: string;
     grade: string;
     parentName: string | null;
@@ -356,7 +354,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.service.recordByCode(this.examId, code, grade).subscribe({
       next: (res) => {
         this.resolvingCode.set(false);
-        const name = `${res.studentFirstName} ${res.studentLastName}`;
+        const name = `${res.studentName}`;
         this.lastScanResult.set({ name, grade: res.grade, updated: res.alreadyRecorded });
         this.playBeep(true);
         this.roster.update((list) =>
@@ -384,7 +382,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     }
     this.service.recordByQr(this.examId, token, grade).subscribe({
       next: (res) => {
-        const name = `${res.studentFirstName} ${res.studentLastName}`;
+        const name = `${res.studentName}`;
         this.lastScanResult.set({ name, grade: res.grade, updated: res.alreadyRecorded });
         this.playBeep(true);
         // Reflect in the roster.
@@ -414,9 +412,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     }
     this.resultsStudents.set(graded.map(s => ({
       studentId: s.studentId,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      name: `${s.firstName} ${s.lastName}`,
+      name: s.name,
       grade: s.grade!,
       parentName: s.parentName ?? null,
       parentPhone: s.parentPhone ?? null,
@@ -427,8 +423,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
 
   /** Open a pre-filled WhatsApp chat with one student's parent (click-to-chat). */
   sendExamResult(row: {
-    firstName: string;
-    lastName: string;
+    name: string;
     grade: string;
     parentName: string | null;
     parentPhone: string | null;
@@ -440,8 +435,8 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     const gradeNum = parseFloat(row.grade);
     const percentage = maxGrade > 0 ? Math.round((gradeNum / maxGrade) * 100) : 0;
     const text = renderWhatsappTemplate(this.templatesSvc.get('EXAM_RESULTS'), {
-      studentName: `${row.firstName} ${row.lastName}`,
-      parentName: row.parentName || `${row.firstName} ${row.lastName}`,
+      studentName: row.name,
+      parentName: row.parentName || row.name,
       academyName: this.authService.getCompanyName(),
       examName: e.name,
       grade: row.grade,

@@ -47,7 +47,7 @@ export const eventSubscriptionsRoutes = {
       const rows = await query(
         `SELECT es.*,
                 CASE WHEN s.id IS NOT NULL
-                  THEN s.first_name || ' ' || s.last_name
+                  THEN s.name
                   ELSE NULL END AS student_name,
                 COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.subscription_id = es.id), 0) AS refunded_amount
          FROM event_subscriptions es
@@ -112,7 +112,7 @@ export const eventSubscriptionsRoutes = {
       const row = await queryOne(
         `SELECT es.*,
                 CASE WHEN s.id IS NOT NULL
-                  THEN s.first_name || ' ' || s.last_name
+                  THEN s.name
                   ELSE NULL END AS student_name
          FROM event_subscriptions es
          LEFT JOIN students s ON s.id = es.student_id
@@ -188,7 +188,7 @@ export const eventSubscriptionsRoutes = {
 
       const rows = await query(
         `SELECT r.*,
-                CASE WHEN s.id IS NOT NULL THEN s.first_name || ' ' || s.last_name
+                CASE WHEN s.id IS NOT NULL THEN s.name
                      WHEN es.id IS NOT NULL THEN COALESCE(
                        NULLIF(TRIM(CONCAT(es.external_first_name, ' ', es.external_last_name)), ''),
                        NULL
