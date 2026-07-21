@@ -6923,6 +6923,7 @@ export const contract = c.router({
         branchId: z.string().optional(),
         teacherId: z.string().optional(),
         courseId: z.string().optional(),
+        roomId: z.string().optional(),
       }),
       responses: {
         200: z.object({

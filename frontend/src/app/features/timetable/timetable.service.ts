@@ -40,6 +40,8 @@ export interface TimetableFilters {
   branchId?: string;
   teacherId?: string;
   courseId?: string;
+  /** Rooms hang off the day's session, so this only matches classes that have one. */
+  roomId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -51,6 +53,7 @@ export class TimetableService {
     if (filters.branchId) params.branchId = filters.branchId;
     if (filters.teacherId) params.teacherId = filters.teacherId;
     if (filters.courseId) params.courseId = filters.courseId;
+    if (filters.roomId) params.roomId = filters.roomId;
     return this.api.get<TimetableDay>('timetable', params);
   }
 }

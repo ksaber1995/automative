@@ -224,11 +224,13 @@ export class TimetableComponent implements OnInit {
   selectedBranchId: string | null = null;
   selectedTeacherId: string | null = null;
   selectedCourseId: string | null = null;
+  selectedRoomId: string | null = null;
 
   loading = signal(false);
   entries = signal<TimetableEntry[]>([]);
   weekColumns = signal<WeekColumn[]>([]);
   branches = signal<LookupOption[]>([]);
+  rooms = signal<LookupOption[]>([]);
   teachers = signal<any[]>([]);
   courses = signal<any[]>([]);
 
@@ -314,7 +316,7 @@ export class TimetableComponent implements OnInit {
   );
 
   hasActiveFilters = computed(() =>
-    !!this.selectedBranchId || !!this.selectedTeacherId || !!this.selectedCourseId
+    !!this.selectedBranchId || !!this.selectedTeacherId || !!this.selectedCourseId || !!this.selectedRoomId
   );
 
   formattedDateLabel = computed(() => {
@@ -381,6 +383,9 @@ export class TimetableComponent implements OnInit {
   loadFilters() {
     this.lookupService.branches().subscribe({
       next: (b) => this.branches.set(b),
+    });
+    this.lookupService.rooms().subscribe({
+      next: (r) => this.rooms.set(r),
     });
     this.courseService.getActiveCourses().subscribe({
       next: (c) => this.courses.set(c),
@@ -464,6 +469,7 @@ export class TimetableComponent implements OnInit {
       branchId: this.selectedBranchId || undefined,
       teacherId: this.selectedTeacherId || undefined,
       courseId: this.selectedCourseId || undefined,
+      roomId: this.selectedRoomId || undefined,
     };
   }
 
@@ -532,6 +538,7 @@ export class TimetableComponent implements OnInit {
     this.selectedBranchId = null;
     this.selectedTeacherId = null;
     this.selectedCourseId = null;
+    this.selectedRoomId = null;
     this.load();
   }
 

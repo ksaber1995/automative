@@ -80,7 +80,7 @@ export const timetableRoutes = {
     query: queryParams,
     headers,
   }: {
-    query: { date: string; branchId?: string; teacherId?: string; courseId?: string };
+    query: { date: string; branchId?: string; teacherId?: string; courseId?: string; roomId?: string };
     headers: { authorization: string };
   }) => {
     try {
@@ -167,6 +167,15 @@ export const timetableRoutes = {
       if (queryParams.courseId) {
         params.push(queryParams.courseId);
         sql += ` AND c.course_id = $${params.length}`;
+      }
+
+      // A room belongs to the SESSION, not the class — a class only has a room once
+      // its session for that date was opened in one. So filtering by room narrows to
+      // classes actually sitting in that room that day, and classes with no session
+      // yet drop out (they have no room to match).
+      if (queryParams.roomId) {
+        params.push(queryParams.roomId);
+        sql += ` AND s.room_id = $${params.length}`;
       }
 
       sql += ' ORDER BY cdt.start_time ASC, c.name ASC';
