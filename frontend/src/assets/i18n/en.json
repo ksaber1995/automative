@@ -1218,6 +1218,7 @@
     "FIND_STUDENT": "Find Student",
     "QR_CAMERA_FAILED": "Could not start the camera. Please check permissions.",
     "QR_STUDENT_NOT_FOUND": "Student not found for this QR code.",
+    "QR_SCAN_INCOMPLETE": "That scan came through incomplete. Please scan the card again.",
     "QR_STARTING_CAMERA": "Starting camera...",
     "QR_USB_READY": "Ready — scan with your USB reader.",
     "QR_USE_CAMERA": "No scanner? Use camera",

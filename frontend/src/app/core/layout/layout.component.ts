@@ -81,7 +81,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private scanBuffer = '';
   private scanBufferAt = 0;
   // A gap longer than this between keystrokes is a human typing, not a scanner.
-  private readonly SCAN_KEY_GAP_MS = 100;
+  // Generous on purpose: a scanner's own keystrokes are ~5-20ms apart, but the
+  // main thread can stall longer than that mid-burst (change detection, a chart
+  // rendering, an XHR callback). At 100ms such a stall split the burst and we
+  // kept only the tail — a partial token that looked exactly like a scan of an
+  // unknown student ("student not found", intermittently).
+  private readonly SCAN_KEY_GAP_MS = 400;
 
   @HostListener('document:keydown', ['$event'])
   onDocumentKeydown(e: KeyboardEvent): void {
