@@ -52,6 +52,12 @@ export async function ensureQrCardSchema(): Promise<void> {
   // Off by default: an academy only gets the pool once we switch it on for them.
   await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS qr_cards_enabled BOOLEAN NOT NULL DEFAULT false`);
 
+  // The student code this card overwrote when it was linked, so unlinking can put
+  // it back. Cards linked before this column existed have NULL — unlink() then
+  // issues a fresh organic code instead, which is the best it can do: the old
+  // number was never recorded anywhere.
+  await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS prev_student_code INTEGER`);
+
   // Cards generated before the reserved range existed carry serials 1..N, which
   // collide head-on with the students' own codes. Lift them out of the way. The
   // predicate is self-limiting, so this is a no-op on every later boot.
@@ -181,6 +187,55 @@ function mapCard(row: any) {
   };
 }
 
+/**
+ * Give a student a real number back after their card was unlinked.
+ *
+ * Only acts when the student is still wearing THIS card's serial — if they have
+ * since been given another card, or an admin typed them a code by hand, that is
+ * the current truth and must not be overwritten.
+ *
+ * Prefers the code the card overwrote at link time. Falls back to the next free
+ * organic code (the same MAX(student_code) < CARD_SERIAL_BASE + 1 rule a new
+ * student gets) when nothing was stored — every card linked before
+ * prev_student_code existed — or when the old number has since been taken.
+ */
+async function restoreStudentCode(
+  studentId: string,
+  companyId: string,
+  cardSerial: number,
+  prevCode: number | null,
+): Promise<void> {
+  const student = await queryOne<any>(
+    'SELECT student_code FROM students WHERE id = $1 AND company_id = $2',
+    [studentId, companyId],
+  );
+  if (!student || Number(student.student_code) !== cardSerial) return;
+
+  let code: number | null = null;
+  const wanted = Number(prevCode);
+  if (Number.isInteger(wanted) && wanted > 0 && wanted < CARD_SERIAL_BASE) {
+    const taken = await queryOne<any>(
+      'SELECT id FROM students WHERE student_code = $1 AND company_id = $2 AND id <> $3',
+      [wanted, companyId, studentId],
+    );
+    if (!taken) code = wanted;
+  }
+
+  if (code === null) {
+    const next = await queryOne<any>(
+      `SELECT COALESCE(MAX(student_code), 0) + 1 AS next FROM students
+       WHERE company_id = $1 AND student_code < ${CARD_SERIAL_BASE}`,
+      [companyId],
+    );
+    code = Number(next?.next ?? 1);
+  }
+
+  await query(
+    'UPDATE students SET student_code = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3',
+    [code, studentId, companyId],
+  );
+}
+
 export const qrCardsRoutes = {
   /** Print run: mint `count` blank cards, numbered on from the last serial. */
   generate: async ({ body, headers }: { body: { count: number }; headers: AuthHeaders }) => {
@@ -269,7 +324,7 @@ export const qrCardsRoutes = {
       // link a card that belongs to them.
 
       const student = await queryOne<any>(
-        'SELECT id, first_name, last_name FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
+        'SELECT id, first_name, last_name, student_code FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
         [body?.studentId, context.companyId],
       );
       if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
@@ -310,11 +365,20 @@ export const qrCardsRoutes = {
       );
       if (clash) return apiError(409, 'ERRORS.QR_CARDS.CODE_TAKEN', 'Another student already has that code');
 
+      // Remember the number we're about to take away, so unlink() can give it
+      // back. Only an ORGANIC code is worth keeping: if their current code is
+      // itself a card's serial (they already hold another card), restoring it
+      // later would hand them a number that belongs to a card in the pool.
+      const previousCode = Number(student.student_code);
+      const restorable = Number.isInteger(previousCode) && previousCode > 0 && previousCode < CARD_SERIAL_BASE
+        ? previousCode
+        : null;
+
       const updated = await queryOne<any>(
-        `UPDATE qr_cards SET student_id = $1, assigned_at = NOW()
+        `UPDATE qr_cards SET student_id = $1, assigned_at = NOW(), prev_student_code = $4
          WHERE id = $2 AND company_id = $3 AND student_id IS NULL
          RETURNING *`,
-        [student.id, card.id, context.companyId],
+        [student.id, card.id, context.companyId, restorable],
       );
       // Someone linked it a moment ago, between the read and the write.
       if (!updated) return apiError(409, 'ERRORS.QR_CARDS.ALREADY_LINKED', 'That card is already linked to another student');
@@ -343,13 +407,28 @@ export const qrCardsRoutes = {
       // Ungated for the same reason as link(): whoever can link a card must be
       // able to undo it, or a card handed to the wrong student is stuck there.
 
+      // Read first: the UPDATE below returns the row AFTER the write, by which
+      // point the student it was on is gone from it.
+      const before = await queryOne<any>(
+        'SELECT id, serial, student_id, prev_student_code FROM qr_cards WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!before) return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'That card is not in this pool');
+
       const row = await queryOne<any>(
-        `UPDATE qr_cards SET student_id = NULL, assigned_at = NULL
+        `UPDATE qr_cards SET student_id = NULL, assigned_at = NULL, prev_student_code = NULL
          WHERE id = $1 AND company_id = $2
          RETURNING *`,
         [params.id, context.companyId],
       );
       if (!row) return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'That card is not in this pool');
+
+      // Linking took the student's number away; unlinking has to give one back, or
+      // they are left wearing a code from the card pool forever.
+      if (before.student_id) {
+        await restoreStudentCode(before.student_id, context.companyId, Number(before.serial), before.prev_student_code);
+      }
+
       return { status: 200 as const, body: mapCard(row) };
     } catch (error) {
       console.error('QR card unlink error:', error);
