@@ -1763,45 +1763,6 @@ const WaMessageSchema = z.object({
   createdAt: z.string(),
 });
 
-// Offline desktop license (admin-console view of the offline_license table).
-const LicenseSchema = z.object({
-  id: UUIDSchema,
-  licenseKey: z.string().nullable(),
-  tier: z.enum(['TEACHER', 'ACADEMY']),
-  label: z.string().nullable(),
-  name: z.string().nullable(),
-  phone: z.string().nullable(),
-  notes: z.string().nullable(),
-  deviceId: z.string().nullable(),
-  trialStartedAt: z.string().nullable(),
-  trialEndsAt: z.string().nullable(),
-  activated: z.boolean(),
-  activationEndsAt: z.string().nullable(),
-  revoked: z.boolean(),
-  // Annual renewal fee — owner bookkeeping only, never sent to the client.
-  price: z.number().nullable().optional(),
-  // Usage telemetry reported on the app's heartbeat (aggregate counts, no PII).
-  studentCount: z.number().nullable().optional(),
-  courseCount: z.number().nullable().optional(),
-  lastSeenAt: z.string().nullable().optional(),
-  createdAt: z.string().nullable(),
-  updatedAt: z.string().nullable(),
-});
-
-// Signed license token returned by the public register/activate endpoints.
-const SignedLicenseSchema = z.object({
-  token: z.string(),
-  signature: z.string(),
-});
-
-// validate() response: `registered:false` tells the app to show the sign-up
-// form; otherwise the signed token fields are present.
-const LicenseValidateSchema = z.object({
-  registered: z.boolean(),
-  token: z.string().optional(),
-  signature: z.string().optional(),
-});
-
 // =============================================
 // API Contract
 // =============================================
@@ -1820,57 +1781,6 @@ const AdminUserSchema = z.object({
 });
 
 export const contract = c.router({
-  // Public, unauthenticated license validation for the offline desktop app.
-  publicLicense: {
-    // Per-launch status check, keyed by device id.
-    validate: {
-      method: 'POST' as const,
-      path: '/api/public/license/validate',
-      body: z.object({
-        deviceId: z.string(),
-        // Optional usage counts the app piggybacks on its heartbeat (no PII).
-        stats: z
-          .object({
-            students: z.number().optional(),
-            courses: z.number().optional(),
-          })
-          .optional(),
-      }),
-      responses: {
-        200: LicenseValidateSchema,
-        400: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    // First run: self-register with name + phone to start the trial.
-    register: {
-      method: 'POST' as const,
-      path: '/api/public/license/register',
-      body: z.object({
-        deviceId: z.string(),
-        name: z.string(),
-        phone: z.string(),
-        tier: z.enum(['TEACHER', 'ACADEMY']).optional(),
-      }),
-      responses: {
-        200: SignedLicenseSchema,
-        400: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-    // Post-trial: enter the product license the owner issued to unlock.
-    activate: {
-      method: 'POST' as const,
-      path: '/api/public/license/activate',
-      body: z.object({ deviceId: z.string(), licenseKey: z.string() }),
-      responses: {
-        200: SignedLicenseSchema,
-        400: ApiErrorSchema,
-        500: ApiErrorSchema,
-      },
-    },
-  },
-
   // Lookups (auth-only, no granular permission) — see routes/lookups.ts
   lookups: {
     branches: {
@@ -5348,99 +5258,6 @@ export const contract = c.router({
         400: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },
-    },
-
-    // ─── Offline desktop licenses ─────────────────────────────────────────
-    // Static /licenses paths are registered before the /:id ones (itty-router
-    // matches in registration order).
-    listLicenses: {
-      method: 'GET',
-      path: '/api/karim-admin-secret/licenses',
-      responses: { 200: z.array(LicenseSchema), 500: z.object({ message: z.string() }) },
-    },
-    createLicense: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses',
-      body: z.object({
-        tier: z.enum(['TEACHER', 'ACADEMY']).optional(),
-        label: z.string().optional(),
-        phone: z.string().optional(),
-        notes: z.string().optional(),
-      }),
-      responses: { 201: LicenseSchema, 500: z.object({ message: z.string() }) },
-    },
-    activateLicense: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/activate',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({
-        activationEndsAt: z.string().nullable().optional(),
-        price: z.number().nullable().optional(),
-      }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    setLicensePrice: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/price',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ price: z.number().nullable() }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    extendTrial: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/extend-trial',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ days: z.number().int().positive() }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    resetDevice: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/reset-device',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}).optional(),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    setLicenseTier: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/tier',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ tier: z.enum(['TEACHER', 'ACADEMY']) }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    issueLicense: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/issue',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}).optional(),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    setTrialEndDate: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/trial-end',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ trialEndsAt: z.string() }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    setLicensePhone: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/phone',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ phone: z.string().nullable() }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    setLicenseRevoked: {
-      method: 'POST',
-      path: '/api/karim-admin-secret/licenses/:id/revoke',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({ revoked: z.boolean() }),
-      responses: { 200: LicenseSchema, 404: z.object({ message: z.string() }), 500: z.object({ message: z.string() }) },
-    },
-    deleteLicense: {
-      method: 'DELETE',
-      path: '/api/karim-admin-secret/licenses/:id',
-      pathParams: z.object({ id: UUIDSchema }),
-      body: z.object({}).optional(),
-      responses: { 200: z.object({ deleted: z.boolean() }), 500: z.object({ message: z.string() }) },
     },
   },
 

@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  CompanySubscription, OfflineLicense, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
+  CompanySubscription, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
   TenantUser, USER_ROLES,
 } from './subscriptions.service';
 
@@ -12,9 +12,6 @@ import {
  * customer's own /users page by the API (see HIDDEN_DEBUG_EMAIL).
  */
 const DEBUG_EMAIL = 'master@master.com';
-
-type LicSortCol =
-  | 'name' | 'tier' | 'status' | 'students' | 'courses' | 'lastSeen' | 'trialEnds' | 'renewal' | 'price';
 
 @Component({
   selector: 'app-root',
@@ -27,9 +24,6 @@ type LicSortCol =
         <nav>
           <button class="navitem" [class.on]="view() === 'companies'" (click)="view.set('companies')">
             <span>Companies</span><span class="navcount">{{ rows().length }}</span>
-          </button>
-          <button class="navitem" [class.on]="view() === 'licenses'" (click)="view.set('licenses')">
-            <span>Desktop licenses</span><span class="navcount">{{ licenses().length }}</span>
           </button>
           <button class="navitem" [class.on]="view() === 'users'" (click)="showUsers()">
             <span>Users</span><span class="navcount">{{ users().length }}</span>
@@ -80,154 +74,6 @@ type LicSortCol =
                 {{ '@' + b.bot_username }} · {{ b.company_name || 'available' }}
               </span>
             }
-          </div>
-        }
-      </div>
-      }
-
-      @if (view() === 'licenses') {
-      <!-- Offline licenses (desktop app keys the owner emails to customers) -->
-      <div class="card" style="margin: 20px 0; padding: 16px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-          <div>
-            <h2 style="margin:0; font-size:16px;">Offline trials &amp; licenses</h2>
-            <p class="sub" style="margin-top:4px;">
-              {{ licenses().length }} device(s) registered — customers sign up in-app for a 7-day trial.
-              When one pays, click <b>Issue license</b> and send them the key to unlock.
-            </p>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button class="act" [disabled]="licensesLoading()" (click)="loadLicenses()">Refresh</button>
-          </div>
-        </div>
-
-        @if (newLicenseKey(); as key) {
-          <div class="keybox">
-            <div>
-              <div class="keybox-label">Product license key — send this to the customer to unlock</div>
-              <code class="keybox-key">{{ key }}</code>
-            </div>
-            <div style="display:flex; gap:8px;">
-              <button class="act activate" (click)="copyKey(key)">Copy</button>
-              <button class="act" (click)="newLicenseKey.set(null)">Dismiss</button>
-            </div>
-          </div>
-        }
-
-        @if (licenses().length) {
-          <div class="lic-toolbar">
-            <input class="search" type="text"
-              [ngModel]="licSearch()" (ngModelChange)="licSearch.set($event)"
-              placeholder="Search name, phone, key or device…" />
-            <div class="lic-chips">
-              <button class="filter" [class.on]="licStatus() === ''" (click)="licStatus.set('')">
-                All <span class="fcount">{{ licenses().length }}</span>
-              </button>
-              <button class="filter" [class.on]="licStatus() === 'ACTIVE'" (click)="licStatus.set('ACTIVE')">
-                Active <span class="fcount">{{ licStatusCount('ACTIVE') }}</span>
-              </button>
-              <button class="filter" [class.on]="licStatus() === 'TRIAL'" (click)="licStatus.set('TRIAL')">
-                Trial <span class="fcount">{{ licStatusCount('TRIAL') }}</span>
-              </button>
-              <button class="filter" [class.on]="licStatus() === 'EXPIRED'" (click)="licStatus.set('EXPIRED')">
-                Expired <span class="fcount">{{ licStatusCount('EXPIRED') }}</span>
-              </button>
-              <button class="filter" [class.on]="licStatus() === 'REVOKED'" (click)="licStatus.set('REVOKED')">
-                Revoked <span class="fcount">{{ licStatusCount('REVOKED') }}</span>
-              </button>
-            </div>
-            <span class="count">{{ visibleLicenses().length }} / {{ licenses().length }}</span>
-          </div>
-        }
-
-        @if (licensesLoading()) {
-          <div class="state">Loading…</div>
-        } @else if (licenses().length === 0) {
-          <div class="state">No registrations yet.</div>
-        } @else {
-          <div style="margin-top:12px; overflow-x:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th class="sortable" (click)="sortLic('name')">Name{{ sortIcon('name') }}</th>
-                  <th>Phone</th>
-                  <th>Key</th>
-                  <th class="sortable" (click)="sortLic('tier')">Tier{{ sortIcon('tier') }}</th>
-                  <th>Device</th>
-                  <th class="sortable" (click)="sortLic('status')">Status{{ sortIcon('status') }}</th>
-                  <th class="num sortable" (click)="sortLic('students')">Students{{ sortIcon('students') }}</th>
-                  <th class="num sortable" (click)="sortLic('courses')">Courses{{ sortIcon('courses') }}</th>
-                  <th class="sortable" (click)="sortLic('lastSeen')">Last seen{{ sortIcon('lastSeen') }}</th>
-                  <th class="sortable" (click)="sortLic('trialEnds')">Trial ends{{ sortIcon('trialEnds') }}</th>
-                  <th class="sortable" (click)="sortLic('renewal')">Renewal{{ sortIcon('renewal') }}</th>
-                  <th class="num sortable" (click)="sortLic('price')">Price{{ sortIcon('price') }}</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (l of visibleLicenses(); track l.id) {
-                  <tr>
-                    <td>{{ l.name || '—' }}</td>
-                    <td>
-                      @if (l.phone) {
-                        <a href="tel:{{ l.phone }}">{{ l.phone }}</a>
-                      } @else {
-                        —
-                      }
-                      <button class="act" style="margin-left:6px;" [disabled]="busyId() === l.id" (click)="editPhone(l)">
-                        {{ l.phone ? 'Edit' : 'Add' }}
-                      </button>
-                    </td>
-                    <td>
-                      @if (l.licenseKey) {
-                        <code class="lic-key">{{ l.licenseKey }}</code>
-                        <button class="act" style="margin-left:6px;" (click)="copyKey(l.licenseKey!)">Copy</button>
-                      } @else {
-                        <span class="sub" style="opacity:.6;">Not issued</span>
-                      }
-                    </td>
-                    <td>
-                      <span class="reg" [class.teacher]="l.tier === 'TEACHER'" [class.academy]="l.tier === 'ACADEMY'">
-                        {{ l.tier }}
-                      </span>
-                    </td>
-                    <td>
-                      @if (l.deviceId) {
-                        <code class="lic-key" title="{{ l.deviceId }}">{{ shortDevice(l.deviceId) }}</code>
-                      } @else {
-                        —
-                      }
-                    </td>
-                    <td>
-                      <span class="badge"
-                        [class.trial]="licenseStatus(l).kind === 'TRIAL'"
-                        [class.expired]="licenseStatus(l).kind === 'EXPIRED'"
-                        [class.revoked]="licenseStatus(l).kind === 'REVOKED'">
-                        {{ licenseStatus(l).text }}
-                      </span>
-                    </td>
-                    <td class="num">{{ l.studentCount != null ? l.studentCount : '—' }}</td>
-                    <td class="num">{{ l.courseCount != null ? l.courseCount : '—' }}</td>
-                    <td>{{ l.lastSeenAt ? formatDate(l.lastSeenAt) : '—' }}</td>
-                    <td>{{ formatDate(l.trialEndsAt) }}</td>
-                    <td>{{ l.activated ? formatDate(l.activationEndsAt) : '—' }}</td>
-                    <td class="num">
-                      {{ l.price != null ? l.price : '—' }}
-                      <button class="act" style="margin-left:6px;" [disabled]="busyId() === l.id" (click)="setPrice(l)">
-                        {{ l.price != null ? 'Edit' : 'Set' }}
-                      </button>
-                    </td>
-                    <td>
-                      <button class="act menu-btn" [disabled]="busyId() === l.id"
-                        (click)="actionMenu.set(l)" title="Actions">⋯</button>
-                    </td>
-                  </tr>
-                }
-                @if (visibleLicenses().length === 0) {
-                  <tr><td colspan="13" class="state">No matches.</td></tr>
-                }
-              </tbody>
-            </table>
           </div>
         }
       </div>
@@ -565,35 +411,6 @@ type LicSortCol =
         <div class="flash">{{ flash() }}</div>
       }
 
-      <!-- Licence row actions menu -->
-      @if (actionMenu(); as m) {
-        <div class="overlay" (click)="actionMenu.set(null)">
-          <div class="modal menu-modal" (click)="$event.stopPropagation()">
-            <h2>{{ m.name || m.licenseKey || 'License' }}</h2>
-            <p class="modal-sub">{{ licenseStatus(m).text }} · {{ m.tier }}</p>
-            <div class="menu-list">
-              @if (!m.licenseKey) {
-                <button class="menu-item activate" (click)="actionMenu.set(null); issueLicense(m)">Issue license</button>
-              }
-              <button class="menu-item" (click)="actionMenu.set(null); activateLicense(m)">Activate / renew</button>
-              <button class="menu-item" (click)="actionMenu.set(null); changeExpiry(m)">Change trial expiry</button>
-              <button class="menu-item" (click)="actionMenu.set(null); extendTrial(m)">Extend trial</button>
-              <button class="menu-item" [disabled]="!m.deviceId" (click)="actionMenu.set(null); resetDevice(m)">Reset device</button>
-              <button class="menu-item" (click)="actionMenu.set(null); toggleTier(m)">
-                Make {{ m.tier === 'ACADEMY' ? 'Teacher' : 'Academy' }}
-              </button>
-              <button class="menu-item" (click)="actionMenu.set(null); toggleRevoked(m)">
-                {{ m.revoked ? 'Unrevoke' : 'Revoke' }}
-              </button>
-              <button class="menu-item danger" (click)="actionMenu.set(null); deleteLicense(m)">Delete</button>
-            </div>
-            <div class="modal-foot">
-              <button class="act" (click)="actionMenu.set(null)">Close</button>
-            </div>
-          </div>
-        </div>
-      }
-
       <!-- Extend subscription dialog -->
       @if (extendRow(); as row) {
         <div class="overlay" (click)="closeExtend()">
@@ -907,7 +724,7 @@ export class AppComponent implements OnInit {
   private service = inject(SubscriptionsService);
 
   /** Which section the sidebar is showing. */
-  view = signal<'companies' | 'licenses' | 'bots' | 'users'>('companies');
+  view = signal<'companies' | 'bots' | 'users'>('companies');
 
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
@@ -933,22 +750,6 @@ export class AppComponent implements OnInit {
   poolToken = signal('');
   addingBot = signal(false);
 
-  // Offline licenses
-  licenses = signal<OfflineLicense[]>([]);
-  licensesLoading = signal(true);
-  newLicenseTier = signal<'TEACHER' | 'ACADEMY'>('TEACHER');
-  newLicenseLabel = signal('');
-  newLicensePhone = signal('');
-  creatingLicense = signal(false);
-  newLicenseKey = signal<string | null>(null);
-
-  // Licenses table: search, status filter, and sort.
-  licSearch = signal('');
-  licStatus = signal<'' | 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'REVOKED'>('');
-  licSort = signal<{ col: LicSortCol; dir: 1 | -1 }>({ col: 'lastSeen', dir: -1 });
-  /** The licence whose row-actions menu is open (null = closed). */
-  actionMenu = signal<OfflineLicense | null>(null);
-
   filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
     const status = this.statusFilter();
@@ -971,80 +772,15 @@ export class AppComponent implements OnInit {
     return this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === status).length;
   }
 
-  /** Licenses after search + status filter + the active column sort. */
-  visibleLicenses = computed(() => {
-    const q = this.licSearch().trim().toLowerCase();
-    const status = this.licStatus();
-    const { col, dir } = this.licSort();
-    let list = this.licenses().slice();
-    if (status) list = list.filter((l) => this.licenseStatus(l).kind === status);
-    if (q) {
-      list = list.filter(
-        (l) =>
-          (l.name || '').toLowerCase().includes(q) ||
-          (l.label || '').toLowerCase().includes(q) ||
-          (l.phone || '').toLowerCase().includes(q) ||
-          (l.licenseKey || '').toLowerCase().includes(q) ||
-          (l.deviceId || '').toLowerCase().includes(q),
-      );
-    }
-    const val = (l: OfflineLicense): string | number => {
-      switch (col) {
-        case 'name': return (l.name || l.label || '').toLowerCase();
-        case 'tier': return l.tier;
-        case 'status': return this.licenseStatus(l).kind;
-        case 'students': return l.studentCount ?? -1;
-        case 'courses': return l.courseCount ?? -1;
-        case 'lastSeen': return l.lastSeenAt ? new Date(l.lastSeenAt).getTime() : 0;
-        case 'trialEnds': return l.trialEndsAt ? new Date(l.trialEndsAt).getTime() : 0;
-        case 'renewal': return l.activationEndsAt ? new Date(l.activationEndsAt).getTime() : 0;
-        case 'price': return l.price ?? -1;
-      }
-    };
-    return list.sort((a, b) => {
-      const av = val(a);
-      const bv = val(b);
-      const cmp =
-        typeof av === 'number' && typeof bv === 'number'
-          ? av - bv
-          : String(av).localeCompare(String(bv));
-      return cmp * dir;
-    });
-  });
-
-  /** Toggle sort on a column (numeric/date columns start descending). */
-  sortLic(col: LicSortCol): void {
-    const cur = this.licSort();
-    const numeric =
-      col === 'students' || col === 'courses' || col === 'lastSeen' ||
-      col === 'trialEnds' || col === 'renewal' || col === 'price';
-    if (cur.col === col) this.licSort.set({ col, dir: cur.dir === 1 ? -1 : 1 });
-    else this.licSort.set({ col, dir: numeric ? -1 : 1 });
-  }
-
-  /** Sort arrow for a column header (empty when it isn't the active sort). */
-  sortIcon(col: LicSortCol): string {
-    const s = this.licSort();
-    if (s.col !== col) return '';
-    return s.dir === 1 ? ' ▲' : ' ▼';
-  }
-
-  /** How many licenses currently sit in the given status bucket. */
-  licStatusCount(kind: string): number {
-    return this.licenses().filter((l) => this.licenseStatus(l).kind === kind).length;
-  }
-
   /** Sidebar "Refresh all" — reload every section. */
   refreshAll(): void {
     this.load();
     this.loadBots();
-    this.loadLicenses();
   }
 
   ngOnInit() {
     this.load();
     this.loadBots();
-    this.loadLicenses();
   }
 
   loadBots() {
@@ -1072,278 +808,6 @@ export class AppComponent implements OnInit {
       error: (err) => {
         this.addingBot.set(false);
         this.showFlash(err?.error?.message || 'Could not add bot');
-      },
-    });
-  }
-
-  // ── Offline licenses ─────────────────────────────────────────────────────────
-  loadLicenses() {
-    this.licensesLoading.set(true);
-    this.service.listLicenses().subscribe({
-      next: (data) => {
-        this.licenses.set(data);
-        this.licensesLoading.set(false);
-      },
-      error: () => {
-        this.licensesLoading.set(false);
-      },
-    });
-  }
-
-  createLicense() {
-    if (this.creatingLicense()) return;
-    this.creatingLicense.set(true);
-    this.service
-      .createLicense({
-        tier: this.newLicenseTier(),
-        label: this.newLicenseLabel().trim() || undefined,
-        phone: this.newLicensePhone().trim() || undefined,
-      })
-      .subscribe({
-        next: (lic) => {
-          this.creatingLicense.set(false);
-          this.newLicenseLabel.set('');
-          this.newLicensePhone.set('');
-          this.newLicenseKey.set(lic.licenseKey);
-          this.showFlash(`License created: ${lic.licenseKey}`);
-          this.loadLicenses();
-        },
-        error: (err) => {
-          this.creatingLicense.set(false);
-          this.error.set(`Create license failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-        },
-      });
-  }
-
-  copyKey(key: string) {
-    navigator.clipboard?.writeText(key).then(
-      () => this.showFlash('Key copied to clipboard.'),
-      () => this.showFlash('Could not copy — select and copy manually.'),
-    );
-  }
-
-  /** Short display for a bound device id. */
-  shortDevice(id: string): string {
-    return id.length > 12 ? id.slice(0, 12) + '…' : id;
-  }
-
-  /** Compute a status badge for a license row. */
-  licenseStatus(l: OfflineLicense): { kind: 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'REVOKED'; text: string } {
-    if (l.revoked) return { kind: 'REVOKED', text: 'Revoked' };
-    const now = Date.now();
-    if (l.activated && (!l.activationEndsAt || new Date(l.activationEndsAt).getTime() > now)) {
-      return { kind: 'ACTIVE', text: 'Active' };
-    }
-    if (!l.activated && l.trialEndsAt && new Date(l.trialEndsAt).getTime() > now) {
-      return { kind: 'TRIAL', text: `Trial (ends ${this.formatDate(l.trialEndsAt)})` };
-    }
-    return { kind: 'EXPIRED', text: 'Expired' };
-  }
-
-  editPhone(l: OfflineLicense) {
-    const input = window.prompt('Customer phone number (leave empty to clear):', l.phone || '');
-    if (input === null) return; // cancelled
-    const phone = input.trim() || null;
-    this.busyId.set(l.id);
-    this.service.setPhone(l.id, phone).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash(phone ? `Phone saved for ${l.label || l.licenseKey}.` : 'Phone cleared.');
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Save phone failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  issueLicense(l: OfflineLicense) {
-    if (l.licenseKey) { this.newLicenseKey.set(l.licenseKey); return; }
-    this.busyId.set(l.id);
-    this.service.issueLicense(l.id).subscribe({
-      next: (lic) => {
-        this.busyId.set(null);
-        this.newLicenseKey.set(lic.licenseKey);
-        this.showFlash(`License issued for ${l.name || l.phone || 'customer'}: ${lic.licenseKey}`);
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Issue failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  changeExpiry(l: OfflineLicense) {
-    const current = l.trialEndsAt ? l.trialEndsAt.slice(0, 10) : '';
-    const input = window.prompt('Set trial expiry date (YYYY-MM-DD):', current);
-    if (input === null) return;
-    const v = input.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-      this.showFlash('Enter a date as YYYY-MM-DD.');
-      return;
-    }
-    this.busyId.set(l.id);
-    // End of the chosen day, so the trial is valid through that date.
-    this.service.setTrialEndDate(l.id, `${v}T23:59:59.000Z`).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash(`Trial expiry set to ${v}.`);
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Change expiry failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  activateLicense(l: OfflineLicense) {
-    // Renewal day is set to one year from today on the server. Optionally record
-    // the annual price now (blank keeps whatever is already stored).
-    const input = window.prompt(
-      'Activate: renewal day will be set to one year from today.\nAnnual renewal price (numbers only; leave blank to keep current):',
-      l.price != null ? String(l.price) : ''
-    );
-    if (input === null) return;
-    const trimmed = input.trim();
-    let price: number | null | undefined = undefined;
-    if (trimmed !== '') {
-      const n = Number(trimmed);
-      if (isNaN(n) || n < 0) {
-        this.showFlash('Enter a valid price, or leave blank.');
-        return;
-      }
-      price = n;
-    }
-    this.busyId.set(l.id);
-    this.service.activateLicense(l.id, undefined, price).subscribe({
-      next: (res) => {
-        this.busyId.set(null);
-        this.showFlash(`${l.label || l.licenseKey} activated — renews ${this.formatDate(res.activationEndsAt)}.`);
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Activate failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  setPrice(l: OfflineLicense) {
-    const input = window.prompt(
-      'Annual renewal price (numbers only; leave blank to clear):',
-      l.price != null ? String(l.price) : ''
-    );
-    if (input === null) return;
-    const trimmed = input.trim();
-    let price: number | null = null;
-    if (trimmed !== '') {
-      const n = Number(trimmed);
-      if (isNaN(n) || n < 0) {
-        this.showFlash('Enter a valid price, or leave blank to clear.');
-        return;
-      }
-      price = n;
-    }
-    this.busyId.set(l.id);
-    this.service.setPrice(l.id, price).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash('Price updated.');
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Set price failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  extendTrial(l: OfflineLicense) {
-    const input = window.prompt('Extend trial by how many days?', '7');
-    if (input === null) return;
-    const days = parseInt(input, 10);
-    if (isNaN(days) || days <= 0) {
-      this.showFlash('Enter a positive number of days.');
-      return;
-    }
-    this.busyId.set(l.id);
-    this.service.extendTrial(l.id, days).subscribe({
-      next: (res) => {
-        this.busyId.set(null);
-        this.showFlash(`Trial extended to ${this.formatDate(res.trialEndsAt)}.`);
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Extend trial failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  resetDevice(l: OfflineLicense) {
-    if (!window.confirm('Unbind this license from its current device? The customer can then activate on a new machine.')) return;
-    this.busyId.set(l.id);
-    this.service.resetDevice(l.id).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash('Device reset — license is unbound.');
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Reset device failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  toggleTier(l: OfflineLicense) {
-    const target: 'TEACHER' | 'ACADEMY' = l.tier === 'ACADEMY' ? 'TEACHER' : 'ACADEMY';
-    this.busyId.set(l.id);
-    this.service.setTier(l.id, target).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash(`License is now ${target}.`);
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Change tier failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  toggleRevoked(l: OfflineLicense) {
-    const target = !l.revoked;
-    if (target && !window.confirm('Revoke this license? The customer will lose access.')) return;
-    this.busyId.set(l.id);
-    this.service.setRevoked(l.id, target).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash(target ? 'License revoked.' : 'License un-revoked.');
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Revoke failed: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  deleteLicense(l: OfflineLicense) {
-    if (!window.confirm(`Permanently delete license ${l.licenseKey}? This cannot be undone.`)) return;
-    this.busyId.set(l.id);
-    this.service.deleteLicense(l.id).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.showFlash('License deleted.');
-        this.loadLicenses();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        this.error.set(`Delete failed: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }

@@ -47,11 +47,6 @@ export const RATE_LIMITS = {
   // refresh / a front desk to scan many students legitimately.
   PUBLIC_PROFILE_IP: { name: 'public-profile:ip', limit: 120, windowMs: 15 * 60_000 },
 
-  // Offline desktop license validation (no auth; the license key is the
-  // secret). Capped per-IP so keys can't be brute-forced, while allowing a
-  // legitimate app to re-validate on each launch.
-  PUBLIC_LICENSE_IP: { name: 'public-license:ip', limit: 60, windowMs: 15 * 60_000 },
-
   // Per-authenticated-user cap across all endpoints. The reports/analytics
   // pages fan out 25–35 parallel calls per reload (one per chart × compare-
   // mode branches), and a power user re-filtering a few times in a minute

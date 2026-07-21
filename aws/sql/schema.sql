@@ -66,32 +66,6 @@ CREATE TABLE subscriptions (
 CREATE INDEX idx_subscriptions_company_id ON subscriptions(company_id);
 
 -- =============================================
--- OFFLINE_LICENSE TABLE
--- Licenses for the offline desktop build (separate product). NOT a tenant of
--- this DB — one row per issued license key. Created at runtime by
--- ensureOfflineLicenseTable() in the API, mirrored here for documentation.
--- =============================================
-CREATE TABLE IF NOT EXISTS offline_license (
-    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    license_key        VARCHAR(64) UNIQUE,    -- NULL during trial; issued by owner on payment
-    tier               VARCHAR(20) NOT NULL DEFAULT 'ACADEMY'
-                         CHECK (tier IN ('TEACHER', 'ACADEMY')),
-    label              VARCHAR(255),
-    name               VARCHAR(255),          -- customer-supplied on first-run self-registration
-    phone              VARCHAR(32),           -- customer contact number (for calling them)
-    notes              TEXT,
-    device_id          VARCHAR(128),          -- bound on first run (registration); locks to one device
-    trial_started_at   TIMESTAMP WITH TIME ZONE,
-    trial_ends_at      TIMESTAMP WITH TIME ZONE,
-    activated          BOOLEAN NOT NULL DEFAULT false,
-    activation_ends_at DATE,                   -- NULL = never expires
-    revoked            BOOLEAN NOT NULL DEFAULT false,
-    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_offline_license_key ON offline_license(license_key);
-
--- =============================================
 -- USERS TABLE
 -- =============================================
 CREATE TABLE users (

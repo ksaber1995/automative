@@ -51,7 +51,6 @@ import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
 import { demoLeadsRoutes } from './routes/demo-leads';
 import { publicStudentsRoutes } from './routes/public-students';
-import { publicLicenseRoutes } from './routes/public-license';
 import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
@@ -158,7 +157,6 @@ const router = {
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,
   publicStudents: publicStudentsRoutes,
-  publicLicense: publicLicenseRoutes,
   rooms: roomsRoutes,
   attendance: attendanceRoutes,
   sessions: {
