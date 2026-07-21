@@ -10,6 +10,7 @@ import {
   PermissionAction,
   ROLE_DEFAULT_PERMISSIONS,
 } from '@shared/interfaces/permissions.interface';
+import { LANGUAGE_STORAGE_KEY } from './language.service';
 
 /**
  * Tenants trialling WhatsApp Cloud API messaging, by company id:
@@ -123,13 +124,28 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(environment.jwtTokenKey);
-    localStorage.removeItem(environment.refreshTokenKey);
-    localStorage.removeItem(environment.userDataKey);
-    localStorage.removeItem('company_name');
+    this.clearStoredData();
     this.currentUser.set(null);
     this.currentUserSubject.next(null);
     this.router.navigate(['/auth/login']);
+  }
+
+  /**
+   * Leave nothing of the session on the device. A blanket clear, not a list of
+   * keys: feature code stashes its own state (saved filters, cached company
+   * name, scanner detection…), and a hand-maintained list goes stale the moment
+   * someone adds a key — which is how one user's data ends up in front of the
+   * next one on a shared machine.
+   *
+   * The UI language is the deliberate exception. It's a device preference set
+   * before anyone signs in, so wiping it would throw the login page back to the
+   * default on every logout.
+   */
+  private clearStoredData(): void {
+    const lang = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    localStorage.clear();
+    sessionStorage.clear();
+    if (lang) localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
   }
 
   getProfile(): Observable<SafeUser> {

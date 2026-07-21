@@ -4,13 +4,19 @@ import { PrimeNG } from 'primeng/config';
 
 export type AppLanguage = 'en' | 'ar';
 
+/**
+ * Where the chosen UI language lives. Exported because logout wipes storage
+ * and has to spare this one key — see AuthService.clearStoredData().
+ */
+export const LANGUAGE_STORAGE_KEY = 'app_lang';
+
 @Injectable({ providedIn: 'root' })
 export class LanguageService {
   private translate = inject(TranslateService);
   private primeng = inject(PrimeNG);
 
   currentLang = signal<AppLanguage>(
-    (localStorage.getItem('app_lang') as AppLanguage) || 'ar'
+    (localStorage.getItem(LANGUAGE_STORAGE_KEY) as AppLanguage) || 'ar'
   );
 
   isRtl = computed(() => this.currentLang() === 'ar');
@@ -26,7 +32,7 @@ export class LanguageService {
   setLanguage(lang: AppLanguage) {
     this.currentLang.set(lang);
     this.apply(lang);
-    localStorage.setItem('app_lang', lang);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
   }
 
   private apply(lang: AppLanguage) {
