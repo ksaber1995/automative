@@ -72,12 +72,13 @@ function missingArt(ctx: Ctx, which: string): void {
 /**
  * True when a 'custom' pool design is actually printable.
  *
- * Both faces are required. A pool ZIP is printed once, in bulk, by an outside
- * printer — shipping it with one side blank is not a thing anybody recovers from
- * after the fact, so the export checks this rather than rendering it anyway.
+ * Pool cards are front-only, so only the front artwork is required. A pool ZIP is
+ * printed once, in bulk, by an outside printer — shipping it with a blank face is
+ * not a thing anybody recovers from, so the export checks this rather than
+ * rendering it anyway.
  */
 export function canExportCustom(design: CardDesign): boolean {
-  return !!(design.artFront || '').trim() && !!(design.artBack || '').trim();
+  return !!(design.artFront || '').trim();
 }
 
 // ─────────────────────────────── FRONT ───────────────────────────────────────

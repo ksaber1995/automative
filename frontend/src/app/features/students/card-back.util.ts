@@ -162,37 +162,9 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
 
   contentTransform(ctx);
 
-  // ================= teacher block (right) =================
-  const tR = 936;            // right edge of the teacher column's text
+  // ================= contact block (right) =================
+  const tR = 936;            // right edge of the contact column's text
   const iconR = 980;         // right edge of the contact icon chips
-
-  // person glyph, to the right of the name
-  ctx.save();
-  ctx.fillStyle = goldGrad(ctx, 946, 40, 980, 84);
-  ctx.beginPath();
-  ctx.arc(963, 52, 9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(948, 76);
-  ctx.bezierCurveTo(948, 62, 978, 62, 978, 76);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  fitText(ctx, d.teacherName || '—', tR, 60, 232, 32, 'bold', T.onPanel, 'right', 'rtl');
-
-  if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 100, 210, 19, 'bold', T.accentOnPanel, 'right', 'rtl');
-    ctx.save();
-    ctx.strokeStyle = T.accent;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(716, 100);
-    ctx.lineTo(752, 100);
-    ctx.stroke();
-    ctx.restore();
-  }
 
   const contacts = ([
     { icon: 'phone', value: d.phone },

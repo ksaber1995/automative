@@ -12,15 +12,15 @@ import { CardTheme, CARD_THEMES } from './card-theme';
  * side that no content may enter — a guillotined card loses a millimetre or two,
  * and a name or QR clipped off the edge makes the card useless.
  *
- * The artwork is still authored in the ORIGINAL 1016 × 638 space (every
- * coordinate below is in it). Two transforms map that space onto the print
- * canvas, so nothing had to be re-measured by hand:
+ * The artwork is authored in the ORIGINAL 1016 × 638 space (every coordinate below
+ * is in it). Two transforms map that space onto the card canvas, so nothing had to
+ * be re-measured by hand:
  *
  *   background → fills the whole card, bleeding off all four edges
- *   content    → fits inside the card minus the 0.5 cm margin
+ *   content    → fits inside the card minus the 0.5 cm safe margin
  *
- * So the panel and ribbons still run to the edge, while the text, photo, crest
- * and QR are guaranteed to sit inside the safe zone.
+ * So the panel and ribbons still run to the edge, while the text and QR are
+ * guaranteed to sit inside the safe zone.
  */
 const CM = 300 / 2.54;                       // px per cm at 300 dpi ≈ 118.11
 export const CARD_W = Math.round(9 * CM);    // 1063 px = 9 cm
@@ -231,6 +231,9 @@ export function star(ctx: Ctx, cx: number, cy: number, r: number): void {
 
 function drawPanel(ctx: Ctx): void {
   ctx.save();
+  // Narrow the whole left panel: every x below is compressed toward the left edge,
+  // so the coloured side is thinner (it carries no crest/photo any more).
+  ctx.scale(0.78, 1);
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(320, 0);
@@ -288,57 +291,6 @@ function drawPanel(ctx: Ctx): void {
   ctx.restore();
 }
 
-function drawCrest(ctx: Ctx, cx: number, cy: number): void {
-  ctx.save();
-  ctx.fillStyle = goldGrad(ctx, cx - 60, cy - 70, cx + 60, cy - 50);
-  for (let i = 0; i < 5; i++) {
-    const a = -Math.PI / 2 + (i - 2) * 0.235;
-    star(ctx, cx + Math.cos(a) * 74, cy + 12 + Math.sin(a) * 74, 8.5);
-  }
-
-  const w = 47;
-  const top = cy - 44;
-  ctx.beginPath();
-  ctx.moveTo(cx - w, top);
-  ctx.lineTo(cx + w, top);
-  ctx.lineTo(cx + w, cy + 12);
-  ctx.bezierCurveTo(cx + w, cy + 42, cx + 22, cy + 54, cx, cy + 62);
-  ctx.bezierCurveTo(cx - 22, cy + 54, cx - w, cy + 42, cx - w, cy + 12);
-  ctx.closePath();
-  ctx.fillStyle = T.panelDark;
-  ctx.fill();
-  ctx.strokeStyle = goldGrad(ctx, cx - w, top, cx + w, cy + 62);
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  ctx.fillStyle = T.onPanel;
-  ctx.beginPath();
-  ctx.moveTo(cx - 27, cy + 4);
-  ctx.quadraticCurveTo(cx - 13, cy - 4, cx - 1, cy + 2);
-  ctx.lineTo(cx - 1, cy + 25);
-  ctx.quadraticCurveTo(cx - 13, cy + 19, cx - 27, cy + 27);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 27, cy + 4);
-  ctx.quadraticCurveTo(cx + 13, cy - 4, cx + 1, cy + 2);
-  ctx.lineTo(cx + 1, cy + 25);
-  ctx.quadraticCurveTo(cx + 13, cy + 19, cx + 27, cy + 27);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = goldGrad(ctx, cx - 8, cy - 30, cx + 8, cy + 2);
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 32);
-  ctx.lineTo(cx + 8, cy - 12);
-  ctx.lineTo(cx, cy - 2);
-  ctx.lineTo(cx - 8, cy - 12);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-/** Empty gold-framed silhouette — students have no photo on file, so this is left blank to be filled in. */
 /**
  * Draw `img` to COVER the box: scaled to fill it and centre-cropped, never
  * squashed. A portrait photo in a landscape frame gets its sides trimmed rather
@@ -365,50 +317,16 @@ export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: nu
   ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
 }
 
-/** The photo frame. With no upload, the grey silhouette placeholder is drawn instead. */
-function drawPhoto(ctx: Ctx, photo?: CanvasImageSource | null): void {
-  // 15% taller than the original 232: the frame ends at 475, still clear of the
-  // gold sweeps that start at y=498.
-  const x = 45, y = 208, w = 190, h = 267, r = 16;
-  ctx.save();
-  // The nudge is a translate, not an offset on x/y: the frame, its gold border and
-  // the clip that holds the photo inside it all have to move as one piece.
-  ctx.translate(A.photoDx, A.photoDy);
-  roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.strokeStyle = goldGrad(ctx, x, y, x + w, y + h);
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
-  roundRect(ctx, x + 4, y + 4, w - 8, h - 8, r - 4);
-  ctx.clip();
-  ctx.fillStyle = '#eceef2';
-  ctx.fillRect(x, y, w, h);
-
-  if (photo) {
-    drawCover(ctx, photo, x + 4, y + 4, w - 8, h - 8);
-    ctx.restore();
-    return;
-  }
-
-  const cx = x + w / 2;
-  ctx.fillStyle = '#c8ccd6';
-  ctx.beginPath();
-  ctx.arc(cx, y + 84, 42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 74, y + h);
-  ctx.bezierCurveTo(cx - 74, y + 150, cx + 74, y + 150, cx + 74, y + h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
 
 type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
 
 function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
   ctx.save();
+  // Drawn larger than the original glyph metrics — scaled about the chip centre.
+  const s = 1.3;
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  ctx.translate(-cx, -cy);
   ctx.strokeStyle = T.onPanel;
   ctx.fillStyle = T.onPanel;
   ctx.lineWidth = 2.2;
@@ -486,6 +404,11 @@ function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
 
 function footIcon(ctx: Ctx, kind: 'book' | 'target' | 'star', cx: number, cy: number): void {
   ctx.save();
+  // Drawn larger than the original glyph metrics — scaled about the icon centre.
+  const s = 1.25;
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  ctx.translate(-cx, -cy);
   ctx.strokeStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
   ctx.fillStyle = goldGrad(ctx, cx - 16, cy - 16, cx + 16, cy + 16);
   ctx.lineWidth = 2.4;
@@ -567,13 +490,6 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // ── Content: inside the 0.5 cm safe margin, so nothing can be cut off ────────
   contentTransform(ctx);
 
-  // An uploaded logo replaces the crest entirely — drawn to fit, so it keeps its
-  // own shape instead of being forced into the shield.
-  if (images.logo) drawLogo(ctx, images.logo, 140, 106, 150, 128);
-  else drawCrest(ctx, 140, 106);
-
-  drawPhoto(ctx, images.photo);
-
   // --- header ---
   const hcx = 626;
   if (data.companyName) {
@@ -605,16 +521,18 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.restore();
 
   // --- info rows ---
+  // The level row is dropped entirely when no level is set — a lone "—" on a
+  // printed card reads as a mistake, so the row reflows away instead.
   const rows: { icon: RowIcon; label: string; value: string; dir: Dir; gold?: boolean }[] = [
     { icon: 'user', label: 'اسم الطالب', value: data.name, dir: 'rtl' },
     { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
-    { icon: 'cap', label: 'الصف الدراسي', value: data.level, dir: 'rtl' },
+    ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
     { icon: 'group', label: 'المجموعة', value: data.group, dir: 'rtl' },
     { icon: 'cal', label: 'العام الدراسي', value: data.year, dir: 'ltr' },
   ];
 
-  const rx = 360;      // left edge — clears the gold ribbon on the navy panel
-  const chip = 42;
+  const rx = 300;      // left edge — clears the (now narrower) gold ribbon on the navy panel
+  const chip = 46;
   const labelR = 766;
   // The label runs right-to-left from labelR and is capped at 124 wide, so it can
   // reach x=642. valueR must leave a real gutter before that: label and value are
@@ -663,10 +581,10 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // of the gold ribbon paints ON TOP of the navy side panel and reads as a dark bar
   // bleeding out of it. BANNER_L therefore lines up with the icon-chip column above
   // (rx = 360) and never crosses the ribbon (which ends at ~364).
-  const BANNER_L = 360;
+  const BANNER_L = 300;      // lines up with the icon-chip column (rx), left of the narrowed panel's ribbon
   const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
   const TEXT_R = BANNER_R - 46;
-  const TEXT_L = 432;        // leaves a gap after the quill (ends at ~410)
+  const TEXT_L = 372;        // leaves a gap after the quill
   ctx.save();
   roundRect(ctx, BANNER_L, 544, BANNER_R - BANNER_L, 68, 16);
   ctx.fillStyle = T.panelDark;
@@ -676,16 +594,16 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
 
   ctx.save();
-  ctx.strokeStyle = goldGrad(ctx, 368, 560, 412, 598);
+  ctx.strokeStyle = goldGrad(ctx, 310, 560, 354, 598);
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(370, 596);
-  ctx.quadraticCurveTo(390, 590, 410, 560);
+  ctx.moveTo(312, 596);
+  ctx.quadraticCurveTo(332, 590, 352, 560);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(379, 593);
-  ctx.quadraticCurveTo(399, 592, 408, 569);
+  ctx.moveTo(321, 593);
+  ctx.quadraticCurveTo(341, 592, 350, 569);
   ctx.stroke();
   ctx.restore();
 
@@ -699,7 +617,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.strokeStyle = goldGrad(ctx, qx, qy, qx + qs, qy + qs);
   ctx.lineWidth = 5;
   ctx.stroke();
-  ctx.drawImage(qr, qx + 12, qy + 12, qs - 24, qs - 24);
+  // Wider quiet zone around the QR — more white padding inside the frame.
+  ctx.drawImage(qr, qx + 24, qy + 24, qs - 48, qs - 48);
 
   const capTop = qy + qs + 14;
   roundRect(ctx, qx, capTop, qs, 64, 12);
@@ -741,14 +660,5 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   }
 
   ctx.restore();
-
-  // The card's edge frame — drawn after restore(), so it re-establishes the
-  // full-card transform and traces the real 9 x 5.7 cm edge.
-  ctx.save();
-  bgTransform(ctx);
-  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 30);
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+  // No outer edge frame — the card prints without a border.
 }

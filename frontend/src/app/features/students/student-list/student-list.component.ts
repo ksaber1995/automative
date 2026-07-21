@@ -21,7 +21,8 @@ import { firstValueFrom, forkJoin } from 'rxjs';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { StudentService } from '../services/student.service';
-import { StudentCardData, currentAcademicYear, loadCardImages, renderCardBackPng, renderStudentCardPng } from '../card-render.util';
+import { StudentCardData, currentAcademicYear, loadCardImages, renderStudentCardPng } from '../card-render.util';
+import { CardTemplate } from '../card-theme';
 import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -499,7 +500,7 @@ export class StudentListComponent implements OnInit {
       // Load the card design first: it picks the template for the per-student
       // fronts as well as the shared back, so a printed pair always matches.
       const design = await firstValueFrom(this.companyService.getCardDesign()).catch(() => null);
-      const template = design?.template;
+      const template = design?.template as CardTemplate | undefined;
       // Decoded once for the whole batch — not once per student.
       const images = await loadCardImages(design);
 
@@ -556,16 +557,6 @@ export class StudentListComponent implements OnInit {
         this.zipDone.set(++rendered);
         this.zipPercent.set(Math.round((rendered / exportStudents.length) * 100));
         if (rendered % 5 === 0) await new Promise((r) => setTimeout(r));
-      }
-
-      // The back face is identical for every student, so it ships once at the ZIP
-      // root. Optional: if it fails, the student cards are still worth delivering.
-      if (design) {
-        try {
-          zip.file('card-back.png', await renderCardBackPng(design, canvas), { base64: true });
-        } catch {
-          console.warn('Card back face skipped — could not render the card design.');
-        }
       }
 
       // Compressing a few thousand PNGs is itself a long step, so it gets its own

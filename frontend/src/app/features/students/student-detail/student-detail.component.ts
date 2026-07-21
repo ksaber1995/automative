@@ -12,6 +12,7 @@ import { DialogModule } from 'primeng/dialog';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
@@ -25,7 +26,7 @@ import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
 import { StudentService } from '../services/student.service';
-import { formatStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
+import { CARD_SERIAL_BASE, formatStudentCode, normalizeStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -66,6 +67,10 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     DialogModule,
     ConfirmDialogModule,
     InputNumberModule,
+    // The link-card field is a plain pInputText (it takes a typed serial or a
+    // scanned token) — without this import the directive is inert and it renders
+    // as an unstyled browser input.
+    InputTextModule,
     DatePickerModule,
     TextareaModule,
     RadioButtonModule,
@@ -1172,11 +1177,17 @@ export class StudentDetailComponent implements OnInit {
   linkCardVisible = signal(false);
   linkedCards = signal<QrCard[]>([]);
   linkingCard = signal(false);
-  linkSerial: number | null = null;
+  /**
+   * The one link field. It takes anything printed on the card: the serial number,
+   * the raw QR token, OR a full scanned profile URL. The dialog autofocuses it, so
+   * a USB scanner (which the global capture ignores while a field is focused —
+   * see the layout's keydown guard) types straight into here and Enter submits.
+   */
+  linkInput = '';
   cardLabel = serialLabel;
 
   openLinkCard(): void {
-    this.linkSerial = null;
+    this.linkInput = '';
     this.linkCardVisible.set(true);
     // While this is open a scan links the card, instead of falling through to the
     // global "find student / take attendance" behaviour.
@@ -1200,13 +1211,31 @@ export class StudentDetailComponent implements OnInit {
     this.linkCard({ token });
   }
 
-  linkBySerial(): void {
-    const serial = Number(this.linkSerial);
-    if (!Number.isInteger(serial) || serial < 1) {
-      this.notificationService.error(this.translate.instant('QR_CARDS.BAD_SERIAL'));
+  /**
+   * Link from whatever is in the field — typed or scanned. A scanned QR is the
+   * profile URL, so reduce it to its token; a bare number is the printed serial;
+   * anything else is treated as a raw token.
+   */
+  linkByInput(): void {
+    const raw = (this.linkInput || '').trim();
+    if (!raw || this.linkingCard()) return;
+
+    // A scanned card QR is the profile URL — reduce it to its token.
+    if (raw.includes('/p/s/')) {
+      const token = this.globalScan.extractToken(raw);
+      if (token) this.linkCard({ token });
       return;
     }
-    this.linkCard({ serial });
+    // Otherwise it's the code printed on the card — "A5", "05", "051", or the full
+    // serial. normalizeStudentCode turns any of those into the stored serial.
+    const serial = Number(normalizeStudentCode(raw));
+    if (Number.isInteger(serial) && serial > CARD_SERIAL_BASE) {
+      this.linkCard({ serial });
+      return;
+    }
+    // Not a recognisable card number — treat the raw value as a token (a hand-typed
+    // token from a damaged QR); the API will reject it if it isn't one.
+    this.linkCard({ token: raw });
   }
 
   private linkCard(by: { token?: string; serial?: number }): void {

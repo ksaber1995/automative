@@ -6,7 +6,6 @@ import {
 } from './student-card.util';
 import { drawCardBack } from './card-back.util';
 import { drawCardBackMinimal, drawStudentCardMinimal } from './card-minimal.util';
-import { drawCardBackPortrait, drawStudentCardPortrait } from './card-portrait.util';
 import {
   AgnosticCardData, AgnosticTemplate, DEFAULT_AGNOSTIC, drawAgnosticBack, drawAgnosticFront,
 } from './card-agnostic.util';
@@ -77,9 +76,10 @@ function prepare(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 }
 
 /**
- * Decode the design's photo/logo/artwork data URLs ONCE, so a 500-student export
- * doesn't re-decode the same images 500 times. A broken or empty value yields null
- * and the card falls back to its built-in placeholder/crest.
+ * Decode the design's artwork data URLs ONCE, so a 500-student export doesn't
+ * re-decode the same images 500 times. A broken or empty value yields null.
+ * Only the custom-pool artwork is used now — teacher photo and academy logo were
+ * removed from every card.
  *
  * These must be data URLs, not hosted ones: an image from another origin taints
  * the canvas, and canvas.toDataURL() then throws — the export would die.
@@ -97,8 +97,6 @@ export async function loadCardImages(design?: CardDesign | null): Promise<CardIm
     }
   };
   return {
-    photo: await decode(design?.photo),
-    logo: await decode(design?.logo),
     artFront: await decode(design?.artFront),
     artBack: await decode(design?.artBack),
   };
@@ -121,10 +119,7 @@ export async function renderStudentCardPng(
   const qr = await qrImage(data.qrUrl);
 
   arm(design, 'student', template);
-  // 'portrait' takes no images on the front — the teacher's photo and logo are on
-  // its BACK, which is the whole point of that template.
-  if (template === 'portrait') drawStudentCardPortrait(ctx, data, qr);
-  else if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
+  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
   else drawStudentCard(ctx, data, qr, images);
 
   return canvas.toDataURL('image/png').split(',')[1];
@@ -141,10 +136,7 @@ export async function renderCardBackPng(design: CardDesign, canvas: HTMLCanvasEl
 
   const template = design.template as CardTemplate | undefined;
   arm(design, 'student', template);
-  if (template === 'portrait') {
-    // The only back face that carries images: the teacher's photo and logo.
-    drawCardBackPortrait(ctx, design, qr, await loadCardImages(design));
-  } else if (template === 'minimal') {
+  if (template === 'minimal') {
     drawCardBackMinimal(ctx, design, qr);
   } else {
     drawCardBack(ctx, design, qr);

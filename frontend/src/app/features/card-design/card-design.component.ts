@@ -18,7 +18,7 @@ import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import {
   DESIGN_H, DESIGN_W, StudentCardData, canExportCustom, currentAcademicYear, loadCardImages,
-  renderAgnosticBackPng, renderAgnosticCardPng, renderCardBackPng, renderStudentCardPng,
+  renderAgnosticCardPng, renderStudentCardPng,
 } from '../students/card-render.util';
 import { CARD_TEMPLATES, CardTemplate } from '../students/card-theme';
 import { AGNOSTIC_TEMPLATES, AgnosticTemplate, DEFAULT_AGNOSTIC } from '../students/card-agnostic.util';
@@ -63,15 +63,12 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
-  @ViewChild('preview') previewCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewFront') previewFrontCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewPoolFront') previewPoolFrontCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('previewPoolBack') previewPoolBackCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
   saving = signal(false);
   savingTemplate = signal(false);
-  downloading = signal(false);
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
   /** Last design the server confirmed — the base for a template-only save. */
   savedDesign = signal<CardDesign | null>(null);
@@ -259,15 +256,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     this.redraw();
   }
 
-  setListItem(key: 'instructions' | 'highlights', index: number, value: string) {
-    this.design.update((d) => {
-      const list = [...d[key]];
-      list[index] = value;
-      return { ...d, [key]: list };
-    });
-    this.redraw();
-  }
-
   // ── Photo / logo upload ─────────────────────────────────────────────────────
   // Stored as data URLs inside the card design, NOT as hosted files: the card is
   // rasterised through canvas.toDataURL(), and an image loaded from another origin
@@ -384,13 +372,12 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   /** The placement in force, clamped — a stored design may predate the field. */
   artLayout = computed<PoolArtLayout>(() => clampPoolArt(this.design().poolArt));
 
-  /** Both faces are required before a pool ZIP can be printed. */
+  /** The front artwork is required before a pool ZIP can be printed. */
   customReady = computed(() => canExportCustom(this.design()));
 
-  /** The two artwork slots, so the upload block is written once rather than twice. */
+  /** The artwork slot(s). Pool cards are front-only, so just the front. */
   readonly artFields: { key: 'artFront' | 'artBack'; label: string }[] = [
     { key: 'artFront', label: 'CARD_DESIGN.ART_FRONT' },
-    { key: 'artBack', label: 'CARD_DESIGN.ART_BACK' },
   ];
 
   setArt<K extends keyof PoolArtLayout>(key: K, value: PoolArtLayout[K]): void {
@@ -614,58 +601,32 @@ export class CardDesignComponent implements OnInit, OnDestroy {
     requestAnimationFrame(async () => {
       this.redrawPending = false;
       const d = this.design();
-      const back = this.previewCanvas?.nativeElement;
       const front = this.previewFrontCanvas?.nativeElement;
       try {
-        if (back) await renderCardBackPng(d, back);
         // The student side is not editable — it is rendered from sample data so
-        // you can see the look and feel the students will actually get. The photo
-        // and logo ARE the teacher's own, so the preview shows them for real.
+        // you can see the look and feel the students will actually get.
         if (front) {
           const images = await loadCardImages(d);
           await renderStudentCardPng(this.sampleStudent(), front, d.template as CardTemplate, images, d);
         }
 
-        // The pool card, both faces. Its serial is a sample — the real ones come
+        // The pool card is front-only. Its serial is a sample — the real ones come
         // from the pool — but everything else is exactly what gets printed.
         const poolFront = this.previewPoolFrontCanvas?.nativeElement;
-        const poolBack = this.previewPoolBackCanvas?.nativeElement;
-        if (poolFront || poolBack) {
+        if (poolFront) {
           const images = await loadCardImages(d);
           const company = d.teacherName || '';
-          if (poolFront) {
-            await renderAgnosticCardPng(
-              { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
-              poolFront, this.agnostic(), images, d,
-            );
-          }
-          if (poolBack) await renderAgnosticBackPng(d, company, poolBack, images);
+          await renderAgnosticCardPng(
+            { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
+            poolFront, this.agnostic(), images, d,
+          );
           // AFTER the render, and only in the editor — see paintArtHandles.
-          if (poolFront && this.isCustomPool()) this.paintArtHandles(poolFront);
+          if (this.isCustomPool()) this.paintArtHandles(poolFront);
         }
       } catch {
         // A malformed QR link (e.g. mid-typing) just leaves the last good frame up.
       }
     });
-  }
-
-  /**
-   * Download the back face on its own, as the print-ready PNG. Renders from the
-   * CURRENT form state (not the saved copy), so what you see is what you get
-   * even with unsaved edits.
-   */
-  async downloadPng() {
-    this.downloading.set(true);
-    try {
-      const canvas = document.createElement('canvas');
-      const base64 = await renderCardBackPng(this.design(), canvas);
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      saveAs(new Blob([bytes], { type: 'image/png' }), 'card-back.png');
-    } catch {
-      this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
-    } finally {
-      this.downloading.set(false);
-    }
   }
 
   /** Strip the empty slots the form pads out; the server re-applies defaults. */
@@ -753,8 +714,6 @@ export class CardDesignComponent implements OnInit, OnDestroy {
         { companyName: company, code: 'A-100001', qrUrl: `${window.location.origin}/p/s/preview` },
         canvas, t, images, { ...d, agnosticTemplate: t },
       ), `pool-${t}-front.png`);
-
-      save(await renderAgnosticBackPng({ ...d, agnosticTemplate: t }, company, canvas, images), `pool-${t}-back.png`);
     } catch {
       this.notificationService.error(this.translate.instant('CARD_DESIGN.DOWNLOAD_ERROR'));
     } finally {

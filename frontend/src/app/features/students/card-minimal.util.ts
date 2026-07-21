@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  A, CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, drawCover, fitText, roundRect, wrap, wrapFit,
+  CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -13,62 +13,20 @@ import {
  * gradient note in student-card.util.ts; that constraint is a feature here.
  */
 
-const SILHOUETTE = '#cbd5e1';   // slate 300
-
 /** Rounded page + hairline border, shared by both faces. */
 function page(ctx: Ctx): void {
   ctx.fillStyle = T.page;
   ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 }
 
-function border(ctx: Ctx): void {
-  // Called after restore(), so it re-establishes the full-card transform itself —
-  // the hairline frame traces the card's real edge.
-  ctx.save();
-  bgTransform(ctx);
-  roundRect(ctx, 1, 1, DESIGN_W - 2, DESIGN_H - 2, 26);
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+function border(_ctx: Ctx): void {
+  // Outer card border removed on request — the card prints without an edge frame.
 }
 
 /** The teal spine down the left edge — the one strong colour on the front. */
 function spine(ctx: Ctx): void {
   ctx.fillStyle = T.accent;
   ctx.fillRect(0, 0, 12, DESIGN_H);
-}
-
-function photo(ctx: Ctx, x: number, y: number, w: number, h: number, img?: CanvasImageSource | null): void {
-  ctx.save();
-  // Frame, border and clip move as one piece — see drawPhoto in student-card.util.ts.
-  ctx.translate(A.photoDx, A.photoDy);
-  roundRect(ctx, x, y, w, h, 14);
-  ctx.fillStyle = T.wash;
-  ctx.fill();
-  ctx.strokeStyle = T.line;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.clip();
-
-  // An uploaded photo fills the frame; otherwise the silhouette placeholder.
-  if (img) {
-    drawCover(ctx, img, x, y, w, h);
-    ctx.restore();
-    return;
-  }
-
-  const cx = x + w / 2;
-  ctx.fillStyle = SILHOUETTE;
-  ctx.beginPath();
-  ctx.arc(cx, y + 82, 38, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 68, y + h);
-  ctx.bezierCurveTo(cx - 68, y + 140, cx + 68, y + 140, cx + 68, y + h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 }
 
 // ─────────────────────────────── FRONT ───────────────────────────────────────
@@ -89,11 +47,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   contentTransform(ctx);
 
-  // 15% taller (226 -> 260). It grows upward: the code chip is at y=414, so the
-  // frame keeps its foot at 394 rather than running into it.
-  photo(ctx, 46, 134, 186, 260, images.photo);
-
-  // student code chip under the photo
+  // student code chip in the left column
   roundRect(ctx, 46, 414, 186, 44, 10);
   ctx.fillStyle = T.accentLight;
   ctx.fill();
@@ -269,13 +223,8 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
 
   contentTransform(ctx);
 
-  // ---- teacher block (right) ----
+  // ---- contact block (right) ----
   const tR = 968;
-  fitText(ctx, d.teacherName || '—', tR, 58, 300, 30, 'bold', T.ink, 'right', 'rtl');
-  if (d.teacherTitle) {
-    fitText(ctx, d.teacherTitle, tR, 92, 300, 18, 'bold', T.accent, 'right', 'rtl');
-  }
-
   const contacts = ([
     { k: 'phone', v: d.phone },
     { k: 'whatsapp', v: d.whatsapp },
