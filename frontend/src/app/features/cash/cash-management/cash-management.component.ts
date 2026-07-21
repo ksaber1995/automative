@@ -20,7 +20,6 @@ import { AuthService } from '../../../core/services/auth.service';
 import { toLocalYmd } from '../../../core/utils/date.util';
 
 const ALL = '__ALL__';
-const COMPANY = '__COMPANY__';
 
 @Component({
   selector: 'app-cash-management',
@@ -45,21 +44,26 @@ export class CashManagementComponent implements OnInit {
   adjustmentsLoading = signal(true);
   branches = signal<LookupOption[]>([]);
 
-  // Filter on the page (special values: ALL, COMPANY, or a branch UUID)
-  filterValue: string = ALL;
+  // Filter on the page: ALL, or a branch UUID.
+  //
+  // A signal, not a plain field: filteredBalance() below is a computed(), and a
+  // computed cannot see a plain field change — the balance was worked out once on
+  // first render (with ALL selected) and then stayed on the company total no
+  // matter which branch you picked.
+  filterValue = signal<string>(ALL);
 
   // Computed: balance shown on the page given the current filter
   filteredBalance = computed(() => {
     const c = this.current();
     if (!c) return 0;
-    if (this.filterValue === ALL) return c.totalCash;
-    if (this.filterValue === COMPANY) return c.unallocatedAdjustments || 0;
-    const branch = c.byBranch.find((b) => b.branchId === this.filterValue);
+    const filter = this.filterValue();
+    if (filter === ALL) return c.totalCash;
+    const branch = c.byBranch.find((b) => b.branchId === filter);
     return branch?.cash || 0;
   });
 
   filterIsBranch(): boolean {
-    return this.filterValue !== ALL && this.filterValue !== COMPANY;
+    return this.filterValue() !== ALL;
   }
 
   // Dialog state
@@ -86,16 +90,14 @@ export class CashManagementComponent implements OnInit {
     });
   }
 
+  // Everything, or one branch. The old "Global" (unallocated) slice is gone from
+  // here on request: it showed a number nobody banks — company-level adjustments
+  // that haven't been attributed to a branch — and read as a third kind of cash.
+  // It still exists in the data and in the ALL breakdown note.
   filterOptions = computed(() => {
-    const isAdmin = this.authService.isGlobalAdmin();
     const opts: { label: string; value: string }[] = [
       { label: this.translate.instant('CASH.FILTER_ALL'), value: ALL },
     ];
-    // Only global admins can see/filter the "Global" (unallocated) slice —
-    // branch admins never own company-wide cash.
-    if (isAdmin) {
-      opts.push({ label: this.translate.instant('CASH.FILTER_COMPANY'), value: COMPANY });
-    }
     for (const b of this.branches()) {
       opts.push({ label: b.label, value: b.id });
     }
@@ -134,10 +136,8 @@ export class CashManagementComponent implements OnInit {
 
   loadAdjustments() {
     this.adjustmentsLoading.set(true);
-    let branchFilter: string | null | undefined;
-    if (this.filterValue === ALL) branchFilter = undefined;
-    else if (this.filterValue === COMPANY) branchFilter = null;
-    else branchFilter = this.filterValue;
+    const filter = this.filterValue();
+    const branchFilter: string | undefined = filter === ALL ? undefined : filter;
     this.cashService.listAdjustments(branchFilter).subscribe({
       next: (data) => {
         this.adjustments.set(data);
@@ -157,7 +157,7 @@ export class CashManagementComponent implements OnInit {
     // admins, a null (company-wide) target isn't allowed — fall back to the
     // first branch they have access to so the picker isn't empty.
     if (this.filterIsBranch()) {
-      this.dialogBranchId = this.filterValue;
+      this.dialogBranchId = this.filterValue();
     } else if (!this.authService.isGlobalAdmin()) {
       this.dialogBranchId = this.branches()[0]?.id ?? null;
     } else {
