@@ -137,7 +137,9 @@
         </div>
         }
 
-        <!-- Room the class is scheduled in -->
+        <!-- Room the class is scheduled in (hidden for teacher companies, who
+             have no rooms: the API already exempts them from the room check). -->
+        @if (!authService.isTeacher()) {
         <div class="field">
           <label for="roomId" class="block text-sm font-medium text-gray-700 mb-2">
             {{ 'CLASSES.FORM.ROOM_LABEL' | translate }}
@@ -156,6 +158,7 @@
           </p-select>
           <small class="text-gray-500">{{ 'CLASSES.FORM.ROOM_HINT' | translate }}</small>
         </div>
+        }
 
         <!-- Days of Week -->
         <div class="field md:col-span-2">
