@@ -33,7 +33,7 @@ interface WeekColumn {
 }
 
 type ViewMode = 'DAY' | 'WEEK';
-type WeekLayout = 'GRID' | 'STACKED';
+type Layout = 'GRID' | 'STACKED';
 
 /**
  * The week runs Saturday → Friday here, not Monday → Sunday: these are Egyptian
@@ -220,7 +220,7 @@ export class TimetableComponent implements OnInit {
   // for. The Day toggle is one click away for a single day's detail.
   viewMode = signal<ViewMode>('WEEK');
   // GRID = hour × day counts; STACKED = each day listed under the previous one.
-  weekLayout = signal<WeekLayout>('GRID');
+  layout = signal<Layout>('GRID');
   selectedBranchId: string | null = null;
   selectedTeacherId: string | null = null;
   selectedCourseId: string | null = null;
@@ -306,6 +306,11 @@ export class TimetableComponent implements OnInit {
 
   positionedEntries = computed<PositionedEntry[]>(() =>
     layoutEntries(this.filteredEntries(), this.totalGridHeight)
+  );
+
+  /** The day's classes in time order — what the stacked day layout lists. */
+  sortedDayEntries = computed(() =>
+    [...this.filteredEntries()].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
   );
 
   hasActiveFilters = computed(() =>
@@ -468,9 +473,9 @@ export class TimetableComponent implements OnInit {
     this.load();
   }
 
-  /** Layout only — both shapes read the week already in hand, so no reload. */
-  setWeekLayout(layout: WeekLayout) {
-    this.weekLayout.set(layout);
+  /** Layout only — both shapes read what's already loaded, so no reload. */
+  setLayout(layout: Layout) {
+    this.layout.set(layout);
   }
 
   /**

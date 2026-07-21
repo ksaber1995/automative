@@ -41,19 +41,18 @@
         icon="pi pi-calendar" [outlined]="true"
         severity="secondary" (onClick)="goToToday()"></p-button>
 
-      <!-- Week only: counts side by side, or every day listed one under the other -->
-      @if (isWeek()) {
-        <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden">
-          <button type="button" class="px-3 py-2 text-sm transition-colors"
-            [class]="weekLayout() === 'GRID' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
-            [pTooltip]="'TIMETABLE.LAYOUT_GRID' | translate"
-            (click)="setWeekLayout('GRID')"><i class="pi pi-th-large"></i></button>
-          <button type="button" class="px-3 py-2 text-sm border-s border-gray-300 transition-colors"
-            [class]="weekLayout() === 'STACKED' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
-            [pTooltip]="'TIMETABLE.LAYOUT_STACKED' | translate"
-            (click)="setWeekLayout('STACKED')"><i class="pi pi-bars"></i></button>
-        </div>
-      }
+      <!-- Calendar grid, or everything listed one under the other. Applies to both
+           views and is remembered when switching between them. -->
+      <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+        <button type="button" class="px-3 py-2 text-sm transition-colors"
+          [class]="layout() === 'GRID' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          [pTooltip]="'TIMETABLE.LAYOUT_GRID' | translate"
+          (click)="setLayout('GRID')"><i class="pi pi-th-large"></i></button>
+        <button type="button" class="px-3 py-2 text-sm border-s border-gray-300 transition-colors"
+          [class]="layout() === 'STACKED' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          [pTooltip]="'TIMETABLE.LAYOUT_STACKED' | translate"
+          (click)="setLayout('STACKED')"><i class="pi pi-bars"></i></button>
+      </div>
     </div>
   </div>
 
@@ -199,7 +198,7 @@
 
   <!-- Week, as counts: an academy's week has too many classes to draw as blocks.
        Every number opens the list behind it. -->
-  @if (!loading() && isWeek() && weekLayout() === 'GRID' && visibleEntries().length > 0) {
+  @if (!loading() && isWeek() && layout() === 'GRID' && visibleEntries().length > 0) {
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       <div class="overflow-x-auto">
         <div class="min-w-[720px]">
@@ -249,7 +248,7 @@
   }
 
   <!-- Week, stacked: each day under the previous one, fully listed -->
-  @if (!loading() && isWeek() && weekLayout() === 'STACKED' && visibleEntries().length > 0) {
+  @if (!loading() && isWeek() && layout() === 'STACKED' && visibleEntries().length > 0) {
     <div class="space-y-4">
       @for (day of weekDays(); track day.iso) {
         <div class="bg-white rounded-xl border overflow-hidden shadow-sm"
@@ -301,8 +300,25 @@
     </div>
   </p-dialog>
 
+  <!-- Day, stacked: the same list, for one day -->
+  @if (!loading() && !isWeek() && layout() === 'STACKED' && filteredEntries().length > 0) {
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div class="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+        <span class="font-semibold text-gray-700">{{ longDayLabel(selectedDate()) }}</span>
+        <span class="text-xs text-gray-500">
+          {{ 'TIMETABLE.CLASS_COUNT' | translate: { count: filteredEntries().length } }}
+        </span>
+      </div>
+      <div class="p-3 space-y-2">
+        @for (entry of sortedDayEntries(); track entry.classId) {
+          <ng-container *ngTemplateOutlet="sessionRow; context: { $implicit: entry }"></ng-container>
+        }
+      </div>
+    </div>
+  }
+
   <!-- Day calendar -->
-  @if (!loading() && !isWeek() && filteredEntries().length > 0) {
+  @if (!loading() && !isWeek() && layout() === 'GRID' && filteredEntries().length > 0) {
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       <div class="flex">
         <!-- Hour rail -->
