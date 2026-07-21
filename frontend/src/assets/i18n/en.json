@@ -3062,7 +3062,19 @@
       "PCT_COL_PAID": "Amount paid",
       "PCT_COL_SHARE": "Teacher share",
       "PCT_TOTAL": "Total",
-      "PCT_NO_PAYMENTS": "No student payments yet for this teacher."
+      "PCT_NO_PAYMENTS": "No student payments yet for this teacher.",
+      "PCT_OPEN_TAB": "Open full view in new tab",
+      "PCT_BACK_TO_SALARIES": "Back to salaries",
+      "PCT_NOT_FOUND": "This salary breakdown could not be loaded.",
+      "PCT_FROM_STUDENTS": "{{students}} students · {{payments}} payments",
+      "PCT_OF_REVENUE": "of revenue",
+      "PCT_BY_COURSE": "Revenue by course",
+      "PCT_COL_COURSE": "Course",
+      "PCT_COL_STUDENTS": "Students",
+      "PCT_COL_PAYMENTS": "Payments",
+      "PCT_COL_REVENUE": "Revenue",
+      "PCT_COL_SOURCE": "Type",
+      "PCT_DETAILS": "All payments ({{count}})"
     },
     "CATEGORY_VALUES": {
       "SALARIES": "Salaries",

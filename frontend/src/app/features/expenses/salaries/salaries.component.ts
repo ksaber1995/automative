@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
@@ -54,6 +54,7 @@ interface SalaryAdjustment {
     ConfirmDialogModule,
     DialogModule,
     TranslateModule,
+    RouterLink,
     AmountPipe,
   ],
   providers: [ConfirmationService],
@@ -221,12 +222,15 @@ export class SalariesComponent implements OnInit {
   pctDialogVisible = signal(false);
   pctLoading = signal(false);
   pctEmployeeName = signal('');
+  /** Drives the "open in new tab" link to the full-page view. */
+  pctEmployeeId = signal<string | null>(null);
   pctData = signal<PercentageBreakdown | null>(null);
   /** The dialog opens on the summary; the history is a click away. */
   pctShowHistory = signal(false);
 
   openPercentageDetails(item: any) {
     this.pctEmployeeName.set(this.getEmployeeName(item.employeeId));
+    this.pctEmployeeId.set(item.employeeId);
     this.pctData.set(null);
     this.pctShowHistory.set(false);
     this.pctLoading.set(true);

@@ -3062,7 +3062,19 @@
       "PCT_COL_PAID": "المبلغ المدفوع",
       "PCT_COL_SHARE": "نصيب المدرس",
       "PCT_TOTAL": "الإجمالي",
-      "PCT_NO_PAYMENTS": "لا توجد مدفوعات طلاب لهذا المدرس بعد."
+      "PCT_NO_PAYMENTS": "لا توجد مدفوعات طلاب لهذا المدرس بعد.",
+      "PCT_OPEN_TAB": "فتح العرض الكامل في تبويب جديد",
+      "PCT_BACK_TO_SALARIES": "رجوع إلى الرواتب",
+      "PCT_NOT_FOUND": "تعذّر تحميل تفاصيل هذا الراتب.",
+      "PCT_FROM_STUDENTS": "{{students}} طالب · {{payments}} دفعة",
+      "PCT_OF_REVENUE": "من الإيراد",
+      "PCT_BY_COURSE": "الإيراد حسب الكورس",
+      "PCT_COL_COURSE": "الكورس",
+      "PCT_COL_STUDENTS": "الطلاب",
+      "PCT_COL_PAYMENTS": "الدفعات",
+      "PCT_COL_REVENUE": "الإيراد",
+      "PCT_COL_SOURCE": "النوع",
+      "PCT_DETAILS": "كل الدفعات ({{count}})"
     },
     "CATEGORY_VALUES": {
       "SALARIES": "الرواتب",

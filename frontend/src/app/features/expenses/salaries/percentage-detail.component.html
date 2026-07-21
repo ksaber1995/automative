@@ -1,0 +1,127 @@
+<div class="p-4 md:p-6 max-w-6xl mx-auto">
+
+  <a routerLink="/expenses/salaries"
+     class="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1.5 mb-4">
+    <i class="pi pi-arrow-left text-xs"></i>
+    {{ 'EXPENSES.SALARIES.PCT_BACK_TO_SALARIES' | translate }}
+  </a>
+
+  @if (loading()) {
+    <div class="py-20 text-center text-gray-500">
+      <i class="pi pi-spin pi-spinner text-3xl"></i>
+    </div>
+  } @else if (notFound()) {
+    <div class="py-20 text-center text-gray-500">{{ 'EXPENSES.SALARIES.PCT_NOT_FOUND' | translate }}</div>
+  } @else if (data(); as d) {
+
+    <h1 class="text-2xl font-bold text-gray-900">{{ employeeName() }}</h1>
+    <p class="text-gray-500 mb-5">
+      {{ 'EXPENSES.SALARIES.PCT_TITLE' | translate }} · {{ d.percentageRate }}%
+    </p>
+
+    <!-- Preview: the headline numbers before any detail -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div class="border rounded-lg p-4 bg-white">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.PCT_TOTAL_PAID' | translate }}</div>
+        <div class="text-xl font-bold text-gray-900">{{ d.totalPaid | amount }}</div>
+        <div class="text-xs text-gray-400 mt-1">
+          {{ 'EXPENSES.SALARIES.PCT_FROM_STUDENTS' | translate: { students: studentCount(), payments: lines().length } }}
+        </div>
+      </div>
+      <div class="border rounded-lg p-4 bg-white">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.PCT_ACCRUED' | translate }}</div>
+        <div class="text-xl font-bold text-gray-900">{{ d.accrued | amount }}</div>
+        <div class="text-xs text-gray-400 mt-1">{{ d.percentageRate }}% {{ 'EXPENSES.SALARIES.PCT_OF_REVENUE' | translate }}</div>
+      </div>
+      <div class="border rounded-lg p-4 bg-white">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.PCT_WITHDRAWN' | translate }}</div>
+        <div class="text-xl font-bold text-red-700">{{ d.withdrawn | amount }}</div>
+      </div>
+      <div class="border rounded-lg p-4 bg-green-50 border-green-200">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.PCT_OWED' | translate }}</div>
+        <div class="text-xl font-bold text-green-700">{{ d.owed | amount }}</div>
+      </div>
+    </div>
+
+    <!-- Per course: where the money actually comes from -->
+    <p-card styleClass="mb-6">
+      <h2 class="text-lg font-semibold mb-3">{{ 'EXPENSES.SALARIES.PCT_BY_COURSE' | translate }}</h2>
+      @if (courseRollup().length) {
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-600">
+                <th class="p-2 font-medium">{{ 'EXPENSES.SALARIES.PCT_COL_COURSE' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_STUDENTS' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_PAYMENTS' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_REVENUE' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_SHARE' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of courseRollup(); track c.course) {
+                <tr class="border-t">
+                  <td class="p-2 font-medium">{{ c.course }}</td>
+                  <td class="p-2 text-right">{{ c.students }}</td>
+                  <td class="p-2 text-right text-gray-600">{{ c.payments }}</td>
+                  <td class="p-2 text-right">{{ c.revenue | amount }}</td>
+                  <td class="p-2 text-right font-medium text-green-700">{{ c.share | amount }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot class="bg-gray-50">
+              <tr class="border-t font-semibold">
+                <td class="p-2">{{ 'EXPENSES.SALARIES.PCT_TOTAL' | translate }}</td>
+                <td class="p-2 text-right">{{ studentCount() }}</td>
+                <td class="p-2 text-right">{{ lines().length }}</td>
+                <td class="p-2 text-right">{{ d.totalPaid | amount }}</td>
+                <td class="p-2 text-right text-green-700">{{ d.accrued | amount }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      } @else {
+        <div class="py-8 text-center text-gray-500">{{ 'EXPENSES.SALARIES.PCT_NO_PAYMENTS' | translate }}</div>
+      }
+    </p-card>
+
+    <!-- Then every payment, newest first -->
+    <p-card>
+      <h2 class="text-lg font-semibold mb-3">
+        {{ 'EXPENSES.SALARIES.PCT_DETAILS' | translate: { count: lines().length } }}
+      </h2>
+      @if (lines().length) {
+        <p-table [value]="lines()" [paginator]="lines().length > 25" [rows]="25"
+                 [rowsPerPageOptions]="[25, 50, 100]" styleClass="p-datatable-sm">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_STUDENT' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_CLASS' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_SOURCE' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_DATE' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.PCT_COL_PAID' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.PCT_COL_SHARE' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-l>
+            <tr>
+              <td class="font-medium">{{ l.studentName }}</td>
+              <td class="text-gray-600">
+                {{ l.className || '—' }}
+                @if (l.courseName) {
+                  <div class="text-xs text-gray-400">{{ l.courseName }}</div>
+                }
+              </td>
+              <td><p-tag [value]="l.source" [severity]="sourceSeverity(l.source)"></p-tag></td>
+              <td class="text-gray-600 whitespace-nowrap">{{ l.paidAt ? (l.paidAt | date: 'MMM d, y') : '—' }}</td>
+              <td class="text-right whitespace-nowrap">{{ l.amount | amount }}</td>
+              <td class="text-right font-medium text-green-700 whitespace-nowrap">{{ l.share | amount }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      } @else {
+        <div class="py-8 text-center text-gray-500">{{ 'EXPENSES.SALARIES.PCT_NO_PAYMENTS' | translate }}</div>
+      }
+    </p-card>
+  }
+</div>
