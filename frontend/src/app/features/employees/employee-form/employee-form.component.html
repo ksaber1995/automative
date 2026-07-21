@@ -22,10 +22,10 @@
 
         <!-- Email -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.EMAIL' | translate }} <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.EMAIL' | translate }}</label>
           <input pInputText type="email" formControlName="email" class="w-full" />
           @if (email?.invalid && email?.touched) {
-            <small class="text-red-500">{{ 'EMPLOYEES.FORM.EMAIL_REQUIRED' | translate }}</small>
+            <small class="text-red-500">{{ 'EMPLOYEES.FORM.EMAIL_INVALID' | translate }}</small>
           }
         </div>
 

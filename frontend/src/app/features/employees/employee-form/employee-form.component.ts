@@ -59,7 +59,7 @@ export class EmployeeFormComponent implements OnInit {
     this.employeeForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
       lastName: ['', [Validators.required, Validators.minLength(2)]],
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [Validators.email]],
       phone: ['', [Validators.required]],
       position: ['', [Validators.required]],
       department: ['', [Validators.required]],

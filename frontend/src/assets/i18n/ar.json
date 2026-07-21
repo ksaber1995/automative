@@ -2683,6 +2683,7 @@
       "LAST_NAME_REQUIRED": "اسم العائلة مطلوب",
       "EMAIL": "البريد الإلكتروني",
       "EMAIL_REQUIRED": "بريد إلكتروني صحيح مطلوب",
+      "EMAIL_INVALID": "أدخل بريدًا إلكترونيًا صحيحًا",
       "PHONE": "الهاتف",
       "POSITION": "المنصب",
       "POSITION_PLACEHOLDER": "مثال: مدرس، مدير",

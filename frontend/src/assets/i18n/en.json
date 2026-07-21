@@ -2683,6 +2683,7 @@
       "LAST_NAME_REQUIRED": "Last name is required",
       "EMAIL": "Email",
       "EMAIL_REQUIRED": "Valid email is required",
+      "EMAIL_INVALID": "Enter a valid email address",
       "PHONE": "Phone",
       "POSITION": "Position",
       "POSITION_PLACEHOLDER": "e.g., Instructor, Manager",

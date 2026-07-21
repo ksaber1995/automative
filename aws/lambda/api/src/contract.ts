@@ -1289,7 +1289,9 @@ const CreateExpensePaymentSchema = z.object({
 const CreateEmployeeSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
-  email: z.string().email().optional(),
+  // Optional, and an empty string counts as "not given" — the form always sends
+  // the key. Same shape as CreateStudentSchema.email.
+  email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
   phone: z.string().optional(),
   department: z.string().optional(),
   position: z.string().optional(),

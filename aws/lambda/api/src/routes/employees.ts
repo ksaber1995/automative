@@ -217,7 +217,8 @@ export const employeesRoutes = {
 
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
       if (body.lastName !== undefined) updateData.last_name = body.lastName;
-      if (body.email !== undefined) updateData.email = body.email;
+      // Clearing the field sends '', which should land as NULL, not an empty string.
+      if (body.email !== undefined) updateData.email = body.email || null;
       if (body.phone !== undefined) updateData.phone = body.phone;
       if (body.department !== undefined) updateData.department = body.department;
       if (body.position !== undefined) updateData.position = body.position;
