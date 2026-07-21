@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
+import { DialogModule } from 'primeng/dialog';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
@@ -31,6 +33,7 @@ interface WeekColumn {
 }
 
 type ViewMode = 'DAY' | 'WEEK';
+type WeekLayout = 'GRID' | 'STACKED';
 
 /**
  * The week runs Saturday → Friday here, not Monday → Sunday: these are Egyptian
@@ -189,6 +192,7 @@ function layoutEntries(entries: TimetableEntry[], totalGridHeight: number): Posi
     ButtonModule,
     SelectModule,
     DatePickerModule,
+    DialogModule,
     TagModule,
     TooltipModule,
     TranslateModule,
@@ -196,6 +200,7 @@ function layoutEntries(entries: TimetableEntry[], totalGridHeight: number): Posi
   templateUrl: './timetable.component.html',
   styleUrl: './timetable.component.scss'})
 export class TimetableComponent implements OnInit {
+  private router = inject(Router);
   private timetableService = inject(TimetableService);
   private lookupService = inject(LookupService);
   private courseService = inject(CourseService);
@@ -214,6 +219,8 @@ export class TimetableComponent implements OnInit {
   // Opens on the week: the whole schedule at a glance is what people come here
   // for. The Day toggle is one click away for a single day's detail.
   viewMode = signal<ViewMode>('WEEK');
+  // GRID = hour × day counts; STACKED = each day listed under the previous one.
+  weekLayout = signal<WeekLayout>('GRID');
   selectedBranchId: string | null = null;
   selectedTeacherId: string | null = null;
   selectedCourseId: string | null = null;
@@ -226,6 +233,11 @@ export class TimetableComponent implements OnInit {
   courses = signal<any[]>([]);
 
   dayOfWeek = signal<string>('');
+
+  // "What's behind this number" dialog.
+  dialogVisible = signal(false);
+  dialogTitle = signal('');
+  dialogEntries = signal<TimetableEntry[]>([]);
 
   /** ticking signal for the now-line, refreshed every minute */
   nowTick = signal<number>(Date.now());
@@ -255,13 +267,42 @@ export class TimetableComponent implements OnInit {
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   });
 
-  positionedWeek = computed(() =>
+  /** The week's days with their entries sorted by start time, today flagged. */
+  weekDays = computed(() =>
     this.weekColumns().map((col) => ({
       ...col,
       isToday: isSameDay(col.date, new Date(this.nowTick())),
-      positioned: layoutEntries(col.entries, this.totalGridHeight),
+      label: this.columnLabel(col.date),
+      longLabel: this.longDayLabel(col.date),
+      entries: [...col.entries].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || '')),
     }))
   );
+
+  /**
+   * The week as counts, not cards. An academy runs dozens of classes a day across
+   * rooms and teachers — drawn as positioned blocks in a 120px column they are an
+   * unreadable mosaic. Each cell is "how many classes start in this hour on this
+   * day"; the number opens the list. Hours with nothing all week are dropped, so a
+   * school that only teaches 4pm-9pm gets five rows, not seventeen.
+   */
+  weekGridRows = computed(() => {
+    const days = this.weekDays();
+    return this.hours
+      .map((hour) => ({
+        hour,
+        label: this.formatHour(hour),
+        cells: days.map((d) => ({
+          iso: d.iso,
+          date: d.date,
+          isToday: d.isToday,
+          entries: d.entries.filter((e) => {
+            const start = parseHHMM(e.startTime);
+            return !!start && start.h === hour;
+          }),
+        })),
+      }))
+      .filter((row) => row.cells.some((c) => c.entries.length > 0));
+  });
 
   positionedEntries = computed<PositionedEntry[]>(() =>
     layoutEntries(this.filteredEntries(), this.totalGridHeight)
@@ -298,6 +339,11 @@ export class TimetableComponent implements OnInit {
   /** Short column heading: "Sat 12". */
   columnLabel(d: Date): string {
     return d.toLocaleDateString(this.localeTag(), { weekday: 'short', day: 'numeric' });
+  }
+
+  /** Stacked-list heading: "Saturday, 18 July". */
+  longDayLabel(d: Date): string {
+    return d.toLocaleDateString(this.localeTag(), { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
   private localeTag(): string {
@@ -420,6 +466,37 @@ export class TimetableComponent implements OnInit {
     if (!mode || mode === this.viewMode()) return;
     this.viewMode.set(mode);
     this.load();
+  }
+
+  /** Layout only — both shapes read the week already in hand, so no reload. */
+  setWeekLayout(layout: WeekLayout) {
+    this.weekLayout.set(layout);
+  }
+
+  /**
+   * Open the list behind a count. `hour` is set when the click came from a grid
+   * cell, so the title says which hour; a day-header click passes none and lists
+   * the whole day.
+   */
+  openSessions(date: Date, entries: TimetableEntry[], hour?: number) {
+    if (!entries.length) return;
+    const day = this.longDayLabel(date);
+    this.dialogTitle.set(hour === undefined ? day : `${day} · ${this.formatHour(hour)}`);
+    this.dialogEntries.set([...entries].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || '')));
+    this.dialogVisible.set(true);
+  }
+
+  /** From the list into the class itself. */
+  openClass(classId: string) {
+    this.dialogVisible.set(false);
+    this.router.navigate(['/classes', classId]);
+  }
+
+  /** Jump to a single day's detailed grid — the "see these sessions" route out. */
+  openDay(date: Date) {
+    this.dialogVisible.set(false);
+    this.selectedDate.set(date);
+    this.setViewMode('DAY');
   }
 
   /** Steps a day at a time in day view, a week at a time in week view. */
