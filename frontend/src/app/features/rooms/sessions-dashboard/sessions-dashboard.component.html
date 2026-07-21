@@ -962,10 +962,11 @@
     [options]="freeRooms()"
     [(ngModel)]="roomPickRoomId"
     [ngModelOptions]="{ standalone: true }"
-    optionLabel="name"
+    optionLabel="code"
     optionValue="id"
     appendTo="body"
     [filter]="true"
+    filterBy="code"
     [style]="{ width: '100%' }"
     [placeholder]="'SESSIONS_DASHBOARD.PICK_ROOM_PLACEHOLDER' | translate"
   ></p-select>
