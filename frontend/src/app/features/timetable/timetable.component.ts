@@ -211,7 +211,9 @@ export class TimetableComponent implements OnInit {
   // A signal, not a plain field: every label and stat below is a computed(), and a
   // plain field would leave them showing the date the page opened with.
   selectedDate = signal<Date>(new Date());
-  viewMode = signal<ViewMode>('DAY');
+  // Opens on the week: the whole schedule at a glance is what people come here
+  // for. The Day toggle is one click away for a single day's detail.
+  viewMode = signal<ViewMode>('WEEK');
   selectedBranchId: string | null = null;
   selectedTeacherId: string | null = null;
   selectedCourseId: string | null = null;

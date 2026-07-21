@@ -4284,7 +4284,7 @@
   },
   "TIMETABLE": {
     "TITLE": "Time Table",
-    "SUBTITLE": "Daily schedule of classes across your branches",
+    "SUBTITLE": "Schedule of classes across your branches",
     "PREV_DAY": "Previous day",
     "NEXT_DAY": "Next day",
     "TODAY": "Today",
