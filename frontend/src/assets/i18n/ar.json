@@ -207,6 +207,7 @@
       "TEACHER_HISTORY_FAILED": "فشل تحميل سجل حضور المعلم"
     },
     "CASH": {
+      "NOT_AVAILABLE": "الخزنة متاحة للأكاديميات على الخطة المتقدمة",
       "CURRENT_FAILED": "فشل تحميل الرصيد النقدي الحالي",
       "INVALID_TYPE": "نوع التسوية غير صالح",
       "OBSERVED_AMOUNT_REQUIRED": "المبلغ المرصود مطلوب",

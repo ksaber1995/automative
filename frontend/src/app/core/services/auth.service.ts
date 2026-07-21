@@ -251,6 +251,16 @@ export class AuthService {
   }
 
   /**
+   * The cash drawer (Current Cash page, its dashboard tile and its permission rows).
+   * Advanced-plan academies only: teachers have no drawer, and an academy that
+   * registered on Basic does not get the feature at all — not a locked page with an
+   * upgrade prompt. The API refuses the endpoints on the same rule.
+   */
+  canUseCash(): boolean {
+    return !this.isTeacher() && this.plan() === 'ADVANCED';
+  }
+
+  /**
    * WhatsApp (Cloud API) messaging, limited to the tenants trialling it while the
    * Meta onboarding — business verification, display name, template approval — is
    * still being worked through per company. Everyone else would land on a Connect

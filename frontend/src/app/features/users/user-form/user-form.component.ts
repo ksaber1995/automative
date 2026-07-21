@@ -199,9 +199,13 @@ export class UserFormComponent implements OnInit {
   }
 
   buildSections() {
-    // Teacher-type companies have no branches and no cash drawer — hide those
-    // permission rows entirely (mirrors the sidebar hiding for those features).
-    const hidden = this.isTeacher() ? ['branches', 'cash'] : [];
+    // Hide the rows for features this company doesn't have at all, mirroring the
+    // sidebar: teachers have no branches, and the cash drawer is Advanced-plan
+    // academies only (so a Basic academy never sees it either).
+    const hidden = [
+      ...(this.isTeacher() ? ['branches'] : []),
+      ...(this.authService.canUseCash() ? [] : ['cash']),
+    ];
     const show = (r: PermissionRow) => !hidden.includes(r.resource);
     const academic = this.permissionRows.filter(r =>
       ['dashboard','branches','academy','students','enrollments','employees'].includes(r.resource) && show(r)

@@ -207,6 +207,7 @@
       "TEACHER_HISTORY_FAILED": "Failed to load teacher attendance history"
     },
     "CASH": {
+      "NOT_AVAILABLE": "Cash is available for academies on the Advanced plan",
       "CURRENT_FAILED": "Failed to load current cash balance",
       "INVALID_TYPE": "Invalid adjustment type",
       "OBSERVED_AMOUNT_REQUIRED": "Observed amount is required",

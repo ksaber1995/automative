@@ -82,6 +82,28 @@ export const notTeacherGuard = () => {
 };
 
 /**
+ * The cash drawer is an Advanced-plan academy feature. A Basic academy (and any
+ * teacher tenant) does not have it at all, so the URL is blocked the same way the
+ * sidebar entry is hidden — see `AuthService.canUseCash`.
+ */
+export const cashGuard = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/auth/login']);
+    return false;
+  }
+
+  if (!authService.canUseCash()) {
+    router.navigate([getFirstAccessiblePath(authService)]);
+    return false;
+  }
+
+  return true;
+};
+
+/**
  * Vendor-only guard for the QR card pool. Admits the debugging login
  * (master@master.com) and the vendor's own test tenants, so the page is reachable
  * from the accounts we test prod with. The matching sidebar entry hides on the

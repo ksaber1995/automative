@@ -68,7 +68,9 @@ export class UserDetailComponent implements OnInit {
 
   UserRole = UserRole;
   RESOURCE_META = RESOURCE_META;
-  allResources = PERMISSION_RESOURCES;
+  // The cash drawer is Advanced-plan academies only, so companies without it never
+  // see its permission row here either (same rule as the user form and the sidebar).
+  allResources = PERMISSION_RESOURCES.filter(r => r !== 'cash' || this.authService.canUseCash());
 
   user = signal<SafeUser | null>(null);
   branches = signal<Branch[]>([]);

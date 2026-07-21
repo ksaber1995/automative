@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { permissionGuard, roleGuard, notTeacherGuard, qrPoolGuard } from './core/guards/permission.guard';
+import { permissionGuard, roleGuard, notTeacherGuard, qrPoolGuard, cashGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
 import { UserRole } from '@shared/enums/user-role.enum';
 
@@ -273,7 +273,8 @@ export const routes: Routes = [
       },
       {
         path: 'cash',
-        canActivate: [permissionGuard('cash')],
+        // Advanced-plan academies only — Basic academies don't have the drawer.
+        canActivate: [permissionGuard('cash'), cashGuard],
         data: { breadcrumb: 'BREADCRUMBS.CASH' },
         loadChildren: () => import('./features/cash/cash.routes').then(m => m.CASH_ROUTES)
       },

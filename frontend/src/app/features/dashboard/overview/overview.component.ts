@@ -36,6 +36,8 @@ export class OverviewComponent implements OnInit {
   private authService = inject(AuthService);
 
   isTeacher = (): boolean => this.authService.isTeacher();
+  /** Basic academies (and teachers) have no cash drawer — no tile, and no request. */
+  canUseCash = (): boolean => this.authService.canUseCash();
 
   startDate: Date;
   endDate: Date;
@@ -78,6 +80,7 @@ export class OverviewComponent implements OnInit {
   }
 
   loadCurrentCash() {
+    if (!this.canUseCash()) return;
     this.cashLoading.set(true);
     this.cashService.getCurrentCash().subscribe({
       next: (data) => {

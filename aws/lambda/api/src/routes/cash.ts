@@ -1,4 +1,4 @@
-import { query } from '../db/connection';
+import { query, queryOne } from '../db/connection';
 import {
   extractTenantContext,
   canAccessBranch,
@@ -7,6 +7,17 @@ import {
   type TenantContext,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+
+// The cash drawer is sold with the Advanced plan and only to academies — a Basic
+// academy doesn't have the feature at all, and teacher companies never did. The UI
+// hides it on the same rule (AuthService.canUseCash); this is what enforces it.
+async function cashDenied(companyId: string): Promise<any | null> {
+  const c = await queryOne<any>(`SELECT type, plan FROM companies WHERE id = $1`, [companyId]);
+  if (!c || c.type !== 'ACADEMY' || c.plan !== 'ADVANCED') {
+    return apiError(403, 'ERRORS.CASH.NOT_AVAILABLE', 'Cash is available for academies on the Advanced plan');
+  }
+  return null;
+}
 
 /**
  * For non-admins, return the IDs of branches they may see; for admins return
@@ -257,6 +268,8 @@ export const cashRoutes = {
       ) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      const denied = await cashDenied(context.companyId);
+      if (denied) return denied;
 
       const scoped = scopedBranchIdsFor(context);
       const aggs = await fetchCashAggregates(context.companyId, scoped);
@@ -426,6 +439,8 @@ export const cashRoutes = {
       if (!checkGranularPermission(context, 'cash', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      const denied = await cashDenied(context.companyId);
+      if (denied) return denied;
 
       const type = String(body.type || '').toUpperCase();
       if (!['DEPOSIT', 'WITHDRAWAL', 'ADJUSTMENT'].includes(type)) {
@@ -512,6 +527,8 @@ export const cashRoutes = {
       if (!checkGranularPermission(context, 'cash', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      const denied = await cashDenied(context.companyId);
+      if (denied) return denied;
 
       const params: any[] = [context.companyId];
       let where = `ca.company_id = $1`;
@@ -560,6 +577,8 @@ export const cashRoutes = {
       if (!checkGranularPermission(context, 'cash', 'delete')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      const denied = await cashDenied(context.companyId);
+      if (denied) return denied;
 
       const result = await query(
         `DELETE FROM cash_adjustments WHERE id = $1 AND company_id = $2 RETURNING id`,
@@ -583,6 +602,8 @@ export const cashRoutes = {
       if (!checkGranularPermission(context, 'cash', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
+      const denied = await cashDenied(context.companyId);
+      if (denied) return denied;
       return { status: 200 as const, body: [] };
     } catch (error) {
       console.error('Get cash flow error:', error);

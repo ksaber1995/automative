@@ -154,8 +154,8 @@
       </p-card>
     </div>
 
-    <!-- Current Cash Card (hidden for teacher-type companies) -->
-    @if (!isTeacher()) {
+    <!-- Current Cash Card (Advanced-plan academies only) -->
+    @if (canUseCash()) {
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <p-card
         class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200 cursor-pointer hover:shadow-md transition-shadow"

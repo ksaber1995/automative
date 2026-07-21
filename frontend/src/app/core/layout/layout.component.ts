@@ -249,7 +249,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // group rather than sitting under the ledgers.
       { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
-      { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && !auth.isTeacher() },
+      { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
       { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
