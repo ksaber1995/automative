@@ -281,4 +281,18 @@ export class ClassListComponent implements OnInit {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
+
+  /**
+   * "2:00 PM" from the stored "14:00" / "14:00:00". Same en-US locale as
+   * formatDate, so both halves of the schedule column read the same way.
+   * Anything unparseable falls through as-is rather than showing "Invalid Date".
+   */
+  formatTime(time: string): string {
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return time;
+    const date = new Date();
+    date.setHours(h, m, 0, 0);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
 }

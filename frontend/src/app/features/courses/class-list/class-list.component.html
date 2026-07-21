@@ -179,7 +179,7 @@
                 <div>{{ formatDaysOfWeek(classItem.daysOfWeek) }}</div>
               }
               @if (classItem.startTime && classItem.endTime) {
-                <div class="text-gray-500">{{ classItem.startTime }} - {{ classItem.endTime }}</div>
+                <div class="text-gray-500">{{ formatTime(classItem.startTime) }} - {{ formatTime(classItem.endTime) }}</div>
               }
               @if (!classItem.daysOfWeek && !classItem.startTime) {
                 <span class="text-gray-400">{{ 'CLASSES.LIST.NOT_SPECIFIED' | translate }}</span>
