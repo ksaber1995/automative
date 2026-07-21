@@ -249,7 +249,9 @@
               @for (cell of row.cells; track cell.iso) {
                 <div class="border-s border-gray-100 p-1.5 flex items-center justify-center min-h-[52px]"
                   [class.bg-indigo-50]="cell.isToday">
-                  @if (cell.entries.length) {
+                  <!-- One or two fit; beyond that only the number is readable in a
+                       column this narrow, and the click opens the list. -->
+                  @if (cell.entries.length > 2) {
                     <button type="button"
                       class="w-full h-full rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors py-1.5"
                       [pTooltip]="'TIMETABLE.SHOW_SESSIONS' | translate"
@@ -257,6 +259,28 @@
                       <div class="text-lg font-bold text-indigo-700 leading-none">{{ cell.entries.length }}</div>
                       <div class="text-[10px] text-indigo-500 mt-0.5">{{ 'TIMETABLE.SESSIONS_SHORT' | translate }}</div>
                     </button>
+                  } @else if (cell.entries.length) {
+                    <div class="w-full space-y-1">
+                      @for (entry of cell.entries; track entry.classId) {
+                        <button type="button"
+                          class="w-full text-start rounded-md border-s-4 px-1.5 py-1 hover:shadow-sm transition-shadow"
+                          [class]="entryClasses(entry)"
+                          [pTooltip]="entry.className + ' · ' + formatTimeShort(entry.startTime) + ' – ' + formatTimeShort(entry.endTime) + (entry.instructorName ? ' · ' + entry.instructorName : '')"
+                          (click)="openClass(entry.classId)">
+                          <div class="flex items-center gap-1">
+                            @if (entry.isInProgress) {
+                              <span class="shrink-0 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                            }
+                            <span class="font-semibold text-[11px] leading-tight truncate" [class]="textColor(entry)">
+                              {{ entry.className }}
+                            </span>
+                          </div>
+                          <div class="text-[10px] text-gray-500 truncate">
+                            {{ formatTimeShort(entry.startTime) }}@if (entry.roomCode) { · {{ entry.roomCode }} }
+                          </div>
+                        </button>
+                      }
+                    </div>
                   }
                 </div>
               }

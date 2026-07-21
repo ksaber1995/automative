@@ -49,6 +49,11 @@ export class ClassService {
     return this.api.post<Class>('classes', classData);
   }
 
+  /** Put many classes in one room at once. `roomId: null` clears it. */
+  assignRoom(classIds: string[], roomId: string | null): Observable<{ updated: number }> {
+    return this.api.post<{ updated: number }>('classes/assign-room', { classIds, roomId });
+  }
+
   updateClass(id: string, classData: ClassUpdateDto): Observable<Class> {
     return this.api.patch<Class>(`classes/${id}`, classData);
   }

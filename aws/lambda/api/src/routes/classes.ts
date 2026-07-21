@@ -350,6 +350,50 @@ export const classesRoutes = {
     }
   },
 
+  /**
+   * Put a set of classes in one room (or clear it). Everything is scoped in the
+   * UPDATE itself — company, branch access and soft-deletes — so ids the caller
+   * shouldn't touch simply don't match, and `updated` tells them how many did.
+   */
+  assignRoom: async ({ body, headers }: { body: { classIds: string[]; roomId: string | null }; headers: { authorization: string } }) => {
+    try {
+      await ensureClassStatusColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const classIds = Array.isArray(body?.classIds) ? body.classIds : [];
+      if (!classIds.length) {
+        return apiError(400, 'ERRORS.CLASSES.NO_CLASSES_SELECTED', 'Select at least one class');
+      }
+
+      const roomId = await resolveRoomId(body?.roomId, context.companyId);
+      if (roomId === INVALID_ROOM) {
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+      }
+
+      const params: any[] = [roomId, context.companyId, classIds];
+      let sql = `
+        UPDATE classes c
+        SET room_id = $1, updated_at = NOW()
+        FROM courses co
+        WHERE co.id = c.course_id
+          AND co.company_id = $2
+          AND c.id = ANY($3::uuid[])
+          AND c.deleted_at IS NULL`;
+      const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+      if (branchClause) sql += ` AND ${branchClause}`;
+      sql += ' RETURNING c.id';
+
+      const rows = await query(sql, params);
+      return { status: 200 as const, body: { updated: rows.length } };
+    } catch (error) {
+      console.error('Assign class room error:', error);
+      return mapThrownError(error, 'ERRORS.CLASSES.ASSIGN_ROOM_FAILED', 'Failed to assign the room', 400);
+    }
+  },
+
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
     try {
       await ensureClassStatusColumns();

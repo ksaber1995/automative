@@ -8,6 +8,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { DialogModule } from 'primeng/dialog';
 import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ClassService } from '../services/class.service';
@@ -29,6 +30,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     TagModule,
     TooltipModule,
     SelectModule,
+    DialogModule,
     TabsModule,
     TranslateModule,
     DeleteConfirmDialogComponent
@@ -48,6 +50,15 @@ export class ClassListComponent implements OnInit {
   courses = signal<any[]>([]);
   branches = signal<any[]>([]);
   loading = signal(true);
+
+  // Bulk "put these classes in this room". Rooms landed on classes long after the
+  // classes did, so an existing timetable has to be filled in — one edit page at a
+  // time would be dozens of round trips through a form.
+  selectedClasses: ClassWithDetails[] = [];
+  rooms = signal<any[]>([]);
+  assignRoomDialogOpen = signal(false);
+  assignRoomId: string | null = null;
+  assigningRoom = signal(false);
   showDeleteDialog = false;
   classToDelete = signal<ClassWithDetails | null>(null);
   activeStatus = signal<ClassStatus>('IN_PROGRESS');
@@ -102,7 +113,42 @@ export class ClassListComponent implements OnInit {
 
     this.loadCourses();
     this.loadBranches();
+    this.loadRooms();
     this.loadClasses();
+  }
+
+  loadRooms() {
+    this.lookupService.rooms().subscribe({
+      next: (rooms) => this.rooms.set(rooms.map(r => ({ label: r.label, value: r.id }))),
+    });
+  }
+
+  openAssignRoom() {
+    if (!this.selectedClasses.length) return;
+    this.assignRoomId = null;
+    this.assignRoomDialogOpen.set(true);
+  }
+
+  /** `assignRoomId` of null clears the room on every selected class. */
+  confirmAssignRoom() {
+    const ids = this.selectedClasses.map(c => c.id);
+    if (!ids.length) return;
+    this.assigningRoom.set(true);
+    this.classService.assignRoom(ids, this.assignRoomId).subscribe({
+      next: (res) => {
+        this.assigningRoom.set(false);
+        this.assignRoomDialogOpen.set(false);
+        this.selectedClasses = [];
+        this.notificationService.success(
+          this.translate.instant('CLASSES.LIST.ROOM_ASSIGNED', { count: res.updated })
+        );
+        this.loadClasses();
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.assigningRoom.set(false);
+      },
+    });
   }
 
   loadCourses() {

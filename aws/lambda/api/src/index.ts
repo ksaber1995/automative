@@ -122,6 +122,7 @@ const router = {
   },
   classes: {
     create: classesRoutes.create,
+    assignRoom: classesRoutes.assignRoom,
     list: classesRoutes.list,
     listActive: classesRoutes.listActive,
     checkTeacherAvailability: classesRoutes.checkTeacherAvailability,

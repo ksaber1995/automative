@@ -3508,6 +3508,23 @@ export const contract = c.router({
         400: ApiErrorSchema,
       },
     },
+    // Put many classes in one room in a single call — assigning rooms to an
+    // existing timetable one PATCH at a time is dozens of round trips.
+    assignRoom: {
+      method: 'POST',
+      path: '/api/classes/assign-room',
+      body: z.object({
+        classIds: z.array(UUIDSchema).min(1).max(500),
+        // null clears the room on every selected class.
+        roomId: UUIDSchema.nullable(),
+      }),
+      responses: {
+        200: z.object({ updated: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     list: {
       method: 'GET',
       path: '/api/classes',
