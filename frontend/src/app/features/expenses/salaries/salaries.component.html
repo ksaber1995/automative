@@ -168,6 +168,16 @@
             @if (item.salaryType === 'SESSION_BASED') {
               <div class="text-xs text-gray-400">{{ 'EXPENSES.SALARIES.SESSION_BREAKDOWN' | translate: { count: item.sessionCount, rate: (item.sessionRate | amount) } }}</div>
             }
+            @if (item.salaryType === 'PERCENTAGE') {
+              <!-- The figure moves with student payments, so offer the reckoning. -->
+              <button
+                type="button"
+                class="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-0.5 flex items-center gap-1 ms-auto"
+                (click)="openPercentageDetails(item)">
+                <i class="pi pi-calculator text-[10px]"></i>
+                {{ 'EXPENSES.SALARIES.PCT_HOW' | translate: { rate: item.percentageRate } }}
+              </button>
+            }
           </td>
           <td class="text-right">
             <p-inputNumber
@@ -369,6 +379,106 @@
     </p-table>
   </p-card>
   }
+
+  <!-- How a percentage salary was worked out: the sum first, the receipts on request -->
+  <p-dialog
+    [(visible)]="pctDialogVisible"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    [style]="{ width: pctShowHistory() ? '760px' : '480px', maxWidth: '95vw' }"
+    [header]="('EXPENSES.SALARIES.PCT_TITLE' | translate) + ' — ' + pctEmployeeName()"
+  >
+    @if (pctLoading()) {
+      <div class="py-10 text-center text-gray-500">
+        <i class="pi pi-spin pi-spinner text-2xl"></i>
+      </div>
+    } @else if (pctData(); as d) {
+      @if (!pctShowHistory()) {
+        <!-- The calculation, in the order it happens -->
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_TOTAL_PAID' | translate }}</span>
+            <span class="font-medium">{{ d.totalPaid | amount }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_RATE' | translate }}</span>
+            <span class="font-medium">{{ d.percentageRate }}%</span>
+          </div>
+          <div class="flex justify-between border-t pt-3">
+            <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_ACCRUED' | translate }}</span>
+            <span class="font-medium">{{ d.accrued | amount }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_WITHDRAWN' | translate }}</span>
+            <span class="font-medium text-red-700">− {{ d.withdrawn | amount }}</span>
+          </div>
+          <div class="flex justify-between border-t pt-3 text-base">
+            <span class="font-semibold">{{ 'EXPENSES.SALARIES.PCT_OWED' | translate }}</span>
+            <span class="font-bold text-green-700">{{ d.owed | amount }}</span>
+          </div>
+
+          <button
+            type="button"
+            class="w-full mt-2 text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center justify-center gap-1.5 py-2"
+            (click)="pctShowHistory.set(true)">
+            <i class="pi pi-list text-xs"></i>
+            {{ 'EXPENSES.SALARIES.PCT_SEE_HISTORY' | translate: { count: pctLines().length, students: pctStudentCount() } }}
+          </button>
+        </div>
+      } @else {
+        <!-- Every payment behind the number: who paid, for what, and the cut -->
+        <button
+          type="button"
+          class="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 mb-3"
+          (click)="pctShowHistory.set(false)">
+          <i class="pi pi-arrow-left text-xs"></i>
+          {{ 'EXPENSES.SALARIES.PCT_BACK' | translate }}
+        </button>
+
+        @if (pctLines().length) {
+          <div class="overflow-x-auto max-h-[55vh] overflow-y-auto border rounded">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr class="text-left text-gray-600">
+                  <th class="p-2 font-medium">{{ 'EXPENSES.SALARIES.PCT_COL_STUDENT' | translate }}</th>
+                  <th class="p-2 font-medium">{{ 'EXPENSES.SALARIES.PCT_COL_CLASS' | translate }}</th>
+                  <th class="p-2 font-medium whitespace-nowrap">{{ 'EXPENSES.SALARIES.PCT_COL_DATE' | translate }}</th>
+                  <th class="p-2 font-medium text-right whitespace-nowrap">{{ 'EXPENSES.SALARIES.PCT_COL_PAID' | translate }}</th>
+                  <th class="p-2 font-medium text-right whitespace-nowrap">{{ 'EXPENSES.SALARIES.PCT_COL_SHARE' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of pctLines(); track $index) {
+                  <tr class="border-t">
+                    <td class="p-2 font-medium">{{ l.studentName }}</td>
+                    <td class="p-2 text-gray-600">
+                      {{ l.className || '—' }}
+                      @if (l.courseName) {
+                        <div class="text-xs text-gray-400">{{ l.courseName }}</div>
+                      }
+                    </td>
+                    <td class="p-2 text-gray-600 whitespace-nowrap">{{ l.paidAt ? (l.paidAt | date: 'MMM d, y') : '—' }}</td>
+                    <td class="p-2 text-right whitespace-nowrap">{{ l.amount | amount }}</td>
+                    <td class="p-2 text-right font-medium text-green-700 whitespace-nowrap">{{ l.share | amount }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot class="bg-gray-50 sticky bottom-0">
+                <tr class="border-t font-semibold">
+                  <td class="p-2" colspan="3">{{ 'EXPENSES.SALARIES.PCT_TOTAL' | translate }}</td>
+                  <td class="p-2 text-right whitespace-nowrap">{{ d.totalPaid | amount }}</td>
+                  <td class="p-2 text-right text-green-700 whitespace-nowrap">{{ d.accrued | amount }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        } @else {
+          <div class="py-10 text-center text-gray-500">{{ 'EXPENSES.SALARIES.PCT_NO_PAYMENTS' | translate }}</div>
+        }
+      }
+    }
+  </p-dialog>
 
   <!-- Salary payment details -->
   <p-dialog

@@ -136,6 +136,74 @@ async function getWithdrawnSalaryBase(companyId: string, employeeId: string): Pr
   return row && row.base != null ? parseFloat(row.base) : 0;
 }
 
+// The individual student payments behind getTeacherPaidTotal, so the accrual can
+// be audited line by line instead of taken on trust. Same four sources, same
+// joins and filters — if you change one, change the other or the lines stop
+// adding up to the total.
+async function getTeacherPaidLines(companyId: string, employeeId: string): Promise<any[]> {
+  const reg = await queryOne<any>(
+    `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
+            to_regclass('public.session_payments')            IS NOT NULL AS has_sp,
+            to_regclass('public.session_packages')            IS NOT NULL AS has_spkg`
+  );
+
+  const parts: string[] = [
+    `SELECT s.name AS student_name, c.name AS class_name, co.name AS course_name,
+            'ENROLLMENT' AS source,
+            (COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0)) AS amount,
+            e.enrollment_date::date AS paid_at
+       FROM enrollments e
+       JOIN classes  c  ON c.id = e.class_id
+       JOIN students s  ON s.id = e.student_id
+       LEFT JOIN courses co ON co.id = c.course_id
+      WHERE c.instructor_id = $2 AND e.company_id = $1
+        AND (COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0)) <> 0`,
+  ];
+  // COVERED per-session rows carry amount_paid = 0 (the money sits on the
+  // package row), so the <> 0 filter also keeps them from showing as noise.
+  if (reg?.has_msp) {
+    parts.push(
+      `SELECT s.name, c.name, co.name, 'MONTHLY', COALESCE(msp.amount_paid,0),
+              COALESCE(msp.paid_date, msp.created_at::date)
+         FROM monthly_subscription_payments msp
+         JOIN enrollments e ON e.id = msp.enrollment_id
+         JOIN classes  c  ON c.id = e.class_id
+         JOIN students s  ON s.id = msp.student_id
+         LEFT JOIN courses co ON co.id = c.course_id
+        WHERE c.instructor_id = $2 AND e.company_id = $1 AND COALESCE(msp.amount_paid,0) <> 0`
+    );
+  }
+  if (reg?.has_sp) {
+    parts.push(
+      `SELECT s.name, c.name, co.name, 'SESSION', COALESCE(sp.amount_paid,0),
+              COALESCE(sp.paid_date, sp.created_at::date)
+         FROM session_payments sp
+         JOIN enrollments e ON e.id = sp.enrollment_id
+         JOIN classes  c  ON c.id = e.class_id
+         JOIN students s  ON s.id = sp.student_id
+         LEFT JOIN courses co ON co.id = c.course_id
+        WHERE c.instructor_id = $2 AND e.company_id = $1 AND COALESCE(sp.amount_paid,0) <> 0`
+    );
+  }
+  if (reg?.has_spkg) {
+    parts.push(
+      `SELECT s.name, c.name, co.name, 'PACKAGE', COALESCE(spkg.amount_paid,0),
+              spkg.created_at::date
+         FROM session_packages spkg
+         JOIN enrollments e ON e.id = spkg.enrollment_id
+         JOIN classes  c  ON c.id = e.class_id
+         JOIN students s  ON s.id = spkg.student_id
+         LEFT JOIN courses co ON co.id = c.course_id
+        WHERE c.instructor_id = $2 AND e.company_id = $1 AND COALESCE(spkg.amount_paid,0) <> 0`
+    );
+  }
+
+  return query<any>(
+    `${parts.join(' UNION ALL ')} ORDER BY paid_at DESC NULLS LAST, student_name`,
+    [companyId, employeeId]
+  );
+}
+
 // Full percentage picture for one employee: what they've earned so far and what
 // remains to withdraw right now.
 async function getPercentageSummary(
@@ -920,6 +988,56 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get employee percentage summary error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.PERCENTAGE_SUMMARY_FAILED', 'Failed to get percentage summary');
+    }
+  },
+
+  /**
+   * GET /api/expenses/employee/:employeeId/percentage-breakdown
+   * The summary plus every student payment behind it — who paid, for which
+   * class, when, and the teacher's cut of each. Read-only audit of the accrual.
+   */
+  getEmployeePercentageBreakdown: async ({ params, headers }: { params: { employeeId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureSalaryColumns();
+
+      const emp = await queryOne<any>(
+        'SELECT * FROM employees WHERE id = $1 AND company_id = $2',
+        [params.employeeId, context.companyId]
+      );
+      if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+
+      const summary = await getPercentageSummary(context.companyId, emp);
+      const rows = await getTeacherPaidLines(context.companyId, params.employeeId);
+
+      return {
+        status: 200 as const,
+        body: {
+          salaryType: emp.salary_type || 'MONTHLY',
+          ...summary,
+          lines: rows.map((r) => {
+            const amount = r.amount != null ? parseFloat(r.amount) : 0;
+            return {
+              studentName: r.student_name || '',
+              className: r.class_name ?? null,
+              courseName: r.course_name ?? null,
+              source: r.source,
+              amount,
+              // The teacher's cut of this one payment. Rounded per line, so the
+              // column can drift a cent or two from `accrued` (rounded once on
+              // the total) — accrued stays the figure of record.
+              share: Math.round(amount * summary.percentageRate) / 100,
+              paidAt: r.paid_at ? new Date(r.paid_at).toISOString() : null,
+            };
+          }),
+        },
+      };
+    } catch (error) {
+      console.error('Get employee percentage breakdown error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.PERCENTAGE_SUMMARY_FAILED', 'Failed to get percentage breakdown');
     }
   },
 

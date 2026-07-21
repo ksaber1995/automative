@@ -48,6 +48,23 @@ export interface PercentageSummary {
   owed: number;        // available to withdraw now (accrued - withdrawn, >= 0)
 }
 
+/** One student payment that fed a percentage teacher's accrual. */
+export interface PercentageLine {
+  studentName: string;
+  className: string | null;
+  courseName: string | null;
+  source: 'ENROLLMENT' | 'MONTHLY' | 'SESSION' | 'PACKAGE';
+  amount: number;
+  /** The teacher's cut of this payment (rounded per line). */
+  share: number;
+  paidAt: string | null;
+}
+
+/** The summary plus the payments behind it, for auditing the accrual. */
+export interface PercentageBreakdown extends PercentageSummary {
+  lines: PercentageLine[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -116,6 +133,10 @@ export class ExpenseService {
 
   getEmployeePercentageSummary(employeeId: string): Observable<PercentageSummary> {
     return this.api.get<PercentageSummary>(`expenses/employee/${employeeId}/percentage-summary`);
+  }
+
+  getEmployeePercentageBreakdown(employeeId: string): Observable<PercentageBreakdown> {
+    return this.api.get<PercentageBreakdown>(`expenses/employee/${employeeId}/percentage-breakdown`);
   }
 
   previewEmployeeBackPay(employeeId: string, upTo?: string): Observable<BackPayPreview> {

@@ -19,7 +19,7 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
-import { ExpenseService } from '../services/expense.service';
+import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -212,6 +212,44 @@ export class SalariesComponent implements OnInit {
   getBasePaid(p: ExpensePayment): number {
     return (p.amount || 0) - (p.bonusAmount || 0) + (p.discountAmount || 0);
   }
+
+  // ── How a PERCENTAGE salary was worked out ───────────────────────────────
+  // A percentage teacher's pay is a share of what their students actually paid,
+  // so the amount moves on its own and needs to be explainable: the sum, the
+  // rate, what's already been drawn — and, on demand, the individual payments
+  // it came from.
+  pctDialogVisible = signal(false);
+  pctLoading = signal(false);
+  pctEmployeeName = signal('');
+  pctData = signal<PercentageBreakdown | null>(null);
+  /** The dialog opens on the summary; the history is a click away. */
+  pctShowHistory = signal(false);
+
+  openPercentageDetails(item: any) {
+    this.pctEmployeeName.set(this.getEmployeeName(item.employeeId));
+    this.pctData.set(null);
+    this.pctShowHistory.set(false);
+    this.pctLoading.set(true);
+    this.pctDialogVisible.set(true);
+    this.expenseService.getEmployeePercentageBreakdown(item.employeeId).subscribe({
+      next: (data) => {
+        this.pctData.set(data);
+        this.pctLoading.set(false);
+      },
+      error: () => {
+        this.pctLoading.set(false);
+        this.pctDialogVisible.set(false);
+      },
+    });
+  }
+
+  /** Payment lines, newest first, as the API returned them. */
+  pctLines = computed(() => this.pctData()?.lines ?? []);
+
+  /** Distinct students in the history — the headline for "who paid". */
+  pctStudentCount = computed(
+    () => new Set(this.pctLines().map((l) => l.studentName)).size
+  );
 
   // ── Payment details view dialog ──────────────────────────────────────────
   viewDialogVisible = signal(false);

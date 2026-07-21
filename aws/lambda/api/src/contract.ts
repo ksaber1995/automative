@@ -3894,6 +3894,32 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // The summary above, plus the student payments it was computed from.
+    getEmployeePercentageBreakdown: {
+      method: 'GET',
+      path: '/api/expenses/employee/:employeeId/percentage-breakdown',
+      pathParams: z.object({ employeeId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          salaryType: z.string(),
+          percentageRate: z.number(),
+          totalPaid: z.number(),
+          accrued: z.number(),
+          withdrawn: z.number(),
+          owed: z.number(),
+          lines: z.array(z.object({
+            studentName: z.string(),
+            className: z.string().nullable(),
+            courseName: z.string().nullable(),
+            source: z.enum(['ENROLLMENT', 'MONTHLY', 'SESSION', 'PACKAGE']),
+            amount: z.number(),
+            share: z.number(),
+            paidAt: z.string().nullable(),
+          })),
+        }),
+        404: ApiErrorSchema,
+      },
+    },
     previewEmployeeBackPay: {
       method: 'GET',
       path: '/api/expenses/employee/:employeeId/back-pay-preview',
