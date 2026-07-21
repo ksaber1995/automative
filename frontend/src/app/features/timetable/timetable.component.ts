@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -20,6 +22,22 @@ interface PositionedEntry extends TimetableEntry {
   leftPct: number;
   widthPct: number;
 }
+
+/** One column of the week strip: its date, plus that day's laid-out classes. */
+interface WeekColumn {
+  date: Date;
+  iso: string;
+  entries: TimetableEntry[];
+}
+
+type ViewMode = 'DAY' | 'WEEK';
+
+/**
+ * The week runs Saturday → Friday here, not Monday → Sunday: these are Egyptian
+ * academies, whose teaching week starts on Saturday. `Date#getDay()` numbering,
+ * so 6 = Saturday.
+ */
+const WEEK_START_DOW = 6;
 
 const HOUR_HEIGHT_PX = 60; // 1 hour = 60px
 const DAY_START_HOUR = 7;
@@ -58,6 +76,110 @@ function toLocalISODate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Midnight on the Saturday that opens the week `d` falls in. */
+function startOfWeek(d: Date): Date {
+  const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  out.setDate(out.getDate() - ((out.getDay() + 7 - WEEK_START_DOW) % 7));
+  return out;
+}
+
+function addDays(d: Date, n: number): Date {
+  const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Place one day's classes on the hour grid: vertical position from the times, and
+ * side-by-side columns for classes that overlap. Shared by the day view and by
+ * every column of the week view, so a busy Sunday looks the same in both.
+ */
+function layoutEntries(entries: TimetableEntry[], totalGridHeight: number): PositionedEntry[] {
+  if (entries.length === 0) return [];
+
+  const sized = entries
+    .map((e) => {
+      const start = parseHHMM(e.startTime);
+      const end = parseHHMM(e.endTime);
+      if (!start || !end) return null;
+
+      const startMinutes = (start.h - DAY_START_HOUR) * 60 + start.m;
+      const endMinutes = (end.h - DAY_START_HOUR) * 60 + end.m;
+
+      const clampedStart = Math.max(0, startMinutes);
+      const clampedEnd = Math.min(totalGridHeight / (HOUR_HEIGHT_PX / 60), endMinutes);
+
+      const topPx = (clampedStart / 60) * HOUR_HEIGHT_PX;
+      const heightPx = Math.max(28, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT_PX);
+
+      return {
+        ...e,
+        topPx,
+        heightPx,
+        // computed below
+        leftPct: 0,
+        widthPct: 100,
+        _startMin: startMinutes,
+        _endMin: endMinutes,
+      } as PositionedEntry & { _startMin: number; _endMin: number };
+    })
+    .filter((e): e is PositionedEntry & { _startMin: number; _endMin: number } => !!e);
+
+  // Lay out overlapping entries side-by-side using a simple sweep algorithm
+  sized.sort((a, b) => a._startMin - b._startMin || b._endMin - a._endMin);
+
+  type Group = { items: typeof sized; columns: { endMin: number }[] };
+  const groups: Group[] = [];
+  let current: Group | null = null;
+  let currentMaxEnd = -Infinity;
+
+  for (const item of sized) {
+    if (!current || item._startMin >= currentMaxEnd) {
+      current = { items: [], columns: [] };
+      groups.push(current);
+      currentMaxEnd = -Infinity;
+    }
+    current.items.push(item);
+    currentMaxEnd = Math.max(currentMaxEnd, item._endMin);
+  }
+
+  for (const group of groups) {
+    const columns: { endMin: number }[] = [];
+    const colByItem = new Map<typeof sized[number], number>();
+    for (const item of group.items) {
+      let placedCol = -1;
+      for (let c = 0; c < columns.length; c++) {
+        if (item._startMin >= columns[c].endMin) {
+          placedCol = c;
+          columns[c].endMin = item._endMin;
+          break;
+        }
+      }
+      if (placedCol === -1) {
+        placedCol = columns.length;
+        columns.push({ endMin: item._endMin });
+      }
+      colByItem.set(item, placedCol);
+    }
+    const totalCols = columns.length;
+    for (const item of group.items) {
+      const col = colByItem.get(item)!;
+      item.leftPct = (col / totalCols) * 100;
+      item.widthPct = (1 / totalCols) * 100;
+    }
+  }
+
+  return sized.map(({ _startMin, _endMin, ...rest }) => rest);
+}
+
 @Component({
   selector: 'app-timetable',
   standalone: true,
@@ -86,13 +208,17 @@ export class TimetableComponent implements OnInit {
   dayStartHour = DAY_START_HOUR;
   totalGridHeight = (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_HEIGHT_PX;
 
-  selectedDate: Date = new Date();
+  // A signal, not a plain field: every label and stat below is a computed(), and a
+  // plain field would leave them showing the date the page opened with.
+  selectedDate = signal<Date>(new Date());
+  viewMode = signal<ViewMode>('DAY');
   selectedBranchId: string | null = null;
   selectedTeacherId: string | null = null;
   selectedCourseId: string | null = null;
 
   loading = signal(false);
   entries = signal<TimetableEntry[]>([]);
+  weekColumns = signal<WeekColumn[]>([]);
   branches = signal<LookupOption[]>([]);
   teachers = signal<any[]>([]);
   courses = signal<any[]>([]);
@@ -102,126 +228,81 @@ export class TimetableComponent implements OnInit {
   /** ticking signal for the now-line, refreshed every minute */
   nowTick = signal<number>(Date.now());
 
+  isWeek = computed(() => this.viewMode() === 'WEEK');
+
   filteredEntries = computed(() => this.entries());
 
+  /** Everything on screen right now — one day's classes, or the whole week's. */
+  visibleEntries = computed<TimetableEntry[]>(() =>
+    this.isWeek()
+      ? this.weekColumns().flatMap((c) => c.entries)
+      : this.filteredEntries()
+  );
+
   inProgressCount = computed(() =>
-    this.filteredEntries().filter((e) => e.isInProgress).length
+    this.visibleEntries().filter((e) => e.isInProgress).length
   );
 
   totalStudents = computed(() =>
-    this.filteredEntries().reduce((sum, e) => sum + (e.studentCount || 0), 0)
+    this.visibleEntries().reduce((sum, e) => sum + (e.studentCount || 0), 0)
   );
 
-  positionedEntries = computed<PositionedEntry[]>(() => {
-    const entries = this.filteredEntries();
-    if (entries.length === 0) return [];
-
-    // Compute top/height for each entry from start_time / end_time.
-    const sized = entries
-      .map((e) => {
-        const start = parseHHMM(e.startTime);
-        const end = parseHHMM(e.endTime);
-        if (!start || !end) return null;
-
-        const startMinutes = (start.h - DAY_START_HOUR) * 60 + start.m;
-        const endMinutes = (end.h - DAY_START_HOUR) * 60 + end.m;
-
-        const clampedStart = Math.max(0, startMinutes);
-        const clampedEnd = Math.min(this.totalGridHeight / (HOUR_HEIGHT_PX / 60), endMinutes);
-
-        const topPx = (clampedStart / 60) * HOUR_HEIGHT_PX;
-        const heightPx = Math.max(28, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT_PX);
-
-        return {
-          ...e,
-          topPx,
-          heightPx,
-          // computed below
-          leftPct: 0,
-          widthPct: 100,
-          _startMin: startMinutes,
-          _endMin: endMinutes,
-        } as PositionedEntry & { _startMin: number; _endMin: number };
-      })
-      .filter((e): e is PositionedEntry & { _startMin: number; _endMin: number } => !!e);
-
-    // Lay out overlapping entries side-by-side using a simple sweep algorithm
-    sized.sort((a, b) => a._startMin - b._startMin || b._endMin - a._endMin);
-
-    type Group = { items: typeof sized; columns: { endMin: number }[] };
-    const groups: Group[] = [];
-    let current: Group | null = null;
-    let currentMaxEnd = -Infinity;
-
-    for (const item of sized) {
-      if (!current || item._startMin >= currentMaxEnd) {
-        current = { items: [], columns: [] };
-        groups.push(current);
-        currentMaxEnd = -Infinity;
-      }
-      current.items.push(item);
-      currentMaxEnd = Math.max(currentMaxEnd, item._endMin);
-    }
-
-    for (const group of groups) {
-      const columns: { endMin: number }[] = [];
-      const colByItem = new Map<typeof sized[number], number>();
-      for (const item of group.items) {
-        let placedCol = -1;
-        for (let c = 0; c < columns.length; c++) {
-          if (item._startMin >= columns[c].endMin) {
-            placedCol = c;
-            columns[c].endMin = item._endMin;
-            break;
-          }
-        }
-        if (placedCol === -1) {
-          placedCol = columns.length;
-          columns.push({ endMin: item._endMin });
-        }
-        colByItem.set(item, placedCol);
-      }
-      const totalCols = columns.length;
-      for (const item of group.items) {
-        const col = colByItem.get(item)!;
-        item.leftPct = (col / totalCols) * 100;
-        item.widthPct = (1 / totalCols) * 100;
-      }
-    }
-
-    return sized.map(({ _startMin, _endMin, ...rest }) => rest);
+  /** The seven Saturday→Friday dates of the week `selectedDate` falls in. */
+  weekDates = computed<Date[]>(() => {
+    const start = startOfWeek(this.selectedDate());
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   });
+
+  positionedWeek = computed(() =>
+    this.weekColumns().map((col) => ({
+      ...col,
+      isToday: isSameDay(col.date, new Date(this.nowTick())),
+      positioned: layoutEntries(col.entries, this.totalGridHeight),
+    }))
+  );
+
+  positionedEntries = computed<PositionedEntry[]>(() =>
+    layoutEntries(this.filteredEntries(), this.totalGridHeight)
+  );
 
   hasActiveFilters = computed(() =>
     !!this.selectedBranchId || !!this.selectedTeacherId || !!this.selectedCourseId
   );
 
   formattedDateLabel = computed(() => {
-    const d = this.selectedDate;
-    return d.toLocaleDateString(this.localeTag(), {
+    if (this.isWeek()) return this.weekRangeLabel();
+    return this.selectedDate().toLocaleDateString(this.localeTag(), {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
   });
 
-  dayOfWeekLabel = computed(() => {
-    const d = this.selectedDate;
-    return d.toLocaleDateString(this.localeTag(), { weekday: 'long' });
+  dayOfWeekLabel = computed(() =>
+    this.selectedDate().toLocaleDateString(this.localeTag(), { weekday: 'long' })
+  );
+
+  /** "Sat 12 – Fri 18 July 2026", collapsing the month when both ends share it. */
+  weekRangeLabel = computed(() => {
+    const days = this.weekDates();
+    const [first, last] = [days[0], days[6]];
+    const locale = this.localeTag();
+    const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
+    const from = first.toLocaleDateString(locale, sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'long' });
+    const to = last.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${from} – ${to}`;
   });
+
+  /** Short column heading: "Sat 12". */
+  columnLabel(d: Date): string {
+    return d.toLocaleDateString(this.localeTag(), { weekday: 'short', day: 'numeric' });
+  }
 
   private localeTag(): string {
     return this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-US';
   }
 
-  showNowLine = computed(() => {
-    const today = new Date();
-    return (
-      today.getFullYear() === this.selectedDate.getFullYear() &&
-      today.getMonth() === this.selectedDate.getMonth() &&
-      today.getDate() === this.selectedDate.getDate()
-    );
-  });
+  showNowLine = computed(() => isSameDay(new Date(this.nowTick()), this.selectedDate()));
 
   nowLineTop = computed(() => {
     this.nowTick(); // re-trigger when nowTick changes
@@ -275,15 +356,14 @@ export class TimetableComponent implements OnInit {
   }
 
   load() {
+    if (this.isWeek()) {
+      this.loadWeek();
+      return;
+    }
     this.loading.set(true);
-    const dateStr = toLocalISODate(this.selectedDate);
+    const dateStr = toLocalISODate(this.selectedDate());
     this.timetableService
-      .getDay({
-        date: dateStr,
-        branchId: this.selectedBranchId || undefined,
-        teacherId: this.selectedTeacherId || undefined,
-        courseId: this.selectedCourseId || undefined,
-      })
+      .getDay({ date: dateStr, ...this.activeFilters() })
       .subscribe({
         next: (res) => {
           this.entries.set(res.entries || []);
@@ -297,20 +377,67 @@ export class TimetableComponent implements OnInit {
       });
   }
 
+  /**
+   * The week is seven day-loads fired together — the API answers one date at a
+   * time, and seven small queries beat teaching it a second shape. A day that
+   * fails comes back empty instead of blanking the whole week.
+   */
+  private loadWeek() {
+    this.loading.set(true);
+    const dates = this.weekDates();
+    const filters = this.activeFilters();
+    forkJoin(
+      dates.map((d) =>
+        this.timetableService
+          .getDay({ date: toLocalISODate(d), ...filters })
+          .pipe(catchError(() => of({ date: toLocalISODate(d), dayOfWeek: '', entries: [] })))
+      )
+    ).subscribe({
+      next: (days) => {
+        this.weekColumns.set(
+          days.map((res, i) => ({ date: dates[i], iso: toLocalISODate(dates[i]), entries: res.entries || [] }))
+        );
+        this.loading.set(false);
+      },
+      error: () => {
+        this.weekColumns.set([]);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private activeFilters() {
+    return {
+      branchId: this.selectedBranchId || undefined,
+      teacherId: this.selectedTeacherId || undefined,
+      courseId: this.selectedCourseId || undefined,
+    };
+  }
+
+  setViewMode(mode: ViewMode) {
+    if (!mode || mode === this.viewMode()) return;
+    this.viewMode.set(mode);
+    this.load();
+  }
+
+  /** Steps a day at a time in day view, a week at a time in week view. */
   shiftDay(delta: number) {
-    const d = new Date(this.selectedDate);
-    d.setDate(d.getDate() + delta);
-    this.selectedDate = d;
+    this.selectedDate.set(addDays(this.selectedDate(), this.isWeek() ? delta * 7 : delta));
     this.load();
   }
 
   goToToday() {
-    this.selectedDate = new Date();
+    this.selectedDate.set(new Date());
     this.load();
   }
 
-  onDateChange(_d: Date) {
+  onDateChange(d: Date) {
+    this.selectedDate.set(d);
     this.load();
+  }
+
+  isToday(d: Date): boolean {
+    return isSameDay(d, new Date(this.nowTick()));
   }
 
   onFilterChange() {

@@ -7,24 +7,38 @@
     </div>
 
     <!-- Date navigation -->
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Day / week toggle -->
+      <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+        <button type="button" class="px-3 py-2 text-sm font-medium transition-colors"
+          [class]="!isWeek() ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          (click)="setViewMode('DAY')">{{ 'TIMETABLE.VIEW_DAY' | translate }}</button>
+        <button type="button" class="px-3 py-2 text-sm font-medium border-s border-gray-300 transition-colors"
+          [class]="isWeek() ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          (click)="setViewMode('WEEK')">{{ 'TIMETABLE.VIEW_WEEK' | translate }}</button>
+      </div>
+
       <p-button [icon]="languageService.isRtl() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
         [outlined]="true" severity="secondary"
-        (onClick)="shiftDay(-1)" [pTooltip]="'TIMETABLE.PREV_DAY' | translate"></p-button>
+        (onClick)="shiftDay(-1)"
+        [pTooltip]="(isWeek() ? 'TIMETABLE.PREV_WEEK' : 'TIMETABLE.PREV_DAY') | translate"></p-button>
 
       <p-datepicker
-        [(ngModel)]="selectedDate"
+        [ngModel]="selectedDate()"
         (ngModelChange)="onDateChange($event)"
         [showIcon]="true"
         dateFormat="yy-mm-dd"
+        [firstDayOfWeek]="6"
         [style]="{ width: '170px' }"
       ></p-datepicker>
 
       <p-button [icon]="languageService.isRtl() ? 'pi pi-chevron-left' : 'pi pi-chevron-right'"
         [outlined]="true" severity="secondary"
-        (onClick)="shiftDay(1)" [pTooltip]="'TIMETABLE.NEXT_DAY' | translate"></p-button>
+        (onClick)="shiftDay(1)"
+        [pTooltip]="(isWeek() ? 'TIMETABLE.NEXT_WEEK' : 'TIMETABLE.NEXT_DAY') | translate"></p-button>
 
-      <p-button [label]="'TIMETABLE.TODAY' | translate" icon="pi pi-calendar" [outlined]="true"
+      <p-button [label]="(isWeek() ? 'TIMETABLE.THIS_WEEK' : 'TIMETABLE.TODAY') | translate"
+        icon="pi pi-calendar" [outlined]="true"
         severity="secondary" (onClick)="goToToday()"></p-button>
     </div>
   </div>
@@ -33,13 +47,15 @@
   <div class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl p-5 mb-5 shadow-md">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
       <div>
-        <p class="text-sm uppercase tracking-wider text-indigo-100">{{ dayOfWeekLabel() }}</p>
+        <p class="text-sm uppercase tracking-wider text-indigo-100">
+          {{ isWeek() ? ('TIMETABLE.WEEK_LABEL' | translate) : dayOfWeekLabel() }}
+        </p>
         <p class="text-2xl font-bold">{{ formattedDateLabel() }}</p>
       </div>
       <div class="flex items-center gap-6">
         <div>
           <p class="text-xs text-indigo-100">{{ 'TIMETABLE.STAT_SCHEDULED' | translate }}</p>
-          <p class="text-2xl font-bold">{{ filteredEntries().length }}</p>
+          <p class="text-2xl font-bold">{{ visibleEntries().length }}</p>
         </div>
         <div>
           <p class="text-xs text-indigo-100">{{ 'TIMETABLE.STAT_IN_PROGRESS' | translate }}</p>
@@ -124,7 +140,7 @@
     </div>
   }
 
-  @if (!loading() && filteredEntries().length === 0) {
+  @if (!loading() && visibleEntries().length === 0) {
     <div class="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
       <i class="pi pi-calendar text-5xl text-gray-300 mb-3"></i>
       <p class="text-lg font-medium text-gray-600">{{ 'TIMETABLE.EMPTY_TITLE' | translate }}</p>
@@ -132,8 +148,92 @@
     </div>
   }
 
-  <!-- Calendar -->
-  @if (!loading() && filteredEntries().length > 0) {
+  <!-- Week calendar: one column per day, Saturday → Friday -->
+  @if (!loading() && isWeek() && visibleEntries().length > 0) {
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <div class="flex min-w-[900px]">
+          <!-- Hour rail -->
+          <div class="w-16 shrink-0 border-e border-gray-200 bg-gray-50">
+            <div class="h-14 border-b border-gray-200"></div>
+            @for (hour of hours; track hour) {
+              <div class="border-b border-gray-100 flex items-start justify-end pe-2 pt-1"
+                [style.height.px]="hourHeight">
+                <span class="text-xs font-medium text-gray-500">{{ formatHour(hour) }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- Day columns -->
+          @for (col of positionedWeek(); track col.iso) {
+            <div class="flex-1 min-w-[120px] border-e border-gray-200 last:border-e-0">
+              <!-- Column header -->
+              <div class="h-14 border-b border-gray-200 px-2 flex flex-col justify-center"
+                [class]="col.isToday ? 'bg-indigo-50' : 'bg-gray-50'">
+                <span class="text-sm font-semibold"
+                  [class]="col.isToday ? 'text-indigo-700' : 'text-gray-700'">{{ columnLabel(col.date) }}</span>
+                <span class="text-[11px] text-gray-400">
+                  {{ 'TIMETABLE.CLASS_COUNT' | translate: { count: col.entries.length } }}
+                </span>
+              </div>
+
+              <div class="relative" [style.height.px]="totalGridHeight">
+                <!-- Hour lines -->
+                @for (hour of hours; track hour) {
+                  <div class="absolute left-0 right-0 border-b border-gray-100"
+                    [style.top.px]="(hour - dayStartHour) * hourHeight + hourHeight"></div>
+                }
+
+                <!-- "Now" indicator on today's column only -->
+                @if (col.isToday) {
+                  <div class="absolute left-0 right-0 z-10 pointer-events-none" [style.top.px]="nowLineTop()">
+                    <div class="flex items-center">
+                      <span class="w-2 h-2 rounded-full bg-red-500 -ms-1"></span>
+                      <div class="flex-1 h-px bg-red-500"></div>
+                    </div>
+                  </div>
+                }
+
+                <!-- Entries: compact cards, the column is too narrow for the full detail -->
+                @for (entry of col.positioned; track entry.classId) {
+                  <div
+                    class="absolute rounded-md border-s-4 shadow-sm overflow-hidden"
+                    [class]="entryClasses(entry)"
+                    [style.top.px]="entry.topPx"
+                    [style.height.px]="entry.heightPx"
+                    [style.left]="'calc(' + entry.leftPct + '% + 3px)'"
+                    [style.width]="'calc(' + entry.widthPct + '% - 6px)'"
+                    [pTooltip]="entry.className + ' · ' + formatTimeShort(entry.startTime) + ' – ' + formatTimeShort(entry.endTime) + (entry.instructorName ? ' · ' + entry.instructorName : '')"
+                  >
+                    <div class="p-1.5 h-full flex flex-col" [class]="textColor(entry)">
+                      <div class="flex items-start gap-1">
+                        @if (entry.isInProgress) {
+                          <span class="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                        }
+                        <span class="font-bold text-[11px] leading-tight truncate">{{ entry.className }}</span>
+                      </div>
+                      <div class="text-[10px] opacity-80 truncate">{{ formatTimeShort(entry.startTime) }}</div>
+                      @if (entry.instructorName && entry.heightPx >= 56) {
+                        <div class="text-[10px] opacity-70 truncate">{{ entry.instructorName }}</div>
+                      }
+                      @if (entry.heightPx >= 76) {
+                        <div class="mt-auto text-[10px] opacity-80">
+                          <i class="pi pi-users text-[9px] me-0.5"></i>{{ entry.studentCount }}
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Day calendar -->
+  @if (!loading() && !isWeek() && filteredEntries().length > 0) {
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       <div class="flex">
         <!-- Hour rail -->
