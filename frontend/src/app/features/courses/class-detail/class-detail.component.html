@@ -48,6 +48,16 @@
           <p class="font-semibold">{{ classDetail()?.instructorName || ('CLASSES.DETAIL.NOT_ASSIGNED' | translate) }}</p>
         </div>
         <div>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.ROOM' | translate }}</p>
+          @if (classDetail()?.roomCode) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-slate-700 text-white text-[11px] font-semibold px-2 py-0.5">
+              <i class="pi pi-map-marker text-[10px]"></i>{{ classDetail()?.roomCode }}
+            </span>
+          } @else {
+            <p class="font-semibold">{{ 'CLASSES.DETAIL.NOT_ASSIGNED' | translate }}</p>
+          }
+        </div>
+        <div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.SCHEDULE' | translate }}</p>
           <p class="font-semibold text-sm">
             @if (classDetail()?.daysOfWeek) { {{ formatDays(classDetail()!.daysOfWeek!) }} }

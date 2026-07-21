@@ -124,8 +124,11 @@ export const timetableRoutes = {
           s.start_date AS session_start,
           s.end_date AS session_end,
           s.started AS session_started,
-          s.room_id AS session_room_id,
-          r.code AS session_room_code
+          -- Where it actually ran beats where it was scheduled: a session opened
+          -- in another room is the truth for that day. Before any session exists,
+          -- the class's own room is what the timetable shows.
+          COALESCE(s.room_id, c.room_id) AS session_room_id,
+          COALESCE(r.code, cr.code) AS session_room_code
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         -- One row per day the class runs, carrying that day's own start/end time.
@@ -141,6 +144,7 @@ export const timetableRoutes = {
           LIMIT 1
         ) s ON TRUE
         LEFT JOIN rooms r ON s.room_id = r.id
+        LEFT JOIN rooms cr ON cr.id = c.room_id
         WHERE co.company_id = $1
           AND c.is_active = true
           AND (c.start_date IS NULL OR c.start_date <= $2::date)
@@ -169,13 +173,11 @@ export const timetableRoutes = {
         sql += ` AND c.course_id = $${params.length}`;
       }
 
-      // A room belongs to the SESSION, not the class — a class only has a room once
-      // its session for that date was opened in one. So filtering by room narrows to
-      // classes actually sitting in that room that day, and classes with no session
-      // yet drop out (they have no room to match).
+      // Matches on the same room the row displays: the day's session room when it
+      // has one, otherwise the class's scheduled room.
       if (queryParams.roomId) {
         params.push(queryParams.roomId);
-        sql += ` AND s.room_id = $${params.length}`;
+        sql += ` AND COALESCE(s.room_id, c.room_id) = $${params.length}`;
       }
 
       sql += ' ORDER BY cdt.start_time ASC, c.name ASC';

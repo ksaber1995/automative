@@ -10,6 +10,24 @@ async function ensureClassStatusColumns(): Promise<void> {
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`);
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`);
         await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS type VARCHAR(16) NOT NULL DEFAULT 'OFFLINE'`);
+        // The room a class is scheduled in, chosen up front. Sessions still carry
+        // their own room_id (where it ACTUALLY ran, which can differ on the day);
+        // this is the plan, and it's what the timetable shows before a session
+        // exists. ON DELETE SET NULL: deleting a room must not delete classes.
+        await query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS room_id UUID`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_classes_room_id ON classes(room_id)`);
+        // The FK is added separately and guarded: this ensure() runs at the top of
+        // EVERY class endpoint, so a throw here would take the whole feature down.
+        // Nothing is lost if it doesn't attach — the column still works.
+        await query(`DO $$
+          BEGIN
+            IF to_regclass('public.rooms') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'classes_room_id_fkey') THEN
+              ALTER TABLE classes
+                ADD CONSTRAINT classes_room_id_fkey
+                FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL;
+            END IF;
+          END $$`);
         // Soft-delete marker: a class that has payments cannot be hard-deleted
         // (that would destroy financial records), so it is hidden from the tenant
         // by stamping deleted_at. Every tenant-facing class query filters it out.
@@ -32,6 +50,21 @@ async function ensureClassStatusColumns(): Promise<void> {
     })();
   }
   return classSchemaInitPromise;
+}
+
+/** Sentinel: a room id was given, but it isn't one of this company's rooms. */
+const INVALID_ROOM = Symbol('invalid-room');
+
+/**
+ * Validate the scheduled room against the caller's company. Returns null when no
+ * room was chosen (or it was cleared), the id when it checks out, and the
+ * INVALID_ROOM sentinel when it belongs to someone else — which must 404 rather
+ * than silently save nothing.
+ */
+async function resolveRoomId(raw: any, companyId: string): Promise<string | null | typeof INVALID_ROOM> {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const room = await queryOne<any>('SELECT id FROM rooms WHERE id = $1 AND company_id = $2', [raw, companyId]);
+  return room ? String(raw) : INVALID_ROOM;
 }
 
 function normalizeClassType(value: any): 'ONLINE' | 'OFFLINE' {
@@ -183,9 +216,10 @@ function mapClassDbError(error: any) {
  */
 async function loadClassForTenant(classId: string, companyId: string): Promise<any | null> {
   return queryOne(
-    `SELECT c.*, co.company_id, co.branch_id
+    `SELECT c.*, co.company_id, co.branch_id, r.code AS room_code
      FROM classes c
      INNER JOIN courses co ON c.course_id = co.id
+     LEFT JOIN rooms r ON r.id = c.room_id
      WHERE c.id = $1 AND co.company_id = $2 AND c.deleted_at IS NULL`,
     [classId, companyId]
   );
@@ -206,6 +240,8 @@ function mapClassFromDB(row: any) {
     courseId: row.course_id,
     branchId: row.branch_id,
     instructorId: row.instructor_id,
+    roomId: row.room_id ?? null,
+    roomCode: row.room_code ?? null,
     name: row.name,
     startDate: row.start_date,
     endDate: row.end_date,
@@ -271,9 +307,15 @@ export const classesRoutes = {
         ? legacyColumnsFromDayTimes(dayTimes)
         : { days_of_week: body.daysOfWeek || null, start_time: body.startTime || null, end_time: body.endTime || null };
 
+      const roomId = await resolveRoomId(body.roomId, context.companyId);
+      if (roomId === INVALID_ROOM) {
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+      }
+
       const insertData = {
         course_id: body.courseId,
         instructor_id: body.instructorId || null,
+        room_id: roomId,
         name: body.name,
         start_date: body.startDate,
         end_date: body.endDate,
@@ -324,6 +366,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
@@ -343,6 +386,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
+        LEFT JOIN rooms r ON r.id = c.room_id
         WHERE co.company_id = $1 AND c.deleted_at IS NULL
       `;
       const params: any[] = [context.companyId];
@@ -392,6 +436,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
@@ -411,6 +456,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
+        LEFT JOIN rooms r ON r.id = c.room_id
         WHERE co.company_id = $1 AND c.is_active = true AND c.deleted_at IS NULL
       `;
       const params: any[] = [context.companyId];
@@ -552,6 +598,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
@@ -564,6 +611,7 @@ export const classesRoutes = {
         INNER JOIN courses co ON c.course_id = co.id
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
+        LEFT JOIN rooms r ON r.id = c.room_id
         WHERE c.id = $1 AND co.company_id = $2 AND c.deleted_at IS NULL
       `;
 
@@ -624,6 +672,13 @@ export const classesRoutes = {
         updateData.course_id = body.courseId;
       }
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
+      if (body.roomId !== undefined) {
+        const roomId = await resolveRoomId(body.roomId, context.companyId);
+        if (roomId === INVALID_ROOM) {
+          return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+        }
+        updateData.room_id = roomId;
+      }
       if (body.name !== undefined) updateData.name = body.name;
       if (body.startDate !== undefined) updateData.start_date = body.startDate;
       if (body.endDate !== undefined) updateData.end_date = body.endDate;

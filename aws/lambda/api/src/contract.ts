@@ -954,6 +954,8 @@ const CreateClassSchema = z.object({
   // for backward compatibility with older clients; the server ignores it.
   branchId: OptionalUUIDSchema,
   instructorId: OptionalUUIDSchema,
+  // The room this class is scheduled in. A session may still be opened elsewhere.
+  roomId: OptionalUUIDSchema,
   name: z.string(),
   startDate: z.string(),
   endDate: z.string(),
@@ -970,6 +972,7 @@ const CreateClassSchema = z.object({
 
 const UpdateClassSchema = z.object({
   instructorId: OptionalUUIDSchema,
+  roomId: OptionalUUIDSchema,
   name: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -991,6 +994,8 @@ const ClassSchema = z.object({
   courseId: UUIDSchema,
   branchId: UUIDSchema,
   instructorId: UUIDSchema.nullable(),
+  roomId: UUIDSchema.nullable().optional(),
+  roomCode: z.string().nullable().optional(),
   name: z.string(),
   startDate: z.string(),
   endDate: z.string(),

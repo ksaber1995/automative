@@ -62,6 +62,7 @@ export class ClassFormComponent implements OnInit {
   fromOrigin: string | null = null;
   instructors = signal<any[]>([]);
   branches = signal<LookupOption[]>([]);
+  rooms = signal<LookupOption[]>([]);
   // All active courses fetched once; the dropdown shown to the user is `filteredCourses`,
   // which narrows them down to those belonging to the currently-selected branch.
   allCourses = signal<Array<{ id: string; name: string; branchId: string | null }>>([]);
@@ -103,6 +104,7 @@ export class ClassFormComponent implements OnInit {
       // The form control acts purely as a UI filter for the course dropdown in global-create mode.
       branchId: [''],
       instructorId: [''],
+      roomId: [''],
       type: ['OFFLINE', [Validators.required]],
       daysOfWeek: [[]],
       startTime: [''],
@@ -145,6 +147,7 @@ export class ClassFormComponent implements OnInit {
 
     this.loadInstructors();
     this.loadBranches();
+    this.loadRooms();
 
     // When the branch changes in global-create mode, clear the picked course
     // (it may not belong to the new branch).
@@ -309,6 +312,15 @@ export class ClassFormComponent implements OnInit {
     });
   }
 
+  loadRooms() {
+    this.lookupService.rooms().subscribe({
+      next: (rooms) => this.rooms.set(rooms),
+      error: () => {
+        // Interceptor toasted the translated error.
+      }
+    });
+  }
+
   loadBranches() {
     this.lookupService.branches().subscribe({
       next: (branches) => {
@@ -360,6 +372,7 @@ export class ClassFormComponent implements OnInit {
           name: classData.name,
           branchId: classData.branchId,
           instructorId: classData.instructorId,
+          roomId: classData.roomId || '',
           type: classData.type || 'OFFLINE',
           daysOfWeek: daysArray,
           startTime: sharedStart,
@@ -542,6 +555,8 @@ export class ClassFormComponent implements OnInit {
       // branchId no longer sent — backend derives it from the course.
       name: formValue.name,
       instructorId: formValue.instructorId || undefined,
+      // null, not undefined: clearing the room must actually clear it on update.
+      roomId: formValue.roomId || null,
       type: formValue.type || 'OFFLINE',
       startDate,
       endDate,

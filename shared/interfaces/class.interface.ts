@@ -14,6 +14,9 @@ export interface Class {
   courseId: string;
   branchId: string;
   instructorId?: string;
+  /** The room the class is scheduled in. A session may still be opened elsewhere. */
+  roomId?: string | null;
+  roomCode?: string | null;
   name: string;
   startDate: string;
   endDate: string;
@@ -37,6 +40,7 @@ export interface ClassCreateDto {
   courseId: string;
   branchId: string;
   instructorId?: string;
+  roomId?: string | null;
   name: string;
   startDate: string;
   endDate: string;
@@ -53,6 +57,7 @@ export interface ClassUpdateDto {
   courseId?: string;
   branchId?: string;
   instructorId?: string;
+  roomId?: string | null;
   name?: string;
   startDate?: string;
   endDate?: string;
