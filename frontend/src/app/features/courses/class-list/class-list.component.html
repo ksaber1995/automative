@@ -104,7 +104,11 @@
       </ng-template>
       <ng-template pTemplate="body" let-classItem>
         <tr>
-          <td>{{ classItem.name }}</td>
+          <td>
+            <span class="font-medium text-blue-600 hover:underline cursor-pointer" (click)="viewClass(classItem)">
+              {{ classItem.name }}
+            </span>
+          </td>
           <td>{{ classItem.courseName || 'N/A' }}</td>
           <td>{{ classItem.branchName || 'N/A' }}</td>
           <td>{{ classItem.instructorName || ('CLASSES.LIST.NOT_ASSIGNED' | translate) }}</td>

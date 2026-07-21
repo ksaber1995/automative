@@ -409,9 +409,9 @@
           @for (cls of classes(); track cls.id) {
             <p-panel [toggleable]="true" [collapsed]="true">
               <ng-template pTemplate="header">
-                <div class="flex items-center gap-4 w-full">
+                <div class="flex items-center gap-4 w-full cursor-pointer" (click)="openClass(cls.id)">
                   <div class="flex-1">
-                    <div class="font-bold text-lg">{{ cls.name }}</div>
+                    <div class="font-bold text-lg hover:text-primary-600">{{ cls.name }}</div>
                     <div class="text-sm text-gray-600 mt-1">
                       <i class="pi pi-user mr-2"></i>
                       @if (cls.instructorName) {

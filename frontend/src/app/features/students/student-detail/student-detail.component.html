@@ -91,8 +91,9 @@
       <div class="mt-4">
         <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.OR_SERIAL' | translate }}</label>
         <div class="flex items-center gap-2">
-          <input pInputText type="number" min="1" class="flex-1"
-            [(ngModel)]="linkSerial" (keyup.enter)="linkBySerial()"
+          <p-inputnumber styleClass="flex-1 min-w-0" inputStyleClass="w-full"
+            [(ngModel)]="linkSerial" [min]="1" [useGrouping]="false"
+            (keyup.enter)="linkBySerial()"
             [placeholder]="'QR_CARDS.SERIAL_PLACEHOLDER' | translate" />
           <p-button icon="pi pi-link" [label]="'QR_CARDS.LINK' | translate"
             [disabled]="!linkSerial" [loading]="linkingCard()" (onClick)="linkBySerial()"></p-button>

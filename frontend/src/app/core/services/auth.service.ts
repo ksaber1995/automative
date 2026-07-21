@@ -20,6 +20,17 @@ const WHATSAPP_TRIAL_COMPANIES = [
   '07d91513-9a21-478c-ba46-4a8d6aa84150',
 ];
 
+/**
+ * The vendor's own two tenants — `netrofit` (teacher) and `Karim` (academy) — the
+ * ones used to test in prod. Vendor tools show here as well as on the debug login.
+ * Same two ids as the WhatsApp trial above today; kept separate because that list
+ * grows with trialling customers, and this one must not.
+ */
+const VENDOR_TEST_COMPANIES = [
+  'b6420df6-74fc-4d9d-ab56-78106b376f06',
+  '07d91513-9a21-478c-ba46-4a8d6aa84150',
+];
+
 @Injectable({
   providedIn: 'root'
 })
@@ -223,6 +234,16 @@ export class AuthService {
    */
   isDebugUser(): boolean {
     return (this.currentUser()?.email ?? '').trim().toLowerCase() === 'master@master.com';
+  }
+
+  /**
+   * Who sees the pre-printed QR card pool (the page and its sidebar entry): the
+   * debug login, plus every user in the vendor's own test tenants, so the pool can
+   * be worked with while logged in as those. Still hidden from real customers.
+   */
+  canSeeQrCardPool(): boolean {
+    const companyId = this.currentUser()?.companyId;
+    return this.isDebugUser() || (!!companyId && VENDOR_TEST_COMPANIES.includes(companyId));
   }
 
   canUseCrm(): boolean {

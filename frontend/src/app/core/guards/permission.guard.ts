@@ -82,12 +82,13 @@ export const notTeacherGuard = () => {
 };
 
 /**
- * Vendor-only guard. Admits nobody but the debugging login (master@master.com),
- * so a page can be reached only when that account is parked in the tenant. The
- * matching sidebar entry hides on the same check; this stops a direct URL. Anyone
- * else is bounced to their first accessible page, exactly like the other guards.
+ * Vendor-only guard for the QR card pool. Admits the debugging login
+ * (master@master.com) and the vendor's own test tenants, so the page is reachable
+ * from the accounts we test prod with. The matching sidebar entry hides on the
+ * same check; this stops a direct URL. Anyone else is bounced to their first
+ * accessible page, exactly like the other guards.
  */
-export const debugOnlyGuard = () => {
+export const qrPoolGuard = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
@@ -96,7 +97,7 @@ export const debugOnlyGuard = () => {
     return false;
   }
 
-  if (authService.isDebugUser()) {
+  if (authService.canSeeQrCardPool()) {
     return true;
   }
 

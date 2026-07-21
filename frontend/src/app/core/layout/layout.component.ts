@@ -298,9 +298,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // save it, so it sits with Settings rather than with the students.
       { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.canRead('students') },
       // The pool of pre-printed blank QR cards, and which student each one is on.
-      // Hidden from every tenant on request — shown only to the vendor's debug
-      // login. The /qr-cards route itself stays reachable; this hides the nav entry.
-      { labelKey: 'NAV.QR_CARDS', icon: 'pi pi-qrcode', routerLink: ['/qr-cards'], visible: auth.isDebugUser() },
+      // Hidden from customer tenants on request — shown to the vendor's debug login
+      // and to the vendor's own test tenants, same check the route guard uses.
+      { labelKey: 'NAV.QR_CARDS', icon: 'pi pi-qrcode', routerLink: ['/qr-cards'], visible: auth.canSeeQrCardPool() },
     ].filter(c => c.visible) : [];
     if (admin.length) {
       entries.push({ kind: 'group', group: {

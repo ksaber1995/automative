@@ -562,6 +562,10 @@ export class CourseDetailComponent implements OnInit {
     this.router.navigate(['/courses', this.courseId, 'classes', 'create']);
   }
 
+  openClass(classId: string) {
+    this.router.navigate(['/classes', classId]);
+  }
+
   editClass(classId: string) {
     // Tell the edit page we came from the course, so Cancel/Update return here.
     this.router.navigate(['/courses', this.courseId, 'classes', classId, 'edit'], { queryParams: { from: 'course' } });
