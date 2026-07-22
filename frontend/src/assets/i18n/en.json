@@ -706,7 +706,9 @@
       "PACKAGE_NOT_FOUND": "Package not found",
       "INVALID_AMOUNT": "Amount must be greater than zero",
       "PACKAGE_PAY_FAILED": "Failed to record package payment",
-      "STUDENT_NOT_FOUND": "Student not found for this code"
+      "STUDENT_NOT_FOUND": "Student not found for this code",
+      "NOT_PER_SESSION": "This enrollment is not billed per session",
+      "PAY_PER_SESSION_FAILED": "Failed to switch to per-session payment"
     },
     "SUBJECTS": {
       "CREATE_FAILED": "Failed to create subject",
@@ -905,7 +907,16 @@
     "REFUND_NOTE": "Note",
     "REFUND_SUBMIT": "Refund",
     "REFUND_SUCCESS": "Refund recorded",
-    "CANCEL": "Cancel"
+    "CANCEL": "Cancel",
+    "PER_SESSION_BTN": "Pay per session",
+    "PER_SESSION_HINT": "Stop offering bundles to this student — they pay for each session they attend",
+    "PER_SESSION_TITLE": "Pay session by session?",
+    "PER_SESSION_CONFIRM": "{{name}} will pay for each session they attend instead of buying another bundle. You can put them back on bundles any time by buying one.",
+    "PER_SESSION_CONFIRM_OWING": "{{name}} will pay for each session they attend instead of buying another bundle. The {{count}} session(s) they have already attended stay as unpaid dues on the Charges tab — nothing is written off. You can put them back on bundles any time by buying one.",
+    "PER_SESSION_ACCEPT": "Pay per session",
+    "PER_SESSION_CANCEL": "Cancel",
+    "PER_SESSION_DONE": "Now paying session by session",
+    "PER_SESSION_DONE_OWING": "Now paying session by session — {{count}} unpaid session(s) are on the Charges tab"
   },
   "MONTHLY_SUBSCRIPTIONS": {
     "TITLE": "Monthly Subscriptions",

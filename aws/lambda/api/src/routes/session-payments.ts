@@ -85,6 +85,10 @@ export async function ensurePerSessionSchema(): Promise<void> {
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_course_id ON session_packages(course_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_branch_id ON session_packages(branch_id)`);
         await query(`CREATE INDEX IF NOT EXISTS idx_spkg_status ON session_packages(status)`);
+        // Migration 072: this enrollment pays session by session, so stop
+        // prompting for the next bundle. Billing is unchanged — attendance
+        // already raises a charge whenever there's no bundle credit to consume.
+        await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS session_packages_opted_out BOOLEAN NOT NULL DEFAULT FALSE`);
 
         // session_payments
         await query(`CREATE TABLE IF NOT EXISTS session_payments (
@@ -896,6 +900,65 @@ export const sessionPaymentsRoutes = {
     }
   },
 
+  /**
+   * POST /api/session-payments/enrollments/:id/pay-per-session
+   *
+   * Switch this enrollment off bundles: it pays for each session it attends
+   * instead of buying the next prepaid block. Nothing is billed or written off
+   * here — the sessions attended since the last bundle ran out already exist as
+   * individual charges, and stay exactly as they are, payable on the Charges
+   * tab. The only change is that the student stops being asked to renew.
+   *
+   * Reversible: buying a bundle for them clears the flag again.
+   */
+  payPerSession: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      await ensurePerSessionSchema();
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const enrollment = await queryOne<any>(
+        `SELECT id, branch_id, payment_type FROM enrollments WHERE id = $1 AND company_id = $2`,
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (!canAccessBranch(context, enrollment.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      if (enrollment.payment_type !== 'PER_SESSION') {
+        return apiError(400, 'ERRORS.SESSION_PAYMENTS.NOT_PER_SESSION', 'This enrollment is not billed per session');
+      }
+
+      await query(
+        `UPDATE enrollments SET session_packages_opted_out = TRUE, updated_at = NOW() WHERE id = $1`,
+        [enrollment.id]
+      );
+
+      // Report what is now owed session by session, so the caller can point the
+      // user straight at it rather than leaving them to hunt for it.
+      const owed = await queryOne<any>(
+        `SELECT COUNT(*) AS count, COALESCE(SUM(amount_due - amount_paid), 0) AS total
+         FROM session_payments
+         WHERE enrollment_id = $1 AND company_id = $2 AND payment_status = 'PENDING'`,
+        [enrollment.id, context.companyId]
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          enrollmentId: enrollment.id,
+          unpaidSessions: parseInt(owed?.count ?? '0', 10),
+          unpaidAmount: parseFloat(owed?.total ?? 0),
+        },
+      };
+    } catch (error) {
+      console.error('Switch to per-session error:', error);
+      return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.PAY_PER_SESSION_FAILED', 'Failed to switch to per-session payment');
+    }
+  },
+
   /** POST /api/session-payments/packages — buy a prepaid session package */
   buyPackage: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -924,6 +987,15 @@ export const sessionPaymentsRoutes = {
       const price = enrollment.session_package_price != null ? parseFloat(enrollment.session_package_price) : 0;
       const amountDue = body.amountDue != null ? parseFloat(body.amountDue) : price;
       const amountPaid = body.amount != null ? parseFloat(body.amount) : amountDue;
+
+      // Buying a bundle is the clearest possible statement that this student is
+      // back on bundles, so it undoes any earlier "pays per session" choice.
+      // Without this, they'd own an active package and still never be prompted
+      // to renew it when it ran out.
+      await query(
+        `UPDATE enrollments SET session_packages_opted_out = FALSE WHERE id = $1`,
+        [enrollment.id]
+      );
 
       const inserted = await query(
         `INSERT INTO session_packages
@@ -1130,6 +1202,9 @@ export const sessionPaymentsRoutes = {
         `e.payment_type = 'PER_SESSION'`,
         `e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')`,
         `c.session_package_size IS NOT NULL AND c.session_package_size > 0`,
+        // Students who chose to pay session by session aren't waiting to renew
+        // anything, so they don't belong on this list (migration 072).
+        `e.session_packages_opted_out = FALSE`,
         // No usable credit anywhere on this enrollment…
         `NOT EXISTS (
            SELECT 1 FROM session_packages ap

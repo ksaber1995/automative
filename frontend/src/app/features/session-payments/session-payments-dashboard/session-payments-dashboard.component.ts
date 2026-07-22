@@ -12,6 +12,8 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { DialogModule } from 'primeng/dialog';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -47,9 +49,10 @@ type StatusTab = 'ALL' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'ON_HOLD' 
   imports: [
     CommonModule, FormsModule, TranslateModule,
     CardModule, TableModule, ButtonModule, TagModule, TooltipModule, SelectModule,
-    DialogModule, InputNumberModule, InputTextModule, DatePickerModule, TextareaModule,
+    DialogModule, ConfirmDialogModule, InputNumberModule, InputTextModule, DatePickerModule, TextareaModule,
     AmountPipe, SessionPayDialogComponent,
   ],
+  providers: [ConfirmationService],
   templateUrl: './session-payments-dashboard.component.html',
 })
 export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
@@ -65,6 +68,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   /** Teacher-type companies have a single implicit branch — hide the filter. */
   isTeacher = (): boolean => this.auth.isTeacher();
   private translate = inject(TranslateService);
+  private confirmationService = inject(ConfirmationService);
 
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
 
@@ -250,6 +254,39 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     this.renewalAmount.set(r.packagePrice ?? 0);
     this.renewalNotes.set('');
     this.showRenewalPay.set(true);
+  }
+
+  /**
+   * Offer the alternative to renewing: this student pays for each session they
+   * attend instead of buying the next bundle. The confirmation spells out what
+   * happens to the sessions they've already attended — those stay as individual
+   * dues, they are not written off — because "convert" could easily be read as
+   * "clear the balance".
+   */
+  confirmPayPerSession(r: PackageRenewalDue): void {
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_PAYMENTS.PER_SESSION_TITLE'),
+      message: r.unpaidSessions > 0
+        ? this.translate.instant('SESSION_PAYMENTS.PER_SESSION_CONFIRM_OWING', {
+            name: r.studentName, count: r.unpaidSessions })
+        : this.translate.instant('SESSION_PAYMENTS.PER_SESSION_CONFIRM', { name: r.studentName }),
+      icon: 'pi pi-wallet',
+      acceptLabel: this.translate.instant('SESSION_PAYMENTS.PER_SESSION_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSION_PAYMENTS.PER_SESSION_CANCEL'),
+      accept: () => {
+        this.submitting.set(true);
+        this.service.payPerSession(r.enrollmentId).subscribe({
+          next: (res) => {
+            this.submitting.set(false);
+            this.notify.success(res.unpaidSessions > 0
+              ? this.translate.instant('SESSION_PAYMENTS.PER_SESSION_DONE_OWING', { count: res.unpaidSessions })
+              : this.translate.instant('SESSION_PAYMENTS.PER_SESSION_DONE'));
+            this.loadData();
+          },
+          error: () => this.submitting.set(false),
+        });
+      },
+    });
   }
 
   confirmRenewalPay(): void {

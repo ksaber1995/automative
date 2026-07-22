@@ -6595,6 +6595,23 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    /** Switch an enrollment off bundles — it pays session by session instead. */
+    payPerSession: {
+      method: 'POST' as const,
+      path: '/api/session-payments/enrollments/:id/pay-per-session',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          enrollmentId: z.string(),
+          unpaidSessions: z.number(),
+          unpaidAmount: z.number(),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     buyPackage: {
       method: 'POST' as const,
       path: '/api/session-payments/packages',

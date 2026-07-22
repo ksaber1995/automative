@@ -71,6 +71,18 @@ export class SessionPaymentsService {
     return this.http.post<SessionPackage>(`${this.base}/packages`, dto);
   }
 
+  /**
+   * Switch an enrollment off bundles — it pays for each session it attends
+   * instead. Nothing is billed or written off; the sessions already attended
+   * stay as individual charges. Returns how many of those are still unpaid.
+   * Buying a bundle for them later undoes it.
+   */
+  payPerSession(enrollmentId: string): Observable<{ enrollmentId: string; unpaidSessions: number; unpaidAmount: number }> {
+    return this.http.post<{ enrollmentId: string; unpaidSessions: number; unpaidAmount: number }>(
+      `${this.base}/enrollments/${enrollmentId}/pay-per-session`, {}
+    );
+  }
+
   payPackage(id: string, dto: RecordSessionPaymentDto): Observable<SessionPackage> {
     return this.http.post<SessionPackage>(`${this.base}/packages/${id}/pay`, dto);
   }

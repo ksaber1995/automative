@@ -216,6 +216,9 @@ const router = {
     list: sessionPaymentsRoutes.list,
     summary: sessionPaymentsRoutes.summary,
     overdue: sessionPaymentsRoutes.overdue,
+    // Registered ahead of the `/:id/...` routes below — itty-router matches in
+    // order with no static-over-param precedence (see the sessions block).
+    payPerSession: sessionPaymentsRoutes.payPerSession,
     recordPayment: sessionPaymentsRoutes.recordPayment,
     voidPayment: sessionPaymentsRoutes.voidPayment,
     refund: sessionPaymentsRoutes.refund,

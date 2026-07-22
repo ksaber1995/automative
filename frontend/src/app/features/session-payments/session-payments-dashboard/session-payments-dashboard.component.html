@@ -233,9 +233,15 @@
               <td class="text-right"><span class="font-semibold text-red-600">{{ (row.r.packagePrice || 0) | amount }}</span></td>
               <td><p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_DUE_STATUS' | translate"></p-tag></td>
               <td>
-                <p-button icon="pi pi-box" severity="warn" size="small"
-                  [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: row.r.packageSize, amount: ((row.r.packagePrice || 0) | amount) }"
-                  (onClick)="openRenewalPay(row.r)"></p-button>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p-button icon="pi pi-box" severity="warn" size="small"
+                    [label]="'SESSION_PAYMENTS.RENEW_BTN' | translate: { count: row.r.packageSize, amount: ((row.r.packagePrice || 0) | amount) }"
+                    (onClick)="openRenewalPay(row.r)"></p-button>
+                  <p-button icon="pi pi-wallet" severity="secondary" [outlined]="true" size="small"
+                    [label]="'SESSION_PAYMENTS.PER_SESSION_BTN' | translate"
+                    [pTooltip]="'SESSION_PAYMENTS.PER_SESSION_HINT' | translate"
+                    (onClick)="confirmPayPerSession(row.r)"></p-button>
+                </div>
               </td>
             </tr>
           } @else {
@@ -286,6 +292,8 @@
 
 <!-- Pay popup (shared) -->
 <app-session-pay-dialog (settled)="loadData()"></app-session-pay-dialog>
+
+<p-confirmDialog [style]="{ width: '440px' }"></p-confirmDialog>
 
 <!-- Collect next package (renewal) dialog -->
 <p-dialog [(visible)]="showRenewalPay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.RENEWAL_TITLE' | translate">
