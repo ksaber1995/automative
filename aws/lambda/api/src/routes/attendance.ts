@@ -286,7 +286,11 @@ export const attendanceRoutes = {
       // default (no activation gate).
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.name
+        // student_code travels back with the check-in so the caller can show the
+        // badge immediately. A trial attendee has no enrolment, so the roster the
+        // page loaded doesn't contain them — without this their row would be the
+        // only one on screen with no code until a refetch.
+        `SELECT s.id, s.name, s.student_code
          FROM students s
          WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
         [token, context.companyId]
@@ -335,6 +339,7 @@ export const attendanceRoutes = {
           body: {
             studentId: student.id,
             studentName: student.name,
+            studentCode: student.student_code ?? null,
             attendanceType: type as 'NORMAL' | 'TRIAL',
             homeClassName: null,
             sessionNumber: session.session_number ?? null,
@@ -389,6 +394,7 @@ export const attendanceRoutes = {
           body: {
             studentId: student.id,
             studentName: student.name,
+            studentCode: student.student_code ?? null,
             attendanceType: 'NORMAL' as const,
             homeClassName: null,
             sessionNumber: session.session_number ?? null,
@@ -450,6 +456,7 @@ export const attendanceRoutes = {
         body: {
           studentId: student.id,
           studentName: student.name,
+          studentCode: student.student_code ?? null,
           attendanceType: 'SUBSTITUTION' as const,
           homeClassName: siblingClass.name,
           sessionNumber: session.session_number ?? null,

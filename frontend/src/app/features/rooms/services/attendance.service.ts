@@ -39,6 +39,8 @@ export interface StudentAttendanceRecord {
 export interface QrCheckinResult {
   studentId: string;
   studentName: string;
+  /** Sent back so an off-roster attendee (trial/substitution) can show its badge. */
+  studentCode?: number | null;
   alreadyPresent: boolean;
   attendanceType?: AttendanceType;
   homeClassName?: string | null;

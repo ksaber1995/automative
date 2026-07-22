@@ -204,7 +204,12 @@
       "CLASS_FAILED": "Failed to load class attendance",
       "TEACHER_GET_FAILED": "Failed to load teacher attendance",
       "TEACHER_SAVE_FAILED": "Failed to save teacher attendance",
-      "TEACHER_HISTORY_FAILED": "Failed to load teacher attendance history"
+      "TEACHER_HISTORY_FAILED": "Failed to load teacher attendance history",
+      "STUDENT_NOT_IN_CLASS": "This student is not enrolled in this class",
+      "QR_STUDENT_NOT_FOUND": "No active student matches this QR code",
+      "QR_TOKEN_REQUIRED": "QR token is required",
+      "CHECKIN_FAILED": "Failed to check in student",
+      "REMOVE_FAILED": "Failed to remove attendee"
     },
     "CASH": {
       "NOT_AVAILABLE": "Cash is available for academies on the Advanced plan",
@@ -508,7 +513,13 @@
       "ALREADY_ENDED": "Session has already ended",
       "INVALID_END_DATE": "End date is invalid",
       "END_BEFORE_START": "End date must be after the start date",
-      "NO_TEACHER_PRESENT": "Cannot end the session — mark at least one teacher present first"
+      "NO_TEACHER_PRESENT": "Cannot end the session — mark at least one teacher present first",
+      "CLASS_ID_REQUIRED": "A class is required",
+      "FREE_SUMMARY_FAILED": "Failed to load free sessions",
+      "INVALID_SESSION_NUMBER": "Session number must be a positive whole number",
+      "NEXT_NUMBER_FAILED": "Failed to work out the next session number",
+      "PREPARE_FAILED": "Failed to prepare session",
+      "UPDATE_FAILED": "Failed to update session"
     },
     "SUBSCRIPTIONS": {
       "NOT_FOUND": "Subscription not found",
@@ -942,7 +953,8 @@
     "CONNECTED": "WhatsApp connected.",
     "CONNECT_FAILED": "Couldn't connect WhatsApp.",
     "INBOX_REPLY_PLACEHOLDER": "Write a reply…",
-    "INBOX_WINDOW_CLOSED": "More than 24 hours since their last message — WhatsApp only allows an approved template now."
+    "INBOX_WINDOW_CLOSED": "More than 24 hours since their last message — WhatsApp only allows an approved template now.",
+    "SEND_FAILED": "Failed to send the message"
   },
   "CRM": {
     "TITLE": "CRM — Leads",
@@ -4531,7 +4543,10 @@
     "UNCHECK_UNPAID": "The pending charge of {{amount}} will be removed.",
     "UNCHECK_MANY": "This will delete the session charge/payment for {{count}} student(s). Continue?",
     "UNCHECK_ACCEPT": "Delete & un-check",
-    "UNCHECK_CANCEL": "Keep present"
+    "UNCHECK_CANCEL": "Keep present",
+    "MARK_ALL_TITLE": "Mark everyone present?",
+    "MARK_ALL_CONFIRM": "This marks {{count}} student(s) present in one go. Any per-session fees they owe will be raised now.",
+    "MARK_ALL_ACCEPT": "Mark all present"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",
@@ -4680,7 +4695,9 @@
     "FREE_BADGE": "Free",
     "FREE_BADGE_HINT": "A free session: no bills, open to any student",
     "TRIAL": "Trying it out",
-    "TRIAL_HINT": "Attending this free session without being enrolled in the class"
+    "TRIAL_HINT": "Attending this free session without being enrolled in the class",
+    "STUDENTS_TITLE": "Students",
+    "NO_STUDENTS_SCAN_HINT": "Scan a QR code or type a student code above to check someone in."
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "Teacher Attendance",

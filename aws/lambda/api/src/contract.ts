@@ -5965,8 +5965,12 @@ export const contract = c.router({
         200: z.object({
           studentId: UUIDSchema,
           studentName: z.string(),
+          // Sent back so a caller can render the code badge for an attendee who
+          // isn't on the roster it already loaded (a trial, or a substitution).
+          studentCode: z.number().nullable().optional(),
           alreadyPresent: z.boolean(),
-          attendanceType: z.enum(['NORMAL', 'SUBSTITUTION']).optional(),
+          // TRIAL: attended a free session without being enrolled in the class.
+          attendanceType: z.enum(['NORMAL', 'SUBSTITUTION', 'TRIAL']).optional(),
           homeClassName: z.string().nullable().optional(),
           sessionNumber: z.number().nullable().optional(),
           code: z.string(),

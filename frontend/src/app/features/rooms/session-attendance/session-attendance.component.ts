@@ -300,27 +300,27 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Bulk-set every student currently matching the search filter. */
-  markAllFiltered(present: boolean) {
-    const targets = this.filteredStudents();
+  /**
+   * Mark everyone currently matching the search as present, after confirming.
+   * It's one click that writes attendance for the whole visible roster — and on
+   * a PER_SESSION course that raises a charge per student — so it asks first and
+   * says how many people it is about to affect.
+   *
+   * Already-present students are excluded so the count reflects what actually
+   * changes; substitution and trial attendees are present by definition and so
+   * fall out of it too.
+   */
+  confirmMarkAllPresent() {
+    const targets = this.filteredStudents().filter((s) => !s.isPresent);
     if (targets.length === 0) return;
-    // Marking many absent would delete each of their per-session charges — confirm once.
-    if (!present) {
-      const charged = targets.filter((s) => s.charge);
-      if (charged.length > 0) {
-        this.confirmationService.confirm({
-          header: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_TITLE'),
-          message: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_MANY', { count: charged.length }),
-          icon: 'pi pi-exclamation-triangle',
-          acceptLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_ACCEPT'),
-          rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
-          acceptButtonStyleClass: 'p-button-danger',
-          accept: () => this.applyMarkAll(targets, present),
-        });
-        return;
-      }
-    }
-    this.applyMarkAll(targets, present);
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_TITLE'),
+      message: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_CONFIRM', { count: targets.length }),
+      icon: 'pi pi-check-circle',
+      acceptLabel: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
+      accept: () => this.applyMarkAll(targets, true),
+    });
   }
 
   private applyMarkAll(targets: SessionAttendanceStudent[], present: boolean) {
@@ -644,6 +644,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
           return [...list, {
             studentId: res.studentId,
             studentName: res.studentName,
+            studentCode: res.studentCode ?? null,
             isPresent: true,
             attendanceType: res.attendanceType ?? null,
             homeClassName: res.homeClassName ?? null,
