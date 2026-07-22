@@ -178,15 +178,22 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   });
 
   /**
+   * A renewal-due student owes the next bundle, so they belong under Pending —
+   * and under All, which must be a superset of every other tab or the counts
+   * stop adding up.
+   */
+  private renewalsVisible = computed(() =>
+    this.selectedTab() === 'PENDING' || this.selectedTab() === 'ALL'
+  );
+
+  /**
    * Rows for the Packages table: the prepaid-package rows, plus — under the
    * Pending (or All) status filter — the renewal-due students (last bundle used
    * up, owe the next). Renewals sit on top since they need action.
    */
   packagesTableRows = computed(() => {
     const pkgRows = this.filteredPackages().map(p => ({ kind: 'package' as const, p }));
-    // Renewals-due belong to the Pending filter only (they owe the next package).
-    const showRenewals = this.selectedTab() === 'PENDING';
-    const renewalRows = showRenewals
+    const renewalRows = this.renewalsVisible()
       ? this.renewals().map(r => ({ kind: 'renewal' as const, r }))
       : [];
     return [...renewalRows, ...pkgRows];
@@ -326,8 +333,13 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
 
   statusCount(st: StatusTab): number {
     if (this.view() === 'PACKAGES') {
-      if (st === 'ALL') return this.packages().length;
-      return this.packages().filter(p => this.packageEffectiveStatus(p) === st).length;
+      // Renewals-due are rows in this table too (students whose bundle ran out
+      // and owe the next one). Counting only the prepaid-package rows made the
+      // Pending badge read 0 while the tab itself listed every student waiting
+      // to renew — so nobody clicked through to collect from them.
+      const renewals = (st === 'ALL' || st === 'PENDING') ? this.renewals().length : 0;
+      if (st === 'ALL') return this.packages().length + renewals;
+      return this.packages().filter(p => this.packageEffectiveStatus(p) === st).length + renewals;
     }
     if (st === 'ALL') return this.payments().length;
     if (st === 'ON_HOLD') return this.payments().filter(p => p.enrollmentStatus === 'ON_HOLD').length;
