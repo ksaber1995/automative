@@ -3619,7 +3619,17 @@
       "SEND_NOTES_HINT": "This opens WhatsApp to {{parent}} with the message ready to send from your own number.",
       "SEND_NOTES_THE_PARENT": "the parent",
       "SEND_NOTES_PLACEHOLDER": "Write what you want the parent to know…",
-      "SEND_NOTES_SEND": "Open WhatsApp"
+      "SEND_NOTES_SEND": "Open WhatsApp",
+      "ATTENDANCE_ALL_CLASSES": "All classes",
+      "ATTENDANCE_NO_MATCH": "No sessions match this filter",
+      "ATTENDANCE_TRIAL": "tried",
+      "ATTENDANCE_TRIAL_LABEL": "Tried it out",
+      "ATTENDANCE_TRIAL_HINT": "Attended a free session of a class they are not enrolled in",
+      "KIND_ALL": "All",
+      "KIND_PAID": "Paid",
+      "KIND_FREE": "Free",
+      "EXAMS_ALL_CLASSES": "All classes",
+      "EXAMS_AVERAGE": "average"
     },
     "CREATED": "Student created successfully",
     "UPDATED": "Student updated successfully",
@@ -4427,7 +4437,9 @@
       "DROPPED": "Dropped",
       "PENDING": "Pending",
       "CANCELLED": "Cancelled"
-    }
+    },
+    "ATTENDANCE_BY_CLASS": "Attendance by class",
+    "PRESENT_OF_TOTAL": "{{present}} of {{total}}"
   },
   "STUDENT_QR": {
     "BUTTON": "QR Code",

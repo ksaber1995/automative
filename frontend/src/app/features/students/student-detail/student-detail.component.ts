@@ -16,6 +16,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { SelectModule } from 'primeng/select';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -74,6 +75,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     DatePickerModule,
     TextareaModule,
     RadioButtonModule,
+    SelectModule,
     ProgressBarModule,
     TabsModule,
     Tab,
@@ -289,18 +291,98 @@ export class StudentDetailComponent implements OnInit {
   // exam results.
   examResults = signal<StudentExamResult[]>([]);
   loadingExams = signal(false);
-  examOnlyResults = computed(() => this.examResults().filter((r) => !r.isHomework));
-  homeworkResults = computed(() => this.examResults().filter((r) => r.isHomework));
+
+  /** Class filter shared by the exam and homework cards (null = every class). */
+  examClassFilter = signal<string | null>(null);
+
+  /** Classes this student has results in. */
+  examClassOptions = computed(() => {
+    const seen = new Set<string>();
+    for (const r of this.examResults()) {
+      if (r.className) seen.add(r.className);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b)).map(name => ({ id: name, label: name }));
+  });
+
+  private filteredExamFeed = computed(() => {
+    const cls = this.examClassFilter();
+    if (!cls) return this.examResults();
+    return this.examResults().filter(r => r.className === cls);
+  });
+
+  examOnlyResults = computed(() => this.filteredExamFeed().filter((r) => !r.isHomework));
+  homeworkResults = computed(() => this.filteredExamFeed().filter((r) => r.isHomework));
+
+  /**
+   * Average score across the filtered exams, as a percentage of what was
+   * available. Only results with a numeric grade AND a max grade can be scored,
+   * so a letter grade or an exam with no maximum is left out rather than
+   * silently counted as zero. Returns null when nothing is scoreable.
+   */
+  examAveragePercent = computed<number | null>(() => {
+    const scored = this.examOnlyResults()
+      .map(r => ({ got: Number(r.grade), max: r.maxGrade ?? 0 }))
+      .filter(v => Number.isFinite(v.got) && v.max > 0);
+    if (!scored.length) return null;
+    const total = scored.reduce((sum, v) => sum + (v.got / v.max) * 100, 0);
+    return Math.round(total / scored.length);
+  });
 
   // Attendance
   attendanceRecords = signal<StudentAttendanceRecord[]>([]);
   loadingAttendance = signal(false);
+
+  /** Class filter for the attendance history (null = every class). */
+  attendanceClassFilter = signal<string | null>(null);
+  /** Session-kind filter: everything, only free (trial) sessions, or only paid. */
+  attendanceKindFilter = signal<'ALL' | 'FREE' | 'PAID'>('ALL');
+
+  /**
+   * The classes this student actually has history in, labelled with their
+   * course. Built from the records themselves rather than from enrolments, so a
+   * class they only ever tried for free still shows up here.
+   */
+  attendanceClassOptions = computed(() => {
+    const seen = new Map<string, string>();
+    for (const r of this.attendanceRecords()) {
+      if (!seen.has(r.classId)) {
+        seen.set(r.classId, r.courseName ? `${r.className} · ${r.courseName}` : r.className);
+      }
+    }
+    return [...seen.entries()]
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
+
+  filteredAttendance = computed(() => {
+    const cls = this.attendanceClassFilter();
+    const kind = this.attendanceKindFilter();
+    return this.attendanceRecords().filter(r => {
+      if (cls && r.classId !== cls) return false;
+      if (kind === 'FREE' && !r.isFree) return false;
+      if (kind === 'PAID' && r.isFree) return false;
+      return true;
+    });
+  });
+
+  /**
+   * The rate is over the filtered records, so picking a class answers "how
+   * often do they turn up to THIS class" rather than blending every class into
+   * one number.
+   *
+   * Trials are excluded from the calculation entirely: the student isn't
+   * enrolled in that class, so there is no set of sessions they were expected
+   * at, and counting an always-present row would inflate the rate. They are
+   * still listed, and counted separately.
+   */
+  private ratedAttendance = computed(() => this.filteredAttendance().filter(r => r.status !== 'TRIAL'));
   // Present count includes substitutions (they count as present for the rate).
-  attendancePresentCount = computed(() => this.attendanceRecords().filter(r => r.isPresent).length);
-  attendanceAbsentCount = computed(() => this.attendanceRecords().filter(r => !r.isPresent).length);
-  attendanceSubstitutedCount = computed(() => this.attendanceRecords().filter(r => r.status === 'SUBSTITUTED').length);
+  attendancePresentCount = computed(() => this.ratedAttendance().filter(r => r.isPresent).length);
+  attendanceAbsentCount = computed(() => this.ratedAttendance().filter(r => !r.isPresent).length);
+  attendanceSubstitutedCount = computed(() => this.ratedAttendance().filter(r => r.status === 'SUBSTITUTED').length);
+  attendanceTrialCount = computed(() => this.filteredAttendance().filter(r => r.status === 'TRIAL').length);
   attendanceRate = computed(() => {
-    const total = this.attendanceRecords().length;
+    const total = this.ratedAttendance().length;
     if (!total) return 0;
     return Math.round((this.attendancePresentCount() / total) * 100);
   });

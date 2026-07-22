@@ -275,6 +275,28 @@ export const publicStudentsRoutes = {
       const absentCount = totalSessions - presentCount;
       const attendanceRate = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
 
+      // The same numbers again, split per class. One blended percentage across
+      // every class a student takes tells a parent nothing about WHICH class is
+      // being missed — and that is the question they open this page to answer.
+      const byClassMap = new Map<string, { className: string; total: number; present: number }>();
+      for (const a of withStatus) {
+        const name = a.class_name || '—';
+        const entry = byClassMap.get(name) || { className: name, total: 0, present: 0 };
+        entry.total += 1;
+        if (a.status !== 'ABSENT') entry.present += 1;
+        byClassMap.set(name, entry);
+      }
+      const attendanceByClass = [...byClassMap.values()]
+        .map(e => ({
+          className: e.className,
+          totalSessions: e.total,
+          presentCount: e.present,
+          absentCount: e.total - e.present,
+          attendanceRate: e.total > 0 ? Math.round((e.present / e.total) * 100) : 0,
+        }))
+        // Worst attendance first: the class that needs attention leads.
+        .sort((a, b) => a.attendanceRate - b.attendanceRate);
+
       const num = (v: any) => (v === null || v === undefined ? 0 : parseFloat(v));
 
       const monthly = monthlyRows.map((row: any) => ({
@@ -408,6 +430,7 @@ export const publicStudentsRoutes = {
             presentCount,
             absentCount,
             attendanceRate,
+            byClass: attendanceByClass,
             recent: withStatus.slice(0, 10).map((row: any) => ({
               sessionStartDate: row.session_start_date,
               sessionNumber: row.session_number === null || row.session_number === undefined

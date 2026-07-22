@@ -5,7 +5,8 @@ import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.in
 
 /** TRIAL: attended a free session without being enrolled in the class. */
 export type AttendanceType = 'NORMAL' | 'SUBSTITUTION' | 'TRIAL';
-export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
+/** TRIAL: sat in on a free session of a class they're not enrolled in. */
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED' | 'TRIAL';
 
 export interface SessionAttendanceStudent {
   studentId: string;
@@ -30,6 +31,10 @@ export interface StudentAttendanceRecord {
   sessionNumber?: number | null;
   classId: string;
   className: string;
+  courseId?: string | null;
+  courseName?: string | null;
+  /** The session was a free (trial) one — nobody was billed for it. */
+  isFree?: boolean;
   roomCode?: string | null;
   isPresent: boolean;
   status?: AttendanceStatus;

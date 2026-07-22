@@ -48,6 +48,15 @@ export interface PublicSessionPayment {
   paidDate: string | null;
 }
 
+/** Attendance for one of the student's classes. */
+export interface PublicStudentClassAttendance {
+  className: string;
+  totalSessions: number;
+  presentCount: number;
+  absentCount: number;
+  attendanceRate: number;
+}
+
 /** A prepaid bundle of sessions. */
 export interface PublicSessionPackage {
   courseName: string;
@@ -114,6 +123,8 @@ export interface PublicStudentProfile {
     presentCount: number;
     absentCount: number;
     attendanceRate: number;
+    /** The same figures per class, worst attendance first. */
+    byClass: PublicStudentClassAttendance[];
     recent: PublicStudentAttendanceRecent[];
   };
   exams?: PublicStudentExam[];

@@ -3743,7 +3743,17 @@
       "SEND_NOTES_HINT": "سيفتح واتساب على محادثة {{parent}} والرسالة جاهزة للإرسال من رقمك.",
       "SEND_NOTES_THE_PARENT": "ولي الأمر",
       "SEND_NOTES_PLACEHOLDER": "اكتب ما تود إبلاغ ولي الأمر به…",
-      "SEND_NOTES_SEND": "فتح واتساب"
+      "SEND_NOTES_SEND": "فتح واتساب",
+      "ATTENDANCE_ALL_CLASSES": "كل المجموعات",
+      "ATTENDANCE_NO_MATCH": "لا توجد حصص مطابقة لهذا الفلتر",
+      "ATTENDANCE_TRIAL": "تجريبية",
+      "ATTENDANCE_TRIAL_LABEL": "حضور تجريبي",
+      "ATTENDANCE_TRIAL_HINT": "حضر حصة مجانية لمجموعة غير مسجل بها",
+      "KIND_ALL": "الكل",
+      "KIND_PAID": "مدفوعة",
+      "KIND_FREE": "مجانية",
+      "EXAMS_ALL_CLASSES": "كل المجموعات",
+      "EXAMS_AVERAGE": "المتوسط"
     },
     "CREATED": "تم إنشاء الطالب بنجاح",
     "UPDATED": "تم تحديث الطالب بنجاح",
@@ -4551,7 +4561,9 @@
       "DROPPED": "منسحب",
       "PENDING": "قيد الانتظار",
       "CANCELLED": "ملغى"
-    }
+    },
+    "ATTENDANCE_BY_CLASS": "الحضور حسب المجموعة",
+    "PRESENT_OF_TOTAL": "{{present}} من {{total}}"
   },
   "STUDENT_QR": {
     "BUTTON": "رمز QR",

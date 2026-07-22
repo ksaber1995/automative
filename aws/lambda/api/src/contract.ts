@@ -3077,6 +3077,15 @@ export const contract = c.router({
             presentCount: z.number(),
             absentCount: z.number(),
             attendanceRate: z.number(),
+            // The same figures per class, worst attendance first — one blended
+            // percentage can't tell a parent which class is being missed.
+            byClass: z.array(z.object({
+              className: z.string(),
+              totalSessions: z.number(),
+              presentCount: z.number(),
+              absentCount: z.number(),
+              attendanceRate: z.number(),
+            })).optional(),
             recent: z.array(z.object({
               sessionStartDate: z.string(),
               sessionNumber: z.number().nullable().optional(),

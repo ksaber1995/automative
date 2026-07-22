@@ -485,6 +485,7 @@ export const attendanceRoutes = {
       }
 
       await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();   // the queries below read sessions.is_free
 
       // For each session of the student's enrolled classes, derive a status:
       //   PRESENT     — a NORMAL attendance row exists for this session.
@@ -498,13 +499,17 @@ export const attendanceRoutes = {
           s.start_date AS session_start_date,
           s.end_date AS session_end_date,
           s.session_number AS session_number,
+          s.is_free AS is_free,
           cl.id AS class_id,
           cl.name AS class_name,
+          co.id AS course_id,
+          co.name AS course_name,
           r.code AS room_code,
           CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
           sub.sub_class_name AS substituted_in_class_name
         FROM sessions s
         JOIN classes cl ON s.class_id = cl.id
+        JOIN courses co ON co.id = cl.course_id
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN session_attendance sa
           ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
@@ -542,13 +547,17 @@ export const attendanceRoutes = {
           s2.start_date AS session_start_date,
           s2.end_date AS session_end_date,
           s2.session_number AS session_number,
+          s2.is_free AS is_free,
           c2.id AS class_id,
           c2.name AS class_name,
+          co2.id AS course_id,
+          co2.name AS course_name,
           r2.code AS room_code,
           hc.name AS home_class_name
         FROM session_attendance sub
         JOIN sessions s2 ON s2.id = sub.session_id
         JOIN classes c2 ON c2.id = s2.class_id
+        JOIN courses co2 ON co2.id = c2.course_id
         LEFT JOIN rooms r2 ON r2.id = s2.room_id
         LEFT JOIN classes hc ON hc.id = sub.home_class_id
         WHERE sub.student_id = $1
@@ -572,6 +581,35 @@ export const attendanceRoutes = {
         [params.studentId, context.companyId]
       );
 
+      // Free sessions the student sat in on without being enrolled in the class
+      // (attendance_type = TRIAL). Neither query above can see these: the first
+      // is scoped to the student's enrolled classes, the second to substitutions.
+      // Without them, a student who tried three classes has an empty history and
+      // no answer to "which free sessions did they attend?".
+      const trials = await query(
+        `SELECT
+          s.id AS session_id,
+          s.start_date AS session_start_date,
+          s.end_date AS session_end_date,
+          s.session_number AS session_number,
+          s.is_free AS is_free,
+          cl.id AS class_id,
+          cl.name AS class_name,
+          co.id AS course_id,
+          co.name AS course_name,
+          r.code AS room_code
+        FROM session_attendance sa
+        JOIN sessions s  ON s.id = sa.session_id
+        JOIN classes cl  ON cl.id = s.class_id
+        JOIN courses co  ON co.id = cl.course_id
+        LEFT JOIN rooms r ON r.id = s.room_id
+        WHERE sa.student_id = $1
+          AND sa.attendance_type = 'TRIAL'
+          AND s.company_id = $2
+        ORDER BY s.start_date DESC`,
+        [params.studentId, context.companyId]
+      );
+
       const enrolledBody = records.map((row: any) => {
         const status: 'PRESENT' | 'ABSENT' | 'SUBSTITUTED' =
           row.is_present_normal ? 'PRESENT'
@@ -586,6 +624,9 @@ export const attendanceRoutes = {
             : parseInt(row.session_number, 10),
           classId: row.class_id,
           className: row.class_name,
+          courseId: row.course_id,
+          courseName: row.course_name,
+          isFree: row.is_free === true,
           roomCode: row.room_code,
           status,
           substitutedInClassName: row.substituted_in_class_name || null,
@@ -604,13 +645,34 @@ export const attendanceRoutes = {
         classId: row.class_id,
         // The class the student physically attended as a substitute.
         className: row.class_name,
+        courseId: row.course_id,
+        courseName: row.course_name,
+        isFree: row.is_free === true,
         roomCode: row.room_code,
         status: 'SUBSTITUTED' as const,
         substitutedInClassName: row.class_name,
         isPresent: true,
       }));
 
-      const body = [...enrolledBody, ...orphanBody].sort((a, b) =>
+      const trialBody = trials.map((row: any) => ({
+        sessionId: row.session_id,
+        sessionStartDate: row.session_start_date,
+        sessionEndDate: row.session_end_date,
+        sessionNumber: row.session_number === null || row.session_number === undefined
+          ? null
+          : parseInt(row.session_number, 10),
+        classId: row.class_id,
+        className: row.class_name,
+        courseId: row.course_id,
+        courseName: row.course_name,
+        isFree: row.is_free === true,
+        roomCode: row.room_code,
+        status: 'TRIAL' as const,
+        substitutedInClassName: null,
+        isPresent: true,
+      }));
+
+      const body = [...enrolledBody, ...orphanBody, ...trialBody].sort((a, b) =>
         new Date(b.sessionStartDate).getTime() - new Date(a.sessionStartDate).getTime()
       );
 

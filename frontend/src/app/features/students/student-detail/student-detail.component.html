@@ -1093,13 +1093,35 @@
             <i class="pi pi-check-square text-indigo-600"></i>
             {{ 'STUDENTS.DETAIL.ATTENDANCE_HISTORY' | translate }}
           </h3>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-wrap justify-end">
             @if (attendanceRecords().length > 0) {
+              @if (attendanceClassOptions().length > 1) {
+                <p-select [ngModel]="attendanceClassFilter()" (ngModelChange)="attendanceClassFilter.set($event)"
+                  [options]="attendanceClassOptions()" optionLabel="label" optionValue="id"
+                  [showClear]="true" appendTo="body" styleClass="text-sm"
+                  [placeholder]="'STUDENTS.DETAIL.ATTENDANCE_ALL_CLASSES' | translate"></p-select>
+              }
+              <!-- Free/paid filter as plain buttons so the labels go through the
+                   translate pipe and follow a language switch. -->
+              <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
+                @for (k of ['ALL', 'PAID', 'FREE']; track k) {
+                  <button type="button" class="px-2.5 py-1 font-medium"
+                    [class.bg-indigo-600]="attendanceKindFilter() === k"
+                    [class.text-white]="attendanceKindFilter() === k"
+                    [class.text-gray-600]="attendanceKindFilter() !== k"
+                    (click)="attendanceKindFilter.set($any(k))">
+                    {{ ('STUDENTS.DETAIL.KIND_' + k) | translate }}
+                  </button>
+                }
+              </div>
               <span class="text-sm text-gray-500">
                 <span class="text-green-600 font-semibold">{{ attendancePresentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_PRESENT' | translate }} ·
                 <span class="text-red-500 font-semibold">{{ attendanceAbsentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_ABSENT' | translate }} ·
                 @if (attendanceSubstitutedCount() > 0) {
                   <span class="text-amber-600 font-semibold">{{ attendanceSubstitutedCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_SUBSTITUTED' | translate }} ·
+                }
+                @if (attendanceTrialCount() > 0) {
+                  <span class="text-emerald-600 font-semibold">{{ attendanceTrialCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_TRIAL' | translate }} ·
                 }
                 <span class="font-semibold text-indigo-600">{{ attendanceRate() }}%</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_RATE' | translate }}
               </span>
@@ -1113,13 +1135,13 @@
           <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
           <p>{{ 'STUDENTS.DETAIL.ATTENDANCE_LOADING' | translate }}</p>
         </div>
-      } @else if (attendanceRecords().length === 0) {
+      } @else if (filteredAttendance().length === 0) {
         <div class="text-center py-8 text-gray-400">
           <i class="pi pi-check-square text-4xl mb-3 block"></i>
-          <p>{{ 'STUDENTS.DETAIL.ATTENDANCE_EMPTY' | translate }}</p>
+          <p>{{ (attendanceRecords().length === 0 ? 'STUDENTS.DETAIL.ATTENDANCE_EMPTY' : 'STUDENTS.DETAIL.ATTENDANCE_NO_MATCH') | translate }}</p>
         </div>
       } @else {
-        <p-table [value]="attendanceRecords()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
+        <p-table [value]="filteredAttendance()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
               <th pSortableColumn="sessionStartDate">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
@@ -1137,7 +1159,15 @@
                   @if (rec.sessionNumber != null) {
                     <span class="ml-1 text-xs font-semibold text-indigo-600">{{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: rec.sessionNumber } }}</span>
                   }
+                  @if (rec.isFree) {
+                    <span class="ml-1 inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                      <i class="pi pi-gift text-[10px]"></i>{{ 'SESSIONS_DASHBOARD.FREE_BADGE' | translate }}
+                    </span>
+                  }
                 </div>
+                @if (rec.courseName) {
+                  <div class="text-xs text-gray-400">{{ rec.courseName }}</div>
+                }
               </td>
               <td class="text-gray-600 text-sm">{{ rec.roomCode || '—' }}</td>
               <td>
@@ -1147,6 +1177,11 @@
                     @if (rec.substitutedInClassName) {
                       <span class="text-xs text-gray-400 font-normal">({{ rec.substitutedInClassName }})</span>
                     }
+                  </span>
+                } @else if (rec.status === 'TRIAL') {
+                  <span class="inline-flex items-center gap-1.5 text-emerald-700 font-semibold text-sm"
+                    [pTooltip]="'STUDENTS.DETAIL.ATTENDANCE_TRIAL_HINT' | translate">
+                    <i class="pi pi-gift text-emerald-500"></i> {{ 'STUDENTS.DETAIL.ATTENDANCE_TRIAL_LABEL' | translate }}
                   </span>
                 } @else if (rec.isPresent) {
                   <span class="inline-flex items-center gap-1.5 text-green-700 font-semibold text-sm">
@@ -1167,11 +1202,25 @@
     <!-- Exam Results Card -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">
-        <div class="flex justify-between items-center p-4">
+        <div class="flex justify-between items-center p-4 flex-wrap gap-3">
           <h3 class="text-xl font-bold flex items-center gap-2">
             <i class="pi pi-file-edit text-indigo-600"></i>
             {{ 'STUDENTS.DETAIL.EXAMS_TITLE' | translate }} ({{ examOnlyResults().length }})
           </h3>
+          <div class="flex items-center gap-3 flex-wrap justify-end">
+            @if (examClassOptions().length > 1) {
+              <p-select [ngModel]="examClassFilter()" (ngModelChange)="examClassFilter.set($event)"
+                [options]="examClassOptions()" optionLabel="label" optionValue="id"
+                [showClear]="true" appendTo="body" styleClass="text-sm"
+                [placeholder]="'STUDENTS.DETAIL.EXAMS_ALL_CLASSES' | translate"></p-select>
+            }
+            @if (examAveragePercent() !== null) {
+              <span class="text-sm text-gray-500">
+                <span class="font-semibold text-indigo-600">{{ examAveragePercent() }}%</span>
+                {{ 'STUDENTS.DETAIL.EXAMS_AVERAGE' | translate }}
+              </span>
+            }
+          </div>
         </div>
       </ng-template>
 
