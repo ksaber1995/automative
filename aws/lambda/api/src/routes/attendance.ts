@@ -2,7 +2,7 @@ import { query, queryOne } from '../db/connection';
 import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
-import { ensureAttendanceMagicColumns } from './sessions';
+import { ensureAttendanceMagicColumns, ensureFreeSessionSchema } from './sessions';
 import { notifyCheckin } from './telegram';
 import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema } from './session-payments';
 
@@ -14,6 +14,7 @@ export const attendanceRoutes = {
   getBySession: async ({ params, headers }: { params: { sessionId: string }; headers: { authorization: string } }) => {
     try {
       await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -31,9 +32,12 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
-      // Enrolled roster (direct + bundle) plus any SUBSTITUTION attendees who are
-      // NOT enrolled in this class. Substitution rows are surfaced so the editor
-      // can show "<name> · Substitution (from A_1)".
+      // Enrolled roster (direct + bundle) plus any SUBSTITUTION or TRIAL attendees
+      // who are NOT enrolled in this class. Substitution rows are surfaced so the
+      // editor can show "<name> · Substitution (from A_1)"; TRIAL rows so that a
+      // prospect who scanned into a free session appears on the roster at all —
+      // they have no enrolment to be found by, and an attendance editor that
+      // silently dropped them would delete them on the next save.
       const students = await query(
         `SELECT
             s.id AS student_id,
@@ -73,7 +77,7 @@ export const attendanceRoutes = {
          FROM session_attendance sa
          JOIN students s ON s.id = sa.student_id
          LEFT JOIN classes hc ON hc.id = sa.home_class_id
-         WHERE sa.session_id = $3 AND sa.attendance_type = 'SUBSTITUTION'
+         WHERE sa.session_id = $3 AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')
            AND sa.student_id NOT IN (
              SELECT student_id FROM enrollments
              WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
@@ -139,6 +143,7 @@ export const attendanceRoutes = {
   saveForSession: async ({ params, body, headers }: { params: { sessionId: string }; body: { presentStudentIds: string[] }; headers: { authorization: string } }) => {
     try {
       await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();   // charge guards below read session.is_free
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -158,7 +163,9 @@ export const attendanceRoutes = {
       const presentIds: string[] = body.presentStudentIds || [];
 
       // Only NORMAL (enrolled-roster) rows are managed by the checkbox editor.
-      // SUBSTITUTION rows come from QR check-in and must survive a bulk save.
+      // SUBSTITUTION and TRIAL rows come from QR check-in and must survive a
+      // bulk save — neither has an enrolment, so neither can be re-created from
+      // the roster if this wiped them.
       await query(
         `DELETE FROM session_attendance WHERE session_id = $1 AND attendance_type = 'NORMAL'`,
         [params.sessionId]
@@ -252,6 +259,7 @@ export const attendanceRoutes = {
   checkinByQr: async ({ params, body, headers }: { params: { sessionId: string }; body: { qrToken: string }; headers: { authorization: string } }) => {
     try {
       await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -285,6 +293,57 @@ export const attendanceRoutes = {
       );
       if (!student) {
         return apiError(404, 'ERRORS.ATTENDANCE.QR_STUDENT_NOT_FOUND', 'No active student matches this QR code');
+      }
+
+      // A free session is open to the whole academy. Enrolment is exactly what
+      // the trial exists to sell, so requiring it would defeat the point — and
+      // since nothing is billed, there is no charge to attach to an enrolment
+      // anyway. This runs BEFORE the enrolment lookup so a prospect never falls
+      // through to the SUBSTITUTION path (which would look for a sibling class
+      // they are not in) and get rejected.
+      if (session.is_free) {
+        // An enrolled student sitting in on a free lesson is still NORMAL —
+        // nothing unusual happened, they simply weren't charged. TRIAL is
+        // reserved for the newcomers, which is what makes the count on the
+        // class's Free sessions tab worth reading.
+        const enrolledHere = await queryOne<any>(
+          `SELECT 1 FROM (
+              SELECT student_id FROM enrollments
+              WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+              UNION
+              SELECT student_id FROM master_class_enrollments
+              WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+           ) enrolled
+           WHERE student_id = $3`,
+          [session.class_id, context.companyId, student.id]
+        );
+        const type = enrolledHere ? 'NORMAL' : 'TRIAL';
+
+        const insertedFree = await query(
+          `INSERT INTO session_attendance (session_id, student_id, attendance_type)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (session_id, student_id) DO NOTHING
+           RETURNING id`,
+          [params.sessionId, student.id, type]
+        );
+        const alreadyPresentFree = insertedFree.length === 0;
+
+        await notifyCheckin(context.companyId, params.sessionId, student.id);
+
+        return {
+          status: 200 as const,
+          body: {
+            studentId: student.id,
+            studentName: student.name,
+            attendanceType: type as 'NORMAL' | 'TRIAL',
+            homeClassName: null,
+            sessionNumber: session.session_number ?? null,
+            alreadyPresent: alreadyPresentFree,
+            code: alreadyPresentFree ? 'ATTENDANCE.ALREADY_PRESENT' : 'ATTENDANCE.CHECKED_IN_FREE',
+            message: alreadyPresentFree ? 'Student was already marked present' : 'Student marked present at a free session',
+            sessionCharge: null,
+          },
+        };
       }
 
       // Is the student enrolled in THIS session's class?

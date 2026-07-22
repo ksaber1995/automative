@@ -2443,7 +2443,17 @@
       "COURSE_MARKED_FINISHED": "تم تعليم الكورس كمنتهٍ",
       "ERR_FINISH_CLASS": "فشل إنهاء المجموعة",
       "FINISH_CLASS_TITLE": "إنهاء المجموعة",
-      "FINISH_CLASS_MSG": "هل تريد تعليم \"{{name}}\" كمنتهٍ؟ بمجرد الإنهاء لن يُسمح بتسجيلات جديدة ولا ببدء جلسات لهذا المجموعة. لا يمكن التراجع عن ذلك من هنا."
+      "FINISH_CLASS_MSG": "هل تريد تعليم \"{{name}}\" كمنتهٍ؟ بمجرد الإنهاء لن يُسمح بتسجيلات جديدة ولا ببدء جلسات لهذا المجموعة. لا يمكن التراجع عن ذلك من هنا.",
+      "TAB_FREE_SESSIONS": "الحصص المجانية",
+      "LOADING_FREE_SESSIONS": "جارٍ تحميل الحصص المجانية...",
+      "NO_FREE_SESSIONS": "لا توجد حصص مجانية بعد",
+      "NO_FREE_SESSIONS_HINT": "ابدأ واحدة من صفحة الحصص لتتيح للطلاب تجربة هذه المجموعة مجانًا.",
+      "FREE_TOTAL_SESSIONS": "الحصص المجانية المنعقدة",
+      "FREE_TOTAL_ATTENDANCES": "إجمالي الحضور",
+      "FREE_UNIQUE_TRIALS": "طلاب جدد جرّبوا",
+      "COL_ATTENDED": "الحضور",
+      "COL_TRIAL_STUDENTS": "يجرّبون المجموعة",
+      "COL_TRIAL_STUDENTS_HINT": "طلاب حضروا دون أن يكونوا مسجلين في هذه المجموعة"
     },
     "CREATED": "تم إنشاء المجموعة بنجاح",
     "UPDATED": "تم تحديث المجموعة بنجاح",
@@ -4603,7 +4613,8 @@
     "CODE_SUBMIT": "تسجيل الحضور",
     "CHECKED_IN": "تم تسجيل حضور {{name}}",
     "ALREADY_PRESENT": "{{name}} مسجّل حاضر بالفعل",
-    "SUBSTITUTION_CHECKED_IN": "تم تسجيل حضور {{name}} كتعويض (مسجّل في {{className}})"
+    "SUBSTITUTION_CHECKED_IN": "تم تسجيل حضور {{name}} كتعويض (مسجّل في {{className}})",
+    "TRIAL_CHECKED_IN": "انضم {{name}} إلى الحصة المجانية"
   },
   "SESSION_HISTORY": {
     "TITLE": "سجل الحصص",
@@ -4784,7 +4795,16 @@
     "PICK_ROOM_TITLE": "أي قاعة؟",
     "PICK_ROOM_HINT": "{{class}} ليس لها قاعة في الجدول. اختر قاعة لبدء الحصة فيها.",
     "PICK_ROOM_PLACEHOLDER": "اختر قاعة",
-    "PICK_ROOM_REQUIRED": "اختر قاعة أولاً."
+    "PICK_ROOM_REQUIRED": "اختر قاعة أولاً.",
+    "START_FREE_SESSION": "بدء حصة مجانية",
+    "START_FREE_SESSION_HINT": "حصة لا يُحاسب عليها أحد، متاحة لأي طالب",
+    "DIALOG_START_FREE_TITLE": "بدء حصة مجانية",
+    "FREE_SESSION_NOTE": "لن يُحاسب أحد على هذه الحصة، ويمكن لأي طالب الحضور بمسح رمز QR الخاص به — دون حاجة لأن يكون مسجلًا في المجموعة.",
+    "MSG_FREE_SESSION_STARTED": "بدأت الحصة المجانية",
+    "FREE_BADGE": "مجانية",
+    "FREE_BADGE_HINT": "حصة مجانية: بلا فواتير، ومتاحة لأي طالب",
+    "TRIAL": "يجرّب",
+    "TRIAL_HINT": "يحضر هذه الحصة المجانية دون أن يكون مسجلًا في المجموعة"
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "حضور المعلمين",

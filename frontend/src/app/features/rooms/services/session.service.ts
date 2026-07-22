@@ -12,6 +12,8 @@ export interface Session {
   startDate: string;
   endDate: string | null;
   started: boolean;
+  /** A free (trial) session: nobody is billed, and any student may scan in. */
+  isFree: boolean;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -56,7 +58,30 @@ export interface StartSessionDto {
   branchId: string;
   notes?: string;
   sessionNumber?: number;
+  /** Start it as a free (trial) session — no bills, open to any student. */
+  isFree?: boolean;
   teachers?: StartSessionTeacher[];
+}
+
+/** One free session of a class, as shown on the class's Free sessions tab. */
+export interface FreeSessionRow {
+  id: string;
+  sessionNumber: number | null;
+  startDate: string;
+  endDate: string | null;
+  roomCode: string | null;
+  /** Everyone who scanned in. */
+  attendeeCount: number;
+  /** Of those, the ones not enrolled in the class — the prospects. */
+  trialCount: number;
+}
+
+export interface FreeSessionSummary {
+  sessions: FreeSessionRow[];
+  totalSessions: number;
+  totalAttendances: number;
+  uniqueStudents: number;
+  uniqueTrialStudents: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -116,6 +141,11 @@ export class SessionService {
   /** Suggested next session number for a class's course (prefills the Start dialog). */
   nextNumber(classId: string): Observable<{ sessionNumber: number }> {
     return this.api.get<{ sessionNumber: number }>('sessions/next-number', { classId });
+  }
+
+  /** Every free session of a class, with how many students each one drew. */
+  freeSummary(classId: string): Observable<FreeSessionSummary> {
+    return this.api.get<FreeSessionSummary>('sessions/free-summary', { classId });
   }
 
   /** Edit a session's number (and/or notes) after it was started. */

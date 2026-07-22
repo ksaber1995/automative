@@ -118,6 +118,8 @@ export class GlobalScanService {
             const name = `${res.studentName}`;
             if (res.attendanceType === 'SUBSTITUTION') {
               this.notify.success(this.translate.instant('SESSION_QR.SUBSTITUTION_CHECKED_IN', { name, className: res.homeClassName }));
+            } else if (res.attendanceType === 'TRIAL' && !res.alreadyPresent) {
+              this.notify.success(this.translate.instant('SESSION_QR.TRIAL_CHECKED_IN', { name }));
             } else if (res.alreadyPresent) {
               this.notify.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
             } else {

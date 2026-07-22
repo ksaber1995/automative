@@ -6127,6 +6127,8 @@ export const contract = c.router({
         branchId: UUIDSchema,
         notes: z.string().optional(),
         sessionNumber: z.number().int().positive().optional(),
+        // Free (trial) session: bills nobody, and any active student may scan in.
+        isFree: z.boolean().optional(),
         teachers: z.array(z.object({
           employeeId: UUIDSchema,
           role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']).optional(),
@@ -6179,6 +6181,31 @@ export const contract = c.router({
       query: z.object({ classId: z.string() }),
       responses: {
         200: z.object({ sessionNumber: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    freeSummary: {
+      method: 'GET' as const,
+      path: '/api/sessions/free-summary',
+      query: z.object({ classId: z.string() }),
+      responses: {
+        200: z.object({
+          sessions: z.array(z.object({
+            id: z.string(),
+            sessionNumber: z.number().nullable(),
+            startDate: z.any(),
+            endDate: z.any(),
+            roomCode: z.string().nullable(),
+            attendeeCount: z.number(),
+            trialCount: z.number(),
+          })),
+          totalSessions: z.number(),
+          totalAttendances: z.number(),
+          uniqueStudents: z.number(),
+          uniqueTrialStudents: z.number(),
+        }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,

@@ -99,6 +99,9 @@
         <p-tab value="attendance">
           <i class="pi pi-check-square mr-2"></i>{{ 'CLASSES.DETAIL.TAB_ATTENDANCE' | translate }}
         </p-tab>
+        <p-tab value="free">
+          <i class="pi pi-gift mr-2"></i>{{ 'CLASSES.DETAIL.TAB_FREE_SESSIONS' | translate }}
+        </p-tab>
       </p-tablist>
 
       <p-tabpanels>
@@ -316,6 +319,84 @@
                     <td>
                       <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
                         (onClick)="openAttendanceDialogById(row.sessionId)" [pTooltip]="'CLASSES.DETAIL.EDIT_ATTENDANCE' | translate"></p-button>
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            }
+          </div>
+        </p-tabpanel>
+
+        <!-- Free (trial) Sessions Tab -->
+        <p-tabpanel value="free">
+          <div class="mt-2">
+            @if (loadingFreeSessions()) {
+              <div class="text-center py-12 text-gray-400">
+                <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+                <p>{{ 'CLASSES.DETAIL.LOADING_FREE_SESSIONS' | translate }}</p>
+              </div>
+            } @else if (!freeSummary() || freeSummary()!.totalSessions === 0) {
+              <div class="text-center py-12 text-gray-400">
+                <i class="pi pi-gift text-4xl mb-3 block"></i>
+                <p>{{ 'CLASSES.DETAIL.NO_FREE_SESSIONS' | translate }}</p>
+                <p class="text-sm mt-1">{{ 'CLASSES.DETAIL.NO_FREE_SESSIONS_HINT' | translate }}</p>
+              </div>
+            } @else {
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-50 rounded-xl p-4 text-center">
+                  <p class="text-2xl font-bold text-green-700">{{ freeSummary()!.totalSessions }}</p>
+                  <p class="text-sm text-green-600 mt-1">{{ 'CLASSES.DETAIL.FREE_TOTAL_SESSIONS' | translate }}</p>
+                </div>
+                <div class="bg-blue-50 rounded-xl p-4 text-center">
+                  <p class="text-2xl font-bold text-blue-700">{{ freeSummary()!.totalAttendances }}</p>
+                  <p class="text-sm text-blue-600 mt-1">{{ 'CLASSES.DETAIL.FREE_TOTAL_ATTENDANCES' | translate }}</p>
+                </div>
+                <div class="bg-amber-50 rounded-xl p-4 text-center">
+                  <p class="text-2xl font-bold text-amber-700">{{ freeSummary()!.uniqueTrialStudents }}</p>
+                  <p class="text-sm text-amber-600 mt-1">{{ 'CLASSES.DETAIL.FREE_UNIQUE_TRIALS' | translate }}</p>
+                </div>
+              </div>
+
+              <p-table [value]="freeSummary()!.sessions" responsiveLayout="scroll">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>{{ 'CLASSES.DETAIL.COL_SESSION_DATE' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_ROOM' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_ATTENDED' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_TRIAL_STUDENTS' | translate }}</th>
+                    <th>{{ 'CLASSES.DETAIL.COL_STATUS' | translate }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-row>
+                  <tr>
+                    <td class="font-medium">
+                      {{ formatDate(row.startDate) }}
+                      @if (row.sessionNumber != null) {
+                        <span class="ml-2 inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                          #{{ row.sessionNumber }}
+                        </span>
+                      }
+                    </td>
+                    <td class="text-gray-600">{{ row.roomCode || '—' }}</td>
+                    <td>
+                      <span class="inline-flex items-center gap-1 text-green-700 font-semibold">
+                        <i class="pi pi-check-circle text-green-500"></i>
+                        {{ row.attendeeCount }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="inline-flex items-center gap-1 text-amber-700 font-semibold"
+                        [pTooltip]="'CLASSES.DETAIL.COL_TRIAL_STUDENTS_HINT' | translate">
+                        <i class="pi pi-user-plus text-amber-500"></i>
+                        {{ row.trialCount }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (row.endDate) {
+                        <p-tag severity="secondary" [value]="'CLASSES.DETAIL.SESSION_ENDED' | translate"></p-tag>
+                      } @else {
+                        <p-tag severity="success" [value]="'CLASSES.DETAIL.SESSION_ACTIVE' | translate"></p-tag>
+                      }
                     </td>
                   </tr>
                 </ng-template>

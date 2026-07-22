@@ -2443,7 +2443,17 @@
       "COURSE_MARKED_FINISHED": "Course marked as finished",
       "ERR_FINISH_CLASS": "Failed to finish class",
       "FINISH_CLASS_TITLE": "Finish Class",
-      "FINISH_CLASS_MSG": "Mark \"{{name}}\" as finished? Once finished, no new enrollments and no sessions can be started for this class. This cannot be undone here."
+      "FINISH_CLASS_MSG": "Mark \"{{name}}\" as finished? Once finished, no new enrollments and no sessions can be started for this class. This cannot be undone here.",
+      "TAB_FREE_SESSIONS": "Free sessions",
+      "LOADING_FREE_SESSIONS": "Loading free sessions...",
+      "NO_FREE_SESSIONS": "No free sessions yet",
+      "NO_FREE_SESSIONS_HINT": "Start one from the Sessions page to let students try this class for free.",
+      "FREE_TOTAL_SESSIONS": "Free sessions held",
+      "FREE_TOTAL_ATTENDANCES": "Total attendances",
+      "FREE_UNIQUE_TRIALS": "New students tried",
+      "COL_ATTENDED": "Attended",
+      "COL_TRIAL_STUDENTS": "Trying the class",
+      "COL_TRIAL_STUDENTS_HINT": "Students who attended without being enrolled in this class"
     },
     "CREATED": "Class created successfully",
     "UPDATED": "Class updated successfully",
@@ -4479,7 +4489,8 @@
     "CODE_SUBMIT": "Check in",
     "CHECKED_IN": "{{name}} marked present",
     "ALREADY_PRESENT": "{{name}} was already present",
-    "SUBSTITUTION_CHECKED_IN": "{{name}} marked present by substitution (enrolled in {{className}})"
+    "SUBSTITUTION_CHECKED_IN": "{{name}} marked present by substitution (enrolled in {{className}})",
+    "TRIAL_CHECKED_IN": "{{name}} joined the free session"
   },
   "SESSION_HISTORY": {
     "TITLE": "Session History",
@@ -4660,7 +4671,16 @@
     "PICK_ROOM_TITLE": "Which room?",
     "PICK_ROOM_HINT": "{{class}} has no room on the timetable. Pick one to start the session in.",
     "PICK_ROOM_PLACEHOLDER": "Choose a room",
-    "PICK_ROOM_REQUIRED": "Pick a room first."
+    "PICK_ROOM_REQUIRED": "Pick a room first.",
+    "START_FREE_SESSION": "Start free session",
+    "START_FREE_SESSION_HINT": "Run a lesson that nobody is charged for, open to any student",
+    "DIALOG_START_FREE_TITLE": "Start a free session",
+    "FREE_SESSION_NOTE": "Nobody is billed for this session, and any student can attend by scanning their QR code — they do not need to be enrolled in the class.",
+    "MSG_FREE_SESSION_STARTED": "Free session started",
+    "FREE_BADGE": "Free",
+    "FREE_BADGE_HINT": "A free session: no bills, open to any student",
+    "TRIAL": "Trying it out",
+    "TRIAL_HINT": "Attending this free session without being enrolled in the class"
   },
   "TEACHER_ATTENDANCE": {
     "TITLE": "Teacher Attendance",

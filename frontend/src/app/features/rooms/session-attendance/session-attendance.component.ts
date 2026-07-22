@@ -15,7 +15,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
-import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
+import { AttendanceService, SessionAttendanceStudent, AttendanceType } from '../services/attendance.service';
 import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -110,7 +110,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // app-wide GlobalScanService handler, and the roster's search box resolves a
   // typed student code on Enter.
   resolvingCode = signal(false);
-  lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: 'NORMAL' | 'SUBSTITUTION'; homeClassName?: string | null } | null>(null);
+  lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: AttendanceType | null; homeClassName?: string | null } | null>(null);
 
   // Session number inline edit
   editingNumber = signal(false);
@@ -231,10 +231,11 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     // Any click on the roster is a user gesture — enough for the browser to let the
     // check-in beep play later, now that the scanner button isn't there to prime it.
     this.ensureAudio();
-    // SUBSTITUTION attendees aren't part of the enrolled roster the checkbox save
-    // manages, so unchecking one removes their attendance row outright (undo a
-    // wrong scan). They can't be toggled back on here — re-scan to re-add.
-    if (student.attendanceType === 'SUBSTITUTION') {
+    // SUBSTITUTION and TRIAL attendees aren't part of the enrolled roster the
+    // checkbox save manages, so unchecking one removes their attendance row
+    // outright (undo a wrong scan). They can't be toggled back on here — re-scan
+    // to re-add.
+    if (student.attendanceType === 'SUBSTITUTION' || student.attendanceType === 'TRIAL') {
       if (!value) this.confirmChargeThen(student, () => this.removeAttendee(student));
       return;
     }
@@ -626,6 +627,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       next: (res) => {
         const name = `${res.studentName}`;
         const isSub = res.attendanceType === 'SUBSTITUTION';
+        // A trial attendee has no enrolment in this class either, so like a
+        // substitution they must be appended to the roster rather than matched.
+        const isTrial = res.attendanceType === 'TRIAL';
         this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent, attendanceType: res.attendanceType, homeClassName: res.homeClassName });
         this.playBeep(!res.alreadyPresent);
         // Reflect in the local roster so a later checkbox save doesn't drop it.
@@ -643,11 +647,13 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
             isPresent: true,
             attendanceType: res.attendanceType ?? null,
             homeClassName: res.homeClassName ?? null,
-            isEnrolled: !isSub,
+            isEnrolled: !isSub && !isTrial,
           }];
         });
         if (isSub) {
           this.notificationService.success(this.translate.instant('SESSION_QR.SUBSTITUTION_CHECKED_IN', { name, className: res.homeClassName }));
+        } else if (isTrial && !res.alreadyPresent) {
+          this.notificationService.success(this.translate.instant('SESSION_QR.TRIAL_CHECKED_IN', { name }));
         } else if (res.alreadyPresent) {
           this.notificationService.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
         } else {

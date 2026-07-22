@@ -5,7 +5,12 @@
       <h1 class="text-3xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.TITLE' | translate }}</h1>
       <p class="text-gray-600 mt-1">{{ 'SESSIONS_DASHBOARD.SUBTITLE' | translate }}</p>
     </div>
-    <p-button [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate" icon="pi pi-play" (onClick)="openStartDialog()"></p-button>
+    <div class="flex items-center gap-2">
+      <p-button [label]="'SESSIONS_DASHBOARD.START_FREE_SESSION' | translate" icon="pi pi-gift"
+        severity="success" [outlined]="true" (onClick)="openFreeStartDialog()"
+        [pTooltip]="'SESSIONS_DASHBOARD.START_FREE_SESSION_HINT' | translate"></p-button>
+      <p-button [label]="'SESSIONS_DASHBOARD.START_SESSION' | translate" icon="pi pi-play" (onClick)="openStartDialog()"></p-button>
+    </div>
   </div>
 
   <!-- Stats -->
@@ -324,6 +329,12 @@
                           {{ 'SESSIONS_DASHBOARD.SESSION_NUMBER_BADGE' | translate: { number: session.sessionNumber } }}
                         </span>
                       }
+                      @if (session.isFree) {
+                        <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700"
+                          [pTooltip]="'SESSIONS_DASHBOARD.FREE_BADGE_HINT' | translate">
+                          <i class="pi pi-gift text-[10px]"></i>{{ 'SESSIONS_DASHBOARD.FREE_BADGE' | translate }}
+                        </span>
+                      }
                     </h3>
                     <p class="text-sm text-gray-500">{{ session.courseName }}</p>
                   </div>
@@ -502,7 +513,7 @@
                                   [ngModel]="student.isPresent"
                                   (ngModelChange)="toggleStudentPresence(session.id, student, $event)"
                                   [binary]="true"
-                                  [disabled]="student.attendanceType === 'SUBSTITUTION'"
+                                  [disabled]="student.attendanceType === 'SUBSTITUTION' || student.attendanceType === 'TRIAL'"
                                   [inputId]="'att-' + session.id + '-' + student.studentId"
                                 ></p-checkbox>
                                 <label [for]="'att-' + session.id + '-' + student.studentId"
@@ -518,6 +529,11 @@
                               @if (student.attendanceType === 'SUBSTITUTION') {
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                                   {{ 'SESSIONS_DASHBOARD.SUBSTITUTION' | translate }}
+                                </span>
+                              } @else if (student.attendanceType === 'TRIAL') {
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"
+                                  [pTooltip]="'SESSIONS_DASHBOARD.TRIAL_HINT' | translate">
+                                  {{ 'SESSIONS_DASHBOARD.TRIAL' | translate }}
                                 </span>
                               } @else {
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -646,14 +662,21 @@
   </p-tabs>
 </div>
 
-<!-- Start Session Dialog -->
+<!-- Start Session Dialog (also serves free sessions — see startingFree) -->
 <p-dialog
   [(visible)]="showStartDialog"
-  [header]="'SESSIONS_DASHBOARD.DIALOG_START_TITLE' | translate"
+  [header]="(startingFree() ? 'SESSIONS_DASHBOARD.DIALOG_START_FREE_TITLE' : 'SESSIONS_DASHBOARD.DIALOG_START_TITLE') | translate"
   [modal]="true"
   [style]="{ width: '480px' }"
 >
   <form [formGroup]="sessionForm" class="space-y-4 pt-2">
+
+    @if (startingFree()) {
+      <div class="flex items-start gap-3 rounded-lg bg-green-50 border border-green-200 p-3">
+        <i class="pi pi-gift text-green-600 mt-0.5"></i>
+        <p class="text-sm text-green-800 leading-relaxed">{{ 'SESSIONS_DASHBOARD.FREE_SESSION_NOTE' | translate }}</p>
+      </div>
+    }
 
     <!-- Branch (hidden for single-branch companies — preselected) -->
     @if (!branchState.isSingleBranch()) {

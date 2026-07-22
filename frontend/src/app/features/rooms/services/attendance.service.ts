@@ -3,7 +3,8 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.interface';
 
-export type AttendanceType = 'NORMAL' | 'SUBSTITUTION';
+/** TRIAL: attended a free session without being enrolled in the class. */
+export type AttendanceType = 'NORMAL' | 'SUBSTITUTION' | 'TRIAL';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
 
 export interface SessionAttendanceStudent {

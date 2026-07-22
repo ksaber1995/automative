@@ -299,6 +299,14 @@ interface ChargeResult {
  * (enrollment_id, session_id): a re-save never double-charges or double-consumes
  * a package credit (INSERT ... ON CONFLICT DO NOTHING; the package is only
  * decremented when a NEW row is actually inserted).
+ *
+ * FREE SESSIONS (migration 071): every public entry point above bails on
+ * `session.is_free` before reaching here, so a trial lesson never produces a
+ * session_payments row at all. The guard is repeated at each entry point rather
+ * than centralised here on purpose — some of them do work (package lookups,
+ * course reads) before they would ever call this function, and a free session
+ * should cost nothing, not even a query. Nothing needs to reverse those charges
+ * later because none were ever written.
  */
 async function chargeOneEnrollment(
   companyId: string,
@@ -382,6 +390,7 @@ export async function chargeSessionAttendance(
   session: any,
   presentStudentIds: string[],
 ): Promise<any[]> {
+  if (session.is_free) return [];   // free session — see chargeOneEnrollment's note
   const ids = presentStudentIds || [];
   if (ids.length === 0) return [];
 
@@ -421,6 +430,7 @@ export async function chargeSessionAttendance(
  * popups at session end. Best-effort; never throws to the caller.
  */
 export async function chargeAbsencesAtSessionEnd(companyId: string, session: any): Promise<void> {
+  if (session.is_free) return;   // free session — see chargeOneEnrollment's note
   // Cheap pre-check on existing columns; bail before the guard for non-PER_SESSION.
   const base = await queryOne<any>(
     `SELECT co.id, co.payment_type, co.price
@@ -521,6 +531,7 @@ export async function chargeSingleCheckin(
   session: any,
   studentId: string,
 ): Promise<any | null> {
+  if (session.is_free) return null;   // free session — see chargeOneEnrollment's note
   const course = await queryOne<any>(
     `SELECT co.id, co.payment_type, co.price
      FROM classes cl JOIN courses co ON cl.course_id = co.id

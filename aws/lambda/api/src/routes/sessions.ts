@@ -105,6 +105,33 @@ async function ensureAutoStartedColumn(): Promise<void> {
 }
 
 /**
+ * Ensure 'is_free' and the widened attendance_type CHECK exist (migration 071).
+ *
+ * A free session bills nobody and admits any active student, enrolled or not.
+ * Exported because attendance.ts reads sessions.is_free on every QR check-in.
+ */
+let freeSessionInitPromise: Promise<void> | null = null;
+export async function ensureFreeSessionSchema(): Promise<void> {
+  if (!freeSessionInitPromise) {
+    freeSessionInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS is_free BOOLEAN NOT NULL DEFAULT FALSE`);
+        await query(`ALTER TABLE session_attendance DROP CONSTRAINT IF EXISTS session_attendance_attendance_type_check`);
+        await query(
+          `ALTER TABLE session_attendance ADD CONSTRAINT session_attendance_attendance_type_check
+           CHECK (attendance_type IN ('NORMAL', 'SUBSTITUTION', 'TRIAL'))`
+        );
+        await query(`CREATE INDEX IF NOT EXISTS idx_sessions_class_is_free ON sessions(class_id, is_free)`);
+      } catch (e) {
+        freeSessionInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return freeSessionInitPromise;
+}
+
+/**
  * How long a running session is allowed to overrun its scheduled end before the
  * automation closes it. A lesson that runs a few minutes over is normal, and
  * attendance scanned during the overrun must still land on the right session.
@@ -166,6 +193,7 @@ function mapSessionFromDB(row: any) {
     startDate: row.start_date,
     endDate: row.end_date,
     started: row.started !== false,
+    isFree: row.is_free === true,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -196,6 +224,7 @@ export const sessionsRoutes = {
       await ensureSessionRoomNullable();
       await ensureAttendanceMagicColumns();
       await ensureStartedColumn();
+      await ensureFreeSessionSchema();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -224,6 +253,7 @@ export const sessionsRoutes = {
 
       const isTeacherCompany = cls.company_type === 'TEACHER';
       const isOnlineClass = typeof cls.type === 'string' && cls.type.toUpperCase() === 'ONLINE';
+      const isFree = body.isFree === true;
 
       // If a prepared (started=false) session already exists for this class,
       // just mark it as started and update with any provided room/notes/teachers.
@@ -240,6 +270,10 @@ export const sessionsRoutes = {
       }
       if (prepared) {
         const updateFields: any = { started: true };
+        // Starting it as free is an explicit choice made now — it must survive
+        // adoption of a session that was prepared (by pre-attendance or the
+        // automation) before anyone decided this lesson would be a trial.
+        if (isFree) updateFields.is_free = true;
         if (body.roomId) updateFields.room_id = body.roomId;
         if (body.notes) updateFields.notes = body.notes;
         if (body.sessionNumber !== undefined && body.sessionNumber !== null && body.sessionNumber !== '') {
@@ -326,6 +360,7 @@ export const sessionsRoutes = {
         start_date: new Date().toISOString(),
         end_date: null,
         started: true,
+        is_free: isFree,
         notes: body.notes || null,
       });
 
@@ -658,6 +693,9 @@ export const sessionsRoutes = {
 
   end: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      // The absence-charge guard below reads existing.is_free, and an undefined
+      // flag would read as "not free" and bill a trial lesson's no-shows.
+      await ensureFreeSessionSchema();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -833,6 +871,7 @@ export const sessionsRoutes = {
   listActive: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       await ensureStartedColumn();
+      await ensureFreeSessionSchema();   // s.* below carries is_free for the Free badge
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -970,6 +1009,7 @@ export const sessionsRoutes = {
     try {
       await ensureStartedColumn();
       await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
       const context = await extractTenantContext(headers.authorization);
       // May create (prepare) a session, so require write.
       if (!checkGranularPermission(context, 'academy', 'write')) {
@@ -1007,6 +1047,34 @@ export const sessionsRoutes = {
         const row = await queryOne<any>(sql, sqlParams);
         if (row) {
           return { status: 200 as const, body: mapCheckinTarget(row, false) };
+        }
+      }
+
+      // 1b) A free session running right now. Deliberately NOT filtered by
+      // enrolment: a free session is open to the whole academy, and the person
+      // it exists for is precisely the one with no enrolment to be found by.
+      // It ranks below the student's own class (an enrolled student scanning
+      // during their real lesson belongs in that lesson, not in the trial) and
+      // above the schedule guess below.
+      {
+        const freeParams: any[] = [context.companyId];
+        let freeSql = `
+          SELECT s.id, s.class_id, s.session_number,
+                 cl.name AS class_name, co.name AS course_name, r.code AS room_code
+          FROM sessions s
+          JOIN classes cl ON cl.id = s.class_id
+          LEFT JOIN courses co ON co.id = cl.course_id
+          LEFT JOIN rooms r ON r.id = s.room_id
+          WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+            AND s.is_free = TRUE
+        `;
+        const freeBranchClause = appendBranchSqlFilter(context, freeParams, 's.branch_id');
+        if (freeBranchClause) freeSql += ` AND ${freeBranchClause}`;
+        freeSql += ' ORDER BY s.start_date DESC LIMIT 1';
+
+        const freeRow = await queryOne<any>(freeSql, freeParams);
+        if (freeRow) {
+          return { status: 200 as const, body: mapCheckinTarget(freeRow, false) };
         }
       }
 
@@ -1135,6 +1203,97 @@ export const sessionsRoutes = {
     } catch (error) {
       console.error('Get session error:', error);
       return mapThrownError(error, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found', 404);
+    }
+  },
+
+  /**
+   * GET /api/sessions/free-summary?classId=…
+   * Every free (trial) session of a class, with how many students turned up to
+   * each — the "did the trial bring anyone in?" view.
+   *
+   * `trialCount` is the part that matters commercially: attendees who were NOT
+   * enrolled in the class, i.e. the prospects the free session was run for.
+   * `uniqueTrialStudents` de-duplicates across sessions, so a prospect who
+   * sampled three free lessons is one person to follow up with, not three.
+   */
+  freeSummary: async ({ query: queryParams, headers }: { query: { classId?: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      if (!queryParams.classId) {
+        return apiError(400, 'ERRORS.SESSIONS.CLASS_ID_REQUIRED', 'classId is required');
+      }
+
+      const cls = await queryOne<any>(
+        `SELECT c.id
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.id = $1 AND co.company_id = $2`,
+        [queryParams.classId, context.companyId]
+      );
+      if (!cls) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+
+      const rows = await query<any>(
+        `SELECT s.id,
+                s.session_number,
+                s.start_date,
+                s.end_date,
+                r.code AS room_code,
+                COUNT(sa.id)                                              AS attendee_count,
+                COUNT(sa.id) FILTER (WHERE sa.attendance_type = 'TRIAL')  AS trial_count
+         FROM sessions s
+         LEFT JOIN rooms r ON r.id = s.room_id
+         LEFT JOIN session_attendance sa ON sa.session_id = s.id
+         WHERE s.class_id = $1 AND s.company_id = $2 AND s.is_free = TRUE
+         GROUP BY s.id, s.session_number, s.start_date, s.end_date, r.code
+         ORDER BY s.start_date DESC`,
+        [cls.id, context.companyId]
+      );
+
+      // Distinct people, not distinct attendances — counted in SQL because the
+      // rows above are already grouped by session and can no longer tell us
+      // whether the same student appears in two of them.
+      const uniqueRow = await queryOne<any>(
+        `SELECT COUNT(DISTINCT sa.student_id) AS unique_students,
+                COUNT(DISTINCT sa.student_id) FILTER (WHERE sa.attendance_type = 'TRIAL') AS unique_trial_students
+         FROM sessions s
+         JOIN session_attendance sa ON sa.session_id = s.id
+         WHERE s.class_id = $1 AND s.company_id = $2 AND s.is_free = TRUE`,
+        [cls.id, context.companyId]
+      );
+
+      const sessions = rows.map(r => ({
+        id: r.id,
+        sessionNumber: r.session_number === null || r.session_number === undefined
+          ? null
+          : parseInt(r.session_number, 10),
+        startDate: r.start_date,
+        endDate: r.end_date,
+        roomCode: r.room_code ?? null,
+        attendeeCount: parseInt(r.attendee_count ?? '0', 10),
+        trialCount: parseInt(r.trial_count ?? '0', 10),
+      }));
+
+      return {
+        status: 200 as const,
+        body: {
+          sessions,
+          totalSessions: sessions.length,
+          totalAttendances: sessions.reduce((sum, s) => sum + s.attendeeCount, 0),
+          uniqueStudents: parseInt(uniqueRow?.unique_students ?? '0', 10),
+          uniqueTrialStudents: parseInt(uniqueRow?.unique_trial_students ?? '0', 10),
+        },
+      };
+    } catch (error) {
+      console.error('Free session summary error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.FREE_SUMMARY_FAILED', 'Failed to load free sessions');
     }
   },
 

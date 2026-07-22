@@ -255,7 +255,7 @@
                   [ngModel]="student.isPresent"
                   (ngModelChange)="togglePresence(student, $event)"
                   [binary]="true"
-                  [pTooltip]="student.attendanceType === 'SUBSTITUTION' ? ('SESSIONS_DASHBOARD.UNCHECK_TO_REMOVE' | translate) : null"
+                  [pTooltip]="(student.attendanceType === 'SUBSTITUTION' || student.attendanceType === 'TRIAL') ? ('SESSIONS_DASHBOARD.UNCHECK_TO_REMOVE' | translate) : null"
                   [inputId]="'att-' + student.studentId"
                 ></p-checkbox>
                 <label [for]="'att-' + student.studentId"
@@ -274,6 +274,11 @@
               @if (student.attendanceType === 'SUBSTITUTION') {
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                   {{ 'SESSIONS_DASHBOARD.SUBSTITUTION' | translate }}
+                </span>
+              } @else if (student.attendanceType === 'TRIAL') {
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"
+                  [pTooltip]="'SESSIONS_DASHBOARD.TRIAL_HINT' | translate">
+                  {{ 'SESSIONS_DASHBOARD.TRIAL' | translate }}
                 </span>
               } @else {
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full"

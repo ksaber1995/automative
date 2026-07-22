@@ -267,6 +267,13 @@ export class SessionsDashboardComponent implements OnInit {
 
   activeTab = 'active';
   showStartDialog = false;
+  /**
+   * The Start dialog is running in free-session mode: the lesson bills nobody
+   * and any student may scan into it. It also widens the class list — a trial is
+   * often run for a class that hasn't got a single student yet, which is exactly
+   * the class the normal "has enrolled students" filter would hide.
+   */
+  startingFree = signal(false);
   showEndDialog = false;
   endingSession = signal<Session | null>(null);
 
@@ -421,6 +428,16 @@ export class SessionsDashboardComponent implements OnInit {
   openStartDialog() {
     // Single-branch companies hide the branch picker, so preselect the only
     // branch and load its rooms/classes up front.
+    this.startingFree.set(false);
+    const only = this.branchState.onlyBranchId();
+    this.buildSessionForm(undefined, only || undefined);
+    if (only) this.populateDialogOptionsForBranch(only);
+    this.showStartDialog = true;
+  }
+
+  /** Same dialog, but the session it starts is free — see `startingFree`. */
+  openFreeStartDialog() {
+    this.startingFree.set(true);
     const only = this.branchState.onlyBranchId();
     this.buildSessionForm(undefined, only || undefined);
     if (only) this.populateDialogOptionsForBranch(only);
@@ -435,6 +452,7 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   openStartDialogForRoom(room: Room) {
+    this.startingFree.set(false);
     this.buildSessionForm(room.id, room.branchId);
     this.populateDialogOptionsForBranch(room.branchId);
     this.showStartDialog = true;
@@ -449,7 +467,9 @@ export class SessionsDashboardComponent implements OnInit {
       next: (classes: any[]) => {
         this.dialogActiveClasses.set(
           classes
-            .filter((c: any) => (c.studentCount ?? 0) > 0)
+            // A free session may be run for a class nobody has enrolled in yet —
+            // that empty class is often the whole reason for the trial.
+            .filter((c: any) => this.startingFree() || (c.studentCount ?? 0) > 0)
             .map((c: any) => ({
               ...c,
               displayName: c.name,
@@ -503,12 +523,17 @@ export class SessionsDashboardComponent implements OnInit {
       branchId: val.branchId,
       notes: val.notes || undefined,
       sessionNumber: val.sessionNumber != null && val.sessionNumber !== '' ? Number(val.sessionNumber) : undefined,
+      isFree: this.startingFree() || undefined,
       teachers: teachers.length > 0 ? teachers : undefined,
     }).subscribe({
       next: () => {
         this.saving.set(false);
         this.showStartDialog = false;
-        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_STARTED'));
+        this.notificationService.success(this.translate.instant(
+          this.startingFree()
+            ? 'SESSIONS_DASHBOARD.MSG_FREE_SESSION_STARTED'
+            : 'SESSIONS_DASHBOARD.MSG_SESSION_STARTED'
+        ));
         this.loadAll();
         this.loadUpcoming();
       },

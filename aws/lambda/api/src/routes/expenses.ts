@@ -2,6 +2,7 @@ import { insert, update, findById, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { mapPaymentFromDB } from './expense-payments';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensureFreeSessionSchema } from './sessions';
 
 // Idempotent guard — ensures the session-based salary columns exist even on a
 // DB that hasn't had migration 037 applied yet (mirrors ensureExamTables).
@@ -45,12 +46,18 @@ export async function ensureSalaryColumns(): Promise<void> {
 
 // Session ids an employee was PRESENT for within [monthStart, monthEnd] that
 // have NOT yet been covered by a salary payment. These are what's owed now.
+//
+// Free (trial) sessions are excluded: they bill no student, so there is no
+// revenue for a per-session fee to come out of. A PERCENTAGE teacher already
+// earns nothing from one for the same reason — their accrual is a share of money
+// actually paid — so this keeps both salary types consistent.
 async function getUnpaidSessionIds(
   companyId: string,
   employeeId: string,
   monthStart: string,
   monthEnd: string,
 ): Promise<string[]> {
+  await ensureFreeSessionSchema();
   const rows = await query<{ id: string }>(
     `SELECT DISTINCT s.id
      FROM session_teacher_attendance sta
@@ -58,6 +65,7 @@ async function getUnpaidSessionIds(
      WHERE s.company_id = $1
        AND sta.employee_id = $2
        AND sta.status = 'PRESENT'
+       AND s.is_free = FALSE
        AND s.start_date::date >= $3
        AND s.start_date::date <= $4
        AND NOT EXISTS (

@@ -18,7 +18,7 @@ import { ConfirmationService } from 'primeng/api';
 import { FormsModule } from '@angular/forms';
 import { ClassService } from '../services/class.service';
 import { NotificationService } from '../../../core/services/notification.service';
-import { SessionService, Session } from '../../rooms/services/session.service';
+import { SessionService, Session, FreeSessionSummary } from '../../rooms/services/session.service';
 import { RoomService, Room } from '../../rooms/services/room.service';
 import { AttendanceService, SessionAttendanceStudent, ClassAttendanceSummary } from '../../rooms/services/attendance.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
@@ -81,6 +81,10 @@ export class ClassDetailComponent implements OnInit {
   finishing = signal(false);
 
   isFinished = () => this.classDetail()?.status === 'DONE' || !!this.classDetail()?.isFinished;
+
+  // Free (trial) sessions — how many were run for this class, and who turned up.
+  freeSummary = signal<FreeSessionSummary | null>(null);
+  loadingFreeSessions = signal(false);
 
   // Attendance
   attendanceSummary = signal<ClassAttendanceSummary[]>([]);
@@ -157,10 +161,19 @@ export class ClassDetailComponent implements OnInit {
     });
   }
 
+  loadFreeSessions() {
+    this.loadingFreeSessions.set(true);
+    this.sessionService.freeSummary(this.classId).subscribe({
+      next: (data) => { this.freeSummary.set(data); this.loadingFreeSessions.set(false); },
+      error: () => this.loadingFreeSessions.set(false),
+    });
+  }
+
   onTabChange(val: string | number | undefined) {
     this.activeTab = val?.toString() ?? 'students';
     if (this.activeTab === 'sessions') this.loadSessions();
     if (this.activeTab === 'attendance') this.loadAttendanceSummary();
+    if (this.activeTab === 'free') this.loadFreeSessions();
   }
 
   openStartSessionDialog() {
