@@ -161,7 +161,16 @@
       "CREATE_FAILED": "Failed to create student",
       "LIST_FAILED": "Failed to load students",
       "UPDATE_FAILED": "Failed to update student",
-      "DELETE_FAILED": "Failed to delete student"
+      "DELETE_FAILED": "Failed to delete student",
+      "PROFILE_FAILED": "Failed to load profile",
+      "IMPORT_EMPTY": "No students to import",
+      "IMPORT_FAILED": "Failed to import students",
+      "BRANCH_INACTIVE": "Cannot activate a student whose branch is inactive",
+      "REACTIVATE_FAILED": "Failed to reactivate student",
+      "HAS_ENROLLMENTS": "Cannot permanently delete a student with subscriptions or enrollments",
+      "QR_REGENERATE_FAILED": "Failed to regenerate QR code",
+      "LOOKUP_QR_FAILED": "Failed to lookup student by QR",
+      "LOOKUP_CODE_FAILED": "Failed to lookup student by code"
     },
     "NO_FIELDS": "No valid fields to update",
     "RECAPTCHA_FAILED": "Captcha verification failed",
@@ -251,7 +260,10 @@
       "NOT_FOUND": "Company not found",
       "ADMIN_ONLY": "Only administrators can manage company settings",
       "UPDATE_FAILED": "Failed to update company",
-      "SETTINGS_FAILED": "Failed to load company settings"
+      "SETTINGS_FAILED": "Failed to load company settings",
+      "PROFILE_FAILED": "Failed to load company profile",
+      "PLAN_ACADEMY_ONLY": "Plans apply to academies only",
+      "PLAN_UPDATE_FAILED": "Failed to update plan"
     },
     "COURSES": {
       "NOT_FOUND": "Course not found",
@@ -290,7 +302,8 @@
       "UPDATE_FAILED": "Failed to update employee",
       "DELETE_FAILED": "Failed to delete employee",
       "LIST_FAILED": "Failed to load employees",
-      "ASSIGNED_TO_ACTIVE_CLASSES": "Employee is assigned to active classes"
+      "ASSIGNED_TO_ACTIVE_CLASSES": "Employee is assigned to active classes",
+      "GLOBAL_ADMIN_ONLY_GLOBAL": "Only Global Admins can create global employees"
     },
     "ENROLLMENTS": {
       "NOT_FOUND": "Enrollment not found",
@@ -313,7 +326,13 @@
       "GET_PAYMENTS_FAILED": "Failed to load payments",
       "ADD_PAYMENT_FAILED": "Failed to record payment",
       "PAYMENT_EXCEEDS_BALANCE": "Payment exceeds remaining balance",
-      "REFUND_EXCEEDS_REFUNDABLE": "Refund exceeds the refundable amount"
+      "REFUND_EXCEEDS_REFUNDABLE": "Refund exceeds the refundable amount",
+      "NOT_MONTHLY": "Only monthly subscriptions can be held",
+      "ALREADY_ON_HOLD": "Subscription is already on hold",
+      "NOT_ACTIVE": "Only active subscriptions can be held",
+      "HOLD_FAILED": "Failed to hold subscription",
+      "NOT_ON_HOLD": "Subscription is not on hold",
+      "RESUME_FAILED": "Failed to resume subscription"
     },
     "EVENTS": {
       "NOT_FOUND": "Event not found",
@@ -360,7 +379,12 @@
       "SALARY_NON_POSITIVE": "Salary amount must be greater than zero",
       "PAY_SALARIES_FAILED": "Failed to pay salaries",
       "PAY_SALARY_FAILED": "Failed to pay salary",
-      "SALARY_HISTORY_FAILED": "Failed to load salary history"
+      "SALARY_HISTORY_FAILED": "Failed to load salary history",
+      "NO_PERCENTAGE_DUE": "No percentage earnings available to withdraw",
+      "PERCENTAGE_SUMMARY_FAILED": "Failed to get percentage summary",
+      "NO_HIRE_DATE": "Employee has no hire date",
+      "BACK_PAY_PREVIEW_FAILED": "Failed to preview back pay",
+      "BACK_PAY_FAILED": "Failed to create back pay"
     },
     "EXPENSE_PAYMENTS": {
       "NOT_FOUND": "Expense payment not found",
@@ -460,7 +484,8 @@
       "CREATE_REFUND_FAILED": "Failed to issue refund",
       "REFUND_NON_POSITIVE": "Refund amount must be greater than zero",
       "REFUND_EXCEEDS_REMAINING": "Refund exceeds the remaining amount",
-      "RESTOCK_EXCEEDS_QUANTITY": "Cannot return more units than were sold"
+      "RESTOCK_EXCEEDS_QUANTITY": "Cannot return more units than were sold",
+      "INSUFFICIENT_STOCK": "Not enough stock for this sale"
     },
     "REPORTS": {
       "MONTHLY_PL_FAILED": "Failed to load monthly P&L",
@@ -556,7 +581,10 @@
       "DEACTIVATE_FAILED": "Failed to deactivate user",
       "ACTIVATE_FAILED": "Failed to activate user",
       "EMPLOYEE_ALREADY_USER": "This employee already has a user account",
-      "CONVERT_EMPLOYEE_FAILED": "Failed to convert employee to user"
+      "CONVERT_EMPLOYEE_FAILED": "Failed to convert employee to user",
+      "GLOBAL_ADMIN_ONLY_DELETE": "Only Global Admins can remove users",
+      "CANNOT_DELETE_SELF": "You cannot remove your own user account",
+      "DELETE_FAILED": "Failed to remove user"
     },
     "WITHDRAWALS": {
       "NOT_FOUND": "Withdrawal not found",
@@ -595,6 +623,130 @@
       "LIST_FAILED": "Could not load the cards",
       "CODE_TAKEN": "Another student already has that code",
       "DISABLED": "QR cards are not enabled for this academy"
+    },
+    "COURSE_PRODUCTS": {
+      "LIST_FAILED": "Failed to list course products",
+      "COURSE_NOT_FOUND": "Course not found",
+      "LINK_FAILED": "Failed to link product to course",
+      "NOT_FOUND": "Course product link not found",
+      "UPDATE_FAILED": "Failed to update course product",
+      "UNLINK_FAILED": "Failed to unlink product"
+    },
+    "CRM": {
+      "NOT_AVAILABLE": "CRM is available for academies on the Advanced plan",
+      "LIST_FAILED": "Failed to list leads",
+      "NAME_REQUIRED": "Lead name is required",
+      "CREATE_FAILED": "Failed to create lead",
+      "NOT_FOUND": "Lead not found",
+      "INVALID_STAGE": "Invalid stage",
+      "UPDATE_FAILED": "Failed to update lead",
+      "DELETE_FAILED": "Failed to delete lead",
+      "ALREADY_CONVERTED": "Lead already converted",
+      "NO_BRANCH": "No branch available to place the student",
+      "CONVERT_FAILED": "Failed to convert lead",
+      "ACT_LIST_FAILED": "Failed to list activities",
+      "ACT_CREATE_FAILED": "Failed to create activity",
+      "ACT_UPDATE_FAILED": "Failed to update activity",
+      "ACT_DELETE_FAILED": "Failed to delete activity",
+      "TASKS_FAILED": "Failed to load tasks",
+      "TASK_SUBJECT_REQUIRED": "Task title is required",
+      "TASK_CREATE_FAILED": "Failed to create task",
+      "TASK_UPDATE_FAILED": "Failed to update task",
+      "CALLS_FAILED": "Failed to load call history",
+      "CALL_LOG_FAILED": "Failed to log the call",
+      "CALL_DELETE_FAILED": "Failed to delete call",
+      "ANALYTICS_FAILED": "Failed to load analytics",
+      "ATRISK_FAILED": "Failed to load at-risk students",
+      "LIST_NAME_REQUIRED": "List name is required",
+      "LIST_NAME_TAKEN": "A list with this name already exists",
+      "LIST_CREATE_FAILED": "Failed to create the list",
+      "LIST_NOT_FOUND": "List not found",
+      "LIST_UPDATE_FAILED": "Failed to update the list",
+      "LIST_DELETE_FAILED": "Failed to delete the list",
+      "LIST_NO_LEADS": "Pick at least one lead",
+      "LEAD_NOT_FOUND": "No matching leads",
+      "LIST_ADD_FAILED": "Failed to add leads to the list",
+      "LIST_REMOVE_FAILED": "Failed to remove the lead from the list"
+    },
+    "EDUCATIONAL_BOOKS": {
+      "COURSES_FAILED": "Failed to load courses",
+      "COURSE_NOT_FOUND": "Course not found",
+      "DETAIL_FAILED": "Failed to load course books"
+    },
+    "LOOKUPS": {
+      "FAILED": "Failed to load lookups"
+    },
+    "MONTHLY_SUBSCRIPTIONS": {
+      "GENERATE_FAILED": "Failed to generate monthly bills",
+      "LIST_FAILED": "Failed to list monthly payments",
+      "SUMMARY_FAILED": "Failed to get summary",
+      "NOT_FOUND": "Payment record not found",
+      "PAY_FAILED": "Failed to record payment",
+      "VOID_FAILED": "Failed to void payment",
+      "NOTHING_TO_REFUND": "There is no paid amount to refund",
+      "INVALID_REFUND_AMOUNT": "Refund amount must be greater than zero",
+      "REFUND_EXCEEDS_PAID": "Refund amount cannot exceed the amount paid",
+      "REFUND_FAILED": "Failed to refund payment",
+      "STUDENT_NOT_FOUND": "Student not found for this code",
+      "OVERRIDE_FAILED": "Failed to set price override",
+      "OVERRIDE_NOT_FOUND": "Price override not found"
+    },
+    "SESSION_PAYMENTS": {
+      "LIST_FAILED": "Failed to list session payments",
+      "SUMMARY_FAILED": "Failed to get summary",
+      "NOT_FOUND": "Charge not found",
+      "PAY_FAILED": "Failed to record payment",
+      "VOID_FAILED": "Failed to void payment",
+      "NOTHING_TO_REFUND": "There is no paid amount to refund",
+      "INVALID_REFUND_AMOUNT": "Refund amount must be greater than zero",
+      "REFUND_EXCEEDS_PAID": "Refund amount cannot exceed the amount paid",
+      "REFUND_FAILED": "Failed to refund payment",
+      "NO_PACKAGE_CONFIGURED": "No package size configured for this course",
+      "PACKAGE_FAILED": "Failed to buy package",
+      "PACKAGE_NOT_FOUND": "Package not found",
+      "INVALID_AMOUNT": "Amount must be greater than zero",
+      "PACKAGE_PAY_FAILED": "Failed to record package payment",
+      "STUDENT_NOT_FOUND": "Student not found for this code"
+    },
+    "SUBJECTS": {
+      "CREATE_FAILED": "Failed to create subject",
+      "LIST_FAILED": "Failed to list subjects",
+      "NOT_FOUND": "Subject not found",
+      "UPDATE_FAILED": "Failed to update subject",
+      "DELETE_FAILED": "Failed to delete subject"
+    },
+    "WA": {
+      "ACCOUNT_FAILED": "Failed to load WhatsApp account",
+      "DISCONNECT_FAILED": "Failed to disconnect",
+      "PLATFORM_NOT_CONFIGURED": "WhatsApp is not set up on this platform yet",
+      "CONNECT_FAILED": "Failed to start connection",
+      "NO_WABA": "That Meta account granted no WhatsApp business account",
+      "WABA_NOT_GRANTED": "That WhatsApp business account was not granted to this app",
+      "NO_PHONE_NUMBER": "That WhatsApp business account has no phone number yet",
+      "NUMBER_IN_USE": "That number is already connected to another account",
+      "SETTINGS_FAILED": "Failed to load settings",
+      "SETTINGS_UPDATE_FAILED": "Failed to update settings",
+      "TEMPLATES_FAILED": "Failed to load templates",
+      "BAD_TEMPLATE_KEY": "Unknown template key",
+      "TEMPLATE_SAVE_FAILED": "Failed to save template",
+      "NOT_CONNECTED": "Connect a WhatsApp number first",
+      "CREDENTIALS_MISSING": "This number needs reconnecting",
+      "NO_RECIPIENT": "No phone number to send to",
+      "TEMPLATE_INACTIVE": "That template is switched off",
+      "TEMPLATE_NOT_APPROVED": "That template has no approved Meta name yet",
+      "EMPTY_MESSAGE": "Write a message first",
+      "WINDOW_CLOSED": "More than 24 hours since their last message — send an approved template instead",
+      "CONVERSATIONS_FAILED": "Failed to load conversations",
+      "CONVERSATION_NOT_FOUND": "Conversation not found",
+      "MESSAGES_FAILED": "Failed to load messages",
+      "META_REJECTED": "Meta rejected the request",
+      "SEND_FAILED": "Failed to send"
+    },
+    "WHATSAPP": {
+      "FETCH_TEMPLATES_FAILED": "Failed to fetch templates",
+      "UPDATE_TEMPLATES_FAILED": "Failed to update templates",
+      "INVALID_BODY": "Template body must be text",
+      "INVALID_TYPE": "Invalid template type"
     }
   },
   "BREADCRUMBS": {

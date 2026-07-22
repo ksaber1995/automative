@@ -161,7 +161,16 @@
       "CREATE_FAILED": "فشل إنشاء الطالب",
       "LIST_FAILED": "فشل تحميل الطلاب",
       "UPDATE_FAILED": "فشل تعديل الطالب",
-      "DELETE_FAILED": "فشل حذف الطالب"
+      "DELETE_FAILED": "فشل حذف الطالب",
+      "PROFILE_FAILED": "فشل تحميل الملف",
+      "IMPORT_EMPTY": "لا يوجد طلاب للاستيراد",
+      "IMPORT_FAILED": "فشل استيراد الطلاب",
+      "BRANCH_INACTIVE": "لا يمكن تفعيل طالب فرعه غير نشط",
+      "REACTIVATE_FAILED": "فشل إعادة تفعيل الطالب",
+      "HAS_ENROLLMENTS": "لا يمكن الحذف النهائي لطالب لديه اشتراكات أو تسجيلات",
+      "QR_REGENERATE_FAILED": "فشل إعادة إنشاء رمز QR",
+      "LOOKUP_QR_FAILED": "فشل البحث عن الطالب برمز QR",
+      "LOOKUP_CODE_FAILED": "فشل البحث عن الطالب بالرقم"
     },
     "NO_FIELDS": "لا توجد حقول صالحة للتحديث",
     "RECAPTCHA_FAILED": "فشل التحقق من اختبار الإنسان",
@@ -251,7 +260,10 @@
       "NOT_FOUND": "الشركة غير موجودة",
       "ADMIN_ONLY": "يمكن للمسؤولين فقط إدارة إعدادات الشركة",
       "UPDATE_FAILED": "فشل تحديث الشركة",
-      "SETTINGS_FAILED": "فشل تحميل إعدادات الشركة"
+      "SETTINGS_FAILED": "فشل تحميل إعدادات الشركة",
+      "PROFILE_FAILED": "فشل تحميل ملف الشركة",
+      "PLAN_ACADEMY_ONLY": "الخطط متاحة للأكاديميات فقط",
+      "PLAN_UPDATE_FAILED": "فشل تحديث الخطة"
     },
     "COURSES": {
       "NOT_FOUND": "الدورة غير موجودة",
@@ -290,7 +302,8 @@
       "UPDATE_FAILED": "فشل تحديث الموظف",
       "DELETE_FAILED": "فشل حذف الموظف",
       "LIST_FAILED": "فشل تحميل الموظفين",
-      "ASSIGNED_TO_ACTIVE_CLASSES": "الموظف معيّن في فصول نشطة"
+      "ASSIGNED_TO_ACTIVE_CLASSES": "الموظف معيّن في فصول نشطة",
+      "GLOBAL_ADMIN_ONLY_GLOBAL": "لا يمكن إنشاء موظفين عامين إلا لمدير النظام العام"
     },
     "ENROLLMENTS": {
       "NOT_FOUND": "التسجيل غير موجود",
@@ -313,7 +326,13 @@
       "GET_PAYMENTS_FAILED": "فشل تحميل الدفعات",
       "ADD_PAYMENT_FAILED": "فشل تسجيل الدفعة",
       "PAYMENT_EXCEEDS_BALANCE": "الدفعة تتجاوز الرصيد المتبقي",
-      "REFUND_EXCEEDS_REFUNDABLE": "الاسترداد يتجاوز المبلغ القابل للاسترداد"
+      "REFUND_EXCEEDS_REFUNDABLE": "الاسترداد يتجاوز المبلغ القابل للاسترداد",
+      "NOT_MONTHLY": "لا يمكن إيقاف إلا الاشتراكات الشهرية",
+      "ALREADY_ON_HOLD": "الاشتراك موقوف بالفعل",
+      "NOT_ACTIVE": "لا يمكن إيقاف إلا الاشتراكات النشطة",
+      "HOLD_FAILED": "فشل إيقاف الاشتراك",
+      "NOT_ON_HOLD": "الاشتراك غير موقوف",
+      "RESUME_FAILED": "فشل استئناف الاشتراك"
     },
     "EVENTS": {
       "NOT_FOUND": "الفعالية غير موجودة",
@@ -360,7 +379,12 @@
       "SALARY_NON_POSITIVE": "يجب أن يكون مبلغ الراتب أكبر من صفر",
       "PAY_SALARIES_FAILED": "فشل دفع الرواتب",
       "PAY_SALARY_FAILED": "فشل دفع الراتب",
-      "SALARY_HISTORY_FAILED": "فشل تحميل سجل الرواتب"
+      "SALARY_HISTORY_FAILED": "فشل تحميل سجل الرواتب",
+      "NO_PERCENTAGE_DUE": "لا توجد أرباح نسبة متاحة للسحب",
+      "PERCENTAGE_SUMMARY_FAILED": "فشل تحميل ملخص النسبة",
+      "NO_HIRE_DATE": "لا يوجد تاريخ تعيين للموظف",
+      "BACK_PAY_PREVIEW_FAILED": "فشل عرض الرواتب المتأخرة",
+      "BACK_PAY_FAILED": "فشل إنشاء الرواتب المتأخرة"
     },
     "EXPENSE_PAYMENTS": {
       "NOT_FOUND": "دفعة المصروف غير موجودة",
@@ -460,7 +484,8 @@
       "CREATE_REFUND_FAILED": "فشل إصدار الاسترداد",
       "REFUND_NON_POSITIVE": "يجب أن يكون مبلغ الاسترداد أكبر من صفر",
       "REFUND_EXCEEDS_REMAINING": "الاسترداد يتجاوز المبلغ المتبقي",
-      "RESTOCK_EXCEEDS_QUANTITY": "لا يمكن إرجاع وحدات أكثر مما تم بيعه"
+      "RESTOCK_EXCEEDS_QUANTITY": "لا يمكن إرجاع وحدات أكثر مما تم بيعه",
+      "INSUFFICIENT_STOCK": "المخزون غير كافٍ لإتمام هذا البيع"
     },
     "REPORTS": {
       "MONTHLY_PL_FAILED": "فشل تحميل أرباح وخسائر الأشهر",
@@ -556,7 +581,10 @@
       "DEACTIVATE_FAILED": "فشل تعطيل المستخدم",
       "ACTIVATE_FAILED": "فشل تفعيل المستخدم",
       "EMPLOYEE_ALREADY_USER": "هذا الموظف لديه حساب مستخدم بالفعل",
-      "CONVERT_EMPLOYEE_FAILED": "فشل تحويل الموظف إلى مستخدم"
+      "CONVERT_EMPLOYEE_FAILED": "فشل تحويل الموظف إلى مستخدم",
+      "GLOBAL_ADMIN_ONLY_DELETE": "لا يمكن حذف المستخدمين إلا لمدير النظام العام",
+      "CANNOT_DELETE_SELF": "لا يمكنك حذف حسابك الخاص",
+      "DELETE_FAILED": "فشل حذف المستخدم"
     },
     "WITHDRAWALS": {
       "NOT_FOUND": "السحب غير موجود",
@@ -595,6 +623,130 @@
       "LIST_FAILED": "تعذر تحميل البطاقات",
       "CODE_TAKEN": "يوجد طالب آخر يحمل هذا الرقم بالفعل",
       "DISABLED": "ميزة بطاقات QR غير مفعّلة لهذه الأكاديمية"
+    },
+    "COURSE_PRODUCTS": {
+      "LIST_FAILED": "فشل عرض منتجات الدورة",
+      "COURSE_NOT_FOUND": "الدورة غير موجودة",
+      "LINK_FAILED": "فشل ربط المنتج بالدورة",
+      "NOT_FOUND": "ربط المنتج بالدورة غير موجود",
+      "UPDATE_FAILED": "فشل تحديث منتج الدورة",
+      "UNLINK_FAILED": "فشل إلغاء ربط المنتج"
+    },
+    "CRM": {
+      "NOT_AVAILABLE": "إدارة العملاء متاحة للأكاديميات على الخطة المتقدمة",
+      "LIST_FAILED": "فشل عرض العملاء المحتملين",
+      "NAME_REQUIRED": "اسم العميل المحتمل مطلوب",
+      "CREATE_FAILED": "فشل إنشاء العميل المحتمل",
+      "NOT_FOUND": "العميل المحتمل غير موجود",
+      "INVALID_STAGE": "مرحلة غير صالحة",
+      "UPDATE_FAILED": "فشل تحديث العميل المحتمل",
+      "DELETE_FAILED": "فشل حذف العميل المحتمل",
+      "ALREADY_CONVERTED": "تم تحويل العميل المحتمل بالفعل",
+      "NO_BRANCH": "لا يوجد فرع متاح لتسجيل الطالب",
+      "CONVERT_FAILED": "فشل تحويل العميل المحتمل",
+      "ACT_LIST_FAILED": "فشل عرض الأنشطة",
+      "ACT_CREATE_FAILED": "فشل إنشاء النشاط",
+      "ACT_UPDATE_FAILED": "فشل تحديث النشاط",
+      "ACT_DELETE_FAILED": "فشل حذف النشاط",
+      "TASKS_FAILED": "فشل تحميل المهام",
+      "TASK_SUBJECT_REQUIRED": "عنوان المهمة مطلوب",
+      "TASK_CREATE_FAILED": "فشل إنشاء المهمة",
+      "TASK_UPDATE_FAILED": "فشل تحديث المهمة",
+      "CALLS_FAILED": "فشل تحميل سجل المكالمات",
+      "CALL_LOG_FAILED": "فشل تسجيل المكالمة",
+      "CALL_DELETE_FAILED": "فشل حذف المكالمة",
+      "ANALYTICS_FAILED": "فشل تحميل التحليلات",
+      "ATRISK_FAILED": "فشل تحميل الطلاب المعرضين للتسرب",
+      "LIST_NAME_REQUIRED": "اسم القائمة مطلوب",
+      "LIST_NAME_TAKEN": "توجد قائمة بهذا الاسم بالفعل",
+      "LIST_CREATE_FAILED": "فشل إنشاء القائمة",
+      "LIST_NOT_FOUND": "القائمة غير موجودة",
+      "LIST_UPDATE_FAILED": "فشل تحديث القائمة",
+      "LIST_DELETE_FAILED": "فشل حذف القائمة",
+      "LIST_NO_LEADS": "اختر عميلًا محتملًا واحدًا على الأقل",
+      "LEAD_NOT_FOUND": "لا يوجد عملاء محتملون مطابقون",
+      "LIST_ADD_FAILED": "فشل إضافة العملاء المحتملين إلى القائمة",
+      "LIST_REMOVE_FAILED": "فشل حذف العميل المحتمل من القائمة"
+    },
+    "EDUCATIONAL_BOOKS": {
+      "COURSES_FAILED": "فشل تحميل الدورات",
+      "COURSE_NOT_FOUND": "الدورة غير موجودة",
+      "DETAIL_FAILED": "فشل تحميل كتب الدورة"
+    },
+    "LOOKUPS": {
+      "FAILED": "فشل تحميل البيانات المرجعية"
+    },
+    "MONTHLY_SUBSCRIPTIONS": {
+      "GENERATE_FAILED": "فشل إنشاء الفواتير الشهرية",
+      "LIST_FAILED": "فشل عرض المدفوعات الشهرية",
+      "SUMMARY_FAILED": "فشل تحميل الملخص",
+      "NOT_FOUND": "سجل الدفع غير موجود",
+      "PAY_FAILED": "فشل تسجيل الدفعة",
+      "VOID_FAILED": "فشل إلغاء الدفعة",
+      "NOTHING_TO_REFUND": "لا يوجد مبلغ مدفوع لاسترداده",
+      "INVALID_REFUND_AMOUNT": "مبلغ الاسترداد يجب أن يكون أكبر من صفر",
+      "REFUND_EXCEEDS_PAID": "مبلغ الاسترداد لا يمكن أن يتجاوز المبلغ المدفوع",
+      "REFUND_FAILED": "فشل استرداد المبلغ",
+      "STUDENT_NOT_FOUND": "لا يوجد طالب بهذا الرقم",
+      "OVERRIDE_FAILED": "فشل تعيين السعر المخصص",
+      "OVERRIDE_NOT_FOUND": "السعر المخصص غير موجود"
+    },
+    "SESSION_PAYMENTS": {
+      "LIST_FAILED": "فشل عرض مدفوعات الحصص",
+      "SUMMARY_FAILED": "فشل تحميل الملخص",
+      "NOT_FOUND": "الرسوم غير موجودة",
+      "PAY_FAILED": "فشل تسجيل الدفعة",
+      "VOID_FAILED": "فشل إلغاء الدفعة",
+      "NOTHING_TO_REFUND": "لا يوجد مبلغ مدفوع لاسترداده",
+      "INVALID_REFUND_AMOUNT": "مبلغ الاسترداد يجب أن يكون أكبر من صفر",
+      "REFUND_EXCEEDS_PAID": "مبلغ الاسترداد لا يمكن أن يتجاوز المبلغ المدفوع",
+      "REFUND_FAILED": "فشل استرداد المبلغ",
+      "NO_PACKAGE_CONFIGURED": "لا يوجد حجم باقة محدد لهذه الدورة",
+      "PACKAGE_FAILED": "فشل شراء الباقة",
+      "PACKAGE_NOT_FOUND": "الباقة غير موجودة",
+      "INVALID_AMOUNT": "المبلغ يجب أن يكون أكبر من صفر",
+      "PACKAGE_PAY_FAILED": "فشل تسجيل دفعة الباقة",
+      "STUDENT_NOT_FOUND": "لا يوجد طالب بهذا الرقم"
+    },
+    "SUBJECTS": {
+      "CREATE_FAILED": "فشل إنشاء المادة",
+      "LIST_FAILED": "فشل عرض المواد",
+      "NOT_FOUND": "المادة غير موجودة",
+      "UPDATE_FAILED": "فشل تحديث المادة",
+      "DELETE_FAILED": "فشل حذف المادة"
+    },
+    "WA": {
+      "ACCOUNT_FAILED": "فشل تحميل حساب واتساب",
+      "DISCONNECT_FAILED": "فشل قطع الاتصال",
+      "PLATFORM_NOT_CONFIGURED": "لم يتم إعداد واتساب على هذه المنصة بعد",
+      "CONNECT_FAILED": "فشل بدء الاتصال",
+      "NO_WABA": "حساب ميتا هذا لم يمنح أي حساب واتساب للأعمال",
+      "WABA_NOT_GRANTED": "لم يتم منح حساب واتساب للأعمال هذا لهذا التطبيق",
+      "NO_PHONE_NUMBER": "لا يوجد رقم هاتف لحساب واتساب للأعمال هذا بعد",
+      "NUMBER_IN_USE": "هذا الرقم متصل بحساب آخر بالفعل",
+      "SETTINGS_FAILED": "فشل تحميل الإعدادات",
+      "SETTINGS_UPDATE_FAILED": "فشل تحديث الإعدادات",
+      "TEMPLATES_FAILED": "فشل تحميل القوالب",
+      "BAD_TEMPLATE_KEY": "مفتاح قالب غير معروف",
+      "TEMPLATE_SAVE_FAILED": "فشل حفظ القالب",
+      "NOT_CONNECTED": "قم بربط رقم واتساب أولًا",
+      "CREDENTIALS_MISSING": "هذا الرقم يحتاج إعادة ربط",
+      "NO_RECIPIENT": "لا يوجد رقم هاتف للإرسال إليه",
+      "TEMPLATE_INACTIVE": "هذا القالب غير مفعّل",
+      "TEMPLATE_NOT_APPROVED": "هذا القالب ليس له اسم معتمد من ميتا بعد",
+      "EMPTY_MESSAGE": "اكتب رسالة أولًا",
+      "WINDOW_CLOSED": "مرت أكثر من 24 ساعة على آخر رسالة منهم — أرسل قالبًا معتمدًا بدلًا من ذلك",
+      "CONVERSATIONS_FAILED": "فشل تحميل المحادثات",
+      "CONVERSATION_NOT_FOUND": "المحادثة غير موجودة",
+      "MESSAGES_FAILED": "فشل تحميل الرسائل",
+      "META_REJECTED": "رفضت ميتا الطلب",
+      "SEND_FAILED": "فشل الإرسال"
+    },
+    "WHATSAPP": {
+      "FETCH_TEMPLATES_FAILED": "فشل جلب القوالب",
+      "UPDATE_TEMPLATES_FAILED": "فشل تحديث القوالب",
+      "INVALID_BODY": "نص القالب يجب أن يكون نصًا",
+      "INVALID_TYPE": "نوع القالب غير صالح"
     }
   },
   "BREADCRUMBS": {
