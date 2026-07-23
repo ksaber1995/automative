@@ -55,6 +55,12 @@
     .sub { color: var(--text-2); font-size: 13px; margin-top: 2px; }
     .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
     .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); cursor: pointer; user-select: none; }
+    .search {
+      font: inherit; color: var(--text); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; width: 220px; max-width: 60vw;
+    }
+    .search::placeholder { color: var(--muted); }
+    .search:focus { outline: none; border-color: var(--linked); }
     button.refresh {
       font: inherit; color: var(--text); background: var(--surface);
       border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer;
@@ -157,6 +163,7 @@
         <div class="sub">Cards generated per active (paying) client, and the QR pool split (linked vs unlinked).</div>
       </div>
       <div class="controls">
+        <input type="search" id="search" class="search" placeholder="Search clients…" autocomplete="off" spellcheck="false" />
         <label class="toggle"><input type="checkbox" id="onlyWithCards" checked /> Only clients with cards</label>
         <button class="refresh" id="refresh">Refresh</button>
       </div>
@@ -310,7 +317,13 @@
 
     function render() {
       const onlyWith = $('onlyWithCards').checked;
-      const shown = onlyWith ? rows.filter((r) => r.total > 0) : rows.slice();
+      const q = $('search').value.trim().toLowerCase();
+      let shown = onlyWith ? rows.filter((r) => r.total > 0) : rows.slice();
+      if (q) {
+        shown = shown.filter((r) =>
+          [r.name, r.type, r.ownerEmail, r.mobile].some((f) => String(f || '').toLowerCase().includes(q))
+        );
+      }
 
       // KPI tiles — computed over active clients (the pool split reflects shown set).
       const withCards = rows.filter((r) => r.total > 0).length;
@@ -368,7 +381,8 @@
           ? ` <span class="arrow">${sort.dir < 0 ? '▼' : '▲'}</span>` : '');
       });
 
-      $('state').textContent = shown.length ? '' : 'No clients to show with the current filter.';
+      $('state').textContent = shown.length ? ''
+        : (q ? `No clients match “${$('search').value.trim()}”.` : 'No clients to show with the current filter.');
       $('state').className = 'state';
       $('kpis').hidden = false;
       $('poolbarWrap').hidden = false;
@@ -474,6 +488,7 @@
       });
     });
     $('onlyWithCards').addEventListener('change', render);
+    $('search').addEventListener('input', render);
     $('refresh').addEventListener('click', load);
 
     load();
