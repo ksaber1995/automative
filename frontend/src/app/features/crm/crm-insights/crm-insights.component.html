@@ -2,6 +2,13 @@
   @if (!authService.canUseCrm()) {
     <p-card><div class="text-center py-10 text-gray-500">{{ 'CRM.LOCKED_HINT' | translate }}</div></p-card>
   } @else {
+    @if (branches().length > 1) {
+      <div class="flex justify-end mb-4">
+        <p-select [options]="branchFilterOptions()" [ngModel]="filterBranch()"
+          (ngModelChange)="filterBranch.set($event); load()"
+          optionLabel="label" optionValue="value" [style]="{ minWidth: '200px' }" appendTo="body"></p-select>
+      </div>
+    }
     @if (loading()) {
       <div class="text-center text-gray-400 py-16"><i class="pi pi-spin pi-spinner text-3xl"></i></div>
     } @else if (data(); as d) {

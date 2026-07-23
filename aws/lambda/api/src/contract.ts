@@ -2791,6 +2791,7 @@ export const contract = c.router({
     getAnalytics: {
       method: 'GET',
       path: '/api/crm/analytics',
+      query: z.object({ branchId: UUIDSchema.optional() }),
       responses: {
         200: z.object({
           totalLeads: z.number(),
@@ -2817,6 +2818,7 @@ export const contract = c.router({
     getAtRisk: {
       method: 'GET',
       path: '/api/crm/at-risk',
+      query: z.object({ branchId: UUIDSchema.optional() }),
       responses: {
         200: z.array(z.object({
           studentId: UUIDSchema,
@@ -2836,6 +2838,7 @@ export const contract = c.router({
     listLists: {
       method: 'GET',
       path: '/api/crm/lists',
+      query: z.object({ branchId: UUIDSchema.optional() }),
       responses: { 200: z.array(CrmListSchema), 403: ApiErrorSchema },
     },
     createList: {

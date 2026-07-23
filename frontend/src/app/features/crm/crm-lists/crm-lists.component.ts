@@ -58,6 +58,11 @@ export class CrmListsComponent implements OnInit {
   lists = signal<CrmList[]>([]);
   loading = signal(false);
   branches = signal<LookupOption[]>([]);
+  filterBranch = signal<string | null>(null);
+  branchFilterOptions = computed(() => [
+    { label: this.translate.instant('CRM.ALL_BRANCHES'), value: null as string | null },
+    ...this.branches().map((b) => ({ label: b.label, value: b.id as string | null })),
+  ]);
 
   // ── Board view ─────────────────────────────────────────────────────────────
   // Columns are the lists; cards are the leads in them. Dragging a card into
@@ -177,7 +182,7 @@ export class CrmListsComponent implements OnInit {
 
   load(): void {
     this.loading.set(true);
-    this.crm.listLists().subscribe({
+    this.crm.listLists(this.filterBranch() || undefined).subscribe({
       next: (rows) => {
         this.lists.set(rows);
         this.loading.set(false);

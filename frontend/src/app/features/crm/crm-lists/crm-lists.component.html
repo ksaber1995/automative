@@ -17,7 +17,12 @@
           <h1 class="text-2xl font-bold text-gray-800">{{ 'CRM.LISTS_TITLE' | translate }}</h1>
           <p class="text-gray-500 mt-1">{{ 'CRM.LISTS_SUBTITLE' | translate }}</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          @if (branches().length > 1) {
+            <p-select [options]="branchFilterOptions()" [ngModel]="filterBranch()"
+              (ngModelChange)="filterBranch.set($event); load()"
+              optionLabel="label" optionValue="value" [style]="{ minWidth: '170px' }" appendTo="body"></p-select>
+          }
           <p-button [icon]="viewMode() === 'board' ? 'pi pi-list' : 'pi pi-th-large'"
             severity="secondary" [outlined]="true"
             [label]="(viewMode() === 'board' ? 'CRM.VIEW_LIST' : 'CRM.VIEW_BOARD') | translate"

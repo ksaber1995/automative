@@ -857,7 +857,7 @@ export const crmRoutes = {
   },
 
   // ── Analytics (Phase 4): funnel, source attribution, owner leaderboard ──────
-  getAnalytics: async ({ headers }: { headers: { authorization: string } }) => {
+  getAnalytics: async ({ query: q, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -867,9 +867,25 @@ export const crmRoutes = {
       const denied = await crmDenied(context.companyId);
       if (denied) return denied;
 
+      if (q.branchId && !canAccessBranch(context, q.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      // Every aggregate below is confined to the caller's branches (a branch admin
+      // never sees another branch's numbers) and, if asked, one chosen branch.
+      // `col` names the branch column in each query; company-wide (NULL) rows stay
+      // visible under branch scoping, same as the lead pipeline.
+      const branchCond = (params: any[], col: string): string => {
+        let cond = '';
+        const scope = appendBranchSqlFilter(context, params, col);
+        if (scope) cond += ` AND (${scope} OR ${col} IS NULL)`;
+        if (q.branchId) { params.push(q.branchId); cond += ` AND ${col} = $${params.length}`; }
+        return cond;
+      };
+
       const cid = context.companyId;
+      const pStage: any[] = [cid];
       const stageRows = await query<any>(
-        `SELECT stage, COUNT(*)::int AS count FROM crm_leads WHERE company_id = $1 GROUP BY stage`, [cid]
+        `SELECT stage, COUNT(*)::int AS count FROM crm_leads WHERE company_id = $1${branchCond(pStage, 'branch_id')} GROUP BY stage`, pStage
       );
       const byStage: Record<string, number> = {};
       for (const s of VALID_STAGES) byStage[s] = 0;
@@ -881,24 +897,27 @@ export const crmRoutes = {
       const open = totalLeads - won - lost;
       const conversionRate = totalLeads > 0 ? Math.round((won / totalLeads) * 1000) / 10 : 0;
 
+      const pSrc: any[] = [cid];
       const sources = await query<any>(
         `SELECT COALESCE(NULLIF(source, ''), 'UNKNOWN') AS source, COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE stage = 'WON')::int AS won
-         FROM crm_leads WHERE company_id = $1 GROUP BY 1 ORDER BY total DESC`, [cid]
+         FROM crm_leads WHERE company_id = $1${branchCond(pSrc, 'branch_id')} GROUP BY 1 ORDER BY total DESC`, pSrc
       );
 
+      const pOwn: any[] = [cid];
       const ownerLeads = await query<any>(
         `SELECT l.owner_user_id, TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS owner_name,
                 COUNT(*)::int AS total, COUNT(*) FILTER (WHERE l.stage = 'WON')::int AS won
          FROM crm_leads l LEFT JOIN users u ON u.id = l.owner_user_id
-         WHERE l.company_id = $1 AND l.owner_user_id IS NOT NULL
-         GROUP BY l.owner_user_id, u.first_name, u.last_name ORDER BY total DESC`, [cid]
+         WHERE l.company_id = $1 AND l.owner_user_id IS NOT NULL${branchCond(pOwn, 'l.branch_id')}
+         GROUP BY l.owner_user_id, u.first_name, u.last_name ORDER BY total DESC`, pOwn
       );
+      const pOwnT: any[] = [cid];
       const ownerTasks = await query<any>(
         `SELECT owner_user_id,
                 COUNT(*) FILTER (WHERE done_at IS NULL AND due_at IS NOT NULL)::int AS open_tasks,
                 COUNT(*) FILTER (WHERE done_at IS NULL AND due_at < NOW())::int AS overdue_tasks
-         FROM crm_activities WHERE company_id = $1 AND owner_user_id IS NOT NULL GROUP BY owner_user_id`, [cid]
+         FROM crm_activities WHERE company_id = $1 AND owner_user_id IS NOT NULL${branchCond(pOwnT, 'branch_id')} GROUP BY owner_user_id`, pOwnT
       );
       const taskByOwner = new Map<string, any>();
       for (const t of ownerTasks) taskByOwner.set(t.owner_user_id, t);
@@ -911,18 +930,21 @@ export const crmRoutes = {
         overdueTasks: taskByOwner.get(o.owner_user_id)?.overdue_tasks ?? 0,
       }));
 
+      const pTot: any[] = [cid];
       const taskTotals = await queryOne<any>(
         `SELECT COUNT(*) FILTER (WHERE done_at IS NULL AND due_at IS NOT NULL)::int AS open,
                 COUNT(*) FILTER (WHERE done_at IS NULL AND due_at < NOW())::int AS overdue
-         FROM crm_activities WHERE company_id = $1`, [cid]
+         FROM crm_activities WHERE company_id = $1${branchCond(pTot, 'branch_id')}`, pTot
       );
 
       // Why leads don't join — obstacles cited on calls (distinct leads per obstacle).
+      // Calls carry no branch of their own, so scope through the lead they belong to.
+      const pObs: any[] = [cid];
       const obstacleRows = await query<any>(
-        `SELECT obstacle, COUNT(DISTINCT lead_id)::int AS count
-         FROM crm_lead_calls
-         WHERE company_id = $1 AND obstacle IS NOT NULL AND obstacle <> 'NONE'
-         GROUP BY obstacle ORDER BY count DESC`, [cid]
+        `SELECT c.obstacle, COUNT(DISTINCT c.lead_id)::int AS count
+         FROM crm_lead_calls c JOIN crm_leads l ON l.id = c.lead_id
+         WHERE c.company_id = $1 AND c.obstacle IS NOT NULL AND c.obstacle <> 'NONE'${branchCond(pObs, 'l.branch_id')}
+         GROUP BY c.obstacle ORDER BY count DESC`, pObs
       );
 
       return {
@@ -943,7 +965,7 @@ export const crmRoutes = {
   },
 
   // ── Retention (Phase 4): active students at risk (dues / overdue subscriptions) ──
-  getAtRisk: async ({ headers }: { headers: { authorization: string } }) => {
+  getAtRisk: async ({ query: q, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -952,6 +974,19 @@ export const crmRoutes = {
       await ensureCrmSchema();
       const denied = await crmDenied(context.companyId);
       if (denied) return denied;
+
+      if (q.branchId && !canAccessBranch(context, q.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      // Confine at-risk students to the caller's branches (and one chosen branch if
+      // asked). `col` names the branch column in each query.
+      const branchCond = (params: any[], col: string): string => {
+        let cond = '';
+        const scope = appendBranchSqlFilter(context, params, col);
+        if (scope) cond += ` AND (${scope} OR ${col} IS NULL)`;
+        if (q.branchId) { params.push(q.branchId); cond += ` AND ${col} = $${params.length}`; }
+        return cond;
+      };
 
       const cid = context.companyId;
       const map = new Map<string, any>();
@@ -976,30 +1011,34 @@ export const crmRoutes = {
       };
 
       // Outstanding balance on active enrollments (unpaid dues).
+      const pDues: any[] = [cid];
+      const duesBranch = branchCond(pDues, 'e.branch_id');
       const dues = await query<any>(
         `SELECT e.student_id, s.name, s.phone, s.parent_name, s.parent_phone, e.branch_id,
                 SUM(GREATEST(COALESCE(e.final_price,0) - COALESCE(e.amount_paid,0), 0))::numeric AS balance
          FROM enrollments e JOIN students s ON s.id = e.student_id
          WHERE e.company_id = $1 AND s.is_active = true
            AND e.status IN ('ACTIVE', 'PENDING', 'ON_HOLD')
-           AND COALESCE(e.final_price,0) > COALESCE(e.amount_paid,0)
+           AND COALESCE(e.final_price,0) > COALESCE(e.amount_paid,0)${duesBranch}
          GROUP BY e.student_id, s.name, s.phone, s.parent_name, s.parent_phone, e.branch_id`,
-        [cid]
+        pDues
       );
       for (const r of dues) add(r, 'DUES', parseFloat(r.balance) || 0);
 
       // Overdue monthly subscription installments (if the table exists).
       const hasMsp = await queryOne<any>(`SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS ok`);
       if (hasMsp?.ok) {
+        const pSubs: any[] = [cid];
+        const subsBranch = branchCond(pSubs, 's.branch_id');
         const subs = await query<any>(
           `SELECT msp.student_id, s.name, s.phone, s.parent_name, s.parent_phone, s.branch_id,
                   SUM(GREATEST(COALESCE(msp.amount_due,0) - COALESCE(msp.amount_paid,0), 0))::numeric AS balance
            FROM monthly_subscription_payments msp JOIN students s ON s.id = msp.student_id
            WHERE s.company_id = $1 AND s.is_active = true
              AND msp.payment_status IN ('PENDING', 'PARTIAL', 'OVERDUE')
-             AND msp.due_date < CURRENT_DATE
+             AND msp.due_date < CURRENT_DATE${subsBranch}
            GROUP BY msp.student_id, s.name, s.phone, s.parent_name, s.parent_phone, s.branch_id`,
-          [cid]
+          pSubs
         );
         for (const r of subs) add(r, 'SUBSCRIPTION', parseFloat(r.balance) || 0);
       }
@@ -1021,7 +1060,7 @@ export const crmRoutes = {
   // Every handler keeps the house order: permission -> ensureCrmSchema -> crmDenied
   // (which is what makes this ACADEMY-only) -> company-scoped SQL.
 
-  listLists: async ({ headers }: { headers: { authorization: string } }) => {
+  listLists: async ({ query: q, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -1040,6 +1079,10 @@ export const crmRoutes = {
       // Branch admins see lists in their branch, plus company-wide (untied) ones.
       const branchClause = appendBranchSqlFilter(context, params, 'li.branch_id');
       if (branchClause) sql += ` AND (${branchClause} OR li.branch_id IS NULL)`;
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        params.push(q.branchId); sql += ` AND li.branch_id = $${params.length}`;
+      }
       sql += ` ORDER BY li.created_at DESC`;
 
       const rows = await query<any>(sql, params);

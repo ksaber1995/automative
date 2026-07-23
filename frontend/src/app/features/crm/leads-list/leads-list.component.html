@@ -32,6 +32,15 @@
           optionLabel="label" optionValue="value"
           [style]="{ minWidth: '180px' }"
         ></p-select>
+        @if (branches().length > 1) {
+          <p-select
+            [options]="branchFilterOptions()"
+            [ngModel]="filterBranch()"
+            (ngModelChange)="filterBranch.set($event); load()"
+            optionLabel="label" optionValue="value"
+            [style]="{ minWidth: '180px' }"
+          ></p-select>
+        }
         <span class="p-input-icon-left">
           <input pInputText [(ngModel)]="search" (keyup.enter)="load()" [placeholder]="'CRM.SEARCH_PLACEHOLDER' | translate" />
         </span>

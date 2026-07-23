@@ -50,6 +50,7 @@ export class CrmTasksComponent implements OnInit {
 
   filterStatus = signal<'open' | 'overdue' | 'done' | 'all'>('open');
   filterAssignee: string | null = null;
+  filterBranch: string | null = null;
   search = '';
 
   readonly priorities = TASK_PRIORITIES;
@@ -57,6 +58,10 @@ export class CrmTasksComponent implements OnInit {
   assigneeFilterOptions = computed(() => [
     { label: this.translate.instant('CRM.T_ALL_ASSIGNEES'), value: null as string | null },
     ...this.employees(),
+  ]);
+  branchFilterOptions = computed(() => [
+    { label: this.translate.instant('CRM.ALL_BRANCHES'), value: null as string | null },
+    ...this.branches().map(b => ({ label: b.label, value: b.id as string | null })),
   ]);
 
   // Dialog
@@ -94,6 +99,7 @@ export class CrmTasksComponent implements OnInit {
     this.crm.listTasks({
       status: this.filterStatus(),
       assigneeId: this.filterAssignee || undefined,
+      branchId: this.filterBranch || undefined,
       search: this.search || undefined,
     }).subscribe({
       next: (rows) => { this.tasks.set(rows); this.loading.set(false); },

@@ -1132,6 +1132,7 @@
     "SELECT": "Select",
     "EMAIL": "Email",
     "BRANCH": "Branch",
+    "ALL_BRANCHES": "All branches",
     "NOTES": "Notes",
     "NEXT_ACTION": "Next follow-up",
     "CANCEL": "Cancel",

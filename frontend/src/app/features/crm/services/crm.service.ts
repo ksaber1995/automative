@@ -106,18 +106,18 @@ export class CrmService {
     return this.api.delete<{ message: string; code: string }>(`crm/calls/${id}`);
   }
 
-  getAnalytics(): Observable<CrmAnalytics> {
-    return this.api.get<CrmAnalytics>('crm/analytics');
+  getAnalytics(branchId?: string): Observable<CrmAnalytics> {
+    return this.api.get<CrmAnalytics>('crm/analytics', branchId ? { branchId } : undefined);
   }
 
-  getAtRisk(): Observable<AtRiskStudent[]> {
-    return this.api.get<AtRiskStudent[]>('crm/at-risk');
+  getAtRisk(branchId?: string): Observable<AtRiskStudent[]> {
+    return this.api.get<AtRiskStudent[]>('crm/at-risk', branchId ? { branchId } : undefined);
   }
 
   // ── Lists — named groups of leads (a lead can be in many) ───────────────────
 
-  listLists(): Observable<CrmList[]> {
-    return this.api.get<CrmList[]>('crm/lists');
+  listLists(branchId?: string): Observable<CrmList[]> {
+    return this.api.get<CrmList[]>('crm/lists', branchId ? { branchId } : undefined);
   }
 
   createList(dto: CrmListWriteDto): Observable<CrmList> {

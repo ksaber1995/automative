@@ -56,6 +56,7 @@ export class LeadsListComponent implements OnInit {
   courses = signal<{ label: string; value: string }[]>([]);
 
   filterStage = signal<string | null>(null);
+  filterBranch = signal<string | null>(null);
   search = '';
   toCallOnly = signal(false);
 
@@ -84,6 +85,10 @@ export class LeadsListComponent implements OnInit {
     { label: this.translate.instant('CRM.ALL_STAGES'), value: null },
     ...LEAD_STAGES.map(s => ({ label: this.translate.instant('CRM.STAGE_' + s), value: s })),
   ]);
+  branchFilterOptions = computed(() => [
+    { label: this.translate.instant('CRM.ALL_BRANCHES'), value: null as string | null },
+    ...this.branches().map(b => ({ label: b.label, value: b.id as string | null })),
+  ]);
   sourceOptions = ACQUISITION_CHANNELS.map(c => ({ label: this.translate.instant('CRM.SRC_' + c), value: c }));
 
   // Add/edit dialog
@@ -106,6 +111,7 @@ export class LeadsListComponent implements OnInit {
     this.loading.set(true);
     this.crm.listLeads({
       stage: this.filterStage() || undefined,
+      branchId: this.filterBranch() || undefined,
       search: this.search || undefined,
       toCall: this.toCallOnly() ? 'true' : undefined,
     }).subscribe({

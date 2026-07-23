@@ -18,6 +18,9 @@
         }
         <span class="mx-1 text-gray-300">|</span>
         <p-select [options]="assigneeFilterOptions()" [(ngModel)]="filterAssignee" (ngModelChange)="load()" optionLabel="label" optionValue="value" [style]="{ minWidth: '200px' }" appendTo="body"></p-select>
+        @if (branches().length > 1) {
+          <p-select [options]="branchFilterOptions()" [(ngModel)]="filterBranch" (ngModelChange)="load()" optionLabel="label" optionValue="value" [style]="{ minWidth: '180px' }" appendTo="body"></p-select>
+        }
         <input pInputText [(ngModel)]="search" (keyup.enter)="load()" [placeholder]="'CRM.SEARCH_PLACEHOLDER' | translate" />
         <button pButton icon="pi pi-search" [outlined]="true" size="small" (click)="load()"></button>
       </div>
