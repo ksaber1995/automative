@@ -115,12 +115,6 @@ export class ExpenseListComponent implements OnInit {
   paymentInvoiceNumber: string = '';
   recordingPayment = signal(false);
 
-  // Pay salaries dialog
-  showSalariesDialog = false;
-  salariesDate: Date = new Date();
-  salariesBranchId: string = '';
-  payingSalaries = signal(false);
-
   categories = [
     'SALARIES','RENT','UTILITIES','ELECTRICITY','INTERNET','WATER',
     'MARKETING','SUPPLIES','EQUIPMENT','MAINTENANCE','INSURANCE',
@@ -310,12 +304,6 @@ export class ExpenseListComponent implements OnInit {
     });
   }
 
-  openSalariesDialog() {
-    this.salariesDate = new Date();
-    this.salariesBranchId = '';
-    this.showSalariesDialog = true;
-  }
-
   viewExpense(expense: Expense) {
     this.router.navigate(['/expenses', expense.id]);
   }
@@ -326,25 +314,6 @@ export class ExpenseListComponent implements OnInit {
 
   goToInstallments() {
     this.router.navigate(['/expenses/installments']);
-  }
-
-  confirmPaySalaries() {
-    this.payingSalaries.set(true);
-    const dateStr = toLocalYmd(this.salariesDate);
-
-    this.expenseService.paySalaries(dateStr, this.salariesBranchId || undefined).subscribe({
-      next: () => {
-        this.payingSalaries.set(false);
-        this.showSalariesDialog = false;
-        this.notificationService.success(this.translate.instant('SALARIES.PAID'));
-        this.loadExpenses();
-      },
-      error: () => {
-        // Interceptor toasted the translated error.
-        this.payingSalaries.set(false);
-        this.showSalariesDialog = false;
-      }
-    });
   }
 
   getBranchName(branchId?: string | null): string {
