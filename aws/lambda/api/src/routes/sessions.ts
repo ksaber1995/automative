@@ -528,7 +528,25 @@ export const sessionsRoutes = {
           )
           AND NOT EXISTS (
             SELECT 1 FROM sessions s
-            WHERE s.class_id = c.id AND s.company_id = $1 AND s.end_date IS NULL AND s.started = true
+            WHERE s.class_id = c.id AND s.company_id = $1 AND s.started = true
+              AND (
+                -- A session is already running anywhere — never open a second one.
+                s.end_date IS NULL
+                -- OR this scheduled window ALREADY ran today and was ended (e.g. the
+                -- teacher finished a 1-hour lesson after 20 min). Without this, the
+                -- class is still inside its window with nothing running, so auto-start
+                -- would restart it — the bug. We treat it as "already ran" if a session
+                -- started at/after this window began. That instant is derived in UTC as
+                -- NOW() - (localNow - windowStart): both are academy-local times so the
+                -- timezone offset cancels, which matters because start_date is UTC while
+                -- the schedule/localTime are local.
+                OR s.start_date >= NOW() - ($4::time - (
+                     SELECT cdt2.start_time FROM class_day_times cdt2
+                     WHERE cdt2.class_id = c.id AND cdt2.day_of_week = $2
+                       AND cdt2.start_time <= $4::time AND cdt2.end_time > $4::time
+                     LIMIT 1
+                   ))
+              )
           )
       `;
       const startBranch = appendBranchSqlFilter(context, startParams, 'co.branch_id');

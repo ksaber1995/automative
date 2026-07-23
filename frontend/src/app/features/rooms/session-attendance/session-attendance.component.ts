@@ -139,8 +139,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   presentCount = computed(() => this.students().filter((s) => s.isPresent).length);
   absentCount = computed(() => this.students().filter((s) => !s.isPresent).length);
 
-  /** A student absent this many of the class's recent sessions in a row is flagged. */
-  readonly ABSENCE_WARN_THRESHOLD = 3;
+  /** A student absent this many of the class's recent sessions in a row is flagged.
+   *  1 = flag any student who missed the previous session (don't wait for a streak). */
+  readonly ABSENCE_WARN_THRESHOLD = 1;
   /** Enrolled students who have missed the last N sessions in a row. */
   atRiskStudents = computed(() =>
     this.students().filter((s) => (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD),
