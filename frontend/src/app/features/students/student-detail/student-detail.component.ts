@@ -164,6 +164,8 @@ export class StudentDetailComponent implements OnInit {
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   classDoneMap = signal<Map<string, boolean>>(new Map());
+  /** classId → class name, so an enrollment row can show which class the student is in. */
+  classNameMap = signal<Map<string, string>>(new Map());
 
   private isEnrollmentFinished(e: Enrollment): boolean {
     return this.classDoneMap().get(e.classId) === true;
@@ -234,6 +236,11 @@ export class StudentDetailComponent implements OnInit {
   dialogPaymentAmount: number | null = null;
   dialogPaymentDate: Date = new Date();
   dialogPaymentNotes = '';
+
+  // Edit-price dialog — override the final price this student pays for a course.
+  showEditPriceDialog = false;
+  editPriceEnrollment = signal<Enrollment | null>(null);
+  editPriceValue: number | null = null;
 
   // Refund dialog (regular enrollment)
   showRefundDialog = false;
@@ -454,13 +461,21 @@ export class StudentDetailComponent implements OnInit {
   loadClassesForDoneMap() {
     this.classService.getAllClasses().subscribe({
       next: (classes) => {
-        const map = new Map<string, boolean>();
+        const doneMap = new Map<string, boolean>();
+        const nameMap = new Map<string, string>();
         for (const c of classes) {
-          map.set(c.id, c.status === 'DONE' || c.isFinished === true);
+          doneMap.set(c.id, c.status === 'DONE' || c.isFinished === true);
+          nameMap.set(c.id, c.name);
         }
-        this.classDoneMap.set(map);
+        this.classDoneMap.set(doneMap);
+        this.classNameMap.set(nameMap);
       },
     });
+  }
+
+  /** The class this enrollment sits in (empty until the class list loads). */
+  getClassName(classId: string): string {
+    return this.classNameMap().get(classId) || '';
   }
 
   loadAttendance(studentId: string) {
@@ -908,6 +923,33 @@ export class StudentDetailComponent implements OnInit {
         // Interceptor toasted the translated error.
         this.actionLoading.set(false);
       }
+    });
+  }
+
+  // ─── Edit-price dialog ───────────────────────────────────────────────────────
+
+  openEditPriceDialog(enrollment: Enrollment) {
+    this.editPriceEnrollment.set(enrollment);
+    this.editPriceValue = enrollment.finalPrice;
+    this.showEditPriceDialog = true;
+  }
+
+  submitEditPrice() {
+    const enrollment = this.editPriceEnrollment();
+    if (!enrollment || this.editPriceValue == null || this.editPriceValue < 0) return;
+
+    this.actionLoading.set(true);
+    this.enrollmentService.updateEnrollment(enrollment.id, { finalPrice: this.editPriceValue }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.PRICE_UPDATED'));
+        this.showEditPriceDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) this.loadEnrollments(this.studentId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.actionLoading.set(false);
+      },
     });
   }
 

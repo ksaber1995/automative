@@ -591,6 +591,25 @@ export const enrollmentsRoutes = {
       if (body.completionDate !== undefined) updateData.completion_date = body.completionDate;
       if (body.notes !== undefined) updateData.notes = body.notes;
 
+      // Override the price this student pays. The list price rises to meet a higher
+      // figure; a lower one reads as a discount, keeping original − discount = final.
+      // For a one-time course the paid/owed status is re-derived from the new price;
+      // monthly & per-session bills live in their own tables, so their status stands.
+      if (body.finalPrice !== undefined) {
+        const newPrice = Number(body.finalPrice);
+        if (!Number.isFinite(newPrice) || newPrice < 0) {
+          return apiError(400, 'ERRORS.ENROLLMENTS.INVALID_PRICE', 'Invalid price');
+        }
+        const original = Math.max(parseFloat(existing.original_price || 0), newPrice);
+        updateData.original_price = original;
+        updateData.final_price = newPrice;
+        updateData.discount_amount = Math.round((original - newPrice) * 100) / 100;
+        updateData.discount_percent = original > 0 ? Math.round(((original - newPrice) / original) * 10000) / 100 : 0;
+        if ((existing.payment_type || 'ONE_TIME') === 'ONE_TIME') {
+          updateData.payment_status = computePaymentStatus(newPrice, parseFloat(existing.amount_paid || 0));
+        }
+      }
+
       const enrollment = await update('enrollments', params.id, updateData);
 
       if (!enrollment) {

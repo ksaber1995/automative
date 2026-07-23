@@ -141,6 +141,8 @@ export interface EnrollmentUpdateDto {
   paymentStatus?: PaymentStatus;
   completionDate?: string;
   notes?: string;
+  /** Override the final price this student pays for the course. */
+  finalPrice?: number;
 }
 
 export interface PaymentInstallment {
