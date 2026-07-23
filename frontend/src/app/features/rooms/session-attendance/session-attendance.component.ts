@@ -146,6 +146,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   atRiskStudents = computed(() =>
     this.students().filter((s) => (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD),
   );
+  /** First few flagged students named in the banner (the rest become "+N more"). */
+  bannerStudents = computed(() => this.atRiskStudents().slice(0, 8));
+  bannerMore = computed(() => Math.max(0, this.atRiskStudents().length - 8));
   isAtRisk = (s: SessionAttendanceStudent): boolean =>
     (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD;
   /** Top banner shown briefly when the roster loads with at-risk students. */
@@ -250,7 +253,12 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       return;
     }
     this.showAbsenceBanner.set(true);
-    this.absenceBannerTimer = setTimeout(() => this.showAbsenceBanner.set(false), 8000);
+    // Keep the banner up longer when more students are flagged — there's more to
+    // read. ~8s for one, growing to a 20s cap. (It only shows when there ARE
+    // absences, so this always runs longer than a plain heads-up would.)
+    const n = this.atRiskStudents().length;
+    const duration = Math.min(20000, 6000 + n * 2000);
+    this.absenceBannerTimer = setTimeout(() => this.showAbsenceBanner.set(false), duration);
   }
 
   dismissAbsenceBanner() {

@@ -4974,6 +4974,7 @@
     "CANCEL_SESSION_REJECT": "الاحتفاظ بها",
     "MSG_SESSION_CANCELLED": "تم إلغاء الحصة",
     "ABSENCE_BANNER": "تغيّب {{count}} طالب/طلاب في حصة سابقة — يُرجى المتابعة (انظر علامات ⚠ بالأسفل).",
+    "ABSENCE_MORE": "+{{count}} آخرون",
     "ABSENCE_WARN_BADGE": "غياب ×{{count}}",
     "ABSENCE_WARN_TOOLTIP": "غائب في آخر {{count}} حصص متتالية",
     "DISMISS": "تجاهل",

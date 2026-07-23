@@ -89,7 +89,22 @@
     <div class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
       <i class="pi pi-exclamation-triangle mt-0.5"></i>
       <div class="flex-1 text-sm">
-        {{ 'SESSIONS_DASHBOARD.ABSENCE_BANNER' | translate: { count: atRiskStudents().length } }}
+        <div class="font-semibold mb-1.5">
+          {{ 'SESSIONS_DASHBOARD.ABSENCE_BANNER' | translate: { count: atRiskStudents().length } }}
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          @for (st of bannerStudents(); track st.studentId) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs">
+              {{ st.studentName }}
+              <span class="font-bold">×{{ st.absentStreak }}</span>
+            </span>
+          }
+          @if (bannerMore() > 0) {
+            <span class="inline-flex items-center text-xs text-amber-600 px-1">
+              {{ 'SESSIONS_DASHBOARD.ABSENCE_MORE' | translate: { count: bannerMore() } }}
+            </span>
+          }
+        </div>
       </div>
       <button type="button" class="text-amber-500 hover:text-amber-700"
         (click)="dismissAbsenceBanner()" [attr.aria-label]="'SESSIONS_DASHBOARD.DISMISS' | translate">

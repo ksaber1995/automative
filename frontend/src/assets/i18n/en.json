@@ -4850,6 +4850,7 @@
     "CANCEL_SESSION_REJECT": "Keep it",
     "MSG_SESSION_CANCELLED": "Session cancelled",
     "ABSENCE_BANNER": "{{count}} student(s) were absent in a recent session — follow up (see the ⚠ marks below).",
+    "ABSENCE_MORE": "+{{count}} more",
     "ABSENCE_WARN_BADGE": "Absent ×{{count}}",
     "ABSENCE_WARN_TOOLTIP": "Absent the last {{count}} sessions in a row",
     "DISMISS": "Dismiss",
