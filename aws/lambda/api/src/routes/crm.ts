@@ -81,6 +81,9 @@ async function applyCrmSchema(): Promise<void> {
   await query(`ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM'`);
   await query(`ALTER TABLE crm_activities ALTER COLUMN lead_id DROP NOT NULL`);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_assignee ON crm_activities(assigned_employee_id)`);
+  // A task/activity can be tied to a branch, or left company-wide (migration 073).
+  await query(`ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_act_branch ON crm_activities(branch_id)`);
   await ensureTrigger('update_crm_activities_updated_at', `BEFORE UPDATE ON crm_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
 
@@ -115,6 +118,9 @@ async function applyCrmSchema(): Promise<void> {
     )
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_crm_lists_company ON crm_lists(company_id)`);
+  // A list can be tied to a branch, or left company-wide (migration 073).
+  await query(`ALTER TABLE crm_lists ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_crm_lists_branch ON crm_lists(branch_id)`);
   await ensureTrigger('update_crm_lists_updated_at', `BEFORE UPDATE ON crm_lists
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`);
 
@@ -186,6 +192,8 @@ function mapActivityFromDB(row: any) {
     id: row.id,
     leadId: row.lead_id,
     leadName: row.lead_name ?? null,
+    branchId: row.branch_id ?? null,
+    branchName: row.branch_name ?? null,
     type: row.type,
     subject: row.subject ?? null,
     body: row.body ?? null,
@@ -205,6 +213,8 @@ function mapListFromDB(row: any) {
   return {
     id: row.id,
     companyId: row.company_id,
+    branchId: row.branch_id ?? null,
+    branchName: row.branch_name ?? null,
     name: row.name,
     description: row.description ?? null,
     memberCount: row.member_count !== undefined && row.member_count !== null
@@ -390,6 +400,7 @@ export const crmRoutes = {
             await insert('crm_activities', {
               company_id: context.companyId,
               lead_id: params.id,
+              branch_id: existing.branch_id || null,
               type: 'TASK',
               subject: `Follow up — ${data.stage}`,
               due_at: due.toISOString(),
@@ -533,7 +544,7 @@ export const crmRoutes = {
       const denied = await crmDenied(context.companyId);
       if (denied) return denied;
 
-      const lead = await queryOne<any>('SELECT id FROM crm_leads WHERE id = $1 AND company_id = $2', [params.leadId, context.companyId]);
+      const lead = await queryOne<any>('SELECT id, branch_id FROM crm_leads WHERE id = $1 AND company_id = $2', [params.leadId, context.companyId]);
       if (!lead) return apiError(404, 'ERRORS.CRM.NOT_FOUND', 'Lead not found');
 
       const type = ACTIVITY_TYPES.includes(body?.type) ? body.type : 'NOTE';
@@ -543,6 +554,7 @@ export const crmRoutes = {
       const act = await insert('crm_activities', {
         company_id: context.companyId,
         lead_id: params.leadId,
+        branch_id: lead.branch_id || null, // a timeline activity lives in its lead's branch
         type,
         subject: body?.subject || null,
         body: body?.body || null,
@@ -619,7 +631,7 @@ export const crmRoutes = {
 
   // Tasks list (dedicated page). Filter by assignee (employee), status, lead, text.
   // Standalone tasks (no lead) are included via LEFT JOIN.
-  listTasks: async ({ query: q, headers }: { query: { assigneeId?: string; status?: string; leadId?: string; search?: string }; headers: { authorization: string } }) => {
+  listTasks: async ({ query: q, headers }: { query: { assigneeId?: string; status?: string; leadId?: string; search?: string; branchId?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
@@ -632,18 +644,27 @@ export const crmRoutes = {
       const params: any[] = [context.companyId];
       let sql = `SELECT a.*, l.full_name AS lead_name,
                         TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS owner_name,
-                        TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+                        TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name,
+                        b.name AS branch_name
                  FROM crm_activities a
                  LEFT JOIN crm_leads l ON l.id = a.lead_id
                  LEFT JOIN users u ON u.id = a.owner_user_id
                  LEFT JOIN employees e ON e.id = a.assigned_employee_id
+                 LEFT JOIN branches b ON b.id = a.branch_id
                  WHERE a.company_id = $1 AND a.type = 'TASK'`;
+      // Branch admins see tasks in their branch, plus company-wide (untied) ones.
+      const branchClause = appendBranchSqlFilter(context, params, 'a.branch_id');
+      if (branchClause) sql += ` AND (${branchClause} OR a.branch_id IS NULL)`;
       const status = q.status || 'open';
       if (status === 'open') sql += ` AND a.done_at IS NULL`;
       else if (status === 'overdue') sql += ` AND a.done_at IS NULL AND a.due_at IS NOT NULL AND a.due_at < NOW()`;
       else if (status === 'done') sql += ` AND a.done_at IS NOT NULL`;
       // 'all' → no status filter
       if (q.assigneeId) { params.push(q.assigneeId); sql += ` AND a.assigned_employee_id = $${params.length}`; }
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        params.push(q.branchId); sql += ` AND a.branch_id = $${params.length}`;
+      }
       if (q.leadId) { params.push(q.leadId); sql += ` AND a.lead_id = $${params.length}`; }
       if (q.search) { params.push(`%${q.search}%`); sql += ` AND (a.subject ILIKE $${params.length} OR a.body ILIKE $${params.length})`; }
       sql += ` ORDER BY (a.done_at IS NOT NULL), a.due_at ASC NULLS LAST, a.created_at DESC`;
@@ -670,11 +691,15 @@ export const crmRoutes = {
       if (!body?.subject || !String(body.subject).trim()) {
         return apiError(400, 'ERRORS.CRM.TASK_SUBJECT_REQUIRED', 'Task title is required');
       }
+      if (body.branchId && !canAccessBranch(context, body.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
       const priority = ['LOW', 'MEDIUM', 'HIGH'].includes(body.priority) ? body.priority : 'MEDIUM';
 
       const task = await insert('crm_activities', {
         company_id: context.companyId,
         lead_id: body.leadId || null,
+        branch_id: body.branchId || null,
         type: 'TASK',
         subject: String(body.subject).trim(),
         body: body.body || null,
@@ -686,10 +711,12 @@ export const crmRoutes = {
       });
       const full = await queryOne<any>(
         `SELECT a.*, l.full_name AS lead_name,
-                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name,
+                b.name AS branch_name
          FROM crm_activities a
          LEFT JOIN crm_leads l ON l.id = a.lead_id
-         LEFT JOIN employees e ON e.id = a.assigned_employee_id WHERE a.id = $1`,
+         LEFT JOIN employees e ON e.id = a.assigned_employee_id
+         LEFT JOIN branches b ON b.id = a.branch_id WHERE a.id = $1`,
         [task.id]
       );
       return { status: 201 as const, body: mapActivityFromDB(full || task) };
@@ -720,15 +747,21 @@ export const crmRoutes = {
       if (body.leadId !== undefined) data.lead_id = body.leadId || null;
       if (body.assignedEmployeeId !== undefined) data.assigned_employee_id = body.assignedEmployeeId || null;
       if (body.priority !== undefined && ['LOW', 'MEDIUM', 'HIGH'].includes(body.priority)) data.priority = body.priority;
+      if (body.branchId !== undefined) {
+        if (body.branchId && !canAccessBranch(context, body.branchId)) return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        data.branch_id = body.branchId || null;
+      }
       if (body.done !== undefined) data.done_at = body.done ? (existing.done_at || new Date().toISOString()) : null;
 
       await update('crm_activities', params.id, data);
       const full = await queryOne<any>(
         `SELECT a.*, l.full_name AS lead_name,
-                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name
+                TRIM(CONCAT(e.first_name, ' ', e.last_name)) AS assignee_name,
+                b.name AS branch_name
          FROM crm_activities a
          LEFT JOIN crm_leads l ON l.id = a.lead_id
-         LEFT JOIN employees e ON e.id = a.assigned_employee_id WHERE a.id = $1`,
+         LEFT JOIN employees e ON e.id = a.assigned_employee_id
+         LEFT JOIN branches b ON b.id = a.branch_id WHERE a.id = $1`,
         [params.id]
       );
       return { status: 200 as const, body: mapActivityFromDB(full) };
@@ -998,14 +1031,18 @@ export const crmRoutes = {
       const denied = await crmDenied(context.companyId);
       if (denied) return denied;
 
-      const rows = await query<any>(
-        `SELECT li.*,
-                (SELECT COUNT(*) FROM crm_list_leads m WHERE m.list_id = li.id) AS member_count
-         FROM crm_lists li
-         WHERE li.company_id = $1
-         ORDER BY li.created_at DESC`,
-        [context.companyId],
-      );
+      const params: any[] = [context.companyId];
+      let sql = `SELECT li.*, b.name AS branch_name,
+                        (SELECT COUNT(*) FROM crm_list_leads m WHERE m.list_id = li.id) AS member_count
+                 FROM crm_lists li
+                 LEFT JOIN branches b ON b.id = li.branch_id
+                 WHERE li.company_id = $1`;
+      // Branch admins see lists in their branch, plus company-wide (untied) ones.
+      const branchClause = appendBranchSqlFilter(context, params, 'li.branch_id');
+      if (branchClause) sql += ` AND (${branchClause} OR li.branch_id IS NULL)`;
+      sql += ` ORDER BY li.created_at DESC`;
+
+      const rows = await query<any>(sql, params);
       return { status: 200 as const, body: rows.map(mapListFromDB) };
     } catch (error) {
       console.error('CRM list lists error:', error);
@@ -1025,6 +1062,9 @@ export const crmRoutes = {
 
       const name = String(body?.name ?? '').trim();
       if (!name) return apiError(400, 'ERRORS.CRM.LIST_NAME_REQUIRED', 'List name is required');
+      if (body?.branchId && !canAccessBranch(context, body.branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
 
       // Names are unique per company, so a duplicate is a friendly 409 rather than
       // a constraint violation surfacing as a 500.
@@ -1038,6 +1078,7 @@ export const crmRoutes = {
         company_id: context.companyId,
         name,
         description: body?.description || null,
+        branch_id: body?.branchId || null,
         created_by: context.userId,
       });
       return { status: 201 as const, body: mapListFromDB({ ...row, member_count: 0 }) };
@@ -1075,6 +1116,10 @@ export const crmRoutes = {
         patch.name = name;
       }
       if (body?.description !== undefined) patch.description = body.description || null;
+      if (body?.branchId !== undefined) {
+        if (body.branchId && !canAccessBranch(context, body.branchId)) return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        patch.branch_id = body.branchId || null;
+      }
 
       const row = await update('crm_lists', params.id, patch);
       const count = await queryOne<any>('SELECT COUNT(*) AS n FROM crm_list_leads WHERE list_id = $1', [params.id]);

@@ -6,6 +6,7 @@ import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { DialogModule } from 'primeng/dialog';
+import { SelectModule } from 'primeng/select';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
@@ -17,6 +18,7 @@ import { forkJoin } from 'rxjs';
 import { saveAs } from 'file-saver';
 import { CrmService } from '../services/crm.service';
 import { CrmNavComponent } from '../crm-nav/crm-nav.component';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
@@ -39,7 +41,7 @@ import { CrmLead, CrmList } from '@shared/interfaces/crm.interface';
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TableModule, TagModule,
-    DialogModule, InputTextModule, TextareaModule, TooltipModule, ConfirmDialogModule, DragDropModule,
+    DialogModule, SelectModule, InputTextModule, TextareaModule, TooltipModule, ConfirmDialogModule, DragDropModule,
     TranslateModule, CrmNavComponent,
   ],
   providers: [ConfirmationService],
@@ -47,6 +49,7 @@ import { CrmLead, CrmList } from '@shared/interfaces/crm.interface';
 })
 export class CrmListsComponent implements OnInit {
   private crm = inject(CrmService);
+  private lookup = inject(LookupService);
   private notify = inject(NotificationService);
   private translate = inject(TranslateService);
   private confirm = inject(ConfirmationService);
@@ -54,6 +57,7 @@ export class CrmListsComponent implements OnInit {
 
   lists = signal<CrmList[]>([]);
   loading = signal(false);
+  branches = signal<LookupOption[]>([]);
 
   // ── Board view ─────────────────────────────────────────────────────────────
   // Columns are the lists; cards are the leads in them. Dragging a card into
@@ -138,6 +142,7 @@ export class CrmListsComponent implements OnInit {
   editing = signal<CrmList | null>(null);
   formName = '';
   formDescription = '';
+  formBranchId: string | null = null;
   saving = signal(false);
 
   // Add-leads picker
@@ -161,7 +166,13 @@ export class CrmListsComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.authService.canUseCrm()) return;
+    this.lookup.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.load();
+  }
+
+  branchName(id?: string | null): string {
+    if (!id) return '—';
+    return this.branches().find((b) => b.id === id)?.label || '—';
   }
 
   load(): void {
@@ -201,6 +212,7 @@ export class CrmListsComponent implements OnInit {
     this.editing.set(null);
     this.formName = '';
     this.formDescription = '';
+    this.formBranchId = this.branches().length === 1 ? this.branches()[0].id : null;
     this.formVisible.set(true);
   }
 
@@ -208,6 +220,7 @@ export class CrmListsComponent implements OnInit {
     this.editing.set(list);
     this.formName = list.name;
     this.formDescription = list.description ?? '';
+    this.formBranchId = list.branchId ?? null;
     this.formVisible.set(true);
   }
 
@@ -218,7 +231,7 @@ export class CrmListsComponent implements OnInit {
       return;
     }
     this.saving.set(true);
-    const dto = { name, description: this.formDescription.trim() || null };
+    const dto = { name, description: this.formDescription.trim() || null, branchId: this.formBranchId || null };
     const editing = this.editing();
     const call = editing ? this.crm.updateList(editing.id, dto) : this.crm.createList(dto);
 

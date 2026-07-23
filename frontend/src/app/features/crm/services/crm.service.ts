@@ -75,11 +75,12 @@ export class CrmService {
   }
 
   // Tasks (dedicated page)
-  listTasks(filters?: { assigneeId?: string; status?: string; leadId?: string; search?: string }): Observable<CrmActivity[]> {
+  listTasks(filters?: { assigneeId?: string; status?: string; leadId?: string; search?: string; branchId?: string }): Observable<CrmActivity[]> {
     const clean: any = {};
     if (filters?.assigneeId) clean.assigneeId = filters.assigneeId;
     if (filters?.status) clean.status = filters.status;
     if (filters?.leadId) clean.leadId = filters.leadId;
+    if (filters?.branchId) clean.branchId = filters.branchId;
     if (filters?.search) clean.search = filters.search;
     return this.api.get<CrmActivity[]>('crm/tasks', Object.keys(clean).length ? clean : undefined);
   }

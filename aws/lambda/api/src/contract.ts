@@ -1649,6 +1649,8 @@ const CrmActivitySchema = z.object({
   id: UUIDSchema,
   leadId: UUIDSchema,
   leadName: z.string().nullable().optional(),
+  branchId: UUIDSchema.nullable().optional(),
+  branchName: z.string().nullable().optional(),
   type: z.string(),
   subject: z.string().nullable(),
   body: z.string().nullable(),
@@ -1668,6 +1670,7 @@ const CrmTaskWriteSchema = z.object({
   body: z.string().nullable().optional(),
   dueAt: z.string().nullable().optional(),
   leadId: OptionalUUIDSchema,
+  branchId: OptionalUUIDSchema,
   assignedEmployeeId: OptionalUUIDSchema,
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   done: z.boolean().optional(),
@@ -1704,6 +1707,8 @@ const PoolTypeSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 const CrmListSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable().optional(),
+  branchName: z.string().nullable().optional(),
   name: z.string(),
   description: z.string().nullable(),
   memberCount: z.number(),
@@ -1714,6 +1719,7 @@ const CrmListSchema = z.object({
 const CrmListWriteSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  branchId: OptionalUUIDSchema,
 });
 
 // WhatsApp Cloud API (foundation)
@@ -2715,6 +2721,7 @@ export const contract = c.router({
         assigneeId: UUIDSchema.optional(),
         status: z.string().optional(),
         leadId: UUIDSchema.optional(),
+        branchId: UUIDSchema.optional(),
         search: z.string().optional(),
       }),
       responses: {

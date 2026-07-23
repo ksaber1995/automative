@@ -62,6 +62,8 @@ export interface CrmActivity {
   id: string;
   leadId?: string | null;
   leadName?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
   type: ActivityType;
   subject?: string | null;
   body?: string | null;
@@ -81,6 +83,7 @@ export interface CrmTaskWriteDto {
   body?: string | null;
   dueAt?: string | null;
   leadId?: string | null;
+  branchId?: string | null;
   assignedEmployeeId?: string | null;
   priority?: TaskPriority;
   done?: boolean;
@@ -116,6 +119,8 @@ export interface CrmLeadWriteDto {
 export interface CrmList {
   id: string;
   companyId: string;
+  branchId?: string | null;
+  branchName?: string | null;
   name: string;
   description?: string | null;
   /** How many leads are in the list (populated by the API). */
@@ -127,4 +132,5 @@ export interface CrmList {
 export interface CrmListWriteDto {
   name?: string;
   description?: string | null;
+  branchId?: string | null;
 }

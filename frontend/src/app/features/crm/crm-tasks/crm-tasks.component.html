@@ -30,6 +30,7 @@
             <th>{{ 'CRM.T_COL_ASSIGNEE' | translate }}</th>
             <th>{{ 'CRM.T_COL_PRIORITY' | translate }}</th>
             <th>{{ 'CRM.T_COL_LEAD' | translate }}</th>
+            <th>{{ 'CRM.BRANCH' | translate }}</th>
             <th>{{ 'CRM.T_COL_DUE' | translate }}</th>
             <th style="width: 96px"></th>
           </tr>
@@ -50,6 +51,7 @@
             </td>
             <td><p-tag [value]="priorityLabel(t.priority)" [severity]="prioritySeverity(t.priority)"></p-tag></td>
             <td class="text-sm text-gray-600">{{ t.leadName || '—' }}</td>
+            <td class="text-sm text-gray-600">{{ t.branchName || branchName(t.branchId) }}</td>
             <td class="text-sm whitespace-nowrap" [class.text-red-600]="isOverdue(t)" [class.text-gray-500]="!isOverdue(t)">
               @if (t.dueAt) { <i class="pi pi-clock"></i> {{ t.dueAt | date: 'MMM d, h:mm a' }} } @else { — }
             </td>
@@ -63,7 +65,7 @@
         </ng-template>
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="7" class="text-center py-12 text-gray-400">
+            <td colspan="8" class="text-center py-12 text-gray-400">
               <i class="pi pi-check-square text-4xl mb-3"></i>
               <p class="text-lg font-medium">{{ 'CRM.T_EMPTY' | translate }}</p>
               <p class="text-sm">{{ 'CRM.T_EMPTY_HINT' | translate }}</p>
@@ -107,6 +109,10 @@
             <label class="block text-sm font-medium mb-1">{{ 'CRM.T_COL_LEAD' | translate }}</label>
             <p-select [options]="leads()" [(ngModel)]="form.leadId" optionLabel="label" optionValue="value" [showClear]="true" [filter]="true" [placeholder]="'CRM.T_NO_LEAD' | translate" appendTo="body" [style]="{ width: '100%' }"></p-select>
           </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ 'CRM.BRANCH' | translate }}</label>
+          <p-select [options]="branches()" [(ngModel)]="form.branchId" optionLabel="label" optionValue="id" [showClear]="true" [placeholder]="'CRM.SELECT' | translate" appendTo="body" [style]="{ width: '100%' }"></p-select>
         </div>
       </div>
       <ng-template pTemplate="footer">

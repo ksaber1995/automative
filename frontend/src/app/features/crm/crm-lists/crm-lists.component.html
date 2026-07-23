@@ -49,7 +49,9 @@
                      pDroppable (onDrop)="dropOn(list)">
                   <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between gap-2">
                     <button class="font-semibold text-gray-800 text-start hover:text-indigo-600 truncate"
-                      (click)="open(list)">{{ list.name }}</button>
+                      (click)="open(list)">{{ list.name }}
+                      @if (list.branchId) { <span class="block text-xs font-normal text-gray-400 truncate">{{ list.branchName || branchName(list.branchId) }}</span> }
+                    </button>
                     <span class="text-xs text-gray-400 shrink-0">{{ columnLeads(list.id).length }}</span>
                   </div>
                   <div class="p-2 flex flex-col gap-2 min-h-[100px]">
@@ -80,6 +82,7 @@
           <ng-template pTemplate="header">
             <tr>
               <th>{{ 'CRM.LISTS_COL_NAME' | translate }}</th>
+              <th>{{ 'CRM.BRANCH' | translate }}</th>
               <th>{{ 'CRM.LISTS_COL_MEMBERS' | translate }}</th>
               <th class="w-40 text-end">{{ 'CRM.LISTS_COL_ACTIONS' | translate }}</th>
             </tr>
@@ -93,6 +96,7 @@
                   <span class="block text-xs text-gray-500">{{ list.description }}</span>
                 }
               </td>
+              <td class="text-sm text-gray-600">{{ list.branchName || branchName(list.branchId) }}</td>
               <td>
                 <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1">
                   <i class="pi pi-users text-xs"></i>
@@ -110,7 +114,7 @@
 
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="3">
+              <td colspan="4">
                 <div class="text-center py-10 text-gray-500">
                   <i class="pi pi-bookmark text-4xl mb-3 text-gray-300"></i>
                   <p class="font-medium">{{ 'CRM.LISTS_EMPTY' | translate }}</p>
@@ -133,6 +137,7 @@
           <h1 class="text-2xl font-bold text-gray-800 mt-1">{{ list.name }}</h1>
           <p class="text-gray-500">
             {{ 'CRM.LISTS_MEMBER_COUNT' | translate: { count: members().length } }}
+            @if (list.branchId) { · <i class="pi pi-map-marker text-xs"></i> {{ list.branchName || branchName(list.branchId) }} }
             @if (list.description) { · {{ list.description }} }
           </p>
         </div>
@@ -204,6 +209,10 @@
 
       <label class="block text-sm text-gray-600 mt-3 mb-1">{{ 'CRM.LISTS_DESCRIPTION' | translate }}</label>
       <textarea pTextarea rows="2" class="w-full" [(ngModel)]="formDescription"></textarea>
+
+      <label class="block text-sm text-gray-600 mt-3 mb-1">{{ 'CRM.BRANCH' | translate }}</label>
+      <p-select [options]="branches()" [(ngModel)]="formBranchId" optionLabel="label" optionValue="id"
+        [showClear]="true" [placeholder]="'CRM.SELECT' | translate" appendTo="body" [style]="{ width: '100%' }"></p-select>
 
       <ng-template pTemplate="footer">
         <p-button [label]="'CRM.CANCEL' | translate" [text]="true" (onClick)="formVisible.set(false)"></p-button>

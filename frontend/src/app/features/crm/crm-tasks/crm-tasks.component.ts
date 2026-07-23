@@ -16,6 +16,7 @@ import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CrmService } from '../services/crm.service';
 import { EmployeeService } from '../../employees/services/employee.service';
+import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CrmActivity, TASK_PRIORITIES, TaskPriority } from '@shared/interfaces/crm.interface';
@@ -34,6 +35,7 @@ import { CrmActivity, TASK_PRIORITIES, TaskPriority } from '@shared/interfaces/c
 export class CrmTasksComponent implements OnInit {
   private crm = inject(CrmService);
   private employeeService = inject(EmployeeService);
+  private lookup = inject(LookupService);
   private notify = inject(NotificationService);
   private confirm = inject(ConfirmationService);
   private translate = inject(TranslateService);
@@ -44,6 +46,7 @@ export class CrmTasksComponent implements OnInit {
   tasks = signal<CrmActivity[]>([]);
   employees = signal<{ label: string; value: string }[]>([]);
   leads = signal<{ label: string; value: string }[]>([]);
+  branches = signal<LookupOption[]>([]);
 
   filterStatus = signal<'open' | 'overdue' | 'done' | 'all'>('open');
   filterAssignee: string | null = null;
@@ -62,7 +65,7 @@ export class CrmTasksComponent implements OnInit {
   form: any = this.blank();
 
   private blank() {
-    return { subject: '', body: '', assignedEmployeeId: null, priority: 'MEDIUM' as TaskPriority, dueAt: null as Date | null, leadId: null };
+    return { subject: '', body: '', assignedEmployeeId: null, priority: 'MEDIUM' as TaskPriority, dueAt: null as Date | null, leadId: null, branchId: null as string | null };
   }
 
   ngOnInit() {
@@ -73,6 +76,7 @@ export class CrmTasksComponent implements OnInit {
       next: (list: any[]) => this.employees.set(list.filter(e => e.isActive).map(e => ({ label: `${e.firstName} ${e.lastName}`.trim(), value: e.id }))),
     });
     this.crm.listLeads().subscribe({ next: (rows) => this.leads.set(rows.filter(l => !l.convertedStudentId).map(l => ({ label: l.fullName, value: l.id }))) });
+    this.lookup.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.load();
   }
 
@@ -108,9 +112,15 @@ export class CrmTasksComponent implements OnInit {
     return 'warn';
   }
 
+  branchName(id?: string | null): string {
+    if (!id) return '—';
+    return this.branches().find(b => b.id === id)?.label || '—';
+  }
+
   openCreate() {
     this.editingId.set(null);
     this.form = this.blank();
+    if (this.branches().length === 1) this.form.branchId = this.branches()[0].id;
     this.dialogVisible.set(true);
   }
 
@@ -123,6 +133,7 @@ export class CrmTasksComponent implements OnInit {
       priority: t.priority || 'MEDIUM',
       dueAt: t.dueAt ? new Date(t.dueAt) : null,
       leadId: t.leadId || null,
+      branchId: t.branchId || null,
     };
     this.dialogVisible.set(true);
   }
@@ -137,6 +148,7 @@ export class CrmTasksComponent implements OnInit {
       priority: this.form.priority,
       dueAt: this.form.dueAt ? this.form.dueAt.toISOString() : null,
       leadId: this.form.leadId || null,
+      branchId: this.form.branchId || null,
     };
     const id = this.editingId();
     const req = id ? this.crm.updateTask(id, dto) : this.crm.createTask(dto);
