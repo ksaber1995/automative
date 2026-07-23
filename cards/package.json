@@ -1,0 +1,9 @@
+{
+  "name": "cards",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-only report: cards generated per active client, and the QR pool split (linked vs unlinked). Reads the production /api/karim-admin-secret endpoint. Must be served on http://localhost:4800 for CORS.",
+  "scripts": {
+    "start": "npx --yes http-server . -p 4800 -c-1 -o"
+  }
+}

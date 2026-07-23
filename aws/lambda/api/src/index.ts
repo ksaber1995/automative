@@ -251,6 +251,7 @@ const ALLOWED_ORIGINS = [
   'https://dev.netrofit.com',   // dev frontend
   'http://localhost:4200',      // local Angular dev server
   'http://localhost:4300',      // local admin console
+  'http://localhost:4800',      // local cards report (cards/)
 ];
 
 function getAllowedOrigin(requestOrigin: string | null | undefined): string | null {
