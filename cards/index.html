@@ -115,6 +115,38 @@
     .state.err { color: #d03b3b; }
     a.link { color: var(--linked); }
     .foot { margin-top: 18px; color: var(--muted); font-size: 12px; }
+
+    tbody tr.rowlink { cursor: pointer; }
+    tbody tr.rowlink:focus-visible { outline: 2px solid var(--linked); outline-offset: -2px; }
+
+    /* ---- detail drawer ---- */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(11,11,11,0.38);
+      opacity: 0; visibility: hidden; transition: opacity .16s ease; z-index: 40;
+    }
+    .overlay.open { opacity: 1; visibility: visible; }
+    .drawer {
+      position: fixed; top: 0; right: 0; height: 100%; width: 420px; max-width: 92vw;
+      background: var(--surface); border-left: 1px solid var(--border);
+      box-shadow: -8px 0 32px rgba(11,11,11,0.18);
+      transform: translateX(100%); transition: transform .2s ease; z-index: 50;
+      display: flex; flex-direction: column;
+    }
+    .overlay.open + .drawer, .drawer.open { transform: translateX(0); }
+    .drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid var(--grid); }
+    .drawer-head h2 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+    .drawer-head .meta { color: var(--text-2); font-size: 12.5px; margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .x { border: none; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+    .x:hover { color: var(--text); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+    .drawer-body { overflow-y: auto; padding: 6px 22px 26px; }
+    .sec { margin-top: 18px; }
+    .sec h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13.5px; }
+    .kv dt { color: var(--text-2); }
+    .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+    .kv dd.mono { font-variant-numeric: tabular-nums; }
+    .drawer .poolbar { margin-top: 4px; }
+    .drawer .legend { margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -155,7 +187,7 @@
             <tr>
               <th data-sort="name">Client</th>
               <th data-sort="type">Type</th>
-              <th class="num" data-sort="total">Cards generated</th>
+              <th class="num" data-sort="total">Total cards</th>
               <th class="num" data-sort="linked">Linked</th>
               <th class="num" data-sort="unlinked">Unlinked</th>
               <th>Split</th>
@@ -170,6 +202,18 @@
     <div class="state" id="state">Loading…</div>
     <div class="foot" id="foot"></div>
   </div>
+
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-name">
+    <div class="drawer-head">
+      <div>
+        <h2 id="d-name">—</h2>
+        <div class="meta" id="d-meta"></div>
+      </div>
+      <button class="x" id="d-close" aria-label="Close">×</button>
+    </div>
+    <div class="drawer-body" id="d-body"></div>
+  </aside>
 
   <script>
     // Live, unauthenticated owner endpoint — same one the admin console uses.
@@ -228,8 +272,21 @@
             enabled = s.qr_cards_enabled === true;
           } catch (_) { /* leave zeros if a single client fails */ }
           return {
+            id: c.company_id,
             name: c.company_name || '(unnamed)',
             type: c.company_type || '—',
+            currency: c.currency || null,
+            createdAt: c.company_created_at || null,
+            mobile: c.mobile || null,
+            ownerEmail: c.owner_email || null,
+            subType: c.subscription_type || null,
+            price: c.price,
+            startDate: c.start_date || null,
+            endDate: c.end_date || null,
+            employees: Number(c.employee_count || 0),
+            branches: Number(c.branch_count || 0),
+            students: Number(c.student_count || 0),
+            courses: Number(c.course_count || 0),
             enabled,
             total,
             linked,
@@ -287,8 +344,8 @@
         const bar = r.total
           ? `<span class="minibar"><i class="l" style="width:${lp}%"></i><i class="u" style="width:${100 - lp}%"></i></span>`
           : '<span class="off">—</span>';
-        return `<tr>
-          <td class="name" title="${esc(r.name)}">${esc(r.name)}</td>
+        return `<tr class="rowlink" data-id="${esc(r.id)}" tabindex="0" title="View ${esc(r.name)} details">
+          <td class="name">${esc(r.name)}</td>
           <td><span class="badge">${esc(r.type)}</span>${r.enabled ? '' : ' <span class="off" title="QR pool disabled">off</span>'}</td>
           <td class="num">${fmt(r.total)}</td>
           <td class="num">${fmt(r.linked)}</td>
@@ -319,8 +376,94 @@
     }
 
     function esc(s) {
-      return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     }
+
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return isNaN(d) ? '—' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+    const fmtMoney = (p, cur) => (p == null ? '—' : `${Number(p).toLocaleString()}${cur ? ' ' + esc(cur) : ''}`);
+    const kv = (label, value) => `<dt>${label}</dt><dd>${value}</dd>`;
+
+    // ---- detail drawer ----
+    function openDetail(id) {
+      const r = rows.find((x) => x.id === id);
+      if (!r) return;
+
+      $('d-name').textContent = r.name;
+      $('d-meta').innerHTML =
+        `<span class="badge">${esc(r.type)}</span>` +
+        `<span>${esc(r.subType || '—')} subscription</span>` +
+        (r.enabled ? '' : ' <span class="off">· pool off</span>');
+
+      const lp = r.total ? (r.linked / r.total) * 100 : 0;
+      const bar = r.total
+        ? `<div class="poolbar"><i class="l" style="width:${lp}%"></i><i class="u" style="width:${100 - lp}%"></i></div>
+           <div class="legend"><span><span class="dot l"></span>Linked</span><span><span class="dot u"></span>Unlinked</span></div>`
+        : '<div class="off" style="font-size:13px">No cards generated yet.</div>';
+
+      $('d-body').innerHTML = `
+        <div class="sec">
+          <h3>QR pool</h3>
+          <dl class="kv">
+            ${kv('Total cards', fmt(r.total))}
+            ${kv('Linked', `${fmt(r.linked)}${r.total ? ` (${Math.round((r.linked / r.total) * 100)}%)` : ''}`)}
+            ${kv('Unlinked', fmt(r.unlinked))}
+            ${kv('Pool enabled', r.enabled ? 'Yes' : 'No')}
+          </dl>
+          ${bar}
+        </div>
+        <div class="sec">
+          <h3>Subscription</h3>
+          <dl class="kv">
+            ${kv('Status', esc(r.subType || '—'))}
+            ${kv('Price', fmtMoney(r.price, r.currency))}
+            ${kv('Started', fmtDate(r.startDate))}
+            ${kv('Ends', fmtDate(r.endDate))}
+          </dl>
+        </div>
+        <div class="sec">
+          <h3>Account</h3>
+          <dl class="kv">
+            ${kv('Owner email', r.ownerEmail ? `<a class="link" href="mailto:${esc(r.ownerEmail)}">${esc(r.ownerEmail)}</a>` : '—')}
+            ${kv('Mobile', r.mobile ? esc(r.mobile) : '—')}
+            ${kv('Client since', fmtDate(r.createdAt))}
+          </dl>
+        </div>
+        <div class="sec">
+          <h3>Usage</h3>
+          <dl class="kv">
+            ${kv('Students', fmt(r.students))}
+            ${kv('Courses', fmt(r.courses))}
+            ${kv('Branches', fmt(r.branches))}
+            ${kv('Employees', fmt(r.employees))}
+          </dl>
+        </div>`;
+
+      $('overlay').classList.add('open');
+      $('drawer').classList.add('open');
+      $('d-close').focus();
+    }
+
+    function closeDetail() {
+      $('overlay').classList.remove('open');
+      $('drawer').classList.remove('open');
+    }
+
+    $('tbody').addEventListener('click', (e) => {
+      const tr = e.target.closest('tr.rowlink');
+      if (tr) openDetail(tr.dataset.id);
+    });
+    $('tbody').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tr = e.target.closest('tr.rowlink');
+      if (tr) { e.preventDefault(); openDetail(tr.dataset.id); }
+    });
+    $('overlay').addEventListener('click', closeDetail);
+    $('d-close').addEventListener('click', closeDetail);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
 
     document.querySelectorAll('thead th[data-sort]').forEach((th) => {
       th.addEventListener('click', () => {
