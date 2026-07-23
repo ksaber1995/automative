@@ -194,6 +194,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/expenses/expenses.routes').then(m => m.EXPENSES_ROUTES)
       },
       {
+        path: 'salaries',
+        canActivate: [permissionGuard('expenses')],
+        data: { breadcrumb: 'BREADCRUMBS.SALARIES' },
+        loadChildren: () => import('./features/expenses/salaries/salaries.routes').then(m => m.SALARIES_ROUTES)
+      },
+      {
         path: 'reports',
         canActivate: [permissionGuard('reports')],
         data: { breadcrumb: 'BREADCRUMBS.REPORTS' },

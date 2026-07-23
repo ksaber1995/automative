@@ -257,6 +257,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
       { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
+      { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);

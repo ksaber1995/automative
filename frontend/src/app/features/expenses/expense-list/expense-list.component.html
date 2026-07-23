@@ -15,12 +15,6 @@
             (onClick)="goToManageRecurring()">
           </p-button>
           <p-button
-            [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
-            icon="pi pi-users"
-            severity="warn"
-            (onClick)="goToSalaries()">
-          </p-button>
-          <p-button
             [label]="'EXPENSES.LIST.ADD' | translate"
             icon="pi pi-plus"
             (onClick)="createExpense()">
@@ -48,13 +42,6 @@
           <i class="pi pi-receipt text-blue-600 mr-2"></i>
           {{ 'EXPENSES.LIST.TAB_DIRECT' | translate }}
           <span class="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ directCount() }}</span>
-        </p-tab>
-        <p-tab value="salaries">
-          <i class="pi pi-users text-orange-600 mr-2"></i>
-          {{ 'EXPENSES.LIST.TAB_SALARIES' | translate }}
-          @if (salaryPayments().length > 0) {
-            <span class="ml-2 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ salaryPayments().length }}</span>
-          }
         </p-tab>
         <p-tab value="installments">
           <i class="pi pi-credit-card text-violet-600 mr-2"></i>
@@ -153,66 +140,6 @@
         <!-- ============ Direct ============ -->
         <p-tabpanel value="direct">
           <ng-container *ngTemplateOutlet="expenseTablePanel"></ng-container>
-        </p-tabpanel>
-
-        <!-- ============ Salaries ============ -->
-        <p-tabpanel value="salaries">
-          <div class="flex items-center justify-between mb-3">
-            <p class="text-sm text-gray-600">{{ 'EXPENSES.LIST.SALARIES_HINT' | translate }}</p>
-            <p-button
-              [label]="'EXPENSES.LIST.MANAGE_SALARIES' | translate"
-              icon="pi pi-cog"
-              severity="warn"
-              [outlined]="true"
-              (onClick)="goToSalaries()">
-            </p-button>
-          </div>
-
-          <p-table [value]="salaryPayments()" [loading]="salaryLoading()" responsiveLayout="scroll" [paginator]="true" [rows]="15">
-            <ng-template pTemplate="header">
-              <tr>
-                <th pSortableColumn="date">{{ 'EXPENSES.LIST.COL_DATE' | translate }} <p-sortIcon field="date"></p-sortIcon></th>
-                <th pSortableColumn="employeeId">{{ 'EXPENSES.LIST.COL_EMPLOYEE' | translate }} <p-sortIcon field="employeeId"></p-sortIcon></th>
-                @if (!authService.isTeacher()) {
-                  <th pSortableColumn="branchId">{{ 'EXPENSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
-                }
-                <th pSortableColumn="amount" class="text-right">{{ 'EXPENSES.LIST.COL_AMOUNT' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
-                <th pSortableColumn="bonusAmount" class="text-right">{{ 'EXPENSES.LIST.COL_BONUS' | translate }} <p-sortIcon field="bonusAmount"></p-sortIcon></th>
-                <th pSortableColumn="discountAmount" class="text-right">{{ 'EXPENSES.LIST.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
-                <th pSortableColumn="notes">{{ 'EXPENSES.LIST.COL_NOTES' | translate }} <p-sortIcon field="notes"></p-sortIcon></th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-p>
-              <tr>
-                <td>{{ p.date | date: 'MMM d, y' }}</td>
-                <td class="font-medium">{{ getEmployeeName(p.employeeId) }}</td>
-                @if (!authService.isTeacher()) {
-                  <td>{{ getBranchName(p.branchId) }}</td>
-                }
-                <td class="text-right font-semibold text-green-700">{{ p.amount | number:'1.2-2' }}</td>
-                <td class="text-right">
-                  @if (p.bonusAmount && p.bonusAmount > 0) {
-                    <span class="text-blue-600">+{{ p.bonusAmount | number:'1.2-2' }}</span>
-                  } @else {
-                    <span class="text-gray-400">—</span>
-                  }
-                </td>
-                <td class="text-right">
-                  @if (p.discountAmount && p.discountAmount > 0) {
-                    <span class="text-red-600">-{{ p.discountAmount | number:'1.2-2' }}</span>
-                  } @else {
-                    <span class="text-gray-400">—</span>
-                  }
-                </td>
-                <td class="text-sm text-gray-600">{{ p.notes || p.adjustmentReason || '' }}</td>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="emptymessage">
-              <tr>
-                <td [attr.colspan]="authService.isTeacher() ? 6 : 7" class="text-center py-8 text-gray-500">{{ 'EXPENSES.LIST.NO_SALARIES' | translate }}</td>
-              </tr>
-            </ng-template>
-          </p-table>
         </p-tabpanel>
 
         <!-- ============ Installments ============ -->

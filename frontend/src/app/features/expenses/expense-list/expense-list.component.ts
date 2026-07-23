@@ -20,14 +20,14 @@ import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Expense, ExpensePayment } from '@shared/interfaces/expense.interface';
+import { Expense } from '@shared/interfaces/expense.interface';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { InstallmentPlan } from '@shared/interfaces/installment.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { toLocalYmd } from '../../../core/utils/date.util';
 
-type ExpenseTab = 'all' | 'due' | 'direct' | 'salaries' | 'installments' | 'events';
+type ExpenseTab = 'all' | 'due' | 'direct' | 'installments' | 'events';
 
 @Component({
   selector: 'app-expense-list',
@@ -64,9 +64,6 @@ export class ExpenseListComponent implements OnInit {
   dueLoading = signal(false);
   dueMonth = signal<string>(new Date().toISOString().substring(0, 7));
   dueTotal = signal<number>(0);
-
-  salaryPayments = signal<ExpensePayment[]>([]);
-  salaryLoading = signal(false);
 
   installmentPlans = signal<InstallmentPlan[]>([]);
   installmentLoading = signal(false);
@@ -172,8 +169,6 @@ export class ExpenseListComponent implements OnInit {
     this.activeTab.set(tab);
     if (tab === 'due' && this.dueItems().length === 0) {
       this.loadDue();
-    } else if (tab === 'salaries' && this.salaryPayments().length === 0) {
-      this.loadSalaryPayments();
     } else if (tab === 'installments' && this.installmentPlans().length === 0) {
       this.loadInstallments();
     }
@@ -191,21 +186,6 @@ export class ExpenseListComponent implements OnInit {
     });
   }
 
-  loadSalaryPayments() {
-    this.salaryLoading.set(true);
-    const params: any = { category: 'SALARIES' };
-    if (this.selectedBranchId) params.branchId = this.selectedBranchId;
-    if (this.startDate) params.startDate = this.startDate;
-    if (this.endDate) params.endDate = this.endDate;
-    this.expenseService.getAllPayments(params).subscribe({
-      next: (payments) => {
-        this.salaryPayments.set(payments.filter(p => !!p.employeeId));
-        this.salaryLoading.set(false);
-      },
-      error: () => this.salaryLoading.set(false),
-    });
-  }
-
   loadInstallments() {
     this.installmentLoading.set(true);
     const params: any = {};
@@ -217,12 +197,6 @@ export class ExpenseListComponent implements OnInit {
       },
       error: () => this.installmentLoading.set(false),
     });
-  }
-
-  getEmployeeName(employeeId?: string | null): string {
-    if (!employeeId) return '—';
-    const e = this.employees().find(x => x.id === employeeId);
-    return e ? `${e.firstName} ${e.lastName}` : 'Unknown';
   }
 
   installmentProgress(plan: InstallmentPlan): string {
@@ -245,7 +219,7 @@ export class ExpenseListComponent implements OnInit {
   goToDuesPay(item: any) {
     // Recurring → expense detail (pay button), Salary → salaries page.
     if (item.type === 'salary') {
-      this.router.navigate(['/expenses/salaries']);
+      this.router.navigate(['/salaries']);
     } else if (item.templateId) {
       this.router.navigate(['/expenses', item.templateId]);
     }
@@ -352,10 +326,6 @@ export class ExpenseListComponent implements OnInit {
 
   goToInstallments() {
     this.router.navigate(['/expenses/installments']);
-  }
-
-  goToSalaries() {
-    this.router.navigate(['/expenses/salaries']);
   }
 
   confirmPaySalaries() {
