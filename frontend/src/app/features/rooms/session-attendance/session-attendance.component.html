@@ -82,6 +82,22 @@
     </div>
   </div>
 
+  <!-- Absent-streak warning: flashes for a few seconds when the roster loads with
+       students who have missed the last few sessions in a row. The inline ⚠ marks
+       beside those students stay after this dismisses. -->
+  @if (showAbsenceBanner() && atRiskStudents().length > 0) {
+    <div class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+      <i class="pi pi-exclamation-triangle mt-0.5"></i>
+      <div class="flex-1 text-sm">
+        {{ 'SESSIONS_DASHBOARD.ABSENCE_BANNER' | translate: { count: atRiskStudents().length, threshold: ABSENCE_WARN_THRESHOLD } }}
+      </div>
+      <button type="button" class="text-amber-500 hover:text-amber-700"
+        (click)="dismissAbsenceBanner()" [attr.aria-label]="'SESSIONS_DASHBOARD.DISMISS' | translate">
+        <i class="pi pi-times"></i>
+      </button>
+    </div>
+  }
+
   <!-- Teacher management -->
   @if (teacherPanelOpen()) {
     <div class="mb-4">
@@ -272,6 +288,13 @@
                     @if (student.attendanceType === 'SUBSTITUTION') {
                       <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                         {{ 'SESSIONS_DASHBOARD.SUBSTITUTION_FROM' | translate: { className: student.homeClassName } }}
+                      </span>
+                    }
+                    @if (isAtRisk(student)) {
+                      <span class="ml-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+                        [pTooltip]="'SESSIONS_DASHBOARD.ABSENCE_WARN_TOOLTIP' | translate: { count: student.absentStreak }">
+                        <i class="pi pi-exclamation-triangle" style="font-size:10px"></i>
+                        {{ 'SESSIONS_DASHBOARD.ABSENCE_WARN_BADGE' | translate: { count: student.absentStreak } }}
                       </span>
                     }
                   </label>

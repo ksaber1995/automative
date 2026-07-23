@@ -22,6 +22,8 @@ export interface SessionAttendanceStudent {
   isEnrolled?: boolean;
   /** PER_SESSION: the student's existing charge for this session (null if none). */
   charge?: { status: string; amountDue: number; amountPaid: number } | null;
+  /** How many of this class's most recent ended sessions the student missed in a row. */
+  absentStreak?: number | null;
 }
 
 export interface StudentAttendanceRecord {

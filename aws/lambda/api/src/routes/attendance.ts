@@ -112,6 +112,64 @@ export const attendanceRoutes = {
         }
       }
 
+      // Consecutive-absence warning: for each enrolled student, how many of this
+      // class's most recent ENDED sessions they have missed in an unbroken run
+      // (counting back from the latest). Only ended, non-free sessions count and
+      // the current (still-running) session is excluded. A SUBSTITUTION into
+      // another class of the same course + session_number counts as present —
+      // same fairness as the student attendance history — so a student who
+      // attended elsewhere is not flagged. Capped at the last 20 sessions.
+      const absentStreakByStudent = new Map<string, number>();
+      const streakRows = await query<any>(
+        `WITH recent AS (
+            SELECT s.id, s.session_number,
+                   ROW_NUMBER() OVER (ORDER BY s.start_date DESC) AS rn
+            FROM sessions s
+            WHERE s.class_id = $1 AND s.company_id = $2
+              AND s.id <> $3
+              AND s.end_date IS NOT NULL
+              AND COALESCE(s.is_free, false) = false
+            ORDER BY s.start_date DESC
+            LIMIT 20
+         ),
+         enrolled AS (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+         ),
+         presence AS (
+            SELECT e.student_id, r.rn,
+              (
+                EXISTS (
+                  SELECT 1 FROM session_attendance sa
+                  WHERE sa.session_id = r.id AND sa.student_id = e.student_id
+                    AND sa.attendance_type = 'NORMAL'
+                )
+                OR (r.session_number IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM session_attendance sub
+                  JOIN sessions s2 ON s2.id = sub.session_id
+                  JOIN classes c2 ON c2.id = s2.class_id
+                  WHERE sub.student_id = e.student_id
+                    AND sub.attendance_type = 'SUBSTITUTION'
+                    AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
+                    AND s2.session_number = r.session_number
+                ))
+              ) AS present
+            FROM recent r CROSS JOIN enrolled e
+         )
+         SELECT student_id,
+           CASE WHEN bool_or(present) THEN MIN(rn) FILTER (WHERE present) - 1
+                ELSE COUNT(*) END AS absent_streak
+         FROM presence
+         GROUP BY student_id`,
+        [session.class_id, context.companyId, params.sessionId]
+      );
+      for (const r of streakRows) {
+        absentStreakByStudent.set(r.student_id, Number(r.absent_streak ?? 0));
+      }
+
       return {
         status: 200 as const,
         body: students.map((row: any) => ({
@@ -127,6 +185,7 @@ export const attendanceRoutes = {
           homeClassName: row.home_class_name || null,
           isEnrolled: row.is_enrolled === true,
           charge: chargeByStudent.get(row.student_id) || null,
+          absentStreak: absentStreakByStudent.get(row.student_id) ?? 0,
         })),
       };
     } catch (error) {

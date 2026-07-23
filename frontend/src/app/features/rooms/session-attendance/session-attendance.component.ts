@@ -139,6 +139,18 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   presentCount = computed(() => this.students().filter((s) => s.isPresent).length);
   absentCount = computed(() => this.students().filter((s) => !s.isPresent).length);
 
+  /** A student absent this many of the class's recent sessions in a row is flagged. */
+  readonly ABSENCE_WARN_THRESHOLD = 3;
+  /** Enrolled students who have missed the last N sessions in a row. */
+  atRiskStudents = computed(() =>
+    this.students().filter((s) => (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD),
+  );
+  isAtRisk = (s: SessionAttendanceStudent): boolean =>
+    (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD;
+  /** Top banner shown briefly when the roster loads with at-risk students. */
+  showAbsenceBanner = signal(false);
+  private absenceBannerTimer?: ReturnType<typeof setTimeout>;
+
   /** TEACHER-type company — used to hide staff/teacher management. */
   isTeacherCompany = computed(() => this.auth.isTeacher());
 
@@ -222,9 +234,27 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       next: (students) => {
         this.students.set(students.map((s) => ({ ...s })));
         this.loading.set(false);
+        this.maybeShowAbsenceBanner();
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** Flash the top banner for a few seconds when the roster has at-risk students.
+   *  The inline ⚠ marks beside each student stay put. */
+  private maybeShowAbsenceBanner() {
+    if (this.absenceBannerTimer) clearTimeout(this.absenceBannerTimer);
+    if (this.atRiskStudents().length === 0) {
+      this.showAbsenceBanner.set(false);
+      return;
+    }
+    this.showAbsenceBanner.set(true);
+    this.absenceBannerTimer = setTimeout(() => this.showAbsenceBanner.set(false), 8000);
+  }
+
+  dismissAbsenceBanner() {
+    if (this.absenceBannerTimer) clearTimeout(this.absenceBannerTimer);
+    this.showAbsenceBanner.set(false);
   }
 
   togglePresence(student: SessionAttendanceStudent, value: boolean) {
@@ -675,6 +705,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.audioCtx?.close().catch(() => {});
     if (this.saveTimer) clearTimeout(this.saveTimer);
     if (this.savedClearTimer) clearTimeout(this.savedClearTimer);
+    if (this.absenceBannerTimer) clearTimeout(this.absenceBannerTimer);
   }
 
   formatTime(dateStr: string): string {
