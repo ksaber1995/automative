@@ -61,6 +61,16 @@ export class GlobalScanService {
   dispatch(decodedText: string, forceOpen = false): void {
     const token = this.extractToken(decodedText);
     if (!token) return;
+    // Every QR token — student or pre-printed card — is 32 hex characters, and
+    // extractToken has already stripped any /p/s/ URL and lower-cased the result.
+    // Anything else here is a genuinely bad read — most often a keyboard-wedge
+    // burst that got split (a stall between keystrokes, or focus landing in a
+    // field mid-scan) leaving us holding the tail. Tell the user to rescan rather
+    // than sending garbage to the API and getting a misleading "student not found".
+    if (!/^[0-9a-f]{32}$/.test(token)) {
+      this.notify.warning(this.translate.instant('NAV.QR_SCAN_INCOMPLETE'));
+      return;
+    }
     if (this.handler && !forceOpen) {
       this.handler(token);
       return;
