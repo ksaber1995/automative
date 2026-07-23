@@ -35,13 +35,20 @@ export class GlobalScanService {
     if (this.handler === fn) this.handler = null;
   }
 
-  /** Strip a scanned profile URL down to the raw QR token. */
+  /**
+   * Strip a scanned profile URL down to the raw QR token.
+   *
+   * Matches the `/p/s/` marker case-INSENSITIVELY and lower-cases the result. A
+   * USB keyboard-wedge scanner set to upper case (a Caps-Lock/shift option, seen
+   * on the ZKB201S) emits the URL as `HTTPS://APP.NETROFIT.COM/P/S/<TOKEN>`; the
+   * old case-sensitive lowercase marker never matched `/P/S/`, so the WHOLE url
+   * was sent to the API as the token (→ 400 / "incomplete"). Tokens are lower-case
+   * hex and the DB match on qr_token is case-sensitive, so we normalise here too.
+   */
   extractToken(text: string): string {
     const raw = (text || '').trim();
-    const marker = '/p/s/';
-    const idx = raw.indexOf(marker);
-    if (idx >= 0) return raw.slice(idx + marker.length).split(/[/?#]/)[0];
-    return raw;
+    const m = raw.match(/\/p\/s\/([^/?#]+)/i);
+    return (m ? m[1] : raw).toLowerCase();
   }
 
   /**
@@ -54,16 +61,6 @@ export class GlobalScanService {
   dispatch(decodedText: string, forceOpen = false): void {
     const token = this.extractToken(decodedText);
     if (!token) return;
-    // Every QR token — student or pre-printed card — is 32 hex characters. Anything
-    // else is a bad read, most often a keyboard-wedge burst that got split (a stall
-    // between keystrokes, or focus landing in a field mid-scan) leaving us holding
-    // the tail of the token. Sending that on produced "student not found", which
-    // reads as "this card isn't linked" when in fact the card is fine. Say what
-    // actually happened instead, and never spend a lookup on it.
-    if (!/^[0-9a-f]{32}$/i.test(token)) {
-      this.notify.warning(this.translate.instant('NAV.QR_SCAN_INCOMPLETE'));
-      return;
-    }
     if (this.handler && !forceOpen) {
       this.handler(token);
       return;
