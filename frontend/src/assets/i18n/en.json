@@ -544,7 +544,10 @@
       "INVALID_SESSION_NUMBER": "Session number must be a positive whole number",
       "NEXT_NUMBER_FAILED": "Failed to work out the next session number",
       "PREPARE_FAILED": "Failed to prepare session",
-      "UPDATE_FAILED": "Failed to update session"
+      "UPDATE_FAILED": "Failed to update session",
+      "NOT_STARTED": "This session hasn't been started yet",
+      "CANCEL_HAS_ATTENDANCE": "Can't cancel — students are already checked in. End the session instead.",
+      "CANCEL_FAILED": "Failed to cancel session"
     },
     "SUBSCRIPTIONS": {
       "NOT_FOUND": "Subscription not found",
@@ -4840,6 +4843,12 @@
     "MSG_SESSION_NUMBER_SAVED": "Session number updated",
     "MSG_SESSION_ENDED": "Session ended successfully",
     "MSG_END_FAILED": "Failed to end session",
+    "CANCEL_SESSION": "Cancel Session",
+    "CANCEL_SESSION_TITLE": "Cancel this session?",
+    "CANCEL_SESSION_MSG": "This removes the session as if it never started — it disappears from the dashboard and nobody is billed. This can't be undone. (Only available before anyone is checked in.)",
+    "CANCEL_SESSION_ACCEPT": "Cancel session",
+    "CANCEL_SESSION_REJECT": "Keep it",
+    "MSG_SESSION_CANCELLED": "Session cancelled",
     "MSG_LOAD_STUDENTS_FAILED": "Failed to load students for attendance",
     "MSG_ATTENDANCE_SAVED": "Attendance saved — {{count}} present",
     "MSG_ATTENDANCE_SAVE_FAILED": "Failed to save attendance",

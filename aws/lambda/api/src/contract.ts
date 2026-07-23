@@ -6263,6 +6263,18 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    cancel: {
+      method: 'PATCH' as const,
+      path: '/api/sessions/:id/cancel',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}),
+      responses: {
+        200: z.any(),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     list: {
       method: 'GET' as const,
       path: '/api/sessions',

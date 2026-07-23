@@ -392,6 +392,20 @@
                   ></p-button>
                 </div>
 
+                <!-- Cancel = undo a mistaken start. Only while nobody's checked in
+                     yet; once attendance is taken, End (which bills) is the path. -->
+                @if (!session.presentCount) {
+                  <p-button
+                    [label]="'SESSIONS_DASHBOARD.CANCEL_SESSION' | translate"
+                    icon="pi pi-times"
+                    severity="danger"
+                    [text]="true"
+                    size="small"
+                    styleClass="w-full mt-2"
+                    (onClick)="confirmCancelSession(session)"
+                  ></p-button>
+                }
+
                 <!-- Teacher attendance accordion -->
                 @if (expandedTeachersSessionId() === session.id) {
                   <div class="mt-4 pt-4 border-t border-gray-200">

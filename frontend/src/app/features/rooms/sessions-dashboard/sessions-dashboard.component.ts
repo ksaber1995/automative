@@ -603,6 +603,38 @@ export class SessionsDashboardComponent implements OnInit {
     });
   }
 
+  /**
+   * Cancel = undo a session started by mistake: delete it so it disappears from
+   * the dashboard, billing nobody. Only offered while no student is checked in
+   * (the button is hidden otherwise) — the server enforces the same rule.
+   */
+  confirmCancelSession(session: Session) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSIONS_DASHBOARD.CANCEL_SESSION_TITLE'),
+      message: this.translate.instant('SESSIONS_DASHBOARD.CANCEL_SESSION_MSG'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('SESSIONS_DASHBOARD.CANCEL_SESSION_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSIONS_DASHBOARD.CANCEL_SESSION_REJECT'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.cancelSession(session),
+    });
+  }
+
+  private cancelSession(session: Session) {
+    this.saving.set(true);
+    this.sessionService.cancel(session.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_CANCELLED'));
+        this.loadAll();
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.saving.set(false);
+      },
+    });
+  }
+
   // ── Upcoming sessions ────────────────────────────────────────────────────────
 
   /** Maps classId → session that was auto-started for pre-attendance */

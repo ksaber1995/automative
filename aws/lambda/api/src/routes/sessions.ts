@@ -778,6 +778,66 @@ export const sessionsRoutes = {
     }
   },
 
+  /**
+   * PATCH /api/sessions/:id/cancel
+   * Undo a session that was started by mistake: delete it outright so it
+   * vanishes from the dashboard, as if it had never started. Distinct from
+   * `end` (which requires a teacher present and BILLS absent students) — cancel
+   * bills nobody.
+   *
+   * Guardrail: only a session with NO student checked in yet can be cancelled.
+   * Once the roster is real, the user must End it instead — deleting it would
+   * silently drop attendance the customer took. And because per-session charges
+   * are only ever created on check-in, "no attendance" also means "no charges",
+   * so the plain DELETE has nothing to refund. FK cascades clear the
+   * session_teacher_attendance rows that start writes.
+   */
+  cancel: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureStartedColumn();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne<any>(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) {
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      }
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+      if (existing.end_date) {
+        return apiError(400, 'ERRORS.SESSIONS.ALREADY_ENDED', 'Session has already ended');
+      }
+      if (!existing.started) {
+        return apiError(400, 'ERRORS.SESSIONS.NOT_STARTED', 'Session has not been started');
+      }
+
+      const attended = await queryOne<any>(
+        'SELECT COUNT(*)::int AS n FROM session_attendance WHERE session_id = $1',
+        [params.id]
+      );
+      if (Number(attended?.n ?? 0) > 0) {
+        return apiError(
+          400,
+          'ERRORS.SESSIONS.CANCEL_HAS_ATTENDANCE',
+          'Cannot cancel — students are already checked in. End the session instead.'
+        );
+      }
+
+      await query('DELETE FROM sessions WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+
+      return { status: 200 as const, body: { success: true, id: params.id } };
+    } catch (error) {
+      console.error('Cancel session error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.CANCEL_FAILED', 'Failed to cancel session', 400);
+    }
+  },
+
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; classId?: string; roomId?: string; courseId?: string; studentId?: string; attendance?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

@@ -164,6 +164,7 @@ const router = {
     prepare: sessionsRoutes.prepare,
     autoSchedule: sessionsRoutes.autoSchedule,
     end: sessionsRoutes.end,
+    cancel: sessionsRoutes.cancel,
     list: sessionsRoutes.list,
     listActive: sessionsRoutes.listActive,
     // NOTE: itty-router (used by @ts-rest/serverless) matches in registration

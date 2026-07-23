@@ -138,6 +138,14 @@ export class SessionService {
     return this.api.patch<Session>(`sessions/${id}/end`, { notes, endDate });
   }
 
+  /**
+   * Undo a mistaken start: delete the session outright. The server only allows
+   * this before any student is checked in (otherwise End is the right action).
+   */
+  cancel(id: string): Observable<{ success: boolean; id: string }> {
+    return this.api.patch<{ success: boolean; id: string }>(`sessions/${id}/cancel`, {});
+  }
+
   /** Suggested next session number for a class's course (prefills the Start dialog). */
   nextNumber(classId: string): Observable<{ sessionNumber: number }> {
     return this.api.get<{ sessionNumber: number }>('sessions/next-number', { classId });

@@ -544,7 +544,10 @@
       "INVALID_SESSION_NUMBER": "رقم الحصة يجب أن يكون رقمًا صحيحًا موجبًا",
       "NEXT_NUMBER_FAILED": "فشل حساب رقم الحصة التالي",
       "PREPARE_FAILED": "فشل تجهيز الحصة",
-      "UPDATE_FAILED": "فشل تحديث الحصة"
+      "UPDATE_FAILED": "فشل تحديث الحصة",
+      "NOT_STARTED": "لم تبدأ هذه الحصة بعد",
+      "CANCEL_HAS_ATTENDANCE": "لا يمكن الإلغاء — تم تسجيل حضور طلاب بالفعل. أنهِ الحصة بدلاً من ذلك.",
+      "CANCEL_FAILED": "فشل إلغاء الحصة"
     },
     "SUBSCRIPTIONS": {
       "NOT_FOUND": "الاشتراك غير موجود",
@@ -4964,6 +4967,12 @@
     "MSG_START_FAILED": "فشل بدء الحصة",
     "MSG_SESSION_ENDED": "تم إنهاء الحصة بنجاح",
     "MSG_END_FAILED": "فشل إنهاء الحصة",
+    "CANCEL_SESSION": "إلغاء الحصة",
+    "CANCEL_SESSION_TITLE": "إلغاء هذه الحصة؟",
+    "CANCEL_SESSION_MSG": "سيؤدي هذا إلى حذف الحصة كأنها لم تبدأ — تختفي من اللوحة ولا يُحاسَب أحد. لا يمكن التراجع عن ذلك. (متاح فقط قبل تسجيل حضور أي طالب.)",
+    "CANCEL_SESSION_ACCEPT": "إلغاء الحصة",
+    "CANCEL_SESSION_REJECT": "الاحتفاظ بها",
+    "MSG_SESSION_CANCELLED": "تم إلغاء الحصة",
     "MSG_LOAD_STUDENTS_FAILED": "فشل تحميل الطلاب للحضور",
     "MSG_ATTENDANCE_SAVED": "تم حفظ الحضور — {{count}} حاضر",
     "MSG_ATTENDANCE_SAVE_FAILED": "فشل حفظ الحضور",
