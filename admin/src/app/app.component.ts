@@ -298,9 +298,6 @@ const DEBUG_EMAIL = 'master@master.com';
                           Move
                         </button>
                       }
-                      <button class="act danger" [disabled]="busyId() === u.id" (click)="openDeleteUser(u)">
-                        Delete
-                      </button>
                     </td>
                   </tr>
                 }
@@ -342,23 +339,6 @@ const DEBUG_EMAIL = 'master@master.com';
         </div>
       }
 
-      <!-- Delete a user -->
-      @if (deleteUserRow(); as u) {
-        <div class="overlay" (click)="deleteUserRow.set(null)">
-          <div class="modal" (click)="$event.stopPropagation()">
-            <h2 class="danger-title">Delete user</h2>
-            <p class="modal-sub">
-              <strong>{{ u.first_name }} {{ u.last_name }}</strong> ({{ u.email }}) in
-              <strong>{{ u.company_name || 'no tenant' }}</strong>. This cannot be undone.
-            </p>
-            <div class="modal-foot">
-              <button class="act" [disabled]="busyId() === u.id" (click)="deleteUserRow.set(null)">Cancel</button>
-              <button class="act danger" [disabled]="busyId() === u.id" (click)="confirmDeleteUser(u)">Delete</button>
-            </div>
-          </div>
-        </div>
-      }
-
       <!-- Move a user to another tenant -->
       @if (moveUserRow(); as u) {
         <div class="overlay" (click)="moveUserRow.set(null)">
@@ -373,7 +353,7 @@ const DEBUG_EMAIL = 'master@master.com';
             <select class="search" [ngModel]="moveTarget()" (ngModelChange)="moveTarget.set($event)">
               <option value="">Choose a tenant…</option>
               @for (c of rows(); track c.company_id) {
-                @if (c.company_id !== u.company_id) {
+                @if (c.company_id !== u.company_id && c.company_active) {
                   <option [value]="c.company_id">{{ c.company_name }}</option>
                 }
               }
@@ -1079,7 +1059,6 @@ export class AppComponent implements OnInit {
   userCompany = signal('');
   createUserOpen = signal(false);
   creatingUser = signal(false);
-  deleteUserRow = signal<TenantUser | null>(null);
   newUser = { companyId: '', email: '', password: '', firstName: '', lastName: '', role: 'ADMIN' };
 
   visibleUsers = computed(() => {
@@ -1149,10 +1128,6 @@ export class AppComponent implements OnInit {
     });
   }
 
-  openDeleteUser(u: TenantUser) {
-    this.deleteUserRow.set(u);
-  }
-
   // Moving an account between tenants — for a debugging login that needs to sit
   // inside a customer's data. The API refuses to move a tenant's last admin out,
   // for the same reason it refuses to delete them.
@@ -1189,23 +1164,6 @@ export class AppComponent implements OnInit {
         this.busyId.set(null);
         // e.g. "last admin" — keep the dialog open so the message is read in context.
         this.error.set(`Move user: ${err?.error?.message || err?.message || 'Request failed'}`);
-      },
-    });
-  }
-
-  confirmDeleteUser(u: TenantUser) {
-    this.busyId.set(u.id);
-    this.service.deleteUser(u.id).subscribe({
-      next: () => {
-        this.busyId.set(null);
-        this.deleteUserRow.set(null);
-        this.showFlash(`${u.email} deleted.`);
-        this.loadUsers();
-      },
-      error: (err) => {
-        this.busyId.set(null);
-        // e.g. "last admin" — keep the dialog open so the message is read in context.
-        this.error.set(`Delete user: ${err?.error?.message || err?.message || 'Request failed'}`);
       },
     });
   }
