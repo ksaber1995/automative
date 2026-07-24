@@ -27,8 +27,6 @@ export interface MonthlyPaymentWithDetails extends MonthlySubscriptionPayment {
   studentName: string;
   /** The student's sequential code, and the QR state that decides whether it may be shown. */
   studentCode?: number | string | null;
-  qrActivated?: boolean;
-  qrExpiration?: string | null;
   courseName: string;
   branchName: string;
   className?: string | null;
@@ -47,8 +45,6 @@ export interface HeldSubscription {
   branchId: string;
   studentName: string;
   studentCode?: number | string | null;
-  qrActivated?: boolean;
-  qrExpiration?: string | null;
   courseName: string;
   branchName: string;
   className?: string | null;

@@ -31,12 +31,6 @@ function mapStudentFromDB(row: any) {
     acquisitionChannel: row.acquisition_channel,
     studentCode: row.student_code ?? null,
     qrToken: row.qr_token,
-    // QR is active by default for every student (no activation gate) — always
-    // report it live so the code/QR shows for all tenants, like academies.
-    qrActivated: true,
-    qrExpiration: row.qr_expiration ?? null,
-    qrPrice: row.qr_price === null || row.qr_price === undefined ? null : parseFloat(row.qr_price),
-    qrPaid: row.qr_paid === true,
     hasSubscriptions: row.has_subscriptions === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

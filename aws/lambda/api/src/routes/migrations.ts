@@ -1272,24 +1272,21 @@ async function addCompanyType() {
 }
 
 async function addQrActivationToStudents() {
-  console.log('Starting migration: add QR activation columns to students');
-
-  await query(`
-    ALTER TABLE students
-      ADD COLUMN IF NOT EXISTS qr_activated BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS qr_expiration DATE,
-      ADD COLUMN IF NOT EXISTS qr_price DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS qr_paid BOOLEAN DEFAULT false
-  `);
-
-  // Booleans must never be NULL — backfill pre-existing rows.
-  const a = await query(`UPDATE students SET qr_activated = false WHERE qr_activated IS NULL RETURNING id`);
-  const p = await query(`UPDATE students SET qr_paid = false WHERE qr_paid IS NULL RETURNING id`);
-
-  console.log('✅ students QR-activation migration completed!');
+  // No-op since migration 078 dropped these columns.
+  //
+  // The QR-activation gate is gone: the QR is free for every tenant, nothing
+  // reads qr_activated / qr_price / qr_paid / qr_expiration, and the columns
+  // have been dropped. This used to ADD them back, so leaving it live would let
+  // one call to /api/migrations/add-qr-activation-to-students resurrect the
+  // whole concept.
+  //
+  // Kept as a routed no-op rather than deleted: the endpoint is public and
+  // something outside this repo may still call it, and a 200 saying "nothing to
+  // do" beats a 404.
+  console.log('add-qr-activation-to-students: no-op (columns dropped in migration 078)');
   return {
     success: true,
-    message: `students QR-activation columns ready; backfilled qr_activated=${a.length}, qr_paid=${p.length}`,
+    message: 'No-op: the QR activation columns were removed (migration 078).',
   };
 }
 

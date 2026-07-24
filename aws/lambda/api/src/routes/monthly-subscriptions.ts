@@ -34,7 +34,6 @@ function mapPaymentWithDetailsFromDB(row: any) {
     // The code, plus what the UI needs to decide whether it may be shown yet:
     // a TEACHER company only reveals it once the student's QR is live.
     studentCode: row.student_code ?? null,
-    qrExpiration: row.qr_expiration ?? null,
     courseName: row.course_name,
     branchName: row.branch_name,
     className: row.class_name || null,
@@ -386,7 +385,6 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           s.qr_expiration AS qr_expiration,
            s.phone        AS student_phone,
            s.parent_phone AS parent_phone,
            s.parent_name  AS parent_name,
@@ -462,7 +460,6 @@ export const monthlySubscriptionsRoutes = {
            e.hold_start_year,
            s.name AS student_name,
            s.student_code AS student_code,
-           s.qr_expiration AS qr_expiration,
            c.name         AS course_name,
            b.name         AS branch_name,
            cl.name        AS class_name
@@ -483,7 +480,6 @@ export const monthlySubscriptionsRoutes = {
         branchId: r.branch_id,
         studentName: r.student_name,
         studentCode: r.student_code ?? null,
-        qrExpiration: r.qr_expiration ?? null,
         courseName: r.course_name,
         branchName: r.branch_name,
         className: r.class_name || null,
@@ -834,7 +830,6 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
@@ -899,7 +894,6 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
@@ -944,7 +938,6 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           s.qr_expiration AS qr_expiration,
            c.name       AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name

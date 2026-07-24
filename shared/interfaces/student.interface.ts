@@ -41,14 +41,6 @@ export interface Student {
   studentCode?: number | null;
   /** Random token encoded in the student's QR code (public profile + check-in). */
   qrToken?: string | null;
-  /** Paid QR activation (TEACHER companies). For academies the QR is free. */
-  qrActivated?: boolean;
-  /** ISO date; null = lifelong (when activated) or not activated. */
-  qrExpiration?: string | null;
-  /** Amount billed for the current activation (EGP): 25 (1yr) or 40 (lifelong). */
-  qrPrice?: number | null;
-  /** Toggled by the owner once the teacher settles the activation bill. */
-  qrPaid?: boolean;
   hasSubscriptions?: boolean;
   createdAt: string;
   updatedAt: string;

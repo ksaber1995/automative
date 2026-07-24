@@ -402,10 +402,6 @@ const StudentSchema = z.object({
   // Short sequential per-company number for QR-less attendance / payment lookup.
   studentCode: z.number().nullable().optional(),
   qrToken: z.string().nullable().optional(),
-  qrActivated: z.boolean().optional(),
-  qrExpiration: z.string().nullable().optional(),
-  qrPrice: z.number().nullable().optional(),
-  qrPaid: z.boolean().optional(),
   hasSubscriptions: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
