@@ -991,6 +991,9 @@ const ClassSchema = z.object({
   courseId: UUIDSchema,
   branchId: UUIDSchema,
   instructorId: UUIDSchema.nullable(),
+  /** Assigned teacher, joined from employees. Null when nobody is assigned. */
+  instructorName: z.string().nullable().optional(),
+  instructorEmail: z.string().nullable().optional(),
   roomId: UUIDSchema.nullable().optional(),
   roomCode: z.string().nullable().optional(),
   name: z.string(),

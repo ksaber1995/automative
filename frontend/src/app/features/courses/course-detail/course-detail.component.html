@@ -464,15 +464,18 @@
 
                 <div>
                   <h4 class="text-md font-semibold mb-3 text-gray-700">{{ 'COURSES.DETAIL.TEACHER_SECTION' | translate }}</h4>
-                  @if (cls.teacher) {
+                  <!-- instructorName/Email, not `teacher`: no endpoint has ever
+                       sent a `teacher` object, so this block always fell through
+                       to "no teacher" even for the 75 classes that have one. -->
+                  @if (cls.instructorName) {
                     <div class="space-y-2">
                       <div class="flex">
                         <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.TEACHER_NAME' | translate }}</span>
-                        <span>{{ cls.teacher.firstName }} {{ cls.teacher.lastName }}</span>
+                        <span>{{ cls.instructorName }}</span>
                       </div>
                       <div class="flex">
                         <span class="font-medium text-gray-600 w-32">{{ 'COURSES.DETAIL.TEACHER_EMAIL' | translate }}</span>
-                        <span>{{ cls.teacher.email }}</span>
+                        <span>{{ cls.instructorEmail || '—' }}</span>
                       </div>
                     </div>
                   } @else {

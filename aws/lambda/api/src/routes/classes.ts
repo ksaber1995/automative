@@ -268,6 +268,7 @@ function mapClassWithDetailsFromDB(row: any) {
     courseName: row.course_name,
     branchName: row.branch_name,
     instructorName: row.instructor_name,
+    instructorEmail: row.instructor_email ?? null,
     studentCount: parseInt(row.student_count ?? row.current_enrollment ?? '0', 10),
     hasActiveSession: row.has_active_session === true || row.has_active_session === 'true' || parseInt(row.has_active_session ?? '0', 10) > 0,
   };
@@ -410,6 +411,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          e.email AS instructor_email,
           r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
@@ -480,6 +482,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          e.email AS instructor_email,
           r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
@@ -642,6 +645,7 @@ export const classesRoutes = {
           co.name as course_name,
           b.name as branch_name,
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
+          e.email AS instructor_email,
           r.code AS room_code,
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en

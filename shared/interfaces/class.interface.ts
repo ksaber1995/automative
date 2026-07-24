@@ -75,6 +75,12 @@ export interface ClassWithDetails extends Class {
   courseName?: string;
   branchName?: string;
   instructorName?: string;
+  instructorEmail?: string | null;
+  /**
+   * @deprecated No endpoint has ever populated this — it was always undefined,
+   * so any UI branching on it silently took the "no teacher" path even when a
+   * teacher was assigned. Use instructorName / instructorEmail.
+   */
   teacher?: {
     id: string;
     firstName: string;
