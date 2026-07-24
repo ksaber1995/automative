@@ -36,6 +36,60 @@ type AuthHeaders = { authorization?: string };
  * sensitive here is a product decision, not a refactor.
  */
 export const publicStudentsRoutes = {
+  /**
+   * Public, UNAUTHENTICATED lookup for a pool card that isn't linked to anyone.
+   *
+   * Scanning a blank card previously hit `profile` and got a flat 404, which is
+   * useless to whoever is holding it: a card printed and dropped, or one handed
+   * over before it was linked, gives no clue whose it is. This answers the two
+   * questions a finder actually has — which teacher/academy it belongs to, and
+   * what number is on it, so it can be returned or linked by staff.
+   *
+   * Exposes nothing a person holding the card can't already see: the serial is
+   * printed on its face, and naming the academy is the entire point. No student
+   * is involved — an unlinked card has no student by definition.
+   *
+   * Same IP rate limit as the profile, so this can't be used to sweep the token
+   * space any faster.
+   */
+  cardByToken: async ({ params }: { params: { token: string }; headers: AuthHeaders }) => {
+    enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);
+    try {
+      await ensureQrCardSchema();
+      const token = (params.token || '').trim();
+      if (!/^[a-f0-9]{16,64}$/i.test(token)) {
+        return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'Not found');
+      }
+
+      const card = await queryOne<any>(
+        `SELECT c.serial, c.student_id, co.name AS company_name, co.type AS company_type
+           FROM qr_cards c
+           JOIN companies co ON co.id = c.company_id
+          WHERE c.token = $1`,
+        [token],
+      );
+
+      // Generic 404 either way — never reveal whether a token is unknown.
+      if (!card) return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'Not found');
+
+      // A linked card belongs on the student profile, not here. Sending it back
+      // as "unassigned" would tell a finder the card is free when it isn't.
+      if (card.student_id) return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'Not found');
+
+      return {
+        status: 200 as const,
+        body: {
+          serial: card.serial,
+          companyName: card.company_name,
+          companyType: card.company_type,
+        },
+      };
+    } catch (error) {
+      console.error('Public card lookup error:', error);
+      return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'Not found');
+    }
+  },
+
   profile: async ({ params }: { params: { qrToken: string }; headers: AuthHeaders }) => {
     // Rate-limit by IP so the token space can't be brute-forced.
     enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);

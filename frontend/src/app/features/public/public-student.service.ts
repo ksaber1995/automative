@@ -136,11 +136,26 @@ export interface PublicStudentProfile {
  * auth interceptor skips token attachment for `/public/` URLs, so this works
  * for a logged-out visitor (e.g. a parent scanning the printed QR).
  */
+/** A pool card that hasn't been handed to a student yet. */
+export interface PublicUnassignedCard {
+  serial: number;
+  companyName: string;
+  companyType: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PublicStudentService {
   private api = inject(ApiService);
 
   getProfile(qrToken: string): Observable<PublicStudentProfile> {
     return this.api.get<PublicStudentProfile>(`public/students/${qrToken}`);
+  }
+
+  /**
+   * Whose blank card is this? Only resolves for a card with no student on it —
+   * a linked card belongs on the profile above.
+   */
+  getUnassignedCard(token: string): Observable<PublicUnassignedCard> {
+    return this.api.get<PublicUnassignedCard>(`public/cards/${token}`);
   }
 }

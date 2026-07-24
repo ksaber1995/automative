@@ -11,6 +11,9 @@ export interface QrCard {
   studentName: string | null;
   studentCode: number | null;
   assignedAt: string | null;
+  /** When this card went to the printer; null = still waiting to be printed. */
+  printedAt?: string | null;
+  printed?: boolean;
   createdAt: string;
 }
 
@@ -28,8 +31,22 @@ export class QrCardService {
     return this.api.post<QrCard[]>('qr-cards/generate', { count });
   }
 
-  list(status?: 'free' | 'linked'): Observable<QrCard[]> {
+  list(status?: 'free' | 'linked' | 'unprinted' | 'printed'): Observable<QrCard[]> {
     return this.api.get<QrCard[]>('qr-cards', status ? { status } : undefined);
+  }
+
+  /**
+   * Stamp a print run as sent to the printer. Always pass the exact ids that were
+   * downloaded — omitting them marks everything currently unprinted, which would
+   * wrongly swallow any cards generated since the download.
+   */
+  markPrinted(ids: string[]): Observable<{ marked: number }> {
+    return this.api.post<{ marked: number }>('qr-cards/mark-printed', { ids });
+  }
+
+  /** Undo a mark, for a run that never actually reached the printer. */
+  unmarkPrinted(ids: string[]): Observable<{ marked: number }> {
+    return this.api.post<{ marked: number }>('qr-cards/unmark-printed', { ids });
   }
 
   /** Hand a card to a student: by scanned token, or by the serial printed on it. */

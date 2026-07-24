@@ -4639,7 +4639,11 @@
       "CANCELLED": "Cancelled"
     },
     "ATTENDANCE_BY_CLASS": "Attendance by class",
-    "PRESENT_OF_TOTAL": "{{present}} of {{total}}"
+    "PRESENT_OF_TOTAL": "{{present}} of {{total}}",
+    "CARD_UNASSIGNED_TITLE": "This card is not assigned yet",
+    "CARD_UNASSIGNED_TEXT": "It belongs to the academy above, but has not been given to a student yet.",
+    "CARD_NUMBER": "Card number",
+    "CARD_UNASSIGNED_HINT": "If you found this card, please return it to the academy. Staff can activate it by scanning it on a student’s page."
   },
   "STUDENT_QR": {
     "BUTTON": "QR Code",
@@ -5370,6 +5374,20 @@
     "SEARCH": "Search a card or a student",
     "CUSTOM_ART_MISSING": "Your own card design is missing one of its sides. Upload both on the Card Design page before downloading.",
     "DOWNLOAD_FRONT_ONLY": "Student side only",
-    "DOWNLOAD_FRONT_ONLY_HINT": "Just the QR side — one image per card, without the shared academy side."
+    "DOWNLOAD_FRONT_ONLY_HINT": "Just the QR side — one image per card, without the shared academy side.",
+    "COL_PRINTED": "Printed",
+    "NOT_PRINTED": "Not printed",
+    "UNPRINTED_COUNT": "{{count}} to print",
+    "F_UNPRINTED": "To print",
+    "F_PRINTED": "Printed",
+    "NONE_UNPRINTED": "Nothing new to print — every card in the pool has already been sent to the printer.",
+    "DOWNLOAD_HINT": "Downloads only the cards not yet sent to the printer.",
+    "MARK_PRINTED": "Mark as printed",
+    "MARK_PRINTED_HINT": "Stamp the run you just downloaded, so the next download only has new cards.",
+    "MARK_PRINTED_TITLE": "Mark as printed",
+    "MARK_PRINTED_MSG": "Mark {{count}} card(s) as sent to the printer? They will be left out of the next download.",
+    "MARKED_PRINTED": "{{count}} card(s) marked as printed",
+    "UNMARK_PRINTED": "Not printed after all — put back in the next run",
+    "UNMARKED_PRINTED": "{{serial}} is back in the next print run"
   }
 }

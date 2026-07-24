@@ -5,14 +5,23 @@
       <p class="text-gray-500 mt-1">{{ 'QR_CARDS.SUBTITLE' | translate }}</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
+      <!-- Downloads the PENDING run only (unprinted, unhanded) — see downloadZip. -->
       <p-button icon="pi pi-download" severity="secondary" [outlined]="true"
-        [label]="'QR_CARDS.DOWNLOAD' | translate"
-        [disabled]="!freeCount() || exporting()" (onClick)="downloadZip()"></p-button>
+        [label]="('QR_CARDS.DOWNLOAD' | translate) + (unprintedCount() ? ' (' + unprintedCount() + ')' : '')"
+        [pTooltip]="unprintedRange() ? (('QR_CARDS.DOWNLOAD_HINT' | translate) + ' ' + unprintedRange()) : ('QR_CARDS.DOWNLOAD_HINT' | translate)"
+        [disabled]="!unprintedCount() || exporting()" (onClick)="downloadZip()"></p-button>
       <!-- The plain QR codes only — one PNG per card, no card template/design. -->
       <p-button icon="pi pi-qrcode" severity="secondary" [text]="true"
         [label]="'QR_CARDS.DOWNLOAD_RAW' | translate"
         [pTooltip]="'QR_CARDS.DOWNLOAD_RAW_HINT' | translate"
         [disabled]="!freeCount() || exporting()" (onClick)="downloadRawZip()"></p-button>
+      <!-- Explicit, never automatic on download: a downloaded ZIP is not proof it
+           reached a printer. -->
+      <p-button icon="pi pi-check-square" severity="success" [outlined]="true"
+        [label]="'QR_CARDS.MARK_PRINTED' | translate"
+        [pTooltip]="'QR_CARDS.MARK_PRINTED_HINT' | translate"
+        [loading]="markingPrinted()"
+        [disabled]="!unprintedCount() || exporting()" (onClick)="confirmMarkPrinted()"></p-button>
     </div>
   </div>
 
@@ -63,6 +72,11 @@
           <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1">
             {{ 'QR_CARDS.LINKED_COUNT' | translate: { count: linkedCount() } }}
           </span>
+          <!-- The pending print run — the number the Download button exports. -->
+          <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 text-sm font-semibold px-3 py-1"
+                [pTooltip]="unprintedRange()">
+            <i class="pi pi-print"></i>{{ 'QR_CARDS.UNPRINTED_COUNT' | translate: { count: unprintedCount() } }}
+          </span>
           <span class="p-input-icon-left">
             <input pInputText type="text" class="w-56" [ngModel]="search()" (ngModelChange)="search.set($event)"
                    [placeholder]="'QR_CARDS.SEARCH' | translate" />
@@ -70,6 +84,8 @@
           <p-button size="small" [text]="filter() !== 'all'" [label]="'QR_CARDS.F_ALL' | translate" (onClick)="filter.set('all')"></p-button>
           <p-button size="small" [text]="filter() !== 'free'" [label]="'QR_CARDS.F_FREE' | translate" (onClick)="filter.set('free')"></p-button>
           <p-button size="small" [text]="filter() !== 'linked'" [label]="'QR_CARDS.F_LINKED' | translate" (onClick)="filter.set('linked')"></p-button>
+          <p-button size="small" [text]="filter() !== 'unprinted'" [label]="'QR_CARDS.F_UNPRINTED' | translate" (onClick)="filter.set('unprinted')"></p-button>
+          <p-button size="small" [text]="filter() !== 'printed'" [label]="'QR_CARDS.F_PRINTED' | translate" (onClick)="filter.set('printed')"></p-button>
         </div>
       </div>
     </ng-template>
@@ -80,6 +96,7 @@
         <tr>
           <th class="w-40">{{ 'QR_CARDS.COL_SERIAL' | translate }}</th>
           <th>{{ 'QR_CARDS.COL_STATUS' | translate }}</th>
+          <th class="w-44">{{ 'QR_CARDS.COL_PRINTED' | translate }}</th>
           <th class="w-24 text-end">{{ 'QR_CARDS.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -97,7 +114,23 @@
               <p-tag [value]="'QR_CARDS.FREE' | translate" severity="success"></p-tag>
             }
           </td>
+          <td>
+            @if (card.printed) {
+              <span class="inline-flex items-center gap-1 text-gray-600 text-sm">
+                <i class="pi pi-check-circle text-green-600"></i>
+                {{ card.printedAt | date: 'MMM d, y' }}
+              </span>
+            } @else {
+              <p-tag [value]="'QR_CARDS.NOT_PRINTED' | translate" severity="warn"></p-tag>
+            }
+          </td>
           <td class="text-end">
+            <!-- Only for a free card: a linked one is physically out there, so
+                 "not printed" would be a lie. -->
+            @if (card.printed && !card.studentId) {
+              <p-button icon="pi pi-undo" severity="secondary" [text]="true" size="small"
+                [pTooltip]="'QR_CARDS.UNMARK_PRINTED' | translate" (onClick)="unmarkPrinted(card)"></p-button>
+            }
             @if (card.studentId) {
               <p-button icon="pi pi-times" severity="danger" [text]="true" size="small"
                 [pTooltip]="'QR_CARDS.UNLINK' | translate" (onClick)="confirmUnlink(card)"></p-button>
@@ -108,7 +141,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="3">
+          <td colspan="4">
             <div class="text-center py-10 text-gray-500">
               <i class="pi pi-qrcode text-4xl mb-3 text-gray-300"></i>
               <p class="font-medium">{{ 'QR_CARDS.EMPTY' | translate }}</p>

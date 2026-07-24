@@ -69,12 +69,37 @@ export class QrCardsComponent implements OnInit {
   generating = signal(false);
   count = 100;
 
-  filter = signal<'all' | 'free' | 'linked'>('all');
+  filter = signal<'all' | 'free' | 'linked' | 'unprinted' | 'printed'>('all');
   /** Find one card in a box of a thousand: by its number, or by who holds it. */
   search = signal('');
 
   freeCount = computed(() => this.cards().filter((c) => !c.studentId).length);
   linkedCount = computed(() => this.cards().filter((c) => !!c.studentId).length);
+
+  /**
+   * The next print run: never sent to the printer, and not already in a student's
+   * hand. This is what "download" exports.
+   */
+  unprintedCards = computed(() => this.cards().filter((c) => !c.printed && !c.studentId));
+  unprintedCount = computed(() => this.unprintedCards().length);
+  printedCount = computed(() => this.cards().filter((c) => c.printed).length);
+
+  /** Serial range of the pending run, for the button and the confirm text. */
+  unprintedRange = computed(() => {
+    const rows = this.unprintedCards();
+    if (!rows.length) return '';
+    const serials = rows.map((c) => c.serial);
+    return `${serialLabel(Math.min(...serials))} – ${serialLabel(Math.max(...serials))}`;
+  });
+
+  /**
+   * Ids from the most recent download, so "mark as printed" stamps exactly what
+   * was exported. Marking "everything unprinted" instead would swallow any cards
+   * generated between the download and the click — and a card wrongly marked
+   * printed silently never reaches a printer.
+   */
+  lastDownloadedIds = signal<string[]>([]);
+  markingPrinted = signal(false);
 
   visible = computed(() => {
     const f = this.filter();
@@ -82,6 +107,8 @@ export class QrCardsComponent implements OnInit {
     let rows = this.cards();
     if (f === 'free') rows = rows.filter((c) => !c.studentId);
     if (f === 'linked') rows = rows.filter((c) => !!c.studentId);
+    if (f === 'unprinted') rows = rows.filter((c) => !c.printed && !c.studentId);
+    if (f === 'printed') rows = rows.filter((c) => c.printed);
     if (q) {
       rows = rows.filter((c) =>
         serialLabel(c.serial).toLowerCase().includes(q)
@@ -129,6 +156,53 @@ export class QrCardsComponent implements OnInit {
     });
   }
 
+  /**
+   * Mark the run that was just downloaded as printed, so the next download
+   * contains only cards minted after it.
+   *
+   * Targets the ids from the last download when there is one; otherwise every
+   * currently-unprinted card. The confirm always names the count, because this
+   * decides what does and doesn't reach a printer next time.
+   */
+  confirmMarkPrinted(): void {
+    const ids = this.lastDownloadedIds().length
+      ? this.lastDownloadedIds()
+      : this.unprintedCards().map((c) => c.id);
+    if (!ids.length) {
+      this.notify.warning(this.translate.instant('QR_CARDS.NONE_UNPRINTED'));
+      return;
+    }
+
+    this.confirm.confirm({
+      header: this.translate.instant('QR_CARDS.MARK_PRINTED_TITLE'),
+      message: this.translate.instant('QR_CARDS.MARK_PRINTED_MSG', { count: ids.length }),
+      icon: 'pi pi-print',
+      accept: () => {
+        this.markingPrinted.set(true);
+        this.service.markPrinted(ids).subscribe({
+          next: (res) => {
+            this.markingPrinted.set(false);
+            this.lastDownloadedIds.set([]);
+            this.notify.success(this.translate.instant('QR_CARDS.MARKED_PRINTED', { count: res.marked }));
+            this.load();
+          },
+          error: () => this.markingPrinted.set(false),
+        });
+      },
+    });
+  }
+
+  /** Put one card back into the pending run — it never reached the printer. */
+  unmarkPrinted(card: QrCard): void {
+    this.service.unmarkPrinted([card.id]).subscribe({
+      next: () => {
+        this.notify.success(this.translate.instant('QR_CARDS.UNMARKED_PRINTED', { serial: this.label(card.serial) }));
+        this.load();
+      },
+      error: () => {},
+    });
+  }
+
   confirmUnlink(card: QrCard): void {
     this.confirm.confirm({
       header: this.translate.instant('QR_CARDS.UNLINK_TITLE'),
@@ -161,11 +235,15 @@ export class QrCardsComponent implements OnInit {
    * own QR and serial. Pool cards are front-only, so there is no shared back face.
    */
   async downloadZip(): Promise<void> {
-    const pool = this.cards().filter((c) => !c.studentId);
+    // The pending print run, not the whole free pool: re-exporting cards that
+    // already went to the printer is how a batch gets printed twice, and two
+    // physical cards carrying one serial is not recoverable once they ship.
+    const pool = this.unprintedCards();
     if (!pool.length) {
-      this.notify.warning(this.translate.instant('QR_CARDS.NONE_FREE'));
+      this.notify.warning(this.translate.instant('QR_CARDS.NONE_UNPRINTED'));
       return;
     }
+    this.lastDownloadedIds.set(pool.map((c) => c.id));
 
     this.exporting.set(true);
     this.exportDone.set(0);

@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { LanguageService } from '../../../core/services/language.service';
-import { PublicStudentService, PublicStudentProfile } from '../public-student.service';
+import { PublicStudentService, PublicStudentProfile, PublicUnassignedCard } from '../public-student.service';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 
 /**
  * Public, read-only student profile shown when a student's QR code is scanned
@@ -38,6 +39,14 @@ export class PublicStudentComponent implements OnInit {
   loading = signal(true);
   error = signal(false);
   profile = signal<PublicStudentProfile | null>(null);
+  /** Set when the token is a blank pool card rather than a student's. */
+  unassignedCard = signal<PublicUnassignedCard | null>(null);
+
+  /** The number printed on the card, e.g. "A-42". */
+  cardCode = () => {
+    const c = this.unassignedCard();
+    return c ? formatStudentCode(c.serial) : '';
+  };
 
   ngOnInit(): void {
     const token = this.route.snapshot.paramMap.get('qrToken') || '';
@@ -49,6 +58,19 @@ export class PublicStudentComponent implements OnInit {
     this.service.getProfile(token).subscribe({
       next: (p) => {
         this.profile.set(p);
+        this.loading.set(false);
+      },
+      // No student behind this token. Before giving up, check whether it's a
+      // pool card nobody has been given yet — whoever scanned it is holding a
+      // real card and deserves to know whose it is, not a dead end.
+      error: () => this.lookUpUnassignedCard(token),
+    });
+  }
+
+  private lookUpUnassignedCard(token: string): void {
+    this.service.getUnassignedCard(token).subscribe({
+      next: (card) => {
+        this.unassignedCard.set(card);
         this.loading.set(false);
       },
       error: () => {

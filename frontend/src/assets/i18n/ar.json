@@ -4763,7 +4763,11 @@
       "CANCELLED": "ملغى"
     },
     "ATTENDANCE_BY_CLASS": "الحضور حسب المجموعة",
-    "PRESENT_OF_TOTAL": "{{present}} من {{total}}"
+    "PRESENT_OF_TOTAL": "{{present}} من {{total}}",
+    "CARD_UNASSIGNED_TITLE": "هذا الكرت غير مُخصص بعد",
+    "CARD_UNASSIGNED_TEXT": "ينتمي هذا الكرت للجهة الموضحة أعلاه، ولم يتم تسليمه لطالب بعد.",
+    "CARD_NUMBER": "رقم الكرت",
+    "CARD_UNASSIGNED_HINT": "إذا وجدت هذا الكرت، يرجى إعادته إلى الجهة. يمكن للموظفين تفعيله بمسحه من صفحة الطالب."
   },
   "STUDENT_QR": {
     "BUTTON": "رمز QR",
@@ -5370,6 +5374,20 @@
     "SEARCH": "ابحث عن بطاقة أو طالب",
     "CUSTOM_ART_MISSING": "تصميمك الخاص ينقصه أحد الوجهين. ارفع الوجهين من صفحة تصميم البطاقة قبل التحميل.",
     "DOWNLOAD_FRONT_ONLY": "وجه الطالب فقط",
-    "DOWNLOAD_FRONT_ONLY_HINT": "وجه رمز الـ QR فقط — صورة لكل بطاقة، بدون وجه الأكاديمية المشترك."
+    "DOWNLOAD_FRONT_ONLY_HINT": "وجه رمز الـ QR فقط — صورة لكل بطاقة، بدون وجه الأكاديمية المشترك.",
+    "COL_PRINTED": "الطباعة",
+    "NOT_PRINTED": "لم تُطبع",
+    "UNPRINTED_COUNT": "{{count}} للطباعة",
+    "F_UNPRINTED": "للطباعة",
+    "F_PRINTED": "مطبوعة",
+    "NONE_UNPRINTED": "لا يوجد جديد للطباعة — كل الكروت في المجموعة تم إرسالها للمطبعة.",
+    "DOWNLOAD_HINT": "يتم تحميل الكروت التي لم تُرسل للمطبعة فقط.",
+    "MARK_PRINTED": "تحديد كمطبوعة",
+    "MARK_PRINTED_HINT": "حدد الدفعة التي حملتها للتو حتى لا تظهر في التحميل القادم.",
+    "MARK_PRINTED_TITLE": "تحديد كمطبوعة",
+    "MARK_PRINTED_MSG": "تحديد {{count}} كرت كمُرسل للمطبعة؟ لن تظهر في التحميل القادم.",
+    "MARKED_PRINTED": "تم تحديد {{count}} كرت كمطبوعة",
+    "UNMARK_PRINTED": "لم تُطبع — أعدها إلى الدفعة القادمة",
+    "UNMARKED_PRINTED": "تمت إعادة {{serial}} إلى دفعة الطباعة القادمة"
   }
 }

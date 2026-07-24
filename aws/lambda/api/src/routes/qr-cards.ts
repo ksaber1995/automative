@@ -44,6 +44,13 @@ export async function ensureQrCardSchema(): Promise<void> {
   // rather than NULL. That is a choice: it means whatever consumes this can
   // always group by a value instead of carrying a "no type" branch forever, and
   // "1" is the honest name for the only run there has ever been.
+  // Print tracking (migration 076). NULL = not sent to the printer yet, so the
+  // next download can carry only the new run. A timestamp rather than a boolean
+  // so a run stays identifiable after the fact.
+  await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS printed_at TIMESTAMP WITH TIME ZONE`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_unprinted
+                 ON qr_cards (company_id, serial) WHERE printed_at IS NULL`);
+
   await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS pool_type SMALLINT NOT NULL DEFAULT 1`);
   await query(`DO $$ BEGIN
     ALTER TABLE qr_cards ADD CONSTRAINT qr_cards_pool_type_check CHECK (pool_type IN (1, 2, 3));
@@ -183,6 +190,8 @@ function mapCard(row: any) {
     studentName: row.student_name ?? null,
     studentCode: row.student_code ?? null,
     assignedAt: row.assigned_at ?? null,
+    printedAt: row.printed_at ?? null,
+    printed: row.printed_at != null,
     createdAt: row.created_at,
   };
 }
@@ -293,6 +302,10 @@ export const qrCardsRoutes = {
         WHERE c.company_id = $1`;
       if (q?.status === 'free') sql += ' AND c.student_id IS NULL';
       if (q?.status === 'linked') sql += ' AND c.student_id IS NOT NULL';
+      // The next print run: never yet sent to the printer, and not already in
+      // somebody's hand.
+      if (q?.status === 'unprinted') sql += ' AND c.printed_at IS NULL AND c.student_id IS NULL';
+      if (q?.status === 'printed') sql += ' AND c.printed_at IS NOT NULL';
       sql += ' ORDER BY c.serial';
 
       const rows = await query<any>(sql, [context.companyId]);
@@ -300,6 +313,81 @@ export const qrCardsRoutes = {
     } catch (error) {
       console.error('QR cards list error:', error);
       return mapThrownError(error, 'ERRORS.QR_CARDS.LIST_FAILED', 'Failed to load the QR cards');
+    }
+  },
+
+  /**
+   * Stamp a print run as sent to the printer, so the next download carries only
+   * new cards.
+   *
+   * `ids` should be exactly what was downloaded. Omitting it falls back to "every
+   * card currently unprinted", which is only safe when nothing was generated
+   * between the download and this call — the UI always sends ids for that reason.
+   *
+   * Already-printed cards are left untouched rather than re-stamped, so a second
+   * click can't rewrite the date of an earlier run.
+   */
+  markPrinted: async ({ body, headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
+
+      const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : null;
+
+      const rows = ids
+        ? await query<any>(
+            `UPDATE qr_cards SET printed_at = NOW()
+              WHERE company_id = $1 AND printed_at IS NULL AND id = ANY($2::uuid[])
+              RETURNING *`,
+            [context.companyId, ids],
+          )
+        : await query<any>(
+            `UPDATE qr_cards SET printed_at = NOW()
+              WHERE company_id = $1 AND printed_at IS NULL AND student_id IS NULL
+              RETURNING *`,
+            [context.companyId],
+          );
+
+      return { status: 200 as const, body: { marked: rows.length } };
+    } catch (error) {
+      console.error('QR cards mark-printed error:', error);
+      return mapThrownError(error, 'ERRORS.QR_CARDS.MARK_PRINTED_FAILED', 'Failed to mark the cards as printed', 400);
+    }
+  },
+
+  /**
+   * Undo a mark — a run that never actually reached the printer goes back into
+   * the next download rather than being stranded as "printed" forever.
+   */
+  unmarkPrinted: async ({ body, headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
+
+      const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
+      if (!ids.length) return apiError(400, 'ERRORS.QR_CARDS.NO_IDS', 'No cards given');
+
+      // Linked cards stay printed: the card is physically out there.
+      const rows = await query<any>(
+        `UPDATE qr_cards SET printed_at = NULL
+          WHERE company_id = $1 AND student_id IS NULL AND id = ANY($2::uuid[])
+          RETURNING *`,
+        [context.companyId, ids],
+      );
+      return { status: 200 as const, body: { marked: rows.length } };
+    } catch (error) {
+      console.error('QR cards unmark-printed error:', error);
+      return mapThrownError(error, 'ERRORS.QR_CARDS.MARK_PRINTED_FAILED', 'Failed to update the cards', 400);
     }
   },
 

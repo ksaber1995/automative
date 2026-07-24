@@ -1707,6 +1707,10 @@ const QrCardSchema = z.object({
   studentName: z.string().nullable(),
   studentCode: z.number().nullable(),
   assignedAt: z.string().nullable(),
+  // When this card was sent to the printer (migration 076). null = not yet, and
+  // those are exactly what the next download contains.
+  printedAt: z.string().nullable().optional(),
+  printed: z.boolean().optional(),
   createdAt: z.string(),
 });
 
@@ -2617,6 +2621,20 @@ export const contract = c.router({
       pathParams: z.object({ studentId: UUIDSchema }),
       responses: { 200: z.array(QrCardSchema), 403: ApiErrorSchema },
     },
+    markPrinted: {
+      method: 'POST',
+      path: '/api/qr-cards/mark-printed',
+      // Omit `ids` to mark every currently-unprinted card; the UI always sends
+      // exactly what it downloaded.
+      body: z.object({ ids: z.array(UUIDSchema).optional() }),
+      responses: { 200: z.object({ marked: z.number() }), 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
+    unmarkPrinted: {
+      method: 'POST',
+      path: '/api/qr-cards/unmark-printed',
+      body: z.object({ ids: z.array(UUIDSchema).optional() }),
+      responses: { 200: z.object({ marked: z.number() }), 400: ApiErrorSchema, 403: ApiErrorSchema },
+    },
   },
 
   // CRM (Phase 1) — lead pipeline for ADVANCED-plan academies
@@ -3074,6 +3092,24 @@ export const contract = c.router({
   // Public, unauthenticated student profile (resolved by QR token). No
   // `authorization` header → auth is NOT required. See routes/public-students.ts.
   publicStudents: {
+    /**
+     * An unlinked pool card, by token. Lets a scanned blank card say whose it is
+     * and what number it carries, instead of a bare 404. Unauthenticated and
+     * IP-rate-limited, like `profile`.
+     */
+    cardByToken: {
+      method: 'GET',
+      path: '/api/public/cards/:token',
+      pathParams: z.object({ token: z.string().min(16).max(64) }),
+      responses: {
+        200: z.object({
+          serial: z.number(),
+          companyName: z.string(),
+          companyType: z.string(),
+        }),
+        404: ApiErrorSchema,
+      },
+    },
     profile: {
       method: 'GET',
       path: '/api/public/students/:qrToken',
