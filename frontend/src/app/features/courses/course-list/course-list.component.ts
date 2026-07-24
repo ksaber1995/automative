@@ -180,9 +180,20 @@ export class CourseListComponent implements OnInit {
     return course.levelName || '—';
   }
 
-  getBranchName(branchId: string | null): string {
-    if (!branchId) return this.translate.instant('COURSES.LIST.GLOBAL');
-    return this.branches().find(b => b.id === branchId)?.label ?? branchId;
+  /**
+   * The branch to show for a course.
+   *
+   * Prefers the name the API now sends with the row. The lookup is only a
+   * fallback: it's filtered by is_active and by the caller's branch scope, so a
+   * course on any branch outside that set found nothing — and the old `?? branchId`
+   * then printed a raw UUID into the table.
+   */
+  getBranchName(course: { branchId: string | null; branchName?: string | null }): string {
+    if (course.branchName) return course.branchName;
+    if (!course.branchId) return this.translate.instant('COURSES.LIST.GLOBAL');
+    const found = this.branches().find(b => b.id === course.branchId)?.label;
+    // Never fall back to the id — a UUID in a Branch column is worse than a dash.
+    return found ?? '—';
   }
 
   clearFilters() {

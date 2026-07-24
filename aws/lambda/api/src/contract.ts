@@ -713,6 +713,8 @@ const CourseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   price: z.number(),
+  /** The course's branch name. Populated by the list; null for a global course. */
+  branchName: z.string().nullable().optional(),
   instructorId: UUIDSchema.nullable(),
   /** The assigned teacher's name. Populated by the list; null when unassigned. */
   instructorName: z.string().nullable().optional(),

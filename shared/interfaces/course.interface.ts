@@ -5,6 +5,8 @@ export interface Course {
   name: string;
   description: string | null;
   price: number;
+  /** The branch's name, supplied by the course list. Null for a global course. */
+  branchName?: string | null;
   instructorId: string | null;
   /** The assigned teacher's name, supplied by the course list. */
   instructorName?: string | null;

@@ -129,7 +129,7 @@
             }
           </td>
           @if (!authService.isTeacher()) {
-            <td>{{ getBranchName(course.branchId) }}</td>
+            <td>{{ getBranchName(course) }}</td>
           }
           <td>{{ levelNames(course) }}</td>
           @if (showTeacher()) {

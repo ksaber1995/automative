@@ -48,6 +48,7 @@ function mapCourseFromDB(row: any) {
     name: row.name,
     description: row.description,
     price: parseFloat(row.price),
+    branchName: row.branch_name ?? null,
     instructorId: row.instructor_id,
     // Only populated where the query joins employees (the list); undefined
     // elsewhere rather than a wrong null, so a caller can tell "no teacher" from
@@ -201,6 +202,7 @@ export const coursesRoutes = {
         SELECT
           c.*,
           l.name as level_name,
+          br.name AS branch_name,
           NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS instructor_name,
           ${LEVELS_SUBQUERY},
           ${SUBJECTS_SUBQUERY},
@@ -208,6 +210,10 @@ export const coursesRoutes = {
           COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
         LEFT JOIN levels l ON c.level_id = l.id
+        -- Branch name comes from the row itself rather than a client-side lookup.
+        -- The lookup is filtered (is_active, and the caller's own branch scope),
+        -- so any course on a branch outside it fell back to printing a raw UUID.
+        LEFT JOIN branches br ON br.id = c.branch_id
         -- The assigned teacher's name, so the list can show who teaches a course
         -- without a lookup round-trip per row.
         LEFT JOIN employees emp ON emp.id = c.instructor_id
@@ -228,7 +234,7 @@ export const coursesRoutes = {
         if (branchClause) sql += ` AND ${branchClause}`;
       }
 
-      sql += ' GROUP BY c.id, l.name, emp.first_name, emp.last_name ORDER BY c.created_at DESC';
+      sql += ' GROUP BY c.id, l.name, br.name, emp.first_name, emp.last_name ORDER BY c.created_at DESC';
 
       const courses = await query(sql, params);
       return {
