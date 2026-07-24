@@ -250,7 +250,9 @@
         <tr>
           <th style="width: 3rem"></th>
           <th>{{ 'MONTHLY_SUBSCRIPTIONS.PERIOD' | translate }}</th>
-          <th>{{ 'MONTHLY_SUBSCRIPTIONS.COL_CODE' | translate }}</th>
+          <!-- The student code rides along as a badge on the Student cell rather
+               than owning a column of its own — it identifies the student, so it
+               belongs beside the name. -->
           <th>{{ 'MONTHLY_SUBSCRIPTIONS.STUDENT' | translate }}</th>
           <th>{{ 'MONTHLY_SUBSCRIPTIONS.COURSE' | translate }}</th>
           @if (!isTeacher) {
@@ -278,14 +280,19 @@
             ></p-button>
           </td>
           <td class="whitespace-nowrap font-medium text-gray-700">{{ periodLabel(p) }}</td>
-          <td>
-            @if (showCode(p)) {
-              <span class="font-semibold text-indigo-700">{{ code(p.studentCode) }}</span>
-            } @else {
-              <span class="text-gray-300">—</span>
-            }
+          <td class="font-medium">
+            <div class="flex items-center gap-2">
+              <span>{{ p.studentName }}</span>
+              @if (showCode(p)) {
+                <span
+                  class="inline-flex items-center gap-1 shrink-0 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold px-2 py-0.5"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.COL_CODE' | translate"
+                >
+                  <i class="pi pi-hashtag" style="font-size: 0.65rem"></i>{{ code(p.studentCode) }}
+                </span>
+              }
+            </div>
           </td>
-          <td class="font-medium">{{ p.studentName }}</td>
           <td>{{ p.courseName }}</td>
           @if (!isTeacher) {
           <td>{{ p.branchName }}</td>
@@ -396,7 +403,7 @@
       </ng-template>
       <ng-template pTemplate="expandedrow" let-p>
         <tr>
-          <td [attr.colspan]="isTeacher ? 11 : 12">
+          <td [attr.colspan]="isTeacher ? 10 : 11">
             <div class="p-4 bg-gray-50 border-l-4 border-gray-300">
               <div class="text-sm font-semibold text-gray-700 mb-1">
                 <i class="pi pi-file-edit mr-1"></i>{{ 'MONTHLY_SUBSCRIPTIONS.NOTES' | translate }}
@@ -417,7 +424,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="isTeacher ? 11 : 12" class="text-center py-10">
+          <td [attr.colspan]="isTeacher ? 10 : 11" class="text-center py-10">
             <div class="text-gray-500">
               <i class="pi pi-calendar-times text-4xl mb-3 block"></i>
               <p class="mb-1">{{ 'MONTHLY_SUBSCRIPTIONS.NO_RECORDS' | translate }}</p>
