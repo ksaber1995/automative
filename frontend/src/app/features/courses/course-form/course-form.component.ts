@@ -74,6 +74,16 @@ export class CourseFormComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Subscribe BEFORE loading branches. LookupService.branches() is a
+    // shareReplay cache that BranchStateService warms at app startup, so this
+    // call usually emits synchronously — and loadBranches() auto-selects the only
+    // branch for a single-branch company. Registering afterwards meant that
+    // setValue fired with nobody listening, so rooms were never fetched and the
+    // Default room dropdown stayed empty.
+    this.courseForm.get('branchId')?.valueChanges.subscribe(branchId => {
+      if (branchId) this.loadRooms(branchId);
+    });
+
     this.loadBranches();
     this.loadEmployees();
     this.loadLevels();
@@ -85,10 +95,6 @@ export class CourseFormComponent implements OnInit {
       this.isEditMode.set(true);
       this.loadCourse(this.courseId);
     }
-    // Load rooms when branch changes
-    this.courseForm.get('branchId')?.valueChanges.subscribe(branchId => {
-      if (branchId) this.loadRooms(branchId);
-    });
   }
 
   loadRooms(branchId: string) {
@@ -118,7 +124,13 @@ export class CourseFormComponent implements OnInit {
         this.branches.set(branches);
         if (branches.length === 1 && !this.isEditMode()) {
           const ctrl = this.courseForm.get('branchId');
-          if (ctrl && !ctrl.value) ctrl.setValue(branches[0].id);
+          if (ctrl && !ctrl.value) {
+            ctrl.setValue(branches[0].id);
+            // Explicit as well as via valueChanges: setValue is a no-op emit if
+            // the control already holds this id, and the rooms list must not
+            // depend on that subtlety.
+            this.loadRooms(branches[0].id);
+          }
         }
       },
       error: () => {
