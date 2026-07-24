@@ -22,6 +22,18 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       const serverCode: string | undefined = error.error?.code;
       const serverMessage: string | undefined = error.error?.message;
 
+      // A 404 from the public QR lookups is an ordinary outcome, not a failure:
+      // the page probes /public/students/:token first and falls back to
+      // /public/cards/:token to see whether the token is an unassigned pool card.
+      // Both misses are rendered as a full-page state by the component, so a
+      // toast on top of that is noise — and on the fallback path it was an
+      // outright lie, since the page went on to resolve the card successfully.
+      const isPublicQrLookup =
+        req.url.includes('/public/students/') || req.url.includes('/public/cards/');
+      if (isPublicQrLookup && error.status === 404) {
+        return throwError(() => error);
+      }
+
       // Structured 409 responses (course/master-course deactivation blockers) carry
       // a list of blockers under `classes` or `courses`. The calling component will
       // render a richer dialog with links, so we skip the generic toast here.
