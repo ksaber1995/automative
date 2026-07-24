@@ -2480,7 +2480,8 @@
       "CHECKING_AVAILABILITY": "Checking teacher availability...",
       "TEACHER_CONFLICT_TITLE": "Teacher {{name}} is not free at this time",
       "TEACHER_CONFLICT_TITLE_SELF": "You already have a class at this time",
-      "TEACHER_CONFLICT_HINT": "This teacher already has the following overlapping class(es). Pick a different time, day, or teacher to enable saving."
+      "TEACHER_CONFLICT_HINT": "This teacher already has the following overlapping class(es). Pick a different time, day, or teacher to enable saving.",
+      "TIME_REQUIRED": "Start and end time are required"
     },
     "LIST": {
       "TITLE": "Classes",

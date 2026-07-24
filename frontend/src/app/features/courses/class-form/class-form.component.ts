@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -107,13 +107,37 @@ export class ClassFormComponent implements OnInit {
       roomId: [''],
       type: ['OFFLINE', [Validators.required]],
       daysOfWeek: [[]],
-      startTime: [''],
-      endTime: [''],
+      // Required only in sameTime mode — see the effect below. Per-day mode
+      // leaves these empty and carries its times in `perDay` instead.
+      startTime: ['', [Validators.required]],
+      endTime: ['', [Validators.required]],
       startDate: ['', [Validators.required]],
       endDate: [''],
       numberOfSessions: [null],
       maxStudents: [null],
       notes: ['']
+    });
+
+    /**
+     * A class needs a time. Without one it gets no class_day_times row, and the
+     * timetable — which joins on that — cannot place it on the hour grid at all.
+     * Ten active classes were created timeless this way and were invisible until
+     * the timetable was taught to list them separately.
+     *
+     * Only enforced in sameTime mode: per-day mode deliberately leaves these two
+     * inputs empty and carries a time per selected day in `perDay`, which
+     * onSubmit already checks for completeness.
+     */
+    effect(() => {
+      const same = this.sameTime();
+      for (const field of ['startTime', 'endTime']) {
+        const ctrl = this.classForm.get(field);
+        if (!ctrl) continue;
+        if (same) ctrl.setValidators([Validators.required]);
+        else ctrl.clearValidators();
+        // A validity change, not a value change — don't mark the field edited.
+        ctrl.updateValueAndValidity({ emitEvent: false });
+      }
     });
   }
 
