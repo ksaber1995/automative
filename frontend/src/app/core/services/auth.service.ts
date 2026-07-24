@@ -81,6 +81,10 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, credentials)
       .pipe(
         tap(response => {
+          // Establishing a session is also a tenant switch when the previous one
+          // was never formally logged out (expired token, a second tab). Start
+          // clean so nothing of the last account survives into this one.
+          this.clearStoredData();
           this.setTokens(response.accessToken, response.refreshToken);
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
@@ -100,6 +104,10 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/verify-email`, { email, otp })
       .pipe(
         tap(response => {
+          // Establishing a session is also a tenant switch when the previous one
+          // was never formally logged out (expired token, a second tab). Start
+          // clean so nothing of the last account survives into this one.
+          this.clearStoredData();
           this.setTokens(response.accessToken, response.refreshToken);
           this.setCachedUser(response.user);
           this.currentUser.set(response.user);
@@ -127,7 +135,17 @@ export class AuthService {
     this.clearStoredData();
     this.currentUser.set(null);
     this.currentUserSubject.next(null);
-    this.router.navigate(['/auth/login']);
+    // A full document load, not router.navigate: clearing storage does nothing
+    // about root-provided singletons, which keep their caches across an in-app
+    // navigation. BranchStateService is the one that bit us — it caches the
+    // company's branches behind a `loaded` guard and never refetches, so signing
+    // in as another tenant left the previous tenant's branches in memory and the
+    // room form wrote one of THEIR branch ids onto a new room.
+    //
+    // Same reasoning as the blanket storage clear above: enumerating the caches
+    // to reset is a list that goes stale the moment someone adds a service.
+    // Reloading the document drops all of them at once.
+    window.location.href = '/auth/login';
   }
 
   /**

@@ -1,5 +1,5 @@
 import { insert, update, query, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter, branchBelongsToCompany } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 function mapRoomFromDB(row: any) {
@@ -39,6 +39,13 @@ export const roomsRoutes = {
 
       if (body.branchId && !canAccessBranch(context, body.branchId)) {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      // canAccessBranch alone is not enough: it short-circuits to true for a
+      // global admin and cannot see whether the branch is even in this company.
+      // A stale branch id from a previously-signed-in tenant therefore stored
+      // fine and produced a room nobody could see. Reject it at the boundary.
+      if (body.branchId && !(await branchBelongsToCompany(body.branchId, context.companyId))) {
+        return apiError(400, 'ERRORS.ROOMS.BRANCH_NOT_IN_COMPANY', 'That branch does not belong to this company');
       }
 
       const room = await insert('rooms', {

@@ -62,7 +62,11 @@ export class LoginComponent {
     this.authService.login({ identifier: String(identifier).trim(), password }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('AUTH.LOGIN.SUCCESS'));
-        this.router.navigate(['/dashboard']);
+        // Full document load, not router.navigate — see AuthService.logout().
+        // Root singletons (BranchStateService's branch cache in particular) keep
+        // their data across an in-app navigation, so signing into a different
+        // tenant without a reload leaves the previous tenant's branches in memory.
+        window.location.href = '/dashboard';
       },
       error: (error) => {
         this.loading.set(false);

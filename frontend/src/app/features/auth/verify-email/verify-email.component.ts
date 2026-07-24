@@ -79,7 +79,9 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
     this.authService.verifyEmail(this.email, otp).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('AUTH.VERIFY_EMAIL.VERIFY_SUCCESS'));
-        this.router.navigate(['/dashboard']);
+        // Full document load — same reason as the login page: root singletons
+        // keep their caches across an in-app navigation. See AuthService.logout().
+        window.location.href = '/dashboard';
       },
       error: (error) => {
         this.loading.set(false);

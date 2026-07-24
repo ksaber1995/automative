@@ -8,6 +8,7 @@
 
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { enforce, RATE_LIMITS } from './rate-limit';
+import { queryOne } from '../db/connection';
 
 // ─── Permission types (inlined to avoid cross-rootDir imports) ──────────────
 
@@ -242,6 +243,31 @@ export function canAccessBranch(context: TenantContext, targetBranchId: string):
     return (context.branchIds ?? []).includes(targetBranchId);
   }
   return context.branchId === targetBranchId;
+}
+
+/**
+ * Does this branch actually belong to this company?
+ *
+ * canAccessBranch answers a different question — "is this caller allowed to work
+ * in this branch" — and short-circuits to `true` for a global admin. It is
+ * synchronous and has no DB access, so it cannot tell whether the branch is even
+ * in the caller's company. That is fine for READ paths, which also filter on
+ * company_id, but not for anything that WRITES a caller-supplied branch_id: a
+ * stray or foreign UUID is stored verbatim, and the row then belongs to a branch
+ * nobody in the company can see.
+ *
+ * That is not hypothetical — three rooms on one tenant were created against
+ * another company's branch and became invisible to both tenants.
+ *
+ * Use alongside canAccessBranch, not instead of it: this checks ownership,
+ * canAccessBranch checks permission.
+ */
+export async function branchBelongsToCompany(branchId: string, companyId: string): Promise<boolean> {
+  const row = await queryOne<any>(
+    'SELECT 1 AS ok FROM branches WHERE id = $1 AND company_id = $2',
+    [branchId, companyId],
+  );
+  return !!row;
 }
 
 export function getBranchFilter(context: TenantContext, requestedBranchId?: string): string | null {

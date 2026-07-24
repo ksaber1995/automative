@@ -521,7 +521,8 @@
       "UPDATE_FAILED": "فشل تحديث الغرفة",
       "DELETE_FAILED": "فشل حذف الغرفة",
       "LIST_FAILED": "فشل تحميل الغرف",
-      "HAS_ACTIVE_SESSION": "الغرفة لديها حصة نشطة"
+      "HAS_ACTIVE_SESSION": "الغرفة لديها حصة نشطة",
+      "BRANCH_NOT_IN_COMPANY": "هذا الفرع لا ينتمي إلى هذه الجهة"
     },
     "SESSIONS": {
       "NOT_FOUND": "الحصة غير موجودة",
