@@ -1,0 +1,61 @@
+/* ---- palette (light + dark), roles not raw hex ----
+   These are design tokens shared by every component, so they live here rather
+   than in any one component's styles — CSS custom properties inherit, but
+   Angular's per-component style encapsulation would scope the declarations. */
+:root {
+  color-scheme: light;
+  --page:        #f9f9f7;
+  --surface:     #fcfcfb;
+  --text:        #0b0b0b;
+  --text-2:      #52514e;
+  --muted:       #898781;
+  --grid:        #e1e0d9;
+  --border:      rgba(11,11,11,0.10);
+  --linked:      #2a78d6;  /* blue — cards handed out */
+  --unlinked:    #c9c8c1;  /* neutral — still in the pool */
+  --good:        #0ca30c;
+  --danger:      #d03b3b;
+  --shadow:      0 1px 2px rgba(11,11,11,0.04), 0 1px 12px rgba(11,11,11,0.03);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --text:      #ffffff;
+    --text-2:    #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --border:    rgba(255,255,255,0.10);
+    --linked:    #3987e5;
+    --unlinked:  #3a3a37;
+    --shadow:    none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --text: #fff; --text-2: #c3c2b7;
+  --muted: #898781; --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+  --linked: #3987e5; --unlinked: #3a3a37; --shadow: none;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px; line-height: 1.45;
+}
+
+/* ---- shared primitives used across components ---- */
+.badge {
+  font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2);
+}
+.off { color: var(--muted); }
+a.link { color: var(--linked); }
+
+.legend { display: flex; gap: 16px; color: var(--text-2); font-size: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.dot.l { background: var(--linked); }
+.dot.u { background: var(--unlinked); }

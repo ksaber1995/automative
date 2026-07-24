@@ -4,6 +4,25 @@
   "private": true,
   "description": "Local-only report: cards generated per active client, and the QR pool split (linked vs unlinked). Reads the production /api/karim-admin-secret endpoint. Must be served on http://localhost:4800 for CORS.",
   "scripts": {
-    "start": "npx --yes http-server . -p 4800 -c-1 -o"
+    "ng": "ng",
+    "start": "ng serve --port 4800 --open",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development"
+  },
+  "dependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "typescript": "~5.9.0"
   }
 }
