@@ -1336,7 +1336,11 @@
     "LISTS_ADD_TO_HINT": "Add {{name}} to a list.",
     "LISTS_CREATE_ADD": "Create & add",
     "LISTS_BOARD_HINT": "Drag a lead into another list to add them there — they stay in the list they came from.",
-    "LISTS_DROP_HERE": "Drop a lead here"
+    "LISTS_DROP_HERE": "Drop a lead here",
+    "T_COL_DONE": "Done",
+    "T_MARKED_DONE": "\"{{title}}\" moved to Done",
+    "T_REOPENED": "\"{{title}}\" reopened",
+    "T_DONE_FAILED": "Could not update the task. Please try again."
   },
   "NAV": {
     "DASHBOARD": "Dashboard",

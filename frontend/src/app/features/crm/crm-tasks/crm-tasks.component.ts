@@ -11,6 +11,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TooltipModule } from 'primeng/tooltip';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -27,7 +28,7 @@ import { CrmActivity, TASK_PRIORITIES, TaskPriority } from '@shared/interfaces/c
   imports: [
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DialogModule, SelectModule, InputTextModule, TextareaModule, DatePickerModule,
-    TooltipModule, ConfirmDialogModule, TranslateModule,
+    TooltipModule, CheckboxModule, ConfirmDialogModule, TranslateModule,
   ],
   providers: [ConfirmationService],
   templateUrl: './crm-tasks.component.html',
@@ -43,6 +44,8 @@ export class CrmTasksComponent implements OnInit {
 
   loading = signal(false);
   saving = signal(false);
+  /** Task currently being toggled, so its checkbox can't be double-clicked. */
+  togglingId = signal<string | null>(null);
   tasks = signal<CrmActivity[]>([]);
   employees = signal<{ label: string; value: string }[]>([]);
   leads = signal<{ label: string; value: string }[]>([]);
@@ -169,10 +172,30 @@ export class CrmTasksComponent implements OnInit {
     });
   }
 
+  /**
+   * Move a task to done (or back to open).
+   *
+   * Always confirm the outcome with a toast. Under the default "Open" filter a
+   * completed task drops straight out of the list, and with no message that reads
+   * as "nothing happened" rather than "it moved to Done" — which is exactly how a
+   * working feature gets reported as missing.
+   */
   toggleDone(t: CrmActivity) {
-    this.crm.updateTask(t.id, { done: !t.doneAt }).subscribe({
-      next: () => this.load(),
-      error: () => {},
+    const done = !t.doneAt;
+    this.togglingId.set(t.id);
+    this.crm.updateTask(t.id, { done }).subscribe({
+      next: () => {
+        this.togglingId.set(null);
+        this.notify.success(this.translate.instant(
+          done ? 'CRM.T_MARKED_DONE' : 'CRM.T_REOPENED', { title: t.subject ?? '' },
+        ));
+        this.load();
+      },
+      // Was swallowed entirely, so a failure looked identical to a success.
+      error: () => {
+        this.togglingId.set(null);
+        this.notify.error(this.translate.instant('CRM.T_DONE_FAILED'));
+      },
     });
   }
 

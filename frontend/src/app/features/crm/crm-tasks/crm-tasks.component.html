@@ -28,7 +28,7 @@
       <p-table [value]="tasks()" [loading]="loading()" [paginator]="tasks().length > 20" [rows]="20" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr>
-            <th style="width: 44px"></th>
+            <th style="width: 64px" class="text-center">{{ 'CRM.T_COL_DONE' | translate }}</th>
             <th>{{ 'CRM.T_COL_TASK' | translate }}</th>
             <th>{{ 'CRM.T_COL_ASSIGNEE' | translate }}</th>
             <th>{{ 'CRM.T_COL_PRIORITY' | translate }}</th>
@@ -40,9 +40,17 @@
         </ng-template>
         <ng-template pTemplate="body" let-t>
           <tr [class.opacity-60]="t.doneAt">
-            <td>
-              <p-button [icon]="t.doneAt ? 'pi pi-undo' : 'pi pi-check'" [severity]="t.doneAt ? 'secondary' : 'success'" [text]="true" size="small"
-                        [pTooltip]="(t.doneAt ? 'CRM.ACT_REOPEN' : 'CRM.ACT_COMPLETE') | translate" (onClick)="toggleDone(t)"></p-button>
+            <!-- A checkbox, not a bare icon button: ticking something off is the
+                 universal "move this to done" gesture, and the old 44px unlabelled
+                 icon column was easy to miss entirely. -->
+            <td class="text-center">
+              <p-checkbox
+                [binary]="true"
+                [ngModel]="!!t.doneAt"
+                [disabled]="togglingId() === t.id"
+                [pTooltip]="(t.doneAt ? 'CRM.ACT_REOPEN' : 'CRM.ACT_COMPLETE') | translate"
+                (onChange)="toggleDone(t)"
+              ></p-checkbox>
             </td>
             <td>
               <div class="font-medium text-gray-800" [class.line-through]="t.doneAt">{{ t.subject }}</div>
