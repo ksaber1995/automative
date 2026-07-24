@@ -177,7 +177,9 @@ export const routes: Routes = [
       },
       {
         path: 'employees',
-        canActivate: [permissionGuard('employees')],
+        // notTeacherGuard as well as the nav flag: hiding a menu item does not
+        // stop a bookmarked or typed URL.
+        canActivate: [permissionGuard('employees'), notTeacherGuard],
         data: { breadcrumb: 'BREADCRUMBS.EMPLOYEES' },
         loadChildren: () => import('./features/employees/employees.routes').then(m => m.EMPLOYEES_ROUTES)
       },
@@ -195,7 +197,10 @@ export const routes: Routes = [
       },
       {
         path: 'salaries',
-        canActivate: [permissionGuard('expenses')],
+        // Follows Employees: salaries are paid TO employees, so with no staff to
+        // manage the page has nothing to list. Not the same as Expenses, which a
+        // solo teacher still needs for rent, bills and the like.
+        canActivate: [permissionGuard('expenses'), notTeacherGuard],
         data: { breadcrumb: 'BREADCRUMBS.SALARIES' },
         loadChildren: () => import('./features/expenses/salaries/salaries.routes').then(m => m.SALARIES_ROUTES)
       },

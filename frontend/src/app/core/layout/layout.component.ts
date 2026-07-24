@@ -172,7 +172,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   // ─── Computed menu (permission-aware, grouped) ──────────────────────────
 
-  openGroups = signal<Set<string>>(new Set<string>());
+  /**
+   * Groups expanded in the sidebar. Academic starts open: it holds the pages
+   * people actually work in all day (and, for a teacher, Students at the top of
+   * it), so a collapsed sidebar on every load put a click in front of the most
+   * common destination. syncOpenGroupFromUrl still opens whichever group matches
+   * the current URL, and toggleGroup can close this one like any other.
+   */
+  openGroups = signal<Set<string>>(new Set<string>(['academic']));
 
   visibleMenuEntries = computed<NavEntry[]>(() => {
     const auth = this.authService;
@@ -186,7 +193,17 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
 
     // Academic
+    //
+    // Students leads this group for a TEACHER tenant. Gating Employees and
+    // Teacher Attendance leaves People holding nothing but Students, and a
+    // one-item group is a click in the way of the page a solo teacher opens
+    // most. Academies keep Students under People, which still has three entries.
+    const teacherStudentsFirst: NavLeaf[] = auth.isTeacher()
+      ? [{ labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') }]
+      : [];
+
     const academic: NavLeaf[] = [
+      ...teacherStudentsFirst,
       { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
@@ -207,8 +224,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     // People
     const people: NavLeaf[] = [
-      { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') },
-      { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') },
+      // Teachers get Students at the top of Academic instead — see above.
+      { labelKey: 'NAV.STUDENTS', icon: 'pi pi-users', routerLink: ['/students'], visible: auth.canRead('students') && !auth.isTeacher() },
+      // Academy-only, like Rooms/Branches/Subjects above: a TEACHER tenant IS the
+      // one teacher, so it has no staff to manage. Across 24 teacher tenants in
+      // production not one had used it — the only rows were test data.
+      { labelKey: 'NAV.EMPLOYEES', icon: 'pi pi-user', routerLink: ['/employees'], visible: auth.canRead('employees') && !auth.isTeacher() },
       { labelKey: 'NAV.ATTENDANCE_TEACHERS', icon: 'pi pi-user-edit', routerLink: ['/attendance/teachers'], visible: auth.canRead('academy') && !auth.isTeacher() },
     ].filter(c => c.visible);
     if (people.length) {
@@ -257,7 +278,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
       { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
-      { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') },
+      // Hidden for teachers alongside Employees — a salary is paid to an
+      // employee, and a teacher tenant has none. Expenses above stays visible:
+      // rent and bills apply to a solo teacher too.
+      { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') && !auth.isTeacher() },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);
