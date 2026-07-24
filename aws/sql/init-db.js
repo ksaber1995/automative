@@ -277,8 +277,8 @@ CREATE OR REPLACE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR
 -- STUDENTS TABLE
 CREATE TABLE IF NOT EXISTS students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
+    -- One name field, not a first/last pair. See migrations 070 and 074.
+    name TEXT NOT NULL,
     date_of_birth DATE,
     email VARCHAR(255),
     phone VARCHAR(50),

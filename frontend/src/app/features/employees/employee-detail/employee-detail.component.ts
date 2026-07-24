@@ -59,6 +59,9 @@ export class EmployeeDetailComponent implements OnInit {
   removingUser = signal(false);
 
   hasLinkedUser = computed(() => !!this.employee()?.linkedUserId);
+
+  subjectNames = computed(() => (this.employee()?.subjects ?? []).map(s => s.name).filter(Boolean).join(', '));
+  levelNames = computed(() => (this.employee()?.levels ?? []).map(l => l.name).filter(Boolean).join(', '));
   salaryHistory = signal<ExpensePayment[]>([]);
   historyLoading = signal(false);
 

@@ -6,7 +6,7 @@ test.describe('Students list', () => {
     await page.goto('/students');
     await expect(page.getByRole('heading', { name: /students/i })).toBeVisible();
     for (const s of STUDENTS) {
-      await expect(page.getByText(s.firstName, { exact: false }).first()).toBeVisible();
+      await expect(page.getByText(s.name, { exact: false }).first()).toBeVisible();
     }
   });
 
@@ -37,8 +37,7 @@ test.describe('Students list', () => {
 test.describe('Student create', () => {
   test('form renders the required fields', async ({ page }) => {
     await page.goto('/students/create');
-    await expect(page.locator('input[formControlName="firstName"], #firstName')).toBeVisible();
-    await expect(page.locator('input[formControlName="lastName"], #lastName')).toBeVisible();
+    await expect(page.locator('input[formControlName="name"], #name')).toBeVisible();
   });
 
   test('submit is disabled until required fields are filled', async ({ page }) => {
@@ -52,6 +51,6 @@ test.describe('Student detail', () => {
   test('renders the student profile', async ({ page }) => {
     const s = STUDENTS[0];
     await page.goto(`/students/${s.id}`);
-    await expect(page.getByRole('heading', { name: new RegExp(s.firstName) })).toBeVisible();
+    await expect(page.getByRole('heading', { name: new RegExp(s.name) })).toBeVisible();
   });
 });

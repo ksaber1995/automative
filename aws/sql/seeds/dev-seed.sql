@@ -121,13 +121,15 @@ BEGIN
     -- created_at IS the join date now that students.enrollment_date is gone, so set it
     -- explicitly from v_enrollment_date; the DEFAULT now() would flatten every seeded
     -- student onto today and break the historical spread the reports rely on.
-    INSERT INTO students (id, company_id, branch_id, first_name, last_name, date_of_birth,
+    INSERT INTO students (id, company_id, branch_id, name, date_of_birth,
                           parent_name, parent_phone,
                           is_active,
                           inactive_date, inactive_reason, notes, created_at)
     VALUES (
       v_student_id, v_company_id, v_branch_id,
-      v_first, v_last, v_dob,
+      -- students.name is one field; the two arrays just make the seeded names
+      -- read like real ones.
+      v_first || ' ' || v_last, v_dob,
       'Parent of ' || v_first,
       '+201' || lpad(floor(random() * 999999999)::text, 9, '0'),
       v_is_active,

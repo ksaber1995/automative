@@ -56,18 +56,27 @@ export class EmployeeListComponent implements OnInit {
   loading = signal(true);
   selectedBranchId: string | null = null;
   statusFilter = signal<'active' | 'inactive'>('active');
+  // Employee vs teacher. Filtered client-side (like statusFilter) so both counts
+  // stay live off one fetch; the API also takes an `isTeacher` query param.
+  roleFilter = signal<'all' | 'employee' | 'teacher'>('all');
 
   showAssignedClassesDialog = signal(false);
   blockedEmployee = signal<Employee | null>(null);
   blockingClasses = signal<{ id: string; name: string }[]>([]);
 
   filteredEmployees = computed(() => {
-    const list = this.employees();
-    return this.statusFilter() === 'active'
-      ? list.filter(e => e.isActive)
-      : list.filter(e => !e.isActive);
+    const active = this.statusFilter() === 'active';
+    const role = this.roleFilter();
+    return this.employees().filter(e => {
+      if (e.isActive !== active) return false;
+      if (role === 'teacher') return e.isTeacher === true;
+      if (role === 'employee') return e.isTeacher !== true;
+      return true;
+    });
   });
 
+  // Status counts stay whole-list so the tab badges don't move when the
+  // employee/teacher filter changes.
   activeCount = computed(() => this.employees().filter(e => e.isActive).length);
   inactiveCount = computed(() => this.employees().filter(e => !e.isActive).length);
 
@@ -176,6 +185,12 @@ export class EmployeeListComponent implements OnInit {
 
   createEmployee() {
     this.router.navigate(['/employees/create']);
+  }
+
+  // Same form, teacher mode — it reads `teacher=1` to show the subject/level
+  // pickers and to set isTeacher on submit.
+  createTeacher() {
+    this.router.navigate(['/employees/create'], { queryParams: { teacher: 1 } });
   }
 
   getBranchName(branchId: string | null): string {

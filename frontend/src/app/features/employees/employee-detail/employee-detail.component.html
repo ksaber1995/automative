@@ -8,6 +8,9 @@
       <div class="flex items-center gap-3">
         <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="back()"></p-button>
         <h1 class="text-2xl font-bold">{{ employee()!.firstName }} {{ employee()!.lastName }}</h1>
+        @if (employee()!.isTeacher) {
+          <p-tag [value]="'EMPLOYEES.DETAIL.TEACHER' | translate" severity="info"></p-tag>
+        }
         <p-tag
           [value]="employee()!.isActive ? ('EMPLOYEES.DETAIL.ACTIVE' | translate) : ('EMPLOYEES.DETAIL.INACTIVE' | translate)"
           [severity]="employee()!.isActive ? 'success' : 'danger'">
@@ -100,6 +103,32 @@
               [severity]="employee()!.isGlobal ? 'success' : 'info'">
             </p-tag>
           </div>
+
+          <!-- Teaching profile — only meaningful for teachers. -->
+          @if (employee()!.isTeacher) {
+            <p-divider styleClass="my-2"></p-divider>
+            <div class="flex justify-between items-start gap-4">
+              <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.SUBJECTS' | translate }}</span>
+              <span class="font-medium text-right">
+                @if (employee()!.subjects?.length) {
+                  {{ subjectNames() }}
+                } @else {
+                  {{ 'EMPLOYEES.DETAIL.NONE' | translate }}
+                }
+              </span>
+            </div>
+            <p-divider styleClass="my-2"></p-divider>
+            <div class="flex justify-between items-start gap-4">
+              <span class="text-gray-500 text-sm">{{ 'EMPLOYEES.DETAIL.LEVELS' | translate }}</span>
+              <span class="font-medium text-right">
+                @if (employee()!.levels?.length) {
+                  {{ levelNames() }}
+                } @else {
+                  {{ 'EMPLOYEES.DETAIL.NONE' | translate }}
+                }
+              </span>
+            </div>
+          }
         </div>
       </p-card>
 

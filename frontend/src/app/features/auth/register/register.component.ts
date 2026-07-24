@@ -118,7 +118,19 @@ export class RegisterComponent {
       },
       error: (error) => {
         this.loading.set(false);
-        const msg = error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED');
+        // Prefer the API's error code over its `message`: the message is an
+        // untranslated English fallback ("A user with this phone number already
+        // exists."), while the code (ERRORS.AUTH.PHONE_TAKEN) has ar/en entries.
+        // instant() echoes the key back when there's no entry — that's the tell
+        // to fall through to the server text. Same shape as login.component.
+        const code = error.error?.code;
+        let msg: string;
+        if (code) {
+          const translated = this.translate.instant(code);
+          msg = translated !== code ? translated : (error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED'));
+        } else {
+          msg = error.error?.message || this.translate.instant('AUTH.REGISTER.FAILED');
+        }
         this.serverError.set(msg);
         this.notificationService.error(msg);
       }

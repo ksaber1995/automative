@@ -20,6 +20,14 @@ export interface Employee {
   hireDate: string;
   terminationDate?: string | null;
   isActive: boolean;
+  /** A teacher is an employee with this flag set — not a separate table. */
+  isTeacher?: boolean;
+  /** Optional, teachers only. Subjects are academy-only, like everywhere else. */
+  subjectIds?: string[];
+  subjects?: { id: string; name: string | null }[];
+  /** Optional, teachers only. */
+  levelIds?: string[];
+  levels?: { id: string; name: string | null }[];
   linkedUserId?: string | null;
   hasSalaryHistory?: boolean;
   notes?: string;
@@ -41,6 +49,9 @@ export interface EmployeeCreateDto {
   sessionRate?: number | null;
   percentageRate?: number | null;
   hireDate: string;
+  isTeacher?: boolean;
+  subjectIds?: string[];
+  levelIds?: string[];
   notes?: string;
 }
 
@@ -59,5 +70,8 @@ export interface EmployeeUpdateDto {
   percentageRate?: number | null;
   terminationDate?: string;
   isActive?: boolean;
+  isTeacher?: boolean;
+  subjectIds?: string[];
+  levelIds?: string[];
   notes?: string;
 }

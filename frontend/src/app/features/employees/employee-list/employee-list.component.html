@@ -3,7 +3,10 @@
     <ng-template pTemplate="header">
       <div class="flex justify-between items-center p-4">
         <h2 class="text-2xl font-bold">{{ 'EMPLOYEES.LIST.TITLE' | translate }}</h2>
-        <button pButton [label]="'EMPLOYEES.LIST.ADD' | translate" icon="pi pi-plus" (click)="createEmployee()"></button>
+        <div class="flex gap-2">
+          <button pButton [label]="'EMPLOYEES.LIST.ADD' | translate" icon="pi pi-plus" class="p-button-outlined" (click)="createEmployee()"></button>
+          <button pButton [label]="'EMPLOYEES.LIST.ADD_TEACHER' | translate" icon="pi pi-user-plus" (click)="createTeacher()"></button>
+        </div>
       </div>
     </ng-template>
 
@@ -25,6 +28,21 @@
         </select>
       </div>
       }
+
+      <!-- Employee / teacher split -->
+      <div>
+        <label for="roleFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.ROLE_FILTER' | translate }}</label>
+        <select
+          id="roleFilter"
+          [ngModel]="roleFilter()"
+          (ngModelChange)="roleFilter.set($event)"
+          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">{{ 'EMPLOYEES.LIST.ROLE_ALL' | translate }}</option>
+          <option value="employee">{{ 'EMPLOYEES.LIST.ROLE_EMPLOYEES' | translate }}</option>
+          <option value="teacher">{{ 'EMPLOYEES.LIST.ROLE_TEACHERS' | translate }}</option>
+        </select>
+      </div>
     </div>
 
     <!-- Active/Inactive Tabs -->
@@ -68,7 +86,12 @@
       </ng-template>
       <ng-template pTemplate="body" let-employee>
         <tr>
-          <td>{{ employee.firstName }} {{ employee.lastName }}</td>
+          <td>
+            {{ employee.firstName }} {{ employee.lastName }}
+            @if (employee.isTeacher) {
+              <p-tag [value]="'EMPLOYEES.LIST.TEACHER' | translate" severity="info" class="ml-2"></p-tag>
+            }
+          </td>
           <td>{{ employee.position }}</td>
           <td>{{ employee.department }}</td>
           @if (!authService.isTeacher()) {
@@ -80,7 +103,35 @@
               }
             </td>
           }
-          <td>{{ employee.salary | amount }}</td>
+          <!-- Pay depends on the model: MONTHLY uses salary, SESSION_BASED uses
+               sessionRate, PERCENTAGE uses percentageRate. Showing `salary` for
+               all three left the last two blank. -->
+          <td>
+            @switch (employee.salaryType) {
+              @case ('SESSION_BASED') {
+                <div class="flex items-center gap-1 whitespace-nowrap">
+                  <span class="font-medium">{{ employee.sessionRate | amount }}</span>
+                  <span class="text-xs text-gray-500">{{ 'EMPLOYEES.LIST.PER_SESSION' | translate }}</span>
+                  <i class="pi pi-info-circle text-gray-400 text-xs cursor-help"
+                     [pTooltip]="'EMPLOYEES.FORM.SESSION_RATE_HINT' | translate" tooltipPosition="top"></i>
+                </div>
+              }
+              @case ('PERCENTAGE') {
+                <div class="flex items-center gap-1 whitespace-nowrap">
+                  <span class="font-medium">{{ (employee.percentageRate ?? 0) | number: '1.0-2' }}%</span>
+                  <span class="text-xs text-gray-500">{{ 'EMPLOYEES.LIST.OF_REVENUE' | translate }}</span>
+                  <i class="pi pi-info-circle text-gray-400 text-xs cursor-help"
+                     [pTooltip]="'EMPLOYEES.FORM.PERCENTAGE_HINT' | translate" tooltipPosition="top"></i>
+                </div>
+              }
+              @default {
+                <div class="flex items-center gap-1 whitespace-nowrap">
+                  <span class="font-medium">{{ employee.salary | amount }}</span>
+                  <span class="text-xs text-gray-500">{{ 'EMPLOYEES.LIST.PER_MONTH' | translate }}</span>
+                </div>
+              }
+            }
+          </td>
           <td>{{ employee.hireDate | date: 'MMM d, y' }}</td>
           <td>
             <p-tag

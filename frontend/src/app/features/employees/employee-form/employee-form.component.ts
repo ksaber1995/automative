@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -8,6 +8,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -28,6 +29,7 @@ import { todayYmd } from '../../../core/utils/date.util';
     InputTextModule,
     InputNumberModule,
     SelectModule,
+    MultiSelectModule,
     TranslateModule
   ],
   templateUrl: './employee-form.component.html',
@@ -42,7 +44,7 @@ export class EmployeeFormComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
-  private authService = inject(AuthService);
+  protected authService = inject(AuthService);
 
   employeeForm: FormGroup;
   loading = signal(false);
@@ -50,6 +52,14 @@ export class EmployeeFormComponent implements OnInit {
   employeeId: string | null = null;
   branches = signal<LookupOption[]>([]);
   salaryTypeOptions = signal<{ label: string; value: string }[]>([]);
+  // Teacher mode: set from ?teacher=1 on create, from the record on edit. Drives
+  // the title and whether the subject/level pickers show.
+  isTeacher = signal(false);
+  subjects = signal<LookupOption[]>([]);
+  levels = signal<LookupOption[]>([]);
+  // Subjects are academy-only across the app (/subjects has a notTeacherGuard,
+  // and course-form hides them the same way).
+  showSubjects = computed(() => this.isTeacher() && !this.authService.isTeacher());
 
   constructor() {
     this.rebuildSalaryTypeOptions();
@@ -61,6 +71,7 @@ export class EmployeeFormComponent implements OnInit {
       lastName: ['', [Validators.required, Validators.minLength(2)]],
       email: ['', [Validators.email]],
       phone: ['', [Validators.required]],
+      // Required for staff, optional for teachers — see the effect below.
       position: ['', [Validators.required]],
       department: ['', [Validators.required]],
       isGlobal: [false],
@@ -70,6 +81,9 @@ export class EmployeeFormComponent implements OnInit {
       sessionRate: [null],
       percentageRate: [null],
       hireDate: [today, [Validators.required]],
+      // Both optional, teachers only.
+      subjectIds: [[] as string[]],
+      levelIds: [[] as string[]],
       notes: ['']
     });
 
@@ -83,6 +97,26 @@ export class EmployeeFormComponent implements OnInit {
         branchControl?.setValidators([Validators.required]);
       }
       branchControl?.updateValueAndValidity();
+    });
+
+    // A teacher's role is already described by the teacher flag plus their
+    // subjects and levels, so position/department are optional for them. For
+    // non-teaching staff those two fields are the only thing recording what the
+    // person actually does, so they stay required.
+    //
+    // Runs as an effect because isTeacher isn't known at construction: on create
+    // it comes from ?teacher=1 in ngOnInit, on edit from the loaded record.
+    effect(() => {
+      const teacher = this.isTeacher();
+      for (const field of ['position', 'department']) {
+        const ctrl = this.employeeForm.get(field);
+        if (!ctrl) continue;
+        if (teacher) ctrl.clearValidators();
+        else ctrl.setValidators([Validators.required]);
+        // emitEvent: false — this is a validity change, not a value change, and
+        // shouldn't look like the user edited the field.
+        ctrl.updateValueAndValidity({ emitEvent: false });
+      }
     });
 
     // Require the field that matches the chosen salary type:
@@ -127,6 +161,18 @@ export class EmployeeFormComponent implements OnInit {
     if (this.employeeId) {
       this.isEditMode.set(true);
       this.loadEmployee(this.employeeId);
+    } else {
+      // Create mode — the Add Teacher button is the only thing that sets this.
+      this.isTeacher.set(this.route.snapshot.queryParamMap.get('teacher') === '1');
+    }
+    this.loadTeacherLookups();
+  }
+
+  private loadTeacherLookups() {
+    this.lookupService.levels().subscribe({ next: (l) => this.levels.set(l) });
+    // Skipped for teacher tenants, which have no subjects feature at all.
+    if (!this.authService.isTeacher()) {
+      this.lookupService.subjects().subscribe({ next: (s) => this.subjects.set(s) });
     }
   }
 
@@ -146,9 +192,12 @@ export class EmployeeFormComponent implements OnInit {
     this.loading.set(true);
     this.employeeService.getEmployeeById(id).subscribe({
       next: (employee) => {
+        this.isTeacher.set(employee.isTeacher === true);
         this.employeeForm.patchValue({
           ...employee,
-          hireDate: employee.hireDate ? employee.hireDate.split('T')[0] : null
+          hireDate: employee.hireDate ? employee.hireDate.split('T')[0] : null,
+          subjectIds: employee.subjectIds ?? [],
+          levelIds: employee.levelIds ?? [],
         });
         this.loading.set(false);
       },
@@ -167,9 +216,15 @@ export class EmployeeFormComponent implements OnInit {
     }
 
     this.loading.set(true);
+    const teacher = this.isTeacher();
     const employeeData = {
       ...this.employeeForm.value,
-      branchId: this.employeeForm.value.isGlobal ? null : this.employeeForm.value.branchId
+      branchId: this.employeeForm.value.isGlobal ? null : this.employeeForm.value.branchId,
+      isTeacher: teacher,
+      // Don't send links a plain employee can't have, and drop subjects for
+      // teacher tenants where the picker was never shown.
+      subjectIds: this.showSubjects() ? (this.employeeForm.value.subjectIds ?? []) : [],
+      levelIds: teacher ? (this.employeeForm.value.levelIds ?? []) : [],
     };
 
     if (this.isEditMode() && this.employeeId) {

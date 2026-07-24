@@ -126,8 +126,9 @@ function makeStudent(i) {
   const phoneTail = pad(10000000 + (i * 137) % 89999999, 8);
   return {
     handle,
-    first_name: first,
-    last_name: last,
+    // students.name is one field; first/last stay local so the email and the
+    // father's name below can still be built from the parts.
+    name: `${first} ${last}`,
     date_of_birth: `${year}-${month}-${day}`,
     email: `${first}.${last}.${pad(i, 4)}@students.example.com`.toLowerCase(),
     phone: `+2010${phoneTail}`,
@@ -205,16 +206,15 @@ async function main() {
     const s = makeStudent(i);
     const id = stableUuid(companyId, 'student', s.handle);
     const res = await runSql(
-      `INSERT INTO students (id, company_id, first_name, last_name, date_of_birth, email, phone,
+      `INSERT INTO students (id, company_id, name, date_of_birth, email, phone,
          parent_name, parent_phone, address, branch_id, qr_token, is_active)
-       VALUES (:id, :cid, :firstName, :lastName, :dob, :emailVal, :phone,
+       VALUES (:id, :cid, :name, :dob, :emailVal, :phone,
          :parentName, :parentPhone, :address, :branchId, :qrToken, true)
        ON CONFLICT (id) DO NOTHING`,
       [
         p.uuid('id', id),
         p.uuid('cid', companyId),
-        p.str('firstName', s.first_name),
-        p.str('lastName', s.last_name),
+        p.str('name', s.name),
         p.date('dob', s.date_of_birth),
         p.str('emailVal', s.email),
         p.str('qrToken', stableQrToken(companyId, s.handle)),

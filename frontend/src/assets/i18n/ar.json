@@ -2862,7 +2862,16 @@
       "TERMINATE": "إنهاء الخدمة",
       "DELETE": "حذف",
       "GLOBAL": "عام",
-      "NO_DATA": "لا يوجد موظفون."
+      "NO_DATA": "لا يوجد موظفون.",
+      "ADD_TEACHER": "إضافة مدرس",
+      "TEACHER": "مدرس",
+      "ROLE_FILTER": "تصفية حسب النوع:",
+      "ROLE_ALL": "الكل",
+      "ROLE_EMPLOYEES": "الموظفون فقط",
+      "ROLE_TEACHERS": "المدرسون فقط",
+      "PER_SESSION": "/ حصة",
+      "OF_REVENUE": "من الإيراد",
+      "PER_MONTH": "/ شهر"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل الموظف",
@@ -2899,7 +2908,16 @@
       "NOTES": "ملاحظات",
       "CANCEL": "إلغاء",
       "UPDATE": "تحديث",
-      "CREATE": "إنشاء"
+      "CREATE": "إنشاء",
+      "CREATE_TEACHER_TITLE": "إضافة مدرس جديد",
+      "EDIT_TEACHER_TITLE": "تعديل بيانات المدرس",
+      "SUBJECTS": "المواد",
+      "SUBJECTS_PLACEHOLDER": "اختر المواد (اختياري)",
+      "SUBJECTS_SELECTED": "{0} مواد مختارة",
+      "LEVELS": "المستويات",
+      "LEVELS_PLACEHOLDER": "اختر المستويات (اختياري)",
+      "LEVELS_SELECTED": "{0} مستويات مختارة",
+      "OPTIONAL": "اختياري"
     },
     "DETAIL": {
       "ACTIVE": "نشط",
@@ -3017,7 +3035,11 @@
       "ROLE_ASSISTANT": "مساعد",
       "STATUS_PRESENT": "حاضر",
       "STATUS_ABSENT": "غائب",
-      "NO_ATTENDANCE": "لا توجد سجلات حضور بعد."
+      "NO_ATTENDANCE": "لا توجد سجلات حضور بعد.",
+      "TEACHER": "مدرس",
+      "SUBJECTS": "المواد",
+      "LEVELS": "المستويات",
+      "NONE": "لا يوجد"
     },
     "CREATED": "تم إنشاء الموظف بنجاح",
     "UPDATED": "تم تحديث الموظف بنجاح",
@@ -4796,7 +4818,12 @@
     "MARK_UPDATED": "{{name}} — تم التحديث إلى {{grade}}",
     "CAMERA_FAILED": "تعذر تشغيل الكاميرا. استخدم خانة الكود بدلاً من ذلك.",
     "CLOSE": "إغلاق",
-    "HIDE": "إخفاء الواجب"
+    "HIDE": "إخفاء الواجب",
+    "DELETE": "حذف الواجب",
+    "DELETE_HEADER": "حذف الواجب",
+    "DELETE_CONFIRM": "حذف \"{{name}}\"؟ سيتم إزالته من هذه المجموعة.",
+    "DELETE_CONFIRM_MARKED": "حذف \"{{name}}\"؟ تم تسجيل {{n}} درجة للطلاب ولن تظهر بعد الآن.",
+    "DELETED": "تم حذف \"{{name}}\""
   },
   "SESSION_QR": {
     "SCAN_BUTTON": "امسح رمز QR لتسجيل الحضور",

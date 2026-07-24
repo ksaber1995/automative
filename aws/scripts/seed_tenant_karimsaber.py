@@ -289,7 +289,9 @@ def main():
         seen_tokens.add(tok)
         bid = branch_ids[i % len(branch_ids)]
         student_rows.append([
-            p_uuid('id', sid), p_str('fn', first), p_str('ln', last),
+            # students.name is one field; first/last are only picked apart here so
+            # the generated names (and the parent's surname above) read naturally.
+            p_uuid('id', sid), p_str('name', f'{first} {last}'),
             p_date('dob', dob.isoformat()), p_str('gen', gender),
             p_str('phone', eg_phone()), p_str('pname', parent), p_str('pphone', eg_phone()),
             p_uuid('bid', bid), p_uuid('cid', cid),
@@ -378,10 +380,10 @@ def main():
     print(f"  inserted {len(class_rows)} classes")
 
     # 8) students
-    run_batch("INSERT INTO students (id, first_name, last_name, date_of_birth, gender, phone, "
+    run_batch("INSERT INTO students (id, name, date_of_birth, gender, phone, "
               "parent_name, parent_phone, branch_id, company_id, is_active, "
               "qr_token, student_code, acquisition_channel, notes) "
-              "VALUES (:id, :fn, :ln, :dob, :gen, :phone, :pname, :pphone, :bid, :cid, true, "
+              "VALUES (:id, :name, :dob, :gen, :phone, :pname, :pphone, :bid, :cid, true, "
               ":tok, :code, :acq, :notes)",
               student_rows)
     print(f"  inserted {len(student_rows)} students")

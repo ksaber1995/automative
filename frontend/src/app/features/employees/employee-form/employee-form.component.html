@@ -1,5 +1,7 @@
 <div class="container mx-auto p-6">
-  <p-card [header]="isEditMode() ? ('EMPLOYEES.FORM.EDIT_TITLE' | translate) : ('EMPLOYEES.FORM.CREATE_TITLE' | translate)">
+  <p-card [header]="isEditMode()
+      ? (isTeacher() ? ('EMPLOYEES.FORM.EDIT_TEACHER_TITLE' | translate) : ('EMPLOYEES.FORM.EDIT_TITLE' | translate))
+      : (isTeacher() ? ('EMPLOYEES.FORM.CREATE_TEACHER_TITLE' | translate) : ('EMPLOYEES.FORM.CREATE_TITLE' | translate))">
     <form [formGroup]="employeeForm" (ngSubmit)="onSubmit()">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- First Name -->
@@ -35,15 +37,29 @@
           <input pInputText type="tel" formControlName="phone" class="w-full" />
         </div>
 
-        <!-- Position -->
+        <!-- Position — optional for teachers, required for other staff -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.POSITION' | translate }} <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">
+            {{ 'EMPLOYEES.FORM.POSITION' | translate }}
+            @if (isTeacher()) {
+              <span class="text-gray-400 text-xs">({{ 'EMPLOYEES.FORM.OPTIONAL' | translate }})</span>
+            } @else {
+              <span class="text-red-500">*</span>
+            }
+          </label>
           <input pInputText formControlName="position" class="w-full" [placeholder]="'EMPLOYEES.FORM.POSITION_PLACEHOLDER' | translate" />
         </div>
 
-        <!-- Department -->
+        <!-- Department — optional for teachers, required for other staff -->
         <div class="field">
-          <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.DEPARTMENT' | translate }} <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium mb-2">
+            {{ 'EMPLOYEES.FORM.DEPARTMENT' | translate }}
+            @if (isTeacher()) {
+              <span class="text-gray-400 text-xs">({{ 'EMPLOYEES.FORM.OPTIONAL' | translate }})</span>
+            } @else {
+              <span class="text-red-500">*</span>
+            }
+          </label>
           <input pInputText formControlName="department" class="w-full" [placeholder]="'EMPLOYEES.FORM.DEPARTMENT_PLACEHOLDER' | translate" />
         </div>
 
@@ -110,6 +126,43 @@
             @if (branchId?.invalid && branchId?.touched) {
               <small class="text-red-500">{{ 'EMPLOYEES.FORM.BRANCH_REQUIRED' | translate }}</small>
             }
+          </div>
+        }
+
+        <!-- What the teacher teaches. Both optional; teacher mode only. -->
+        @if (isTeacher()) {
+          @if (showSubjects()) {
+            <div class="field col-span-2">
+              <label for="subjectIds" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SUBJECTS' | translate }}</label>
+              <p-multiSelect
+                id="subjectIds"
+                formControlName="subjectIds"
+                [options]="subjects()"
+                optionLabel="label"
+                optionValue="id"
+                [maxSelectedLabels]="2"
+                [selectedItemsLabel]="'EMPLOYEES.FORM.SUBJECTS_SELECTED' | translate"
+                [placeholder]="'EMPLOYEES.FORM.SUBJECTS_PLACEHOLDER' | translate"
+                [style]="{ width: '100%' }"
+                [showClear]="true"
+              ></p-multiSelect>
+            </div>
+          }
+
+          <div class="field col-span-2">
+            <label for="levelIds" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.LEVELS' | translate }}</label>
+            <p-multiSelect
+              id="levelIds"
+              formControlName="levelIds"
+              [options]="levels()"
+              optionLabel="label"
+              optionValue="id"
+              [maxSelectedLabels]="2"
+              [selectedItemsLabel]="'EMPLOYEES.FORM.LEVELS_SELECTED' | translate"
+              [placeholder]="'EMPLOYEES.FORM.LEVELS_PLACEHOLDER' | translate"
+              [style]="{ width: '100%' }"
+              [showClear]="true"
+            ></p-multiSelect>
           </div>
         }
 

@@ -996,7 +996,7 @@ export const crmRoutes = {
         if (!e) {
           e = {
             studentId: row.student_id,
-            fullName: `${row.first_name} ${row.last_name}`.trim(),
+            fullName: (row.name ?? '').trim(),
             phone: row.phone ?? null,
             parentName: row.parent_name ?? null,
             parentPhone: row.parent_phone ?? null,

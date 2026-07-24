@@ -324,7 +324,7 @@ export const qrCardsRoutes = {
       // link a card that belongs to them.
 
       const student = await queryOne<any>(
-        'SELECT id, first_name, last_name, student_code FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
+        'SELECT id, name, student_code FROM students WHERE id = $1 AND company_id = $2 AND is_active = true',
         [body?.studentId, context.companyId],
       );
       if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
@@ -352,7 +352,7 @@ export const qrCardsRoutes = {
       if (card.student_id === student.id) {
         return {
           status: 200 as const,
-          body: { ...mapCard(card), studentName: `${student.first_name} ${student.last_name}`, alreadyLinked: true },
+          body: { ...mapCard(card), studentName: student.name, alreadyLinked: true },
         };
       }
 
@@ -388,7 +388,7 @@ export const qrCardsRoutes = {
 
       return {
         status: 200 as const,
-        body: { ...mapCard(updated), studentName: `${student.first_name} ${student.last_name}`, alreadyLinked: false },
+        body: { ...mapCard(updated), studentName: student.name, alreadyLinked: false },
       };
     } catch (error) {
       console.error('QR card link error:', error);

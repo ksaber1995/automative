@@ -371,8 +371,10 @@ CREATE INDEX idx_classes_instructor_id ON classes(instructor_id);
 -- =============================================
 CREATE TABLE students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
+    -- One field, not a first/last pair: a student has one name, and nothing
+    -- sorted, searched or addressed anybody by surname alone. See migrations 070
+    -- (add + backfill) and 074 (drop first_name/last_name).
+    name TEXT NOT NULL,
     date_of_birth DATE,
     gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE')),
     email VARCHAR(255),

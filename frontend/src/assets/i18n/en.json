@@ -2862,7 +2862,16 @@
       "TERMINATE": "Terminate",
       "DELETE": "Delete",
       "GLOBAL": "Global",
-      "NO_DATA": "No employees found."
+      "NO_DATA": "No employees found.",
+      "ADD_TEACHER": "Add Teacher",
+      "TEACHER": "Teacher",
+      "ROLE_FILTER": "Filter by Type:",
+      "ROLE_ALL": "All",
+      "ROLE_EMPLOYEES": "Employees only",
+      "ROLE_TEACHERS": "Teachers only",
+      "PER_SESSION": "/ session",
+      "OF_REVENUE": "of revenue",
+      "PER_MONTH": "/ month"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Employee",
@@ -2899,7 +2908,16 @@
       "NOTES": "Notes",
       "CANCEL": "Cancel",
       "UPDATE": "Update",
-      "CREATE": "Create"
+      "CREATE": "Create",
+      "CREATE_TEACHER_TITLE": "Add New Teacher",
+      "EDIT_TEACHER_TITLE": "Edit Teacher",
+      "SUBJECTS": "Subjects",
+      "SUBJECTS_PLACEHOLDER": "Select subjects (optional)",
+      "SUBJECTS_SELECTED": "{0} subjects selected",
+      "LEVELS": "Levels",
+      "LEVELS_PLACEHOLDER": "Select levels (optional)",
+      "LEVELS_SELECTED": "{0} levels selected",
+      "OPTIONAL": "optional"
     },
     "DETAIL": {
       "ACTIVE": "Active",
@@ -3017,7 +3035,11 @@
       "ROLE_ASSISTANT": "Assistant",
       "STATUS_PRESENT": "Present",
       "STATUS_ABSENT": "Absent",
-      "NO_ATTENDANCE": "No attendance records yet."
+      "NO_ATTENDANCE": "No attendance records yet.",
+      "TEACHER": "Teacher",
+      "SUBJECTS": "Subjects",
+      "LEVELS": "Levels",
+      "NONE": "None"
     },
     "CREATED": "Employee created successfully",
     "UPDATED": "Employee updated successfully",
@@ -4672,7 +4694,12 @@
     "MARK_UPDATED": "{{name}} — updated to {{grade}}",
     "CAMERA_FAILED": "Could not start the camera. Use the code box instead.",
     "CLOSE": "Close",
-    "HIDE": "Hide homework"
+    "HIDE": "Hide homework",
+    "DELETE": "Delete homework",
+    "DELETE_HEADER": "Delete homework",
+    "DELETE_CONFIRM": "Delete \"{{name}}\"? It will be removed from this class.",
+    "DELETE_CONFIRM_MARKED": "Delete \"{{name}}\"? {{n}} student mark(s) have already been recorded and will no longer be visible.",
+    "DELETED": "\"{{name}}\" deleted"
   },
   "SESSION_QR": {
     "SCAN_BUTTON": "Scan QR to check in",

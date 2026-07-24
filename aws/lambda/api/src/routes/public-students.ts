@@ -403,8 +403,7 @@ export const publicStudentsRoutes = {
         status: 200 as const,
         body: {
           student: {
-            firstName: student.first_name,
-            lastName: student.last_name,
+            name: student.name,
             branchName: student.branch_name,
             academyName: student.academy_name,
           },

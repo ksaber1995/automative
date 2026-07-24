@@ -17,6 +17,15 @@ export class EmployeeService {
     return this.api.get<Employee[]>('employees', { branchId });
   }
 
+  /** Server-side employee/teacher split. The list page filters client-side (it
+   *  needs both counts at once); this is for callers that want only one kind. */
+  getEmployeesByRole(isTeacher: boolean, branchId?: string): Observable<Employee[]> {
+    return this.api.get<Employee[]>('employees', {
+      isTeacher: String(isTeacher),
+      ...(branchId ? { branchId } : {}),
+    });
+  }
+
   getGlobalEmployees(): Observable<Employee[]> {
     return this.api.get<Employee[]>('employees/global');
   }

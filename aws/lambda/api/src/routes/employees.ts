@@ -3,7 +3,61 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureSalaryColumns } from './expenses';
 
+// is_teacher + the subject/level join tables (migration 075). Self-applies the
+// same DDL at runtime so a deploy doesn't have to wait on the SQL file, exactly
+// like ensureSalaryColumns.
+let teacherSchemaEnsured = false;
+export async function ensureTeacherSchema(): Promise<void> {
+  if (teacherSchemaEnsured) return;
+  await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_teacher BOOLEAN NOT NULL DEFAULT false`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS employee_subjects (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      subject_id  UUID NOT NULL REFERENCES subjects(id)  ON DELETE CASCADE,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (employee_id, subject_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_employee_subjects_employee ON employee_subjects(employee_id)`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS employee_levels (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      level_id    UUID NOT NULL REFERENCES levels(id)    ON DELETE CASCADE,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (employee_id, level_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_employee_levels_employee ON employee_levels(employee_id)`);
+  teacherSchemaEnsured = true;
+}
+
+// Aggregate an employee's linked subjects/levels into JSON arrays. Aliased `e`
+// must be the employees row in the surrounding query. Same shape as the
+// LEVELS_SUBQUERY / SUBJECTS_SUBQUERY pair in courses.ts.
+const EMP_SUBJECTS_SUBQUERY = `COALESCE((
+  SELECT json_agg(json_build_object('id', s2.id, 'name', s2.name) ORDER BY s2.name ASC)
+  FROM employee_subjects es2
+  JOIN subjects s2 ON es2.subject_id = s2.id
+  WHERE es2.employee_id = e.id
+), '[]'::json) AS subjects_json`;
+
+const EMP_LEVELS_SUBQUERY = `COALESCE((
+  SELECT json_agg(json_build_object('id', l2.id, 'name', l2.name) ORDER BY l2.name ASC)
+  FROM employee_levels el2
+  JOIN levels l2 ON el2.level_id = l2.id
+  WHERE el2.employee_id = e.id
+), '[]'::json) AS levels_json`;
+
+function parseJsonArray(raw: any): { id: string; name: string | null }[] {
+  if (raw == null) return [];
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
 function mapEmployeeFromDB(row: any) {
+  const subjects = parseJsonArray(row.subjects_json);
+  const levels = parseJsonArray(row.levels_json);
   return {
     id: row.id,
     companyId: row.company_id,
@@ -21,6 +75,11 @@ function mapEmployeeFromDB(row: any) {
     branchId: row.branch_id,
     isGlobal: row.is_global,
     isActive: row.is_active,
+    isTeacher: row.is_teacher === true,
+    subjectIds: subjects.map((s) => s.id),
+    subjects,
+    levelIds: levels.map((l) => l.id),
+    levels,
     linkedUserId: row.linked_user_id ?? null,
     hasSalaryHistory: row.has_salary_history === true,
     createdAt: row.created_at,
@@ -28,11 +87,50 @@ function mapEmployeeFromDB(row: any) {
   };
 }
 
+// Replace an employee's subject links with exactly `subjectIds`, ignoring ids
+// that belong to another tenant.
+async function setEmployeeSubjects(employeeId: string, companyId: string, subjectIds: string[]) {
+  await query('DELETE FROM employee_subjects WHERE employee_id = $1', [employeeId]);
+  const unique = [...new Set((subjectIds || []).filter(Boolean))];
+  if (unique.length > 0) {
+    await query(
+      `INSERT INTO employee_subjects (employee_id, subject_id)
+       SELECT $1, s.id FROM subjects s
+        WHERE s.id = ANY($2::uuid[]) AND s.company_id = $3
+       ON CONFLICT (employee_id, subject_id) DO NOTHING`,
+      [employeeId, unique, companyId]
+    );
+  }
+}
+
+// Replace an employee's level links with exactly `levelIds`.
+async function setEmployeeLevels(employeeId: string, companyId: string, levelIds: string[]) {
+  await query('DELETE FROM employee_levels WHERE employee_id = $1', [employeeId]);
+  const unique = [...new Set((levelIds || []).filter(Boolean))];
+  if (unique.length > 0) {
+    await query(
+      `INSERT INTO employee_levels (employee_id, level_id)
+       SELECT $1, l.id FROM levels l
+        WHERE l.id = ANY($2::uuid[]) AND l.company_id = $3
+       ON CONFLICT (employee_id, level_id) DO NOTHING`,
+      [employeeId, unique, companyId]
+    );
+  }
+}
+
+// Re-read an employee with the aggregated joins, so create/update return the
+// same body shape as list/getById.
+async function fetchEmployee(id: string, companyId: string) {
+  return queryOne(`${EMPLOYEE_BASE_SELECT} WHERE e.id = $1 AND e.company_id = $2`, [id, companyId]);
+}
+
 // has_salary_history: any past SALARIES payment makes the employee non-deletable
 // (we can only terminate them). Drives the delete-vs-terminate UI.
 const EMPLOYEE_BASE_SELECT = `
   SELECT e.*,
          u.id AS linked_user_id,
+         ${EMP_SUBJECTS_SUBQUERY},
+         ${EMP_LEVELS_SUBQUERY},
          EXISTS (
            SELECT 1 FROM expense_payments ep
            WHERE ep.employee_id = e.id
@@ -64,6 +162,8 @@ export const employeesRoutes = {
 
       // Make sure percentage_rate / the widened salary_type CHECK exist before insert.
       await ensureSalaryColumns();
+      await ensureTeacherSchema();
+      const isTeacher = body.isTeacher === true;
       const employee = await insert('employees', {
         company_id: context.companyId,
         first_name: body.firstName,
@@ -80,11 +180,20 @@ export const employeesRoutes = {
         branch_id: body.branchId || null,
         is_global: isGlobalAdmin(context) ? (body.isGlobal || false) : false,
         is_active: true,
+        is_teacher: isTeacher,
       });
 
+      // Subjects/levels describe what a teacher teaches, so they're only linked
+      // for teachers — a plain employee sending them silently gets none.
+      if (isTeacher) {
+        await setEmployeeSubjects(employee.id, context.companyId, body.subjectIds || []);
+        await setEmployeeLevels(employee.id, context.companyId, body.levelIds || []);
+      }
+
+      const full = await fetchEmployee(employee.id, context.companyId);
       return {
         status: 201 as const,
-        body: mapEmployeeFromDB(employee),
+        body: mapEmployeeFromDB(full ?? employee),
       };
     } catch (error) {
       console.error('Create employee error:', error);
@@ -92,13 +201,14 @@ export const employeesRoutes = {
     }
   },
 
-  list: async ({ query: queryParams, headers }: { query: { branchId?: string; isGlobal?: string }; headers: { authorization: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; isGlobal?: string; isTeacher?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'employees', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      await ensureTeacherSchema();
       let sql = `${EMPLOYEE_BASE_SELECT} WHERE e.company_id = $1`;
       const params: any[] = [context.companyId];
 
@@ -138,6 +248,14 @@ export const employeesRoutes = {
         }
       }
 
+      // Employee-vs-teacher split for the list page's filter. Anything other
+      // than an explicit 'true'/'false' means "no filter", so a stray value
+      // widens rather than silently empties the list.
+      if (queryParams.isTeacher === 'true' || queryParams.isTeacher === 'false') {
+        params.push(queryParams.isTeacher === 'true');
+        sql += ` AND COALESCE(e.is_teacher, false) = $${params.length}`;
+      }
+
       sql += ' ORDER BY e.created_at DESC';
 
       const employees = await query(sql, params);
@@ -158,10 +276,8 @@ export const employeesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const employee = await queryOne(
-        `${EMPLOYEE_BASE_SELECT} WHERE e.id = $1 AND e.company_id = $2`,
-        [params.id, context.companyId]
-      );
+      await ensureTeacherSchema();
+      const employee = await fetchEmployee(params.id, context.companyId);
 
       if (!employee) {
         return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
@@ -213,15 +329,19 @@ export const employeesRoutes = {
       }
 
       await ensureSalaryColumns();
+      await ensureTeacherSchema();
       const updateData: any = {};
 
+      if (body.isTeacher !== undefined) updateData.is_teacher = body.isTeacher === true;
       if (body.firstName !== undefined) updateData.first_name = body.firstName;
       if (body.lastName !== undefined) updateData.last_name = body.lastName;
       // Clearing the field sends '', which should land as NULL, not an empty string.
       if (body.email !== undefined) updateData.email = body.email || null;
       if (body.phone !== undefined) updateData.phone = body.phone;
-      if (body.department !== undefined) updateData.department = body.department;
-      if (body.position !== undefined) updateData.position = body.position;
+      // Now that these are optional for teachers, clearing one sends '' — land it
+      // as NULL to match what create writes, rather than an empty string.
+      if (body.department !== undefined) updateData.department = body.department || null;
+      if (body.position !== undefined) updateData.position = body.position || null;
       if (body.salary !== undefined) updateData.salary = body.salary;
       if (body.salaryType !== undefined) updateData.salary_type = body.salaryType;
       if (body.sessionRate !== undefined) updateData.session_rate = body.sessionRate;
@@ -235,15 +355,32 @@ export const employeesRoutes = {
       }
       if (body.isGlobal !== undefined) updateData.is_global = body.isGlobal;
 
-      const employee = await update('employees', params.id, updateData);
+      // `update` throws on an empty patch, and a body of only subjectIds/levelIds
+      // is a legitimate edit.
+      const employee = Object.keys(updateData).length > 0
+        ? await update('employees', params.id, updateData)
+        : existing;
 
       if (!employee) {
         return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       }
 
+      // Only rewrite the links the caller actually sent — omitting them leaves
+      // the existing rows alone (same contract as courses' subjectIds/levelIds).
+      // Demoting a teacher to a plain employee clears both.
+      const nowTeacher = updateData.is_teacher !== undefined ? updateData.is_teacher : existing.is_teacher === true;
+      if (!nowTeacher) {
+        await setEmployeeSubjects(params.id, context.companyId, []);
+        await setEmployeeLevels(params.id, context.companyId, []);
+      } else {
+        if (body.subjectIds !== undefined) await setEmployeeSubjects(params.id, context.companyId, body.subjectIds);
+        if (body.levelIds !== undefined) await setEmployeeLevels(params.id, context.companyId, body.levelIds);
+      }
+
+      const full = await fetchEmployee(params.id, context.companyId);
       return {
         status: 200 as const,
-        body: mapEmployeeFromDB(employee),
+        body: mapEmployeeFromDB(full ?? employee),
       };
     } catch (error) {
       console.error('Update employee error:', error);

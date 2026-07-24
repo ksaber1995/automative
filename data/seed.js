@@ -340,20 +340,21 @@ async function seedStudents(companyId, branchByName) {
   for (const r of rows) {
     const branchId = branchByName.get(r.branch_ref);
     if (!branchId) {
-      console.warn(`\n  skip student ${r.first_name}: branch "${r.branch_ref}" not found`);
+      console.warn(`\n  skip student ${r.name}: branch "${r.branch_ref}" not found`);
       stats.students.skipped += 1;
       continue;
     }
-    const id = stableUuid(companyId, 'student', `${r.first_name} ${r.last_name}`);
+    // Keyed on the full name, same string the old `first last` key produced, so
+    // re-seeding an existing tenant still lands on the same UUIDs.
+    const id = stableUuid(companyId, 'student', r.name);
     const res = await runSql(
-      `INSERT INTO students (id, company_id, first_name, last_name, date_of_birth, email, phone, parent_name, parent_phone, address, branch_id, is_active)
-       VALUES (:id, :companyId, :firstName, :lastName, :dob, :emailVal, :phone, :parentName, :parentPhone, :address, :branchId, true)
+      `INSERT INTO students (id, company_id, name, date_of_birth, email, phone, parent_name, parent_phone, address, branch_id, is_active)
+       VALUES (:id, :companyId, :name, :dob, :emailVal, :phone, :parentName, :parentPhone, :address, :branchId, true)
        ON CONFLICT (id) DO NOTHING`,
       [
         p.uuid('id', id),
         p.uuid('companyId', companyId),
-        p.str('firstName', r.first_name),
-        p.str('lastName', r.last_name),
+        p.str('name', r.name),
         p.date('dob', r.date_of_birth ?? null),
         p.str('emailVal', r.email ?? null),
         p.str('phone', r.phone ?? null),

@@ -138,7 +138,7 @@ export const lookupsRoutes = {
   students: async ({ headers, query: q }: { headers: { authorization: string }; query?: { branchId?: string } }) => {
     try {
       return await runLookup(headers.authorization, (ctx, params) => {
-        let sql = `SELECT id, ${FULL_NAME} AS label FROM students WHERE company_id = $1 AND is_active = true`;
+        let sql = `SELECT id, name AS label FROM students WHERE company_id = $1 AND is_active = true`;
         const clause = appendBranchSqlFilter(ctx, params, 'branch_id');
         if (clause) sql += ` AND ${clause}`;
         if (q?.branchId) { params.push(q.branchId); sql += ` AND branch_id = $${params.length}`; }

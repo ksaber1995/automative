@@ -38,23 +38,36 @@
     } @else if (homeworks().length) {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
         @for (hw of homeworks(); track hw.id) {
-          <button
-            type="button"
-            (click)="open(hw)"
-            class="flex items-center justify-between w-full rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 p-3 text-start transition"
-          >
-            <span>
-              <span class="font-semibold text-gray-800">{{ hw.name }}</span>
-              <span class="block text-xs text-gray-500">
-                {{ hw.examDate | date: 'mediumDate' }}
-                @if (hw.maxGrade != null) { · {{ 'SESSION_HOMEWORK.OUT_OF' | translate }} {{ hw.maxGrade }} }
+          <!-- Row is a div, not a button: the delete control is a button of its
+               own and nesting one button inside another is invalid markup. -->
+          <div class="flex items-center rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition">
+            <button
+              type="button"
+              (click)="open(hw)"
+              class="flex items-center justify-between flex-1 min-w-0 p-3 text-start"
+            >
+              <span class="min-w-0">
+                <span class="font-semibold text-gray-800">{{ hw.name }}</span>
+                <span class="block text-xs text-gray-500">
+                  {{ hw.examDate | date: 'mediumDate' }}
+                  @if (hw.maxGrade != null) { · {{ 'SESSION_HOMEWORK.OUT_OF' | translate }} {{ hw.maxGrade }} }
+                </span>
               </span>
-            </span>
-            <span class="text-xs font-medium text-purple-600 whitespace-nowrap">
-              {{ 'SESSION_HOMEWORK.MARKED_COUNT' | translate: { n: hw.resultCount ?? 0 } }}
-              <i class="pi pi-angle-right ms-1"></i>
-            </span>
-          </button>
+              <span class="text-xs font-medium text-purple-600 whitespace-nowrap ms-2">
+                {{ 'SESSION_HOMEWORK.MARKED_COUNT' | translate: { n: hw.resultCount ?? 0 } }}
+                <i class="pi pi-angle-right ms-1"></i>
+              </span>
+            </button>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-trash"
+              class="p-button-rounded p-button-text p-button-danger shrink-0 me-1"
+              [pTooltip]="'SESSION_HOMEWORK.DELETE' | translate"
+              [disabled]="deletingId() === hw.id"
+              (click)="remove(hw)"
+            ></button>
+          </div>
         }
       </div>
     } @else {

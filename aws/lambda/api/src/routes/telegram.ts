@@ -196,10 +196,10 @@ export async function notifyCheckin(companyId: string, sessionId: string, studen
     if (!settings?.enabled || !settings.bot_token || !settings.notify_on_present) return;
     const ctx = await loadSessionCtx(companyId, sessionId);
     if (!ctx) return;
-    const stu = await queryOne<any>('SELECT first_name, last_name FROM students WHERE id = $1', [studentId]);
+    const stu = await queryOne<any>('SELECT name FROM students WHERE id = $1', [studentId]);
     if (!stu) return;
     const templates = await loadTemplates(companyId);
-    await notifyOne(settings, templates, ctx, studentId, `${stu.first_name} ${stu.last_name}`.trim(), 'PRESENT');
+    await notifyOne(settings, templates, ctx, studentId, (stu.name ?? '').trim(), 'PRESENT');
   } catch (e) {
     console.error('notifyCheckin error (ignored):', e);
   }
@@ -241,7 +241,7 @@ export async function notifySessionAttendance(companyId: string, sessionId: stri
       const kind: 'PRESENT' | 'ABSENT' = r.is_present ? 'PRESENT' : 'ABSENT';
       if (kind === 'PRESENT' && !settings.notify_on_present) continue;
       if (kind === 'ABSENT' && !settings.notify_on_absent) continue;
-      await notifyOne(settings, templates, ctx, r.id, `${r.first_name} ${r.last_name}`.trim(), kind);
+      await notifyOne(settings, templates, ctx, r.id, (r.name ?? '').trim(), kind);
     }
   } catch (e) {
     console.error('notifySessionAttendance error (ignored):', e);
@@ -290,7 +290,7 @@ export async function sendExamResultNotifications(
       [companyId, r.student_id, targetRoles(settings.notify_target)]
     );
     if (links.length === 0) continue;
-    const name = `${r.first_name} ${r.last_name}`.trim();
+    const name = (r.name ?? '').trim();
     let body: string;
     if (r.is_absent) {
       body = renderTemplate(templates.EXAM_ABSENT, {
@@ -390,7 +390,7 @@ async function handleAttendanceCommand(settings: TgSettings, chatId: number, tex
 
   const code = codeDigits(codeStr!);   // pool cards print "A-100001"
   const student = await queryOne<any>(
-    `SELECT id, first_name, last_name, student_code FROM students
+    `SELECT id, name, student_code FROM students
      WHERE student_code = $1 AND company_id = $2 AND is_active = true`,
     [code, settings.company_id]
   );
@@ -412,7 +412,7 @@ async function handleAttendanceCommand(settings: TgSettings, chatId: number, tex
      ORDER BY s.start_date DESC LIMIT 1`,
     [settings.company_id, student.id]
   );
-  const name = `${student.first_name} ${student.last_name}`.trim();
+  const name = (student.name ?? '').trim();
   if (!session) {
     await sendMessage(token, chatId, `⚠️ لا توجد حصة جارية لـ ${name} (كود ${code}).\nNo running session for ${name}.`);
     return;

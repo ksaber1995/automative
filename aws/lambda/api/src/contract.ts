@@ -1302,6 +1302,11 @@ const CreateEmployeeSchema = z.object({
   hireDate: z.string().optional(),
   branchId: OptionalUUIDSchema,
   isGlobal: z.boolean().optional(),
+  // A teacher is an employee with this flag (migration 075). Subjects/levels are
+  // optional and only linked when isTeacher is true.
+  isTeacher: z.boolean().optional(),
+  subjectIds: z.array(UUIDSchema).optional(),
+  levelIds: z.array(UUIDSchema).optional(),
 });
 
 const UpdateEmployeeSchema = CreateEmployeeSchema.partial();
@@ -1323,6 +1328,11 @@ const EmployeeSchema = z.object({
   branchId: UUIDSchema.nullable(),
   isGlobal: z.boolean(),
   isActive: z.boolean(),
+  isTeacher: z.boolean().optional(),
+  subjectIds: z.array(UUIDSchema).optional(),
+  subjects: z.array(z.object({ id: UUIDSchema, name: z.string().nullable() })).optional(),
+  levelIds: z.array(UUIDSchema).optional(),
+  levels: z.array(z.object({ id: UUIDSchema, name: z.string().nullable() })).optional(),
   linkedUserId: UUIDSchema.nullable().optional(),
   hasSalaryHistory: z.boolean().optional(),
   createdAt: z.string(),
@@ -4335,6 +4345,8 @@ export const contract = c.router({
       query: z.object({
         branchId: UUIDSchema.optional(),
         isGlobal: z.string().optional(),
+        // 'true' | 'false'; anything else means no employee/teacher filter.
+        isTeacher: z.string().optional(),
       }),
       responses: {
         200: z.array(EmployeeSchema),

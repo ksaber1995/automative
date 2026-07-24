@@ -117,13 +117,13 @@ BEGIN
   -- it explicitly: leaving it to DEFAULT now() would land all 200 students on today
   -- and flatten the 3-year history the demo reports are meant to show.
   WITH ins AS (
-    INSERT INTO students (first_name, last_name, date_of_birth, email, phone,
+    INSERT INTO students (name, date_of_birth, email, phone,
                           parent_name, parent_phone, address,
                           branch_id, company_id, is_active, inactive_date, created_at)
     SELECT
       (ARRAY['Ali','Mariam','Youssef','Habiba','Adam','Lina','Zeyad','Jana','Malak','Selim',
-             'Farida','Karim','Nour','Hassan','Salma','Mostafa','Yara','Hossam','Dina','Tamer'])[((g - 1) % 20) + 1],
-      'Family' || g,
+             'Farida','Karim','Nour','Hassan','Salma','Mostafa','Yara','Hossam','Dina','Tamer'])[((g - 1) % 20) + 1]
+        || ' Family' || g,
       v_start_date - ((random() * 365 * 12 + 365 * 6)::int),  -- age 6-18-ish
       'student' || g || '.demo@netrofit-demo.local',
       '+2011' || LPAD(g::text, 8, '0'),

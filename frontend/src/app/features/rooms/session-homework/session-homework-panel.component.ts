@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
+import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../../exams/services/exam.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -41,6 +42,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   private service = inject(ExamService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
+  private confirmationService = inject(ConfirmationService);
 
   /** Open/closed, owned by the attendance page (its Homework button toggles it). */
   visible = model<boolean>(false);
@@ -54,6 +56,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   homeworks = signal<ExamModel[]>([]);
   loadingList = signal(false);
   creating = signal(false);
+  deletingId = signal<string | null>(null);
 
   // New-homework form.
   newName = signal('');
@@ -175,6 +178,44 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   back(): void {
     this.step.set('pick');
     this.loadList();
+  }
+
+  /**
+   * Delete a homework from the picker. The API soft-deletes (is_active = false)
+   * and the list filters on it, so the row disappears and recorded marks stay on
+   * the row rather than being destroyed.
+   *
+   * Confirmed first, and the message names how many marks are already recorded —
+   * deleting a homework that has been marked is the one that actually costs
+   * someone work.
+   */
+  remove(hw: ExamModel): void {
+    const marked = hw.resultCount ?? 0;
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_HOMEWORK.DELETE_HEADER'),
+      message: marked > 0
+        ? this.translate.instant('SESSION_HOMEWORK.DELETE_CONFIRM_MARKED', { name: hw.name, n: marked })
+        : this.translate.instant('SESSION_HOMEWORK.DELETE_CONFIRM', { name: hw.name }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.deletingId.set(hw.id);
+        this.service.delete(hw.id).subscribe({
+          next: () => {
+            this.deletingId.set(null);
+            this.notifications.success(this.translate.instant('SESSION_HOMEWORK.DELETED', { name: hw.name }));
+            // If the deleted one was open, step 2 would be pointing at a dead
+            // record — drop back to the picker.
+            if (this.active()?.id === hw.id) {
+              this.active.set(null);
+              this.step.set('pick');
+            }
+            this.loadList();
+          },
+          error: () => this.deletingId.set(null), // interceptor toasts the server error
+        });
+      },
+    });
   }
 
   private loadRoster(): void {

@@ -408,8 +408,7 @@ export const examsRoutes = {
         status: 200 as const,
         body: rows.map((row) => ({
           studentId: row.student_id,
-          firstName: row.first_name,
-          lastName: row.last_name,
+          name: row.name,
           code: row.student_code ?? null,
           parentName: row.parent_name ?? null,
           parentPhone: row.parent_phone ?? null,
@@ -523,7 +522,7 @@ export const examsRoutes = {
       }
 
       const student = await queryOne<any>(
-        'SELECT id, first_name, last_name FROM students WHERE student_code = $1 AND company_id = $2 AND is_active = true',
+        'SELECT id, name FROM students WHERE student_code = $1 AND company_id = $2 AND is_active = true',
         [code, context.companyId],
       );
       if (!student) {
