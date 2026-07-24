@@ -21,7 +21,33 @@ export interface AdminCompany {
 export interface QrCardStats {
   total?: number | null;
   linked?: number | null;
+  printed?: number | null;
+  unprinted?: number | null;
+  /** Sum of every card's price, where one was recorded. */
+  poolValue?: number | null;
   qr_cards_enabled?: boolean;
+}
+
+/** One card, as the owner endpoint returns it for printing. */
+export interface AdminQrCard {
+  id: string;
+  token: string;
+  serial: number;
+  poolType: number;
+  price: number | null;
+  printedAt: string | null;
+  printed: boolean;
+  linked: boolean;
+}
+
+/** Which slice of a client's pool to fetch. */
+export type CardStatus = 'unprinted' | 'printed' | 'free' | 'linked' | 'all';
+
+/** A run to mint: how many, which type, and what each card costs. */
+export interface GenerateCardsRequest {
+  count: number;
+  poolType: number;
+  price: number | null;
 }
 
 /** An active client enriched with its card-pool numbers — what the table shows. */
@@ -49,6 +75,12 @@ export interface ClientRow {
   linked: number;
   /** Cards still free in the pool. */
   unlinked: number;
+  /** Already sent to the printer. */
+  printed: number;
+  /** The pending run — not printed and not handed out. */
+  unprinted: number;
+  /** Sum of recorded card prices. */
+  poolValue: number;
 }
 
 export type SortKey = 'name' | 'type' | 'total' | 'linked' | 'unlinked';

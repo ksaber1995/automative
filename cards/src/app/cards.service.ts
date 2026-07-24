@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, from } from 'rxjs';
 import { catchError, map, mergeMap, toArray } from 'rxjs/operators';
 import { environment } from '../environments/environment';
-import { AdminCompany, ClientRow, QrCardStats } from './models';
+import { AdminCompany, AdminQrCard, CardStatus, ClientRow, GenerateCardsRequest, QrCardStats } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class CardsService {
@@ -55,6 +55,38 @@ export class CardsService {
     );
   }
 
+  /** One client's cards, for printing. Defaults to the pending run. */
+  listCards(companyId: string, status: CardStatus = 'unprinted'): Observable<AdminQrCard[]> {
+    return this.http.get<AdminQrCard[]>(`${this.base}/companies/${companyId}/qr-cards/list`, {
+      params: { status },
+    });
+  }
+
+  /** Mint a run for a client: how many, which type, and the price per card. */
+  generateCards(companyId: string, req: GenerateCardsRequest): Observable<{ created: number; from: number; to: number }> {
+    return this.http.post<{ created: number; from: number; to: number }>(
+      `${this.base}/companies/${companyId}/qr-cards`,
+      { count: req.count, poolType: req.poolType, price: req.price },
+    );
+  }
+
+  /**
+   * Stamp a run as sent to the printer. Pass the exact ids that were downloaded —
+   * omitting them marks everything unprinted, which would swallow any cards
+   * minted since.
+   */
+  markPrinted(companyId: string, ids: string[], printed = true): Observable<{ marked: number }> {
+    return this.http.post<{ marked: number }>(
+      `${this.base}/companies/${companyId}/qr-cards/mark-printed`,
+      { ids, printed },
+    );
+  }
+
+  /** Fresh pool numbers for one client, after minting or marking. */
+  cardStats(companyId: string): Observable<QrCardStats> {
+    return this.http.get<QrCardStats>(`${this.base}/companies/${companyId}/qr-cards`);
+  }
+
   private toRow(c: AdminCompany, stats: QrCardStats): ClientRow {
     const total = Number(stats.total ?? 0);
     const linked = Number(stats.linked ?? 0);
@@ -79,6 +111,9 @@ export class CardsService {
       linked,
       // Guard against a linked count somehow exceeding the pool size.
       unlinked: Math.max(0, total - linked),
+      printed: Number(stats.printed ?? 0),
+      unprinted: Number(stats.unprinted ?? 0),
+      poolValue: Number(stats.poolValue ?? 0),
     };
   }
 }

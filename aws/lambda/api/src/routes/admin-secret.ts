@@ -318,7 +318,7 @@ export const adminSecretRoutes = {
    */
   generateQrCards: async ({ params, body }: {
     params: { companyId: string };
-    body: { count: number; poolType?: number };
+    body: { count: number; poolType?: number; price?: number | null };
   }) => {
     try {
       await ensureQrCardSchema();
@@ -336,21 +336,32 @@ export const adminSecretRoutes = {
         return { status: 400 as const, body: { message: 'poolType must be 1, 2 or 3' } };
       }
 
+      // Price per card, stamped on every card in the run (migration 077).
+      // Omitted stays NULL — "not recorded", which is not the same as free.
+      const rawPrice = body?.price;
+      let price: number | null = null;
+      if (rawPrice !== undefined && rawPrice !== null && String(rawPrice) !== '') {
+        price = Number(rawPrice);
+        if (!Number.isFinite(price) || price < 0) {
+          return { status: 400 as const, body: { message: 'price must be a positive number' } };
+        }
+      }
+
       // New cards mint in the V2 range and print "0N"; the number continues from
       // the last card. The reserved range keeps serials clear of student codes.
       const from = await nextCardSerial(params.companyId);
 
       const rows = await query<any>(
-        `INSERT INTO qr_cards (company_id, token, serial, pool_type)
-         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g, $4
+        `INSERT INTO qr_cards (company_id, token, serial, pool_type, price)
+         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g, $4, $5
          FROM generate_series($2::int, $3::int) AS g
          RETURNING serial`,
-        [params.companyId, from, from + count - 1, poolType],
+        [params.companyId, from, from + count - 1, poolType, price],
       );
 
       return {
         status: 200 as const,
-        body: { success: true, created: rows.length, from, to: from + count - 1, poolType },
+        body: { success: true, created: rows.length, from, to: from + count - 1, poolType, price },
       };
     } catch (error: any) {
       console.error('karim-admin-secret generate qr cards failed:', error);
@@ -368,7 +379,11 @@ export const adminSecretRoutes = {
       const row = await queryOne<any>(
         `SELECT c.qr_cards_enabled,
                 (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id) AS total,
-                (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.student_id IS NOT NULL) AS linked
+                (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.student_id IS NOT NULL) AS linked,
+                (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.printed_at IS NOT NULL) AS printed,
+                (SELECT COUNT(*) FROM qr_cards q
+                  WHERE q.company_id = c.id AND q.printed_at IS NULL AND q.student_id IS NULL) AS unprinted,
+                (SELECT COALESCE(SUM(q.price), 0) FROM qr_cards q WHERE q.company_id = c.id) AS pool_value
          FROM companies c WHERE c.id = $1`,
         [params.companyId],
       );
@@ -380,11 +395,113 @@ export const adminSecretRoutes = {
           qr_cards_enabled: row.qr_cards_enabled === true,
           total: Number(row.total ?? 0),
           linked: Number(row.linked ?? 0),
+          printed: Number(row.printed ?? 0),
+          unprinted: Number(row.unprinted ?? 0),
+          poolValue: Number(row.pool_value ?? 0),
         },
       };
     } catch (error: any) {
       console.error('karim-admin-secret qr card stats failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Stats failed' } };
+    }
+  },
+
+  /**
+   * GET /api/karim-admin-secret/companies/:companyId/qr-cards/list?status=
+   *
+   * The cards themselves — token and serial — so the owner dashboard can render
+   * the QR images for a print run without signing in as the client.
+   *
+   * `status` is unprinted (the pending run) | printed | free | linked | all.
+   * Capped at 2000, one run's worth: this returns tokens, and an uncapped dump
+   * would hand over a client's whole pool in one response.
+   */
+  listQrCards: async ({ params, query: q }: {
+    params: { companyId: string };
+    query?: { status?: string };
+  }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      let sql = `SELECT id, token, serial, pool_type, price, printed_at, student_id
+                   FROM qr_cards WHERE company_id = $1`;
+      const status = q?.status || 'unprinted';
+      if (status === 'unprinted') sql += ' AND printed_at IS NULL AND student_id IS NULL';
+      else if (status === 'printed') sql += ' AND printed_at IS NOT NULL';
+      else if (status === 'free') sql += ' AND student_id IS NULL';
+      else if (status === 'linked') sql += ' AND student_id IS NOT NULL';
+      sql += ' ORDER BY serial LIMIT 2000';
+
+      const rows = await query<any>(sql, [params.companyId]);
+      return {
+        status: 200 as const,
+        body: rows.map((r) => ({
+          id: r.id,
+          token: r.token,
+          serial: r.serial,
+          poolType: r.pool_type ?? 1,
+          price: r.price === null || r.price === undefined ? null : parseFloat(r.price),
+          printedAt: r.printed_at ?? null,
+          printed: r.printed_at != null,
+          linked: r.student_id != null,
+        })),
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret list qr cards failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/qr-cards/mark-printed  { ids? }
+   *
+   * Stamp a run as sent to the printer so the next download only carries new
+   * cards. `ids` should be exactly what was downloaded; omitting it marks every
+   * currently-unprinted card, which is only safe when nothing was minted in
+   * between — the dashboard always sends ids.
+   *
+   * Scoped by company_id as well as id, so a stray id can never reach another
+   * client's pool. Already-printed cards are skipped rather than re-stamped.
+   */
+  markQrCardsPrinted: async ({ params, body }: {
+    params: { companyId: string };
+    body: { ids?: string[]; printed?: boolean };
+  }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : null;
+      // printed:false undoes a run that never actually reached the printer.
+      const markPrinted = body?.printed !== false;
+
+      let rows: any[];
+      if (markPrinted) {
+        rows = ids
+          ? await query<any>(
+              `UPDATE qr_cards SET printed_at = NOW()
+                WHERE company_id = $1 AND printed_at IS NULL AND id = ANY($2::uuid[]) RETURNING id`,
+              [params.companyId, ids])
+          : await query<any>(
+              `UPDATE qr_cards SET printed_at = NOW()
+                WHERE company_id = $1 AND printed_at IS NULL AND student_id IS NULL RETURNING id`,
+              [params.companyId]);
+      } else {
+        if (!ids) return { status: 400 as const, body: { message: 'ids required to un-mark' } };
+        // Linked cards stay printed — that card is physically out there.
+        rows = await query<any>(
+          `UPDATE qr_cards SET printed_at = NULL
+            WHERE company_id = $1 AND student_id IS NULL AND id = ANY($2::uuid[]) RETURNING id`,
+          [params.companyId, ids]);
+      }
+
+      return { status: 200 as const, body: { success: true, marked: rows.length } };
+    } catch (error: any) {
+      console.error('karim-admin-secret mark qr cards printed failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Mark printed failed' } };
     }
   },
 

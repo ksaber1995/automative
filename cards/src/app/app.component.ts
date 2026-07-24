@@ -86,7 +86,13 @@ import { ClientDrawerComponent } from './client-drawer.component';
       }
     </div>
 
-    <app-client-drawer [client]="selected()" (close)="selected.set(null)" />
+    <!-- Reloads the whole report after a mint or a print-mark, so the table and
+         KPIs behind the sheet don't go stale. -->
+    <app-client-drawer
+      [client]="selected()"
+      (close)="selected.set(null)"
+      (changed)="load()"
+    />
   `,
   styles: [`
     .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 64px; }

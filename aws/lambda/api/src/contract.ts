@@ -5250,6 +5250,9 @@ export const contract = c.router({
         // Optional so an older caller still mints a run; omitted means type 1,
         // matching the column default and the cards minted before types existed.
         poolType: PoolTypeSchema.optional(),
+        // Price per card for this run (migration 077). Omitted stays NULL —
+        // "not recorded", which is not the same as free.
+        price: z.number().min(0).nullable().optional(),
       }),
       responses: {
         200: z.object({
@@ -5266,7 +5269,50 @@ export const contract = c.router({
       path: '/api/karim-admin-secret/companies/:companyId/qr-cards',
       pathParams: z.object({ companyId: UUIDSchema }),
       responses: {
-        200: z.object({ qr_cards_enabled: z.boolean(), total: z.number(), linked: z.number() }),
+        200: z.object({
+          qr_cards_enabled: z.boolean(), total: z.number(), linked: z.number(),
+          printed: z.number().optional(),
+          unprinted: z.number().optional(),
+          poolValue: z.number().optional(),
+        }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // The cards themselves, so the owner dashboard can render a print run.
+    listQrCards: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards/list',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      query: z.object({ status: z.string().optional() }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          token: z.string(),
+          serial: z.number(),
+          poolType: z.number(),
+          price: z.number().nullable(),
+          printedAt: z.string().nullable(),
+          printed: z.boolean(),
+          linked: z.boolean(),
+        })),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Stamp (or un-stamp) a run as sent to the printer.
+    markQrCardsPrinted: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/qr-cards/mark-printed',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({
+        ids: z.array(UUIDSchema).optional(),
+        /** false un-marks — for a run that never reached the printer. */
+        printed: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean(), marked: z.number() }),
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

@@ -51,6 +51,10 @@ export async function ensureQrCardSchema(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_qr_cards_unprinted
                  ON qr_cards (company_id, serial) WHERE printed_at IS NULL`);
 
+  // What the run cost (migration 077). NULL = minted before prices were
+  // recorded, which is deliberately different from a genuine zero.
+  await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2)`);
+
   await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS pool_type SMALLINT NOT NULL DEFAULT 1`);
   await query(`DO $$ BEGIN
     ALTER TABLE qr_cards ADD CONSTRAINT qr_cards_pool_type_check CHECK (pool_type IN (1, 2, 3));
@@ -192,6 +196,7 @@ function mapCard(row: any) {
     assignedAt: row.assigned_at ?? null,
     printedAt: row.printed_at ?? null,
     printed: row.printed_at != null,
+    price: row.price === null || row.price === undefined ? null : parseFloat(row.price),
     createdAt: row.created_at,
   };
 }
