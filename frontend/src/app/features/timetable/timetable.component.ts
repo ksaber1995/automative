@@ -306,6 +306,16 @@ export class TimetableComponent implements OnInit {
       .filter((row) => row.cells.some((c) => c.entries.length > 0));
   });
 
+  /**
+   * Classes scheduled by weekday with no time on them.
+   *
+   * layoutEntries drops anything it can't place on the hour grid, so these would
+   * silently vanish — which is exactly how a tenant ended up with a blank
+   * timetable while having three active classes. They can't sit at an hour, so
+   * they're listed above the grid instead of being thrown away.
+   */
+  untimedEntries = computed(() => this.filteredEntries().filter((e) => !e.startTime || !e.endTime));
+
   positionedEntries = computed<PositionedEntry[]>(() =>
     layoutEntries(this.filteredEntries(), this.totalGridHeight)
   );

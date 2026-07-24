@@ -361,6 +361,29 @@
     </div>
   }
 
+  <!-- Classes with a weekday but no time. The hour grid can't place them, and
+       dropping them silently is what made this page look empty. -->
+  @if (!loading() && layout() === 'GRID' && untimedEntries().length > 0) {
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+      <div class="flex items-start gap-2">
+        <i class="pi pi-clock text-amber-600 mt-0.5"></i>
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-amber-900">{{ 'TIMETABLE.NO_TIME_TITLE' | translate }}</p>
+          <p class="text-xs text-amber-700 mb-2">{{ 'TIMETABLE.NO_TIME_HINT' | translate }}</p>
+          <div class="flex flex-wrap gap-2">
+            @for (e of untimedEntries(); track e.classId) {
+              <span class="inline-flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-sm">
+                <span class="font-medium text-gray-800">{{ e.className }}</span>
+                <span class="text-gray-400 text-xs">{{ e.courseName }}</span>
+                @if (e.instructorName) { <span class="text-gray-400 text-xs">· {{ e.instructorName }}</span> }
+              </span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- Day calendar -->
   @if (!loading() && !isWeek() && layout() === 'GRID' && filteredEntries().length > 0) {
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">

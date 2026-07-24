@@ -103,8 +103,10 @@ export const timetableRoutes = {
           c.course_id,
           co.branch_id,
           c.instructor_id,
-          cdt.start_time AS start_time,
-          cdt.end_time AS end_time,
+          -- Per-day time when the class has one; otherwise the class's own legacy
+          -- time, which may itself be NULL for a class scheduled by day only.
+          COALESCE(cdt.start_time, c.start_time) AS start_time,
+          COALESCE(cdt.end_time, c.end_time) AS end_time,
           c.days_of_week,
           c.start_date,
           c.end_date,
@@ -132,7 +134,10 @@ export const timetableRoutes = {
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         -- One row per day the class runs, carrying that day's own start/end time.
-        INNER JOIN class_day_times cdt ON cdt.class_id = c.id AND cdt.day_of_week = $3
+        -- LEFT, not INNER: class_day_times is only backfilled for classes that
+        -- have a start_time, so a class scheduled by weekday with no time never
+        -- got a row — and an inner join dropped it from the timetable entirely.
+        LEFT JOIN class_day_times cdt ON cdt.class_id = c.id AND cdt.day_of_week = $3
         LEFT JOIN branches b ON co.branch_id = b.id
         LEFT JOIN employees e ON c.instructor_id = e.id
         LEFT JOIN LATERAL (
@@ -149,6 +154,20 @@ export const timetableRoutes = {
           AND c.is_active = true
           AND (c.start_date IS NULL OR c.start_date <= $2::date)
           AND (c.end_date IS NULL OR c.end_date >= $2::date)
+          AND (
+            -- Normal case: this class has a per-day row for this weekday.
+            cdt.class_id IS NOT NULL
+            -- Fallback for a class that has NO per-day rows at all: honour the
+            -- legacy days_of_week list. Scoped to classes with no rows so a class
+            -- that IS scheduled per-day doesn't leak onto days it was removed
+            -- from — those removals live only in class_day_times.
+            OR (
+              NOT EXISTS (SELECT 1 FROM class_day_times d2 WHERE d2.class_id = c.id)
+              AND c.days_of_week IS NOT NULL
+              AND c.days_of_week <> ''
+              AND $3 = ANY(string_to_array(UPPER(REPLACE(c.days_of_week, ' ', '')), ','))
+            )
+          )
       `;
       const params: any[] = [context.companyId, date, dayName];
 
