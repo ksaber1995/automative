@@ -117,7 +117,7 @@ export class StudentDetailComponent implements OnInit {
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
 
   /** Show the student code only once the QR is active (see student-code.util). */
-  showCode = (s: any) => shouldShowStudentCode(s, this.isTeacher());
+  showCode = (s: any) => shouldShowStudentCode(s);
   /** A card-derived code reads "A5", not 100005. */
   code = formatStudentCode;
 

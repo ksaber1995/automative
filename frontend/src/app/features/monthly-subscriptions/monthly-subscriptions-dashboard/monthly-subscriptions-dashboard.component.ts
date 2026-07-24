@@ -167,11 +167,8 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   /** Same rule as the students list: a TEACHER company reveals the code only once the QR is live. */
-  showCode = (row: { studentCode?: number | string | null; qrActivated?: boolean; qrExpiration?: string | null }) =>
-    shouldShowStudentCode(
-      { studentCode: row.studentCode, qrActivated: row.qrActivated, qrExpiration: row.qrExpiration } as any,
-      this.auth.isTeacher(),
-    );
+  showCode = (row: { studentCode?: number | string | null }) =>
+    shouldShowStudentCode({ studentCode: row.studentCode } as any);
 
   /** A card serial prints as "A5"; an organic code prints as it is. */
   code = (value: number | string | null | undefined) => formatStudentCode(value);

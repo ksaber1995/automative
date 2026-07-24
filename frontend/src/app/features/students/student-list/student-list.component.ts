@@ -83,7 +83,7 @@ export class StudentListComponent implements OnInit {
   protected branchState = inject(BranchStateService);
 
   /** Show the student code only once the QR is active (see student-code.util). */
-  showCode = (s: Student) => shouldShowStudentCode(s, this.authService.isTeacher());
+  showCode = (s: Student) => shouldShowStudentCode(s);
 
   students = signal<Student[]>([]);
   allBranches = signal<LookupOption[]>([]);
