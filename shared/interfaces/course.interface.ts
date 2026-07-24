@@ -6,6 +6,8 @@ export interface Course {
   description: string | null;
   price: number;
   instructorId: string | null;
+  /** The assigned teacher's name, supplied by the course list. */
+  instructorName?: string | null;
   defaultRoomId: string | null;
   levelId?: string | null;
   levelName?: string | null;

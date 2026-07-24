@@ -42,7 +42,23 @@
         [style]="{ minWidth: '200px' }"
       ></p-select>
 
-      @if (selectedBranchId() || selectedLevelId() || selectedPaymentType() !== 'ALL') {
+      <!-- Academies only: a teacher tenant is the single teacher, so filtering
+           by one would be a no-op. -->
+      @if (showTeacher()) {
+        <p-select
+          [options]="teacherOptions()"
+          [ngModel]="selectedInstructorId()"
+          (ngModelChange)="selectedInstructorId.set($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'COURSES.LIST.ALL_TEACHERS' | translate"
+          [showClear]="true"
+          [filter]="true"
+          [style]="{ minWidth: '200px' }"
+        ></p-select>
+      }
+
+      @if (selectedBranchId() || selectedLevelId() || selectedPaymentType() !== 'ALL' || selectedInstructorId()) {
         <p-button
           [label]="'COURSES.LIST.CLEAR' | translate"
           icon="pi pi-times"
@@ -87,6 +103,9 @@
             <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
           <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
+          @if (showTeacher()) {
+            <th pSortableColumn="instructorName">{{ 'COURSES.LIST.COL_TEACHER' | translate }} <p-sortIcon field="instructorName"></p-sortIcon></th>
+          }
           <th pSortableColumn="price">{{ 'COURSES.LIST.COL_PRICE' | translate }} <p-sortIcon field="price"></p-sortIcon></th>
           <th pSortableColumn="enrollmentCount">{{ 'COURSES.LIST.COL_ENROLLMENTS' | translate }} <p-sortIcon field="enrollmentCount"></p-sortIcon></th>
           <th>{{ 'COURSES.LIST.COL_ACTIONS' | translate }}</th>
@@ -113,6 +132,17 @@
             <td>{{ getBranchName(course.branchId) }}</td>
           }
           <td>{{ levelNames(course) }}</td>
+          @if (showTeacher()) {
+            <td>
+              @if (course.instructorName) {
+                <span class="inline-flex items-center gap-1">
+                  <i class="pi pi-user text-gray-400 text-xs"></i>{{ course.instructorName }}
+                </span>
+              } @else {
+                <span class="text-gray-400">{{ 'COURSES.LIST.NO_TEACHER' | translate }}</span>
+              }
+            </td>
+          }
           <td>{{ course.price | amount }}</td>
           <td>
             <div class="flex flex-col gap-1">
@@ -196,7 +226,8 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 5 : 6" class="text-center py-8">
+          <!-- +1 for the academy-only Teacher column. -->
+          <td [attr.colspan]="authService.isTeacher() ? 5 : 7" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>

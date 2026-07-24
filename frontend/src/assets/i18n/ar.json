@@ -2283,7 +2283,10 @@
       "TYPE_ONE_TIME": "دفعة واحدة",
       "TYPE_MONTHLY": "اشتراك شهري",
       "TYPE_PER_SESSION": "الدفع بالحصة",
-      "COL_PAYMENT_TYPE": "نوع الدفع"
+      "COL_PAYMENT_TYPE": "نوع الدفع",
+      "COL_TEACHER": "المدرس",
+      "ALL_TEACHERS": "كل المدرسين",
+      "NO_TEACHER": "بدون مدرس"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل الكورس",
@@ -4714,7 +4717,9 @@
     "EMPTY_HINT": "لا توجد حصص تطابق الفلاتر الحالية لهذا اليوم.",
     "CLASS_COUNT": "— {{count}} حصة",
     "LIVE": "مباشر",
-    "ROOM_PREFIX": "غرفة {{code}}"
+    "ROOM_PREFIX": "غرفة {{code}}",
+    "NO_TIME_TITLE": "محددة باليوم بدون وقت",
+    "NO_TIME_HINT": "هذه الفصول تعمل في هذا اليوم لكن بدون وقت بداية أو نهاية، لذلك لا يمكن عرضها على شبكة الساعات. عدّل الفصل لإضافة الأوقات."
   },
   "PUBLIC_PROFILE": {
     "LANGUAGE_TOGGLE": "English",

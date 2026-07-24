@@ -49,6 +49,10 @@ function mapCourseFromDB(row: any) {
     description: row.description,
     price: parseFloat(row.price),
     instructorId: row.instructor_id,
+    // Only populated where the query joins employees (the list); undefined
+    // elsewhere rather than a wrong null, so a caller can tell "no teacher" from
+    // "didn't ask".
+    instructorName: row.instructor_name ?? null,
     levelId: row.level_id ?? (levels[0]?.id ?? null),
     levelName: row.level_name ?? (levels[0]?.name ?? null),
     levelIds: levels.map((l) => l.id),
@@ -197,12 +201,16 @@ export const coursesRoutes = {
         SELECT
           c.*,
           l.name as level_name,
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS instructor_name,
           ${LEVELS_SUBQUERY},
           ${SUBJECTS_SUBQUERY},
           COUNT(DISTINCT e.id) FILTER (WHERE e.status != 'DROPPED') as direct_enrollment_count,
           COUNT(DISTINCT mce.id) FILTER (WHERE mce.status != 'DROPPED') as master_enrollment_count
         FROM courses c
         LEFT JOIN levels l ON c.level_id = l.id
+        -- The assigned teacher's name, so the list can show who teaches a course
+        -- without a lookup round-trip per row.
+        LEFT JOIN employees emp ON emp.id = c.instructor_id
         LEFT JOIN enrollments e ON c.id = e.course_id AND e.status != 'DROPPED'
         LEFT JOIN master_class_enrollments mce ON c.id = mce.course_id AND mce.status != 'DROPPED'
         WHERE c.company_id = $1
@@ -220,7 +228,7 @@ export const coursesRoutes = {
         if (branchClause) sql += ` AND ${branchClause}`;
       }
 
-      sql += ' GROUP BY c.id, l.name ORDER BY c.created_at DESC';
+      sql += ' GROUP BY c.id, l.name, emp.first_name, emp.last_name ORDER BY c.created_at DESC';
 
       const courses = await query(sql, params);
       return {

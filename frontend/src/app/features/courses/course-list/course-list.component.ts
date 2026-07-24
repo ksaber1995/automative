@@ -63,6 +63,8 @@ export class CourseListComponent implements OnInit {
   selectedBranchId = signal<string | null>(null);
   selectedLevelId = signal<string | null>(null);
   selectedPaymentType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION'>('ALL');
+  /** null = any teacher; '__none__' = courses with nobody assigned. */
+  selectedInstructorId = signal<string | null>(null);
   selectedTab = signal<'active' | 'inactive'>('active');
 
   // Blocker dialog shown when the API returns a 409 with the list of classes
@@ -81,6 +83,35 @@ export class CourseListComponent implements OnInit {
 
   levelOptions = computed(() => this.levels().map(l => ({ label: l.label, value: l.id })));
 
+  /**
+   * Teacher column + filter are ACADEMY-only. A teacher tenant IS the one
+   * teacher, so a "who teaches this" column there would repeat the same name on
+   * every row.
+   */
+  showTeacher = computed(() => !this.authService.isTeacher());
+
+  /**
+   * Built from the courses on screen rather than the employee lookup, so the
+   * dropdown only offers teachers who actually have a course — picking a name
+   * can never yield an empty list.
+   */
+  teacherOptions = computed(() => {
+    const seen = new Map<string, string>();
+    for (const c of this.courses()) {
+      if (c.instructorId && c.instructorName) seen.set(c.instructorId, c.instructorName);
+    }
+    const named = [...seen.entries()]
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Offer "unassigned" only when there is one — finding the courses with no
+    // teacher is the main reason to open this filter.
+    const anyUnassigned = this.courses().some(c => !c.instructorId);
+    return anyUnassigned
+      ? [{ label: this.translate.instant('COURSES.LIST.NO_TEACHER'), value: '__none__' }, ...named]
+      : named;
+  });
+
   paymentTypeOptions = computed(() => [
     { label: this.translate.instant('COURSES.LIST.TYPE_ONE_TIME'), value: 'ONE_TIME' },
     { label: this.translate.instant('COURSES.LIST.TYPE_MONTHLY'), value: 'MONTHLY_SUBSCRIPTION' },
@@ -94,6 +125,7 @@ export class CourseListComponent implements OnInit {
     const branch = this.selectedBranchId();
     const level = this.selectedLevelId();
     const paymentType = this.selectedPaymentType();
+    const instructor = this.selectedInstructorId();
     return this.courses().filter(c => {
       const branchMatch =
         branch === null ? true :
@@ -103,7 +135,13 @@ export class CourseListComponent implements OnInit {
         : (c.levels?.length ? c.levels.some(l => l.id === level) : c.levelId === level);
       const paymentTypeMatch =
         paymentType === 'ALL' ? true : (c.paymentType ?? 'ONE_TIME') === paymentType;
-      return branchMatch && levelMatch && paymentTypeMatch;
+      // '__none__' finds the courses nobody is assigned to — the reason to look
+      // at this filter in the first place.
+      const instructorMatch =
+        instructor === null ? true :
+        instructor === '__none__' ? !c.instructorId :
+        c.instructorId === instructor;
+      return branchMatch && levelMatch && paymentTypeMatch && instructorMatch;
     });
   });
 
@@ -151,6 +189,7 @@ export class CourseListComponent implements OnInit {
     this.selectedBranchId.set(null);
     this.selectedLevelId.set(null);
     this.selectedPaymentType.set('ALL');
+    this.selectedInstructorId.set(null);
   }
 
   viewCourse(course: CourseWithEnrollmentCount) {

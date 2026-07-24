@@ -2283,7 +2283,10 @@
       "TYPE_ONE_TIME": "One-Time",
       "TYPE_MONTHLY": "Monthly Subscription",
       "TYPE_PER_SESSION": "Pay by Session",
-      "COL_PAYMENT_TYPE": "Payment Type"
+      "COL_PAYMENT_TYPE": "Payment Type",
+      "COL_TEACHER": "Teacher",
+      "ALL_TEACHERS": "All teachers",
+      "NO_TEACHER": "No teacher"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Course",
@@ -4590,7 +4593,9 @@
     "EMPTY_HINT": "No classes match the current filters for this day.",
     "CLASS_COUNT": "— {{count}} class(es)",
     "LIVE": "LIVE",
-    "ROOM_PREFIX": "Room {{code}}"
+    "ROOM_PREFIX": "Room {{code}}",
+    "NO_TIME_TITLE": "Scheduled by day, no time set",
+    "NO_TIME_HINT": "These classes run on this day but have no start/end time, so they cannot be placed on the hour grid. Edit the class to add times."
   },
   "PUBLIC_PROFILE": {
     "LANGUAGE_TOGGLE": "العربية",

@@ -714,6 +714,8 @@ const CourseSchema = z.object({
   description: z.string().nullable(),
   price: z.number(),
   instructorId: UUIDSchema.nullable(),
+  /** The assigned teacher's name. Populated by the list; null when unassigned. */
+  instructorName: z.string().nullable().optional(),
   levelId: UUIDSchema.nullable().optional(),
   levelName: z.string().nullable().optional(),
   levelIds: z.array(UUIDSchema).optional(),
