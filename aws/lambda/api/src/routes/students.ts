@@ -407,19 +407,9 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_DELETE', 'Access denied to delete this student');
       }
 
-      const subscriptionCheck = await queryOne<{ has_any: boolean }>(
-        `SELECT (
-           EXISTS (SELECT 1 FROM enrollments WHERE student_id = $1)
-           OR EXISTS (SELECT 1 FROM master_enrollments WHERE student_id = $1)
-           OR EXISTS (SELECT 1 FROM event_subscriptions WHERE student_id = $1)
-         ) AS has_any`,
-        [params.id]
-      );
-
-      if (subscriptionCheck?.has_any) {
-        return apiError(400, 'ERRORS.STUDENTS.HAS_ENROLLMENTS', 'Cannot permanently delete a student with subscriptions or enrollments');
-      }
-
+      // The user is always allowed to permanently delete a student. Any related
+      // billing/subscription rows (enrollments, payments, refunds, …) are removed
+      // by the ON DELETE CASCADE / SET NULL foreign keys — the UI warns first.
       await query('DELETE FROM students WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
 
       return {

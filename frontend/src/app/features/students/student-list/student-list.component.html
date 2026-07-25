@@ -179,23 +179,13 @@
               }
               @if (authService.canDelete('students')) {
                 @if (student.isActive) {
-                  @if (!student.hasSubscriptions) {
-                    <button
-                      pButton
-                      icon="pi pi-trash"
-                      class="p-button-rounded p-button-text p-button-danger"
-                      [pTooltip]="'STUDENTS.LIST.HARD_DELETE' | translate"
-                      (click)="hardDeleteStudent(student)"
-                    ></button>
-                  } @else {
-                    <button
-                      pButton
-                      icon="pi pi-ban"
-                      class="p-button-rounded p-button-text p-button-danger"
-                      [pTooltip]="'STUDENTS.LIST.DEACTIVATE' | translate"
-                      (click)="deleteStudent(student)"
-                    ></button>
-                  }
+                  <button
+                    pButton
+                    icon="pi pi-trash"
+                    class="p-button-rounded p-button-text p-button-danger"
+                    [pTooltip]="'STUDENTS.LIST.HARD_DELETE' | translate"
+                    (click)="hardDeleteStudent(student)"
+                  ></button>
                 } @else if (isBranchActive(student.branchId)) {
                   <button
                     pButton

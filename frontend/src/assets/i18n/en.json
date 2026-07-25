@@ -3847,6 +3847,7 @@
     "HARD_DELETED": "Student deleted permanently",
     "HARD_DELETE_HEADER": "Delete Student Permanently",
     "HARD_DELETE_CONFIRM": "Permanently delete {{name}}? This cannot be undone.",
+    "HARD_DELETE_WARN_CONFIRM": "{{name}} has billing and subscription records. Deleting the student will permanently remove them along with their related billing history. This cannot be undone. Continue?",
     "PAYMENT_RECORDED": "Payment recorded successfully",
     "REFUND_ISSUED": "Refund issued successfully",
     "BUNDLE_REFUND_ISSUED": "Bundle refund issued",

@@ -311,8 +311,13 @@ export class StudentListComponent implements OnInit {
   }
 
   hardDeleteStudent(student: Student) {
+    // Deletion is always allowed, but if the student carries billing/subscription
+    // history we warn that it will be removed along with the student.
+    const messageKey = student.hasSubscriptions
+      ? 'STUDENTS.HARD_DELETE_WARN_CONFIRM'
+      : 'STUDENTS.HARD_DELETE_CONFIRM';
     this.confirmationService.confirm({
-      message: this.translate.instant('STUDENTS.HARD_DELETE_CONFIRM', {
+      message: this.translate.instant(messageKey, {
         name: student.name,
       }),
       header: this.translate.instant('STUDENTS.HARD_DELETE_HEADER'),
