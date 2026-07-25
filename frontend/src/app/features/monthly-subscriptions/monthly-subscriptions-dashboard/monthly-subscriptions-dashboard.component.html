@@ -334,6 +334,13 @@
                   severity="warn"
                 ></p-tag>
               }
+              @if (p.projected) {
+                <p-tag
+                  [value]="'MONTHLY_SUBSCRIPTIONS.PROJECTED' | translate"
+                  severity="secondary"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.PROJECTED_HINT' | translate"
+                ></p-tag>
+              }
             </div>
           </td>
           <td>
@@ -341,20 +348,22 @@
               @if (p.paymentStatus !== 'PAID' && p.paymentStatus !== 'REFUNDED') {
                 <p-button
                   icon="pi pi-wallet"
-                  [label]="'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT' | translate"
+                  [label]="(p.projected ? 'MONTHLY_SUBSCRIPTIONS.COLLECT' : 'MONTHLY_SUBSCRIPTIONS.RECORD_PAYMENT') | translate"
                   size="small"
                   severity="success"
                   [outlined]="true"
                   [disabled]="payingId() === p.id"
                   (onClick)="openPayDialog(p)"
                 ></p-button>
-                <p-button
-                  icon="pi pi-whatsapp"
-                  severity="success"
-                  size="small"
-                  [label]="'WHATSAPP.SEND' | translate"
-                  (onClick)="sendPaymentReminder(p)"
-                ></p-button>
+                @if (!p.projected) {
+                  <p-button
+                    icon="pi pi-whatsapp"
+                    severity="success"
+                    size="small"
+                    [label]="'WHATSAPP.SEND' | translate"
+                    (onClick)="sendPaymentReminder(p)"
+                  ></p-button>
+                }
               }
               @if (p.amountPaid > 0 && p.paymentStatus !== 'REFUNDED') {
                 <p-button

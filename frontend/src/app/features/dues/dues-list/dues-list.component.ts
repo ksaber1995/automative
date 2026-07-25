@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Observable } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
@@ -18,6 +19,8 @@ import { DuesService } from '../services/dues.service';
 import { LookupService } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
+import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
+import { SessionPaymentsService } from '../../session-payments/session-payments.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
@@ -39,6 +42,8 @@ export class DuesListComponent implements OnInit {
   private duesService = inject(DuesService);
   private enrollmentService = inject(EnrollmentService);
   private masterEnrollmentService = inject(MasterEnrollmentService);
+  private monthlyService = inject(MonthlySubscriptionsService);
+  private sessionService = inject(SessionPaymentsService);
   private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
@@ -52,9 +57,43 @@ export class DuesListComponent implements OnInit {
   filterBranch: string | null = null;
   branchOptions: { label: string; value: string }[] = [];
 
-  totalFinal = computed(() => this.dues().reduce((s, d) => s + d.finalPrice, 0));
-  totalPaid = computed(() => this.dues().reduce((s, d) => s + d.amountPaid, 0));
-  totalRemaining = computed(() => this.dues().reduce((s, d) => s + d.remaining, 0));
+  // Client-side filter by billing model (One-time / Monthly / Session).
+  filterType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION'>('ALL');
+  displayedDues = computed(() => {
+    const t = this.filterType();
+    const all = this.dues();
+    return t === 'ALL' ? all : all.filter(d => d.paymentType === t);
+  });
+
+  // Totals follow the active type filter, so the header matches the table.
+  totalFinal = computed(() => this.displayedDues().reduce((s, d) => s + d.finalPrice, 0));
+  totalPaid = computed(() => this.displayedDues().reduce((s, d) => s + d.amountPaid, 0));
+  totalRemaining = computed(() => this.displayedDues().reduce((s, d) => s + d.remaining, 0));
+
+  get typeOptions() {
+    return [
+      { label: this.translate.instant('DUES.LIST.TYPE_ALL'), value: 'ALL' },
+      { label: this.translate.instant('DUES.LIST.TYPE_ONE_TIME'), value: 'ONE_TIME' },
+      { label: this.translate.instant('DUES.LIST.TYPE_MONTHLY'), value: 'MONTHLY_SUBSCRIPTION' },
+      { label: this.translate.instant('DUES.LIST.TYPE_SESSION'), value: 'PER_SESSION' },
+    ];
+  }
+
+  /** "August 2026" for a monthly row; empty for the others. */
+  monthLabel(due: DueEnrollment): string {
+    if (due.type !== 'MONTHLY' || !due.billingMonth) return '';
+    const m = this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + due.billingMonth);
+    return `${m} ${due.billingYear}`;
+  }
+
+  /** Localised label + colour for the "pay type" badge. */
+  typeLabel(due: DueEnrollment): string {
+    return this.translate.instant('DUES.LIST.PT_' + due.paymentType);
+  }
+  typeSeverity(paymentType: string): 'success' | 'warn' | 'info' {
+    return paymentType === 'MONTHLY_SUBSCRIPTION' ? 'warn'
+      : paymentType === 'PER_SESSION' ? 'info' : 'success';
+  }
 
   // Payment dialog
   selectedDue = signal<DueEnrollment | null>(null);
@@ -117,9 +156,14 @@ export class DuesListComponent implements OnInit {
     const dateStr = toLocalYmd(this.paymentDate);
     const dto = { amount: this.paymentAmount, paymentDate: dateStr, notes: this.paymentNotes || undefined };
 
-    const request$ = due.type === 'MASTER_ENROLLMENT'
-      ? this.masterEnrollmentService.addPayment(due.id, dto)
-      : this.enrollmentService.addPayment(due.id, dto);
+    // Each due type records its payment through its own endpoint.
+    let request$: Observable<any>;
+    switch (due.type) {
+      case 'MASTER_ENROLLMENT': request$ = this.masterEnrollmentService.addPayment(due.id, dto); break;
+      case 'MONTHLY': request$ = this.monthlyService.recordPayment(due.id, dto); break;
+      case 'SESSION': request$ = this.sessionService.recordPayment(due.id, dto); break;
+      default: request$ = this.enrollmentService.addPayment(due.id, dto);
+    }
 
     request$.subscribe({
       next: () => {

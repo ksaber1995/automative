@@ -203,6 +203,7 @@ const router = {
     listHeld: monthlySubscriptionsRoutes.listHeld,
     summary: monthlySubscriptionsRoutes.summary,
     recordPayment: monthlySubscriptionsRoutes.recordPayment,
+    collect: monthlySubscriptionsRoutes.collect,
     voidPayment: monthlySubscriptionsRoutes.voidPayment,
     refund: monthlySubscriptionsRoutes.refund,
     listByCourse: monthlySubscriptionsRoutes.listByCourse,

@@ -210,6 +210,57 @@
 
   <p-confirmDialog></p-confirmDialog>
 
+  <p-dialog
+    [(visible)]="deleteDialogVisible"
+    [modal]="true"
+    [dismissableMask]="true"
+    [draggable]="false"
+    [style]="{ width: '30rem' }"
+    [header]="'STUDENTS.HARD_DELETE_HEADER' | translate"
+  >
+    @if (studentToDelete) {
+      <div class="flex flex-column gap-3">
+        <div class="flex align-items-start gap-2">
+          <i class="pi pi-exclamation-triangle text-red-500 text-2xl mt-1"></i>
+          <p class="m-0">
+            {{ (studentToDelete.hasSubscriptions ? 'STUDENTS.HARD_DELETE_WARN_CONFIRM' : 'STUDENTS.HARD_DELETE_CONFIRM') | translate: { name: studentToDelete.name } }}
+          </p>
+        </div>
+        <label class="text-sm" for="deleteConfirmInput">
+          {{ 'STUDENTS.HARD_DELETE_TYPE_PROMPT' | translate }}
+        </label>
+        <input
+          id="deleteConfirmInput"
+          pInputText
+          type="text"
+          class="w-full"
+          autocomplete="off"
+          placeholder="delete"
+          [(ngModel)]="deleteConfirmText"
+          (keyup.enter)="confirmHardDelete()"
+        />
+      </div>
+    }
+    <ng-template pTemplate="footer">
+      <button
+        pButton
+        type="button"
+        class="p-button-text"
+        [label]="'STUDENTS.HARD_DELETE_CANCEL' | translate"
+        (click)="deleteDialogVisible = false"
+      ></button>
+      <button
+        pButton
+        type="button"
+        class="p-button-danger"
+        icon="pi pi-trash"
+        [label]="'STUDENTS.LIST.HARD_DELETE' | translate"
+        [disabled]="!canConfirmDelete"
+        (click)="confirmHardDelete()"
+      ></button>
+    </ng-template>
+  </p-dialog>
+
   <app-student-import-dialog [(visible)]="importVisible" (imported)="loadStudents()"></app-student-import-dialog>
 
   <!-- Choose what to print before rendering what can be thousands of cards -->

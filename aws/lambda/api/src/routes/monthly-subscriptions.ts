@@ -202,6 +202,9 @@ export async function ensureBillsForMonth(
        AND c.is_active = true
        -- never bill a month that ended before the student even enrolled
        AND (e.enrollment_date IS NULL OR e.enrollment_date <= period.last_day)
+       -- never bill a FUTURE month: a bill for a month that has not started yet is
+       -- phantom debt. Nothing is owed before the month begins.
+       AND period.first_day <= date_trunc('month', CURRENT_DATE)::date
      ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
      RETURNING id`,
     [companyId, billingYear, billingMonth],
@@ -219,8 +222,12 @@ async function currentPeriod(): Promise<{ year: number; month: number }> {
 
 /**
  * Materialise every month in an inclusive range (the page's filter range), so the
- * table and its unpaid tab show the month you asked for — including the current one,
- * and including a FUTURE month when you deliberately filter forward to collect early.
+ * table and its unpaid tab show the month you asked for — including the current one.
+ *
+ * A FUTURE month is never materialised: a bill for a month that has not started yet
+ * is phantom debt, and once written it surfaced everywhere (the student page, the
+ * dashboard) as money owed. The range is clamped to the current month even when a
+ * caller filters forward — a future month simply shows no bills.
  * Bounded: a filter can only ever ask for a handful of months.
  */
 async function ensureBillsForRange(
@@ -229,6 +236,11 @@ async function ensureBillsForRange(
   toKey: number,
 ): Promise<void> {
   if (!Number.isFinite(fromKey) || !Number.isFinite(toKey) || toKey < fromKey) return;
+  // Clamp the range so it never reaches past the current month (the DB's "now").
+  const cur = await currentPeriod();
+  const curKey = cur.year * 12 + cur.month;
+  if (toKey > curKey) toKey = curKey;
+  if (toKey < fromKey) return;
   // A runaway range must not turn one page load into hundreds of writes.
   if (toKey - fromKey > 23) return;
   for (let key = fromKey; key <= toKey; key++) {
@@ -236,6 +248,97 @@ async function ensureBillsForRange(
     const month = ((key - 1) % 12) + 1;
     await ensureBillsForMonth(companyId, year, month);
   }
+}
+
+/**
+ * PROJECT (don't create) the bills a future month WOULD have. Same maths as
+ * `ensureBillsForMonth`, but a SELECT — so viewing next month can show who would
+ * owe and how much without writing a single row. Enrollments that already have a
+ * real bill for the month are excluded (the real row is shown instead). Rows are
+ * flagged `projected: true` and carry a synthetic, non-persisted id.
+ *
+ * Only ever called for a range already clamped to the future (> current month);
+ * the current/past months are real rows materialised by ensureBillsForRange.
+ */
+async function projectBillsForRange(
+  context: any,
+  fromKey: number,
+  toKey: number,
+  branchId: string | undefined,
+  courseId: string | undefined,
+): Promise<any[]> {
+  if (!Number.isFinite(fromKey) || !Number.isFinite(toKey) || toKey < fromKey) return [];
+  const params: any[] = [context.companyId, fromKey, toKey];
+  const conds: string[] = [];
+  if (branchId) {
+    params.push(branchId);
+    conds.push(`e.branch_id = $${params.length}`);
+  } else {
+    const bc = appendBranchSqlFilter(context, params, 'e.branch_id');
+    if (bc) conds.push(bc);
+  }
+  if (courseId) {
+    params.push(courseId);
+    conds.push(`e.course_id = $${params.length}`);
+  }
+  const extra = conds.length ? ` AND ${conds.join(' AND ')}` : '';
+
+  const rows = await query(
+    `WITH periods AS (
+       SELECT ((k - 1) / 12)      AS billing_year,
+              ((k - 1) % 12) + 1  AS billing_month,
+              make_date(((k - 1) / 12)::int, (((k - 1) % 12) + 1)::int, 1) AS first_day,
+              (make_date(((k - 1) / 12)::int, (((k - 1) % 12) + 1)::int, 1)
+                 + INTERVAL '1 month - 1 day')::date AS last_day
+       FROM generate_series($2::int, $3::int) AS k
+     )
+     SELECT
+       ('proj-' || e.id || '-' || p.billing_year || '-' || p.billing_month) AS id,
+       e.id AS enrollment_id, e.company_id, e.student_id, e.course_id, e.branch_id,
+       p.billing_year, p.billing_month,
+       CASE
+         WHEN ov.override_price IS NOT NULL AND c.price > 0
+           THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
+         ELSE COALESCE(e.final_price, c.price)
+       END AS amount_due,
+       0 AS amount_paid, 'PENDING' AS payment_status,
+       p.first_day AS due_date, NULL AS paid_date, NULL AS notes,
+       0 AS refunded_amount, NULL AS refund_note, NULL AS refunded_at,
+       -- Not a stored row, but the schema wants non-null timestamps; the period's
+       -- first day is a harmless, stable stand-in.
+       p.first_day AS created_at, p.first_day AS updated_at,
+       s.name AS student_name, s.student_code AS student_code,
+       s.phone AS student_phone, s.parent_phone AS parent_phone, s.parent_name AS parent_name,
+       c.name AS course_name, b.name AS branch_name, cl.name AS class_name,
+       e.status AS enrollment_status
+     FROM enrollments e
+     JOIN courses  c ON c.id = e.course_id
+     JOIN students s ON s.id = e.student_id
+     JOIN branches b ON b.id = e.branch_id
+     LEFT JOIN classes cl ON cl.id = e.class_id
+     CROSS JOIN periods p
+     LEFT JOIN course_monthly_price_overrides ov
+       ON ov.course_id = e.course_id
+      AND ov.billing_year = p.billing_year
+      AND ov.billing_month = p.billing_month
+     LEFT JOIN monthly_subscription_payments existing
+       ON existing.enrollment_id = e.id
+      AND existing.billing_year = p.billing_year
+      AND existing.billing_month = p.billing_month
+     WHERE e.company_id = $1
+       AND e.status = 'ACTIVE'
+       AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
+       AND c.is_active = true
+       AND (e.enrollment_date IS NULL OR e.enrollment_date <= p.last_day)
+       AND existing.id IS NULL${extra}`,
+    params,
+  );
+
+  return (rows as any[]).map((r) => ({
+    ...mapPaymentWithDetailsFromDB(r),
+    paymentStatus: resolveStatus(r),
+    projected: true,
+  }));
 }
 
 export const monthlySubscriptionsRoutes = {
@@ -403,11 +506,32 @@ export const monthlySubscriptionsRoutes = {
         params
       );
 
-      // Apply on-read overdue resolution and optional status filter
+      // Apply on-read overdue resolution.
       let result = rows.map((r: any) => ({
         ...mapPaymentWithDetailsFromDB(r),
         paymentStatus: resolveStatus(r),
       }));
+
+      // Future months are PROJECTED, not created: fold in virtual rows for any
+      // month in the range past the current one, so staff see who would owe next
+      // month without a single write. Real early collections already sit in
+      // `result` and are excluded from the projection.
+      const cur = await currentPeriod();
+      const curKey = cur.year * 12 + cur.month;
+      const futureFrom = Math.max(fromKey, curKey + 1);
+      if (futureFrom <= toKey) {
+        const projected = await projectBillsForRange(context, futureFrom, toKey, q.branchId, q.courseId);
+        result = result.concat(projected);
+      }
+
+      // Newest month first, then by student — the real rows arrived already
+      // ordered, but projected rows are now interleaved and must re-sort.
+      result.sort((a: any, b: any) => {
+        const ak = a.billingYear * 12 + a.billingMonth;
+        const bk = b.billingYear * 12 + b.billingMonth;
+        if (ak !== bk) return bk - ak;
+        return (a.studentName || '').localeCompare(b.studentName || '');
+      });
 
       if (q.status && q.status !== 'ALL') {
         result = result.filter((r: any) => r.paymentStatus === q.status);
@@ -571,6 +695,23 @@ export const monthlySubscriptionsRoutes = {
         else pendingCount++;
       }
 
+      // Fold in PROJECTED future months so the counters agree with the table
+      // underneath them (list() shows the same projected rows). Nothing is written.
+      const curP = await currentPeriod();
+      const curKeyS = curP.year * 12 + curP.month;
+      const futureFromS = Math.max(fromKey, curKeyS + 1);
+      if (futureFromS <= toKey) {
+        const projected = await projectBillsForRange(context, futureFromS, toKey, q.branchId, undefined);
+        for (const p of projected) {
+          billedStudents.add(p.studentId);
+          totalExpected += p.amountDue;
+          // A projected month is never overdue (it has not started); a fully
+          // discounted student reads as PAID, everyone else is pending.
+          if (p.paymentStatus === 'PAID') paidCount++;
+          else pendingCount++;
+        }
+      }
+
       return {
         status: 200 as const,
         body: {
@@ -651,6 +792,111 @@ export const monthlySubscriptionsRoutes = {
     } catch (error) {
       console.error('Record monthly payment error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.PAY_FAILED', 'Failed to record payment', 400);
+    }
+  },
+
+  /**
+   * POST /api/monthly-subscriptions/collect
+   * Collect a payment for a month that has no bill yet — the ONLY path that
+   * creates a future bill. It materialises the single row for THIS one enrollment
+   * (never the whole tenant), then records the payment on it, atomically enough
+   * that a future month never exists as unpaid phantom debt: the row is born with
+   * money on it. If the bill already exists (a prior collect, or a real early
+   * one), it just records the payment on it.
+   */
+  collect: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const { enrollmentId, billingYear, billingMonth, amount, paymentDate, notes } = body;
+      if (!Number.isInteger(billingYear) || !Number.isInteger(billingMonth) || billingMonth < 1 || billingMonth > 12) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.BAD_PERIOD', 'Invalid billing month');
+      }
+      const pay = parseFloat(amount);
+      if (!(pay > 0)) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.BAD_AMOUNT', 'Payment amount must be greater than zero');
+      }
+
+      const enr = await queryOne<any>(
+        `SELECT e.id, e.branch_id, c.payment_type, c.is_active AS course_active
+           FROM enrollments e JOIN courses c ON c.id = e.course_id
+          WHERE e.id = $1 AND e.company_id = $2`,
+        [enrollmentId, context.companyId]
+      );
+      if (!enr) return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_FOUND', 'Enrollment not found');
+      if (!canAccessBranch(context, enr.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      if (enr.payment_type !== 'MONTHLY_SUBSCRIPTION' || !enr.course_active) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_MONTHLY', 'Not an active monthly subscription');
+      }
+
+      // Create the single bill for this enrollment+month, computing amount_due the
+      // same way ensureBillsForMonth does (course price / discounted fee, scaled by
+      // any month override). Guarded so a month before the student enrolled makes
+      // nothing. Idempotent — a bill already there is left as-is.
+      await query(
+        `WITH period AS (
+           SELECT make_date($2::int, $3::int, 1) AS first_day,
+                  (make_date($2::int, $3::int, 1) + INTERVAL '1 month - 1 day')::date AS last_day
+         )
+         INSERT INTO monthly_subscription_payments
+           (enrollment_id, company_id, student_id, course_id, branch_id,
+            billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+         SELECT e.id, e.company_id, e.student_id, e.course_id, e.branch_id,
+           $2::int, $3::int,
+           CASE
+             WHEN ov.override_price IS NOT NULL AND c.price > 0
+               THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
+             ELSE COALESCE(e.final_price, c.price)
+           END,
+           0, 'PENDING', period.first_day
+         FROM enrollments e
+         JOIN courses c ON c.id = e.course_id
+         CROSS JOIN period
+         LEFT JOIN course_monthly_price_overrides ov
+           ON ov.course_id = e.course_id AND ov.billing_year = $2::int AND ov.billing_month = $3::int
+         WHERE e.id = $1 AND e.company_id = $4
+           AND e.status = 'ACTIVE'
+           AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
+           AND c.is_active = true
+           AND (e.enrollment_date IS NULL OR e.enrollment_date <= period.last_day)
+         ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING`,
+        [enrollmentId, billingYear, billingMonth, context.companyId]
+      );
+
+      const bill = await queryOne<any>(
+        `SELECT * FROM monthly_subscription_payments
+          WHERE enrollment_id = $1 AND billing_year = $2 AND billing_month = $3`,
+        [enrollmentId, billingYear, billingMonth]
+      );
+      // No row means the guard rejected it — the month is before the student enrolled.
+      if (!bill) return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_BILLABLE', 'This student is not billable for that month');
+
+      const amountDue = parseFloat(bill.amount_due);
+      const newPaid = parseFloat(bill.amount_paid || 0) + pay;
+      const effectiveDate = paymentDate || new Date().toISOString().split('T')[0];
+      let newStatus: string;
+      let paidDate: string | null = null;
+      if (newPaid >= amountDue) { newStatus = 'PAID'; paidDate = effectiveDate; }
+      else if (newPaid > 0) { newStatus = 'PARTIAL'; paidDate = effectiveDate; }
+      else { newStatus = 'PENDING'; }
+
+      await query(
+        `UPDATE monthly_subscription_payments
+            SET amount_paid = $1, payment_status = $2, paid_date = $3, notes = COALESCE($4, notes), updated_at = NOW()
+          WHERE id = $5`,
+        [newPaid, newStatus, paidDate, notes || null, bill.id]
+      );
+
+      const updated = await queryOne('SELECT * FROM monthly_subscription_payments WHERE id = $1', [bill.id]);
+      return { status: 200 as const, body: mapPaymentFromDB(updated) };
+    } catch (error) {
+      console.error('Collect monthly payment error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.PAY_FAILED', 'Failed to collect payment', 400);
     }
   },
 

@@ -758,6 +758,11 @@ const MonthlySubscriptionPaymentSchema = z.object({
 });
 
 const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend({
+  // Projected (future-month) rows carry a synthetic, non-persisted id (e.g.
+  // "proj-<enrollmentId>-<year>-<month>"), so this is a plain string, not a UUID.
+  id: z.string(),
+  // True for a virtual future-month row that has not been created in the DB.
+  projected: z.boolean().optional(),
   studentName: z.string(),
   courseName: z.string(),
   branchName: z.string(),
@@ -1112,9 +1117,15 @@ const DueEnrollmentSchema = z.object({
   finalPrice: z.number(),
   amountPaid: z.number(),
   remaining: z.number(),
-  paymentStatus: PaymentStatusSchema,
-  status: EnrollmentStatusSchema,
-  type: z.enum(['ENROLLMENT', 'MASTER_ENROLLMENT']),
+  // Heterogeneous union of four due sources, so these stay permissive strings
+  // (monthly resolves OVERDUE/PARTIAL on read; each source carries its own status).
+  paymentStatus: z.string(),
+  status: z.string(),
+  type: z.enum(['ENROLLMENT', 'MASTER_ENROLLMENT', 'MONTHLY', 'SESSION']),
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']),
+  // Present only for MONTHLY rows — which month is owed.
+  billingYear: z.number().optional(),
+  billingMonth: z.number().optional(),
 });
 
 const RefundSchema = z.object({
@@ -6505,6 +6516,27 @@ export const contract = c.router({
       path: '/api/monthly-subscriptions/:id/pay',
       pathParams: z.object({ id: UUIDSchema }),
       body: RecordMonthlyPaymentSchema,
+      responses: {
+        200: MonthlySubscriptionPaymentSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Collect a payment for a month that has no bill yet (a projected future
+    // month). Creates the single bill for that one enrollment, then records the
+    // payment — the only path that ever writes a future bill.
+    collect: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/collect',
+      body: z.object({
+        enrollmentId: UUIDSchema,
+        billingYear: z.number().int(),
+        billingMonth: z.number().int().min(1).max(12),
+        amount: z.number().positive(),
+        paymentDate: z.string().optional(),
+        notes: z.string().optional(),
+      }),
       responses: {
         200: MonthlySubscriptionPaymentSchema,
         400: ApiErrorSchema,

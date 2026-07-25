@@ -35,6 +35,13 @@ export interface MonthlyPaymentWithDetails extends MonthlySubscriptionPayment {
   parentName?: string | null;
   /** Current status of the underlying enrollment (e.g. ACTIVE, ON_HOLD). */
   enrollmentStatus?: string | null;
+  /**
+   * True for a VIRTUAL future-month row: what the student would owe, computed on
+   * the fly and not stored. It has no real bill id (id is "proj-…"), so it cannot
+   * be paid via /:id/pay — collecting on it goes through `collect` instead, which
+   * creates the real bill at that moment.
+   */
+  projected?: boolean;
 }
 
 /** A monthly subscription currently on hold (generates no bills until resumed). */
@@ -68,6 +75,20 @@ export interface MonthlyPaymentSummary {
 export interface RecordMonthlyPaymentDto {
   amount: number;
   paymentDate: string;
+  notes?: string;
+}
+
+/**
+ * Collect a payment for a month that has no bill yet (a projected future month).
+ * The server creates the single bill for that enrollment+month, then records the
+ * payment — the only path that writes a future bill.
+ */
+export interface CollectMonthlyPaymentDto {
+  enrollmentId: string;
+  billingYear: number;
+  billingMonth: number;
+  amount: number;
+  paymentDate?: string;
   notes?: string;
 }
 

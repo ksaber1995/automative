@@ -31,6 +31,17 @@
           ></p-select>
         </div>
       }
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_TYPE' | translate }}</label>
+        <p-select
+          [ngModel]="filterType()"
+          (ngModelChange)="filterType.set($event)"
+          [options]="typeOptions"
+          optionLabel="label"
+          optionValue="value"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
       <div class="flex items-end">
         <button pButton [label]="'DUES.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
           class="p-button-outlined" (click)="clearFilters()"></button>
@@ -41,7 +52,7 @@
   <!-- Table -->
   <p-card>
     <p-table
-      [value]="dues()"
+      [value]="displayedDues()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="15"
@@ -56,6 +67,7 @@
         <tr>
           <th pSortableColumn="studentName">{{ 'DUES.LIST.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
           <th pSortableColumn="courseName">{{ 'DUES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+          <th pSortableColumn="paymentType">{{ 'DUES.LIST.COL_TYPE' | translate }} <p-sortIcon field="paymentType"></p-sortIcon></th>
           <th pSortableColumn="branchName">{{ 'DUES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
           <th pSortableColumn="enrollmentDate">{{ 'DUES.LIST.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
           <th pSortableColumn="finalPrice" class="text-right">{{ 'DUES.LIST.COL_TOTAL' | translate }} <p-sortIcon field="finalPrice"></p-sortIcon></th>
@@ -78,8 +90,17 @@
               <p-tag value="Master" severity="info" styleClass="ml-1 text-xs"></p-tag>
             }
           </td>
+          <td>
+            <p-tag [value]="typeLabel(due)" [severity]="typeSeverity(due.paymentType)" styleClass="text-xs"></p-tag>
+          </td>
           <td class="text-sm text-gray-500">{{ due.branchName }}</td>
-          <td class="text-sm">{{ formatDate(due.enrollmentDate) }}</td>
+          <td class="text-sm">
+            @if (due.type === 'MONTHLY') {
+              {{ monthLabel(due) }}
+            } @else {
+              {{ formatDate(due.enrollmentDate) }}
+            }
+          </td>
           <td class="text-right font-medium">{{ due.finalPrice | number:'1.2-2' }}</td>
           <td class="text-right text-green-600">{{ due.amountPaid | number:'1.2-2' }}</td>
           <td class="text-right font-bold text-red-600">{{ due.remaining | number:'1.2-2' }}</td>
@@ -115,7 +136,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="text-center py-12">
+          <td colspan="10" class="text-center py-12">
             <div class="text-gray-400">
               <i class="pi pi-check-circle text-4xl mb-3 block text-green-400"></i>
               <p class="text-lg text-green-600 font-medium">{{ 'DUES.LIST.ALL_CLEAR' | translate }}</p>
@@ -126,9 +147,9 @@
       </ng-template>
 
       <ng-template pTemplate="footer">
-        @if (dues().length > 0) {
+        @if (displayedDues().length > 0) {
           <tr>
-            <td colspan="4" class="text-right font-semibold text-gray-600">{{ 'DUES.LIST.TOTALS' | translate }}</td>
+            <td colspan="5" class="text-right font-semibold text-gray-600">{{ 'DUES.LIST.TOTALS' | translate }}</td>
             <td class="text-right font-bold">{{ totalFinal() | number:'1.2-2' }}</td>
             <td class="text-right font-bold text-green-600">{{ totalPaid() | number:'1.2-2' }}</td>
             <td class="text-right font-bold text-red-600">{{ totalRemaining() | number:'1.2-2' }}</td>

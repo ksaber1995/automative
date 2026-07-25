@@ -29,39 +29,23 @@ export function cardScanUrl(token: string, origin = 'https://app.netrofit.com'):
 }
 
 /**
- * Render one card as a PNG: the QR, with its serial printed underneath so a
- * human can read the number off the sheet without scanning it.
+ * Render one card as a PNG: the plain QR only, no serial printed on it. The
+ * number still identifies the file — it is the (lowercase) filename in the zip —
+ * so the readable label lives there instead of baked into the image.
  *
- * Plain QR + serial by design — the tenant's own card artwork lives in the main
- * app's renderer, and copying ~2,500 lines of it here would leave two versions
- * to drift apart.
+ * Plain QR by design — the tenant's own card artwork lives in the main app's
+ * renderer, and copying ~2,500 lines of it here would leave two versions to
+ * drift apart.
  */
 async function renderCardPng(card: AdminQrCard, size = 600): Promise<string> {
-  const labelBand = Math.round(size * 0.16);
+  // qrcode writes the whole canvas (white quiet zone included), so we can draw
+  // straight onto it — the image is nothing but the QR.
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size + labelBand;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas is unavailable in this browser');
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Draw the QR onto its own canvas first, then blit — qrcode writes the whole
-  // canvas, so it would otherwise wipe the label band.
-  const qrCanvas = document.createElement('canvas');
-  await QRCode.toCanvas(qrCanvas, cardScanUrl(card.token), {
+  await QRCode.toCanvas(canvas, cardScanUrl(card.token), {
     width: size,
     margin: 1,
     errorCorrectionLevel: 'M',
   });
-  ctx.drawImage(qrCanvas, 0, 0, size, size);
-
-  ctx.fillStyle = '#0b0b0b';
-  ctx.font = `bold ${Math.round(labelBand * 0.52)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(serialLabel(card.serial), size / 2, size + labelBand / 2);
 
   return canvas.toDataURL('image/png').split(',')[1];
 }
@@ -80,15 +64,15 @@ export async function downloadCardsZip(
   const zip = new JSZip();
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
-    zip.file(`${serialLabel(card.serial)}.png`, await renderCardPng(card), { base64: true });
+    zip.file(`${serialLabel(card.serial).toLowerCase()}.png`, await renderCardPng(card), { base64: true });
     onProgress?.(i + 1, cards.length);
     // Yield every 25 cards so the progress bar actually repaints.
     if (i % 25 === 24) await new Promise((r) => setTimeout(r));
   }
 
   const blob = await zip.generateAsync({ type: 'blob' });
-  const first = cards[0] ? serialLabel(cards[0].serial) : '';
-  const last = cards[cards.length - 1] ? serialLabel(cards[cards.length - 1].serial) : '';
+  const first = cards[0] ? serialLabel(cards[0].serial).toLowerCase() : '';
+  const last = cards[cards.length - 1] ? serialLabel(cards[cards.length - 1].serial).toLowerCase() : '';
   // Safe filename: tenant names are Arabic as often as not.
   const slug = companyName.replace(/[^\w؀-ۿ-]+/g, '_').replace(/^_+|_+$/g, '') || 'cards';
   saveAs(blob, `${slug}-${first}-${last}.zip`);

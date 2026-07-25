@@ -594,11 +594,23 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     const token = this.scannedToken();
     const alsoMarkPresent = this.markAttendance() && !!session && !!token;
     this.payingId.set(sel.id);
-    this.svc.recordPayment(sel.id, {
-      amount: this.payAmount,
-      paymentDate: this.formatDate(this.payDate),
-      notes: this.payNotes || undefined,
-    }).pipe(takeUntil(this.destroy$)).subscribe({
+    // A projected (future) row has no real bill yet — collect() creates it and
+    // records the payment in one go. A real row pays through the normal path.
+    const req$ = sel.projected
+      ? this.svc.collect({
+          enrollmentId: sel.enrollmentId,
+          billingYear: sel.billingYear,
+          billingMonth: sel.billingMonth,
+          amount: this.payAmount,
+          paymentDate: this.formatDate(this.payDate),
+          notes: this.payNotes || undefined,
+        })
+      : this.svc.recordPayment(sel.id, {
+          amount: this.payAmount,
+          paymentDate: this.formatDate(this.payDate),
+          notes: this.payNotes || undefined,
+        });
+    req$.pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.payingId.set(null);
         this.closePayDialog();

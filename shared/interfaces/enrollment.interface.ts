@@ -86,7 +86,13 @@ export interface DueEnrollment {
   remaining: number;
   paymentStatus: string;
   status: string;
-  type: 'ENROLLMENT' | 'MASTER_ENROLLMENT';
+  /** Which due source this row is — drives which pay endpoint records a payment. */
+  type: 'ENROLLMENT' | 'MASTER_ENROLLMENT' | 'MONTHLY' | 'SESSION';
+  /** The course's billing model, for the "type" column and the type filter. */
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  /** Present only for MONTHLY rows — the month that is owed. */
+  billingYear?: number;
+  billingMonth?: number;
 }
 
 export interface CreateRefundDto {

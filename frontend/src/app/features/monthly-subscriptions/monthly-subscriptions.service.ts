@@ -6,6 +6,7 @@ import {
   MonthlyPaymentWithDetails,
   MonthlyPaymentSummary,
   RecordMonthlyPaymentDto,
+  CollectMonthlyPaymentDto,
   RefundMonthlyPaymentDto,
   GenerateMonthlyBillsDto,
   CourseMonthlyPriceOverride,
@@ -61,6 +62,11 @@ export class MonthlySubscriptionsService {
 
   recordPayment(id: string, dto: RecordMonthlyPaymentDto): Observable<any> {
     return this.http.post<any>(`${this.base}/${id}/pay`, dto);
+  }
+
+  /** Collect on a projected future month — creates the single bill, then pays it. */
+  collect(dto: CollectMonthlyPaymentDto): Observable<any> {
+    return this.http.post<any>(`${this.base}/collect`, dto);
   }
 
   voidPayment(id: string, reason?: string): Observable<any> {

@@ -637,33 +637,42 @@ export const enrollmentsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
       }
 
-      const eConditions: string[] = ['e.company_id = $1', 'e.amount_paid < e.final_price', 'COALESCE(e.total_refunded, 0) = 0', "e.status != 'DROPPED'"];
+      // /dues aggregates unpaid money across ALL THREE billing models, each from
+      // its own source of truth:
+      //   • ONE_TIME (incl. installment) enrollments — remaining on the enrollment row
+      //   • bundles (master enrollments) — always one-time
+      //   • MONTHLY_SUBSCRIPTION — the real unpaid monthly bills, one row per owed
+      //     month (never a future month, which isn't owed yet)
+      //   • PER_SESSION — unpaid pay-as-you-go charges
+      // A monthly/per-session enrollment's own amount_paid is NEVER updated when its
+      // bills are paid, so it must never be read as a due — hence the per-model split.
+      const buildBranch = (params: any[], col: string): string => {
+        if (q.branchId) { params.push(q.branchId); return `${col} = $${params.length}`; }
+        return appendBranchSqlFilter(context, params, col) || '';
+      };
+      const curPeriodExpr = '(EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int)';
+
       const eParams: any[] = [context.companyId];
-      if (q.branchId) {
-        eParams.push(q.branchId);
-        eConditions.push(`e.branch_id = $${eParams.length}`);
-      } else {
-        const c = appendBranchSqlFilter(context, eParams, 'e.branch_id');
-        if (c) eConditions.push(c);
-      }
+      const eConditions = ['e.company_id = $1', "e.payment_type = 'ONE_TIME'", 'e.amount_paid < e.final_price', 'COALESCE(e.total_refunded, 0) = 0', "e.status <> 'DROPPED'"];
+      { const b = buildBranch(eParams, 'e.branch_id'); if (b) eConditions.push(b); }
 
-      const meConditions: string[] = ['me.company_id = $1', 'me.amount_paid < me.final_price', 'COALESCE(me.total_refunded, 0) = 0', "me.status != 'CANCELLED'"];
       const meParams: any[] = [context.companyId];
-      if (q.branchId) {
-        meParams.push(q.branchId);
-        meConditions.push(`me.branch_id = $${meParams.length}`);
-      } else {
-        const c = appendBranchSqlFilter(context, meParams, 'me.branch_id');
-        if (c) meConditions.push(c);
-      }
+      const meConditions = ['me.company_id = $1', 'me.amount_paid < me.final_price', 'COALESCE(me.total_refunded, 0) = 0', "me.status <> 'CANCELLED'"];
+      { const b = buildBranch(meParams, 'me.branch_id'); if (b) meConditions.push(b); }
 
-      const [enrollmentRows, masterRows] = await Promise.all([
+      const mParams: any[] = [context.companyId];
+      const mConditions = ['msp.company_id = $1', 'msp.amount_due > msp.amount_paid', "msp.payment_status NOT IN ('PAID', 'REFUNDED')", 'COALESCE(msp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", `(msp.billing_year * 12 + msp.billing_month) <= ${curPeriodExpr}`];
+      { const b = buildBranch(mParams, 'msp.branch_id'); if (b) mConditions.push(b); }
+
+      const sParams: any[] = [context.companyId];
+      const sConditions = ['sp.company_id = $1', "sp.payment_status = 'PENDING'", 'sp.amount_due > sp.amount_paid', 'COALESCE(sp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'"];
+      { const b = buildBranch(sParams, 'sp.branch_id'); if (b) sConditions.push(b); }
+
+      const [enrollmentRows, masterRows, monthlyRows, sessionRows] = await Promise.all([
         query(
           `SELECT e.id, e.student_id, e.course_id AS course_id, e.branch_id, e.enrollment_date,
                   e.final_price, e.amount_paid, e.payment_status, e.status,
-                  s.name AS student_name,
-                  c.name AS course_name,
-                  b.name AS branch_name
+                  s.name AS student_name, c.name AS course_name, b.name AS branch_name
            FROM enrollments e
            JOIN students s ON e.student_id = s.id
            JOIN courses c ON e.course_id = c.id
@@ -675,9 +684,7 @@ export const enrollmentsRoutes = {
         query(
           `SELECT me.id, me.student_id, me.master_course_id AS course_id, me.branch_id, me.enrollment_date,
                   me.final_price, me.amount_paid, me.payment_status, me.status,
-                  s.name AS student_name,
-                  mc.name AS course_name,
-                  b.name AS branch_name
+                  s.name AS student_name, mc.name AS course_name, b.name AS branch_name
            FROM master_enrollments me
            JOIN students s ON me.student_id = s.id
            JOIN master_courses mc ON me.master_course_id = mc.id
@@ -686,28 +693,85 @@ export const enrollmentsRoutes = {
            ORDER BY me.enrollment_date DESC`,
           meParams
         ),
+        query(
+          `SELECT msp.id, msp.student_id, msp.course_id, msp.branch_id, msp.billing_year, msp.billing_month,
+                  msp.due_date, msp.amount_due, msp.amount_paid, msp.payment_status,
+                  s.name AS student_name, c.name AS course_name, b.name AS branch_name
+           FROM monthly_subscription_payments msp
+           JOIN enrollments e ON e.id = msp.enrollment_id
+           JOIN students s ON s.id = msp.student_id
+           JOIN courses c ON c.id = msp.course_id
+           JOIN branches b ON b.id = msp.branch_id
+           WHERE ${mConditions.join(' AND ')}
+           ORDER BY msp.due_date DESC`,
+          mParams
+        ),
+        query(
+          `SELECT sp.id, sp.student_id, sp.course_id, sp.branch_id, sp.created_at::date AS charge_date,
+                  sp.amount_due, sp.amount_paid, sp.payment_status,
+                  s.name AS student_name, c.name AS course_name, b.name AS branch_name
+           FROM session_payments sp
+           JOIN enrollments e ON e.id = sp.enrollment_id
+           JOIN students s ON s.id = sp.student_id
+           JOIN courses c ON c.id = sp.course_id
+           JOIN branches b ON b.id = sp.branch_id
+           WHERE ${sConditions.join(' AND ')}
+           ORDER BY sp.created_at DESC`,
+          sParams
+        ),
       ]);
 
-      const mapRow = (r: any, type: 'ENROLLMENT' | 'MASTER_ENROLLMENT') => ({
-        id: r.id,
-        studentId: r.student_id,
-        studentName: r.student_name,
-        courseId: r.course_id,
-        courseName: r.course_name,
-        branchId: r.branch_id,
-        branchName: r.branch_name,
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const mapEnrollment = (r: any, type: 'ENROLLMENT' | 'MASTER_ENROLLMENT') => ({
+        id: r.id, studentId: r.student_id, studentName: r.student_name,
+        courseId: r.course_id, courseName: r.course_name,
+        branchId: r.branch_id, branchName: r.branch_name,
         enrollmentDate: r.enrollment_date,
         finalPrice: parseFloat(r.final_price),
         amountPaid: parseFloat(r.amount_paid || 0),
         remaining: Math.max(0, parseFloat(r.final_price) - parseFloat(r.amount_paid || 0)),
-        paymentStatus: r.payment_status,
-        status: r.status,
-        type,
+        paymentStatus: r.payment_status, status: r.status,
+        type, paymentType: 'ONE_TIME' as const,
       });
 
+      const mapMonthly = (r: any) => {
+        const due = parseFloat(r.amount_due), paid = parseFloat(r.amount_paid || 0);
+        // Resolve overdue on read (stored status is only PENDING/PARTIAL).
+        const overdue = r.due_date && new Date(r.due_date) < today;
+        const status = overdue ? 'OVERDUE' : (paid > 0 ? 'PARTIAL' : 'PENDING');
+        return {
+          id: r.id, studentId: r.student_id, studentName: r.student_name,
+          courseId: r.course_id, courseName: r.course_name,
+          branchId: r.branch_id, branchName: r.branch_name,
+          enrollmentDate: r.due_date,
+          finalPrice: due, amountPaid: paid, remaining: Math.max(0, due - paid),
+          paymentStatus: status, status: 'ACTIVE',
+          type: 'MONTHLY' as const, paymentType: 'MONTHLY_SUBSCRIPTION' as const,
+          billingYear: parseInt(r.billing_year, 10),
+          billingMonth: parseInt(r.billing_month, 10),
+        };
+      };
+
+      const mapSession = (r: any) => {
+        const due = parseFloat(r.amount_due), paid = parseFloat(r.amount_paid || 0);
+        return {
+          id: r.id, studentId: r.student_id, studentName: r.student_name,
+          courseId: r.course_id, courseName: r.course_name,
+          branchId: r.branch_id, branchName: r.branch_name,
+          enrollmentDate: r.charge_date,
+          finalPrice: due, amountPaid: paid, remaining: Math.max(0, due - paid),
+          paymentStatus: r.payment_status, status: 'ACTIVE',
+          type: 'SESSION' as const, paymentType: 'PER_SESSION' as const,
+        };
+      };
+
       const combined = [
-        ...enrollmentRows.map((r: any) => mapRow(r, 'ENROLLMENT')),
-        ...masterRows.map((r: any) => mapRow(r, 'MASTER_ENROLLMENT')),
+        ...enrollmentRows.map((r: any) => mapEnrollment(r, 'ENROLLMENT')),
+        ...masterRows.map((r: any) => mapEnrollment(r, 'MASTER_ENROLLMENT')),
+        ...monthlyRows.map(mapMonthly),
+        ...sessionRows.map(mapSession),
       ].sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime());
 
       return { status: 200 as const, body: combined };

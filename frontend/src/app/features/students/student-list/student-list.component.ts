@@ -9,6 +9,7 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { ProgressBarModule } from 'primeng/progressbar';
@@ -56,6 +57,7 @@ interface EnrollmentCounts {
     TabsModule,
     TranslateModule,
     DialogModule,
+    InputTextModule,
     MultiSelectModule,
     RadioButtonModule,
     ProgressBarModule,
@@ -96,6 +98,11 @@ export class StudentListComponent implements OnInit {
   // studentId → set of courseIds the student is enrolled in (drives the course filter).
   studentCourseMap = signal<Map<string, Set<string>>>(new Map());
   activeTab = signal<'active' | 'inactive'>('active');
+
+  // Type-to-confirm permanent-delete dialog state.
+  deleteDialogVisible = false;
+  studentToDelete: Student | null = null;
+  deleteConfirmText = '';
 
   // The lookup returns active branches only, so all entries are selectable/active.
   branches = computed(() => this.allBranches());
@@ -310,26 +317,29 @@ export class StudentListComponent implements OnInit {
     });
   }
 
+  // Permanent delete is always allowed, but it is destructive — so instead of a
+  // one-click confirm we make the user type "delete" into a dialog. The billing
+  // warning is shown too when the student carries subscription/billing history.
   hardDeleteStudent(student: Student) {
-    // Deletion is always allowed, but if the student carries billing/subscription
-    // history we warn that it will be removed along with the student.
-    const messageKey = student.hasSubscriptions
-      ? 'STUDENTS.HARD_DELETE_WARN_CONFIRM'
-      : 'STUDENTS.HARD_DELETE_CONFIRM';
-    this.confirmationService.confirm({
-      message: this.translate.instant(messageKey, {
-        name: student.name,
-      }),
-      header: this.translate.instant('STUDENTS.HARD_DELETE_HEADER'),
-      icon: 'pi pi-exclamation-triangle',
-      acceptButtonStyleClass: 'p-button-danger',
-      accept: () => {
-        this.studentService.hardDeleteStudent(student.id).subscribe({
-          next: () => {
-            this.notificationService.success(this.translate.instant('STUDENTS.HARD_DELETED'));
-            this.loadStudents();
-          }
-        });
+    this.studentToDelete = student;
+    this.deleteConfirmText = '';
+    this.deleteDialogVisible = true;
+  }
+
+  /** The type-to-confirm gate: the delete button stays disabled until this is true. */
+  get canConfirmDelete(): boolean {
+    return this.deleteConfirmText.trim().toLowerCase() === 'delete';
+  }
+
+  confirmHardDelete() {
+    const student = this.studentToDelete;
+    if (!student || !this.canConfirmDelete) return;
+    this.studentService.hardDeleteStudent(student.id).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.HARD_DELETED'));
+        this.deleteDialogVisible = false;
+        this.studentToDelete = null;
+        this.loadStudents();
       }
     });
   }

@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NgSelectModule } from '@ng-select/ng-select';
 import {
   CompanySubscription, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
   TenantUser, USER_ROLES,
@@ -16,7 +17,7 @@ const DEBUG_EMAIL = 'master@master.com';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgSelectModule],
   template: `
     <div class="app">
       <aside class="sidebar">
@@ -350,14 +351,16 @@ const DEBUG_EMAIL = 'master@master.com';
               and permissions are dropped — they belong to the old tenant. They must log out and
               back in before they see the new one.
             </p>
-            <select class="search" [ngModel]="moveTarget()" (ngModelChange)="moveTarget.set($event)">
-              <option value="">Choose a tenant…</option>
-              @for (c of rows(); track c.company_id) {
-                @if (c.company_id !== u.company_id && c.company_active) {
-                  <option [value]="c.company_id">{{ c.company_name }}</option>
-                }
-              }
-            </select>
+            <ng-select
+              class="move-select"
+              [items]="moveTargets()"
+              bindLabel="company_name"
+              bindValue="company_id"
+              [ngModel]="moveTarget()"
+              (ngModelChange)="moveTarget.set($event || '')"
+              placeholder="Search a tenant…"
+              [clearable]="true"
+            ></ng-select>
             <div class="modal-foot">
               <button class="act" [disabled]="busyId() === u.id" (click)="moveUserRow.set(null)">Cancel</button>
               <button class="act activate" [disabled]="busyId() === u.id || !moveTarget()" (click)="confirmMoveUser(u)">
@@ -688,6 +691,13 @@ const DEBUG_EMAIL = 'master@master.com';
     .preset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
     .preset-grid .act { padding: 10px; font-size: 13px; text-align: center; }
     .modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    .move-select { display: block; margin-bottom: 4px; }
+    .move-select ::ng-deep .ng-select-container {
+      border-radius: 8px; min-height: 42px; border-color: #cbd5e1; font-size: 14px;
+    }
+    .move-select.ng-select-focused ::ng-deep .ng-select-container {
+      border-color: #4f46e5; box-shadow: 0 0 0 2px #c7d2fe;
+    }
     .flash {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
       background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 8px;
@@ -1138,6 +1148,15 @@ export class AppComponent implements OnInit {
   // on every row, one misclick from doing that quietly.
   moveUserRow = signal<TenantUser | null>(null);
   moveTarget = signal('');
+
+  // Eligible move targets for the searchable dropdown: active tenants other than
+  // the user's current one. Recomputes when the dialog opens on a different user.
+  moveTargets = computed(() => {
+    const u = this.moveUserRow();
+    return this.rows().filter(
+      (c) => c.company_active && (!u || c.company_id !== u.company_id),
+    );
+  });
 
   isDebugUser(u: TenantUser): boolean {
     return u.email.trim().toLowerCase() === DEBUG_EMAIL;

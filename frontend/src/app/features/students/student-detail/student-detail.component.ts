@@ -645,16 +645,64 @@ export class StudentDetailComponent implements OnInit {
     this.showMonthlyPayDialog = true;
   }
 
+  /**
+   * Collect a payment for the student's NEXT month — the month right after their
+   * latest bill (or next calendar month if they have none). No bill is created
+   * until this is paid: we open the pay dialog on a projected row, and the server
+   * writes the single real bill only when the payment is confirmed. Clicking again
+   * after collecting advances one more month.
+   */
+  collectNextMonth(enrollment: Enrollment) {
+    const bills = this.getMonthlyPayments(enrollment.id);
+    const now = new Date();
+    let key = now.getFullYear() * 12 + (now.getMonth() + 1);
+    let latest: MonthlyPaymentWithDetails | null = null;
+    for (const b of bills) {
+      const k = b.billingYear * 12 + b.billingMonth;
+      if (k > key) key = k;
+      if (!latest || k > latest.billingYear * 12 + latest.billingMonth) latest = b;
+    }
+    const nextKey = key + 1;
+    const y = Math.floor((nextKey - 1) / 12);
+    const m = ((nextKey - 1) % 12) + 1;
+    const synthetic = {
+      ...(latest || {}),
+      id: `proj-${enrollment.id}-${y}-${m}`,
+      enrollmentId: enrollment.id,
+      billingYear: y,
+      billingMonth: m,
+      // Default to the last month's fee, or the enrollment's monthly fee; the
+      // server recomputes the authoritative amount_due (with overrides) on collect.
+      amountDue: latest ? latest.amountDue : (enrollment.finalPrice || 0),
+      amountPaid: 0,
+      paymentStatus: 'PENDING',
+      projected: true,
+    } as MonthlyPaymentWithDetails;
+    this.openMonthlyPayDialog(synthetic);
+  }
+
   submitMonthlyPayment() {
     const payment = this.monthlyForAction();
     if (!payment || !this.monthlyDialogAmount || !this.monthlyDialogDate) return;
     this.actionLoading.set(true);
     const dateStr = this.ymdLocal(this.monthlyDialogDate);
-    this.monthlyService.recordPayment(payment.id, {
-      amount: this.monthlyDialogAmount,
-      paymentDate: dateStr,
-      notes: this.monthlyDialogNotes || undefined,
-    }).subscribe({
+    // A projected next-month row has no real bill — collect() creates it and pays
+    // it at once. A real bill pays through the normal path.
+    const req$ = payment.projected
+      ? this.monthlyService.collect({
+          enrollmentId: payment.enrollmentId,
+          billingYear: payment.billingYear,
+          billingMonth: payment.billingMonth,
+          amount: this.monthlyDialogAmount,
+          paymentDate: dateStr,
+          notes: this.monthlyDialogNotes || undefined,
+        })
+      : this.monthlyService.recordPayment(payment.id, {
+          amount: this.monthlyDialogAmount,
+          paymentDate: dateStr,
+          notes: this.monthlyDialogNotes || undefined,
+        });
+    req$.subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
         this.showMonthlyPayDialog = false;
