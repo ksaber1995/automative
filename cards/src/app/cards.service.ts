@@ -66,7 +66,7 @@ export class CardsService {
   generateCards(companyId: string, req: GenerateCardsRequest): Observable<{ created: number; from: number; to: number }> {
     return this.http.post<{ created: number; from: number; to: number }>(
       `${this.base}/companies/${companyId}/qr-cards`,
-      { count: req.count, poolType: req.poolType, price: req.price },
+      { count: req.count, poolType: req.poolType, price: req.price, startFrom: req.startFrom },
     );
   }
 

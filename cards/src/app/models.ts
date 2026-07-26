@@ -48,6 +48,11 @@ export interface GenerateCardsRequest {
   count: number;
   poolType: number;
   price: number | null;
+  /**
+   * The PRINTED number the run starts at — 500 makes the first card read
+   * "0500". Null continues from the client's last card.
+   */
+  startFrom: number | null;
 }
 
 /** An active client enriched with its card-pool numbers — what the table shows. */

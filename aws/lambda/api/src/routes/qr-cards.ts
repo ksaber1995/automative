@@ -184,6 +184,34 @@ export async function nextCardSerial(companyId: string): Promise<number> {
   return CARD_SERIAL_BASE_V2 + parseInt(row?.lastn ?? '0', 10) + 1;
 }
 
+/**
+ * The lowest card NUMBER already used in [fromN, toN] for this company, or null
+ * when the whole window is free.
+ *
+ * Numbers, not serials: an old "A5" and a new "05" are the same card number in
+ * two different reserved ranges, so checking serials alone would happily mint a
+ * run that prints numbers the academy has already handed out. Used to vet a
+ * caller-chosen start before generate_series walks into an occupied range and
+ * dies on uq_qr_cards_serial with nothing useful to say.
+ */
+export async function firstTakenCardNumber(
+  companyId: string,
+  fromN: number,
+  toN: number,
+): Promise<number | null> {
+  const row = await queryOne<any>(
+    `SELECT MIN(n) AS taken FROM (
+       SELECT CASE WHEN serial >= ${CARD_SERIAL_BASE_V2} THEN serial - ${CARD_SERIAL_BASE_V2}
+                   WHEN serial >  ${CARD_SERIAL_BASE}    THEN serial - ${CARD_SERIAL_BASE}
+                   ELSE serial END AS n
+       FROM qr_cards WHERE company_id = $1
+     ) t WHERE n BETWEEN $2 AND $3`,
+    [companyId, fromN, toN],
+  );
+  const taken = row?.taken;
+  return taken === null || taken === undefined ? null : parseInt(taken, 10);
+}
+
 function mapCard(row: any) {
   return {
     id: row.id,

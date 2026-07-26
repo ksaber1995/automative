@@ -15,7 +15,8 @@ import { AdminQrCard } from './models';
  * number that resolves to nothing, printed on physical plastic.
  */
 const CARD_SERIAL_BASE = 100000;
-const CARD_SERIAL_BASE_V2 = 900000;
+/** Exported so a chosen start number can be previewed as the label it will print. */
+export const CARD_SERIAL_BASE_V2 = 900000;
 
 export function serialLabel(serial: number): string {
   if (!Number.isFinite(serial)) return String(serial);

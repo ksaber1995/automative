@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { ensureQrCardSchema, nextCardSerial } from './qr-cards';
+import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_BASE_V2 } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
 
@@ -318,7 +318,7 @@ export const adminSecretRoutes = {
    */
   generateQrCards: async ({ params, body }: {
     params: { companyId: string };
-    body: { count: number; poolType?: number; price?: number | null };
+    body: { count: number; poolType?: number; price?: number | null; startFrom?: number | null };
   }) => {
     try {
       await ensureQrCardSchema();
@@ -349,7 +349,28 @@ export const adminSecretRoutes = {
 
       // New cards mint in the V2 range and print "0N"; the number continues from
       // the last card. The reserved range keeps serials clear of student codes.
-      const from = await nextCardSerial(params.companyId);
+      //
+      // startFrom overrides where the run begins — the printed number, not the
+      // serial, so "500" means the first card reads 0500. Academies ask for this
+      // to start a batch on a round number, or to leave room after cards they
+      // already hold. The whole window is checked first: walking into occupied
+      // numbers would otherwise die on uq_qr_cards_serial as a bare 500.
+      let from = await nextCardSerial(params.companyId);
+      const rawStart = body?.startFrom;
+      if (rawStart !== undefined && rawStart !== null && String(rawStart) !== '') {
+        const startN = Math.floor(Number(rawStart));
+        if (!Number.isFinite(startN) || startN < 1 || startN > 999999) {
+          return { status: 400 as const, body: { message: 'startFrom must be between 1 and 999999' } };
+        }
+        const taken = await firstTakenCardNumber(params.companyId, startN, startN + count - 1);
+        if (taken !== null) {
+          return {
+            status: 400 as const,
+            body: { message: `Card ${taken} already exists — choose a start that leaves the whole run free` },
+          };
+        }
+        from = CARD_SERIAL_BASE_V2 + startN;
+      }
 
       const rows = await query<any>(
         `INSERT INTO qr_cards (company_id, token, serial, pool_type, price)

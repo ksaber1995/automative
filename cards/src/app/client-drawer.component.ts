@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { PoolBarComponent } from './pool-bar.component';
 import { CardsService } from './cards.service';
 import { AdminQrCard, CardStatus, ClientRow } from './models';
-import { downloadCardsZip, serialLabel } from './card-export.util';
+import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-export.util';
 
 /**
  * Full-screen detail panel for one client: its pool numbers, the card list, and
@@ -72,6 +72,10 @@ import { downloadCardsZip, serialLabel } from './card-export.util';
                 <span>Price per card</span>
                 <input type="number" min="0" step="0.01" placeholder="not recorded" [(ngModel)]="newPrice" />
               </label>
+              <label>
+                <span>Start at</span>
+                <input type="number" min="1" max="999999" placeholder="continue" [(ngModel)]="newStartFrom" />
+              </label>
               <button class="primary" [disabled]="generating()" (click)="generate()">
                 {{ generating() ? 'Generating…' : 'Generate' }}
               </button>
@@ -81,6 +85,14 @@ import { downloadCardsZip, serialLabel } from './card-export.util';
                 <strong>{{ (newCount * newPrice) | number }}</strong> for this bundle</p>
             } @else {
               <p class="hint">Leave price empty to record nothing — that is not the same as free.</p>
+            }
+            @if (rangePreview(); as r) {
+              <p class="hint">This run prints <strong>{{ r }}</strong>.</p>
+            } @else {
+              <p class="hint">Leave “start at” empty to carry on from this client's last card.</p>
+            }
+            @if (genError(); as e) {
+              <p class="hint err">{{ e }}</p>
             }
           </section>
 
@@ -220,6 +232,8 @@ import { downloadCardsZip, serialLabel } from './card-export.util';
       border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 150px;
     }
     .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+    /* A refused run is the one message here that must not read as a footnote. */
+    .hint.err { color: #d03b3b; font-weight: 600; }
 
     button {
       font: inherit; color: var(--text); background: var(--page);
@@ -295,6 +309,10 @@ export class ClientDrawerComponent {
   newCount = 100;
   newPoolType = 1;
   newPrice: number | null = null;
+  /** Printed number the run starts at; null carries on from the last card. */
+  newStartFrom: number | null = null;
+  /** Why the last mint was refused — a taken range has to be said out loud. */
+  protected genError = signal<string | null>(null);
 
   protected label = serialLabel;
 
@@ -336,27 +354,60 @@ export class ClientDrawerComponent {
     });
   }
 
+  /**
+   * The chosen start as a number, or null when the field is left empty (carry on
+   * from the last card). Blank and nonsense both read as "not chosen".
+   */
+  private startNumber(): number | null {
+    if (this.newStartFrom === null || String(this.newStartFrom).trim() === '') return null;
+    const n = Math.floor(Number(this.newStartFrom));
+    return Number.isFinite(n) && n >= 1 ? n : null;
+  }
+
+  /**
+   * What this run will actually print — "0500 – 0599" — so the operator sees the
+   * label, not the raw number they typed. Null while no start is chosen.
+   */
+  protected rangePreview(): string | null {
+    const start = this.startNumber();
+    const count = Math.floor(Number(this.newCount));
+    if (start === null || !Number.isFinite(count) || count < 1) return null;
+    const first = serialLabel(CARD_SERIAL_BASE_V2 + start);
+    if (count === 1) return first;
+    return `${first} – ${serialLabel(CARD_SERIAL_BASE_V2 + start + count - 1)}`;
+  }
+
   protected generate(): void {
     const c = this.client();
     if (!c) return;
     const count = Math.floor(Number(this.newCount));
     if (!Number.isFinite(count) || count < 1 || count > 2000) return;
 
+    this.genError.set(null);
     this.generating.set(true);
     this.service.generateCards(c.id, {
       count,
       poolType: Number(this.newPoolType) || 1,
       price: this.newPrice === null || String(this.newPrice) === '' ? null : Number(this.newPrice),
+      startFrom: this.startNumber(),
     }).subscribe({
       next: () => {
         this.generating.set(false);
+        // The run landed where it was asked to; a stale start would silently
+        // re-mint the same window on the next click.
+        this.newStartFrom = null;
         // A fresh run is unprinted, so show the tab it landed in.
         this.view.set('unprinted');
         this.loadCards(c.id, 'unprinted');
         this.refreshCounts(c.id);
         this.changed.emit();
       },
-      error: () => this.generating.set(false),
+      // The server refuses a start that overlaps cards already minted — say which
+      // number clashed, or the operator just sees the button stop spinning.
+      error: (err) => {
+        this.generating.set(false);
+        this.genError.set(err?.error?.message || 'Could not generate this run.');
+      },
     });
   }
 

@@ -5273,6 +5273,10 @@ export const contract = c.router({
         // Price per card for this run (migration 077). Omitted stays NULL —
         // "not recorded", which is not the same as free.
         price: z.number().min(0).nullable().optional(),
+        // Where the run's PRINTED numbers begin — 500 makes the first card read
+        // "0500". Omitted continues from the last card, as it always has. The
+        // server refuses a window that overlaps numbers already minted.
+        startFrom: z.number().int().min(1).max(999999).nullable().optional(),
       }),
       responses: {
         200: z.object({
