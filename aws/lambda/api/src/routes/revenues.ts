@@ -425,11 +425,25 @@ export const revenuesRoutes = {
       const REFUND_BRANCH = 'COALESCE(er.branch_id, mer.branch_id, psr.branch_id, esr.branch_id, r.branch_id)';
       let refundConditions = 'WHERE r.company_id = $1';
 
+      // Placeholder positions are captured where the value is PUSHED. They used
+      // to be recovered further down with params.indexOf(value), which silently
+      // collapses when two params hold the same string: a single-day range
+      // (startDate === endDate, i.e. the Today preset) made both resolve to the
+      // first one, so the by-branch query never referenced $3 while three params
+      // were still bound — "bind message supplies 3 parameters, but prepared
+      // statement requires 2", and the whole summary 500'd.
+      let branchIdx: number | null = null;
+      let startIdx: number | null = null;
+      let endIdx: number | null = null;
+      /** A multi-branch admin's branch filter, as an SQL fragment with a __COL__ hole. */
+      let branchTemplate: string | null = null;
+
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
         }
         params.push(queryParams.branchId);
+        branchIdx = params.length;
         enrollmentConditions += ` AND e.branch_id = $${params.length}`;
         productConditions += ` AND ps.branch_id = $${params.length}`;
         masterConditions += ` AND me.branch_id = $${params.length}`;
@@ -441,6 +455,8 @@ export const revenuesRoutes = {
       } else {
         const branchClause = appendBranchSqlFilter(context, params, '__COL__');
         if (branchClause) {
+          // Kept so the by-branch query can reuse these same placeholders.
+          branchTemplate = branchClause;
           enrollmentConditions += ` AND ${branchClause.replace(/__COL__/g, 'e.branch_id')}`;
           productConditions += ` AND ${branchClause.replace(/__COL__/g, 'ps.branch_id')}`;
           masterConditions += ` AND ${branchClause.replace(/__COL__/g, 'me.branch_id')}`;
@@ -455,6 +471,7 @@ export const revenuesRoutes = {
       if (queryParams.startDate) {
         params.push(queryParams.startDate);
         const paramIndex = params.length;
+        startIdx = paramIndex;
         enrollmentConditions += ` AND e.enrollment_date >= $${paramIndex}`;
         productConditions += ` AND ps.sale_date >= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date >= $${paramIndex}`;
@@ -468,6 +485,7 @@ export const revenuesRoutes = {
       if (queryParams.endDate) {
         params.push(queryParams.endDate);
         const paramIndex = params.length;
+        endIdx = paramIndex;
         enrollmentConditions += ` AND e.enrollment_date <= $${paramIndex}`;
         productConditions += ` AND ps.sale_date <= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date <= $${paramIndex}`;
@@ -528,18 +546,18 @@ export const revenuesRoutes = {
         ${refundConditions}
       `;
 
-      // Get revenue by branch (three LEFT JOINs summed)
-      const startIdx = queryParams.startDate ? params.indexOf(queryParams.startDate) + 1 : null;
-      const endIdx = queryParams.endDate ? params.indexOf(queryParams.endDate) + 1 : null;
-      const branchIdx = queryParams.branchId ? params.indexOf(queryParams.branchId) + 1 : null;
+      // Get revenue by branch (three LEFT JOINs summed).
+      // startIdx / endIdx / branchIdx were captured at push time above.
       // For multi-branch admins with no explicit branchId filter, scope the
       // by-branch breakdown to their assigned branches. Push fresh params so
       // we don't have to chase indices through the param array above.
-      let adminBranchClause = '';
-      if (!queryParams.branchId) {
-        const adminClause = appendBranchSqlFilter(context, params, 'b.id');
-        if (adminClause) adminBranchClause = ` AND ${adminClause}`;
-      }
+      // Reuses the placeholders pushed above rather than appending a second copy
+      // of the same branch list. Pushing again left every OTHER query in this
+      // handler bound to params it never referenced, which Postgres rejects
+      // outright — so the summary 500'd for any branch-scoped admin.
+      const adminBranchClause = !queryParams.branchId && branchTemplate
+        ? ` AND ${branchTemplate.replace(/__COL__/g, 'b.id')}`
+        : '';
 
       const byBranchQuery = `
         SELECT
