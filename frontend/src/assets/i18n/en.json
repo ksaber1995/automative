@@ -3427,6 +3427,7 @@
       "SUMMARY_REFUNDED": "Refunded",
       "SUMMARY_GROSS": "Collected:",
       "SUMMARY_BY_SOURCE": "By source",
+      "SUMMARY_BY_MONTH": "By month",
       "SUMMARY_BY_BRANCH": "By branch",
       "AUTO_HINT": "Revenues are automatically generated from course enrollments and product sales",
       "PRESET_TODAY": "Today",

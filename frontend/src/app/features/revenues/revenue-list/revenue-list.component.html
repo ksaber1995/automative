@@ -116,6 +116,75 @@
           </div>
         }
 
+        @if (monthPlot(); as plot) {
+          <div class="mt-5">
+            <div class="text-xs font-medium text-gray-500 mb-2">{{ 'REVENUES.LIST.SUMMARY_BY_MONTH' | translate }}</div>
+            <div class="rounded-lg border border-gray-200 bg-white px-3 pt-3 pb-2">
+              <div class="flex gap-2">
+                <!-- Y ticks: the values not directly labelled are read off these. -->
+                <div class="relative w-14 shrink-0 text-[10px] text-gray-400 tabular-nums" style="height: 160px">
+                  <span class="absolute end-0 -translate-y-1/2" style="top: 0">{{ plot.axisMax | amount: 0 }}</span>
+                  <span class="absolute end-0 -translate-y-1/2" [style.top.%]="plot.posShare">0</span>
+                  @if (plot.axisMin < 0) {
+                    <span class="absolute end-0 -translate-y-1/2" style="top: 100%">{{ plot.axisMin | amount: 0 }}</span>
+                  }
+                </div>
+
+                <div class="relative flex-1" style="height: 160px">
+                  <!-- Hairline gridlines, recessive, behind the marks. -->
+                  <div class="absolute inset-x-0" style="top: 0; border-top: 1px solid #e1e0d9"></div>
+                  <div class="absolute inset-x-0" [style.top.%]="plot.posShare" style="border-top: 1px solid #c3c2b7"></div>
+
+                  <div class="absolute inset-0 flex items-stretch">
+                    @for (bar of plot.bars; track bar.key) {
+                      <!-- The whole slot is the hit target, not just the mark. -->
+                      <div
+                        class="flex-1 flex flex-col min-w-0"
+                        [pTooltip]="bar.title + ' — ' + (bar.value | amount)"
+                        tooltipPosition="top"
+                      >
+                        <div class="flex flex-col justify-end px-[2px]" [style.height.%]="plot.posShare">
+                          <!-- Only where a column is wide enough for the number to
+                               fit whole. Narrower than that, the axis and the hover
+                               tooltip carry it — a clipped value is worse than none. -->
+                          @if (bar.labelled && bar.value > 0) {
+                            <div class="hidden lg:block text-[10px] text-gray-500 text-center whitespace-nowrap mb-0.5">{{ bar.value | amount: 0 }}</div>
+                          }
+                          <div
+                            class="w-full max-w-[24px] mx-auto rounded-t-[4px]"
+                            [style.height.%]="bar.posPct"
+                            style="background-color: #2a78d6"
+                          ></div>
+                        </div>
+                        <div class="flex flex-col justify-start px-[2px]" [style.height.%]="100 - plot.posShare">
+                          <div
+                            class="w-full max-w-[24px] mx-auto rounded-b-[4px]"
+                            [style.height.%]="bar.negPct"
+                            style="background-color: #e34948"
+                          ></div>
+                          @if (bar.labelled && bar.value < 0) {
+                            <div class="hidden lg:block text-[10px] text-gray-500 text-center whitespace-nowrap mt-0.5">{{ bar.value | amount: 0 }}</div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <!-- Month axis, aligned to the same gutter as the plot. -->
+              <div class="flex gap-2 mt-1">
+                <div class="w-14 shrink-0"></div>
+                <div class="flex-1 flex">
+                  @for (bar of plot.bars; track bar.key) {
+                    <div class="flex-1 min-w-0 text-[10px] text-gray-400 text-center truncate">{{ bar.label }}</div>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         @if (!authService.isTeacher() && sum.byBranch.length > 1) {
           <div class="mt-5">
             <div class="text-xs font-medium text-gray-500 mb-2">{{ 'REVENUES.LIST.SUMMARY_BY_BRANCH' | translate }}</div>

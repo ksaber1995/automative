@@ -6,6 +6,7 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 import { RevenueService, RevenueItem, RevenueSource, RevenueSummary } from '../services/revenue.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -17,7 +18,7 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 @Component({
   selector: 'app-revenue-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TranslateModule,
+  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TooltipModule, TranslateModule,
     AmountPipe,
   ],
   templateUrl: './revenue-list.component.html',
@@ -72,6 +73,70 @@ export class RevenueListComponent implements OnInit {
   grossRevenue = computed<number>(() => {
     const s = this.summary();
     return s ? s.totalRevenue + s.totalRefunds : 0;
+  });
+
+  /** Round a value up to a clean axis number (1 / 2 / 2.5 / 5 × a power of ten). */
+  private niceCeil(n: number): number {
+    if (n <= 0) return 0;
+    const mag = Math.pow(10, Math.floor(Math.log10(n)));
+    const step = [1, 2, 2.5, 5, 10].find(s => n <= s * mag) ?? 10;
+    return step * mag;
+  }
+
+  /**
+   * The by-month columns, oldest first (the API returns newest first).
+   *
+   * A month can be NEGATIVE now that refunds are netted — more given back than
+   * taken in — so the plot has a zero baseline with a downward arm, sized only
+   * when something is actually below it. Months with no money at all are absent
+   * from the API; they're filled back in as zeros, because a gap silently closed
+   * would put January next to March and read as consecutive.
+   *
+   * Empty below two buckets: one column is not a trend.
+   */
+  monthPlot = computed<{
+    axisMax: number;
+    axisMin: number;
+    posShare: number;
+    bars: { key: string; label: string; title: string; value: number; posPct: number; negPct: number; labelled: boolean }[];
+  } | null>(() => {
+    const s = this.summary();
+    if (!s || s.byMonth.length < 2) return null;
+
+    const byKey = new Map(s.byMonth.map(m => [m.month, m.revenue]));
+    const keys = [...byKey.keys()].sort();
+    const [firstY, firstM] = keys[0].split('-').map(Number);
+    const [lastY, lastM] = keys[keys.length - 1].split('-').map(Number);
+
+    const rows: { key: string; date: Date; value: number }[] = [];
+    for (let k = firstY * 12 + (firstM - 1); k <= lastY * 12 + (lastM - 1); k++) {
+      const date = new Date(Math.floor(k / 12), k % 12, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      rows.push({ key, date, value: byKey.get(key) ?? 0 });
+    }
+
+    const axisMax = this.niceCeil(Math.max(0, ...rows.map(r => r.value)));
+    const axisMin = -this.niceCeil(Math.max(0, ...rows.map(r => -r.value)));
+    const span = (axisMax - axisMin) || 1;
+    // The extreme and the latest month get a direct label; the rest are carried
+    // by the axis and the hover tooltip — a number on every column reads as noise.
+    const peakKey = rows.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a)).key;
+    const lastKey = rows[rows.length - 1].key;
+
+    return {
+      axisMax,
+      axisMin,
+      posShare: (axisMax / span) * 100,
+      bars: rows.map(r => ({
+        key: r.key,
+        label: r.date.toLocaleDateString('en-US', { month: 'short' }),
+        title: `${r.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+        value: r.value,
+        posPct: r.value > 0 && axisMax > 0 ? (r.value / axisMax) * 100 : 0,
+        negPct: r.value < 0 && axisMin < 0 ? (r.value / axisMin) * 100 : 0,
+        labelled: r.key === peakKey || r.key === lastKey,
+      })),
+    };
   });
 
   ngOnInit() {

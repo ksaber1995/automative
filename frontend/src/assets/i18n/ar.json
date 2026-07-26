@@ -3551,6 +3551,7 @@
       "SUMMARY_REFUNDED": "المسترد",
       "SUMMARY_GROSS": "المُحصَّل:",
       "SUMMARY_BY_SOURCE": "حسب المصدر",
+      "SUMMARY_BY_MONTH": "حسب الشهر",
       "SUMMARY_BY_BRANCH": "حسب الفرع",
       "AUTO_HINT": "تُولَّد الإيرادات تلقائياً من تسجيلات الكورسات ومبيعات المنتجات",
       "PRESET_TODAY": "اليوم",
