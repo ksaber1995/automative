@@ -1301,6 +1301,41 @@ CREATE TRIGGER update_monthly_subscription_payments_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
+-- MONTHLY SUBSCRIPTION INSTALLMENTS  (migration 079)
+-- One row per COLLECTION against a monthly bill. The bill above holds a single
+-- cumulative amount_paid and a single paid_date, so a second installment used to
+-- move the whole collected amount onto the later date (100 on the 19th + 200 on
+-- the 26th read as 300 on the 26th). Every date-bucketed revenue read sums these
+-- rows; the bill keeps amount_paid/paid_date as denormalised status.
+-- Refunds do not touch this table — amount_paid stays gross and refunds are
+-- subtracted from the refunds table by refund_date.
+-- =============================================
+CREATE TABLE monthly_subscription_installments (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    monthly_payment_id UUID NOT NULL REFERENCES monthly_subscription_payments(id) ON DELETE CASCADE,
+    company_id         UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
+    enrollment_id      UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    student_id         UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
+    course_id          UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
+    amount             DECIMAL(10, 2) NOT NULL,
+    payment_date       DATE NOT NULL,
+    notes              TEXT,
+    -- TRUE only for a row synthesised from a bill that was already paid when the
+    -- ledger was introduced (whole amount_paid on the bill's last paid_date).
+    is_backfill        BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_msi_payment_id   ON monthly_subscription_installments(monthly_payment_id);
+CREATE INDEX idx_msi_company_date ON monthly_subscription_installments(company_id, payment_date);
+CREATE INDEX idx_msi_branch_id    ON monthly_subscription_installments(branch_id);
+CREATE INDEX idx_msi_student_id   ON monthly_subscription_installments(student_id);
+CREATE INDEX idx_msi_course_id    ON monthly_subscription_installments(course_id);
+CREATE UNIQUE INDEX uq_msi_backfill
+    ON monthly_subscription_installments(monthly_payment_id) WHERE is_backfill;
+
+-- =============================================
 -- COURSE MONTHLY PRICE OVERRIDES TABLE  (migration 042)
 -- Allows teachers to override the price of a monthly-subscription course
 -- for a specific month. Student amounts scale proportionally.
@@ -1355,6 +1390,38 @@ CREATE INDEX idx_spkg_course_id     ON session_packages(course_id);
 CREATE INDEX idx_spkg_branch_id     ON session_packages(branch_id);
 CREATE INDEX idx_spkg_status        ON session_packages(status);
 
+-- =============================================
+-- SESSION PACKAGE INSTALLMENTS  (migration 079)
+-- One row per COLLECTION against a prepaid bundle: the money taken at purchase
+-- and every later top-up. A package has no "last paid" column — purchased_at is
+-- the purchase day and never moves — so summing amount_paid against it booked a
+-- top-up back onto a day that had already been reported. Date-bucketed revenue
+-- reads sum these rows instead; amount_paid stays the settled-so-far total that
+-- the remaining balance is computed from.
+-- =============================================
+CREATE TABLE session_package_installments (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_package_id UUID NOT NULL REFERENCES session_packages(id) ON DELETE CASCADE,
+    company_id         UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
+    enrollment_id      UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    student_id         UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
+    course_id          UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
+    amount             DECIMAL(10, 2) NOT NULL,
+    payment_date       DATE NOT NULL,
+    notes              TEXT,
+    is_backfill        BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pki_package_id   ON session_package_installments(session_package_id);
+CREATE INDEX idx_pki_company_date ON session_package_installments(company_id, payment_date);
+CREATE INDEX idx_pki_branch_id    ON session_package_installments(branch_id);
+CREATE INDEX idx_pki_student_id   ON session_package_installments(student_id);
+CREATE INDEX idx_pki_course_id    ON session_package_installments(course_id);
+CREATE UNIQUE INDEX uq_pki_backfill
+    ON session_package_installments(session_package_id) WHERE is_backfill;
+
 CREATE TRIGGER update_session_packages_updated_at
     BEFORE UPDATE ON session_packages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -1402,6 +1469,38 @@ CREATE INDEX idx_sp_payment_status ON session_payments(payment_status);
 CREATE TRIGGER update_session_payments_updated_at
     BEFORE UPDATE ON session_payments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- SESSION PAYMENT INSTALLMENTS  (migration 079)
+-- One row per COLLECTION against a per-session charge — same reason as
+-- monthly_subscription_installments above: the charge holds one cumulative
+-- amount_paid and one paid_date, so a part payment followed by the rest booked
+-- all of it on the later date. Date-bucketed revenue reads sum these rows.
+-- COVERED charges carry amount_paid = 0 (their money is on the package row), so
+-- they never appear here.
+-- =============================================
+CREATE TABLE session_payment_installments (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_payment_id UUID NOT NULL REFERENCES session_payments(id) ON DELETE CASCADE,
+    company_id         UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
+    enrollment_id      UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    student_id         UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
+    course_id          UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
+    amount             DECIMAL(10, 2) NOT NULL,
+    payment_date       DATE NOT NULL,
+    notes              TEXT,
+    is_backfill        BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_spi_payment_id   ON session_payment_installments(session_payment_id);
+CREATE INDEX idx_spi_company_date ON session_payment_installments(company_id, payment_date);
+CREATE INDEX idx_spi_branch_id    ON session_payment_installments(branch_id);
+CREATE INDEX idx_spi_student_id   ON session_payment_installments(student_id);
+CREATE INDEX idx_spi_course_id    ON session_payment_installments(course_id);
+CREATE UNIQUE INDEX uq_spi_backfill
+    ON session_payment_installments(session_payment_id) WHERE is_backfill;
 
 -- =============================================
 -- EXAMS TABLES

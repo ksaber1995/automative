@@ -3,6 +3,7 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { apiError, mapThrownError } from '../utils/api-error';
 import { insertProductSaleWithClient } from './product-sales';
 import { ensurePerSessionSchema } from './session-payments';
+import { ensureMonthlyInstallmentLedger, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -60,6 +61,10 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
   const payFirstMonth = !!body.payFirstMonth;
   const notes = body.notes || null;
   const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
+
+  // The first-month collection below writes an installment row — get the ledger in
+  // place before opening the transaction (DDL and money in one txn is asking for it).
+  await ensureMonthlyInstallmentLedger();
 
   // Use a transaction when products are involved (atomic enrollment + product sales).
   const client = buyProducts.length > 0 ? await getClient() : null;
@@ -195,6 +200,23 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
       } else {
         await query(payQuery, args);
       }
+      // Same money, recorded as one dated collection so the rest of the first
+      // month (paid later) can't drag this down payment onto its date. null date
+      // = CURRENT_DATE, matching the stamp above rather than a UTC "today".
+      await recordMonthlyInstallment(
+        {
+          id: firstBillId,
+          company_id: context.companyId,
+          enrollment_id: enrollment.id,
+          student_id: body.studentId,
+          course_id: body.courseId,
+          branch_id: body.branchId,
+        },
+        collect,
+        null,
+        note,
+        client ? (sql, p) => client.query(sql, p) : undefined,
+      );
     }
 
     if (client) await client.query('COMMIT');
@@ -273,13 +295,30 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
     // (full now / part now / later). Any remainder is collectible from the
     // Session Payments dashboard's Packages view.
     if (wantsPackage && packageSize && packageSize > 0) {
-      await client.query(
+      const pkgNote = 'Package purchased at enrollment';
+      const pkgRes = await client.query(
         `INSERT INTO session_packages
            (enrollment_id, company_id, student_id, course_id, branch_id,
             sessions_total, sessions_used, amount_due, amount_paid, status, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,'ACTIVE',$9)`,
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,'ACTIVE',$9) RETURNING id`,
         [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId,
-         packageSize, packageDue, packagePaid, 'Package purchased at enrollment']
+         packageSize, packageDue, packagePaid, pkgNote]
+      );
+      // Anything collected now is the package's first dated installment; a LATER
+      // pay mode collects 0 and records nothing until the money actually arrives.
+      await recordPackageInstallment(
+        {
+          id: pkgRes.rows[0].id,
+          company_id: context.companyId,
+          enrollment_id: enrollment.id,
+          student_id: body.studentId,
+          course_id: body.courseId,
+          branch_id: body.branchId,
+        },
+        packagePaid,
+        null,
+        pkgNote,
+        (sql, p) => client.query(sql, p),
       );
     }
 

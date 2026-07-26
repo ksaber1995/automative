@@ -8,6 +8,7 @@ import {
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensurePerSessionSchema } from './session-payments';
+import { ensureMonthlyInstallmentLedger } from '../db/payment-ledger';
 
 type AuthHeaders = { authorization: string };
 type RangeQuery = { startDate?: string; endDate?: string; branchId?: string };
@@ -122,6 +123,7 @@ export const reportsRoutes = {
       // session_packages / session_payments are created lazily — make sure they
       // exist before the session_rev CTE references them.
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -163,30 +165,43 @@ export const reportsRoutes = {
              AND enrollment_date >= $2 AND enrollment_date <= $3 ${branchClause}
            GROUP BY 1
          ),
+         -- Subscription money is dated per collection (installment ledger), not by
+         -- the bill's last paid_date — otherwise a month's first payment jumps into
+         -- the month the rest was collected in. See db/payment-ledger.ts.
          sub_rev AS (
-           SELECT date_trunc('month', paid_date)::date AS m, SUM(amount_paid) AS amt
-           FROM monthly_subscription_payments
-           WHERE company_id = $1 AND amount_paid > 0
-             AND paid_date >= $2 AND paid_date <= $3 ${branchClause}
+           SELECT date_trunc('month', payment_date)::date AS m, SUM(amount) AS amt
+           FROM monthly_subscription_installments
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${branchClause}
            GROUP BY 1
          ),
          -- Per-session money: prepaid packages + pay-as-you-go charges. COVERED
          -- charges carry amount_paid = 0, so the two never double-count.
          session_rev AS (
            SELECT m, SUM(amt) AS amt FROM (
-             SELECT date_trunc('month', purchased_at)::date AS m, SUM(amount_paid) AS amt
-             FROM session_packages
-             WHERE company_id = $1 AND amount_paid > 0
-               AND purchased_at::date >= $2 AND purchased_at::date <= $3 ${branchClause}
+             SELECT date_trunc('month', payment_date)::date AS m, SUM(amount) AS amt
+             FROM session_package_installments
+             WHERE company_id = $1 AND amount > 0
+               AND payment_date >= $2 AND payment_date <= $3 ${branchClause}
              GROUP BY 1
              UNION ALL
-             SELECT date_trunc('month', COALESCE(paid_date, created_at::date))::date AS m, SUM(amount_paid) AS amt
-             FROM session_payments
-             WHERE company_id = $1 AND amount_paid > 0
-               AND COALESCE(paid_date, created_at::date) >= $2
-               AND COALESCE(paid_date, created_at::date) <= $3 ${branchClause}
+             SELECT date_trunc('month', payment_date)::date AS m, SUM(amount) AS amt
+             FROM session_payment_installments
+             WHERE company_id = $1 AND amount > 0
+               AND payment_date >= $2 AND payment_date <= $3 ${branchClause}
              GROUP BY 1
            ) u GROUP BY m
+         ),
+         -- Event money was absent from this P&L altogether, so a month with event
+         -- income under-reported both revenue and profit by that amount. Unscoped
+         -- (a company P&L) this includes company-wide events; branch-scoped, the
+         -- IN (...) filter drops them, which is what a branch P&L should show.
+         event_rev AS (
+           SELECT date_trunc('month', payment_date)::date AS m, SUM(amount) AS amt
+           FROM event_subscriptions
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${branchClause}
+           GROUP BY 1
          ),
          refund_amt AS (
            SELECT date_trunc('month', refund_date)::date AS m, SUM(amount) AS amt
@@ -207,6 +222,7 @@ export const reportsRoutes = {
            COALESCE(master_rev.amt, 0) AS master_revenue,
            COALESCE(sub_rev.amt, 0) AS subscription_revenue,
            COALESCE(session_rev.amt, 0) AS session_revenue,
+           COALESCE(event_rev.amt, 0) AS event_revenue,
            COALESCE(refund_amt.amt, 0) AS refunds,
            COALESCE(expense_amt.amt, 0) AS expenses
          FROM months
@@ -215,6 +231,7 @@ export const reportsRoutes = {
          LEFT JOIN master_rev ON master_rev.m = months.month_start
          LEFT JOIN sub_rev ON sub_rev.m = months.month_start
          LEFT JOIN session_rev ON session_rev.m = months.month_start
+         LEFT JOIN event_rev ON event_rev.m = months.month_start
          LEFT JOIN refund_amt ON refund_amt.m = months.month_start
          LEFT JOIN expense_amt ON expense_amt.m = months.month_start
          ORDER BY months.month_start ASC`,
@@ -227,9 +244,13 @@ export const reportsRoutes = {
         const masterRevenue = parseFloat(r.master_revenue);
         const subscriptionRevenue = parseFloat(r.subscription_revenue);
         const sessionRevenue = parseFloat(r.session_revenue);
+        // Subscription and event money have no field of their own on this row (the
+        // client renders a four-source breakdown); both are folded into the total
+        // so revenue and netProfit match the dashboard.
+        const eventRevenue = parseFloat(r.event_revenue || '0');
         const refunds = parseFloat(r.refunds);
         const expenses = parseFloat(r.expenses);
-        const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue - refunds;
+        const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue + eventRevenue - refunds;
         return {
           month: r.month,
           enrollmentRevenue,
@@ -303,6 +324,7 @@ export const reportsRoutes = {
       const context = await extractTenantContext(headers.authorization);
       // Revenue subqueries reference the lazily-created per-session tables.
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -327,16 +349,15 @@ export const reportsRoutes = {
              -- old SUM(amount_paid) alone showed the course price for one-time
              -- enrollments and 0 for monthly/per-session courses.
              COALESCE(SUM(e.amount_paid), 0)
-               + COALESCE((SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
-                   WHERE msp.course_id = c.id AND msp.company_id = $1 AND msp.amount_paid > 0
-                     AND msp.paid_date >= $2 AND msp.paid_date <= $3), 0)
-               + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp
-                   WHERE sp.course_id = c.id AND sp.company_id = $1 AND sp.amount_paid > 0
-                     AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
-                     AND COALESCE(sp.paid_date, sp.created_at::date) <= $3), 0)
-               + COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg
-                   WHERE spkg.course_id = c.id AND spkg.company_id = $1 AND spkg.amount_paid > 0
-                     AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3), 0)
+               + COALESCE((SELECT SUM(msi.amount) FROM monthly_subscription_installments msi
+                   WHERE msi.course_id = c.id AND msi.company_id = $1 AND msi.amount > 0
+                     AND msi.payment_date >= $2 AND msi.payment_date <= $3), 0)
+               + COALESCE((SELECT SUM(spi.amount) FROM session_payment_installments spi
+                   WHERE spi.course_id = c.id AND spi.company_id = $1 AND spi.amount > 0
+                     AND spi.payment_date >= $2 AND spi.payment_date <= $3), 0)
+               + COALESCE((SELECT SUM(pki.amount) FROM session_package_installments pki
+                   WHERE pki.course_id = c.id AND pki.company_id = $1 AND pki.amount > 0
+                     AND pki.payment_date >= $2 AND pki.payment_date <= $3), 0)
                - COALESCE((SELECT SUM(r.amount) FROM refunds r
                    JOIN enrollments e2 ON r.enrollment_id = e2.id
                    WHERE r.company_id = $1 AND e2.course_id = c.id
@@ -527,6 +548,7 @@ export const reportsRoutes = {
       const context = await extractTenantContext(headers.authorization);
       // Revenue subqueries reference the lazily-created per-session tables.
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -547,16 +569,15 @@ export const reportsRoutes = {
              COUNT(e.id) AS enrollments,
              -- Real collected revenue, net of refunds (see topCourses).
              COALESCE(SUM(e.amount_paid), 0)
-               + COALESCE((SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
-                   WHERE msp.course_id = c.id AND msp.company_id = $1 AND msp.amount_paid > 0
-                     AND msp.paid_date >= $2 AND msp.paid_date <= $3), 0)
-               + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp
-                   WHERE sp.course_id = c.id AND sp.company_id = $1 AND sp.amount_paid > 0
-                     AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
-                     AND COALESCE(sp.paid_date, sp.created_at::date) <= $3), 0)
-               + COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg
-                   WHERE spkg.course_id = c.id AND spkg.company_id = $1 AND spkg.amount_paid > 0
-                     AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3), 0)
+               + COALESCE((SELECT SUM(msi.amount) FROM monthly_subscription_installments msi
+                   WHERE msi.course_id = c.id AND msi.company_id = $1 AND msi.amount > 0
+                     AND msi.payment_date >= $2 AND msi.payment_date <= $3), 0)
+               + COALESCE((SELECT SUM(spi.amount) FROM session_payment_installments spi
+                   WHERE spi.course_id = c.id AND spi.company_id = $1 AND spi.amount > 0
+                     AND spi.payment_date >= $2 AND spi.payment_date <= $3), 0)
+               + COALESCE((SELECT SUM(pki.amount) FROM session_package_installments pki
+                   WHERE pki.course_id = c.id AND pki.company_id = $1 AND pki.amount > 0
+                     AND pki.payment_date >= $2 AND pki.payment_date <= $3), 0)
                - COALESCE((SELECT SUM(r.amount) FROM refunds r
                    JOIN enrollments e2 ON r.enrollment_id = e2.id
                    WHERE r.company_id = $1 AND e2.course_id = c.id
@@ -625,6 +646,7 @@ export const reportsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'reports', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -657,24 +679,32 @@ export const reportsRoutes = {
                AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            ), 0) AS master_revenue,
            COALESCE((
-             SELECT SUM(msp.amount_paid) FROM monthly_subscription_payments msp
-             WHERE msp.branch_id = b.id AND msp.company_id = $1
-               AND msp.amount_paid > 0
-               AND msp.paid_date >= $2 AND msp.paid_date <= $3
+             SELECT SUM(msi.amount) FROM monthly_subscription_installments msi
+             WHERE msi.branch_id = b.id AND msi.company_id = $1
+               AND msi.amount > 0
+               AND msi.payment_date >= $2 AND msi.payment_date <= $3
            ), 0) AS subscription_revenue,
            -- Per-session revenue: prepaid packages + pay-as-you-go charges
            COALESCE((
-             SELECT SUM(spkg.amount_paid) FROM session_packages spkg
-             WHERE spkg.branch_id = b.id AND spkg.company_id = $1
-               AND spkg.amount_paid > 0
-               AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3
+             SELECT SUM(pki.amount) FROM session_package_installments pki
+             WHERE pki.branch_id = b.id AND pki.company_id = $1
+               AND pki.amount > 0
+               AND pki.payment_date >= $2 AND pki.payment_date <= $3
            ), 0) + COALESCE((
-             SELECT SUM(sp.amount_paid) FROM session_payments sp
-             WHERE sp.branch_id = b.id AND sp.company_id = $1
-               AND sp.amount_paid > 0
-               AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
-               AND COALESCE(sp.paid_date, sp.created_at::date) <= $3
+             SELECT SUM(spi.amount) FROM session_payment_installments spi
+             WHERE spi.branch_id = b.id AND spi.company_id = $1
+               AND spi.amount > 0
+               AND spi.payment_date >= $2 AND spi.payment_date <= $3
            ), 0) AS session_revenue,
+           -- Event revenue for this branch. A company-wide event carries no
+           -- branch_id and so lands in no branch row: this report has no company
+           -- row to hold it (the dashboard's unallocated bucket does).
+           COALESCE((
+             SELECT SUM(es.amount) FROM event_subscriptions es
+             WHERE es.branch_id = b.id AND es.company_id = $1
+               AND es.amount > 0
+               AND es.payment_date >= $2 AND es.payment_date <= $3
+           ), 0) AS event_revenue,
            -- Refunds attributable to this branch. Most refunds have a NULL
            -- branch_id and are linked via enrollment / master enrollment /
            -- product sale / event subscription, so attribute through those
@@ -721,9 +751,10 @@ export const reportsRoutes = {
           // the P&L.
           const subscriptionRevenue = parseFloat(r.subscription_revenue);
           const sessionRevenue = parseFloat(r.session_revenue);
+          const eventRevenue = parseFloat(r.event_revenue || '0');
           const refunds = parseFloat(r.refunds);
           const expenses = parseFloat(r.expenses);
-          const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue - refunds;
+          const revenue = enrollmentRevenue + productRevenue + masterRevenue + subscriptionRevenue + sessionRevenue + eventRevenue - refunds;
           return {
             branchId: r.branch_id,
             branchName: r.branch_name,

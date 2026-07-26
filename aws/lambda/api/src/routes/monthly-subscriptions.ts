@@ -1,4 +1,9 @@
 import { insert, query, queryOne } from '../db/connection';
+import {
+  ensureMonthlyInstallmentLedger,
+  recordMonthlyInstallment,
+  clearMonthlyInstallments,
+} from '../db/payment-ledger';
 import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -738,11 +743,12 @@ export const monthlySubscriptionsRoutes = {
   recordPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const row = await queryOne(
+      const row = await queryOne<any>(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
@@ -754,11 +760,18 @@ export const monthlySubscriptionsRoutes = {
 
       const amountDue = parseFloat(row.amount_due);
       const currentPaid = parseFloat(row.amount_paid || 0);
-      const newPaid = currentPaid + parseFloat(body.amount);
+      const pay = parseFloat(body.amount);
+      // Guarded so a malformed request can never desync amount_paid from the
+      // installment ledger below (collect() has always validated the same way).
+      if (!isFinite(pay) || pay <= 0) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.BAD_AMOUNT', 'Payment amount must be greater than zero');
+      }
+      const newPaid = currentPaid + pay;
 
-      // Any cash collected needs a paid_date: dashboard/report revenue is bucketed by
-      // it, so a PARTIAL payment left with a null date is money that never surfaces as
-      // revenue. Stamp both PAID and PARTIAL, defaulting to today when the client omits it.
+      // paid_date is now only "when was this bill last paid" for display/status —
+      // revenue is bucketed by each installment's own date (see the ledger insert
+      // below), so a second payment no longer drags earlier money onto today.
+      // Still stamped for PARTIAL as well as PAID, defaulting to today.
       const effectiveDate = body.paymentDate || new Date().toISOString().split('T')[0];
       let newStatus: string;
       let paidDate: string | null = null;
@@ -779,9 +792,10 @@ export const monthlySubscriptionsRoutes = {
         [newPaid, newStatus, paidDate, body.notes || null, params.id]
       );
 
-      // No separate revenues row is written: the monthly_subscription_payments row
-      // is the single source of truth and is summed directly into dashboard/report
-      // revenue (bucketed by paid_date). This also makes voiding a no-side-effect reset.
+      // Record THIS collection on its own date. No separate revenues row is
+      // written: the ledger is the single source of truth for dated subscription
+      // revenue, and the bill row for status/dues.
+      await recordMonthlyInstallment(row, pay, effectiveDate, body.notes || null);
 
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',
@@ -807,6 +821,7 @@ export const monthlySubscriptionsRoutes = {
   collect: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -892,6 +907,9 @@ export const monthlySubscriptionsRoutes = {
         [newPaid, newStatus, paidDate, notes || null, bill.id]
       );
 
+      // This collection, on its own date — see recordPayment.
+      await recordMonthlyInstallment(bill, pay, effectiveDate, notes || null);
+
       const updated = await queryOne('SELECT * FROM monthly_subscription_payments WHERE id = $1', [bill.id]);
       return { status: 200 as const, body: mapPaymentFromDB(updated) };
     } catch (error) {
@@ -902,11 +920,13 @@ export const monthlySubscriptionsRoutes = {
 
   /** POST /api/monthly-subscriptions/:id/void
    *  Reverse a recorded payment: clears amount_paid and resets the bill to unpaid.
-   *  Because revenue is derived from amount_paid, this removes it from revenue too.
+   *  The installment ledger rows go with it, so every day this money was booked on
+   *  loses it — a void is "this never happened", unlike a refund.
    */
   voidPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensureMonthlyInstallmentLedger();
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -931,6 +951,8 @@ export const monthlySubscriptionsRoutes = {
         [params.id, reason ? 'Voided: ' + reason : 'Payment voided']
       );
 
+      await clearMonthlyInstallments(params.id);
+
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',
         [params.id]
@@ -944,10 +966,12 @@ export const monthlySubscriptionsRoutes = {
   },
 
   /** POST /api/monthly-subscriptions/:id/refund
-   *  Return money to a leaving student. Unlike void (a mistake reset), a refund
-   *  reduces amount_paid by the refunded amount — so revenue (which sums
-   *  amount_paid) nets out — and records the amount + note, marking the bill
-   *  REFUNDED. Optionally stops the underlying subscription (HOLD or CANCEL).
+   *  Return money to a leaving student. Unlike void (a mistake reset, which
+   *  deletes the money), a refund leaves the collected amount and its installment
+   *  rows alone — the cash really was taken on those days — and books the return
+   *  as a refunds row dated when it was handed back, which every revenue read
+   *  subtracts. Records the amount + note and marks the bill REFUNDED.
+   *  Optionally stops the underlying subscription (HOLD or CANCEL).
    *    body: { type: 'FULL'|'PARTIAL', amount?, note?, subscriptionAction? }
    */
   refund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {

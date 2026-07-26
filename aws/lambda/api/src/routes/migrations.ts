@@ -1577,6 +1577,14 @@ async function addMonthlySubscriptionRefunds() {
       [m.company_id, m.enrollment_id, m.id, m.branch_id, m.student_id, refunded, refundDate, type, m.refund_note]
     );
     await query(`UPDATE monthly_subscription_payments SET amount_paid = $1, updated_at = NOW() WHERE id = $2`, [gross, m.id]);
+    // Keep the installment ledger in step with the restored gross (migration 079).
+    // Only the synthesised row is touched — a real recorded collection is never
+    // rewritten. No-op when this repair runs before the ledger exists.
+    await query(
+      `UPDATE monthly_subscription_installments SET amount = $1
+        WHERE monthly_payment_id = $2 AND is_backfill`,
+      [gross, m.id]
+    ).catch(() => { /* ledger not created yet — its own backfill will read the restored gross */ });
     backfilled++;
   }
 

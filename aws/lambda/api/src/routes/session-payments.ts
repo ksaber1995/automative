@@ -1,4 +1,10 @@
 import { query, queryOne } from '../db/connection';
+import {
+  applySessionInstallmentLedger,
+  recordSessionInstallment,
+  recordPackageInstallment,
+  clearSessionInstallments,
+} from '../db/payment-ledger';
 import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -141,6 +147,11 @@ export async function ensurePerSessionSchema(): Promise<void> {
               END;
             END IF;
           END $$`);
+        // Migration 079: per-collection money ledger for session_payments. Must
+        // come after the table above — it carries the FK. Read paths rely on this
+        // guard for the table's existence, same as for session_payments itself.
+        await applySessionInstallmentLedger();
+
         await query(`ALTER TABLE refunds ADD COLUMN IF NOT EXISTS session_package_id UUID`);
         await query(`DO $$
           BEGIN
@@ -697,23 +708,27 @@ export const sessionPaymentsRoutes = {
       let pkgDate = '';
       if (q.from) {
         cashParams.push(q.from);
-        spDate += ` AND COALESCE(paid_date, created_at::date) >= $${cashParams.length}::date`;
-        pkgDate += ` AND purchased_at::date >= $${cashParams.length}::date`;
+        spDate += ` AND payment_date >= $${cashParams.length}::date`;
+        pkgDate += ` AND payment_date >= $${cashParams.length}::date`;
       }
       if (q.to) {
         cashParams.push(q.to);
-        spDate += ` AND COALESCE(paid_date, created_at::date) <= $${cashParams.length}::date`;
-        pkgDate += ` AND purchased_at::date <= $${cashParams.length}::date`;
+        spDate += ` AND payment_date <= $${cashParams.length}::date`;
+        pkgDate += ` AND payment_date <= $${cashParams.length}::date`;
       }
       // Split the cash into per-session-charge money and prepaid-package money so
       // the dashboard can show "cash for packages only" and a session/package/all
       // breakdown. cashCollected (total) = sessionCash + packageCashCollected.
       const cashRow = await queryOne<any>(
+        // Per-session charge cash comes from the installment ledger: one row per
+        // collection, on the day it was collected. Summing the charge's cumulative
+        // amount_paid instead would move a split payment's earlier half onto the
+        // later date (see db/payment-ledger.ts).
         `SELECT
-           COALESCE((SELECT SUM(amount_paid) FROM session_payments
-                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${spDate}), 0) AS session_cash,
-           COALESCE((SELECT SUM(amount_paid) FROM session_packages
-                     WHERE ${cashConds.join(' AND ')} AND amount_paid > 0 ${pkgDate}), 0) AS package_cash`,
+           COALESCE((SELECT SUM(amount) FROM session_payment_installments
+                     WHERE ${cashConds.join(' AND ')} AND amount > 0 ${spDate}), 0) AS session_cash,
+           COALESCE((SELECT SUM(amount) FROM session_package_installments
+                     WHERE ${cashConds.join(' AND ')} AND amount > 0 ${pkgDate}), 0) AS package_cash`,
         cashParams
       );
       const packageCashCollected = parseFloat(cashRow?.package_cash || 0);
@@ -787,16 +802,28 @@ export const sessionPaymentsRoutes = {
       }
 
       const amountDue = parseFloat(row.amount_due);
-      const newPaid = parseFloat(row.amount_paid || 0) + parseFloat(body.amount);
+      const pay = parseFloat(body.amount);
+      // Guarded so a malformed request can never desync amount_paid from the
+      // installment ledger below.
+      if (!isFinite(pay) || pay <= 0) {
+        return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_AMOUNT', 'Amount must be greater than zero');
+      }
+      const newPaid = parseFloat(row.amount_paid || 0) + pay;
       const newStatus = newPaid >= amountDue ? 'PAID' : 'PENDING';
-      const paidDate = newStatus === 'PAID' ? body.paymentDate : null;
+      // paid_date is now only "when was this charge last paid" for display —
+      // revenue comes from the installment rows, each on its own date. Stamped for
+      // a part payment too (it used to stay null, so the charge looked unpaid) and
+      // defaulted to today when the client omits the date.
+      const effectiveDate = body.paymentDate || new Date().toISOString().split('T')[0];
 
       await query(
         `UPDATE session_payments
          SET amount_paid = $1, payment_status = $2, paid_date = $3, notes = COALESCE($4, notes), updated_at = NOW()
          WHERE id = $5`,
-        [newPaid, newStatus, paidDate, body.notes || null, params.id]
+        [newPaid, newStatus, effectiveDate, body.notes || null, params.id]
       );
+
+      await recordSessionInstallment(row, pay, effectiveDate, body.notes || null);
 
       const updated = await queryOne('SELECT * FROM session_payments WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapSessionPaymentFromDB(updated) };
@@ -829,6 +856,8 @@ export const sessionPaymentsRoutes = {
          WHERE id = $1`,
         [params.id, reason ? 'Voided: ' + reason : 'Payment voided']
       );
+      // The money never happened — drop the days it was booked on with it.
+      await clearSessionInstallments(params.id);
       const updated = await queryOne('SELECT * FROM session_payments WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapSessionPaymentFromDB(updated) };
     } catch (error) {
@@ -1007,6 +1036,11 @@ export const sessionPaymentsRoutes = {
       );
       const pkg = inserted[0];
 
+      // Whatever was collected at purchase is the package's first installment
+      // (skipped when the bundle is bought to be paid later, amount 0). Dated
+      // today, matching the purchased_at the INSERT above defaulted to.
+      await recordPackageInstallment(pkg, amountPaid, null, body.notes || null);
+
       // Back-cover existing PENDING charges (oldest first) up to the credits bought.
       const pending = await query(
         `SELECT id FROM session_payments
@@ -1065,6 +1099,12 @@ export const sessionPaymentsRoutes = {
         `UPDATE session_packages SET amount_paid = $1, updated_at = NOW() WHERE id = $2`,
         [newPaid, params.id]
       );
+
+      // The top-up is its own dated collection. purchased_at deliberately stays
+      // the purchase day — before the ledger, summing amount_paid against it
+      // booked this money onto a day that had already been reported.
+      await recordPackageInstallment(pkg, amount, body.paymentDate || null, body.notes || null);
+
       const fresh = await queryOne('SELECT * FROM session_packages WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapPackageFromDB(fresh) };
     } catch (error) {

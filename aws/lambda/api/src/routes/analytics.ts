@@ -7,14 +7,17 @@ import {
 import { apiError, mapThrownError } from '../utils/api-error';
 import { computeTotalCash } from './cash';
 import { ensurePerSessionSchema } from './session-payments';
+import { ensureMonthlyInstallmentLedger } from '../db/payment-ledger';
 
 export const analyticsRoutes = {
   dashboard: async ({ query: queryParams, headers }: { query: { startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      // session_packages / session_payments are created lazily — make sure they
-      // exist before the revenue queries below reference them.
+      // session_packages / session_payments and the two installment ledgers are
+      // created lazily — make sure they exist before the revenue queries below
+      // reference them.
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
 
       if (!checkGranularPermission(context, 'dashboard', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -89,15 +92,17 @@ export const analyticsRoutes = {
         mrParams
       );
 
-      // Monthly subscription payments are revenue too, attributed to the date the
-      // money was collected (paid_date). This is the single source for subscription
-      // revenue; the underlying enrollments stay PENDING/0 so nothing double-counts.
+      // Monthly subscription money, attributed to the day each collection was
+      // actually taken (the installment ledger — see db/payment-ledger.ts). The
+      // bill's cumulative amount_paid + paid_date would book a split payment
+      // entirely on the later date. The underlying enrollments stay PENDING/0, so
+      // nothing double-counts.
       const msParams: any[] = [context.companyId, startDate, endDate];
       const subscriptionRevenueData = await query(
-        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
-         FROM monthly_subscription_payments
-         WHERE company_id = $1 AND amount_paid > 0
-           AND paid_date >= $2 AND paid_date <= $3
+        `SELECT COALESCE(SUM(amount), 0) as total_revenue
+         FROM monthly_subscription_installments
+         WHERE company_id = $1 AND amount > 0
+           AND payment_date >= $2 AND payment_date <= $3
            ${buildBranchClause('branch_id', msParams)}`,
         msParams
       );
@@ -120,19 +125,19 @@ export const analyticsRoutes = {
       // lives on the package row), so summing both never double-counts.
       const pkgParams: any[] = [context.companyId, startDate, endDate];
       const packageRevenueData = await query(
-        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
-         FROM session_packages
-         WHERE company_id = $1 AND amount_paid > 0
-           AND purchased_at::date >= $2 AND purchased_at::date <= $3
+        `SELECT COALESCE(SUM(amount), 0) as total_revenue
+         FROM session_package_installments
+         WHERE company_id = $1 AND amount > 0
+           AND payment_date >= $2 AND payment_date <= $3
            ${buildBranchClause('branch_id', pkgParams)}`,
         pkgParams
       );
       const spParams: any[] = [context.companyId, startDate, endDate];
       const sessionPayRevenueData = await query(
-        `SELECT COALESCE(SUM(amount_paid), 0) as total_revenue
-         FROM session_payments
-         WHERE company_id = $1 AND amount_paid > 0
-           AND COALESCE(paid_date, created_at::date) >= $2 AND COALESCE(paid_date, created_at::date) <= $3
+        `SELECT COALESCE(SUM(amount), 0) as total_revenue
+         FROM session_payment_installments
+         WHERE company_id = $1 AND amount > 0
+           AND payment_date >= $2 AND payment_date <= $3
            ${buildBranchClause('branch_id', spParams)}`,
         spParams
       );
@@ -233,16 +238,23 @@ export const analyticsRoutes = {
         totalGlobalOverhead = parseFloat(globalOverheadData[0]?.total || '0');
 
         // --- Company-level (unallocated) revenue & expenses ---
-        // Captures product_sales with no branch + every expense_payment with no branch
-        // (overhead AND COGS). These are not attributable to any specific branch and
-        // must reconcile against the company-wide total so branch sums add up.
-        // enrollments and master_enrollments require a branch_id (NOT NULL), so
-        // unallocated revenue can only come from product_sales.
+        // Captures every revenue source that can exist WITHOUT a branch, plus every
+        // expense_payment with no branch (overhead AND COGS). These are not
+        // attributable to any specific branch and must reconcile against the
+        // company-wide total so branch sums add up. enrollments, master_enrollments,
+        // monthly bills and per-session money all require a branch_id (NOT NULL), so
+        // only product sales and event subscriptions can land here — and a
+        // company-wide event's money used to be counted in the company total while
+        // belonging to no bucket at all, breaking that reconciliation by its amount.
         const unallocRevData = await query(
-          `SELECT COALESCE(SUM(total_amount), 0) as total
-           FROM product_sales
-           WHERE company_id = $1 AND branch_id IS NULL
-             AND sale_date >= $2 AND sale_date <= $3`,
+          `SELECT
+             COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps
+                       WHERE ps.company_id = $1 AND ps.branch_id IS NULL
+                         AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0)
+             + COALESCE((SELECT SUM(es.amount) FROM event_subscriptions es
+                         WHERE es.company_id = $1 AND es.branch_id IS NULL
+                           AND es.amount > 0
+                           AND es.payment_date >= $2 AND es.payment_date <= $3), 0) as total`,
           [context.companyId, startDate, endDate]
         );
         const unallocExpData = await query(
@@ -285,18 +297,37 @@ export const analyticsRoutes = {
                AND me.amount_paid > 0
                AND me.enrollment_date >= $2 AND me.enrollment_date <= $3
            ), 0) AS master_revenue,
+           -- Monthly subscription revenue. This was missing entirely, so a branch
+           -- that bills monthly (the whole point of a subscription academy) showed
+           -- ~0 revenue and a deeply negative net profit, while the company-wide
+           -- total above DID count it — so sum(branches) never reconciled.
+           COALESCE((
+             SELECT SUM(msi.amount) FROM monthly_subscription_installments msi
+             WHERE msi.branch_id = b.id AND msi.company_id = $1
+               AND msi.amount > 0
+               AND msi.payment_date >= $2 AND msi.payment_date <= $3
+           ), 0) AS subscription_revenue,
+           -- Event revenue for THIS branch. event_subscriptions.branch_id is
+           -- nullable: a company-wide event belongs to no branch, so that money
+           -- goes to the unallocated bucket above instead of being spread over
+           -- branches that never earned it.
+           COALESCE((
+             SELECT SUM(es.amount) FROM event_subscriptions es
+             WHERE es.branch_id = b.id AND es.company_id = $1
+               AND es.amount > 0
+               AND es.payment_date >= $2 AND es.payment_date <= $3
+           ), 0) AS event_revenue,
            -- Per-session revenue: prepaid packages + pay-as-you-go charges
            COALESCE((
-             SELECT SUM(spkg.amount_paid) FROM session_packages spkg
-             WHERE spkg.branch_id = b.id AND spkg.company_id = $1
-               AND spkg.amount_paid > 0
-               AND spkg.purchased_at::date >= $2 AND spkg.purchased_at::date <= $3
+             SELECT SUM(pki.amount) FROM session_package_installments pki
+             WHERE pki.branch_id = b.id AND pki.company_id = $1
+               AND pki.amount > 0
+               AND pki.payment_date >= $2 AND pki.payment_date <= $3
            ), 0) + COALESCE((
-             SELECT SUM(sp.amount_paid) FROM session_payments sp
-             WHERE sp.branch_id = b.id AND sp.company_id = $1
-               AND sp.amount_paid > 0
-               AND COALESCE(sp.paid_date, sp.created_at::date) >= $2
-               AND COALESCE(sp.paid_date, sp.created_at::date) <= $3
+             SELECT SUM(spi.amount) FROM session_payment_installments spi
+             WHERE spi.branch_id = b.id AND spi.company_id = $1
+               AND spi.amount > 0
+               AND spi.payment_date >= $2 AND spi.payment_date <= $3
            ), 0) AS session_revenue,
            -- Direct expenses (explicitly assigned to this branch)
            COALESCE((
@@ -344,13 +375,13 @@ export const analyticsRoutes = {
             WHERE em.branch_id = b.id AND em.company_id = $1 AND em.is_active = true) AS employee_count
          FROM branches b
          WHERE b.company_id = $1 ${branchScopeClause}
-         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL','REFUNDED') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0)) DESC`,
+         ORDER BY (COALESCE((SELECT SUM(e.amount_paid) FROM enrollments e WHERE e.branch_id = b.id AND e.company_id = $1 AND e.payment_status IN ('PAID','PARTIAL','REFUNDED') AND e.enrollment_date >= $2 AND e.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(ps.total_amount) FROM product_sales ps WHERE ps.branch_id = b.id AND ps.company_id = $1 AND ps.sale_date >= $2 AND ps.sale_date <= $3), 0) + COALESCE((SELECT SUM(me.amount_paid) FROM master_enrollments me WHERE me.branch_id = b.id AND me.company_id = $1 AND me.amount_paid > 0 AND me.enrollment_date >= $2 AND me.enrollment_date <= $3), 0) + COALESCE((SELECT SUM(msi.amount) FROM monthly_subscription_installments msi WHERE msi.branch_id = b.id AND msi.company_id = $1 AND msi.amount > 0 AND msi.payment_date >= $2 AND msi.payment_date <= $3), 0) + COALESCE((SELECT SUM(pki.amount) FROM session_package_installments pki WHERE pki.branch_id = b.id AND pki.company_id = $1 AND pki.amount > 0 AND pki.payment_date >= $2 AND pki.payment_date <= $3), 0) + COALESCE((SELECT SUM(spi.amount) FROM session_payment_installments spi WHERE spi.branch_id = b.id AND spi.company_id = $1 AND spi.amount > 0 AND spi.payment_date >= $2 AND spi.payment_date <= $3), 0) + COALESCE((SELECT SUM(es.amount) FROM event_subscriptions es WHERE es.branch_id = b.id AND es.company_id = $1 AND es.amount > 0 AND es.payment_date >= $2 AND es.payment_date <= $3), 0)) DESC`,
         brParams
       );
 
       // Net branch revenue (after subtracting per-branch refunds) drives proportional allocation.
       const branchNetRevenues = branchRawData.map((b: any) => {
-        const gross = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.session_revenue || '0');
+        const gross = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.subscription_revenue || '0') + parseFloat(b.event_revenue || '0') + parseFloat(b.session_revenue || '0');
         const refunds = parseFloat(b.refunds_amount || '0');
         return gross - refunds;
       });
@@ -363,7 +394,7 @@ export const analyticsRoutes = {
       const distributeUnallocated = allocationMethod !== 'OVERHEAD';
 
       const branchSummaries = branchRawData.map((b: any, i: number) => {
-        const grossRevenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.session_revenue || '0');
+        const grossRevenue = parseFloat(b.enrollment_revenue) + parseFloat(b.product_revenue) + parseFloat(b.master_revenue || '0') + parseFloat(b.subscription_revenue || '0') + parseFloat(b.event_revenue || '0') + parseFloat(b.session_revenue || '0');
         const refunds = parseFloat(b.refunds_amount || '0');
         const netRevenue = grossRevenue - refunds;
         const directExpenses = parseFloat(b.direct_expenses);
@@ -454,25 +485,25 @@ export const analyticsRoutes = {
            WHERE company_id = $1 AND amount_paid > 0
              AND enrollment_date >= $2 AND enrollment_date <= $3 ${masterBc}
            UNION ALL
-           SELECT paid_date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
-           FROM monthly_subscription_payments
-           WHERE company_id = $1 AND amount_paid > 0
-             AND paid_date >= $2 AND paid_date <= $3 ${subBc}
+           SELECT payment_date as date, amount as revenue, 0 as expenses, 0 as refunds
+           FROM monthly_subscription_installments
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${subBc}
            UNION ALL
            SELECT payment_date as date, amount as revenue, 0 as expenses, 0 as refunds
            FROM event_subscriptions
            WHERE company_id = $1 AND amount > 0
              AND payment_date >= $2 AND payment_date <= $3 ${eventBc}
            UNION ALL
-           SELECT purchased_at::date as date, amount_paid as revenue, 0 as expenses, 0 as refunds
-           FROM session_packages
-           WHERE company_id = $1 AND amount_paid > 0
-             AND purchased_at::date >= $2 AND purchased_at::date <= $3 ${pkgBc}
+           SELECT payment_date as date, amount as revenue, 0 as expenses, 0 as refunds
+           FROM session_package_installments
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${pkgBc}
            UNION ALL
-           SELECT COALESCE(paid_date, created_at::date) as date, amount_paid as revenue, 0 as expenses, 0 as refunds
-           FROM session_payments
-           WHERE company_id = $1 AND amount_paid > 0
-             AND COALESCE(paid_date, created_at::date) >= $2 AND COALESCE(paid_date, created_at::date) <= $3 ${sessBc}
+           SELECT payment_date as date, amount as revenue, 0 as expenses, 0 as refunds
+           FROM session_payment_installments
+           WHERE company_id = $1 AND amount > 0
+             AND payment_date >= $2 AND payment_date <= $3 ${sessBc}
            UNION ALL
            SELECT date, 0 as revenue, amount as expenses, 0 as refunds
            FROM expense_payments
