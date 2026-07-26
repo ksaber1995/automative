@@ -383,6 +383,7 @@ export const revenuesRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -395,12 +396,34 @@ export const revenuesRoutes = {
       let masterConditions = 'WHERE me.company_id = $1 AND me.amount_paid > 0';
       // Event subscriptions with cash collected (amount > 0).
       let eventConditions = 'WHERE es.company_id = $1 AND es.amount > 0';
+      // Monthly subscription money — from the installment ledger, dated per
+      // collection. The summary used to leave subscriptions out altogether, so a
+      // monthly-billing academy saw a total that was missing most of its income
+      // (the revenues LIST has always shown them, which made the two disagree).
+      let subscriptionConditions = 'WHERE msi.company_id = $1 AND msi.amount > 0';
       // Per-session money: prepaid packages + pay-as-you-go charges (COVERED
       // charges carry 0, their cash lives on the package row — no double count).
-      // Charge money is read from the installment ledger (one row per collection,
-      // dated when it was taken); packages still date from purchased_at.
+      // Both are read from their installment ledgers (one row per collection,
+      // dated when it was taken).
       let pkgConditions = 'WHERE pki.company_id = $1 AND pki.amount > 0';
       let sessionConditions = 'WHERE spi.company_id = $1 AND spi.amount > 0';
+      // Money given back. The summary reported GROSS collections — it subtracted
+      // nothing — so it disagreed with both the dashboard (which nets refunds
+      // globally) and the revenues list (whose rows show their own refunds).
+      //
+      // The refunds table is polymorphic: one nullable FK per source. A refund is
+      // attributed to the branch of whatever it refunds, falling back to its own
+      // branch_id — product-sale refunds carry no branch_id of their own, so
+      // without the fallback chain they would net out of the company total while
+      // appearing on no branch at all (the same trap analytics.ts documents).
+      const REFUND_JOINS = `
+        FROM refunds r
+        LEFT JOIN enrollments er ON r.enrollment_id = er.id
+        LEFT JOIN master_enrollments mer ON r.master_enrollment_id = mer.id
+        LEFT JOIN product_sales psr ON r.product_sale_id = psr.id
+        LEFT JOIN event_subscriptions esr ON r.subscription_id = esr.id`;
+      const REFUND_BRANCH = 'COALESCE(er.branch_id, mer.branch_id, psr.branch_id, esr.branch_id, r.branch_id)';
+      let refundConditions = 'WHERE r.company_id = $1';
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
@@ -411,8 +434,10 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.branch_id = $${params.length}`;
         masterConditions += ` AND me.branch_id = $${params.length}`;
         eventConditions += ` AND es.branch_id = $${params.length}`;
+        subscriptionConditions += ` AND msi.branch_id = $${params.length}`;
         pkgConditions += ` AND pki.branch_id = $${params.length}`;
         sessionConditions += ` AND spi.branch_id = $${params.length}`;
+        refundConditions += ` AND ${REFUND_BRANCH} = $${params.length}`;
       } else {
         const branchClause = appendBranchSqlFilter(context, params, '__COL__');
         if (branchClause) {
@@ -420,8 +445,10 @@ export const revenuesRoutes = {
           productConditions += ` AND ${branchClause.replace(/__COL__/g, 'ps.branch_id')}`;
           masterConditions += ` AND ${branchClause.replace(/__COL__/g, 'me.branch_id')}`;
           eventConditions += ` AND ${branchClause.replace(/__COL__/g, 'es.branch_id')}`;
+          subscriptionConditions += ` AND ${branchClause.replace(/__COL__/g, 'msi.branch_id')}`;
           pkgConditions += ` AND ${branchClause.replace(/__COL__/g, 'pki.branch_id')}`;
           sessionConditions += ` AND ${branchClause.replace(/__COL__/g, 'spi.branch_id')}`;
+          refundConditions += ` AND ${branchClause.replace(/__COL__/g, REFUND_BRANCH)}`;
         }
       }
 
@@ -432,8 +459,10 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date >= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date >= $${paramIndex}`;
         eventConditions += ` AND es.payment_date >= $${paramIndex}`;
+        subscriptionConditions += ` AND msi.payment_date >= $${paramIndex}`;
         pkgConditions += ` AND pki.payment_date >= $${paramIndex}`;
         sessionConditions += ` AND spi.payment_date >= $${paramIndex}`;
+        refundConditions += ` AND r.refund_date >= $${paramIndex}`;
       }
 
       if (queryParams.endDate) {
@@ -443,8 +472,10 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date <= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date <= $${paramIndex}`;
         eventConditions += ` AND es.payment_date <= $${paramIndex}`;
+        subscriptionConditions += ` AND msi.payment_date <= $${paramIndex}`;
         pkgConditions += ` AND pki.payment_date <= $${paramIndex}`;
         sessionConditions += ` AND spi.payment_date <= $${paramIndex}`;
+        refundConditions += ` AND r.refund_date <= $${paramIndex}`;
       }
 
       // Get total revenue from enrollments
@@ -475,11 +506,26 @@ export const revenuesRoutes = {
         ${eventConditions}
       `;
 
+      // Get total revenue from monthly subscriptions
+      const subscriptionRevenueQuery = `
+        SELECT COALESCE(SUM(msi.amount), 0) as total
+        FROM monthly_subscription_installments msi
+        ${subscriptionConditions}
+      `;
+
       // Get total revenue from per-session money (packages + direct charges)
       const sessionRevenueQuery = `
         SELECT
           COALESCE((SELECT SUM(pki.amount) FROM session_package_installments pki ${pkgConditions}), 0)
           + COALESCE((SELECT SUM(spi.amount) FROM session_payment_installments spi ${sessionConditions}), 0) as total
+      `;
+
+      // Money refunded in the window, by refund_date — subtracted from the total
+      // and from every breakdown below.
+      const refundQuery = `
+        SELECT COALESCE(SUM(r.amount), 0) as total
+        ${REFUND_JOINS}
+        ${refundConditions}
       `;
 
       // Get revenue by branch (three LEFT JOINs summed)
@@ -499,7 +545,7 @@ export const revenuesRoutes = {
         SELECT
           b.id as branch_id,
           b.name as branch_name,
-          COALESCE(enroll.total, 0) + COALESCE(prod.total, 0) + COALESCE(mast.total, 0) + COALESCE(evt.total, 0) + COALESCE(spkg.total, 0) + COALESCE(sess.total, 0) as revenue
+          COALESCE(enroll.total, 0) + COALESCE(prod.total, 0) + COALESCE(mast.total, 0) + COALESCE(evt.total, 0) + COALESCE(subs.total, 0) + COALESCE(spkg.total, 0) + COALESCE(sess.total, 0) - COALESCE(refs.total, 0) as revenue
         FROM branches b
         LEFT JOIN (
           SELECT branch_id, SUM(amount_paid) as total
@@ -535,6 +581,14 @@ export const revenuesRoutes = {
         ) evt ON evt.branch_id = b.id
         LEFT JOIN (
           SELECT branch_id, SUM(amount) as total
+          FROM monthly_subscription_installments
+          WHERE company_id = $1 AND amount > 0
+          ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
+          ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
+          GROUP BY branch_id
+        ) subs ON subs.branch_id = b.id
+        LEFT JOIN (
+          SELECT branch_id, SUM(amount) as total
           FROM session_package_installments
           WHERE company_id = $1 AND amount > 0
           ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
@@ -549,9 +603,17 @@ export const revenuesRoutes = {
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
         ) sess ON sess.branch_id = b.id
+        LEFT JOIN (
+          SELECT ${REFUND_BRANCH} as branch_id, SUM(r.amount) as total
+          ${REFUND_JOINS}
+          WHERE r.company_id = $1
+          ${startIdx ? `AND r.refund_date >= $${startIdx}` : ''}
+          ${endIdx ? `AND r.refund_date <= $${endIdx}` : ''}
+          GROUP BY 1
+        ) refs ON refs.branch_id = b.id
         WHERE b.company_id = $1
         ${branchIdx ? `AND b.id = $${branchIdx}` : ''}${adminBranchClause}
-        GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, evt.total, spkg.total, sess.total
+        GROUP BY b.id, b.name, enroll.total, prod.total, mast.total, evt.total, subs.total, spkg.total, sess.total, refs.total
         ORDER BY revenue DESC
       `;
 
@@ -577,6 +639,10 @@ export const revenuesRoutes = {
           FROM event_subscriptions es
           ${eventConditions}
           UNION ALL
+          SELECT msi.payment_date as date, msi.amount as amount
+          FROM monthly_subscription_installments msi
+          ${subscriptionConditions}
+          UNION ALL
           SELECT pki.payment_date as date, pki.amount as amount
           FROM session_package_installments pki
           ${pkgConditions}
@@ -584,18 +650,26 @@ export const revenuesRoutes = {
           SELECT spi.payment_date as date, spi.amount as amount
           FROM session_payment_installments spi
           ${sessionConditions}
+          UNION ALL
+          -- Refunds ride along as negative amounts on their refund_date, so a
+          -- month shows what was actually kept.
+          SELECT r.refund_date as date, -r.amount as amount
+          ${REFUND_JOINS}
+          ${refundConditions}
         ) combined
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `;
 
-      const [enrollmentResult, productResult, masterResult, eventResult, sessionResult, byBranchResult, byMonthResult] = await Promise.all([
+      const [enrollmentResult, productResult, masterResult, eventResult, subscriptionResult, sessionResult, refundResult, byBranchResult, byMonthResult] = await Promise.all([
         query(enrollmentRevenueQuery, params),
         query(productRevenueQuery, params),
         query(masterRevenueQuery, params),
         query(eventRevenueQuery, params),
+        query(subscriptionRevenueQuery, params),
         query(sessionRevenueQuery, params),
+        query(refundQuery, params),
         query(byBranchQuery, params),
         query(byMonthQuery, params),
       ]);
@@ -604,16 +678,23 @@ export const revenuesRoutes = {
       const productRevenue = parseFloat(productResult[0]?.total || 0);
       const masterRevenue = parseFloat(masterResult[0]?.total || 0);
       const eventRevenue = parseFloat(eventResult[0]?.total || 0);
+      const subscriptionRevenue = parseFloat(subscriptionResult[0]?.total || 0);
       const sessionRevenue = parseFloat(sessionResult[0]?.total || 0);
+      const totalRefunds = parseFloat(refundResult[0]?.total || 0);
 
       return {
         status: 200 as const,
         body: {
-          totalRevenue: enrollmentRevenue + productRevenue + masterRevenue + eventRevenue + sessionRevenue,
+          // Net of refunds, like the dashboard. The per-source figures stay GROSS
+          // (a refund is not attributable to one source without double work), so
+          // they sum to totalRevenue + totalRefunds, not to totalRevenue.
+          totalRevenue: enrollmentRevenue + productRevenue + masterRevenue + eventRevenue + subscriptionRevenue + sessionRevenue - totalRefunds,
+          totalRefunds,
           enrollmentRevenue,
           productRevenue,
           masterRevenue,
           eventRevenue,
+          subscriptionRevenue,
           sessionRevenue,
           byBranch: byBranchResult.map((row: any) => ({
             branchId: row.branch_id,

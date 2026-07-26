@@ -1190,11 +1190,17 @@ const RevenueItemSchema = z.object({
 });
 
 const RevenueSummarySchema = z.object({
+  // Net of refunds. The per-source figures below are gross, so they sum to
+  // totalRevenue + totalRefunds.
   totalRevenue: z.number(),
+  totalRefunds: z.number(),
   enrollmentRevenue: z.number(),
   productRevenue: z.number(),
   masterRevenue: z.number(),
   eventRevenue: z.number(),
+  // Monthly subscription collections (the revenues list has always included
+  // them; the summary totals did not until migration 079's follow-up).
+  subscriptionRevenue: z.number(),
   sessionRevenue: z.number(),
   byBranch: z.array(z.object({
     branchId: z.string(),

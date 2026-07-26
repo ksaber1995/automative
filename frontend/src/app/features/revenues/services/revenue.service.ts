@@ -26,11 +26,15 @@ export interface RevenueItem {
 }
 
 export interface RevenueSummary {
+  /** Net of refunds — the per-source figures below are gross. */
   totalRevenue: number;
+  totalRefunds: number;
   enrollmentRevenue: number;
   productRevenue: number;
   masterRevenue: number;
   eventRevenue: number;
+  /** Monthly subscription collections, dated per payment. */
+  subscriptionRevenue: number;
   sessionRevenue: number;
   byBranch: Array<{
     branchId: string;
