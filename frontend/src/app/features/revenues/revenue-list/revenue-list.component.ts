@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,7 +6,7 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import { RevenueService, RevenueItem } from '../services/revenue.service';
+import { RevenueService, RevenueItem, RevenueSource, RevenueSummary } from '../services/revenue.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -38,8 +38,41 @@ export class RevenueListComponent implements OnInit {
   selectedSource: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'SESSION' | 'ALL' = 'ALL';
   startDate: string = '';
   endDate: string = '';
+  /** Total of the rows listed — the fallback headline if the summary call fails. */
   totalRevenue: number = 0;
   activePreset = signal<string>('month');
+
+  /**
+   * Period totals from /revenues/summary. It honours the branch and date filters
+   * but NOT the Source one — the breakdown below is what a source is worth, so
+   * narrowing it to a single source would defeat the point. Null while loading,
+   * or if the call failed (the page then falls back to the listed total).
+   */
+  summary = signal<RevenueSummary | null>(null);
+
+  /**
+   * The per-source tiles, gross. Sources worth nothing this period are dropped
+   * rather than shown as a row of zeros — an academy that sells no products
+   * should not have to read past "Products 0" every time.
+   */
+  sourceTiles = computed<{ key: RevenueSource; value: number }[]>(() => {
+    const s = this.summary();
+    if (!s) return [];
+    return ([
+      { key: 'ENROLLMENT', value: s.enrollmentRevenue },
+      { key: 'SUBSCRIPTION', value: s.subscriptionRevenue },
+      { key: 'SESSION', value: s.sessionRevenue },
+      { key: 'MASTER_ENROLLMENT', value: s.masterRevenue },
+      { key: 'EVENT', value: s.eventRevenue },
+      { key: 'PRODUCT_SALE', value: s.productRevenue },
+    ] as { key: RevenueSource; value: number }[]).filter(t => t.value > 0);
+  });
+
+  /** Gross collections — what the per-source tiles add up to, before refunds. */
+  grossRevenue = computed<number>(() => {
+    const s = this.summary();
+    return s ? s.totalRevenue + s.totalRefunds : 0;
+  });
 
   ngOnInit() {
     this.loadBranches();
@@ -103,6 +136,14 @@ export class RevenueListComponent implements OnInit {
         this.notificationService.error('Failed to load revenues');
         this.loading.set(false);
       }
+    });
+
+    // Same period and branch, every source. A failure here is silent: the table
+    // is the page, and it has already reported its own error if one occurred.
+    const { source, ...summaryParams } = params;
+    this.revenueService.getRevenueSummary(summaryParams).subscribe({
+      next: (summary: RevenueSummary) => this.summary.set(summary),
+      error: () => this.summary.set(null),
     });
   }
 

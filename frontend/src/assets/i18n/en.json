@@ -3422,6 +3422,12 @@
     "LIST": {
       "TITLE": "Revenue Tracking",
       "TOTAL": "Total Revenue:",
+      "SUMMARY_NET": "Net revenue",
+      "SUMMARY_SCOPE": "This period, across every source. The Source filter narrows the table only.",
+      "SUMMARY_REFUNDED": "Refunded",
+      "SUMMARY_GROSS": "Collected:",
+      "SUMMARY_BY_SOURCE": "By source",
+      "SUMMARY_BY_BRANCH": "By branch",
       "AUTO_HINT": "Revenues are automatically generated from course enrollments and product sales",
       "PRESET_TODAY": "Today",
       "PRESET_MONTH": "This Month",

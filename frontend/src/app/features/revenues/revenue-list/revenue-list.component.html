@@ -3,7 +3,11 @@
     <ng-template pTemplate="header">
       <div class="p-4">
         <h2 class="text-2xl font-bold">{{ 'REVENUES.LIST.TITLE' | translate }}</h2>
-        <p class="text-gray-600 mt-1">{{ 'REVENUES.LIST.TOTAL' | translate }} {{ totalRevenue | amount }}</p>
+        <!-- Only when the summary is unavailable — otherwise its headline below is
+             the same number, computed server-side and net of refunds. -->
+        @if (!summary()) {
+          <p class="text-gray-600 mt-1">{{ 'REVENUES.LIST.TOTAL' | translate }} {{ totalRevenue | amount }}</p>
+        }
         <p class="text-sm text-gray-500 mt-1">{{ 'REVENUES.LIST.AUTO_HINT' | translate }}</p>
       </div>
     </ng-template>
@@ -74,6 +78,59 @@
         </div>
       </div>
     </div>
+
+    <!-- Period summary. Server-computed over the same branch and dates as the
+         table, across EVERY source — the Source filter narrows the table only, so
+         the per-source figures below stay comparable as you flick between them. -->
+    @if (summary(); as sum) {
+      <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
+        <div class="flex flex-wrap items-start justify-between gap-6">
+          <div>
+            <div class="text-sm text-gray-500">{{ 'REVENUES.LIST.SUMMARY_NET' | translate }}</div>
+            <!-- The one figure the page leads with. -->
+            <div class="text-5xl font-semibold text-gray-900 leading-none mt-1">{{ sum.totalRevenue | amount }}</div>
+            <div class="text-xs text-gray-500 mt-2">{{ 'REVENUES.LIST.SUMMARY_SCOPE' | translate }}</div>
+          </div>
+          @if (sum.totalRefunds > 0) {
+            <div>
+              <div class="text-sm text-gray-500">{{ 'REVENUES.LIST.SUMMARY_REFUNDED' | translate }}</div>
+              <div class="text-2xl font-semibold text-red-600 mt-1">-{{ sum.totalRefunds | amount }}</div>
+              <div class="text-xs text-gray-500 mt-1">
+                {{ 'REVENUES.LIST.SUMMARY_GROSS' | translate }} {{ grossRevenue() | amount }}
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (sourceTiles().length) {
+          <div class="mt-5">
+            <div class="text-xs font-medium text-gray-500 mb-2">{{ 'REVENUES.LIST.SUMMARY_BY_SOURCE' | translate }}</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              @for (tile of sourceTiles(); track tile.key) {
+                <div class="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <div class="text-xs text-gray-500 truncate">{{ ('REVENUES.LIST.SOURCE_' + tile.key) | translate }}</div>
+                  <div class="text-lg font-semibold text-gray-900 mt-0.5">{{ tile.value | amount }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (!authService.isTeacher() && sum.byBranch.length > 1) {
+          <div class="mt-5">
+            <div class="text-xs font-medium text-gray-500 mb-2">{{ 'REVENUES.LIST.SUMMARY_BY_BRANCH' | translate }}</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              @for (b of sum.byBranch; track b.branchId) {
+                <div class="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <div class="text-xs text-gray-500 truncate">{{ b.branchName }}</div>
+                  <div class="text-lg font-semibold text-gray-900 mt-0.5">{{ b.revenue | amount }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
 
     <!-- Table -->
     <p-table [value]="revenues()" [loading]="loading()" [paginator]="true" [rows]="10" responsiveLayout="scroll">
