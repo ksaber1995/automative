@@ -2,6 +2,7 @@ import { query } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensurePerSessionSchema } from './session-payments';
+import { ensureMonthlyInstallmentLedger } from '../db/payment-ledger';
 
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
@@ -15,9 +16,10 @@ export const revenuesRoutes = {
   }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      // session_packages / session_payments are created lazily — make sure they
-      // exist before the UNION below references them.
+      // session_packages / session_payments and the two installment ledgers are
+      // created lazily — make sure they exist before the UNION below references them.
       await ensurePerSessionSchema();
+      await ensureMonthlyInstallmentLedger();
 
       if (!checkGranularPermission(context, 'revenues', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -208,40 +210,46 @@ export const revenuesRoutes = {
         parts.push(sql);
       }
 
-      // Monthly subscription payments are revenue too, attributed to the date the
-      // money was collected (paid_date). The monthly_subscription_payments row is the
-      // single source of truth (same as the dashboard) — one entry per paid bill.
+      // Monthly subscription money: ONE LINE PER COLLECTION, from the installment
+      // ledger, each on the day it was actually taken. Reading the bill's
+      // cumulative amount_paid + paid_date instead put the whole amount on the last
+      // payment's date — 100 taken last week and 200 today showed as 300 today.
       // branch_id is NOT NULL on these, so they never appear in the company-level slice.
       if (includeSubscriptions && !companyLevelOnly) {
         let sql = `SELECT
           'SUBSCRIPTION' as source,
-          msp.id as source_id,
-          msp.company_id,
-          msp.branch_id,
+          msi.id as source_id,
+          msi.company_id,
+          msi.branch_id,
           b.name as branch_name,
-          msp.amount_paid as amount,
-          0::numeric as total_refunded,
+          msi.amount as amount,
+          -- A refund is recorded on the parent bill (amount_paid stays gross), so
+          -- spread it across that bill's collections in proportion — the same way
+          -- session charges do. This used to be a hard-coded 0, so a refunded
+          -- subscription payment showed at full value and counted toward the total.
+          COALESCE(ROUND(COALESCE(msp.refunded_amount, 0) * msi.amount / NULLIF(msp.amount_paid, 0), 2), 0) as total_refunded,
           CONCAT('Monthly subscription: ', s.name, ' - ', c.name,
             ' (', msp.billing_year, '-', LPAD(msp.billing_month::text, 2, '0'), ')') as description,
-          msp.paid_date as date,
-          'PAID' as payment_status,
+          msi.payment_date as date,
+          msp.payment_status,
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
           NULL::text as product_name,
-          msp.student_id as student_id,
-          msp.created_at,
+          msi.student_id as student_id,
+          msi.created_at,
           NULL::uuid as event_id,
           NULL::text as event_name
-        FROM monthly_subscription_payments msp
-        JOIN branches b ON msp.branch_id = b.id
-        JOIN students s ON msp.student_id = s.id
-        JOIN courses c ON msp.course_id = c.id
-        WHERE msp.company_id = $1 AND msp.amount_paid > 0`;
-        const b = applyBranch('msp.branch_id');
+        FROM monthly_subscription_installments msi
+        JOIN monthly_subscription_payments msp ON msp.id = msi.monthly_payment_id
+        JOIN branches b ON msi.branch_id = b.id
+        JOIN students s ON msi.student_id = s.id
+        JOIN courses c ON msi.course_id = c.id
+        WHERE msi.company_id = $1 AND msi.amount > 0`;
+        const b = applyBranch('msi.branch_id');
         if (b) sql += ` AND ${b}`;
-        if (startIdx) sql += ` AND msp.paid_date >= $${startIdx}`;
-        if (endIdx) sql += ` AND msp.paid_date <= $${endIdx}`;
+        if (startIdx) sql += ` AND msi.payment_date >= $${startIdx}`;
+        if (endIdx) sql += ` AND msi.payment_date <= $${endIdx}`;
         parts.push(sql);
       }
 
@@ -251,65 +259,79 @@ export const revenuesRoutes = {
       // money lives on the package row), so summing both never double-counts.
       // branch_id is NOT NULL on both, so they never appear company-level.
       if (includeSessions && !companyLevelOnly) {
+        // Package money also comes from its ledger: the purchase payment and any
+        // later top-up are separate lines on the days they were collected, rather
+        // than one lump on purchased_at (which a top-up used to grow after the fact).
         let pkgSql = `SELECT
           'SESSION' as source,
-          spkg.id as source_id,
-          spkg.company_id,
-          spkg.branch_id,
+          pki.id as source_id,
+          pki.company_id,
+          pki.branch_id,
           b.name as branch_name,
-          spkg.amount_paid as amount,
-          COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.session_package_id = spkg.id), 0) as total_refunded,
+          pki.amount as amount,
+          -- Package refunds live in the refunds table; spread over the package's
+          -- collections in proportion so no single line reads as over-refunded.
+          COALESCE(ROUND(
+            COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.session_package_id = spkg.id), 0)
+              * pki.amount / NULLIF(spkg.amount_paid, 0), 2), 0) as total_refunded,
           CONCAT('Session package: ', s.name, ' - ', c.name,
             ' (', spkg.sessions_total, ' sessions)') as description,
-          spkg.purchased_at::date as date,
+          pki.payment_date as date,
           'PAID' as payment_status,
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
           NULL::text as product_name,
-          spkg.student_id as student_id,
-          spkg.created_at,
+          pki.student_id as student_id,
+          pki.created_at,
           NULL::uuid as event_id,
           NULL::text as event_name
-        FROM session_packages spkg
-        JOIN branches b ON spkg.branch_id = b.id
-        JOIN students s ON spkg.student_id = s.id
-        JOIN courses c ON spkg.course_id = c.id
-        WHERE spkg.company_id = $1 AND spkg.amount_paid > 0`;
-        const bp = applyBranch('spkg.branch_id');
+        FROM session_package_installments pki
+        JOIN session_packages spkg ON spkg.id = pki.session_package_id
+        JOIN branches b ON pki.branch_id = b.id
+        JOIN students s ON pki.student_id = s.id
+        JOIN courses c ON pki.course_id = c.id
+        WHERE pki.company_id = $1 AND pki.amount > 0`;
+        const bp = applyBranch('pki.branch_id');
         if (bp) pkgSql += ` AND ${bp}`;
-        if (startIdx) pkgSql += ` AND spkg.purchased_at::date >= $${startIdx}`;
-        if (endIdx) pkgSql += ` AND spkg.purchased_at::date <= $${endIdx}`;
+        if (startIdx) pkgSql += ` AND pki.payment_date >= $${startIdx}`;
+        if (endIdx) pkgSql += ` AND pki.payment_date <= $${endIdx}`;
         parts.push(pkgSql);
 
+        // Charge money, like subscription money, comes from its installment ledger —
+        // one line per collection on its own date.
         let spSql = `SELECT
           'SESSION' as source,
-          sp.id as source_id,
-          sp.company_id,
-          sp.branch_id,
+          spi.id as source_id,
+          spi.company_id,
+          spi.branch_id,
           b.name as branch_name,
-          sp.amount_paid as amount,
-          COALESCE(sp.refunded_amount, 0) as total_refunded,
+          spi.amount as amount,
+          -- A refund is recorded on the parent charge, so spread it across that
+          -- charge's collections in proportion: a half-refunded charge reads as
+          -- half-refunded on each of its lines instead of fully on one.
+          COALESCE(ROUND(COALESCE(sp.refunded_amount, 0) * spi.amount / NULLIF(sp.amount_paid, 0), 2), 0) as total_refunded,
           CONCAT('Session payment: ', s.name, ' - ', c.name) as description,
-          COALESCE(sp.paid_date, sp.created_at::date) as date,
+          spi.payment_date as date,
           sp.payment_status,
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
           NULL::text as product_name,
-          sp.student_id as student_id,
-          sp.created_at,
+          spi.student_id as student_id,
+          spi.created_at,
           NULL::uuid as event_id,
           NULL::text as event_name
-        FROM session_payments sp
-        JOIN branches b ON sp.branch_id = b.id
-        JOIN students s ON sp.student_id = s.id
-        JOIN courses c ON sp.course_id = c.id
-        WHERE sp.company_id = $1 AND sp.amount_paid > 0`;
-        const bs = applyBranch('sp.branch_id');
+        FROM session_payment_installments spi
+        JOIN session_payments sp ON sp.id = spi.session_payment_id
+        JOIN branches b ON spi.branch_id = b.id
+        JOIN students s ON spi.student_id = s.id
+        JOIN courses c ON spi.course_id = c.id
+        WHERE spi.company_id = $1 AND spi.amount > 0`;
+        const bs = applyBranch('spi.branch_id');
         if (bs) spSql += ` AND ${bs}`;
-        if (startIdx) spSql += ` AND COALESCE(sp.paid_date, sp.created_at::date) >= $${startIdx}`;
-        if (endIdx) spSql += ` AND COALESCE(sp.paid_date, sp.created_at::date) <= $${endIdx}`;
+        if (startIdx) spSql += ` AND spi.payment_date >= $${startIdx}`;
+        if (endIdx) spSql += ` AND spi.payment_date <= $${endIdx}`;
         parts.push(spSql);
       }
 
@@ -375,8 +397,10 @@ export const revenuesRoutes = {
       let eventConditions = 'WHERE es.company_id = $1 AND es.amount > 0';
       // Per-session money: prepaid packages + pay-as-you-go charges (COVERED
       // charges carry 0, their cash lives on the package row — no double count).
-      let pkgConditions = 'WHERE spkg.company_id = $1 AND spkg.amount_paid > 0';
-      let sessionConditions = 'WHERE sp.company_id = $1 AND sp.amount_paid > 0';
+      // Charge money is read from the installment ledger (one row per collection,
+      // dated when it was taken); packages still date from purchased_at.
+      let pkgConditions = 'WHERE pki.company_id = $1 AND pki.amount > 0';
+      let sessionConditions = 'WHERE spi.company_id = $1 AND spi.amount > 0';
 
       if (queryParams.branchId) {
         if (!canAccessBranch(context, queryParams.branchId)) {
@@ -387,8 +411,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.branch_id = $${params.length}`;
         masterConditions += ` AND me.branch_id = $${params.length}`;
         eventConditions += ` AND es.branch_id = $${params.length}`;
-        pkgConditions += ` AND spkg.branch_id = $${params.length}`;
-        sessionConditions += ` AND sp.branch_id = $${params.length}`;
+        pkgConditions += ` AND pki.branch_id = $${params.length}`;
+        sessionConditions += ` AND spi.branch_id = $${params.length}`;
       } else {
         const branchClause = appendBranchSqlFilter(context, params, '__COL__');
         if (branchClause) {
@@ -396,8 +420,8 @@ export const revenuesRoutes = {
           productConditions += ` AND ${branchClause.replace(/__COL__/g, 'ps.branch_id')}`;
           masterConditions += ` AND ${branchClause.replace(/__COL__/g, 'me.branch_id')}`;
           eventConditions += ` AND ${branchClause.replace(/__COL__/g, 'es.branch_id')}`;
-          pkgConditions += ` AND ${branchClause.replace(/__COL__/g, 'spkg.branch_id')}`;
-          sessionConditions += ` AND ${branchClause.replace(/__COL__/g, 'sp.branch_id')}`;
+          pkgConditions += ` AND ${branchClause.replace(/__COL__/g, 'pki.branch_id')}`;
+          sessionConditions += ` AND ${branchClause.replace(/__COL__/g, 'spi.branch_id')}`;
         }
       }
 
@@ -408,8 +432,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date >= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date >= $${paramIndex}`;
         eventConditions += ` AND es.payment_date >= $${paramIndex}`;
-        pkgConditions += ` AND spkg.purchased_at::date >= $${paramIndex}`;
-        sessionConditions += ` AND COALESCE(sp.paid_date, sp.created_at::date) >= $${paramIndex}`;
+        pkgConditions += ` AND pki.payment_date >= $${paramIndex}`;
+        sessionConditions += ` AND spi.payment_date >= $${paramIndex}`;
       }
 
       if (queryParams.endDate) {
@@ -419,8 +443,8 @@ export const revenuesRoutes = {
         productConditions += ` AND ps.sale_date <= $${paramIndex}`;
         masterConditions += ` AND me.enrollment_date <= $${paramIndex}`;
         eventConditions += ` AND es.payment_date <= $${paramIndex}`;
-        pkgConditions += ` AND spkg.purchased_at::date <= $${paramIndex}`;
-        sessionConditions += ` AND COALESCE(sp.paid_date, sp.created_at::date) <= $${paramIndex}`;
+        pkgConditions += ` AND pki.payment_date <= $${paramIndex}`;
+        sessionConditions += ` AND spi.payment_date <= $${paramIndex}`;
       }
 
       // Get total revenue from enrollments
@@ -454,8 +478,8 @@ export const revenuesRoutes = {
       // Get total revenue from per-session money (packages + direct charges)
       const sessionRevenueQuery = `
         SELECT
-          COALESCE((SELECT SUM(spkg.amount_paid) FROM session_packages spkg ${pkgConditions}), 0)
-          + COALESCE((SELECT SUM(sp.amount_paid) FROM session_payments sp ${sessionConditions}), 0) as total
+          COALESCE((SELECT SUM(pki.amount) FROM session_package_installments pki ${pkgConditions}), 0)
+          + COALESCE((SELECT SUM(spi.amount) FROM session_payment_installments spi ${sessionConditions}), 0) as total
       `;
 
       // Get revenue by branch (three LEFT JOINs summed)
@@ -510,19 +534,19 @@ export const revenuesRoutes = {
           GROUP BY branch_id
         ) evt ON evt.branch_id = b.id
         LEFT JOIN (
-          SELECT branch_id, SUM(amount_paid) as total
-          FROM session_packages
-          WHERE company_id = $1 AND amount_paid > 0
-          ${startIdx ? `AND purchased_at::date >= $${startIdx}` : ''}
-          ${endIdx ? `AND purchased_at::date <= $${endIdx}` : ''}
+          SELECT branch_id, SUM(amount) as total
+          FROM session_package_installments
+          WHERE company_id = $1 AND amount > 0
+          ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
+          ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
         ) spkg ON spkg.branch_id = b.id
         LEFT JOIN (
-          SELECT branch_id, SUM(amount_paid) as total
-          FROM session_payments
-          WHERE company_id = $1 AND amount_paid > 0
-          ${startIdx ? `AND COALESCE(paid_date, created_at::date) >= $${startIdx}` : ''}
-          ${endIdx ? `AND COALESCE(paid_date, created_at::date) <= $${endIdx}` : ''}
+          SELECT branch_id, SUM(amount) as total
+          FROM session_payment_installments
+          WHERE company_id = $1 AND amount > 0
+          ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
+          ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
         ) sess ON sess.branch_id = b.id
         WHERE b.company_id = $1
@@ -553,12 +577,12 @@ export const revenuesRoutes = {
           FROM event_subscriptions es
           ${eventConditions}
           UNION ALL
-          SELECT spkg.purchased_at::date as date, spkg.amount_paid as amount
-          FROM session_packages spkg
+          SELECT pki.payment_date as date, pki.amount as amount
+          FROM session_package_installments pki
           ${pkgConditions}
           UNION ALL
-          SELECT COALESCE(sp.paid_date, sp.created_at::date) as date, sp.amount_paid as amount
-          FROM session_payments sp
+          SELECT spi.payment_date as date, spi.amount as amount
+          FROM session_payment_installments spi
           ${sessionConditions}
         ) combined
         GROUP BY TO_CHAR(date, 'YYYY-MM')
