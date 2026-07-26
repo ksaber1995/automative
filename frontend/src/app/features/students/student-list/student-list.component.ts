@@ -165,8 +165,21 @@ export class StudentListComponent implements OnInit {
   loadCourses() {
     // Permission-free courses lookup (lookups.courses is auth-only, no granular
     // permission) so the filter works even for users without course-read access.
-    this.lookupService.courses().subscribe({
-      next: (courses) => this.allCourses.set(courses),
+    //
+    // Scoped to the selected branch: the list only holds that branch's students,
+    // so a course belonging to another branch can never match one of them —
+    // offering it is offering a filter that always comes back empty.
+    this.lookupService.courses(this.selectedBranchId || undefined).subscribe({
+      next: (courses) => {
+        this.allCourses.set(courses);
+        // The course already picked may not run in the newly-chosen branch. Clear
+        // it rather than leave a filter applied that its own dropdown no longer
+        // offers — the list would look empty for no visible reason.
+        const picked = this.selectedCourseId();
+        if (picked && !courses.some(c => c.id === picked)) {
+          this.selectedCourseId.set('');
+        }
+      },
     });
   }
 
@@ -261,6 +274,7 @@ export class StudentListComponent implements OnInit {
   }
 
   onBranchFilterChange() {
+    this.loadCourses();
     this.loadStudents();
   }
 
@@ -269,6 +283,8 @@ export class StudentListComponent implements OnInit {
     this.activeTab.set(tab);
     if (this.selectedBranchId) {
       this.selectedBranchId = '';
+      // Back to every branch, so the course list widens again.
+      this.loadCourses();
       this.loadStudents();
     }
   }
