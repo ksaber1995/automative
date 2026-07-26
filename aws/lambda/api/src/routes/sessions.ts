@@ -856,6 +856,64 @@ export const sessionsRoutes = {
     }
   },
 
+  /**
+   * DELETE /api/sessions/:id
+   * Erase a session from the record — a lesson logged by mistake, a duplicate,
+   * a test run. Unlike `cancel` (running sessions with an empty roster only),
+   * this deletes a session at ANY stage, taking its attendance with it, so the
+   * UI must confirm with the user first.
+   *
+   * Guardrail: money already collected is never destroyed silently. A session
+   * carrying a per-session payment with anything paid on it must be voided or
+   * refunded first. Everything else attached (attendance, teacher attendance,
+   * unpaid charges, salary rows) is removed by the FK cascades.
+   */
+  remove: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await queryOne<any>(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) {
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      }
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+
+      // session_payments only exists for PER_SESSION courses — a company that
+      // never used them has no such table, and that is not an error here.
+      try {
+        const paid = await queryOne<any>(
+          `SELECT COUNT(*)::int AS n FROM session_payments
+           WHERE session_id = $1 AND amount_paid > 0 AND payment_status <> 'REFUNDED'`,
+          [params.id]
+        );
+        if (Number(paid?.n ?? 0) > 0) {
+          return apiError(
+            400,
+            'ERRORS.SESSIONS.DELETE_HAS_PAYMENTS',
+            'Cannot delete — this session has collected payments. Void or refund them first.'
+          );
+        }
+      } catch (e: any) {
+        if (e?.code !== '42P01') throw e; // 42P01 = undefined_table
+      }
+
+      await query('DELETE FROM sessions WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+
+      return { status: 200 as const, body: { success: true, id: params.id } };
+    } catch (error) {
+      console.error('Delete session error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.DELETE_FAILED', 'Failed to delete session', 400);
+    }
+  },
+
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; classId?: string; roomId?: string; courseId?: string; studentId?: string; attendance?: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

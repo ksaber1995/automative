@@ -6383,6 +6383,19 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // Hard delete, at any stage, taking the session's attendance with it —
+    // the UI confirms first. Refused when payments were collected on it.
+    remove: {
+      method: 'DELETE' as const,
+      path: '/api/sessions/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.any(),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     list: {
       method: 'GET' as const,
       path: '/api/sessions',

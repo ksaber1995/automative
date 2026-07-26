@@ -146,6 +146,15 @@ export class SessionService {
     return this.api.patch<{ success: boolean; id: string }>(`sessions/${id}/cancel`, {});
   }
 
+  /**
+   * Erase a session from the record, at any stage, taking its attendance with
+   * it — for a lesson logged by mistake. Irreversible, so always confirm first.
+   * The server refuses when payments were collected on the session.
+   */
+  remove(id: string): Observable<{ success: boolean; id: string }> {
+    return this.api.delete<{ success: boolean; id: string }>(`sessions/${id}`);
+  }
+
   /** Suggested next session number for a class's course (prefills the Start dialog). */
   nextNumber(classId: string): Observable<{ sessionNumber: number }> {
     return this.api.get<{ sessionNumber: number }>('sessions/next-number', { classId });

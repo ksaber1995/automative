@@ -6,6 +6,9 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
 import { SelectModule } from 'primeng/select';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { TooltipModule } from 'primeng/tooltip';
+import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
@@ -29,8 +32,11 @@ import { Class } from '@shared/interfaces/class.interface';
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, ConfirmDialogModule, TooltipModule, TranslateModule],
   templateUrl: './session-history.component.html',
+  // Own instance so the delete confirmation targets THIS component's dialog and
+  // not the Sessions page's, which hosts us as its History tab.
+  providers: [ConfirmationService],
 })
 export class SessionHistoryComponent implements OnInit, OnDestroy {
   /** True when hosted inside the Sessions page's History tab (see the template). */
@@ -46,6 +52,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   private translate = inject(TranslateService);
   private globalScan = inject(GlobalScanService);
   private notify = inject(NotificationService);
+  private confirmationService = inject(ConfirmationService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   private readonly scanHandler = (token: string) => this.onScan(token);
 
@@ -91,8 +98,11 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   }
 
   /** Column count for the empty-state row: expander (1) + class/course/started/ended/duration (5)
-   *  + present-absent (1) + room + per-student attendance. */
-  historyColspan = computed<number>(() => 1 + 5 + 1 + (this.isTeacher() ? 0 : 1) + (this.showAttendanceCol() ? 1 : 0));
+   *  + present-absent (1) + actions (1) + room + per-student attendance. */
+  historyColspan = computed<number>(() => 1 + 5 + 1 + 1 + (this.isTeacher() ? 0 : 1) + (this.showAttendanceCol() ? 1 : 0));
+
+  /** Session currently being deleted — disables its row's button. */
+  deletingId = signal<string | null>(null);
 
   hasFilters = computed<boolean>(
     () =>
@@ -257,6 +267,46 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
     this.clearScanFilter();
     this.load();
     if (this.matrixView()) this.loadMatrix();
+  }
+
+  // ── Delete ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Deleting a session erases its attendance with it and cannot be undone, so
+   * the confirmation names the exact session (class + date) and says what is
+   * lost. The server refuses if money was collected on it.
+   */
+  confirmDelete(session: Session): void {
+    const c = this.counts(session.id);
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_HISTORY.DELETE_TITLE'),
+      message: this.translate.instant('SESSION_HISTORY.DELETE_MSG', {
+        session: session.className ?? '',
+        date: this.formatDateTime(session.startDate),
+        present: c?.present ?? 0,
+      }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('SESSION_HISTORY.DELETE_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSION_HISTORY.DELETE_REJECT'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.deleteSession(session),
+    });
+  }
+
+  private deleteSession(session: Session): void {
+    this.deletingId.set(session.id);
+    this.sessionService.remove(session.id).subscribe({
+      next: () => {
+        this.deletingId.set(null);
+        this.notify.success(this.translate.instant('SESSION_HISTORY.MSG_DELETED'));
+        this.load();
+        if (this.matrixView()) this.loadMatrix();
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.deletingId.set(null);
+      },
+    });
   }
 
   // ── Matrix view ─────────────────────────────────────────────────────────────

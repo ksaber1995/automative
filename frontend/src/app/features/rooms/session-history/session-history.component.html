@@ -213,6 +213,7 @@
         @if (showAttendanceCol()) {
           <th pSortableColumn="studentPresent">{{ 'SESSION_HISTORY.COL_ATTENDANCE' | translate }} <p-sortIcon field="studentPresent"></p-sortIcon></th>
         }
+        <th style="width: 4rem"></th>
       </tr>
     </ng-template>
     <ng-template pTemplate="body" let-session let-expanded="expanded">
@@ -260,6 +261,19 @@
             ></p-tag>
           </td>
         }
+        <td>
+          <p-button
+            icon="pi pi-trash"
+            severity="danger"
+            [text]="true"
+            [rounded]="true"
+            size="small"
+            [loading]="deletingId() === session.id"
+            [pTooltip]="'SESSION_HISTORY.DELETE' | translate"
+            [attr.aria-label]="'SESSION_HISTORY.DELETE' | translate"
+            (onClick)="confirmDelete(session)"
+          ></p-button>
+        </td>
       </tr>
     </ng-template>
     <!-- PrimeNG v18+ renamed this template from "rowexpansion" — with the old
@@ -315,4 +329,6 @@
     </ng-template>
   </p-table>
   }
+
+  <p-confirmDialog></p-confirmDialog>
 </div>

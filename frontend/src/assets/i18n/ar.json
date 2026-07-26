@@ -548,7 +548,9 @@
       "UPDATE_FAILED": "فشل تحديث الحصة",
       "NOT_STARTED": "لم تبدأ هذه الحصة بعد",
       "CANCEL_HAS_ATTENDANCE": "لا يمكن الإلغاء — تم تسجيل حضور طلاب بالفعل. أنهِ الحصة بدلاً من ذلك.",
-      "CANCEL_FAILED": "فشل إلغاء الحصة"
+      "CANCEL_FAILED": "فشل إلغاء الحصة",
+      "DELETE_HAS_PAYMENTS": "لا يمكن الحذف — تم تحصيل مدفوعات على هذه الحصة. ألغِ أو استرد المدفوعات أولاً.",
+      "DELETE_FAILED": "فشل حذف الحصة"
     },
     "SUBSCRIPTIONS": {
       "NOT_FOUND": "الاشتراك غير موجود",
@@ -4903,7 +4905,13 @@
     "MATRIX_SELECT_CLASS": "اختر فصلاً لعرض جدول الحضور.",
     "SCAN_FILTER": "عرض الطالب الممسوح:",
     "SCAN_UNKNOWN": "طالب غير معروف",
-    "SCAN_CLEAR": "مسح"
+    "SCAN_CLEAR": "مسح",
+    "DELETE": "حذف الحصة",
+    "DELETE_TITLE": "حذف هذه الحصة؟",
+    "DELETE_MSG": "{{session}} — {{date}}. سيتم حذف الحصة وحضورها نهائيًا ({{present}} حاضر). لا يمكن التراجع عن هذا.",
+    "DELETE_ACCEPT": "حذف الحصة",
+    "DELETE_REJECT": "الاحتفاظ بها",
+    "MSG_DELETED": "تم حذف الحصة"
   },
   "SESSION_ATTENDANCE": {
     "UNCHECK_TITLE": "حذف دفعة الحصة؟",

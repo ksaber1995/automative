@@ -548,7 +548,9 @@
       "UPDATE_FAILED": "Failed to update session",
       "NOT_STARTED": "This session hasn't been started yet",
       "CANCEL_HAS_ATTENDANCE": "Can't cancel — students are already checked in. End the session instead.",
-      "CANCEL_FAILED": "Failed to cancel session"
+      "CANCEL_FAILED": "Failed to cancel session",
+      "DELETE_HAS_PAYMENTS": "Can't delete — payments were collected on this session. Void or refund them first.",
+      "DELETE_FAILED": "Failed to delete session"
     },
     "SUBSCRIPTIONS": {
       "NOT_FOUND": "Subscription not found",
@@ -4779,7 +4781,13 @@
     "MATRIX_SELECT_CLASS": "Select a class to view the attendance grid.",
     "SCAN_FILTER": "Showing scanned student:",
     "SCAN_UNKNOWN": "Unknown student",
-    "SCAN_CLEAR": "Clear"
+    "SCAN_CLEAR": "Clear",
+    "DELETE": "Delete session",
+    "DELETE_TITLE": "Delete this session?",
+    "DELETE_MSG": "{{session}} — {{date}}. This permanently removes the session and its attendance ({{present}} present). It cannot be undone.",
+    "DELETE_ACCEPT": "Delete session",
+    "DELETE_REJECT": "Keep it",
+    "MSG_DELETED": "Session deleted"
   },
   "SESSION_ATTENDANCE": {
     "UNCHECK_TITLE": "Remove session payment?",
