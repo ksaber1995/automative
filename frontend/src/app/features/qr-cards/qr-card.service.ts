@@ -27,8 +27,12 @@ export class QrCardService {
   private api = inject(ApiService);
 
   /** Mint a batch of blank cards, numbered on from the last print run. */
-  generate(count: number): Observable<QrCard[]> {
-    return this.api.post<QrCard[]>('qr-cards/generate', { count });
+  /**
+   * Mint a run. `startFrom` is the PRINTED number the run begins at — 500 makes
+   * the first card read "0500"; null carries on from the last card.
+   */
+  generate(count: number, startFrom: number | null = null): Observable<QrCard[]> {
+    return this.api.post<QrCard[]>('qr-cards/generate', { count, startFrom });
   }
 
   list(status?: 'free' | 'linked' | 'unprinted' | 'printed'): Observable<QrCard[]> {

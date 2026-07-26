@@ -2604,7 +2604,12 @@ export const contract = c.router({
     generate: {
       method: 'POST',
       path: '/api/qr-cards/generate',
-      body: z.object({ count: z.number().int().min(1).max(2000) }),
+      body: z.object({
+        count: z.number().int().min(1).max(2000),
+        // Where the run's PRINTED numbers begin — 500 makes the first card read
+        // "0500". Omitted continues from the last card, as it always has.
+        startFrom: z.number().int().min(1).max(999999).nullable().optional(),
+      }),
       responses: { 201: z.array(QrCardSchema), 400: ApiErrorSchema, 403: ApiErrorSchema },
     },
     list: {

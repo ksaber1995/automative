@@ -42,10 +42,22 @@
         <input pInputText type="number" min="1" max="2000" class="w-32"
           [(ngModel)]="count" (keyup.enter)="generate()" />
       </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.START_FROM' | translate }}</label>
+        <input pInputText type="number" min="1" max="999999" class="w-32"
+          [placeholder]="'QR_CARDS.START_FROM_PLACEHOLDER' | translate"
+          [(ngModel)]="startFrom" (keyup.enter)="generate()" />
+      </div>
       <p-button icon="pi pi-qrcode" [label]="'QR_CARDS.GENERATE' | translate"
         [loading]="generating()" (onClick)="generate()"></p-button>
       <span class="text-xs text-gray-400 ms-2">{{ 'QR_CARDS.MAX_HINT' | translate }}</span>
     </div>
+
+    @if (startPreview(); as range) {
+      <p class="text-xs text-gray-500 mt-2">{{ 'QR_CARDS.START_PREVIEW' | translate: { range } }}</p>
+    } @else {
+      <p class="text-xs text-gray-400 mt-2">{{ 'QR_CARDS.START_FROM_HINT' | translate }}</p>
+    }
 
     @if (exporting()) {
       <div class="mt-5">

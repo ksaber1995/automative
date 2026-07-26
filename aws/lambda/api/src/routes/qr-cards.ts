@@ -280,7 +280,7 @@ async function restoreStudentCode(
 
 export const qrCardsRoutes = {
   /** Print run: mint `count` blank cards, numbered on from the last serial. */
-  generate: async ({ body, headers }: { body: { count: number }; headers: AuthHeaders }) => {
+  generate: async ({ body, headers }: { body: { count: number; startFrom?: number | null }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'write')) {
@@ -297,7 +297,30 @@ export const qrCardsRoutes = {
 
       // New cards are minted in the V2 range (they print "0N"); the number continues
       // from the last card so a reprint never collides with one already in a pocket.
-      const from = await nextCardSerial(context.companyId);
+      //
+      // startFrom overrides where the run begins — the PRINTED number, not the
+      // serial, so 500 makes the first card read "0500". Used to start a batch on
+      // a round number, or to leave room after cards already held. The whole
+      // window is vetted first, against card numbers rather than serials: an old
+      // "A50" and a new "050" are the same number in two reserved ranges, so a
+      // serial-only check would mint a run printing numbers already handed out.
+      let from = await nextCardSerial(context.companyId);
+      const rawStart = body?.startFrom;
+      if (rawStart !== undefined && rawStart !== null && String(rawStart) !== '') {
+        const startN = Math.floor(Number(rawStart));
+        if (!Number.isFinite(startN) || startN < 1 || startN > 999999) {
+          return apiError(400, 'ERRORS.QR_CARDS.BAD_START', 'Start number must be between 1 and 999999');
+        }
+        const taken = await firstTakenCardNumber(context.companyId, startN, startN + count - 1);
+        if (taken !== null) {
+          return apiError(
+            400,
+            'ERRORS.QR_CARDS.START_TAKEN',
+            `Card ${taken} already exists — choose a start that leaves the whole run free`,
+          );
+        }
+        from = CARD_SERIAL_BASE_V2 + startN;
+      }
 
       // One statement: generate_series makes the serials, uuid makes the tokens.
       const rows = await query<any>(

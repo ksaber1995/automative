@@ -16,7 +16,7 @@ import JSZip from 'jszip';
 import QRCode from 'qrcode';
 import { saveAs } from 'file-saver';
 import { QrCard, QrCardService } from './qr-card.service';
-import { formatStudentCode } from '../../core/utils/student-code.util';
+import { CARD_SERIAL_BASE_V2, formatStudentCode } from '../../core/utils/student-code.util';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -68,6 +68,8 @@ export class QrCardsComponent implements OnInit {
   loading = signal(false);
   generating = signal(false);
   count = 100;
+  /** Printed number the next run starts at; empty carries on from the last card. */
+  startFrom: number | null = null;
 
   filter = signal<'all' | 'free' | 'linked' | 'unprinted' | 'printed'>('all');
   /** Find one card in a box of a thousand: by its number, or by who holds it. */
@@ -139,6 +141,28 @@ export class QrCardsComponent implements OnInit {
     });
   }
 
+  /**
+   * The chosen start as a number, or null when the box is left empty (carry on
+   * from the last card). Blank and nonsense both read as "not chosen".
+   */
+  private startNumber(): number | null {
+    if (this.startFrom === null || String(this.startFrom).trim() === '') return null;
+    const n = Math.floor(Number(this.startFrom));
+    return Number.isFinite(n) && n >= 1 ? n : null;
+  }
+
+  /**
+   * What this run will print — "0500 – 0599" — so the number typed is shown as
+   * the label it becomes. Null while no start is chosen.
+   */
+  startPreview(): string | null {
+    const start = this.startNumber();
+    const n = Math.floor(Number(this.count));
+    if (start === null || !Number.isFinite(n) || n < 1) return null;
+    const first = serialLabel(CARD_SERIAL_BASE_V2 + start);
+    return n === 1 ? first : `${first} – ${serialLabel(CARD_SERIAL_BASE_V2 + start + n - 1)}`;
+  }
+
   generate(): void {
     const n = Math.floor(Number(this.count));
     if (!Number.isFinite(n) || n < 1) {
@@ -146,12 +170,16 @@ export class QrCardsComponent implements OnInit {
       return;
     }
     this.generating.set(true);
-    this.service.generate(n).subscribe({
+    this.service.generate(n, this.startNumber()).subscribe({
       next: (rows) => {
         this.generating.set(false);
+        // The run landed where it was asked to; a stale start would re-submit the
+        // same window on the next click and be refused.
+        this.startFrom = null;
         this.notify.success(this.translate.instant('QR_CARDS.GENERATED', { count: rows.length }));
         this.load();
       },
+      // The interceptor toasts the translated reason (e.g. START_TAKEN).
       error: () => this.generating.set(false),
     });
   }
