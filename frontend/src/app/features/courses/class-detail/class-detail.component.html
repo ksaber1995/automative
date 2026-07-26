@@ -61,7 +61,7 @@
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.SCHEDULE' | translate }}</p>
           <p class="font-semibold text-sm">
             @if (classDetail()?.daysOfWeek) { {{ formatDays(classDetail()!.daysOfWeek!) }} }
-            @if (classDetail()?.startTime) { <span class="text-gray-500">{{ classDetail()?.startTime }} - {{ classDetail()?.endTime }}</span> }
+            @if (classDetail()?.startTime) { <span class="text-gray-500">{{ formatTime(classDetail()!.startTime!) }} - {{ formatTime(classDetail()?.endTime) }}</span> }
             @if (!classDetail()?.daysOfWeek && !classDetail()?.startTime) { {{ 'CLASSES.DETAIL.NOT_AVAILABLE' | translate }} }
           </p>
         </div>

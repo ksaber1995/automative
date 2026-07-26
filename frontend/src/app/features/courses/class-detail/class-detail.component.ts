@@ -269,6 +269,21 @@ export class ClassDetailComponent implements OnInit {
     });
   }
 
+  /**
+   * A schedule time as the clock is read: "23:00:00" -> "11:00 PM". The stored
+   * value is a bare SQL time (HH:mm:ss), not an instant, so it is hung on
+   * today's date purely to be formatted — the date part is never shown.
+   * Mirrors the class LIST's formatter, which has always done this.
+   */
+  formatTime(time: string | null | undefined): string {
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return time;
+    const date = new Date();
+    date.setHours(h, m, 0, 0);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
   openAttendanceDialog(session: Session) {
     this.attendanceSession.set(session);
     this.showAttendanceDialog = true;
