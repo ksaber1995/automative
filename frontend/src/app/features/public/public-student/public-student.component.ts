@@ -88,15 +88,28 @@ export class PublicStudentComponent implements OnInit {
     return d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  /** Date + time of day, for a check-in ("14 Jul 2026, 16:32"). */
+  /**
+   * en-GB writes the meridiem lowercase ("4:32 pm"); every other screen in the
+   * app shows "PM". Latin-only, so Arabic's ص/م passes through untouched.
+   */
+  private upperMeridiem(s: string): string {
+    return s.replace(/\b(am|pm)\b/gi, m => m.toUpperCase());
+  }
+
+  /**
+   * Date + time of day, for a check-in ("14 Jul 2026, 04:32 PM").
+   *
+   * hour12 is forced: en-GB would otherwise render 16:32, and this page is read
+   * by parents, who read the clock the way they say it. Arabic gets ص/م.
+   */
   formatDateTime(value: string | null | undefined): string {
     if (!value) return '—';
     const d = new Date(value);
     if (isNaN(d.getTime())) return '—';
     const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
-    return d.toLocaleString(locale, {
-      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+    return this.upperMeridiem(d.toLocaleString(locale, {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
+    }));
   }
 
   /** Time of day only, for the arrival time beside a session's date. */
@@ -105,7 +118,7 @@ export class PublicStudentComponent implements OnInit {
     const d = new Date(value);
     if (isNaN(d.getTime())) return '';
     const locale = this.languageService.currentLang() === 'ar' ? 'ar-EG' : 'en-GB';
-    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    return this.upperMeridiem(d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: true }));
   }
 
   /** "August 2026" for a billing period. */
