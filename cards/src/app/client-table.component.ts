@@ -61,6 +61,9 @@ interface Column {
                     <span class="off">—</span>
                   }
                 </td>
+                <td class="addr" [title]="r.address || 'No address set'">
+                  @if (r.address) { {{ r.address }} } @else { <span class="off">not set</span> }
+                </td>
               </tr>
             }
           </tbody>
@@ -73,6 +76,11 @@ interface Column {
               <td class="num">{{ totals().linked | number }}</td>
               <td class="num">{{ totals().unlinked | number }}</td>
               <td></td>
+              <td>
+                @if (missingAddresses(); as n) {
+                  <span class="off">{{ n }} without an address</span>
+                }
+              </td>
             </tr>
           </tfoot>
         </table>
@@ -95,6 +103,9 @@ interface Column {
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: color-mix(in srgb, var(--muted) 8%, transparent); }
     td.name { font-weight: 550; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+    /* An address is long and the row must not stretch for it — the full value is
+       in the title attribute, and the drawer shows it in full. */
+    td.addr { max-width: 260px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
     tfoot td { font-weight: 650; border-top: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
     tbody tr.rowlink { cursor: pointer; }
     tbody tr.rowlink:focus-visible { outline: 2px solid var(--linked); outline-offset: -2px; }
@@ -114,7 +125,11 @@ export class ClientTableComponent {
     { key: 'linked', label: 'Linked', numeric: true },
     { key: 'unlinked', label: 'Unlinked', numeric: true },
     { key: null, label: 'Split', numeric: false },
+    { key: null, label: 'Ships to', numeric: false },
   ];
+
+  /** Clients with nowhere to ship — the number that blocks a print run. */
+  protected missingAddresses = computed(() => this.rows().filter((r) => !r.address).length);
 
   /** Footer totals reflect the rows actually shown, not the whole data set. */
   protected totals = computed(() =>

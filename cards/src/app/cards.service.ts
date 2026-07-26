@@ -87,6 +87,19 @@ export class CardsService {
     return this.http.get<QrCardStats>(`${this.base}/companies/${companyId}/qr-cards`);
   }
 
+  /**
+   * Set where this client's printed cards ship to. Blank clears it.
+   *
+   * This is the tenant's own `companies.address`, not a separate shipping field,
+   * so what is typed here is what they see in their company profile.
+   */
+  setAddress(companyId: string, address: string | null): Observable<{ success: boolean; address: string | null }> {
+    return this.http.put<{ success: boolean; address: string | null }>(
+      `${this.base}/companies/${companyId}/address`,
+      { address },
+    );
+  }
+
   private toRow(c: AdminCompany, stats: QrCardStats): ClientRow {
     const total = Number(stats.total ?? 0);
     const linked = Number(stats.linked ?? 0);
@@ -96,6 +109,8 @@ export class CardsService {
       type: c.company_type || '—',
       currency: c.currency ?? null,
       createdAt: c.company_created_at ?? null,
+      // Trim to null so a stored blank reads as "not set", like an absent one.
+      address: (c.address ?? '').trim() || null,
       mobile: c.mobile ?? null,
       ownerEmail: c.owner_email ?? null,
       subType: c.subscription_type ?? null,

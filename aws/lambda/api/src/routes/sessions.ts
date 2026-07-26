@@ -143,7 +143,63 @@ const AUTO_END_GRACE_MINUTES = 15;
  * class has no instructor assigned, so there is no teacher it could mark present.
  * Better a closed session that says why it has no teacher than one left running.
  */
-const AUTO_END_NO_TEACHER_NOTE = 'Auto-closed with no teacher on record: this class has no instructor assigned.';
+const AUTO_END_NO_TEACHER_NOTE = 'Auto-closed with no teacher on record: neither the class nor its course has an instructor assigned.';
+
+/** Stamped when a session is ended by hand and nobody could be credited for it. */
+const END_NO_TEACHER_NOTE = 'Ended with no teacher on record: neither the class nor its course has an instructor assigned.';
+
+/**
+ * Closed after its own day, so its end time is the schedule's, not the clock's —
+ * worth saying out loud, or a lesson closed three days late looks like one
+ * somebody actually sat through.
+ */
+const AUTO_END_LATE_NOTE = 'Auto-closed after the fact; stamped with the lesson\'s scheduled end time.';
+
+/** Closed by the backstop below: no schedule row matched the day it started on. */
+const AUTO_END_BACKSTOP_NOTE = 'Auto-closed by the stale-session backstop: no timetable entry matched the day it started, so the class\'s usual lesson length was used.';
+
+/**
+ * How long an automation-owned session may stay open when its schedule cannot be
+ * resolved at all (the class timetable changed after the session opened). Without
+ * a bound, such a session is invisible to every rule above and never closes.
+ */
+const AUTO_END_MAX_OPEN_HOURS = 24;
+
+/**
+ * Who a session is credited to by default: the class's own instructor, falling
+ * back to the instructor on its course.
+ *
+ * Most classes are created without an instructor of their own (12 of 13 in one
+ * live tenant), which left the session with no teacher on record — and an
+ * academy cannot end a teacher-less session, so it stayed open for ever. The
+ * course's instructor is the person who actually teaches those classes, so it
+ * is the right fallback.
+ *
+ * NOTE: a PRESENT row is also what accrues per-session teacher pay
+ * (expenses.ts getUnpaidSessionIds), so crediting the course instructor here
+ * means they are owed for the session too. That is the intended meaning of
+ * "this teacher taught it" — but it is a financial side effect, not just a
+ * display one.
+ */
+async function resolveDefaultInstructorId(classId: string): Promise<string | null> {
+  const row = await queryOne<any>(
+    `SELECT COALESCE(c.instructor_id, co.instructor_id) AS instructor_id
+       FROM classes c JOIN courses co ON co.id = c.course_id
+      WHERE c.id = $1`,
+    [classId],
+  );
+  return row?.instructor_id || null;
+}
+
+/** Mark a teacher PRESENT for a session, promoting an existing row if needed. */
+async function markTeacherPresent(sessionId: string, employeeId: string): Promise<void> {
+  await query(
+    `INSERT INTO session_teacher_attendance (session_id, employee_id, role, status, notes)
+     VALUES ($1, $2, 'PRIMARY', 'PRESENT', NULL)
+     ON CONFLICT (session_id, employee_id) DO UPDATE SET status = 'PRESENT'`,
+    [sessionId, employeeId],
+  );
+}
 
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
@@ -236,7 +292,8 @@ export const sessionsRoutes = {
 
       // Verify class exists and belongs to company (branch/company come from the linked course)
       const cls = await queryOne<any>(
-        `SELECT c.*, co.company_id, co.branch_id, comp.type AS company_type
+        `SELECT c.*, co.company_id, co.branch_id, comp.type AS company_type,
+                COALESCE(c.instructor_id, co.instructor_id) AS default_instructor_id
          FROM classes c
          INNER JOIN courses co ON c.course_id = co.id
          INNER JOIN companies comp ON comp.id = co.company_id
@@ -281,11 +338,14 @@ export const sessionsRoutes = {
         }
         const session = await update('sessions', prepared.id, updateFields);
 
-        // Teacher attendance for the formally-started session
+        // Teacher attendance for the formally-started session. With no explicit
+        // list, the default teacher (class's instructor, else the course's) is
+        // marked present — so the session always has someone on record and can
+        // be ended later.
         const teachers: Array<{ employeeId: string; role?: string; status?: string; notes?: string }> =
           Array.isArray(body.teachers) ? body.teachers : [];
-        if (teachers.length === 0 && cls.instructor_id) {
-          teachers.push({ employeeId: cls.instructor_id, role: 'PRIMARY', status: 'PRESENT' });
+        if (teachers.length === 0 && cls.default_instructor_id) {
+          teachers.push({ employeeId: cls.default_instructor_id, role: 'PRIMARY', status: 'PRESENT' });
         }
         for (const t of teachers) {
           if (!t.employeeId) continue;
@@ -365,13 +425,14 @@ export const sessionsRoutes = {
       });
 
       // Teacher attendance — optional. If the caller provided an explicit list,
-      // use it verbatim. Otherwise fall back to the class's assigned instructor
-      // as PRIMARY/PRESENT (if any).
+      // use it verbatim. Otherwise the default teacher (the class's instructor,
+      // else the course's) is marked PRIMARY/PRESENT, so no session is left
+      // without a teacher on record.
       const teachers: Array<{ employeeId: string; role?: string; status?: string; notes?: string }> =
         Array.isArray(body.teachers) ? body.teachers : [];
 
-      if (teachers.length === 0 && cls.instructor_id) {
-        teachers.push({ employeeId: cls.instructor_id, role: 'PRIMARY', status: 'PRESENT' });
+      if (teachers.length === 0 && cls.default_instructor_id) {
+        teachers.push({ employeeId: cls.default_instructor_id, role: 'PRIMARY', status: 'PRESENT' });
       }
 
       for (const t of teachers) {
@@ -513,7 +574,8 @@ export const sessionsRoutes = {
       // ── Auto-start: classes scheduled in-window now with no running session ──
       const startParams: any[] = [context.companyId, dayName, localDate, localTime];
       let startSql = `
-        SELECT c.id AS class_id, c.name AS class_name, c.instructor_id, co.branch_id
+        SELECT c.id AS class_id, c.name AS class_name,
+               COALESCE(c.instructor_id, co.instructor_id) AS instructor_id, co.branch_id
         FROM classes c
         JOIN courses co ON co.id = c.course_id
         WHERE co.company_id = $1
@@ -633,28 +695,71 @@ export const sessionsRoutes = {
       if (adoptBranch) adoptSql += ` AND ${adoptBranch}`;
       await query(adoptSql, adoptParams);
 
-      // ── Auto-end: running sessions whose scheduled end time has passed today ──
-      const endParams: any[] = [context.companyId, localDate, localTime, dayName];
+      // ── Auto-end: running sessions whose scheduled end has passed ─────────────
+      //
+      // Every session is judged against ITS OWN start day, not today. The previous
+      // version required `start_date::date = today` and looked the schedule up
+      // under TODAY's weekday, which meant a session that survived midnight could
+      // never be closed by the automation again — a Tuesday lesson stayed open
+      // into the following Sunday (121 hours) because the poll only ever runs
+      // while a browser tab is open, and nobody has one at 22:00.
+      //
+      // `off` is the academy's offset from UTC, derived from the clock the client
+      // just sent us: start_date is UTC while the schedule and localTime are local
+      // wall-clock, so every comparison happens in local terms by adding it.
+      const endParams: any[] = [context.companyId, localDate, localTime];
       let endSql = `
-        SELECT s.id, s.notes, c.instructor_id
+        WITH off AS (SELECT (($2::date + $3::time) - NOW()) AS o)
+        SELECT s.id, s.notes, COALESCE(c.instructor_id, co.instructor_id) AS instructor_id,
+               -- Stamp the moment the lesson was SCHEDULED to end, never NOW():
+               -- closing a Tuesday class on Sunday must not log a 121-hour lesson.
+               -- GREATEST guards the odd case of a session adopted after its own
+               -- end time, which would otherwise end before it started.
+               GREATEST(
+                 COALESCE(
+                   ((s.start_date + off.o)::date + sched.end_time) - off.o,
+                   s.start_date + COALESCE(usual.dur, interval '2 hours')
+                 ),
+                 s.start_date
+               ) AS end_at,
+               (sched.end_time IS NULL) AS unscheduled,
+               ((s.start_date + off.o)::date < $2::date) AS from_earlier_day
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         JOIN courses co ON co.id = c.course_id
+        CROSS JOIN off
+        -- The class's schedule for the weekday the session actually started on.
+        LEFT JOIN LATERAL (
+          SELECT cdt.end_time FROM class_day_times cdt
+          WHERE cdt.class_id = c.id
+            AND cdt.day_of_week = TRIM(to_char(s.start_date + off.o, 'DAY'))
+          ORDER BY cdt.end_time DESC LIMIT 1
+        ) sched ON TRUE
+        -- Fallback only: this class's usual lesson length, for the backstop below.
+        LEFT JOIN LATERAL (
+          SELECT (cdt2.end_time - cdt2.start_time) AS dur FROM class_day_times cdt2
+          WHERE cdt2.class_id = c.id ORDER BY cdt2.end_time DESC LIMIT 1
+        ) usual ON TRUE
         WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
           -- ONLY sessions the automation owns (started or adopted). A session a
           -- human opened outside its schedule is a human's to close.
           AND s.auto_started = true
-          AND s.start_date::date = $2::date
-          -- and only on a day the class actually runs, at that day's own end time —
-          -- auto-start checks this, auto-end never did, so a Saturday make-up died
-          -- on a Monday schedule. Subtracting times gives an interval and cannot
-          -- wrap past midnight the way (end_time + interval) can. Grace: a lesson
-          -- that runs a few minutes over is normal, and attendance scanned in the
-          -- overrun has to land on this session, not on nothing.
-          AND EXISTS (
-            SELECT 1 FROM class_day_times cdt
-            WHERE cdt.class_id = c.id AND cdt.day_of_week = $4
-              AND EXTRACT(EPOCH FROM ($3::time - cdt.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60}
+          AND (
+            (sched.end_time IS NOT NULL AND (
+              -- Started on an earlier local day: overdue whatever the time is now.
+              ((s.start_date + off.o)::date < $2::date)
+              -- Started today: past that day's end time, plus a grace period. A
+              -- lesson running a few minutes over is normal, and attendance
+              -- scanned during the overrun must still land on this session.
+              OR ((s.start_date + off.o)::date = $2::date
+                  AND EXTRACT(EPOCH FROM ($3::time - sched.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60})
+            ))
+            -- Backstop: no schedule row matches its start day at all (the class's
+            -- timetable changed after it opened), so nothing above can ever judge
+            -- it. Left alone it would stay open for ever, which is the one outcome
+            -- this automation exists to prevent.
+            OR (sched.end_time IS NULL
+                AND s.start_date < NOW() - interval '${AUTO_END_MAX_OPEN_HOURS} hours')
           )
       `;
       const endBranch = appendBranchSqlFilter(context, endParams, 's.branch_id');
@@ -692,9 +797,16 @@ export const sessionsRoutes = {
           }
         }
 
-        const changes: Record<string, any> = { end_date: new Date().toISOString() };
-        if (noTeacher) {
-          changes.notes = [s.notes, AUTO_END_NO_TEACHER_NOTE].filter(Boolean).join(' ').trim();
+        // end_at comes from the query: the lesson's own scheduled end, not now.
+        const changes: Record<string, any> = { end_date: new Date(s.end_at).toISOString() };
+        const extraNotes: string[] = [];
+        if (noTeacher) extraNotes.push(AUTO_END_NO_TEACHER_NOTE);
+        // Say so whenever the end time was reconstructed rather than observed, so
+        // a 3-day-old closure isn't mistaken for a lesson someone sat through.
+        if (s.unscheduled) extraNotes.push(AUTO_END_BACKSTOP_NOTE);
+        else if (s.from_earlier_day) extraNotes.push(AUTO_END_LATE_NOTE);
+        if (extraNotes.length > 0) {
+          changes.notes = [s.notes, ...extraNotes].filter(Boolean).join(' ').trim();
         }
         await update('sessions', s.id, changes);
         // Best-effort Telegram present/absent notifications (no-op unless enabled).
@@ -736,14 +848,23 @@ export const sessionsRoutes = {
         return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
-      // A session can't be ended unless at least one teacher was present — but
-      // only for "company" tenants. Teacher-type companies don't track per-session
-      // teacher attendance (the owner is the only teacher), so skip the check.
+      // An academy records who taught a session, so ending one wants a teacher
+      // marked present — but it must never REFUSE over it. Blocking here is what
+      // left classes running for days: nobody could close a session whose class
+      // had no instructor, and 12 of 13 classes in one live tenant have none.
+      //
+      // So: credit the default teacher (the class's instructor, else the
+      // course's) and carry on. If neither exists there is nobody to credit, and
+      // the session is closed anyway with a note saying so — the gap is visible
+      // in the record instead of keeping the class open for ever. Teacher-type
+      // companies don't track per-session attendance at all (the owner is the
+      // only teacher), so they skip this entirely.
       const comp = await queryOne<any>(
         'SELECT type FROM companies WHERE id = $1',
         [context.companyId]
       );
       const isTeacherCompany = (comp?.type || '').toUpperCase() === 'TEACHER';
+      let noTeacherOnRecord = false;
       if (!isTeacherCompany) {
         const presentTeacher = await queryOne(
           `SELECT 1 FROM session_teacher_attendance
@@ -751,7 +872,12 @@ export const sessionsRoutes = {
           [params.id]
         );
         if (!presentTeacher) {
-          return apiError(400, 'ERRORS.SESSIONS.NO_TEACHER_PRESENT', 'Cannot end the session — no teacher is marked present');
+          const instructorId = await resolveDefaultInstructorId(existing.class_id);
+          if (instructorId) {
+            await markTeacherPresent(params.id, instructorId);
+          } else {
+            noTeacherOnRecord = true;
+          }
         }
       }
 
@@ -775,6 +901,11 @@ export const sessionsRoutes = {
         end_date: endDate.toISOString(),
       };
       if (body?.notes !== undefined) updateData.notes = body.notes;
+      if (noTeacherOnRecord) {
+        // Append rather than overwrite: the closer's own note still matters.
+        const base = body?.notes !== undefined ? body.notes : existing.notes;
+        updateData.notes = [base, END_NO_TEACHER_NOTE].filter(Boolean).join(' ').trim();
+      }
 
       const session = await update('sessions', params.id, updateData);
 

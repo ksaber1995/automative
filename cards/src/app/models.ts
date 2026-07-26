@@ -5,6 +5,8 @@ export interface AdminCompany {
   company_type?: string | null;
   company_created_at?: string | null;
   currency?: string | null;
+  /** Where this client's printed cards get shipped (companies.address). */
+  address?: string | null;
   mobile?: string | null;
   owner_email?: string | null;
   subscription_type?: string | null;
@@ -62,6 +64,8 @@ export interface ClientRow {
   type: string;
   currency: string | null;
   createdAt: string | null;
+  /** Shipping destination for this client's cards; null when nobody has set one. */
+  address: string | null;
   mobile: string | null;
   ownerEmail: string | null;
   subType: string | null;

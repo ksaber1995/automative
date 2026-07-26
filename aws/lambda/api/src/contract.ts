@@ -5144,6 +5144,8 @@ export const contract = c.router({
             currency: z.string().nullable(),
             company_created_at: z.string().nullable(),
             company_type: z.string().nullable(),
+            /** Where this tenant's printed cards ship to (companies.address). */
+            address: z.string().nullable(),
             mobile: z.string().nullable(),
             subscription_type: z.string().nullable(),
             price: z.number().nullable(),
@@ -5375,6 +5377,18 @@ export const contract = c.router({
       responses: {
         200: z.object({ success: z.boolean(), company_type: z.string() }),
         400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Set (or clear) the address a tenant's printed cards ship to. Empty clears.
+    setCompanyAddress: {
+      method: 'PUT',
+      path: '/api/karim-admin-secret/companies/:companyId/address',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ address: z.string().nullish() }),
+      responses: {
+        200: z.object({ success: z.boolean(), address: z.string().nullable() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

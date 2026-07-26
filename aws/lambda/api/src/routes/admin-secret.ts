@@ -11,11 +11,16 @@ export const ADMIN_ROLES = [
 
 /**
  * Intentionally-obscure, unauthenticated read-only endpoint for the owner's
- * local admin console. Returns one cross-tenant row per company: subscription
- * "type" (status), price, employee/branch counts, and start/end dates. No auth —
- * the obscure path is the only gate, and the payload is aggregate numbers +
- * company names (no credentials, emails, or phones), which the owner has
- * accepted as safe to expose. Read-only: a single SELECT, no writes.
+ * local admin console and cards report. Returns one cross-tenant row per
+ * company: subscription "type" (status), price, employee/branch/student/course
+ * counts, start/end dates, and — because those tools need them — the owner's
+ * email, the account mobile, and the tenant's postal address.
+ *
+ * No auth: the obscure path is the only gate. That was accepted when the payload
+ * was aggregate numbers and company names; it now carries contact and address
+ * details for every tenant, so the path is genuinely the only thing protecting
+ * personal data. Worth revisiting if this endpoint ever outgrows two local-only
+ * tools. Read-only: a single SELECT, no writes.
  */
 const SUBSCRIPTIONS_SQL = `
   SELECT
@@ -25,6 +30,10 @@ const SUBSCRIPTIONS_SQL = `
     c.currency                                                 AS currency,
     c.created_at                                               AS company_created_at,
     c.type                                                     AS company_type,
+    -- Where this tenant's printed cards get shipped. Free text on purpose: a
+    -- postal address is not worth normalising for a handful of clients, and the
+    -- print shop reads it as one block anyway.
+    c.address                                                  AS address,
     NULLIF(CONCAT('+', u.country_code, u.phone), '+')          AS mobile,
     u.email                                                    AS owner_email,
     s.status                                                   AS subscription_type,
@@ -58,6 +67,8 @@ export const adminSecretRoutes = {
         currency: r.currency ?? null,
         company_created_at: toIso(r.company_created_at),
         company_type: r.company_type ?? null,
+        // Blank reads as unset, so a stored empty string can't look like an address.
+        address: (r.address ?? '').trim() || null,
         mobile: r.mobile ?? null,
         owner_email: r.owner_email ?? null,
         subscription_type: r.subscription_type ?? null,
@@ -182,6 +193,36 @@ export const adminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set company type failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set type failed' } };
+    }
+  },
+
+  /**
+   * PUT /api/karim-admin-secret/companies/:companyId/address
+   * Set (or clear) the address a tenant's printed cards are shipped to. This is
+   * `companies.address`, the same field the tenant's own company profile shows —
+   * there is one address per tenant, not a separate shipping one, so updating it
+   * here is visible to them too.
+   *
+   * Empty or whitespace clears it back to NULL, which the cards report shows as
+   * "no address" — a client whose cards have nowhere to go should look unset,
+   * not look like an empty string.
+   */
+  setCompanyAddress: async ({ params, body }: { params: { companyId: string }; body: { address?: string | null } }) => {
+    try {
+      const raw = body?.address == null ? '' : String(body.address);
+      // Cap it: this lands in a free-text column with no length limit of its own,
+      // and a runaway paste would be pushed to every report that reads the list.
+      const address = raw.trim().slice(0, 500) || null;
+
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      await query('UPDATE companies SET address = $2, updated_at = NOW() WHERE id = $1', [params.companyId, address]);
+
+      return { status: 200 as const, body: { success: true, address } };
+    } catch (error: any) {
+      console.error('karim-admin-secret set company address failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set address failed' } };
     }
   },
 

@@ -1,8 +1,171 @@
-:host { display: block; }
+:host {
+  display: block;
+
+  /* ── Chrome colour system ─────────────────────────────────────────
+     Header and sidebar are one neutral surface, #333. Everything else
+     is derived from it: the greys are steps off that base with no blue
+     tint (a tinted grey next to a neutral one just reads as "almost
+     navy"), and the single accent is the logo's own green, which stays
+     legible on grey and keeps the chrome tied to the brand mark.
+
+     Measured on #333 — all text clears WCAG AA (4.5:1) with headroom:
+
+       text        11.59:1      accent       7.08:1
+       muted        6.03:1      accent-soft  9.00:1
+       chevron      3.20:1
+
+     --neon-line (1.6:1) and --neon-raised (1.2:1) are deliberately
+     quiet: on a flat grey, a divider and a hover lift should be felt,
+     not read. The boundary carrying the weight is the chrome against
+     the light page body, at 11.48:1.
+
+     One surface means the header and sidebar are flush — the header's
+     hairline plus its bloom is what separates them. To reintroduce a
+     hierarchy step, give .neon-header its own darker background.
+
+     Retune from --neon-surface and --neon-accent; the rest follows. */
+  --neon-surface:     #333333;               /* header + sidebar      */
+  --neon-raised:      #414141;               /* chip fill, scrollbar  */
+  --neon-line:        #525252;               /* hairlines, dividers   */
+  --neon-faint:       #808080;               /* chevrons, de-emphasis */
+  --neon-idle:        #b3b3b3;               /* resting label         */
+  --neon-bright:      #f5f5f5;               /* primary text          */
+  --neon-accent:      #3ddc84;               /* brand green (active)  */
+  --neon-accent-soft: #86efac;               /* hover                 */
+  /* Hover is a translucent lift, not a colour: it lands on #414141 here,
+     matching --neon-raised, and it keeps green meaning exactly one thing —
+     "this is the page you're on". */
+  --neon-hover:       rgba(255, 255, 255, 0.07);
+  --neon-wash:        rgba(61, 220, 132, 0.12);
+  --neon-wash-strong: rgba(61, 220, 132, 0.20);
+  --neon-edge:        rgba(61, 220, 132, 0.40);
+  --neon-glow:        0 0 12px rgba(61, 220, 132, 0.45);
+  --neon-glow-text:   0 0 10px rgba(61, 220, 132, 0.40);
+}
+
 .top-16{
     top: 4.5rem;
 }
 
 .z-10{
     z-index: 100
+}
+
+/* Shared by the header and the sidebar: hairline colour and the fact that
+   both are dark surfaces. The template no longer carries bg-white /
+   border-gray-200 on these, so nothing competes. */
+.neon-chrome {
+  border-color: var(--neon-line);
+}
+
+/* One surface for both bars. */
+.neon-sidebar { background: var(--neon-surface); }
+
+.neon-header {
+  background: var(--neon-surface);
+  /* A white box-shadow is invisible on grey, and the two bars are the same
+     tone now — so this hairline plus a faint green bloom is the only thing
+     marking where the header ends. */
+  box-shadow: 0 1px 0 var(--neon-line), 0 10px 24px -14px rgba(61, 220, 132, 0.30);
+}
+
+/* Dark scrollbar for the sidebar — the default light one gives the panel
+   away as soon as the menu overflows. */
+.neon-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--neon-raised) transparent;
+
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--neon-raised);
+    border-radius: 4px;
+
+    &:hover { background: var(--neon-line); }
+  }
+}
+
+/* ── Sidebar items ─────────────────────────────────────────────────
+   Icons inherit the label colour so a link is one unit. Keep the
+   :hover rule ABOVE .neon-active: both are specificity 0,2,0, so the
+   later declaration is what wins when a route is active AND hovered. */
+.neon-link,
+.neon-group {
+  color: var(--neon-idle);
+
+  i { color: inherit; }
+
+  &:hover {
+    background: var(--neon-hover);
+    color: var(--neon-bright);
+  }
+}
+
+/* Active route. The 4px bar is already positioned by the template
+   (left in LTR, right in RTL, via the existing border-l-4/border-r-4
+   bindings and the RTL flip in styles.scss) — this only lights it up,
+   so the direction logic stays untouched. */
+.neon-link.neon-active {
+  color: var(--neon-accent);
+  background: var(--neon-wash);
+  border-color: var(--neon-accent);
+  box-shadow: var(--neon-glow);
+  text-shadow: var(--neon-glow-text);
+}
+
+.neon-chevron {
+  color: var(--neon-faint);
+}
+
+/* ── Header pieces ─────────────────────────────────────────────────
+   Anything that was tuned for a white bar needs restating. */
+.neon-user-name { color: var(--neon-bright); }
+.neon-user-role { color: var(--neon-idle); }
+
+/* Company badge: a bg-blue-50 pill would read as a bright hole. */
+.neon-chip {
+  background: var(--neon-wash);
+  border-color: var(--neon-edge);
+  color: var(--neon-accent-soft);
+
+  i { color: var(--neon-accent); }
+
+  &:hover { background: var(--neon-wash-strong); }
+}
+
+/* The presence dot's ring matched the old white bar. */
+.neon-dot-ring { border-color: var(--neon-surface); }
+
+/* ── PrimeNG controls inside the dark chrome ───────────────────────
+   The theme assumes a light surface, so its buttons come out
+   dark-on-dark. Scoped to .neon-chrome and qualified with :enabled so
+   these beat the theme's own :enabled:hover rules without !important. */
+:host ::ng-deep .neon-chrome {
+  .p-button.p-button-text {
+    color: var(--neon-idle);
+
+    &:enabled:hover {
+      color: var(--neon-bright);
+      background: var(--neon-hover);
+    }
+  }
+
+  .p-button.p-button-outlined {
+    color: var(--neon-accent);
+    border-color: var(--neon-edge);
+    background: transparent;
+
+    &:enabled:hover {
+      color: var(--neon-accent-soft);
+      border-color: var(--neon-accent);
+      background: var(--neon-wash);
+    }
+  }
+
+  /* Keyboard focus has to stay visible on dark — same accent as everything
+     else, so focus and "active" read as one language. */
+  .p-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--neon-edge);
+  }
 }

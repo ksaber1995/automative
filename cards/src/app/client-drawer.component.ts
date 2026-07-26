@@ -52,6 +52,36 @@ import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-expor
             </div>
           }
 
+          <!-- ── Where the cards go ───────────────────────────────────── -->
+          <section class="panel">
+            <h3>Shipping address</h3>
+            <textarea
+              class="addr"
+              rows="3"
+              maxlength="500"
+              placeholder="No address set — this client's cards have nowhere to ship."
+              [ngModel]="addressDraft()"
+              (ngModelChange)="addressDraft.set($event)"
+            ></textarea>
+            <div class="actions">
+              <button class="primary" [disabled]="!addressDirty() || savingAddress()" (click)="saveAddress()">
+                {{ savingAddress() ? 'Saving…' : 'Save address' }}
+              </button>
+              @if (addressDirty() && !savingAddress()) {
+                <button (click)="resetAddress()">Discard</button>
+              }
+              @if (addressSaved()) { <span class="progress">Saved.</span> }
+            </div>
+            @if (addressError(); as e) {
+              <p class="hint err">{{ e }}</p>
+            } @else {
+              <p class="hint">
+                This is the tenant's own address — they see the same value in their company profile.
+                Clearing it and saving removes it.
+              </p>
+            }
+          </section>
+
           <!-- ── Mint a run ───────────────────────────────────────────── -->
           <section class="panel">
             <h3>New bundle</h3>
@@ -231,6 +261,13 @@ import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-expor
       font: inherit; color: var(--text); background: var(--page);
       border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 150px;
     }
+    /* Mirrors .form input above, but full-width and growable — a postal address
+       is two or three lines, not a 150px box. */
+    .addr {
+      width: 100%; box-sizing: border-box; resize: vertical;
+      font: inherit; color: var(--text); background: var(--page);
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    }
     .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
     /* A refused run is the one message here that must not read as a footnote. */
     .hint.err { color: #d03b3b; font-weight: 600; }
@@ -306,6 +343,16 @@ export class ClientDrawerComponent {
 
   protected busy = computed(() => this.generating() || this.marking() || this.exporting());
 
+  /** Shipping address editor: draft, in-flight flag, confirmation, failure. */
+  protected addressDraft = signal('');
+  protected savingAddress = signal(false);
+  protected addressSaved = signal(false);
+  protected addressError = signal<string | null>(null);
+  /** Nothing to save until the draft actually differs from what's stored. */
+  protected addressDirty = computed(
+    () => this.addressDraft().trim() !== (this.client()?.address ?? ''),
+  );
+
   newCount = 100;
   newPoolType = 1;
   newPrice: number | null = null;
@@ -328,6 +375,16 @@ export class ClientDrawerComponent {
       this.unprintedCount.set(c.unprinted);
       this.loadCards(c.id, status);
     });
+
+    // Seed the address editor from whichever client is open. Deliberately a
+    // SEPARATE effect that reads only client(): folding it into the one above
+    // would re-run on every tab switch and wipe a half-typed address.
+    effect(() => {
+      const c = this.client();
+      this.addressDraft.set(c?.address ?? '');
+      this.addressSaved.set(false);
+      this.addressError.set(null);
+    });
   }
 
   /** Escape closes — but not mid-export, which would look like a crash. */
@@ -340,6 +397,34 @@ export class ClientDrawerComponent {
     this.service.listCards(companyId, status).subscribe({
       next: (rows) => { this.cards.set(rows); this.loadingCards.set(false); },
       error: () => { this.cards.set([]); this.loadingCards.set(false); },
+    });
+  }
+
+  /** Put the draft back to what's stored. */
+  protected resetAddress(): void {
+    this.addressDraft.set(this.client()?.address ?? '');
+    this.addressError.set(null);
+    this.addressSaved.set(false);
+  }
+
+  /** Save the address. Blank clears it, which the API stores as NULL. */
+  protected saveAddress(): void {
+    const c = this.client();
+    if (!c || this.savingAddress()) return;
+    this.savingAddress.set(true);
+    this.addressError.set(null);
+    this.addressSaved.set(false);
+    this.service.setAddress(c.id, this.addressDraft().trim() || null).subscribe({
+      next: () => {
+        this.savingAddress.set(false);
+        this.addressSaved.set(true);
+        // Refresh the report behind so its Ships-to column matches.
+        this.changed.emit();
+      },
+      error: (e: any) => {
+        this.savingAddress.set(false);
+        this.addressError.set(e?.error?.message || 'Could not save the address. It is unchanged.');
+      },
     });
   }
 
