@@ -580,18 +580,25 @@
         </div>
       </ng-template>
 
-      <p-tabs value="active-courses">
+      <!-- Tab bar only. Active and Withdrawn are the same table — same columns,
+           same row actions — so the rows are swapped by `tabEnrollments()`
+           instead of duplicating 400 lines of markup into a second panel. -->
+      <p-tabs [value]="enrollmentTab()" (valueChange)="enrollmentTab.set($any($event))">
         <p-tablist>
           <p-tab value="active-courses">
             <i class="pi pi-bolt mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_ACTIVE' | translate }} ({{ activeEnrollments().length }})
+          </p-tab>
+          <p-tab value="withdrawn-courses">
+            <i class="pi pi-user-minus mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_WITHDRAWN' | translate }} ({{ withdrawnEnrollments().length }})
           </p-tab>
           <p-tab value="finished-courses">
             <i class="pi pi-check-circle mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_FINISHED' | translate }} ({{ finishedEnrollments().length }})
           </p-tab>
         </p-tablist>
-        <p-tabpanels>
-          <p-tabpanel value="active-courses">
-      <p-table [value]="activeEnrollments()" responsiveLayout="scroll" [expandedRowKeys]="expandedRows" dataKey="id">
+      </p-tabs>
+
+      @if (enrollmentTab() !== 'finished-courses') {
+      <p-table [value]="tabEnrollments()" responsiveLayout="scroll" [expandedRowKeys]="expandedRows" dataKey="id">
         <ng-template pTemplate="header">
           <tr>
             <th style="width: 3rem"></th>
@@ -607,7 +614,9 @@
         </ng-template>
 
         <ng-template pTemplate="body" let-enrollment let-expanded="expanded">
-          <tr>
+          <!-- enrollment-row draws the heavy rule that separates one enrollment
+               (summary row + its expanded panel) from the next — see the scss. -->
+          <tr class="enrollment-row">
             <td>
               <p-button
                 [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
@@ -830,15 +839,19 @@
                     <h4 class="font-semibold text-gray-700 flex items-center gap-2">
                       <i class="pi pi-calendar text-amber-600"></i> {{ 'STUDENTS.DETAIL.MONTHLY_BILLS' | translate }}
                     </h4>
-                    <p-button
-                      icon="pi pi-forward"
-                      size="small"
-                      [outlined]="true"
-                      severity="success"
-                      [label]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH' | translate"
-                      [pTooltip]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH_HINT' | translate"
-                      (onClick)="collectNextMonth(enrollment)"
-                    ></p-button>
+                    <!-- Never for a dropped subscription: the student has left, so
+                         billing them for a month still to come is a bill nobody owes. -->
+                    @if (enrollment.status !== 'DROPPED') {
+                      <p-button
+                        icon="pi pi-forward"
+                        size="small"
+                        [outlined]="true"
+                        severity="success"
+                        [label]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH' | translate"
+                        [pTooltip]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH_HINT' | translate"
+                        (onClick)="collectNextMonth(enrollment)"
+                      ></p-button>
+                    }
                   </div>
                   @if (getMonthlyPayments(enrollment.id).length === 0) {
                     <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</p>
@@ -1026,15 +1039,18 @@
             <td colspan="9" class="text-center py-8">
               <div class="text-gray-500">
                 <i class="pi pi-inbox text-4xl mb-3"></i>
-                <p>{{ 'STUDENTS.DETAIL.NO_ENROLLMENTS' | translate }}</p>
-                <p class="text-sm mt-2">{{ 'STUDENTS.DETAIL.CLICK_TO_ENROLL' | translate }}</p>
+                @if (enrollmentTab() === 'withdrawn-courses') {
+                  <p>{{ 'STUDENTS.DETAIL.NO_WITHDRAWN_COURSES' | translate }}</p>
+                } @else {
+                  <p>{{ 'STUDENTS.DETAIL.NO_ENROLLMENTS' | translate }}</p>
+                  <p class="text-sm mt-2">{{ 'STUDENTS.DETAIL.CLICK_TO_ENROLL' | translate }}</p>
+                }
               </div>
             </td>
           </tr>
         </ng-template>
       </p-table>
-          </p-tabpanel>
-          <p-tabpanel value="finished-courses">
+      } @else {
             @if (finishedEnrollments().length === 0) {
               <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_FINISHED_COURSES' | translate }}</div>
             } @else {
@@ -1102,9 +1118,7 @@
                 </ng-template>
               </p-table>
             }
-          </p-tabpanel>
-        </p-tabpanels>
-      </p-tabs>
+      }
     </p-card>
     <!-- Attendance History Card -->
     <p-card class="mt-6">

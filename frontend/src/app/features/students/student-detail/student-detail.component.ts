@@ -171,8 +171,25 @@ export class StudentDetailComponent implements OnInit {
     return this.classDoneMap().get(e.classId) === true;
   }
 
-  activeEnrollments = computed(() => this.enrollments().filter(e => !this.isEnrollmentFinished(e)));
-  finishedEnrollments = computed(() => this.enrollments().filter(e => this.isEnrollmentFinished(e)));
+  /**
+   * Which enrollment tab is showing. Held here rather than left to PrimeNG
+   * because Active and Withdrawn share one table — same columns, same row
+   * actions — switched by `tabEnrollments()`.
+   */
+  enrollmentTab = signal<'active-courses' | 'withdrawn-courses' | 'finished-courses'>('active-courses');
+
+  /**
+   * The student left this course. Withdrawn wins over both other tabs, so a
+   * dropped enrollment appears in exactly one place — its own — instead of
+   * sitting among the courses the student is actually taking.
+   */
+  withdrawnEnrollments = computed(() => this.enrollments().filter(e => e.status === 'DROPPED'));
+  activeEnrollments = computed(() => this.enrollments().filter(e => e.status !== 'DROPPED' && !this.isEnrollmentFinished(e)));
+  finishedEnrollments = computed(() => this.enrollments().filter(e => e.status !== 'DROPPED' && this.isEnrollmentFinished(e)));
+  /** Rows for the table shared by the Active and Withdrawn tabs. */
+  tabEnrollments = computed(() =>
+    this.enrollmentTab() === 'withdrawn-courses' ? this.withdrawnEnrollments() : this.activeEnrollments()
+  );
   activeMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status !== 'COMPLETED'));
   finishedMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status === 'COMPLETED'));
   courses = new Map<string, Course>();

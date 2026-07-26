@@ -5,3 +5,19 @@
 .field {
   margin-bottom: 1rem;
 }
+
+/**
+ * Course enrollments read as one long list: each one is a summary row plus an
+ * expanded panel of bills, and the default 1px row rule is too faint to show
+ * where one enrollment ends and the next begins. A heavy rule above each
+ * summary row draws that boundary (dropped on the first row — nothing above it
+ * to separate from). ::ng-deep because the rows come from PrimeNG's table
+ * templates and carry no component scoping attribute.
+ */
+:host ::ng-deep .p-datatable-tbody > tr.enrollment-row > td {
+  border-top: 3px solid var(--p-surface-300, #cbd5e1);
+}
+
+:host ::ng-deep .p-datatable-tbody > tr.enrollment-row:first-child > td {
+  border-top: 0;
+}
