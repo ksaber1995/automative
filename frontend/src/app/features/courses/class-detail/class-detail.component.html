@@ -238,6 +238,10 @@
                   <td>
                     <p-button icon="pi pi-check-square" [rounded]="true" [text]="true" severity="info"
                       (onClick)="openAttendanceDialog(s)" [pTooltip]="'CLASSES.DETAIL.MANAGE_ATTENDANCE' | translate"></p-button>
+                    <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                      [loading]="deletingSessionId() === s.id"
+                      (onClick)="confirmDeleteSession(s)" [pTooltip]="'CLASSES.DETAIL.DELETE_SESSION' | translate"
+                      [attr.aria-label]="'CLASSES.DETAIL.DELETE_SESSION' | translate"></p-button>
                   </td>
                 </tr>
               </ng-template>

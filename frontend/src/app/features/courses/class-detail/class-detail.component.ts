@@ -102,6 +102,8 @@ export class ClassDetailComponent implements OnInit {
   sessionNotes = '';
   endSessionNotes = '';
   endingSession = signal<Session | null>(null);
+  /** Session currently being deleted — disables its row's button. */
+  deletingSessionId = signal<string | null>(null);
 
   activeSession = () => this.sessions().find(s => !s.endDate) ?? null;
   presentCount = () => this.attendanceStudents().filter(s => s.isPresent).length;
@@ -226,6 +228,43 @@ export class ClassDetailComponent implements OnInit {
       error: () => {
         // Interceptor toasted the translated error.
         this.savingSession.set(false);
+      },
+    });
+  }
+
+  /**
+   * Deleting a session erases its attendance with it and cannot be undone, so
+   * the confirmation names the date and says what is lost. The server refuses
+   * if money was collected on it.
+   */
+  confirmDeleteSession(session: Session) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('CLASSES.DETAIL.DELETE_SESSION_TITLE'),
+      message: this.translate.instant('CLASSES.DETAIL.DELETE_SESSION_MSG', {
+        date: this.formatDateTime(session.startDate),
+      }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('CLASSES.DETAIL.DELETE_SESSION_ACCEPT'),
+      rejectLabel: this.translate.instant('CLASSES.DETAIL.DELETE_SESSION_REJECT'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.deleteSession(session),
+    });
+  }
+
+  private deleteSession(session: Session) {
+    this.deletingSessionId.set(session.id);
+    this.sessionService.remove(session.id).subscribe({
+      next: () => {
+        this.deletingSessionId.set(null);
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.SESSION_DELETED_MSG'));
+        this.loadSessions();
+        // The summary counts sessions, so it goes stale the moment one dies.
+        if (this.attendanceSummary().length) this.loadAttendanceSummary();
+        if (session.isFree && this.freeSummary()) this.loadFreeSessions();
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.deletingSessionId.set(null);
       },
     });
   }
