@@ -639,6 +639,26 @@ export class ClassFormComponent implements OnInit {
   }
 
   /**
+   * A clashing class's schedule as the clock is read: "23:00:00" -> "11:00 PM".
+   * The value is a bare SQL time, not an instant, so it is hung on today's date
+   * purely to be formatted. Mirrors the class list and detail formatters.
+   */
+  formatTime(time: string | null | undefined): string {
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return time;
+    const date = new Date();
+    date.setHours(h, m, 0, 0);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /** "SATURDAY,TUESDAY" -> the translated short day names. */
+  formatDaysOfWeek(days: string | null | undefined): string {
+    if (!days) return '';
+    return days.split(',').map(d => this.translate.instant('CLASSES.LIST.DAY_' + d.trim())).join(', ');
+  }
+
+  /**
    * After editing a class, return to the origin the user came from:
    * the class detail (from=class) or the course detail (from=course).
    * Falls back to the class detail when no origin hint is present.

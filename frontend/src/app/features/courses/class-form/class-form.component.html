@@ -376,7 +376,7 @@
                 @for (c of availabilityConflicts(); track c.id) {
                   <li>
                     <strong>{{ c.name }}</strong> —
-                    {{ c.daysOfWeek }} {{ c.startTime }}–{{ c.endTime }}
+                    {{ formatDaysOfWeek(c.daysOfWeek) }} {{ formatTime(c.startTime) }}–{{ formatTime(c.endTime) }}
                   </li>
                 }
               </ul>
