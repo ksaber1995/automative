@@ -98,7 +98,13 @@ export class SessionPayDialogComponent {
     const c = charge ?? this.current();
     if (!c) return;
     this.mode.set(mode);
-    this.amount.set(mode === 'PACKAGE' ? (c.coursePackagePrice ?? 0) : c.amountDue);
+    // PACKAGE buys a fresh bundle, so it costs the whole package price.
+    // SESSION settles what is still owed on THIS charge: a student who already
+    // paid 50 of 100 is asked for 50, not 100 again. (The dashboard's package
+    // top-up has always defaulted to the remainder — only this one didn't.)
+    this.amount.set(mode === 'PACKAGE'
+      ? (c.coursePackagePrice ?? 0)
+      : Math.max(0, (c.amountDue ?? 0) - (c.amountPaid || 0)));
   }
 
   private advance(): void {
