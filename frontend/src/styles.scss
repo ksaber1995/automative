@@ -3,6 +3,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Toast (snackbar) ─────────────────────────────────────────────
+   The theme ships every toast at 95% opacity over a 1.5px backdrop blur.
+   Toasts pop up top-right — which is the dark header now, plus whatever the
+   page has drawn under it — and that bleed-through put the page's own text
+   behind the message. Opaque fill, no blur: each severity keeps its colour
+   in the border, icon and title, and the message body is near-black so it
+   reads the same over any surface.
+
+   Specificity 0,2,0 beats the theme's own 0,1,0 rules whatever order the
+   runtime injects them in — no !important needed. */
+.p-toast .p-toast-message {
+  backdrop-filter: none;
+  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.35);
+
+  .p-toast-detail { color: #1f2937; }   /* ≥ 12:1 on all four fills below */
+}
+
+.p-toast .p-toast-message-success {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  .p-toast-summary, .p-toast-message-icon { color: #047857; }
+}
+
+.p-toast .p-toast-message-error {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  .p-toast-summary, .p-toast-message-icon { color: #b91c1c; }
+}
+
+.p-toast .p-toast-message-warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  .p-toast-summary, .p-toast-message-icon { color: #b45309; }
+}
+
+.p-toast .p-toast-message-info {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  .p-toast-summary, .p-toast-message-icon { color: #1d4ed8; }
+}
+
 /* ── RTL / Arabic font support ───────────────────────────── */
 [dir='rtl'] {
   font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
