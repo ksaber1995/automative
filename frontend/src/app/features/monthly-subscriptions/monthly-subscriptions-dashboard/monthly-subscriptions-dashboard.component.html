@@ -371,23 +371,25 @@
                 }
               }
               @if (p.amountPaid > 0 && p.paymentStatus !== 'REFUNDED') {
-                <p-button
-                  icon="pi pi-replay"
-                  [text]="true"
-                  [rounded]="true"
-                  severity="warn"
-                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.REFUND' | translate"
-                  (onClick)="openRefundDialog(p)"
-                ></p-button>
-                <p-button
-                  icon="pi pi-times-circle"
-                  [text]="true"
-                  [rounded]="true"
-                  severity="danger"
-                  [disabled]="voidingId() === p.id"
-                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate"
-                  (onClick)="openVoidDialog(p)"
-                ></p-button>
+                @if (canRefund()) {
+                  <p-button
+                    icon="pi pi-replay"
+                    [text]="true"
+                    [rounded]="true"
+                    severity="warn"
+                    [pTooltip]="'MONTHLY_SUBSCRIPTIONS.REFUND' | translate"
+                    (onClick)="openRefundDialog(p)"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-times-circle"
+                    [text]="true"
+                    [rounded]="true"
+                    severity="danger"
+                    [disabled]="voidingId() === p.id"
+                    [pTooltip]="'MONTHLY_SUBSCRIPTIONS.VOID' | translate"
+                    (onClick)="openVoidDialog(p)"
+                  ></p-button>
+                }
               }
               @if (p.enrollmentStatus === 'ON_HOLD') {
                 <p-button

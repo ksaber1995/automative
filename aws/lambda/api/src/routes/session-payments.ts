@@ -830,7 +830,7 @@ export const sessionPaymentsRoutes = {
         [newPaid, newStatus, effectiveDate, body.notes || null, params.id]
       );
 
-      await recordSessionInstallment(row, pay, effectiveDate, body.notes || null);
+      await recordSessionInstallment(row, pay, effectiveDate, body.notes || null, context.userId);
 
       const updated = await queryOne('SELECT * FROM session_payments WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapSessionPaymentFromDB(updated) };
@@ -845,7 +845,7 @@ export const sessionPaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensurePerSessionSchema();
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const row = await queryOne<any>(
@@ -878,7 +878,7 @@ export const sessionPaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensurePerSessionSchema();
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const row = await queryOne<any>(
@@ -1046,7 +1046,7 @@ export const sessionPaymentsRoutes = {
       // Whatever was collected at purchase is the package's first installment
       // (skipped when the bundle is bought to be paid later, amount 0). Dated
       // today, matching the purchased_at the INSERT above defaulted to.
-      await recordPackageInstallment(pkg, amountPaid, null, body.notes || null);
+      await recordPackageInstallment(pkg, amountPaid, null, body.notes || null, context.userId);
 
       // Back-cover existing PENDING charges (oldest first) up to the credits bought.
       const pending = await query(
@@ -1110,7 +1110,7 @@ export const sessionPaymentsRoutes = {
       // The top-up is its own dated collection. purchased_at deliberately stays
       // the purchase day — before the ledger, summing amount_paid against it
       // booked this money onto a day that had already been reported.
-      await recordPackageInstallment(pkg, amount, body.paymentDate || null, body.notes || null);
+      await recordPackageInstallment(pkg, amount, body.paymentDate || null, body.notes || null, context.userId);
 
       const fresh = await queryOne('SELECT * FROM session_packages WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapPackageFromDB(fresh) };
@@ -1128,7 +1128,7 @@ export const sessionPaymentsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensurePerSessionSchema();
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const pkg = await queryOne<any>(

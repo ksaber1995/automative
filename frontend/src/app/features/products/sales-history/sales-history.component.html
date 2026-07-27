@@ -145,14 +145,16 @@
           <td>{{ ('PRODUCTS.SALES.METHOD_' + (sale.paymentMethod || 'CASH')) | translate }}</td>
           <td>
             @if (authService.canWrite('product_sales') && getRefundableAmount(sale) > 0) {
-              <p-button
-                icon="pi pi-replay"
-                [rounded]="true"
-                [text]="true"
-                severity="warn"
-                [pTooltip]="'PRODUCTS.SALES.REFUND' | translate"
-                (onClick)="openRefundDialog(sale)">
-              </p-button>
+              @if (canRefund()) {
+                <p-button
+                  icon="pi pi-replay"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  [pTooltip]="'PRODUCTS.SALES.REFUND' | translate"
+                  (onClick)="openRefundDialog(sale)">
+                </p-button>
+              }
             } @else {
               <span class="text-gray-300 text-xs">—</span>
             }

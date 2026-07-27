@@ -1,4 +1,5 @@
 import { insert, query, queryOne, update } from '../db/connection';
+import { ensurePaymentRecorderColumns } from '../db/payment-ledger';
 import {
   extractTenantContext,
   canAccessBranch,
@@ -346,7 +347,7 @@ export const masterEnrollmentsRoutes = {
   createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
@@ -460,6 +461,7 @@ export const masterEnrollmentsRoutes = {
   addPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: AuthHeaders }) => {
     try {
       await ensurePaymentsTable();
+      await ensurePaymentRecorderColumns();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -487,6 +489,7 @@ export const masterEnrollmentsRoutes = {
         amount,
         payment_date: body.paymentDate,
         notes: body.notes || null,
+        recorded_by_user_id: context.userId,
       });
 
       const newAmountPaid = currentAmountPaid + amount;

@@ -451,7 +451,7 @@ export const productSalesRoutes = {
     const client = await getClient();
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'product_sales', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         client.release();
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }

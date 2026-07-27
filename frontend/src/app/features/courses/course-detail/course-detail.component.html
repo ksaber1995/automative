@@ -197,7 +197,7 @@
                     [pTooltip]="'COURSES.DETAIL.TOOLTIP_ADD_PAYMENT' | translate"
                   ></p-button>
                 }
-                @if (refundableAmount(row) > 0) {
+                @if (refundableAmount(row) > 0 && canRefund()) {
                   <p-button
                     icon="pi pi-replay"
                     [rounded]="true"

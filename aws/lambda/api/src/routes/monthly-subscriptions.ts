@@ -801,7 +801,7 @@ export const monthlySubscriptionsRoutes = {
       // Record THIS collection on its own date. No separate revenues row is
       // written: the ledger is the single source of truth for dated subscription
       // revenue, and the bill row for status/dues.
-      await recordMonthlyInstallment(row, pay, effectiveDate, body.notes || null);
+      await recordMonthlyInstallment(row, pay, effectiveDate, body.notes || null, context.userId);
 
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',
@@ -914,7 +914,7 @@ export const monthlySubscriptionsRoutes = {
       );
 
       // This collection, on its own date — see recordPayment.
-      await recordMonthlyInstallment(bill, pay, effectiveDate, notes || null);
+      await recordMonthlyInstallment(bill, pay, effectiveDate, notes || null, context.userId);
 
       const updated = await queryOne('SELECT * FROM monthly_subscription_payments WHERE id = $1', [bill.id]);
       return { status: 200 as const, body: mapPaymentFromDB(updated) };
@@ -933,7 +933,7 @@ export const monthlySubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensureMonthlyInstallmentLedger();
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
@@ -983,7 +983,7 @@ export const monthlySubscriptionsRoutes = {
   refund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 

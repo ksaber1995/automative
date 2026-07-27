@@ -226,7 +226,7 @@ export const eventSubscriptionsRoutes = {
   createRefund: async ({ params, body, headers }: { params: { eventId: string }; body: any; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'academy', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
       const event = await queryOne(

@@ -205,6 +205,13 @@ export class CourseDetailComponent implements OnInit {
     }
   }
 
+  /**
+   * Reversing money is its own permission now: recording a payment is
+   * `enrollments: write`, undoing one is `refunds: write`, so whoever collects
+   * fees cannot quietly un-collect them. Hides the button the API would 403.
+   */
+  canRefund = (): boolean => this.auth.canWrite('refunds');
+
   ngOnInit() {
     this.courseId = this.route.snapshot.paramMap.get('id');
     if (this.courseId) {

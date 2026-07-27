@@ -207,6 +207,13 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     return [...renewalRows, ...pkgRows];
   });
 
+  /**
+   * Reversing money is its own permission now: recording a payment is
+   * `enrollments: write`, undoing one is `refunds: write`, so whoever collects
+   * fees cannot quietly un-collect them. Hides the button the API would 403.
+   */
+  canRefund = (): boolean => this.auth.canWrite('refunds');
+
   ngOnInit(): void {
     this.lookup.branches().subscribe({ next: b => this.branches.set(b), error: () => {} });
     this.courseService.getAllCourses().subscribe({

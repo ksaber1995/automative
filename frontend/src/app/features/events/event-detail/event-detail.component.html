@@ -188,10 +188,12 @@
           <td class="text-sm text-gray-500">{{ s.paymentMethod || '—' }}</td>
           <td class="whitespace-nowrap">
             @if (authService.canWrite('academy')) {
-              <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
-                [pTooltip]="isCancelled() ? ('EVENTS.DETAIL.CANCELLED_LOCKED' | translate) : ('EVENTS.DETAIL.TOOLTIP_REFUND' | translate)"
-                [disabled]="refundRemaining(s) <= 0 || isCancelled()"
-                (onClick)="openRefundDialog(s)"></p-button>
+              @if (canRefund()) {
+                <p-button icon="pi pi-replay" severity="warn" [text]="true" [rounded]="true"
+                  [pTooltip]="isCancelled() ? ('EVENTS.DETAIL.CANCELLED_LOCKED' | translate) : ('EVENTS.DETAIL.TOOLTIP_REFUND' | translate)"
+                  [disabled]="refundRemaining(s) <= 0 || isCancelled()"
+                  (onClick)="openRefundDialog(s)"></p-button>
+              }
               <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
                 [pTooltip]="'EVENTS.DETAIL.TOOLTIP_DELETE' | translate" (onClick)="deleteSubscription(s)"></p-button>
             }

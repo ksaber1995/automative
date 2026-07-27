@@ -81,6 +81,13 @@ export class SalesHistoryComponent implements OnInit {
     { label: this.translate.instant('PRODUCTS.SALES.REFUND_PARTIAL_OPT'), value: 'PARTIAL' },
   ];
 
+  /**
+   * Reversing money is its own permission now: recording a payment is
+   * `enrollments: write`, undoing one is `refunds: write`, so whoever collects
+   * fees cannot quietly un-collect them. Hides the button the API would 403.
+   */
+  canRefund = (): boolean => this.authService.canWrite('refunds');
+
   ngOnInit() {
     this.loadSales();
     this.loadSummary();

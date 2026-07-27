@@ -59,6 +59,19 @@ interface LedgerParent {
   branch_id: string;
 }
 
+/**
+ * Who keyed this collection in. Nullable on purpose: every row written before
+ * this column existed genuinely has no answer, and inventing one would be worse
+ * than admitting it. ON DELETE SET NULL because a staff member can leave without
+ * their day's takings disappearing from the books.
+ *
+ * The point is separation of duties — the money tables were the only ones that
+ * could not answer "who took this?", while cash adjustments and withdrawals
+ * always could.
+ */
+const RECORDED_BY_COLUMN = (table: string) =>
+  `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS recorded_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL`;
+
 const MONTHLY_LEDGER_DDL = [
   `CREATE TABLE IF NOT EXISTS monthly_subscription_installments (
      id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -82,6 +95,7 @@ const MONTHLY_LEDGER_DDL = [
   // One synthesised row per bill, ever — makes the backfill below idempotent.
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_msi_backfill
      ON monthly_subscription_installments(monthly_payment_id) WHERE is_backfill`,
+  RECORDED_BY_COLUMN('monthly_subscription_installments'),
 ];
 
 const MONTHLY_LEDGER_BACKFILL = `
@@ -118,6 +132,7 @@ const SESSION_LEDGER_DDL = [
   `CREATE INDEX IF NOT EXISTS idx_spi_course_id    ON session_payment_installments(course_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_spi_backfill
      ON session_payment_installments(session_payment_id) WHERE is_backfill`,
+  RECORDED_BY_COLUMN('session_payment_installments'),
 ];
 
 // A COVERED charge carries amount_paid = 0 (its money sits on the package row),
@@ -156,6 +171,7 @@ const PACKAGE_LEDGER_DDL = [
   `CREATE INDEX IF NOT EXISTS idx_pki_course_id    ON session_package_installments(course_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_pki_backfill
      ON session_package_installments(session_package_id) WHERE is_backfill`,
+  RECORDED_BY_COLUMN('session_package_installments'),
 ];
 
 // A package's own date is purchased_at, which never moved — so a top-up was
@@ -215,6 +231,29 @@ export async function applySessionInstallmentLedger(): Promise<void> {
   await query(PACKAGE_LEDGER_BACKFILL);
 }
 
+let recorderColumnsPromise: Promise<void> | null = null;
+
+/**
+ * enrollment_payments and master_enrollment_payments predate this ledger and
+ * have no schema guard of their own, so they get one here: the same attribution
+ * column the three installment tables carry. Called by the handlers that write
+ * them; cached per container like the ledger guards above.
+ */
+export async function ensurePaymentRecorderColumns(): Promise<void> {
+  if (!recorderColumnsPromise) {
+    recorderColumnsPromise = (async () => {
+      try {
+        await query(RECORDED_BY_COLUMN('enrollment_payments'));
+        await query(RECORDED_BY_COLUMN('master_enrollment_payments'));
+      } catch (e) {
+        recorderColumnsPromise = null;   // let the next caller retry
+        throw e;
+      }
+    })();
+  }
+  return recorderColumnsPromise;
+}
+
 // ============================================================
 // Writes
 // ============================================================
@@ -235,16 +274,17 @@ export async function recordMonthlyInstallment(
   amount: number,
   paymentDate: string | null,
   notes: string | null = null,
+  recordedBy: string | null = null,
   exec: Exec = defaultExec,
 ): Promise<void> {
   if (!Number.isFinite(amount) || amount <= 0) return;
   await exec(
     `INSERT INTO monthly_subscription_installments
        (monthly_payment_id, company_id, enrollment_id, student_id, course_id, branch_id,
-        amount, payment_date, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9)`,
+        amount, payment_date, notes, recorded_by_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9,$10)`,
     [bill.id, bill.company_id, bill.enrollment_id, bill.student_id, bill.course_id, bill.branch_id,
-     cents(amount), paymentDate, notes],
+     cents(amount), paymentDate, notes, recordedBy],
   );
 }
 
@@ -254,16 +294,17 @@ export async function recordSessionInstallment(
   amount: number,
   paymentDate: string | null,
   notes: string | null = null,
+  recordedBy: string | null = null,
   exec: Exec = defaultExec,
 ): Promise<void> {
   if (!Number.isFinite(amount) || amount <= 0) return;
   await exec(
     `INSERT INTO session_payment_installments
        (session_payment_id, company_id, enrollment_id, student_id, course_id, branch_id,
-        amount, payment_date, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9)`,
+        amount, payment_date, notes, recorded_by_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9,$10)`,
     [charge.id, charge.company_id, charge.enrollment_id, charge.student_id, charge.course_id, charge.branch_id,
-     cents(amount), paymentDate, notes],
+     cents(amount), paymentDate, notes, recordedBy],
   );
 }
 
@@ -278,16 +319,17 @@ export async function recordPackageInstallment(
   amount: number,
   paymentDate: string | null,
   notes: string | null = null,
+  recordedBy: string | null = null,
   exec: Exec = defaultExec,
 ): Promise<void> {
   if (!Number.isFinite(amount) || amount <= 0) return;
   await exec(
     `INSERT INTO session_package_installments
        (session_package_id, company_id, enrollment_id, student_id, course_id, branch_id,
-        amount, payment_date, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9)`,
+        amount, payment_date, notes, recorded_by_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9,$10)`,
     [pkg.id, pkg.company_id, pkg.enrollment_id, pkg.student_id, pkg.course_id, pkg.branch_id,
-     cents(amount), paymentDate, notes],
+     cents(amount), paymentDate, notes, recordedBy],
   );
 }
 

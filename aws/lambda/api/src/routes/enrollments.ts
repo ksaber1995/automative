@@ -3,7 +3,7 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { apiError, mapThrownError } from '../utils/api-error';
 import { insertProductSaleWithClient } from './product-sales';
 import { ensurePerSessionSchema } from './session-payments';
-import { ensureMonthlyInstallmentLedger, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
+import { ensureMonthlyInstallmentLedger, ensurePaymentRecorderColumns, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -215,6 +215,7 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
         collect,
         null,
         note,
+        context.userId,
         client ? (sql, p) => client.query(sql, p) : undefined,
       );
     }
@@ -318,6 +319,7 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
         packagePaid,
         null,
         pkgNote,
+        context.userId,
         (sql, p) => client.query(sql, p),
       );
     }
@@ -356,6 +358,7 @@ export const enrollmentsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensurePaymentRecorderColumns();
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -424,10 +427,10 @@ export const enrollmentsRoutes = {
 
           if (amountPaid > 0) {
             await client.query(
-              `INSERT INTO enrollment_payments (enrollment_id, company_id, amount, payment_date, notes)
-               VALUES ($1,$2,$3,$4,$5)`,
+              `INSERT INTO enrollment_payments (enrollment_id, company_id, amount, payment_date, notes, recorded_by_user_id)
+               VALUES ($1,$2,$3,$4,$5,$6)`,
               [enrollment.id, context.companyId, amountPaid, body.enrollmentDate,
-               paymentMode === 'FULL' ? 'Full payment' : 'Down payment']
+               paymentMode === 'FULL' ? 'Full payment' : 'Down payment', context.userId]
             );
           }
 
@@ -489,6 +492,7 @@ export const enrollmentsRoutes = {
           amount: amountPaid,
           payment_date: body.enrollmentDate,
           notes: paymentMode === 'FULL' ? 'Full payment' : 'Down payment',
+          recorded_by_user_id: context.userId,
         });
       }
 
@@ -1139,7 +1143,7 @@ export const enrollmentsRoutes = {
   createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+      if (!checkGranularPermission(context, 'refunds', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
@@ -1232,6 +1236,7 @@ export const enrollmentsRoutes = {
   addPayment: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      await ensurePaymentRecorderColumns();
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -1259,6 +1264,7 @@ export const enrollmentsRoutes = {
         amount: body.amount,
         payment_date: body.paymentDate,
         notes: body.notes || null,
+        recorded_by_user_id: context.userId,
       });
 
       // Update enrollment amount_paid and payment_status

@@ -352,14 +352,16 @@
                     ></p-button>
                   }
                   @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
-                    <p-button
-                      icon="pi pi-undo"
-                      [rounded]="true"
-                      [text]="true"
-                      severity="warn"
-                      (onClick)="openMasterRefundDialog(me)"
-                      [pTooltip]="'STUDENTS.DETAIL.REFUND_MASTER' | translate"
-                    ></p-button>
+                    @if (canRefund()) {
+                      <p-button
+                        icon="pi pi-undo"
+                        [rounded]="true"
+                        [text]="true"
+                        severity="warn"
+                        (onClick)="openMasterRefundDialog(me)"
+                        [pTooltip]="'STUDENTS.DETAIL.REFUND_MASTER' | translate"
+                      ></p-button>
+                    }
                   }
                   @if (me.status === 'ACTIVE') {
                     <p-button
@@ -797,7 +799,7 @@
                   ></p-button>
                 }
                 <!-- Refund button -->
-                @if (enrollment.paymentStatus === 'PAID' || enrollment.paymentStatus === 'PARTIAL') {
+                @if ((enrollment.paymentStatus === 'PAID' || enrollment.paymentStatus === 'PARTIAL') && canRefund()) {
                   <p-button
                     icon="pi pi-replay"
                     [rounded]="true"

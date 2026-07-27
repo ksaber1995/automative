@@ -411,6 +411,13 @@ export class StudentDetailComponent implements OnInit {
     return Math.round((this.attendancePresentCount() / total) * 100);
   });
 
+  /**
+   * Reversing money is its own permission now: recording a payment is
+   * `enrollments: write`, undoing one is `refunds: write`, so whoever collects
+   * fees cannot quietly un-collect them. Hides the button the API would 403.
+   */
+  canRefund = (): boolean => this.authService.canWrite('refunds');
+
   ngOnInit() {
     // Subscribe to the route param (not snapshot) so that scanning another
     // student while already on a detail page — which navigates to the same
