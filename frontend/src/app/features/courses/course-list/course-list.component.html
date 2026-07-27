@@ -20,6 +20,7 @@
       ></p-select>
       }
 
+      @if (!authService.isTeacher()) {
       <p-select
         [options]="levelOptions()"
         [ngModel]="selectedLevelId()"
@@ -30,6 +31,7 @@
         [showClear]="true"
         [style]="{ minWidth: '200px' }"
       ></p-select>
+      }
 
       <p-select
         [options]="paymentTypeOptions()"
@@ -101,8 +103,8 @@
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           @if (!authService.isTeacher()) {
             <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+            <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
           }
-          <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
           @if (showTeacher()) {
             <th pSortableColumn="instructorName">{{ 'COURSES.LIST.COL_TEACHER' | translate }} <p-sortIcon field="instructorName"></p-sortIcon></th>
           }
@@ -131,7 +133,9 @@
           @if (!authService.isTeacher()) {
             <td>{{ getBranchName(course) }}</td>
           }
-          <td>{{ levelNames(course) }}</td>
+          @if (!authService.isTeacher()) {
+            <td>{{ levelNames(course) }}</td>
+          }
           @if (showTeacher()) {
             <td>
               @if (course.instructorName) {
@@ -226,8 +230,9 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <!-- +1 for the academy-only Teacher column. -->
-          <td [attr.colspan]="authService.isTeacher() ? 5 : 7" class="text-center py-8">
+          <!-- A teacher sees name / price / enrollments / actions; an academy adds
+               Branch, Level and Teacher on top of those. -->
+          <td [attr.colspan]="authService.isTeacher() ? 4 : 7" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>

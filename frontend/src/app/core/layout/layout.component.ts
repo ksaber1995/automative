@@ -317,14 +317,16 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // Settings instead of cluttering Academic and People. Levels carries no
       // permission check of its own — the Admin group is already global-admin gated.
       { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('academy') && !auth.isTeacher() },
-      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: true },
+      // Academy-only, like Subjects below: a teacher tenant files nothing under a
+      // level ladder, and the course form hides the picker for them too.
+      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: !auth.isTeacher() },
       // Subjects are academy-only — hidden for teacher accounts (same gate as the
       // /subjects route's notTeacherGuard and the course-form dropdown).
       { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/subjects'], visible: !auth.isTeacher() },
-      // Shared back face of the printed ID cards — a company-wide setting, and
-      // isGlobalAdmin() (which gates this whole group) is exactly who the API lets
-      // save it, so it sits with Settings rather than with the students.
-      { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.canRead('students') },
+      // Card Design (the shared back face of the printed ID cards) is off the
+      // sidebar for everyone. It is set up once and then never touched again, so
+      // it earned no place in a menu people read every day. The /card-design
+      // route still works by URL, and the saved design still prints on cards.
       // The pool of pre-printed blank QR cards, and which student each one is on.
       // Hidden from customer tenants on request — shown to the vendor's debug login
       // and to the vendor's own test tenants, same check the route guard uses.

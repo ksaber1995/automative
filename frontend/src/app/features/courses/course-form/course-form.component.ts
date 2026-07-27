@@ -86,10 +86,12 @@ export class CourseFormComponent implements OnInit {
 
     this.loadBranches();
     this.loadEmployees();
-    this.loadLevels();
-    // Subjects are an academy-only concept — teachers never see the dropdown, so
-    // don't bother fetching the lookup for them.
-    if (!this.authService.isTeacher()) this.loadSubjects();
+    // Levels and subjects are academy-only concepts — teachers never see either
+    // dropdown, so don't bother fetching the lookups for them.
+    if (!this.authService.isTeacher()) {
+      this.loadLevels();
+      this.loadSubjects();
+    }
     this.courseId = this.route.snapshot.paramMap.get('id');
     if (this.courseId) {
       this.isEditMode.set(true);

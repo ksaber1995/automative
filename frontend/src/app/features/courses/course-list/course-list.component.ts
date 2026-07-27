@@ -155,9 +155,12 @@ export class CourseListComponent implements OnInit {
     this.lookupService.branches().subscribe({
       next: (branches) => this.branches.set(branches),
     });
-    this.lookupService.levels().subscribe({
-      next: (levels) => this.levels.set(levels),
-    });
+    // Levels are academy-only — a teacher has no level filter to populate.
+    if (!this.authService.isTeacher()) {
+      this.lookupService.levels().subscribe({
+        next: (levels) => this.levels.set(levels),
+      });
+    }
   }
 
   loadCourses() {
