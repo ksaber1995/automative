@@ -879,8 +879,10 @@ const SessionPaymentSummarySchema = z.object({
   coveredCount: z.number(),
   pendingCount: z.number(),
   refundedCount: z.number(),
-  totalRevenue: z.number(),
-  totalExpected: z.number(),
+  // Money goes only to callers with `revenues: read` — absent, not zero, for
+  // everyone else (same rule as MonthlyPaymentSummarySchema above).
+  totalRevenue: z.number().optional(),
+  totalExpected: z.number().optional(),
   /** Money actually received in the range (payment-dated); packages count in full on purchase day. */
   cashCollected: z.number().optional(),
   /** Of cashCollected, the portion from prepaid packages only (payment-dated). */

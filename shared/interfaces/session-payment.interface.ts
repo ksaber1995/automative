@@ -71,9 +71,13 @@ export interface SessionPaymentSummary {
   coveredCount: number;
   pendingCount: number;
   refundedCount: number;
-  /** Earned revenue: sessions attended in range; packages spread as price ÷ size per session. */
-  totalRevenue: number;
-  totalExpected: number;
+  /**
+   * Earned revenue: sessions attended in range; packages spread as price ÷ size
+   * per session. Money reaches only users with `revenues: read` — this and the
+   * three fields below are undefined for everyone else.
+   */
+  totalRevenue?: number;
+  totalExpected?: number;
   /** Cash collected in range (payment-dated); packages count in full on purchase day. */
   cashCollected?: number;
   /** Of cashCollected, the portion from prepaid packages only. */

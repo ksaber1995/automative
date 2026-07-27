@@ -164,6 +164,14 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   // ── Cash collected, split by money source ────────────────────────────────────
   // cashCollected (server) = session-charge cash + prepaid-package cash. We show
   // the slice that matches the active view: sessions, packages, or the total.
+  /**
+   * Whether this user is shown money at all. The API omits every figure for
+   * users without `revenues: read` (a fee collector records payments without
+   * seeing what the academy takes), so the presence of the number is the
+   * permission — the policy is not restated here.
+   */
+  showMoney = computed(() => this.summary()?.totalRevenue != null);
+
   packageCash = computed(() => this.summary()?.packageCashCollected ?? 0);
   sessionCash = computed(() => Math.max(0, (this.summary()?.cashCollected ?? 0) - this.packageCash()));
   totalCash = computed(() => this.summary()?.cashCollected ?? 0);

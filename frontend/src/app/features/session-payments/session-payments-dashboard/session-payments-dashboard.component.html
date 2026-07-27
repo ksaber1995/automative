@@ -84,6 +84,7 @@
          for that view — session charges only, packages only, or the combined
          total (with a session/package breakdown). Earned revenue (session-
          attendance value) is only meaningful alongside charges. -->
+    @if (showMoney()) {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
         <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
@@ -108,6 +109,7 @@
         </div>
       }
     </div>
+    }
 
     <!-- Package renewals due now live inside the Packages view, under the Pending
          filter (see below the packages table's status tabs). -->

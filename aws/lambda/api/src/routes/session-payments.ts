@@ -734,12 +734,19 @@ export const sessionPaymentsRoutes = {
       const packageCashCollected = parseFloat(cashRow?.package_cash || 0);
       const cashCollected = parseFloat(cashRow?.session_cash || 0) + packageCashCollected;
 
+      // Same split as the monthly summary: the counts are how the desk works and
+      // ride on enrollments:read, while what the academy takes stays behind
+      // revenues:read. Omitted rather than zeroed — a zero would read as "took
+      // nothing", and the redaction is here rather than in the UI because a
+      // hidden tile still ships its number in the response.
+      const canSeeMoney = checkGranularPermission(context, 'revenues', 'read');
+
       return {
         status: 200 as const,
         body: {
           totalCharges: rows.length,
           paidCount, coveredCount, pendingCount, refundedCount,
-          totalRevenue, totalExpected, cashCollected, packageCashCollected,
+          ...(canSeeMoney ? { totalRevenue, totalExpected, cashCollected, packageCashCollected } : {}),
         },
       };
     } catch (error) {
