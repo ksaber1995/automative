@@ -928,6 +928,191 @@ export const enrollmentsRoutes = {
     }
   },
 
+  /** DELETE /api/refunds/:id
+   *
+   *  Erase a refund that should never have been recorded, and put the record it
+   *  was taken against back the way it was. Every money read derives from two
+   *  places — the refunds row (subtracted by refund_date across revenue and the
+   *  P&L) and a refunded/total_refunded column on whatever was refunded — so
+   *  dropping the row on its own would leave the source stuck at REFUNDED with
+   *  a refunded total that no longer has a refund behind it. Each branch below
+   *  reverses exactly what the matching create-refund handler wrote.
+   *
+   *  What it deliberately does NOT restore is lifecycle status the refund may
+   *  have changed alongside the money: an enrollment dropped or put on hold by
+   *  a monthly refund, or a master enrollment cancelled by a full one. Those
+   *  are separate decisions about whether the student is still studying, and
+   *  guessing at them here would be worse than leaving them to be set by hand.
+   */
+  deleteRefund: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    const client = await getClient();
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      // Guarantees refunds.session_payment_id / session_package_id exist before
+      // we branch on them — without the columns a package refund would look
+      // like a plain enrollment refund and decrement the wrong total.
+      await ensurePerSessionSchema();
+      if (!checkGranularPermission(context, 'refunds', 'delete')) {
+        client.release();
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      // Older enrollment/master refunds never stamped branch_id, so the branch
+      // comes from the source record — the same COALESCE the list uses.
+      const refund = (await client.query(
+        `SELECT r.*, COALESCE(r.branch_id, e.branch_id, me.branch_id, ev.branch_id, ps.branch_id) AS source_branch_id
+           FROM refunds r
+           LEFT JOIN enrollments e         ON r.enrollment_id = e.id
+           LEFT JOIN master_enrollments me ON r.master_enrollment_id = me.id
+           LEFT JOIN events ev             ON r.event_id = ev.id
+           LEFT JOIN product_sales ps      ON r.product_sale_id = ps.id
+          WHERE r.id = $1 AND r.company_id = $2`,
+        [params.id, context.companyId]
+      )).rows[0];
+
+      if (!refund) {
+        client.release();
+        return apiError(404, 'ERRORS.REFUNDS.NOT_FOUND', 'Refund not found');
+      }
+      if (refund.source_branch_id && !canAccessBranch(context, refund.source_branch_id)) {
+        client.release();
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const amount = parseFloat(refund.amount || 0);
+      const less = (current: any) => Math.max(0, Math.round((parseFloat(current || 0) - amount) * 100) / 100);
+
+      await client.query('BEGIN');
+
+      if (refund.product_sale_id) {
+        // Take the returned units back out of inventory. Clamped at zero: the
+        // stock may already have been sold down since the refund was recorded.
+        const restock = parseInt(refund.restock_quantity || 0, 10) || 0;
+        if (restock > 0) {
+          await client.query(
+            `UPDATE products p SET stock = GREATEST(0, p.stock - $1)
+               FROM product_sales ps
+              WHERE ps.id = $2 AND p.id = ps.product_id AND p.company_id = $3`,
+            [restock, refund.product_sale_id, context.companyId]
+          );
+        }
+      } else if (refund.monthly_payment_id) {
+        const bill = (await client.query(
+          'SELECT * FROM monthly_subscription_payments WHERE id = $1 AND company_id = $2',
+          [refund.monthly_payment_id, context.companyId]
+        )).rows[0];
+        if (bill) {
+          const remaining = less(bill.refunded_amount);
+          const paid = parseFloat(bill.amount_paid || 0);
+          const due = parseFloat(bill.amount_due || 0);
+          // Still partly refunded → stays REFUNDED. Fully un-refunded → back to
+          // what the collected money says it is; resolveStatus re-derives
+          // OVERDUE on read from the due date.
+          const status = remaining > 0 ? 'REFUNDED'
+            : paid <= 0 ? 'PENDING'
+            : paid >= due ? 'PAID'
+            : 'PARTIAL';
+          await client.query(
+            `UPDATE monthly_subscription_payments
+                SET refunded_amount = $1, payment_status = $2,
+                    refund_note = CASE WHEN $3 THEN NULL ELSE refund_note END,
+                    refunded_at = CASE WHEN $3 THEN NULL ELSE refunded_at END,
+                    updated_at = NOW()
+              WHERE id = $4`,
+            [remaining, status, remaining <= 0, bill.id]
+          );
+        }
+      } else if (refund.session_payment_id) {
+        const charge = (await client.query(
+          'SELECT * FROM session_payments WHERE id = $1 AND company_id = $2',
+          [refund.session_payment_id, context.companyId]
+        )).rows[0];
+        if (charge) {
+          const remaining = less(charge.refunded_amount);
+          const paid = parseFloat(charge.amount_paid || 0);
+          // A per-session charge is paid or not — COVERED/WAIVED can't be told
+          // apart after the fact, so a charge with money on it comes back PAID.
+          const status = remaining > 0 ? 'REFUNDED' : paid > 0 ? 'PAID' : 'PENDING';
+          await client.query(
+            `UPDATE session_payments
+                SET refunded_amount = $1, payment_status = $2,
+                    refund_note = CASE WHEN $3 THEN NULL ELSE refund_note END,
+                    refunded_at = CASE WHEN $3 THEN NULL ELSE refunded_at END,
+                    updated_at = NOW()
+              WHERE id = $4`,
+            [remaining, status, remaining <= 0, charge.id]
+          );
+        }
+      } else if (refund.session_package_id) {
+        const pkg = (await client.query(
+          'SELECT * FROM session_packages WHERE id = $1 AND company_id = $2',
+          [refund.session_package_id, context.companyId]
+        )).rows[0];
+        if (pkg) {
+          const remaining = less(pkg.refunded_amount);
+          const used = parseInt(pkg.sessions_used || 0, 10) || 0;
+          const total = parseInt(pkg.sessions_total || 0, 10) || 0;
+          const status = remaining > 0 ? 'REFUNDED' : used >= total ? 'EXHAUSTED' : 'ACTIVE';
+          await client.query(
+            `UPDATE session_packages
+                SET refunded_amount = $1, status = $2,
+                    refund_note = CASE WHEN $3 THEN NULL ELSE refund_note END,
+                    refunded_at = CASE WHEN $3 THEN NULL ELSE refunded_at END,
+                    updated_at = NOW()
+              WHERE id = $4`,
+            [remaining, status, remaining <= 0, pkg.id]
+          );
+        }
+      } else if (refund.master_enrollment_id) {
+        const me = (await client.query(
+          'SELECT * FROM master_enrollments WHERE id = $1 AND company_id = $2',
+          [refund.master_enrollment_id, context.companyId]
+        )).rows[0];
+        if (me) {
+          const remaining = less(me.total_refunded);
+          await client.query(
+            `UPDATE master_enrollments SET total_refunded = $1, payment_status = $2, updated_at = NOW() WHERE id = $3`,
+            [remaining, computePaymentStatus(parseFloat(me.final_price || 0), parseFloat(me.amount_paid || 0)), me.id]
+          );
+        }
+      } else if (refund.enrollment_id) {
+        const enrollment = (await client.query(
+          'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+          [refund.enrollment_id, context.companyId]
+        )).rows[0];
+        if (enrollment) {
+          const remaining = less(enrollment.total_refunded);
+          const paid = parseFloat(enrollment.amount_paid || 0);
+          // Only createRefund's own REFUNDED stamp is undone — a status the
+          // office set by hand is left alone.
+          const status = enrollment.payment_status === 'REFUNDED' && remaining < paid - 0.001
+            ? computePaymentStatus(parseFloat(enrollment.final_price || 0), paid)
+            : enrollment.payment_status;
+          await client.query(
+            'UPDATE enrollments SET total_refunded = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
+            [remaining, status, enrollment.id]
+          );
+        }
+      }
+      // Event-subscription refunds keep no running total anywhere — the refunds
+      // rows themselves are the source of truth — so the delete below is all it takes.
+
+      await client.query('DELETE FROM refunds WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+      await client.query('COMMIT');
+
+      return {
+        status: 200 as const,
+        body: { message: 'Refund deleted successfully', code: 'REFUNDS.DELETED' },
+      };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('Delete refund error:', error);
+      return mapThrownError(error, 'ERRORS.REFUNDS.DELETE_FAILED', 'Failed to delete refund', 400);
+    } finally {
+      client.release();
+    }
+  },
+
   getRefunds: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);

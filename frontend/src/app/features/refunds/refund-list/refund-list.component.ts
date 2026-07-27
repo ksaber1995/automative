@@ -17,6 +17,8 @@ import { RefundService, RefundSource } from '../services/refund.service';
 import { LookupService } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
 import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
 
 @Component({
@@ -27,7 +29,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, DatePickerModule, InputTextModule, TooltipModule,
     TabsModule, TranslateModule,
-    AmountPipe,
+    AmountPipe, DeleteConfirmDialogComponent,
   ],
   templateUrl: './refund-list.component.html',
 })
@@ -38,6 +40,7 @@ export class RefundListComponent implements OnInit {
   private router = inject(Router);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
+  protected auth = inject(AuthService);
 
   refunds = signal<RefundWithDetails[]>([]);
   loading = signal(true);
@@ -54,6 +57,10 @@ export class RefundListComponent implements OnInit {
   typeOptions: { label: string; value: string }[] = [];
 
   totalRefunded = signal(0);
+
+  refundToDelete = signal<RefundWithDetails | null>(null);
+  showDeleteDialog = false;
+  deleting = signal(false);
 
   ngOnInit() {
     this.typeOptions = [
@@ -160,6 +167,45 @@ export class RefundListComponent implements OnInit {
     } else {
       this.router.navigate(['/refunds']);
     }
+  }
+
+  confirmDelete(refund: RefundWithDetails) {
+    this.refundToDelete.set(refund);
+    this.showDeleteDialog = true;
+  }
+
+  /** Who the refund was for — the same line the table shows, for the dialog. */
+  deleteSubject(refund: RefundWithDetails | null): string {
+    if (!refund) return '';
+    if (refund.source === 'PRODUCT_SALE') return refund.productName || refund.customerName || '';
+    if (refund.source === 'EVENT') return refund.eventName || refund.studentName || '';
+    return refund.studentName || refund.courseName || '';
+  }
+
+  deleteAmount(): string {
+    return (this.refundToDelete()?.amount ?? 0).toFixed(2);
+  }
+
+  deleteRefund() {
+    const refund = this.refundToDelete();
+    if (!refund) return;
+
+    this.deleting.set(true);
+    this.refundService.deleteRefund(refund.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.refundToDelete.set(null);
+        this.notificationService.success(this.translate.instant('REFUNDS.LIST.DELETE_SUCCESS'));
+        this.load();
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        const code = err?.error?.code;
+        this.notificationService.error(
+          code ? this.translate.instant(code) : this.translate.instant('REFUNDS.LIST.DELETE_FAILED')
+        );
+      }
+    });
   }
 
   formatDate(dateStr: string): string {

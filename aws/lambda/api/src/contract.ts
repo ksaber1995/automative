@@ -3734,6 +3734,18 @@ export const contract = c.router({
         200: z.array(RefundWithDetailsSchema),
       },
     },
+    deleteRefund: {
+      method: 'DELETE',
+      path: '/api/refunds/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string().optional() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     getRefunds: {
       method: 'GET',
       path: '/api/enrollments/:id/refunds',

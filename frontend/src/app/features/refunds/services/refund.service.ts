@@ -28,4 +28,9 @@ export class RefundService {
     if (filters?.endDate) params['endDate'] = filters.endDate;
     return this.api.get<RefundWithDetails[]>('refunds', params);
   }
+
+  /** Erase a refund and undo it on the record it was taken against. */
+  deleteRefund(id: string): Observable<{ message: string; code?: string }> {
+    return this.api.delete<{ message: string; code?: string }>(`refunds/${id}`);
+  }
 }

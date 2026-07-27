@@ -168,14 +168,26 @@
             {{ refund.reason || '—' }}
           </td>
           <td>
-            <p-button
-              icon="pi pi-eye"
-              [rounded]="true"
-              [text]="true"
-              severity="secondary"
-              [pTooltip]="'REFUNDS.LIST.VIEW_SOURCE' | translate"
-              (onClick)="viewSource(refund)"
-            ></p-button>
+            <div class="flex items-center gap-1">
+              <p-button
+                icon="pi pi-eye"
+                [rounded]="true"
+                [text]="true"
+                severity="secondary"
+                [pTooltip]="'REFUNDS.LIST.VIEW_SOURCE' | translate"
+                (onClick)="viewSource(refund)"
+              ></p-button>
+              @if (auth.canDelete('refunds')) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  [pTooltip]="'REFUNDS.LIST.DELETE' | translate"
+                  (onClick)="confirmDelete(refund)"
+                ></p-button>
+              }
+            </div>
           </td>
         </tr>
       </ng-template>
@@ -204,3 +216,14 @@
     </p-table>
   </p-card>
 </div>
+
+<!-- Delete Refund Confirm Dialog — the money goes back into revenue, so it asks
+     the operator to type "delete" like every other destructive action. -->
+<app-delete-confirm-dialog
+  [visible]="showDeleteDialog"
+  (visibleChange)="showDeleteDialog = $event"
+  [header]="'REFUNDS.LIST.DELETE_TITLE' | translate"
+  [message]="'REFUNDS.LIST.DELETE_CONFIRM' | translate: { amount: deleteAmount(), subject: deleteSubject(refundToDelete()) }"
+  (confirm)="deleteRefund()"
+  (cancel)="showDeleteDialog = false">
+</app-delete-confirm-dialog>

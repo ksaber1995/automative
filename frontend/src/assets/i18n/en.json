@@ -126,6 +126,10 @@
       "BRANCH_ACCESS": "Access denied to this branch",
       "BRANCH_ACCESS_TARGET": "Access denied to the target branch"
     },
+    "REFUNDS": {
+      "NOT_FOUND": "Refund not found",
+      "DELETE_FAILED": "Failed to delete refund"
+    },
     "BRANCHES": {
       "NOT_FOUND": "Branch not found",
       "ADMIN_ONLY_CREATE": "Only administrators can create branches",
@@ -4207,6 +4211,11 @@
       "PARTIAL_REFUND": "Partial Refund",
       "VIEW_ENROLLMENT": "View Enrollment",
       "VIEW_SOURCE": "View Source",
+      "DELETE": "Delete Refund",
+      "DELETE_TITLE": "Delete Refund",
+      "DELETE_CONFIRM": "Delete the {{amount}} EGP refund for {{subject}}? The money goes back into revenue and the bill, package or sale it was taken from is restored. The enrollment's own status (dropped, on hold or cancelled) is not restored.",
+      "DELETE_SUCCESS": "Refund deleted",
+      "DELETE_FAILED": "Failed to delete refund",
       "NO_DATA": "No refunds found",
       "NO_DATA_HINT": "Refunds issued from the student enrollment screen will appear here",
       "TAB_ALL": "All",
