@@ -25,7 +25,6 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { CourseService } from '../../courses/services/course.service';
 import { StudentService } from '../../students/services/student.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
-import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
@@ -61,7 +60,6 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   private courseService = inject(CourseService);
   private studentSvc = inject(StudentService);
   private globalScan = inject(GlobalScanService);
-  private scanPref = inject(ScanPreferenceService);
   private auth = inject(AuthService);
   private notify = inject(NotificationService);
 
@@ -136,8 +134,6 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   private readonly SCAN_DEDUP_MS = 2500;
   // Stable reference so the global scan handler can be unregistered on destroy.
   private readonly scanHandler = (token: string) => this.resolveToken(token);
-
-  usbDetected = () => this.scanPref.usbDetected();
 
   filtered = computed(() => {
     const tab = this.selectedTab();
@@ -415,18 +411,14 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
 
   // ── QR scan flow (mirrors the monthly-subscriptions dashboard) ─────────────
 
+  /** Opens on the USB-reader panel; the camera is opt-in — see useCamera. */
   openScanner(): void {
     this.scannerOpen.set(true);
     this.manualToken.set('');
     this.lastToken = '';
-    // USB scanner is first priority: skip the camera when one is known on this
-    // device (the always-on wedge handles scans). Camera is the explicit fallback.
-    if (this.usbDetected()) return;
-    this.cameraStarted.set(true);
-    setTimeout(() => this.startCamera(), 0);
   }
 
-  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  /** The one way the camera starts: the operator asks for it. */
   useCamera(): void {
     this.cameraStarted.set(true);
     setTimeout(() => this.startCamera(), 50);

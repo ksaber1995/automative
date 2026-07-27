@@ -22,7 +22,6 @@ import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
-import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { SessionService, ActiveSessionInfo } from '../../rooms/services/session.service';
 import { AttendanceService } from '../../rooms/services/attendance.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
@@ -188,11 +187,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private globalScan: GlobalScanService,
     private sessionService: SessionService,
     private attendanceService: AttendanceService,
-    private scanPref: ScanPreferenceService,
   ) {}
-
-  // Per-device USB-scanner flag (exposed to the template).
-  usbDetected = () => this.scanPref.usbDetected();
 
   ngOnInit(): void {
     const now = new Date();
@@ -296,20 +291,14 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // ── Barcode scan flow ────────────────────────────────────────────────────────
 
-  /** Open the scanner dialog and start the camera. */
+  /** Open the scanner dialog on the USB-reader panel. The camera is opt-in — see useCamera. */
   openScanner(): void {
     this.scannerOpen.set(true);
     this.manualToken.set('');
     this.lastToken = '';
-    // USB scanner is first priority: skip the camera when one is known on this
-    // device (the always-on wedge handles scans). Camera is the explicit fallback.
-    if (this.usbDetected()) return;
-    this.cameraStarted.set(true);
-    // Wait a tick so the scanner region element exists in the DOM.
-    setTimeout(() => this.startCamera(), 0);
   }
 
-  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  /** The one way the camera starts: the operator asks for it. */
   useCamera(): void {
     this.cameraStarted.set(true);
     setTimeout(() => this.startCamera(), 50);

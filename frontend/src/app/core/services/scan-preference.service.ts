@@ -7,10 +7,12 @@ import { Injectable, signal } from '@angular/core';
  * in Enter (captured app-wide), and feature pages call markUsbDetected() when a
  * scan arrives. The result is remembered per-device in localStorage.
  *
- * Consumers use this to decide the scan default: when a USB scanner is known to
- * exist, the "Scan QR" button does NOT auto-start the camera (the wedge handles
- * scans); the camera stays available as an explicit fallback for devices with no
- * scanner (phones/tablets).
+ * This used to decide the scan default — auto-start the camera unless a wedge had
+ * been seen here. It no longer gates anything: a scan dialog never starts the
+ * camera by itself, because guessing wrong meant demanding a camera permission
+ * from a machine that has no camera. The flag is still recorded (it costs one
+ * localStorage write and can only be learned while a scanner is in use) for any
+ * future per-device tuning.
  */
 @Injectable({ providedIn: 'root' })
 export class ScanPreferenceService {

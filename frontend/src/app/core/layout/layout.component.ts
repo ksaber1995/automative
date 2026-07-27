@@ -69,8 +69,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
   qrScanning = signal(false);
   qrLookingUp = signal(false);
   cameraStarted = signal(false);
-  // Expose the per-device USB-scanner flag to the template.
-  usbDetected = () => this.scanPref.usbDetected();
   private html5Qr?: Html5Qrcode;
   private readonly QR_SCANNER_ID = 'navbar-qr-scanner-region';
 
@@ -413,13 +411,13 @@ export class LayoutComponent implements OnInit, OnDestroy {
   // ─── QR Scanner ──────────────────────────────────────────────────────────
 
   openQrScanner() {
+    // The camera never starts on its own. Scanning here is done with a handheld
+    // USB reader (the always-on wedge below picks it up wherever you are), so
+    // opening this dialog used to demand a camera permission from machines that
+    // have no camera to give — and failed with "check your camera permissions",
+    // an error aimed at people who never asked for the camera. The dialog opens
+    // on the reader/manual panel; useCamera() is the one way in.
     this.qrDialogVisible.set(true);
-    // USB scanner is first priority: if one is known on this device, don't start
-    // the camera (the always-on wedge handles scans). Camera is the explicit
-    // fallback (see useCamera) for devices with no scanner.
-    if (this.usbDetected()) return;
-    this.cameraStarted.set(true);
-    setTimeout(() => this.startQrCamera(), 300);
   }
 
   /** Explicit fallback: start the camera even when a USB scanner exists. */
@@ -446,7 +444,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
         () => {},
       );
     } catch {
-      this.notifications.error(this.translate.instant('NAV.QR_CAMERA_FAILED'));
+      // Back to the scanner/manual panel. An error toast on its own left the
+      // dialog showing an empty black frame with no way forward.
+      this.cameraStarted.set(false);
+      this.notifications.warning(this.translate.instant('NAV.QR_CAMERA_FAILED'));
       this.html5Qr = undefined;
     } finally {
       this.qrScanning.set(false);

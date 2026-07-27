@@ -21,7 +21,6 @@ import { EducationalBooksService } from '../services/educational-books.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
-import { ScanPreferenceService } from '../../../core/services/scan-preference.service';
 import { StudentService } from '../../students/services/student.service';
 import {
   EducationalBooksCourseDetail,
@@ -59,7 +58,6 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private globalScan = inject(GlobalScanService);
-  private scanPref = inject(ScanPreferenceService);
   private studentService = inject(StudentService);
 
   DiscountType = DiscountType;
@@ -143,8 +141,6 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
   private readonly SCAN_DEDUP_MS = 2500;
   private readonly scanHandler = (token: string) => this.resolveToken(token);
 
-  usbDetected = () => this.scanPref.usbDetected();
-
   unitPrice = computed(() => this.sellingProduct()?.sellingPrice || 0);
 
   subtotal = computed(() => this.unitPrice() * (this.sellQuantity() || 0));
@@ -213,18 +209,14 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
 
   // ── Scan-to-sell flow ─────────────────────────────────────────────────────────
 
+  /** Opens on the USB-reader panel; the camera is opt-in — see useCamera. */
   openScanner(): void {
     this.scannerOpen.set(true);
     this.manualToken.set('');
     this.lastToken = '';
-    // USB scanner is first priority: skip the camera when one is known on this
-    // device. Camera is the explicit fallback.
-    if (this.usbDetected()) return;
-    this.cameraStarted.set(true);
-    setTimeout(() => this.startCamera(), 0);
   }
 
-  /** Explicit fallback: start the camera even when a USB scanner exists. */
+  /** The one way the camera starts: the operator asks for it. */
   useCamera(): void {
     this.cameraStarted.set(true);
     setTimeout(() => this.startCamera(), 50);
