@@ -6,6 +6,7 @@ import {
   CompanySubscription, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
   TenantUser, USER_ROLES,
 } from './subscriptions.service';
+import { QrGeneratorComponent } from './qr-generator.component';
 
 /**
  * The vendor's debugging login. It is the reason the move-between-tenants
@@ -17,7 +18,7 @@ const DEBUG_EMAIL = 'master@master.com';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgSelectModule],
+  imports: [CommonModule, FormsModule, NgSelectModule, QrGeneratorComponent],
   template: `
     <div class="app">
       <aside class="sidebar">
@@ -31,6 +32,9 @@ const DEBUG_EMAIL = 'master@master.com';
           </button>
           <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
             <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
+          </button>
+          <button class="navitem" [class.on]="view() === 'qr'" (click)="view.set('qr')">
+            <span>QR generator</span>
           </button>
         </nav>
         <button class="refresh side" (click)="refreshAll()">Refresh all</button>
@@ -551,6 +555,10 @@ const DEBUG_EMAIL = 'master@master.com';
         </div>
       }
 
+      @if (view() === 'qr') {
+        <app-qr-generator />
+      }
+
       </main>
     </div>
   `,
@@ -714,7 +722,7 @@ export class AppComponent implements OnInit {
   private service = inject(SubscriptionsService);
 
   /** Which section the sidebar is showing. */
-  view = signal<'companies' | 'bots' | 'users'>('companies');
+  view = signal<'companies' | 'bots' | 'users' | 'qr'>('companies');
 
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
