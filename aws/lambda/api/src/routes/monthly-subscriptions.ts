@@ -717,6 +717,14 @@ export const monthlySubscriptionsRoutes = {
         }
       }
 
+      // The counts are how the desk works — who has paid, who is overdue — so
+      // they follow `enrollments: read` like the table underneath them. The money
+      // totals are a different thing to know: what the academy takes in a month.
+      // Someone hired to collect fees needs the first and not the second, so the
+      // totals are omitted here rather than hidden in the UI — a hidden tile is
+      // still a number sitting in the network response.
+      const canSeeMoney = checkGranularPermission(context, 'revenues', 'read');
+
       return {
         status: 200 as const,
         body: {
@@ -728,9 +736,7 @@ export const monthlySubscriptionsRoutes = {
           pendingCount,
           overdueCount,
           partialCount,
-          totalRevenue,
-          totalExpected,
-          totalRefunded,
+          ...(canSeeMoney ? { totalRevenue, totalExpected, totalRefunded } : {}),
         },
       };
     } catch (error) {

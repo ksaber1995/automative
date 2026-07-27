@@ -67,9 +67,10 @@ export interface MonthlyPaymentSummary {
   pendingCount: number;
   overdueCount: number;
   partialCount: number;
-  totalRevenue: number;
-  totalExpected: number;
-  totalRefunded: number;
+  /** Money reaches only users with `revenues: read` — undefined for everyone else. */
+  totalRevenue?: number;
+  totalExpected?: number;
+  totalRefunded?: number;
 }
 
 export interface RecordMonthlyPaymentDto {

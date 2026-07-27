@@ -794,9 +794,11 @@ const MonthlyPaymentSummarySchema = z.object({
   pendingCount: z.number(),
   overdueCount: z.number(),
   partialCount: z.number(),
-  totalRevenue: z.number(),
-  totalExpected: z.number(),
-  totalRefunded: z.number(),
+  // Money is sent only to callers with `revenues: read` — absent, not zero, for
+  // everyone else. A zero would read as "collected nothing", which is a lie.
+  totalRevenue: z.number().optional(),
+  totalExpected: z.number().optional(),
+  totalRefunded: z.number().optional(),
 });
 
 const RecordMonthlyPaymentSchema = z.object({

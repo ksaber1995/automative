@@ -141,13 +141,18 @@
           <div class="text-2xl font-bold text-red-600">{{ s.overdueCount }}</div>
           <div class="text-xs text-red-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.OVERDUE' | translate }}</div>
         </div>
-        <div class="rounded-lg border border-purple-200 bg-purple-50 p-4 text-center">
-          <div class="text-2xl font-bold text-purple-600">{{ s.totalRevenue | amount }}</div>
-          <div class="text-xs text-purple-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.COLLECTED_NET' | translate }}</div>
-          @if (s.totalRefunded > 0) {
-            <div class="text-[11px] text-red-600 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.REFUNDED_TOTAL' | translate }}: {{ s.totalRefunded | amount }}</div>
-          }
-        </div>
+        <!-- Money tile only for users the API sends money to (`revenues: read`).
+             The server omits the figures for everyone else, so this checks what
+             actually arrived rather than re-deciding the policy here. -->
+        @if (s.totalRevenue != null) {
+          <div class="rounded-lg border border-purple-200 bg-purple-50 p-4 text-center">
+            <div class="text-2xl font-bold text-purple-600">{{ s.totalRevenue | amount }}</div>
+            <div class="text-xs text-purple-700 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.COLLECTED_NET' | translate }}</div>
+            @if ((s.totalRefunded ?? 0) > 0) {
+              <div class="text-[11px] text-red-600 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.REFUNDED_TOTAL' | translate }}: {{ s.totalRefunded | amount }}</div>
+            }
+          </div>
+        }
       </div>
     }
 
