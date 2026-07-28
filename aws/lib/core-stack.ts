@@ -173,7 +173,12 @@ export class CoreStack extends cdk.Stack {
       defaultDatabaseName: dbName,
       credentials: rds.Credentials.fromSecret(dbCredentialsSecret),
       backup: {
-        retention: cdk.Duration.days(7),
+        // 35 days (Aurora's maximum) rather than the default week: migrations here
+        // self-apply at runtime via the `ensure*` guards, so a bad backfill writes
+        // wrong values silently and is typically noticed when someone questions a
+        // number — well after a 7-day restore window would have closed. Costs cents
+        // a month at this volume size.
+        retention: cdk.Duration.days(35),
       },
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
       deletionProtection: stage === 'prod',
