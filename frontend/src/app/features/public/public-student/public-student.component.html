@@ -165,20 +165,44 @@
         }
       </div>
 
-      <!-- Exam grades -->
-      @if (p.exams && p.exams.length > 0) {
+      <!-- Exam grades. Homework is graded the same way but means something else
+           to a parent, so it gets its own section below rather than sitting
+           indistinguishable in this list. -->
+      @if (examOnly().length > 0) {
         <div class="bg-white rounded-xl shadow-sm p-5">
           <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
             <i class="pi pi-file-edit text-xs"></i> {{ 'PUBLIC_PROFILE.EXAMS' | translate }}
           </h2>
           <div class="divide-y divide-gray-100">
-            @for (ex of p.exams; track $index) {
+            @for (ex of examOnly(); track $index) {
               <div class="py-2.5 flex items-center justify-between gap-3">
                 <div class="min-w-0">
                   <div class="text-sm font-medium text-gray-800 truncate">{{ ex.examName }}</div>
                   <div class="text-xs text-gray-500">{{ ex.courseName }} · {{ formatDate(ex.examDate) }}</div>
                 </div>
                 <span class="text-xs font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full whitespace-nowrap">{{ ex.grade }}@if (ex.maxGrade != null) { / {{ ex.maxGrade }} }</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Homework marks -->
+      @if (homeworkOnly().length > 0) {
+        <div class="bg-white rounded-xl shadow-sm p-5 mt-6">
+          <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            <i class="pi pi-book text-xs"></i> {{ 'PUBLIC_PROFILE.HOMEWORK' | translate }}
+          </h2>
+          <div class="divide-y divide-gray-100">
+            @for (hw of homeworkOnly(); track $index) {
+              <div class="py-2.5 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-gray-800 truncate">{{ hw.examName }}</div>
+                  <div class="text-xs text-gray-500">
+                    {{ hw.courseName }}@if (hw.className) { · {{ hw.className }} } · {{ formatDate(hw.examDate) }}
+                  </div>
+                </div>
+                <span class="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full whitespace-nowrap">{{ hw.grade }}@if (hw.maxGrade != null) { / {{ hw.maxGrade }} }</span>
               </div>
             }
           </div>

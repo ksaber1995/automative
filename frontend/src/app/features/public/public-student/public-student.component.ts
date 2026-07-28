@@ -48,6 +48,12 @@ export class PublicStudentComponent implements OnInit {
     return c ? formatStudentCode(c.serial) : '';
   };
 
+  // Exams and homework arrive in one list because they share a table, but they
+  // answer different questions for a parent — "how did they do on the test" vs
+  // "are they doing the work" — so the page shows them as two sections.
+  examOnly = () => (this.profile()?.exams ?? []).filter(e => !e.isHomework);
+  homeworkOnly = () => (this.profile()?.exams ?? []).filter(e => e.isHomework === true);
+
   ngOnInit(): void {
     const token = this.route.snapshot.paramMap.get('qrToken') || '';
     if (!token) {

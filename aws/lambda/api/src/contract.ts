@@ -3194,6 +3194,9 @@ export const contract = c.router({
             examDate: z.string(),
             grade: z.string(),
             maxGrade: z.number().nullable().optional(),
+            /** Homework shares the exams table; the portal lists the two apart. */
+            isHomework: z.boolean().optional(),
+            className: z.string().nullable().optional(),
           })).optional(),
           /**
            * Every payment the student carries, across all three billing models.

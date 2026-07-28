@@ -106,9 +106,13 @@ export interface PublicStudentPayments {
 export interface PublicStudentExam {
   examName: string;
   courseName: string;
+  /** Null when the exam is course-wide rather than set for one class. */
+  className?: string | null;
   examDate: string;
   grade: string;
   maxGrade?: number | null;
+  /** Homework shares the exams table; the portal lists the two apart. */
+  isHomework?: boolean;
 }
 
 export interface PublicStudentProfile {

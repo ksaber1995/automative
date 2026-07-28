@@ -300,15 +300,20 @@ export const publicStudentsRoutes = {
         [student.id, student.company_id]
       );
 
-      // Exam grades (low-sensitivity: exam name, course, date, grade). Tolerant
-      // of DBs that haven't had the exams migration applied yet.
+      // Exam AND homework grades (low-sensitivity: name, course, class, date,
+      // grade). Both live in the exams table, so one query fetches them and
+      // `is_homework` tells the page which list a row belongs in — an exam mark
+      // and a homework mark mean different things to a parent.
+      // Tolerant of DBs that haven't had the exams migrations applied yet.
       let exams: any[] = [];
       try {
         exams = await query<any>(
-          `SELECT e.name AS exam_name, c.name AS course_name, e.exam_date, e.max_grade, r.grade
+          `SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
+                  e.exam_date, e.max_grade, e.is_homework, r.grade
            FROM exam_results r
            JOIN exams e   ON e.id = r.exam_id AND e.is_active = true
            JOIN courses c ON c.id = e.course_id
+           LEFT JOIN classes cl ON cl.id = e.class_id
            WHERE r.student_id = $1 AND r.company_id = $2
            ORDER BY e.exam_date DESC`,
           [student.id, student.company_id],
@@ -503,9 +508,11 @@ export const publicStudentsRoutes = {
           exams: exams.map((row: any) => ({
             examName: row.exam_name,
             courseName: row.course_name,
+            className: row.class_name ?? null,
             examDate: row.exam_date,
             grade: row.grade,
             maxGrade: row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null,
+            isHomework: row.is_homework === true,
           })),
         },
       };
