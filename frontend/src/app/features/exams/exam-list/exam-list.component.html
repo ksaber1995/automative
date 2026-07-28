@@ -31,10 +31,22 @@
       <p-select
         [options]="courses()"
         [ngModel]="selectedCourseId()"
-        (ngModelChange)="selectedCourseId.set($event)"
+        (ngModelChange)="onCourseFilterChange($event)"
         optionLabel="label"
         optionValue="id"
         [placeholder]="'EXAMS.LIST.ALL_COURSES' | translate"
+        [showClear]="true"
+        [filter]="true"
+        [style]="{ minWidth: '200px' }"
+      ></p-select>
+
+      <p-select
+        [options]="classes()"
+        [ngModel]="selectedClassId()"
+        (ngModelChange)="selectedClassId.set($event)"
+        optionLabel="label"
+        optionValue="id"
+        [placeholder]="'EXAMS.LIST.ALL_CLASSES' | translate"
         [showClear]="true"
         [filter]="true"
         [style]="{ minWidth: '200px' }"

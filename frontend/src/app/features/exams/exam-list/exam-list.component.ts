@@ -46,12 +46,14 @@ export class ExamListComponent implements OnInit {
   items = signal<ExamModel[]>([]);
   branches = signal<LookupOption[]>([]);
   courses = signal<LookupOption[]>([]);
+  classes = signal<LookupOption[]>([]);
   loading = signal(true);
   showDeleteDialog = false;
   toDelete = signal<ExamModel | null>(null);
 
   selectedBranchId = signal<string | null>(null);
   selectedCourseId = signal<string | null>(null);
+  selectedClassId = signal<string | null>(null);
   selectedStatus = signal<'SCHEDULED' | 'DONE' | null>(null);
   /** null = both kinds; the list is now Exams AND Homework. */
   selectedKind = signal<'EXAM' | 'HOMEWORK' | null>(null);
@@ -69,11 +71,15 @@ export class ExamListComponent implements OnInit {
   filteredItems = computed(() => {
     const branch = this.selectedBranchId();
     const course = this.selectedCourseId();
+    const cls = this.selectedClassId();
     const status = this.selectedStatus();
     const kind = this.selectedKind();
     return this.items().filter((e) => {
       if (branch && e.branchId !== branch) return false;
       if (course && e.courseId !== course) return false;
+      // A course-wide row carries no class, so filtering by class leaves it out —
+      // it isn't that class's exam, it's every class's.
+      if (cls && e.classId !== cls) return false;
       if (status && e.status !== status) return false;
       if (kind && (kind === 'HOMEWORK') !== (e.isHomework === true)) return false;
       return true;
@@ -84,6 +90,25 @@ export class ExamListComponent implements OnInit {
     this.load();
     this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });
     this.lookupService.courses().subscribe({ next: (c) => this.courses.set(c) });
+    this.loadClasses(null);
+  }
+
+  /**
+   * Class names repeat across courses ("Group A" exists in half of them), so
+   * picking a course narrows the class list to that course's — otherwise the
+   * dropdown is a wall of ambiguous names. With no course chosen it lists all.
+   */
+  private loadClasses(courseId: string | null) {
+    this.lookupService.classes(courseId ? { courseId } : undefined).subscribe({
+      next: (c) => this.classes.set(c),
+    });
+  }
+
+  onCourseFilterChange(courseId: string | null) {
+    this.selectedCourseId.set(courseId);
+    // The chosen class almost certainly isn't in the new course.
+    this.selectedClassId.set(null);
+    this.loadClasses(courseId);
   }
 
   load() {
@@ -101,13 +126,14 @@ export class ExamListComponent implements OnInit {
 
   clearFilters() {
     this.selectedBranchId.set(null);
-    this.selectedCourseId.set(null);
+    this.onCourseFilterChange(null);
     this.selectedStatus.set(null);
     this.selectedKind.set(null);
   }
 
   hasFilters(): boolean {
-    return !!(this.selectedBranchId() || this.selectedCourseId() || this.selectedStatus() || this.selectedKind());
+    return !!(this.selectedBranchId() || this.selectedCourseId() || this.selectedClassId()
+      || this.selectedStatus() || this.selectedKind());
   }
 
   create() { this.router.navigate(['/exams/create']); }
