@@ -1000,6 +1000,34 @@ export class StudentDetailComponent implements OnInit {
 
   // ─── Edit-price dialog ───────────────────────────────────────────────────────
 
+  /**
+   * The price on an enrollment means whatever its course charges for — a total, a
+   * monthly fee, or a per-session fee — so every label around the pencil names the
+   * right thing instead of the generic "price".
+   */
+  private editPriceKey(enrollment: Enrollment, suffix: string): string {
+    if (this.isMonthly(enrollment)) return `STUDENTS.DETAIL.${suffix}_MONTHLY`;
+    if (this.isPerSession(enrollment)) return `STUDENTS.DETAIL.${suffix}_SESSION`;
+    return `STUDENTS.DETAIL.${suffix}`;
+  }
+
+  editPriceTooltip(enrollment: Enrollment): string {
+    return this.editPriceKey(enrollment, 'EDIT_PRICE');
+  }
+
+  editPriceLabel(enrollment: Enrollment): string {
+    return this.editPriceKey(enrollment, 'PRICE_LABEL');
+  }
+
+  editPriceHint(enrollment: Enrollment): string {
+    return this.editPriceKey(enrollment, 'EDIT_PRICE_HINT');
+  }
+
+  editPriceTitle(): string {
+    const enrollment = this.editPriceEnrollment();
+    return enrollment ? this.editPriceKey(enrollment, 'EDIT_PRICE_TITLE') : 'STUDENTS.DETAIL.EDIT_PRICE_TITLE';
+  }
+
   openEditPriceDialog(enrollment: Enrollment) {
     this.editPriceEnrollment.set(enrollment);
     this.editPriceValue = enrollment.finalPrice;
@@ -1016,7 +1044,13 @@ export class StudentDetailComponent implements OnInit {
         this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.PRICE_UPDATED'));
         this.showEditPriceDialog = false;
         this.actionLoading.set(false);
-        if (this.studentId) this.loadEnrollments(this.studentId);
+        if (this.studentId) {
+          this.loadEnrollments(this.studentId);
+          // Monthly bills and session charges live in their own tables; reload them
+          // so a repriced open month shows its new amount without a page refresh.
+          if (this.isMonthly(enrollment)) this.loadMonthlySubscriptions(this.studentId);
+          if (this.isPerSession(enrollment)) this.loadSessionPayments(this.studentId);
+        }
       },
       error: () => {
         // Interceptor toasted the translated error.

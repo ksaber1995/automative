@@ -42,6 +42,59 @@ function computePaymentStatus(finalPrice: number, amountPaid: number): string {
 }
 
 /**
+ * Carry a monthly student's new fee into the bills that already exist.
+ *
+ * `final_price` is only read when a month is materialised, so on its own a price
+ * change would not show up until the NEXT month is created — the student page
+ * would still show the old figure for the month they are about to pay.
+ *
+ * Months that are settled (PAID) or refunded keep what they were billed: that
+ * money already moved. Months BEFORE the current one keep the price they were
+ * owed at — a student who skipped March owes March's price, not today's. So only
+ * the current month and anything after it is repriced, and a month carrying a
+ * course-wide override stays scaled to it, using the same maths as
+ * `ensureBillsForMonth`.
+ */
+async function repriceOpenMonthlyBills(companyId: string, enrollmentId: string, newPrice: number): Promise<void> {
+  await query(
+    `UPDATE monthly_subscription_payments msp
+     SET amount_due = sub.new_due,
+         payment_status = CASE
+           WHEN sub.new_due > 0 AND msp.amount_paid >= sub.new_due THEN 'PAID'
+           WHEN msp.amount_paid > 0 THEN 'PARTIAL'
+           ELSE 'PENDING'
+         END,
+         paid_date = CASE
+           WHEN sub.new_due > 0 AND msp.amount_paid >= sub.new_due THEN COALESCE(msp.paid_date, CURRENT_DATE)
+           ELSE msp.paid_date
+         END,
+         updated_at = NOW()
+     FROM (
+       SELECT b.id,
+              CASE
+                WHEN ov.override_price IS NOT NULL AND c.price > 0
+                  THEN ROUND(ov.override_price * ($3::numeric / c.price), 2)
+                ELSE $3::numeric
+              END AS new_due
+       FROM monthly_subscription_payments b
+       JOIN enrollments e ON e.id = b.enrollment_id
+       JOIN courses c ON c.id = e.course_id
+       LEFT JOIN course_monthly_price_overrides ov
+         ON ov.course_id = e.course_id
+        AND ov.billing_year = b.billing_year
+        AND ov.billing_month = b.billing_month
+       WHERE b.company_id = $1
+         AND b.enrollment_id = $2
+         AND b.payment_status NOT IN ('PAID', 'REFUNDED')
+         AND (b.billing_year * 12 + b.billing_month)
+             >= (EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int)
+     ) sub
+     WHERE msp.id = sub.id`,
+    [companyId, enrollmentId, newPrice],
+  );
+}
+
+/**
  * Monthly-subscription enrollment. The course is billed per calendar month rather
  * than as a one-time price / installment plan.
  *  - `final_price` stores the discounted monthly fee — the per-subscription discount
@@ -636,8 +689,10 @@ export const enrollmentsRoutes = {
 
       // Override the price this student pays. The list price rises to meet a higher
       // figure; a lower one reads as a discount, keeping original − discount = final.
-      // For a one-time course the paid/owed status is re-derived from the new price;
-      // monthly & per-session bills live in their own tables, so their status stands.
+      // `final_price` means whatever the course's billing model charges for: the
+      // total for a one-time course, the monthly fee for a subscription, the
+      // per-session fee for pay-as-you-go — so one number covers all three.
+      let repriceMonthly = false;
       if (body.finalPrice !== undefined) {
         const newPrice = Number(body.finalPrice);
         if (!Number.isFinite(newPrice) || newPrice < 0) {
@@ -648,12 +703,22 @@ export const enrollmentsRoutes = {
         updateData.final_price = newPrice;
         updateData.discount_amount = Math.round((original - newPrice) * 100) / 100;
         updateData.discount_percent = original > 0 ? Math.round(((original - newPrice) / original) * 10000) / 100 : 0;
-        if ((existing.payment_type || 'ONE_TIME') === 'ONE_TIME') {
+        const paymentType = existing.payment_type || 'ONE_TIME';
+        if (paymentType === 'ONE_TIME') {
+          // The one-time total lives on the enrollment row, so paid/owed is re-derived here.
           updateData.payment_status = computePaymentStatus(newPrice, parseFloat(existing.amount_paid || 0));
+        } else if (paymentType === 'MONTHLY_SUBSCRIPTION') {
+          repriceMonthly = true;
         }
+        // PER_SESSION charges are per session already held and billed at the fee of
+        // the day; the new fee applies to the sessions charged from here on.
       }
 
       const enrollment = await update('enrollments', params.id, updateData);
+
+      if (repriceMonthly) {
+        await repriceOpenMonthlyBills(context.companyId, params.id, Number(body.finalPrice));
+      }
 
       if (!enrollment) {
         return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');

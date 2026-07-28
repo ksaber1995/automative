@@ -642,10 +642,8 @@
                   <span class="text-orange-500 ml-1">-{{ enrollment.discountAmount | amount }}</span>
                 }
                 <span class="font-semibold text-green-600 ml-1">= {{ enrollment.finalPrice | amount }}</span>
-                @if (!isMonthly(enrollment) && !isPerSession(enrollment)) {
-                  <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" severity="secondary"
-                    (onClick)="openEditPriceDialog(enrollment)" [pTooltip]="'STUDENTS.DETAIL.EDIT_PRICE' | translate"></p-button>
-                }
+                <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" severity="secondary"
+                  (onClick)="openEditPriceDialog(enrollment)" [pTooltip]="editPriceTooltip(enrollment) | translate"></p-button>
               </div>
             </td>
             <td>
@@ -1437,23 +1435,27 @@
 <!-- Edit Course Price Dialog -->
 <p-dialog
   [(visible)]="showEditPriceDialog"
-  [header]="('STUDENTS.DETAIL.EDIT_PRICE_TITLE' | translate) + ' — ' + getCourseName(editPriceEnrollment()?.courseId || '')"
+  [header]="(editPriceTitle() | translate) + ' — ' + getCourseName(editPriceEnrollment()?.courseId || '')"
   [modal]="true"
   [style]="{ width: '420px' }"
 >
   @if (editPriceEnrollment(); as e) {
     <div class="mb-4 p-3 bg-gray-50 rounded-lg text-sm grid grid-cols-2 gap-2">
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.FINAL_PRICE' | translate }}</span> <strong>{{ e.finalPrice | amount }}</strong></div>
-      <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (e.amountPaid || 0) | amount }}</strong></div>
+      <div><span class="text-gray-500">{{ editPriceLabel(e) | translate }}:</span> <strong>{{ e.finalPrice | amount }}</strong></div>
+      <!-- A monthly/per-session enrollment's own amountPaid is never updated — its
+           money lives in the bills table — so showing it here would read as 0 paid. -->
+      @if (!isMonthly(e) && !isPerSession(e)) {
+        <div><span class="text-gray-500">{{ 'STUDENTS.DETAIL.PAID_LABEL' | translate }}</span> <strong class="text-green-600">{{ (e.amountPaid || 0) | amount }}</strong></div>
+      }
+    </div>
+    <div class="grid gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ editPriceLabel(e) | translate }} <span class="text-red-500">*</span></label>
+        <p-inputnumber [(ngModel)]="editPriceValue" [min]="0" [placeholder]="editPriceLabel(e) | translate" [style]="{ width: '100%' }" />
+        <p class="text-xs text-gray-400 mt-1">{{ editPriceHint(e) | translate }}</p>
+      </div>
     </div>
   }
-  <div class="grid gap-4">
-    <div>
-      <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.PRICE_LABEL' | translate }} <span class="text-red-500">*</span></label>
-      <p-inputnumber [(ngModel)]="editPriceValue" [min]="0" [placeholder]="'STUDENTS.DETAIL.PRICE_LABEL' | translate" [style]="{ width: '100%' }" />
-      <p class="text-xs text-gray-400 mt-1">{{ 'STUDENTS.DETAIL.EDIT_PRICE_HINT' | translate }}</p>
-    </div>
-  </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showEditPriceDialog = false"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.SAVE_PRICE' | translate" icon="pi pi-check" [loading]="actionLoading()"
