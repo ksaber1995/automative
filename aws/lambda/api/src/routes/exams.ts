@@ -95,23 +95,36 @@ function mapExamFromDB(row: any) {
   };
 }
 
-// Is the student enrolled in this course in ANY class? Mirrors the attendance
-// rule — membership of the Course (via regular or bundle enrollment) is enough.
+/**
+ * May this student be graded on this exam?
+ *
+ * A course-wide exam mirrors the attendance rule — membership of the Course (via
+ * regular or bundle enrollment) is enough, whichever class they sit in. A
+ * CLASS-SCOPED row narrows to that class, matching the roster `results` builds:
+ * without this a scan would happily record a grade for a student of another
+ * class of the same course, and that grade would then be invisible on the
+ * screen it was entered from.
+ */
 async function isEnrolledInCourse(
   companyId: string,
   courseId: string,
   studentId: string,
+  classId?: string | null,
 ): Promise<boolean> {
+  const byClass = !!classId;
+  const clause = byClass ? 'AND class_id = $4' : '';
+  const params: any[] = [courseId, companyId, studentId];
+  if (byClass) params.push(classId);
   const row = await queryOne<any>(
     `SELECT 1 FROM (
         SELECT student_id FROM enrollments
-        WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+        WHERE course_id = $1 AND company_id = $2 ${clause} AND status NOT IN ('DROPPED', 'CANCELLED')
         UNION
         SELECT student_id FROM master_class_enrollments
-        WHERE course_id = $1 AND company_id = $2 AND status != 'DROPPED'
+        WHERE course_id = $1 AND company_id = $2 ${clause} AND status != 'DROPPED'
      ) enrolled
      WHERE student_id = $3`,
-    [courseId, companyId, studentId],
+    params,
   );
   return !!row;
 }
@@ -208,10 +221,14 @@ export const examsRoutes = {
         WHERE e.company_id = $1 AND e.is_active = true`;
       const params: any[] = [context.companyId];
 
-      // Exams and homework share the table but never share a screen: the exams
-      // list asks for neither and gets exams only, so homework can't leak into it.
-      params.push(queryParams.isHomework === 'true');
-      sql += ` AND e.is_homework = $${params.length}`;
+      // Exams and homework share the table AND now share a screen, so asking for
+      // neither returns both — that combined list is the only place homework can
+      // be created outside a session. A caller that wants one kind (the in-session
+      // homework panel, which must not offer the class's exams) says so explicitly.
+      if (queryParams.isHomework !== undefined) {
+        params.push(queryParams.isHomework === 'true');
+        sql += ` AND e.is_homework = $${params.length}`;
+      }
 
       if (queryParams.classId) {
         params.push(queryParams.classId);
@@ -311,14 +328,44 @@ export const examsRoutes = {
       if (body.maxGrade !== undefined) updateData.max_grade = body.maxGrade;
       if (body.status !== undefined) updateData.status = body.status;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
+      if (body.isHomework !== undefined) updateData.is_homework = body.isHomework === true;
+
+      // Narrowing a row to a class (or widening it back to the whole course)
+      // changes who may be graded on it, so the class has to belong to the course
+      // the row ends up on — otherwise the roster would come back empty and every
+      // scan would be rejected. Clearing the class also drops the session stamp:
+      // a session belongs to a class, so it means nothing without one.
+      if (body.classId !== undefined) {
+        if (!body.classId) {
+          updateData.class_id = null;
+          updateData.session_id = null;
+        } else {
+          const cls = await queryOne<any>(
+            `SELECT cl.id, cl.course_id
+             FROM classes cl
+             JOIN courses co ON co.id = cl.course_id
+             WHERE cl.id = $1 AND co.company_id = $2`,
+            [body.classId, context.companyId],
+          );
+          if (!cls) return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+          const targetCourse = updateData.course_id ?? existing.course_id;
+          if (cls.course_id !== targetCourse) {
+            return apiError(400, 'ERRORS.EXAMS.CLASS_COURSE_MISMATCH', 'Class does not belong to this course');
+          }
+          updateData.class_id = body.classId;
+        }
+      }
 
       const row = await update('exams', params.id, updateData);
       if (!row) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
-      // Re-read with course name for a consistent response shape.
+      // Re-read with course + class name for a consistent response shape.
       const full = await queryOne(
-        `SELECT e.*, c.name AS course_name,
+        `SELECT e.*, c.name AS course_name, cl.name AS class_name,
                 (SELECT COUNT(*) FROM exam_results r WHERE r.exam_id = e.id) AS result_count
-         FROM exams e JOIN courses c ON c.id = e.course_id WHERE e.id = $1`,
+         FROM exams e
+         JOIN courses c ON c.id = e.course_id
+         LEFT JOIN classes cl ON cl.id = e.class_id
+         WHERE e.id = $1`,
         [params.id],
       );
       return { status: 200 as const, body: mapExamFromDB(full ?? row) };
@@ -461,7 +508,7 @@ export const examsRoutes = {
         return apiError(404, 'ERRORS.EXAMS.QR_STUDENT_NOT_FOUND', 'No active student matches this QR code');
       }
 
-      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, student.id))) {
+      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, student.id, exam.class_id))) {
         return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
       }
 
@@ -528,7 +575,7 @@ export const examsRoutes = {
       if (!student) {
         return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
       }
-      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, student.id))) {
+      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, student.id, exam.class_id))) {
         return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
       }
 
@@ -582,7 +629,7 @@ export const examsRoutes = {
       const grade = (body?.grade ?? '').toString().trim();
       if (!grade) return apiError(400, 'ERRORS.EXAMS.GRADE_REQUIRED', 'Grade is required');
 
-      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, body.studentId))) {
+      if (!(await isEnrolledInCourse(context.companyId, exam.course_id, body.studentId, exam.class_id))) {
         return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
       }
 
@@ -650,7 +697,7 @@ export const examsRoutes = {
       }
 
       if (body?.absent) {
-        if (!(await isEnrolledInCourse(context.companyId, exam.course_id, body.studentId))) {
+        if (!(await isEnrolledInCourse(context.companyId, exam.course_id, body.studentId, exam.class_id))) {
           return apiError(409, 'ERRORS.EXAMS.STUDENT_NOT_IN_COURSE', 'This student is not enrolled in this course');
         }
         await query(
@@ -694,21 +741,29 @@ export const examsRoutes = {
         return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
       }
 
+      // "Everyone else was absent" must mean everyone on THIS row's roster — for a
+      // class-scoped row that is the class, not the whole course, or it would stamp
+      // an absence on students who were never expected to sit it.
+      const byClass = !!exam.class_id;
+      const classClause = byClass ? 'AND class_id = $4' : '';
+      const absentParams: any[] = [params.id, context.companyId, exam.course_id];
+      if (byClass) absentParams.push(exam.class_id);
+
       const inserted = await query<any>(
         `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
          SELECT $1, $2, $3, en.student_id, NULL, true
          FROM (
                SELECT student_id FROM enrollments
-                 WHERE course_id = $3 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+                 WHERE course_id = $3 AND company_id = $2 ${classClause} AND status NOT IN ('DROPPED', 'CANCELLED')
                UNION
                SELECT student_id FROM master_class_enrollments
-                 WHERE course_id = $3 AND company_id = $2 AND status != 'DROPPED'
+                 WHERE course_id = $3 AND company_id = $2 ${classClause} AND status != 'DROPPED'
               ) en
          JOIN students s ON s.id = en.student_id AND s.company_id = $2 AND s.is_active = true
          WHERE NOT EXISTS (SELECT 1 FROM exam_results r WHERE r.exam_id = $1 AND r.student_id = en.student_id)
          ON CONFLICT (exam_id, student_id) DO NOTHING
          RETURNING student_id`,
-        [params.id, context.companyId, exam.course_id],
+        absentParams,
       );
       return { status: 200 as const, body: { success: true, count: inserted.length } };
     } catch (error: any) {

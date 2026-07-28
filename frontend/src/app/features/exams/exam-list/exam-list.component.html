@@ -51,6 +51,17 @@
         [style]="{ minWidth: '180px' }"
       ></p-select>
 
+      <p-select
+        [options]="kindOptions()"
+        [ngModel]="selectedKind()"
+        (ngModelChange)="selectedKind.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'EXAMS.LIST.ALL_KINDS' | translate"
+        [showClear]="true"
+        [style]="{ minWidth: '180px' }"
+      ></p-select>
+
       @if (hasFilters()) {
         <p-button
           [label]="'EXAMS.LIST.CLEAR' | translate"
@@ -72,7 +83,9 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'EXAMS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="isHomework">{{ 'EXAMS.LIST.COL_KIND' | translate }} <p-sortIcon field="isHomework"></p-sortIcon></th>
           <th pSortableColumn="courseName">{{ 'EXAMS.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
+          <th pSortableColumn="className">{{ 'EXAMS.LIST.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
           @if (!branchState.isSingleBranch()) {
             <th pSortableColumn="branchId">{{ 'EXAMS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
@@ -85,7 +98,15 @@
       <ng-template pTemplate="body" let-item>
         <tr>
           <td class="font-medium">{{ item.name }}</td>
+          <td>
+            <p-tag
+              [value]="(item.isHomework ? 'EXAMS.KIND.HOMEWORK' : 'EXAMS.KIND.EXAM') | translate"
+              [severity]="item.isHomework ? 'warn' : 'secondary'"
+            ></p-tag>
+          </td>
           <td>{{ item.courseName || '—' }}</td>
+          <!-- No class = course-wide, every class of the course sits it. -->
+          <td>{{ item.className || ('EXAMS.LIST.ALL_CLASSES' | translate) }}</td>
           @if (!branchState.isSingleBranch()) {
             <td>{{ getBranchName(item.branchId) }}</td>
           }
@@ -132,7 +153,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-8">
+          <td colspan="9" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-file-edit text-4xl mb-3"></i>
               <p>{{ 'EXAMS.LIST.EMPTY' | translate }}</p>

@@ -7,13 +7,20 @@
       </button>
       <h1 class="text-3xl font-bold text-gray-900">{{ exam()?.name }}</h1>
       <p class="text-gray-600 mt-1">
-        {{ exam()?.courseName }} · {{ exam()?.examDate | date: 'mediumDate' }}
+        {{ exam()?.courseName }}
+        <!-- The class, when set, is what the roster below is narrowed to. -->
+        @if (exam()?.className) { · {{ exam()?.className }} }
+        · {{ exam()?.examDate | date: 'mediumDate' }}
         @if (exam()?.maxGrade != null) {
           · {{ 'EXAMS.DETAIL.OUT_OF' | translate: { max: exam()?.maxGrade } }}
         }
       </p>
     </div>
     <div class="flex items-center gap-3">
+      <p-tag
+        [value]="(exam()?.isHomework ? 'EXAMS.KIND.HOMEWORK' : 'EXAMS.KIND.EXAM') | translate"
+        [severity]="exam()?.isHomework ? 'warn' : 'secondary'"
+      ></p-tag>
       <p-tag
         [value]="('EXAMS.STATUS.' + (exam()?.status || 'SCHEDULED')) | translate"
         [severity]="isDone() ? 'success' : 'info'"

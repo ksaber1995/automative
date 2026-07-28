@@ -44,15 +44,21 @@ export class ExamFormComponent implements OnInit {
   isEditMode = signal(false);
   id: string | null = null;
   courses = signal<LookupOption[]>([]);
+  classes = signal<LookupOption[]>([]);
 
   statusOptions = signal<{ label: string; value: string }[]>([]);
+  kindOptions = signal<{ label: string; value: boolean }[]>([]);
 
   constructor() {
     this.rebuildOptions();
     this.translate.onLangChange.subscribe(() => this.rebuildOptions());
 
     this.form = this.fb.group({
+      // Homework created here has no session behind it — that is the whole point
+      // of this screen. The class is what scopes it; the session stays null.
+      isHomework: [false],
       courseId: ['', [Validators.required]],
+      classId: [null],
       name: ['', [Validators.required, Validators.minLength(1)]],
       examDate: [new Date(), [Validators.required]],
       maxGrade: [100, [Validators.min(0)]],
@@ -65,6 +71,14 @@ export class ExamFormComponent implements OnInit {
       next: (c) => this.courses.set(c),
     });
 
+    // The class list only makes sense within a course, and a class from the old
+    // course would fail the server's class/course check — so switching course
+    // reloads the options and drops the stale pick.
+    this.form.get('courseId')!.valueChanges.subscribe((courseId: string) => {
+      this.form.get('classId')!.setValue(null);
+      this.loadClasses(courseId);
+    });
+
     this.id = this.route.snapshot.paramMap.get('id');
     if (this.id) {
       this.isEditMode.set(true);
@@ -72,17 +86,32 @@ export class ExamFormComponent implements OnInit {
     }
   }
 
+  private loadClasses(courseId: string | null) {
+    if (!courseId) {
+      this.classes.set([]);
+      return;
+    }
+    this.lookup.classes({ courseId }).subscribe({
+      next: (c) => this.classes.set(c),
+    });
+  }
+
   load(id: string) {
     this.loading.set(true);
     this.service.getById(id).subscribe({
       next: (row) => {
         this.form.patchValue({
+          isHomework: row.isHomework === true,
           courseId: row.courseId,
           name: row.name,
           examDate: row.examDate ? new Date(row.examDate) : new Date(),
           maxGrade: row.maxGrade ?? null,
           status: row.status,
         });
+        // The courseId patch above synchronously fired valueChanges, which cleared
+        // classId and kicked off the class load — so restore the saved class on
+        // top of it. The select shows the name once the options land.
+        this.form.get('classId')!.setValue(row.classId ?? null);
         this.loading.set(false);
       },
       error: () => {
@@ -99,7 +128,10 @@ export class ExamFormComponent implements OnInit {
     }
     const v = this.form.value;
     const payload: any = {
+      isHomework: v.isHomework === true,
       courseId: v.courseId,
+      // Always sent, so clearing the class widens the row back to the whole course.
+      classId: v.classId || null,
       name: v.name?.trim(),
       examDate: this.toIsoDate(v.examDate),
       maxGrade: v.maxGrade ?? null,
@@ -136,6 +168,10 @@ export class ExamFormComponent implements OnInit {
     this.statusOptions.set([
       { label: this.translate.instant('EXAMS.STATUS.SCHEDULED'), value: 'SCHEDULED' },
       { label: this.translate.instant('EXAMS.STATUS.DONE'), value: 'DONE' },
+    ]);
+    this.kindOptions.set([
+      { label: this.translate.instant('EXAMS.KIND.EXAM'), value: false },
+      { label: this.translate.instant('EXAMS.KIND.HOMEWORK'), value: true },
     ]);
   }
 

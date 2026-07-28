@@ -14,9 +14,10 @@ export interface ExamModel {
   /** Number of students graded so far (populated by list/getById). */
   resultCount?: number;
   /**
-   * Homework rides on the exams table. A homework is always tied to a class, and
-   * optionally stamped with the session it was marked in — a teacher records
-   * homework when they want to, not necessarily every session.
+   * Homework rides on the exams table — same grading, listed separately.
+   * `classId` narrows who sits it to one class; left null the row is course-wide,
+   * every class of the course. Homework set from a session is stamped with it;
+   * homework set from the Exams & Homework screen has no session at all.
    */
   isHomework: boolean;
   classId: string | null;

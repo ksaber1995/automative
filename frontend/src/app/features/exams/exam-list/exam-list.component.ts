@@ -53,20 +53,29 @@ export class ExamListComponent implements OnInit {
   selectedBranchId = signal<string | null>(null);
   selectedCourseId = signal<string | null>(null);
   selectedStatus = signal<'SCHEDULED' | 'DONE' | null>(null);
+  /** null = both kinds; the list is now Exams AND Homework. */
+  selectedKind = signal<'EXAM' | 'HOMEWORK' | null>(null);
 
   statusOptions = computed(() => [
     { label: this.translate.instant('EXAMS.STATUS.SCHEDULED'), value: 'SCHEDULED' },
     { label: this.translate.instant('EXAMS.STATUS.DONE'), value: 'DONE' },
   ]);
 
+  kindOptions = computed(() => [
+    { label: this.translate.instant('EXAMS.KIND.EXAM'), value: 'EXAM' },
+    { label: this.translate.instant('EXAMS.KIND.HOMEWORK'), value: 'HOMEWORK' },
+  ]);
+
   filteredItems = computed(() => {
     const branch = this.selectedBranchId();
     const course = this.selectedCourseId();
     const status = this.selectedStatus();
+    const kind = this.selectedKind();
     return this.items().filter((e) => {
       if (branch && e.branchId !== branch) return false;
       if (course && e.courseId !== course) return false;
       if (status && e.status !== status) return false;
+      if (kind && (kind === 'HOMEWORK') !== (e.isHomework === true)) return false;
       return true;
     });
   });
@@ -94,10 +103,11 @@ export class ExamListComponent implements OnInit {
     this.selectedBranchId.set(null);
     this.selectedCourseId.set(null);
     this.selectedStatus.set(null);
+    this.selectedKind.set(null);
   }
 
   hasFilters(): boolean {
-    return !!(this.selectedBranchId() || this.selectedCourseId() || this.selectedStatus());
+    return !!(this.selectedBranchId() || this.selectedCourseId() || this.selectedStatus() || this.selectedKind());
   }
 
   create() { this.router.navigate(['/exams/create']); }

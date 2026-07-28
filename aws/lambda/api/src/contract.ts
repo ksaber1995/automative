@@ -638,6 +638,10 @@ const CreateExamSchema = z.object({
 
 const UpdateExamSchema = CreateExamSchema.partial().extend({
   isActive: z.boolean().optional(),
+  // Explicitly nullable, unlike OptionalUUIDSchema which folds null into undefined:
+  // that would make "no class" indistinguishable from "leave the class alone", so a
+  // class-scoped row could never be widened back to the whole course.
+  classId: z.string().uuid().nullable().optional(),
 });
 
 const ExamSchema = z.object({

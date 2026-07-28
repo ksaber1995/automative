@@ -8,6 +8,23 @@
 
   <p-card>
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="grid grid-cols-1 gap-5">
+      <!-- Exam or homework. Same row, same grading — only the label and the
+           usual scope differ, so one form covers both. -->
+      <div>
+        <label for="isHomework" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.KIND' | translate }}
+        </label>
+        <p-select
+          inputId="isHomework"
+          formControlName="isHomework"
+          [options]="kindOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [style]="{ width: '100%' }"
+        ></p-select>
+        <small class="text-gray-400">{{ 'EXAMS.FORM.KIND_HINT' | translate }}</small>
+      </div>
+
       <!-- Course -->
       <div>
         <label for="courseId" class="block text-sm font-medium text-gray-700 mb-2">
@@ -27,6 +44,26 @@
         @if (courseId?.invalid && courseId?.touched) {
           <small class="text-red-500">{{ 'EXAMS.FORM.COURSE_REQUIRED' | translate }}</small>
         }
+      </div>
+
+      <!-- Class (optional): narrows who sits it to one class. Left empty, the
+           row stays course-wide — every class of the course. -->
+      <div>
+        <label for="classId" class="block text-sm font-medium text-gray-700 mb-2">
+          {{ 'EXAMS.FORM.CLASS' | translate }}
+        </label>
+        <p-select
+          inputId="classId"
+          formControlName="classId"
+          [options]="classes()"
+          optionLabel="label"
+          optionValue="id"
+          [filter]="true"
+          [showClear]="true"
+          [placeholder]="'EXAMS.FORM.CLASS_PLACEHOLDER' | translate"
+          [style]="{ width: '100%' }"
+        ></p-select>
+        <small class="text-gray-400">{{ 'EXAMS.FORM.CLASS_HINT' | translate }}</small>
       </div>
 
       <!-- Name -->

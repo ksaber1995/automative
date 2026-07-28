@@ -1518,6 +1518,14 @@ CREATE TABLE exams (
     max_grade   DECIMAL(6, 2),
     status      VARCHAR(16) NOT NULL DEFAULT 'SCHEDULED'
                   CHECK (status IN ('SCHEDULED', 'DONE')),
+    -- Homework rides on this table behind a flag (migration 059) — same grading,
+    -- listed separately. class_id narrows who sits it to one class (an exam left
+    -- without one stays course-wide); session_id is the optional stamp for
+    -- homework recorded during a lesson. Both FKs SET NULL so deleting a session
+    -- or a class never destroys the marks recorded against them.
+    is_homework BOOLEAN NOT NULL DEFAULT false,
+    class_id    UUID REFERENCES classes(id)  ON DELETE SET NULL,
+    session_id  UUID REFERENCES sessions(id) ON DELETE SET NULL,
     is_active   BOOLEAN NOT NULL DEFAULT true,
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1527,6 +1535,9 @@ CREATE INDEX idx_exams_company   ON exams(company_id);
 CREATE INDEX idx_exams_branch    ON exams(branch_id);
 CREATE INDEX idx_exams_course    ON exams(course_id);
 CREATE INDEX idx_exams_exam_date ON exams(exam_date);
+CREATE INDEX idx_exams_class     ON exams(class_id);
+CREATE INDEX idx_exams_session   ON exams(session_id);
+CREATE INDEX idx_exams_homework  ON exams(company_id, is_homework);
 
 CREATE TABLE exam_results (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

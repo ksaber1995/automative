@@ -16,8 +16,8 @@ export class ExamService {
   private api = inject(ApiService);
 
   /**
-   * Exams only, unless isHomework is passed — homework shares this table but
-   * never shares a screen with exams, so the API defaults to non-homework.
+   * Exams AND homework — they share this table and the Exams & Homework screen.
+   * Pass isHomework to narrow to one kind (the in-session panel does).
    */
   getAll(filters?: { branchId?: string; courseId?: string; status?: string; classId?: string; isHomework?: string }): Observable<ExamModel[]> {
     return this.api.get<ExamModel[]>('exams', filters);
