@@ -172,8 +172,52 @@ export class EnrollmentFormComponent implements OnInit {
     return this.courseBooks().filter(b => selected.has(b.id)).length;
   });
 
-  // Enrollment final price + selected books net total.
-  grandTotal = computed(() => this.finalPriceSig() + this.booksNetTotal());
+  // ─── What is actually collected today ───────────────────────────────────────
+  // Books are always charged on create — the backend records the product sale in
+  // the same transaction as the enrollment. The course fee is not: it is only
+  // collected if the payment option above says so, and "pay later" (the default
+  // for monthly) collects nothing. So the two cannot simply be added together.
+
+  /** The part of the course fee being collected at enrollment, per the pay option. */
+  feeDueNow = computed(() => {
+    const fee = this.finalPriceSig();
+    if (this.isMonthly()) {
+      const opt = this.monthlyPayOptionSig();
+      return opt === 'PAY_NOW' ? fee
+        : opt === 'PAY_PARTIAL' ? this.monthlyDownPaymentSig()
+        : 0;
+    }
+    if (this.isPerSession()) {
+      // Pay-as-attended collects nothing up front; sessions are billed as they happen.
+      if (this.sessionBillingModeSig() !== 'PACKAGE') return 0;
+      const mode = this.sessionPackagePayModeSig();
+      return mode === 'FULL' ? fee
+        : mode === 'PARTIAL' ? this.sessionPackageDownPaymentSig()
+        : 0;
+    }
+    return this.paymentModeSig() === 'INSTALLMENTS' ? this.downPaymentSig() : fee;
+  });
+
+  /** The part of the course fee left owing after today. */
+  feeDeferred = computed(() => {
+    // Pay-as-attended has no fixed balance to defer — there is no total yet.
+    if (this.isPerSession() && this.sessionBillingModeSig() !== 'PACKAGE') return 0;
+    return Math.max(0, this.finalPriceSig() - this.feeDueNow());
+  });
+
+  /** Cash actually taken at enrollment: books (always) + whatever fee is due now. */
+  dueNowTotal = computed(() => this.booksNetTotal() + this.feeDueNow());
+
+  /** Names the fee the summary line refers to, so the amount is not ambiguous. */
+  feeLineKey = computed(() => {
+    if (this.isMonthly()) return 'ENROLLMENT_FORM.SUMMARY_FEE_MONTH';
+    if (this.isPerSession()) {
+      return this.sessionBillingModeSig() === 'PACKAGE'
+        ? 'ENROLLMENT_FORM.SUMMARY_FEE_PACKAGE'
+        : 'ENROLLMENT_FORM.SUMMARY_FEE_PER_SESSION';
+    }
+    return 'ENROLLMENT_FORM.SUMMARY_FEE_COURSE';
+  });
 
   filteredStudents = computed(() => {
     const branchId = this.selectedBranchId();

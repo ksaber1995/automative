@@ -545,16 +545,28 @@
             }
           </div>
 
-          <!-- Summary line -->
+          <!-- Summary: what is collected today, itemised, then what is left owing.
+               Books are charged on create; the course fee only if the payment
+               option above collects it — so the two are listed separately. -->
           <div class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm flex flex-col gap-1">
             <div class="flex justify-between">
               <span class="text-gray-600">{{ 'ENROLLMENT_FORM.BOOKS_SELECTED' | translate: { count: selectedBooksCount() } }}</span>
               <span class="font-semibold text-gray-800">{{ 'ENROLLMENT_FORM.BOOKS_TOTAL' | translate }}: {{ booksNetTotal() | amount }}</span>
             </div>
-            <div class="flex justify-between pt-1 border-t mt-1">
-              <span class="text-gray-700 font-medium">{{ 'ENROLLMENT_FORM.GRAND_TOTAL' | translate }}</span>
-              <span class="font-bold text-green-700">{{ grandTotal() | amount }}</span>
+            <div class="flex justify-between">
+              <span class="text-gray-600">{{ feeLineKey() | translate }}</span>
+              <span [class]="feeDueNow() > 0 ? 'font-semibold text-gray-800' : 'text-gray-400'">{{ feeDueNow() | amount }}</span>
             </div>
+            <div class="flex justify-between pt-1 border-t mt-1">
+              <span class="text-gray-700 font-medium">{{ 'ENROLLMENT_FORM.DUE_NOW' | translate }}</span>
+              <span class="font-bold text-green-700">{{ dueNowTotal() | amount }}</span>
+            </div>
+            @if (feeDeferred() > 0) {
+              <div class="flex justify-between text-gray-500">
+                <span>{{ 'ENROLLMENT_FORM.DUE_LATER' | translate }}</span>
+                <span>{{ feeDeferred() | amount }}</span>
+              </div>
+            }
           </div>
         }
 
