@@ -285,6 +285,19 @@ export class AuthService {
   }
 
   /**
+   * An academy that registered on Basic. Events, Expenses and Reports are part of
+   * what Advanced buys, so they stay hidden for these tenants.
+   *
+   * Deliberately narrower than canUseCrm/canUseCash: a solo TEACHER keeps all
+   * three whatever their plan. The restriction is about what an academy's Basic
+   * tier includes, not about the feature being unavailable to small tenants —
+   * rent and bills apply to a one-person tenant just the same.
+   */
+  isBasicAcademy(): boolean {
+    return !this.isTeacher() && this.plan() === 'SIMPLE';
+  }
+
+  /**
    * The cash drawer (Current Cash page, its dashboard tile and its permission rows).
    * Advanced-plan academies only: teachers have no drawer, and an academy that
    * registered on Basic does not get the feature at all — not a locked page with an

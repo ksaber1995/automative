@@ -210,7 +210,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // reachable by URL, it just doesn't need its own sidebar entry.
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') && !auth.isTeacher() },
+      { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') && !auth.isTeacher() && !auth.isBasicAcademy() },
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
     ].filter(c => c.visible);
@@ -275,7 +275,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
-      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
+      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') && !auth.isBasicAcademy() },
       // Hidden for teachers alongside Employees — a salary is paid to an
       // employee, and a teacher tenant has none. Expenses above stays visible:
       // rent and bills apply to a solo teacher too.
@@ -302,7 +302,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
 
     // Reports (standalone)
-    if (auth.canRead('reports')) {
+    if (auth.canRead('reports') && !auth.isBasicAcademy()) {
       entries.push({ kind: 'leaf', leaf: {
         labelKey: 'NAV.REPORTS', icon: 'pi pi-chart-bar', routerLink: ['/reports'], visible: true,
       }});
