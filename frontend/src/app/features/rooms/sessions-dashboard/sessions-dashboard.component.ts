@@ -261,6 +261,7 @@ export class SessionsDashboardComponent implements OnInit {
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const branchId = this.selectedBranchId();
+    const classId = this.selectedClassId();
     return this.upcomingEntries()
       .filter(e => {
         // Skip entries whose session today is formally started (it belongs in the
@@ -281,7 +282,7 @@ export class SessionsDashboardComponent implements OnInit {
         if (diff < -30 && !hasPreparedSession) return false;
         return true;
       })
-      .filter(e => !branchId || e.branchId === branchId)
+      .filter(e => (!branchId || e.branchId === branchId) && (!classId || e.classId === classId))
       .sort((a, b) => {
         const [ah, am] = (a.startTime || '00:00').split(':').map(Number);
         const [bh, bm] = (b.startTime || '00:00').split(':').map(Number);
@@ -307,6 +308,41 @@ export class SessionsDashboardComponent implements OnInit {
 
   /** Page-level branch filter (null = all branches) */
   selectedBranchId = signal<string | null>(null);
+  /** Page-level class filter (null = all classes). Applies to Active + Upcoming. */
+  selectedClassId = signal<string | null>(null);
+
+  /**
+   * Classes to offer in the page filter, narrowed to the chosen branch — a class
+   * from another branch can never match a session in this one, so offering it is
+   * offering a filter that always comes back empty. Reuses the active-class list
+   * the Start dialog already loads, so there's no extra request.
+   */
+  classFilterOptions = computed(() => {
+    const branchId = this.selectedBranchId();
+    return this.activeClasses()
+      .filter((c: any) => !branchId || !c.branchId || c.branchId === branchId)
+      .map((c: any) => ({ id: c.id, label: c.name }))
+      .sort((a: any, b: any) => a.label.localeCompare(b.label));
+  });
+
+  onBranchFilterChange(branchId: string | null) {
+    this.selectedBranchId.set(branchId);
+    // A class the dropdown no longer offers must not stay applied, or both tabs
+    // would read empty with no visible reason why.
+    const picked = this.selectedClassId();
+    if (picked && !this.classFilterOptions().some(c => c.id === picked)) {
+      this.selectedClassId.set(null);
+    }
+  }
+
+  clearPageFilters() {
+    this.selectedBranchId.set(null);
+    this.selectedClassId.set(null);
+  }
+
+  hasPageFilters(): boolean {
+    return !!(this.selectedBranchId() || this.selectedClassId());
+  }
 
   /** Start session form */
   sessionForm: FormGroup = this.fb.group({
@@ -363,8 +399,10 @@ export class SessionsDashboardComponent implements OnInit {
 
   filteredActiveSessions = computed(() => {
     const branchId = this.selectedBranchId();
-    if (!branchId) return this.activeSessions();
-    return this.activeSessions().filter((s: Session) => s.branchId === branchId);
+    const classId = this.selectedClassId();
+    if (!branchId && !classId) return this.activeSessions();
+    return this.activeSessions().filter((s: Session) =>
+      (!branchId || s.branchId === branchId) && (!classId || s.classId === classId));
   });
 
   filteredOccupiedRooms = computed(() => this.filteredRooms().filter((r: Room) => r.isOccupied));

@@ -44,14 +44,15 @@
     }
   </div>
 
-  <!-- Branch Filter -->
-  <div class="flex items-center gap-3 mb-6">
+  <!-- Branch + class filters. Both apply to the Active and Upcoming tabs; the
+       History tab carries its own richer filter set. -->
+  <div class="flex flex-wrap items-center gap-3 mb-6">
     <div class="flex items-center gap-2 flex-1 max-w-xs">
       <i class="pi pi-filter text-gray-400"></i>
       <p-select
         [options]="branches()"
         [ngModel]="selectedBranchId()"
-        (ngModelChange)="selectedBranchId.set($event)"
+        (ngModelChange)="onBranchFilterChange($event)"
         optionLabel="label"
         optionValue="id"
         appendTo="body"
@@ -60,14 +61,28 @@
         [style]="{ width: '100%' }"
       ></p-select>
     </div>
-    @if (selectedBranchId()) {
+    <div class="flex items-center gap-2 flex-1 max-w-xs">
+      <p-select
+        [options]="classFilterOptions()"
+        [ngModel]="selectedClassId()"
+        (ngModelChange)="selectedClassId.set($event)"
+        optionLabel="label"
+        optionValue="id"
+        appendTo="body"
+        [filter]="true"
+        [placeholder]="'SESSIONS_DASHBOARD.ALL_CLASSES' | translate"
+        [showClear]="true"
+        [style]="{ width: '100%' }"
+      ></p-select>
+    </div>
+    @if (hasPageFilters()) {
       <p-button
         [label]="'SESSIONS_DASHBOARD.CLEAR_FILTER' | translate"
         icon="pi pi-times"
         severity="secondary"
         [outlined]="true"
         size="small"
-        (onClick)="selectedBranchId.set(null)"
+        (onClick)="clearPageFilters()"
       ></p-button>
     }
   </div>

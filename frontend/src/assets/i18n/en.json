@@ -4873,6 +4873,7 @@
     "STAT_OCCUPIED": "Occupied Rooms",
     "STAT_FREE": "Free Rooms",
     "ALL_BRANCHES": "All Branches",
+    "ALL_CLASSES": "All Classes",
     "CLEAR_FILTER": "Clear Filter",
     "TAB_ACTIVE": "Active Sessions",
     "TAB_ROOMS": "Room Status",
