@@ -37,6 +37,13 @@ import { Student } from '@shared/interfaces/student.interface';
   templateUrl: './student-qr-dialog.component.html',
 })
 export class StudentQrDialogComponent {
+  /**
+   * A card number as it is printed, not as it is stored: 900142 is card "0142".
+   * The drawn card and the download filename already went through this; the line
+   * of text in the dialog did not, so the same student read as two numbers.
+   */
+  code = formatStudentCode;
+
   private studentService = inject(StudentService);
   private notification = inject(NotificationService);
   private authService = inject(AuthService);

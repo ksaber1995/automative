@@ -13,7 +13,7 @@
     @if (student()?.studentCode != null) {
       <div class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">
         <i class="pi pi-hashtag"></i>
-        <span>{{ 'STUDENT_QR.CODE_LABEL' | translate }} <strong>{{ student()?.studentCode }}</strong></span>
+        <span>{{ 'STUDENT_QR.CODE_LABEL' | translate }} <strong>{{ code(student()?.studentCode) }}</strong></span>
       </div>
     }
 
