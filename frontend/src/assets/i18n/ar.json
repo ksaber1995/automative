@@ -3692,6 +3692,8 @@
       "ALL_BRANCHES": "جميع الفروع",
       "COURSE_FILTER": "تصفية حسب الكورس:",
       "ALL_COURSES": "كل الكورسات",
+      "CLASS_FILTER": "تصفية حسب الفصل:",
+      "ALL_CLASSES": "كل الفصول",
       "SEARCH": "البحث بالاسم",
       "SEARCH_PLACEHOLDER": "ابحث بالاسم أو رقم الهاتف أو الكود...",
       "COL_CODE": "الرقم",

@@ -3568,6 +3568,8 @@
       "ALL_BRANCHES": "All Branches",
       "COURSE_FILTER": "Filter by Course:",
       "ALL_COURSES": "All Courses",
+      "CLASS_FILTER": "Filter by Class:",
+      "ALL_CLASSES": "All Classes",
       "SEARCH": "Search by name",
       "SEARCH_PLACEHOLDER": "Search by name, phone, or code...",
       "COL_CODE": "Code",

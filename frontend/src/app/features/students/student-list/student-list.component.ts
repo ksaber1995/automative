@@ -92,11 +92,18 @@ export class StudentListComponent implements OnInit {
   allCourses = signal<LookupOption[]>([]);
   loading = signal(true);
   selectedBranchId: string = '';
+  /** Signal mirror of selectedBranchId so computeds can react to it. */
+  branchFilter = signal('');
   selectedCourseId = signal('');
+  selectedClassId = signal('');
   searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
   // studentId → set of courseIds the student is enrolled in (drives the course filter).
   studentCourseMap = signal<Map<string, Set<string>>>(new Map());
+  // studentId → set of classIds, from the same enrollments (drives the class filter).
+  studentClassMap = signal<Map<string, Set<string>>>(new Map());
+  // Every class, kept whole so the dropdown can narrow itself by branch/course.
+  allClasses = signal<Class[]>([]);
   activeTab = signal<'active' | 'inactive'>('active');
 
   // Type-to-confirm permanent-delete dialog state.
@@ -121,6 +128,22 @@ export class StudentListComponent implements OnInit {
     return map;
   });
 
+  /**
+   * The classes worth offering: those of the chosen course, or of the chosen
+   * branch when no course is picked. Class names repeat across courses ("Group
+   * A" is in half of them), so an unnarrowed list is a wall of ambiguous names.
+   */
+  classOptions = computed(() => {
+    const courseId = this.selectedCourseId();
+    // Mirrors selectedBranchId, which is a plain ngModel field — a computed()
+    // can't track it, so the branch change has to arrive as a signal.
+    const branchId = this.branchFilter();
+    return this.allClasses()
+      .filter(c => (!courseId || c.courseId === courseId)
+                && (!branchId || !c.branchId || c.branchId === branchId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   filteredStudents = computed(() => {
     const list = this.students();
     let filtered = this.activeTab() === 'active'
@@ -130,6 +153,11 @@ export class StudentListComponent implements OnInit {
     if (courseId) {
       const map = this.studentCourseMap();
       filtered = filtered.filter(s => map.get(s.id)?.has(courseId));
+    }
+    const classId = this.selectedClassId();
+    if (classId) {
+      const map = this.studentClassMap();
+      filtered = filtered.filter(s => map.get(s.id)?.has(classId));
     }
     const term = this.searchTerm();
     if (!term.trim()) return filtered;
@@ -179,6 +207,8 @@ export class StudentListComponent implements OnInit {
         if (picked && !courses.some(c => c.id === picked)) {
           this.selectedCourseId.set('');
         }
+        // The course may have just widened or cleared, moving the class list with it.
+        this.dropClassIfUnoffered();
       },
     });
   }
@@ -196,6 +226,7 @@ export class StudentListComponent implements OnInit {
       const classCourseById = new Map(classes.map(c => [c.id, c.courseId]));
       const map: Record<string, EnrollmentCounts> = {};
       const courseMap = new Map<string, Set<string>>();
+      const classMap = new Map<string, Set<string>>();
       for (const e of enrollments) {
         if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
         if (classDoneById.get(e.classId)) map[e.studentId].completed++;
@@ -207,16 +238,22 @@ export class StudentListComponent implements OnInit {
           if (!courseMap.has(e.studentId)) courseMap.set(e.studentId, new Set());
           courseMap.get(e.studentId)!.add(courseId);
         }
+        // Same enrollments drive the class filter — no extra request.
+        if (e.classId) {
+          if (!classMap.has(e.studentId)) classMap.set(e.studentId, new Set());
+          classMap.get(e.studentId)!.add(e.classId);
+        }
       }
       this.enrollmentCounts.set(map);
       this.studentCourseMap.set(courseMap);
+      this.studentClassMap.set(classMap);
     };
     this.enrollmentService.getAllEnrollments().subscribe({
       next: (list) => { enrollments = list; finalize(); },
       error: () => finalize(),
     });
     this.classService.getAllClasses().subscribe({
-      next: (list) => { classes = list; finalize(); },
+      next: (list) => { classes = list; this.allClasses.set(list); finalize(); },
       error: () => finalize(),
     });
   }
@@ -274,8 +311,27 @@ export class StudentListComponent implements OnInit {
   }
 
   onBranchFilterChange() {
+    this.branchFilter.set(this.selectedBranchId);
     this.loadCourses();
     this.loadStudents();
+    this.dropClassIfUnoffered();
+  }
+
+  onCourseFilterChange(courseId: string) {
+    this.selectedCourseId.set(courseId);
+    this.dropClassIfUnoffered();
+  }
+
+  /**
+   * A class the dropdown no longer offers must not stay applied — the list would
+   * look empty for no visible reason, the same trap loadCourses() avoids for the
+   * course filter.
+   */
+  private dropClassIfUnoffered() {
+    const picked = this.selectedClassId();
+    if (picked && !this.classOptions().some(c => c.id === picked)) {
+      this.selectedClassId.set('');
+    }
   }
 
   onTabChange(tab: 'active' | 'inactive') {
@@ -283,6 +339,7 @@ export class StudentListComponent implements OnInit {
     this.activeTab.set(tab);
     if (this.selectedBranchId) {
       this.selectedBranchId = '';
+      this.branchFilter.set('');
       // Back to every branch, so the course list widens again.
       this.loadCourses();
       this.loadStudents();
