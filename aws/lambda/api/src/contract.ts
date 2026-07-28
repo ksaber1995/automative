@@ -1320,7 +1320,8 @@ const CreateEmployeeSchema = z.object({
   department: z.string().optional(),
   position: z.string().optional(),
   salary: z.number().nullable().optional(),
-  salaryType: z.enum(['MONTHLY', 'SESSION_BASED', 'PERCENTAGE']).optional(),
+  // UNPAID: a teacher who draws nothing — a founder or co-founder who teaches.
+  salaryType: z.enum(['MONTHLY', 'SESSION_BASED', 'PERCENTAGE', 'UNPAID']).optional(),
   sessionRate: z.number().nullable().optional(),
   percentageRate: z.number().nullable().optional(),
   hireDate: z.string().optional(),
@@ -4388,6 +4389,17 @@ export const contract = c.router({
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
         }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    updateContact: {
+      method: 'PATCH' as const,
+      path: '/api/companies/contact',
+      // Empty string clears the number; the handler normalises before storing.
+      body: z.object({ phone: z.string().max(24) }),
+      responses: {
+        200: z.object({ id: UUIDSchema, phone: z.string().nullable() }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,
       },

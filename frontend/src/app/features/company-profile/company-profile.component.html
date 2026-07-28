@@ -116,7 +116,57 @@
         </div>
         <div>
           <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.PHONE' | translate }}</dt>
-          <dd class="text-gray-900 mt-0.5">{{ p.company.phone || '—' }}</dd>
+          @if (editingPhone()) {
+            <dd class="mt-0.5 flex items-center gap-2 flex-wrap">
+              <input
+                pInputText
+                type="tel"
+                inputmode="tel"
+                dir="ltr"
+                class="w-44"
+                [ngModel]="phoneDraft()"
+                (ngModelChange)="phoneDraft.set($event)"
+                (keyup.enter)="savePhone()"
+                (keyup.escape)="cancelEditPhone()"
+                [placeholder]="'COMPANY_PROFILE.PHONE_PLACEHOLDER' | translate"
+              />
+              <p-button
+                icon="pi pi-check"
+                size="small"
+                [rounded]="true"
+                [text]="true"
+                severity="success"
+                [loading]="savingPhone()"
+                [pTooltip]="'COMPANY_PROFILE.PHONE_SAVE' | translate"
+                (onClick)="savePhone()"
+              ></p-button>
+              <p-button
+                icon="pi pi-times"
+                size="small"
+                [rounded]="true"
+                [text]="true"
+                severity="secondary"
+                [disabled]="savingPhone()"
+                [pTooltip]="'COMPANY_PROFILE.PHONE_CANCEL' | translate"
+                (onClick)="cancelEditPhone()"
+              ></p-button>
+            </dd>
+          } @else {
+            <dd class="text-gray-900 mt-0.5 flex items-center gap-2">
+              <span dir="ltr">{{ p.company.phone || '—' }}</span>
+              @if (canEditPhone()) {
+                <p-button
+                  icon="pi pi-pencil"
+                  size="small"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="secondary"
+                  [pTooltip]="'COMPANY_PROFILE.PHONE_EDIT' | translate"
+                  (onClick)="startEditPhone()"
+                ></p-button>
+              }
+            </dd>
+          }
         </div>
         <div class="md:col-span-2">
           <dt class="text-xs uppercase tracking-wide text-gray-500">{{ 'COMPANY_PROFILE.ADDRESS' | translate }}</dt>

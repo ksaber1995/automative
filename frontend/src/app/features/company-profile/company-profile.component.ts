@@ -1,8 +1,11 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CompanyProfile, CompanyQrSummary, CompanyService } from '../../core/services/company.service';
@@ -12,7 +15,10 @@ import { NotificationService } from '../../core/services/notification.service';
 @Component({
   selector: 'app-company-profile',
   standalone: true,
-  imports: [CommonModule, DatePipe, CardModule, TagModule, ButtonModule, SkeletonModule, TranslateModule],
+  imports: [
+    CommonModule, DatePipe, FormsModule, CardModule, TagModule, ButtonModule,
+    InputTextModule, TooltipModule, SkeletonModule, TranslateModule,
+  ],
   templateUrl: './company-profile.component.html',
 })
 export class CompanyProfileComponent implements OnInit {
@@ -46,6 +52,45 @@ export class CompanyProfileComponent implements OnInit {
         this.authService.refreshUser();
       },
       error: () => this.upgrading.set(false),
+    });
+  }
+
+  // ── Phone, edited in place ────────────────────────────────────────────────
+  // Only an admin may save it (the API says so too); everyone else reads it.
+  canEditPhone = (): boolean => this.authService.isGlobalAdmin();
+  editingPhone = signal(false);
+  phoneDraft = signal('');
+  savingPhone = signal(false);
+
+  startEditPhone() {
+    this.phoneDraft.set(this.profile()?.company.phone ?? '');
+    this.editingPhone.set(true);
+  }
+
+  cancelEditPhone() {
+    this.editingPhone.set(false);
+  }
+
+  savePhone() {
+    if (this.savingPhone()) return;
+    this.savingPhone.set(true);
+    this.companyService.updateContact(this.phoneDraft().trim()).subscribe({
+      next: (res) => {
+        this.savingPhone.set(false);
+        this.editingPhone.set(false);
+        // Show what the server stored, not what was typed — it normalises
+        // spaces and turns a leading 00 into +.
+        const p = this.profile();
+        if (p) this.profile.set({ ...p, company: { ...p.company, phone: res.phone } });
+        this.notify.success(this.translate.instant('COMPANY_PROFILE.PHONE_SAVED'));
+      },
+      error: (err) => {
+        this.savingPhone.set(false);
+        const code = err?.error?.code;
+        this.notify.error(
+          code ? this.translate.instant(code) : this.translate.instant('COMPANY_PROFILE.PHONE_SAVE_FAILED')
+        );
+      },
     });
   }
 

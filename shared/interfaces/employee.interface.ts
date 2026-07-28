@@ -1,4 +1,9 @@
-export type SalaryType = 'MONTHLY' | 'SESSION_BASED' | 'PERCENTAGE';
+/**
+ * How this person is paid. UNPAID is a teacher who draws nothing — a founder or
+ * co-founder teaching their own academy — so no salary ever accrues for them
+ * and they never appear on the salaries page.
+ */
+export type SalaryType = 'MONTHLY' | 'SESSION_BASED' | 'PERCENTAGE' | 'UNPAID';
 
 export interface Employee {
   id: string;

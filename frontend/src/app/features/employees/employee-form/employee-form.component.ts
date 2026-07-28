@@ -133,6 +133,12 @@ export class EmployeeFormComponent implements OnInit {
       } else if (type === 'PERCENTAGE') {
         // A percentage of paid revenue: 0 < rate <= 100.
         pctCtrl?.setValidators([Validators.required, Validators.min(0.01), Validators.max(100)]);
+      } else if (type === 'UNPAID') {
+        // Nothing to require and nothing to keep: an amount left behind from a
+        // previous choice would sit in the record looking like pay that is owed.
+        salaryCtrl?.setValue(null, { emitEvent: false });
+        rateCtrl?.setValue(null, { emitEvent: false });
+        pctCtrl?.setValue(null, { emitEvent: false });
       } else {
         salaryCtrl?.setValidators([Validators.required, Validators.min(1)]);
       }
@@ -151,6 +157,9 @@ export class EmployeeFormComponent implements OnInit {
     // single person, so there's no separate teacher to revenue-share with).
     if (!this.authService.isTeacher()) {
       options.push({ label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_PERCENTAGE'), value: 'PERCENTAGE' });
+      // Unpaid teaching only makes sense where the academy is not the teacher:
+      // a founder or co-founder who takes classes but draws nothing for them.
+      options.push({ label: this.translate.instant('EMPLOYEES.FORM.SALARY_TYPE_UNPAID'), value: 'UNPAID' });
     }
     this.salaryTypeOptions.set(options);
   }

@@ -370,6 +370,49 @@ export const companiesRoutes = {
     }
   },
 
+  /** PATCH /api/companies/contact — the tenant's own phone number.
+   *
+   *  Kept apart from updateSettings: that one holds accounting switches nobody
+   *  touches twice a year, this is a contact detail that changes when a SIM does.
+   */
+  updateContact: async ({ body, headers }: { body: { phone: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+
+      if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
+        return apiError(403, 'ERRORS.COMPANIES.ADMIN_ONLY', 'Only admins can update company details');
+      }
+
+      // Accept what people actually type — spaces, dashes, brackets, a leading
+      // 00 for the international prefix — and store one canonical shape. 00 maps
+      // to '+' because "002…" was reaching the database and rendering as a
+      // country code that does not exist.
+      const raw = String(body.phone ?? '').trim();
+      let phone: string | null = raw
+        .replace(/[\s()\-.]/g, '')
+        .replace(/^00/, '+');
+
+      if (phone === '') {
+        phone = null;                                   // clearing the field is allowed
+      } else if (!/^\+?\d{7,17}$/.test(phone)) {
+        return apiError(400, 'ERRORS.COMPANIES.INVALID_PHONE', 'Enter a valid phone number');
+      }
+
+      const company = await update('companies', context.companyId, { phone });
+      if (!company) {
+        return apiError(400, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update company');
+      }
+
+      return {
+        status: 200 as const,
+        body: { id: company.id, phone: company.phone ?? null },
+      };
+    } catch (error) {
+      console.error('Update company contact error:', error);
+      return mapThrownError(error, 'ERRORS.COMPANIES.UPDATE_FAILED', 'Failed to update company', 400);
+    }
+  },
+
   getCardDesign: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       await ensureCardDesignColumn();

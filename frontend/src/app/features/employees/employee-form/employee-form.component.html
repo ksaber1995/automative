@@ -70,13 +70,22 @@
         </div>
 
         <!-- Monthly salary (when salary type = MONTHLY) -->
-        @if (salaryType?.value !== 'SESSION_BASED' && salaryType?.value !== 'PERCENTAGE') {
+        @if (salaryType?.value !== 'SESSION_BASED' && salaryType?.value !== 'PERCENTAGE' && salaryType?.value !== 'UNPAID') {
           <div class="field">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.SALARY' | translate }} <span class="text-red-500">*</span></label>
             <p-inputnumber formControlName="salary" [min]="1" mode="decimal" [minFractionDigits]="2" class="w-full"></p-inputnumber>
             @if (salary?.invalid && salary?.touched) {
               <small class="text-red-500">{{ 'EMPLOYEES.FORM.SALARY_REQUIRED' | translate }}</small>
             }
+          </div>
+        }
+
+        <!-- Unpaid: no amount to enter, and none is owed -->
+        @if (salaryType?.value === 'UNPAID') {
+          <div class="md:col-span-2">
+            <div class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <i class="pi pi-info-circle me-1"></i>{{ 'EMPLOYEES.FORM.SALARY_TYPE_UNPAID_HINT' | translate }}
+            </div>
           </div>
         }
 

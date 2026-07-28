@@ -14,16 +14,19 @@ export async function ensureSalaryColumns(): Promise<void> {
   // PERCENTAGE salary type (migration 051): a % of what students have PAID for
   // the teacher's classes. Add the rate column and widen the salary_type CHECK.
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS percentage_rate DECIMAL(5, 2)`);
+  // The probe names the NEWEST value in the list — UNPAID today, PERCENTAGE
+  // before it. A database that already had the PERCENTAGE constraint would
+  // otherwise be judged up to date and reject the value added after it.
   await query(`
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
         WHERE conname = 'employees_salary_type_check'
-          AND pg_get_constraintdef(oid) LIKE '%PERCENTAGE%'
+          AND pg_get_constraintdef(oid) LIKE '%UNPAID%'
       ) THEN
         ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_salary_type_check;
         ALTER TABLE employees ADD CONSTRAINT employees_salary_type_check
-          CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED', 'PERCENTAGE'));
+          CHECK (salary_type IN ('MONTHLY', 'SESSION_BASED', 'PERCENTAGE', 'UNPAID'));
       END IF;
     END $$;
   `);

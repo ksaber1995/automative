@@ -78,6 +78,11 @@ export class CompanyService {
     return this.api.get<CompanyProfile>('companies/profile');
   }
 
+  /** The tenant's own contact number. Empty string clears it. */
+  updateContact(phone: string): Observable<{ id: string; phone: string | null }> {
+    return this.api.patch<{ id: string; phone: string | null }>('companies/contact', { phone });
+  }
+
   upgradePlan(plan: 'SIMPLE' | 'ADVANCED'): Observable<{ plan: string }> {
     return this.api.post<{ plan: string }>('companies/upgrade-plan', { plan });
   }
