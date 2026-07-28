@@ -548,23 +548,38 @@
           <!-- Summary: what is collected today, itemised, then what is left owing.
                Books are charged on create; the course fee only if the payment
                option above collects it — so the two are listed separately. -->
-          <div class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm flex flex-col gap-1">
-            <div class="flex justify-between">
-              <span class="text-gray-600">{{ 'ENROLLMENT_FORM.BOOKS_SELECTED' | translate: { count: selectedBooksCount() } }}</span>
-              <span class="font-semibold text-gray-800">{{ 'ENROLLMENT_FORM.BOOKS_TOTAL' | translate }}: {{ booksNetTotal() | amount }}</span>
+          <div class="mt-4 rounded-lg bg-gray-50 border border-gray-200 text-sm overflow-hidden">
+            <!-- The itemised lines are working-out; they stay muted. -->
+            <div class="p-4 flex flex-col gap-1">
+              <div class="flex justify-between">
+                <span class="text-gray-600">{{ 'ENROLLMENT_FORM.BOOKS_SELECTED' | translate: { count: selectedBooksCount() } }}</span>
+                <span class="font-semibold text-gray-800">{{ 'ENROLLMENT_FORM.BOOKS_TOTAL' | translate }}: {{ booksNetTotal() | amount }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">{{ feeLineKey() | translate }}</span>
+                <span [class]="feeDueNow() > 0 ? 'font-semibold text-gray-800' : 'text-gray-400'">{{ feeDueNow() | amount }}</span>
+              </div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-600">{{ feeLineKey() | translate }}</span>
-              <span [class]="feeDueNow() > 0 ? 'font-semibold text-gray-800' : 'text-gray-400'">{{ feeDueNow() | amount }}</span>
+
+            <!-- The one figure that matters at the desk — what the student hands
+                 over today. It gets its own band rather than a third summary row,
+                 because reading it off a list of similar-looking numbers is what
+                 made the old total easy to misread. -->
+            <div class="px-4 py-3 bg-green-50 border-t-2 border-green-500 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p class="font-semibold text-green-900">{{ 'ENROLLMENT_FORM.DUE_NOW' | translate }}</p>
+                <p class="text-xs text-green-700">{{ 'ENROLLMENT_FORM.DUE_NOW_HINT' | translate }}</p>
+              </div>
+              <span class="text-2xl font-bold text-green-700 whitespace-nowrap">{{ dueNowTotal() | amount }}</span>
             </div>
-            <div class="flex justify-between pt-1 border-t mt-1">
-              <span class="text-gray-700 font-medium">{{ 'ENROLLMENT_FORM.DUE_NOW' | translate }}</span>
-              <span class="font-bold text-green-700">{{ dueNowTotal() | amount }}</span>
-            </div>
+
             @if (feeDeferred() > 0) {
-              <div class="flex justify-between text-gray-500">
-                <span>{{ 'ENROLLMENT_FORM.DUE_LATER' | translate }}</span>
-                <span>{{ feeDeferred() | amount }}</span>
+              <div class="px-4 py-2 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p class="font-medium text-amber-900">{{ 'ENROLLMENT_FORM.DUE_LATER' | translate }}</p>
+                  <p class="text-xs text-amber-700">{{ 'ENROLLMENT_FORM.DUE_LATER_HINT' | translate }}</p>
+                </div>
+                <span class="font-semibold text-amber-800 whitespace-nowrap">{{ feeDeferred() | amount }}</span>
               </div>
             }
           </div>
