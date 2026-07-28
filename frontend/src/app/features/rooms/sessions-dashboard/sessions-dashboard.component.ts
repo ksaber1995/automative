@@ -41,6 +41,10 @@ interface DialogTeacherRow {
 interface TeacherOption {
   id: string;
   displayName: string;
+  /** Which branch they were hired into; null = not tied to one. */
+  branchId: string | null;
+  /** Company-wide staff — available at every branch. */
+  isGlobal: boolean;
 }
 
 /** Cross-field validator: endTime must not produce a datetime before startDate */
@@ -111,9 +115,32 @@ export class SessionsDashboardComponent implements OnInit {
   dialogTeachers = signal<DialogTeacherRow[]>([]);
   allEmployees = signal<TeacherOption[]>([]);
   /** Employees not yet picked in dialogTeachers — used to populate the "add" select. */
+  /** The class picked in the Start dialog — a signal so the teacher list tracks it. */
+  dialogClassId = signal<string>('');
+
+  /**
+   * Who may teach a given class. A class belongs to a branch through its course,
+   * and staff are hired into one, so an in-person class offers that branch's
+   * people only — company-wide staff (isGlobal) and anyone not tied to a branch
+   * included. An ONLINE class has no room and nobody travels to it, so the whole
+   * company is eligible.
+   *
+   * An unknown class means the list has not loaded yet: offer everyone rather
+   * than an empty dropdown that looks like the academy has no teachers.
+   */
+  private eligibleTeachers(cls: any | null | undefined): TeacherOption[] {
+    const all = this.allEmployees();
+    if (!cls) return all;
+    if (String(cls.type || '').toUpperCase() === 'ONLINE') return all;
+    const branchId = cls.branchId ?? cls.branch_id ?? null;
+    if (!branchId) return all;
+    return all.filter((e) => e.isGlobal || !e.branchId || e.branchId === branchId);
+  }
+
   availableEmployees = computed<TeacherOption[]>(() => {
     const used = new Set(this.dialogTeachers().map((t) => t.employeeId));
-    return this.allEmployees().filter((e) => !used.has(e.id));
+    const cls = this.dialogActiveClasses().find((c) => c.id === this.dialogClassId());
+    return this.eligibleTeachers(cls).filter((e) => !used.has(e.id));
   });
   newTeacherEmployeeId: string | null = null;
   private translate = inject(TranslateService);
@@ -177,6 +204,7 @@ export class SessionsDashboardComponent implements OnInit {
   /** Prefill the dialog's teacher list with the class's instructor when the class changes. */
   onDialogClassChange() {
     const classId = this.sessionForm.get('classId')?.value;
+    this.dialogClassId.set(classId || '');
     if (!classId) return;
 
     // Toggle room validator based on class type (online classes don't require a
@@ -391,6 +419,8 @@ export class SessionsDashboardComponent implements OnInit {
           list.map((e: any) => ({
             id: e.id,
             displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
+            branchId: e.branchId ?? null,
+            isGlobal: e.isGlobal === true,
           })),
         );
       },
@@ -429,6 +459,7 @@ export class SessionsDashboardComponent implements OnInit {
     // Single-branch companies hide the branch picker, so preselect the only
     // branch and load its rooms/classes up front.
     this.startingFree.set(false);
+    this.dialogClassId.set('');
     const only = this.branchState.onlyBranchId();
     this.buildSessionForm(undefined, only || undefined);
     if (only) this.populateDialogOptionsForBranch(only);
@@ -497,6 +528,7 @@ export class SessionsDashboardComponent implements OnInit {
   /** When the branch changes inside the dialog, reset room + class and reload both for the branch */
   onDialogBranchChange() {
     this.sessionForm.patchValue({ roomId: '', classId: '' });
+    this.dialogClassId.set('');
     const branchId = this.sessionForm.get('branchId')?.value;
     if (!branchId) {
       this.dialogFreeRooms.set([]);
@@ -1025,7 +1057,9 @@ export class SessionsDashboardComponent implements OnInit {
 
   availableEmployeesFor(sessionId: string): TeacherOption[] {
     const used = new Set(this.getTeacherRows(sessionId).map((t) => t.employeeId));
-    return this.allEmployees().filter((e) => !used.has(e.id));
+    const session = this.activeSessions().find((s) => s.id === sessionId);
+    const cls = this.activeClasses().find((c) => c.id === session?.classId);
+    return this.eligibleTeachers(cls).filter((e) => !used.has(e.id));
   }
 
   addSessionTeacher(sessionId: string) {
