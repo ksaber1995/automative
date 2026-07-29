@@ -1426,6 +1426,10 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
+    <!-- Printing is the deliberate action; most collections are never printed. -->
+    <p-button [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print" severity="secondary" [outlined]="true"
+      [loading]="actionLoading()" [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
+      (onClick)="submitPayment(true)"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
       (onClick)="submitPayment()"></p-button>
@@ -1495,6 +1499,9 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showMonthlyPayDialog = false"></p-button>
+    <p-button [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print" severity="secondary" [outlined]="true"
+      [loading]="actionLoading()" [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
+      (onClick)="submitMonthlyPayment(true)"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
       (onClick)="submitMonthlyPayment()"></p-button>

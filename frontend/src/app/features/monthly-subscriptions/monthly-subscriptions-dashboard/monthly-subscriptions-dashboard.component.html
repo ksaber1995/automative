@@ -516,6 +516,17 @@
       [outlined]="true"
       (onClick)="closePayDialog()"
     ></p-button>
+    <!-- Two ways to finish: most collections are never printed, so plain
+         confirm is the primary action and printing is the deliberate one. -->
+    <p-button
+      [label]="'RECEIPT.PAY_AND_PRINT' | translate"
+      icon="pi pi-print"
+      severity="secondary"
+      [outlined]="true"
+      [loading]="payingId() !== null"
+      [disabled]="payAmount <= 0"
+      (onClick)="confirmPayment(true)"
+    ></p-button>
     <p-button
       [label]="'MONTHLY_SUBSCRIPTIONS.CONFIRM' | translate"
       icon="pi pi-check"

@@ -707,7 +707,8 @@ export class StudentDetailComponent implements OnInit {
     this.openMonthlyPayDialog(synthetic);
   }
 
-  submitMonthlyPayment() {
+  /** Printing is OPT-IN — see the two dialog buttons. */
+  submitMonthlyPayment(print = false) {
     const payment = this.monthlyForAction();
     if (!payment || !this.monthlyDialogAmount || !this.monthlyDialogDate) return;
     this.actionLoading.set(true);
@@ -734,8 +735,7 @@ export class StudentDetailComponent implements OnInit {
         this.showMonthlyPayDialog = false;
         this.actionLoading.set(false);
         if (this.studentId) this.loadMonthlySubscriptions(this.studentId);
-        // Straight to the printer while the payer is still standing there.
-        this.receiptService.openPrint(res?.receipt);
+        if (print) this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         this.actionLoading.set(false);
@@ -977,7 +977,8 @@ export class StudentDetailComponent implements OnInit {
     this.showPaymentDialog = true;
   }
 
-  submitPayment() {
+  /** Printing is OPT-IN — see the two dialog buttons. */
+  submitPayment(print = false) {
     const enrollment = this.enrollmentForAction();
     if (!enrollment || !this.dialogPaymentAmount || !this.dialogPaymentDate) return;
 
@@ -994,7 +995,7 @@ export class StudentDetailComponent implements OnInit {
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
-        this.receiptService.openPrint(res?.receipt);
+        if (print) this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         // Interceptor toasted the translated error.

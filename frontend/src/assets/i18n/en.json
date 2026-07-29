@@ -5525,6 +5525,7 @@
       "PACKAGE": "Session package",
       "ENROLLMENT": "Course payment",
       "MASTER": "Bundle payment"
-    }
+    },
+    "PAY_AND_PRINT": "Pay & print"
   }
 }

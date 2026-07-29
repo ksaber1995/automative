@@ -584,7 +584,12 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.scanActiveSession.set(null);
   }
 
-  confirmPayment(): void {
+  /**
+   * Record the payment. Printing is OPT-IN: most collections are never
+   * printed, so the plain confirm must not fling a print tab at the user
+   * every single time.
+   */
+  confirmPayment(print = false): void {
     const sel = this.selectedPayment();
     if (!sel || this.payAmount <= 0) return;
     // Capture before closePayDialog() clears the scan context.
@@ -616,7 +621,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         if (alsoMarkPresent) this.markPresentForSession(session!, token);
         this.loadData();
         // Straight to the printer while the payer is still at the desk.
-        this.receiptService.openPrint(res?.receipt);
+        if (print) this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         this.payingId.set(null);

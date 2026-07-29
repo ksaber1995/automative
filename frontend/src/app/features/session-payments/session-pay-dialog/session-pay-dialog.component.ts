@@ -10,6 +10,7 @@ import { TextareaModule } from 'primeng/textarea';
 
 import { SessionPaymentsService } from '../session-payments.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ReceiptService } from '../../../core/services/receipt.service';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.interface';
 
@@ -36,6 +37,7 @@ import { SessionPaymentWithDetails } from '@shared/interfaces/session-payment.in
 export class SessionPayDialogComponent {
   private service = inject(SessionPaymentsService);
   private notify = inject(NotificationService);
+  private receiptService = inject(ReceiptService);
   private translate = inject(TranslateService);
 
   /** Emitted after a charge is settled (paid or covered by a package). */
@@ -118,10 +120,13 @@ export class SessionPayDialogComponent {
     this.advance();
   }
 
-  /** Confirm: pay this session, or buy the package (covers this charge too). */
-  pay(): void {
+  /**
+   * Confirm: pay this session, or buy the package (covers this charge too).
+   * Printing is OPT-IN — most collections are never printed.
+   */
+  pay(print = false): void {
     if (this.mode() === 'PACKAGE') {
-      this.buyPackage();
+      this.buyPackage(print);
       return;
     }
     const c = this.current();
@@ -132,17 +137,18 @@ export class SessionPayDialogComponent {
       paymentDate: this.formatDate(this.payDate()),
       notes: this.notes() || undefined,
     }).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PAY_SUCCESS'));
         this.settled.emit();
+        if (print) this.receiptService.openPrint(res?.receipt);
         this.advance();
       },
       error: () => { this.submitting.set(false); },
     });
   }
 
-  buyPackage(): void {
+  buyPackage(print = false): void {
     const c = this.current();
     if (!c) return;
     this.submitting.set(true);
@@ -151,10 +157,11 @@ export class SessionPayDialogComponent {
       amount: this.amount() != null ? (this.amount() as number) : undefined,
       notes: this.notes() || undefined,
     }).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PACKAGE_SUCCESS'));
         this.settled.emit();
+        if (print) this.receiptService.openPrint(res?.receipt);
         this.advance();
       },
       error: () => { this.submitting.set(false); },

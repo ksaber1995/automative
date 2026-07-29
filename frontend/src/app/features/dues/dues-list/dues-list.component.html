@@ -220,6 +220,12 @@
 
   <ng-template pTemplate="footer">
     <button pButton [label]="'DUES.LIST.CANCEL' | translate" class="p-button-text" (click)="showPaymentDialog = false"></button>
+    <button pButton [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print"
+      class="p-button-outlined p-button-secondary"
+      [loading]="actionLoading()"
+      [disabled]="!paymentAmount || paymentAmount <= 0"
+      (click)="submitPayment(true)">
+    </button>
     <button pButton [label]="'DUES.LIST.RECORD_PAYMENT' | translate" icon="pi pi-check"
       [loading]="actionLoading()"
       [disabled]="!paymentAmount || paymentAmount <= 0"

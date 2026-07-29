@@ -150,7 +150,8 @@ export class DuesListComponent implements OnInit {
     this.showPaymentDialog = true;
   }
 
-  submitPayment() {
+  /** Printing is OPT-IN — see the two dialog buttons. */
+  submitPayment(print = false) {
     const due = this.selectedDue();
     if (!due || !this.paymentAmount || !this.paymentDate) return;
 
@@ -174,7 +175,7 @@ export class DuesListComponent implements OnInit {
         this.actionLoading.set(false);
         this.load();
         // Straight to the printer while the payer is still at the desk.
-        this.receiptService.openPrint(res?.receipt);
+        if (print) this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         // Interceptor toasted the translated error.
