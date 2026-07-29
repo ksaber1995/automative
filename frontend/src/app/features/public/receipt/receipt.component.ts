@@ -44,9 +44,9 @@ export interface PaymentReceipt {
  * student QR profile): a parent scanning a slip has no login. The opaque token
  * is the only credential.
  *
- * Laid out for an 80mm thermal roll — the common receipt-printer width — and
- * printed through the browser's own dialog, so it works with whatever printer
- * the machine has installed rather than being tied to one vendor's driver.
+ * Laid out for a 58mm thermal roll (~48mm printable) and printed through the
+ * browser's own dialog, so it works with whatever printer the machine has
+ * installed rather than being tied to one vendor's driver.
  */
 @Component({
   selector: 'app-receipt',
@@ -90,7 +90,12 @@ export class ReceiptComponent implements OnInit {
   private async buildQr(token: string) {
     try {
       const url = `${window.location.origin}/r/${token}`;
-      this.qrDataUrl.set(await QRCode.toDataURL(url, { width: 420, margin: 1 }));
+      // Printed at 24mm on a 58mm roll, so keep the module count low: a low
+      // error-correction level means fewer, fatter modules, which is what
+      // survives a thermal head. margin 1 keeps the quiet zone legal.
+      this.qrDataUrl.set(await QRCode.toDataURL(url, {
+        width: 420, margin: 1, errorCorrectionLevel: 'L',
+      }));
     } catch {
       // A receipt without its QR is still a valid receipt — print it anyway.
       this.qrDataUrl.set('');

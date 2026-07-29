@@ -1,6 +1,10 @@
-/* An 80mm thermal roll is ~72mm of printable width. The slip is sized in mm so
+/* A 58mm thermal roll is ~48mm of printable width. The slip is sized in mm so
    it comes off the printer at true size, and centred on screen so the same
-   markup reads as a receipt before it is printed. */
+   markup reads as a receipt before it is printed.
+
+   48mm is narrow: every label/value row has to survive a long Arabic course
+   name without pushing the amount off the paper, so the value column wraps
+   rather than the row overflowing. */
 
 .receipt-page {
   min-height: 100vh;
@@ -14,76 +18,87 @@
 .state { padding: 4rem 1rem; text-align: center; }
 
 .slip {
-  width: 72mm;
+  width: 48mm;
   background: #fff;
-  padding: 4mm 3mm;
+  padding: 3mm 2mm;
   color: #000;
   /* A receipt printer renders a monospace-ish face; matching it on screen means
      what staff see is what comes out. */
   font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 9.5px;
+  line-height: 1.4;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
 }
 
 .void-banner {
   border: 1.5px solid #000;
-  padding: 2mm;
-  margin-bottom: 3mm;
+  padding: 1.5mm;
+  margin-bottom: 2mm;
   text-align: center;
   font-weight: 700;
-  letter-spacing: .5px;
+  letter-spacing: .3px;
   text-transform: uppercase;
 }
 
 .head { text-align: center; }
-.head h1 { font-size: 15px; font-weight: 700; margin: 0; }
-.head .sub { font-size: 10px; }
-.head .title { margin-top: 1.5mm; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; font-size: 10px; }
-.head .no { font-size: 13px; font-weight: 700; margin-top: .5mm; }
+.head h1 { font-size: 12.5px; font-weight: 700; margin: 0; line-height: 1.25; }
+.head .sub { font-size: 9px; }
+.head .title { margin-top: 1mm; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; font-size: 9px; }
+.head .no { font-size: 12px; font-weight: 700; margin-top: .5mm; }
 
-.rule { border-top: 1px dashed #000; margin: 2.5mm 0; }
+.rule { border-top: 1px dashed #000; margin: 2mm 0; }
 
+/* The label keeps its natural width; the value takes the rest and wraps, so a
+   long name pushes the row taller instead of off the edge of the paper. */
 .rows .row,
 .amounts .row {
   display: flex;
   justify-content: space-between;
-  gap: 3mm;
-  margin-bottom: .8mm;
+  align-items: baseline;
+  gap: 2mm;
+  margin-bottom: .7mm;
 }
 .rows .row span,
-.amounts .row span { color: #333; }
+.amounts .row span { color: #333; flex: 0 0 auto; }
 .rows .row strong,
-.amounts .row strong { text-align: right; font-weight: 600; }
-.amounts .row.small { font-size: 10px; }
+.amounts .row strong {
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.amounts .row.small { font-size: 9px; }
 
 .amounts .paid {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 1.5mm;
+  gap: 2mm;
+  margin-bottom: 1.2mm;
 }
-.amounts .paid span { font-weight: 600; text-transform: uppercase; font-size: 10px; }
-.amounts .paid strong { font-size: 17px; font-weight: 700; }
+.amounts .paid span { font-weight: 600; text-transform: uppercase; font-size: 9px; }
+.amounts .paid strong { font-size: 14px; font-weight: 700; }
 
 .stamp {
-  margin-top: 2mm;
+  margin-top: 1.5mm;
   text-align: center;
   border: 1px solid #000;
-  padding: 1.2mm;
+  padding: 1mm;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
 }
 .stamp.full { background: #000; color: #fff; }
 
-.notes { font-size: 10px; word-break: break-word; }
+.notes { font-size: 9px; word-break: break-word; }
 
 .foot { text-align: center; }
-.foot .qr { width: 28mm; height: 28mm; display: block; margin: 0 auto 1mm; }
-.foot .qr-hint { font-size: 8.5px; color: #333; }
+/* Sized so the ~45-char receipt URL still scans off a 58mm roll — smaller than
+   this and a phone camera struggles with thermal print's soft edges. */
+.foot .qr { width: 24mm; height: 24mm; display: block; margin: 0 auto 1mm; }
+.foot .qr-hint { font-size: 7.5px; color: #333; }
 .foot .by,
-.foot .ts { font-size: 9px; margin-top: 1mm; }
+.foot .ts { font-size: 8px; margin-top: .8mm; }
 
 .actions {
   margin-top: 1.25rem;
@@ -105,7 +120,7 @@
    not get the browser's page furniture, and the shadow/background are dropped
    because a receipt printer renders any grey as wasted ink. */
 @media print {
-  @page { size: 80mm auto; margin: 0; }
+  @page { size: 58mm auto; margin: 0; }
 
   .receipt-page {
     display: block;
@@ -116,7 +131,7 @@
   .slip {
     width: auto;
     box-shadow: none;
-    padding: 2mm;
+    padding: 1.5mm;
   }
   .no-print { display: none !important; }
 }
