@@ -274,6 +274,105 @@ function mapClassWithDetailsFromDB(row: any) {
   };
 }
 
+/**
+ * Two classes cannot sit in the same room at the same time.
+ *
+ * ACADEMIES ONLY. A solo-teacher tenant is one person who cannot be in two
+ * places at once anyway, and its "rooms" are often just labels for the same
+ * physical space — blocking there would reject schedules that are perfectly
+ * real. Academies genuinely run parallel classes and a double-booked room is a
+ * mistake nobody notices until two groups arrive at the same door.
+ *
+ * A clash needs all three: the date ranges overlap, a weekday is shared, and the
+ * times overlap on that weekday. `class_day_times` is the source of truth (a
+ * class can sit 15:00 Saturday and 18:00 Wednesday, which the legacy envelope
+ * columns flatten into one 15:00-20:00 block and would over-report). Classes
+ * predating that table fall back to their legacy columns so they still count.
+ *
+ * Returns the clashing classes; empty means the slot is free.
+ */
+async function findRoomConflicts(
+  companyId: string,
+  // Dates come straight off an existing row on the update path, so they can be
+  // Date objects as well as the ISO strings a request body carries.
+  opts: { roomId: string | null; startDate: string | Date; endDate: string | Date; dayTimes: DayTime[]; excludeClassId?: string },
+): Promise<Array<{ id: string; name: string; day: string; startTime: string; endTime: string; roomCode: string | null }>> {
+  const { roomId, startDate, endDate, dayTimes, excludeClassId } = opts;
+  // No room, no times, or no dates — nothing to collide with.
+  if (!roomId || !startDate || !endDate || !dayTimes.length) return [];
+
+  const company = await queryOne<any>('SELECT type FROM companies WHERE id = $1', [companyId]);
+  if ((company?.type || '').toUpperCase() !== 'ACADEMY') return [];
+
+  const params: any[] = [
+    companyId, roomId, endDate, startDate,
+    dayTimes.map(d => d.day.toUpperCase()),
+    dayTimes.map(d => d.startTime),
+    dayTimes.map(d => d.endTime),
+  ];
+  let exclude = '';
+  if (excludeClassId) { params.push(excludeClassId); exclude = `AND c.id <> $${params.length}`; }
+
+  // Same room, overlapping date range, still running. `candidates` is that set;
+  // `booked` expands each one into its individual weekday slots.
+  const rows = await query(
+    `WITH incoming AS (
+       SELECT UPPER(d) AS day, s::time AS st, e::time AS et
+       FROM unnest($5::text[], $6::text[], $7::text[]) AS t(d, s, e)
+     ),
+     candidates AS (
+       SELECT c.id, c.name, c.start_time, c.end_time, c.days_of_week, r.code AS room_code
+       FROM classes c
+       INNER JOIN courses co ON co.id = c.course_id
+       LEFT JOIN rooms r ON r.id = c.room_id
+       WHERE co.company_id = $1
+         AND c.room_id = $2
+         AND c.deleted_at IS NULL
+         AND COALESCE(c.is_active, true) = true
+         AND COALESCE(c.is_finished, false) = false
+         AND c.start_date <= $3
+         AND c.end_date >= $4
+         ${exclude}
+     ),
+     booked AS (
+       -- per-day times: the source of truth
+       SELECT cd.id, cd.name, cd.room_code,
+              UPPER(cdt.day_of_week) AS day, cdt.start_time AS st, cdt.end_time AS et
+       FROM candidates cd
+       JOIN class_day_times cdt ON cdt.class_id = cd.id
+       UNION ALL
+       -- classes predating that table: one time for every listed day
+       SELECT cd.id, cd.name, cd.room_code,
+              UPPER(TRIM(d)) AS day, cd.start_time AS st, cd.end_time AS et
+       FROM candidates cd
+       CROSS JOIN LATERAL unnest(string_to_array(cd.days_of_week, ',')) AS d
+       WHERE NOT EXISTS (SELECT 1 FROM class_day_times x WHERE x.class_id = cd.id)
+         AND cd.start_time IS NOT NULL AND cd.end_time IS NOT NULL
+         AND COALESCE(cd.days_of_week, '') <> ''
+         AND TRIM(d) <> ''
+     )
+     SELECT DISTINCT b.id, b.name, b.room_code, b.day,
+            b.st::text AS start_time, b.et::text AS end_time
+     FROM booked b
+     JOIN incoming i ON i.day = b.day AND i.st < b.et AND b.st < i.et
+     ORDER BY b.day, start_time`,
+    params,
+  );
+
+  return (rows as any[]).map(r => ({
+    id: r.id, name: r.name, day: r.day,
+    startTime: r.start_time, endTime: r.end_time, roomCode: r.room_code ?? null,
+  }));
+}
+
+/** English fallback text; the frontend translates ERRORS.CLASSES.ROOM_CONFLICT. */
+function roomConflictMessage(conflicts: Array<{ name: string; day: string; startTime: string; endTime: string; roomCode: string | null }>): string {
+  const c = conflicts[0];
+  const hhmm = (t: string) => String(t).slice(0, 5);
+  const where = c.roomCode ? `Room ${c.roomCode}` : 'That room';
+  return `${where} is already taken by "${c.name}" on ${c.day} ${hhmm(c.startTime)}-${hhmm(c.endTime)}`;
+}
+
 export const classesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -311,6 +410,13 @@ export const classesRoutes = {
       const roomId = await resolveRoomId(body.roomId, context.companyId);
       if (roomId === INVALID_ROOM) {
         return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+      }
+
+      const clashes = await findRoomConflicts(context.companyId, {
+        roomId, startDate: body.startDate, endDate: body.endDate, dayTimes: dayTimes ?? [],
+      });
+      if (clashes.length) {
+        return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes));
       }
 
       const insertData = {
@@ -753,6 +859,24 @@ export const classesRoutes = {
         updateData.days_of_week = legacy.days_of_week;
         updateData.start_time = legacy.start_time;
         updateData.end_time = legacy.end_time;
+      }
+
+      // Moving a class's room, dates or times can double-book a room just as
+      // creating one can, so the same rule applies — checked against whatever the
+      // class will look like AFTER the edit, ignoring its own current booking.
+      const nextRoomId = updateData.room_id !== undefined ? updateData.room_id : existing.room_id;
+      if (nextRoomId) {
+        const nextDayTimes = effectiveDayTimes ?? await getClassDayTimes(params.id);
+        const clashes = await findRoomConflicts(context.companyId, {
+          roomId: nextRoomId,
+          startDate: updateData.start_date !== undefined ? updateData.start_date : existing.start_date,
+          endDate: updateData.end_date !== undefined ? updateData.end_date : existing.end_date,
+          dayTimes: nextDayTimes,
+          excludeClassId: params.id,
+        });
+        if (clashes.length) {
+          return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes));
+        }
       }
 
       const classRecord = await update('classes', params.id, updateData);

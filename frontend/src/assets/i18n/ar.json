@@ -252,6 +252,7 @@
       "LIST_FAILED": "فشل تحميل المجموعات",
       "ENROLLMENTS_FAILED": "فشل تحميل التسجيلات",
       "CHECK_AVAILABILITY_FAILED": "فشل التحقق من توفر المعلم",
+      "ROOM_CONFLICT": "هذه القاعة محجوزة لفصل آخر في هذا الوقت. اختر قاعة أو وقتًا آخر.",
       "CANNOT_DEACTIVATE_FINISHED": "لا يمكن تعطيل المجموعات المنتهية",
       "ALREADY_FINISHED": "المجموعة منتهٍ بالفعل",
       "HAS_ACTIVE_SESSION": "المجموعة لديه حصة نشطة ولا يمكن إنهاؤه",

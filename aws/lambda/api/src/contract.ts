@@ -3512,6 +3512,8 @@ export const contract = c.router({
       responses: {
         201: ClassSchema,
         400: ApiErrorSchema,
+        // 409: the room is already booked by another class at that time.
+        409: ApiErrorSchema,
       },
     },
     // Put many classes in one room in a single call — assigning rooms to an
@@ -3627,6 +3629,8 @@ export const contract = c.router({
       responses: {
         200: ClassSchema,
         404: ApiErrorSchema,
+        // 409: the move would double-book a room.
+        409: ApiErrorSchema,
       },
     },
     delete: {
