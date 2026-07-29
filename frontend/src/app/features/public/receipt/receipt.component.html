@@ -86,7 +86,6 @@
       <footer class="foot">
         @if (qrDataUrl()) {
           <img [src]="qrDataUrl()" alt="QR" class="qr" />
-          <div class="qr-hint">{{ 'RECEIPT.QR_HINT' | translate }}</div>
         }
         @if (r.recordedBy) {
           <div class="by">{{ 'RECEIPT.RECEIVED_BY' | translate }}: {{ r.recordedBy }}</div>

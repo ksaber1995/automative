@@ -5519,7 +5519,6 @@
     "PARTIAL": "Partial payment",
     "RECEIVED_BY": "Received by",
     "PRINT": "Print receipt",
-    "QR_HINT": "Scan to view this receipt any time",
     "KIND": {
       "MONTHLY": "Monthly subscription",
       "SESSION": "Session",

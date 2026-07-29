@@ -93,10 +93,10 @@
 .notes { font-size: 9px; word-break: break-word; }
 
 .foot { text-align: center; }
-/* Sized so the ~45-char receipt URL still scans off a 58mm roll — smaller than
-   this and a phone camera struggles with thermal print's soft edges. */
-.foot .qr { width: 24mm; height: 24mm; display: block; margin: 0 auto 1mm; }
-.foot .qr-hint { font-size: 7.5px; color: #333; }
+/* Takes nearly the full 48mm printable width. Thermal print has soft edges, so
+   the bigger the modules the more reliably a phone reads it — and the hint line
+   this replaced was costing height the code could use. */
+.foot .qr { width: 40mm; height: 40mm; display: block; margin: 0 auto 1mm; }
 .foot .by,
 .foot .ts { font-size: 8px; margin-top: .8mm; }
 
