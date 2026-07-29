@@ -293,7 +293,13 @@
                   @if (d.present.length) {
                     <ul class="list-disc ms-5 text-sm text-gray-700">
                       @for (s of d.present; track s.studentId) {
-                        <li>{{ s.studentName }}</li>
+                        <li>
+                          {{ s.studentName }}
+                          <!-- When they arrived, not just that they did. -->
+                          @if (s.checkedInAt) {
+                            <span class="text-gray-400 text-xs ms-1">{{ s.checkedInAt | date: 'h:mm a' }}</span>
+                          }
+                        </li>
                       }
                     </ul>
                   } @else {

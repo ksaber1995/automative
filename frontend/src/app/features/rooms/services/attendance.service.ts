@@ -18,6 +18,8 @@ export interface SessionAttendanceStudent {
   isPresent: boolean;
   attendanceId?: string | null;
   attendanceType?: AttendanceType | null;
+  /** When the student was marked in; null when they were absent. */
+  checkedInAt?: string | null;
   homeClassName?: string | null;
   isEnrolled?: boolean;
   /** PER_SESSION: the student's existing charge for this session (null if none). */

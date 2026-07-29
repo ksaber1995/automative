@@ -268,13 +268,19 @@
                                   {{ student.studentName }}
                                 </label>
                               </div>
-                              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                [class.bg-green-100]="student.isPresent"
-                                [class.text-green-700]="student.isPresent"
-                                [class.bg-gray-100]="!student.isPresent"
-                                [class.text-gray-500]="!student.isPresent">
-                                {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
-                              </span>
+                              <div class="flex items-center gap-2">
+                                <!-- Arrival time: "present" alone cannot answer who came late. -->
+                                @if (student.isPresent && student.checkedInAt) {
+                                  <span class="text-xs text-gray-500 whitespace-nowrap">{{ student.checkedInAt | date: 'h:mm a' }}</span>
+                                }
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                  [class.bg-green-100]="student.isPresent"
+                                  [class.text-green-700]="student.isPresent"
+                                  [class.bg-gray-100]="!student.isPresent"
+                                  [class.text-gray-500]="!student.isPresent">
+                                  {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
+                                </span>
+                              </div>
                             </div>
                           }
                         </div>

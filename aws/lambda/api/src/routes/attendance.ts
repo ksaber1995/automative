@@ -48,6 +48,7 @@ export const attendanceRoutes = {
             s.phone AS student_phone,
             sa.id AS attendance_id,
             sa.attendance_type AS attendance_type,
+            sa.created_at AS checked_in_at,
             hc.name AS home_class_name,
             true AS is_enrolled
          FROM (
@@ -72,6 +73,7 @@ export const attendanceRoutes = {
             s.phone AS student_phone,
             sa.id AS attendance_id,
             sa.attendance_type AS attendance_type,
+            sa.created_at AS checked_in_at,
             hc.name AS home_class_name,
             false AS is_enrolled
          FROM session_attendance sa
@@ -182,6 +184,9 @@ export const attendanceRoutes = {
           isPresent: row.attendance_id !== null,
           attendanceId: row.attendance_id || null,
           attendanceType: row.attendance_type || null,
+          // When they actually walked in — an attendance list that only says
+          // "present" cannot answer who arrived late.
+          checkedInAt: row.checked_in_at || null,
           homeClassName: row.home_class_name || null,
           isEnrolled: row.is_enrolled === true,
           charge: chargeByStudent.get(row.student_id) || null,

@@ -6186,6 +6186,8 @@ export const contract = c.router({
           isPresent: z.boolean(),
           attendanceId: UUIDSchema.nullable().optional(),
           attendanceType: z.enum(['NORMAL', 'SUBSTITUTION']).nullable().optional(),
+          /** When the student was marked in; null when they were not. */
+          checkedInAt: z.string().nullable().optional(),
           homeClassName: z.string().nullable().optional(),
           isEnrolled: z.boolean().optional(),
           charge: z.object({
