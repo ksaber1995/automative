@@ -233,6 +233,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/dues/dues.routes').then(m => m.DUES_ROUTES)
       },
       {
+        path: 'receipts',
+        canActivate: [permissionGuard('enrollments')],
+        data: { breadcrumb: 'BREADCRUMBS.RECEIPTS' },
+        loadComponent: () => import('./features/receipts/receipts-list.component').then(m => m.ReceiptsListComponent)
+      },
+      {
         path: 'debts',
         canActivate: [permissionGuard('debts')],
         data: { breadcrumb: 'BREADCRUMBS.DEBTS' },

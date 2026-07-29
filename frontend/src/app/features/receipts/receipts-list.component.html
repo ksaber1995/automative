@@ -1,0 +1,83 @@
+<div class="container-custom py-8">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'RECEIPT.LIST.TITLE' | translate }}</h1>
+    <p class="text-gray-600 mt-1">{{ 'RECEIPT.LIST.SUBTITLE' | translate }}</p>
+  </div>
+
+  <p-card>
+    <div class="flex flex-wrap gap-3 mb-4">
+      <span class="p-input-icon-left block relative">
+        <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+        <input
+          type="text"
+          pInputText
+          [(ngModel)]="search"
+          (keyup.enter)="load()"
+          [placeholder]="'RECEIPT.LIST.SEARCH_PLACEHOLDER' | translate"
+          class="w-full md:w-96 pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </span>
+      <p-button [label]="'RECEIPT.LIST.SEARCH' | translate" icon="pi pi-search" (onClick)="load()"></p-button>
+      @if (search) {
+        <p-button [label]="'RECEIPT.LIST.CLEAR' | translate" icon="pi pi-times"
+          severity="secondary" [outlined]="true" (onClick)="clearSearch()"></p-button>
+      }
+    </div>
+
+    <p-table [value]="items()" [loading]="loading()" [paginator]="true" [rows]="20" responsiveLayout="scroll">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>{{ 'RECEIPT.LIST.COL_NO' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_DATE' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_STUDENT' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_FOR' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_AMOUNT' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_STATUS' | translate }}</th>
+          <th>{{ 'RECEIPT.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-r>
+        <tr [class.opacity-60]="r.voidedAt">
+          <td class="font-semibold">#{{ r.receiptNumber }}</td>
+          <td class="text-sm">{{ r.paymentDate | date: 'mediumDate' }}</td>
+          <td>
+            <div class="font-medium">{{ r.studentName || '—' }}</div>
+            @if (r.studentPhone) {
+              <div class="text-xs text-gray-500" dir="ltr">{{ r.studentPhone }}</div>
+            }
+          </td>
+          <td class="text-sm">
+            <div>{{ kindKey(r) | translate }}</div>
+            @if (r.courseName) { <div class="text-xs text-gray-500">{{ r.courseName }}</div> }
+            @if (r.periodLabel) { <div class="text-xs text-gray-400">{{ r.periodLabel }}</div> }
+          </td>
+          <td class="font-semibold">{{ r.amount | amount }}</td>
+          <td>
+            <p-tag [value]="statusKey(r) | translate" [severity]="statusSeverity(r)"></p-tag>
+          </td>
+          <td>
+            <div class="flex gap-2">
+              <!-- Reprints the SAME receipt — same number, same QR. -->
+              <p-button icon="pi pi-print" [rounded]="true" [text]="true"
+                [pTooltip]="'RECEIPT.LIST.PRINT' | translate" (onClick)="print(r)"></p-button>
+              <p-button icon="pi pi-external-link" [rounded]="true" [text]="true" severity="secondary"
+                [pTooltip]="'RECEIPT.LIST.VIEW' | translate" (onClick)="view(r)"></p-button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-receipt text-4xl mb-3"></i>
+              <p>{{ 'RECEIPT.LIST.EMPTY' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+</div>

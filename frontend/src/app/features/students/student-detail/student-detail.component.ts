@@ -39,6 +39,8 @@ import { SessionPaymentsService } from '../../session-payments/session-payments.
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ReceiptService } from '../../../core/services/receipt.service';
+import { ApiService } from '../../../core/services/api.service';
+import { PaymentReceipt } from '../../public/receipt/receipt.component';
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
@@ -110,6 +112,7 @@ export class StudentDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private receiptService = inject(ReceiptService);
+  private api = inject(ApiService);
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
   private confirmationService = inject(ConfirmationService);
@@ -442,6 +445,7 @@ export class StudentDetailComponent implements OnInit {
     this.loadMonthlySubscriptions(id);
     this.loadSessionPayments(id);
     this.loadEnrollments(id);
+    this.loadReceipts(id);
     if (!this.isTeacher()) this.loadMasterEnrollments(id);
     this.loadAttendance(id);
     this.loadBookPurchases(id);
@@ -568,6 +572,31 @@ export class StudentDetailComponent implements OnInit {
         this.router.navigate(['/students']);
       }
     });
+  }
+
+  // ── Receipts ────────────────────────────────────────────────────────────────
+  // Every slip issued for this student, so one can be reprinted when it is lost
+  // or when the payment was confirmed without printing (the common case).
+  receipts = signal<PaymentReceipt[]>([]);
+
+  loadReceipts(studentId: string) {
+    this.api.get<PaymentReceipt[]>(`receipts/student/${studentId}`).subscribe({
+      next: (rows) => this.receipts.set(rows),
+      error: () => { /* interceptor toasted it; the page still works without them */ },
+    });
+  }
+
+  /** Reprint: the SAME receipt — same number, same QR, never a new one. */
+  printReceipt(r: PaymentReceipt) { this.receiptService.openPrint(r); }
+
+  receiptStatusKey(r: PaymentReceipt): string {
+    if (r.voidedAt) return 'RECEIPT.VOIDED';
+    return r.isFullPayment ? 'RECEIPT.PAID_IN_FULL' : 'RECEIPT.PARTIAL';
+  }
+
+  receiptStatusSeverity(r: PaymentReceipt): 'success' | 'warn' | 'danger' {
+    if (r.voidedAt) return 'danger';
+    return r.isFullPayment ? 'success' : 'warn';
   }
 
   loadEnrollments(id: string) {
@@ -736,6 +765,7 @@ export class StudentDetailComponent implements OnInit {
         this.actionLoading.set(false);
         if (this.studentId) this.loadMonthlySubscriptions(this.studentId);
         if (print) this.receiptService.openPrint(res?.receipt);
+        if (this.studentId) this.loadReceipts(this.studentId);
       },
       error: () => {
         this.actionLoading.set(false);
@@ -996,6 +1026,7 @@ export class StudentDetailComponent implements OnInit {
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
         if (print) this.receiptService.openPrint(res?.receipt);
+        if (this.studentId) this.loadReceipts(this.studentId);
       },
       error: () => {
         // Interceptor toasted the translated error.

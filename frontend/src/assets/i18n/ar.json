@@ -819,7 +819,8 @@
     "EDUCATIONAL_BOOKS": "الكتب التعليمية",
     "EDUCATIONAL_BOOKS_DETAIL": "كتب الكورس",
     "MESSAGING": "المراسلات",
-    "QR_CARDS": "بطاقات QR"
+    "QR_CARDS": "بطاقات QR",
+    "RECEIPTS": "الإيصالات"
   },
   "MESSAGING": {
     "TAB_WHATSAPP": "قوالب واتساب",
@@ -1430,7 +1431,8 @@
     "QR_LOOKING_UP": "جاري البحث عن الطالب...",
     "QR_SCAN_INSTRUCTION": "وجّه الكاميرا على رمز QR الخاص بالطالب للبحث عنه.",
     "CRM_LISTS": "القوائم",
-    "QR_CARDS": "بطاقات QR"
+    "QR_CARDS": "بطاقات QR",
+    "RECEIPTS": "الإيصالات"
   },
   "HEADER": {
     "LOGOUT": "تسجيل الخروج",
@@ -5526,6 +5528,23 @@
       "ENROLLMENT": "دفعة كورس",
       "MASTER": "دفعة باقة"
     },
-    "PAY_AND_PRINT": "دفع وطباعة"
+    "PAY_AND_PRINT": "دفع وطباعة",
+    "LIST": {
+      "TITLE": "الإيصالات",
+      "SUBTITLE": "كل الإيصالات الصادرة — ابحث عن إيصال وأعد طباعته",
+      "SEARCH": "بحث",
+      "CLEAR": "مسح",
+      "SEARCH_PLACEHOLDER": "رقم الإيصال أو اسم الطالب أو الهاتف",
+      "COL_NO": "رقم",
+      "COL_DATE": "التاريخ",
+      "COL_STUDENT": "الطالب",
+      "COL_FOR": "عن",
+      "COL_AMOUNT": "المبلغ",
+      "COL_STATUS": "الحالة",
+      "COL_ACTIONS": "إجراءات",
+      "PRINT": "إعادة الطباعة",
+      "VIEW": "فتح الإيصال",
+      "EMPTY": "لا توجد إيصالات بعد."
+    }
   }
 }

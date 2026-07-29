@@ -1337,6 +1337,52 @@
       }
     </p-card>
 
+    <!-- Receipts Card — reprint a slip that was lost, or never printed. -->
+    @if (receipts().length > 0) {
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-receipt text-indigo-600"></i>
+            {{ 'RECEIPT.LIST.TITLE' | translate }} ({{ receipts().length }})
+          </h3>
+        </div>
+      </ng-template>
+
+      <p-table [value]="receipts()" [paginator]="receipts().length > 10" [rows]="10" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>{{ 'RECEIPT.LIST.COL_NO' | translate }}</th>
+            <th>{{ 'RECEIPT.LIST.COL_DATE' | translate }}</th>
+            <th>{{ 'RECEIPT.LIST.COL_FOR' | translate }}</th>
+            <th>{{ 'RECEIPT.LIST.COL_AMOUNT' | translate }}</th>
+            <th>{{ 'RECEIPT.LIST.COL_STATUS' | translate }}</th>
+            <th>{{ 'RECEIPT.LIST.COL_ACTIONS' | translate }}</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-r>
+          <tr [class.opacity-60]="r.voidedAt">
+            <td class="font-semibold">#{{ r.receiptNumber }}</td>
+            <td class="text-sm">{{ r.paymentDate | date: 'mediumDate' }}</td>
+            <td class="text-sm">
+              <div>{{ ('RECEIPT.KIND.' + r.sourceType) | translate }}</div>
+              @if (r.courseName) { <span class="text-gray-400 text-xs block">{{ r.courseName }}</span> }
+              @if (r.periodLabel) { <span class="text-gray-400 text-xs block">{{ r.periodLabel }}</span> }
+            </td>
+            <td class="font-semibold">{{ r.amount | amount }}</td>
+            <td>
+              <p-tag [value]="receiptStatusKey(r) | translate" [severity]="receiptStatusSeverity(r)"></p-tag>
+            </td>
+            <td>
+              <p-button icon="pi pi-print" [rounded]="true" [text]="true"
+                [pTooltip]="'RECEIPT.LIST.PRINT' | translate" (onClick)="printReceipt(r)"></p-button>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+    }
+
     <!-- Books & Products Card -->
     <p-card class="mt-6">
       <ng-template pTemplate="header">

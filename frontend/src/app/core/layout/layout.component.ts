@@ -282,6 +282,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') && !auth.isTeacher() },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
+      { labelKey: 'NAV.RECEIPTS', icon: 'pi pi-receipt', routerLink: ['/receipts'], visible: auth.canRead('enrollments') },
     ].filter(c => c.visible);
     if (financial.length) {
       entries.push({ kind: 'group', group: {

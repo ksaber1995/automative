@@ -819,7 +819,8 @@
     "EDUCATIONAL_BOOKS": "Educational Books",
     "EDUCATIONAL_BOOKS_DETAIL": "Course Books",
     "MESSAGING": "Messaging",
-    "QR_CARDS": "QR cards"
+    "QR_CARDS": "QR cards",
+    "RECEIPTS": "Receipts"
   },
   "MESSAGING": {
     "TAB_WHATSAPP": "WhatsApp Templates",
@@ -1430,7 +1431,8 @@
     "QR_LOOKING_UP": "Looking up student...",
     "QR_SCAN_INSTRUCTION": "Point your camera at a student's QR code to find them.",
     "CRM_LISTS": "Lists",
-    "QR_CARDS": "QR cards"
+    "QR_CARDS": "QR cards",
+    "RECEIPTS": "Receipts"
   },
   "HEADER": {
     "LOGOUT": "Logout",
@@ -5526,6 +5528,23 @@
       "ENROLLMENT": "Course payment",
       "MASTER": "Bundle payment"
     },
-    "PAY_AND_PRINT": "Pay & print"
+    "PAY_AND_PRINT": "Pay & print",
+    "LIST": {
+      "TITLE": "Receipts",
+      "SUBTITLE": "Every receipt issued — find one and print it again",
+      "SEARCH": "Search",
+      "CLEAR": "Clear",
+      "SEARCH_PLACEHOLDER": "Receipt number, student name or phone",
+      "COL_NO": "No.",
+      "COL_DATE": "Date",
+      "COL_STUDENT": "Student",
+      "COL_FOR": "For",
+      "COL_AMOUNT": "Amount",
+      "COL_STATUS": "Status",
+      "COL_ACTIONS": "Actions",
+      "PRINT": "Print again",
+      "VIEW": "Open receipt",
+      "EMPTY": "No receipts yet."
+    }
   }
 }
