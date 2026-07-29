@@ -113,6 +113,17 @@ async function isEnrolledInCourse(
 ): Promise<boolean> {
   const byClass = !!classId;
   const clause = byClass ? 'AND class_id = $4' : '';
+  // A substitute who sat this class's lesson may be graded on its homework even
+  // though they are enrolled elsewhere — the same rule the roster uses, so a
+  // student who is VISIBLE in the list can actually be saved.
+  const substitutes = byClass
+    ? `UNION
+       SELECT sa.student_id
+         FROM session_attendance sa
+         JOIN sessions se ON se.id = sa.session_id
+        WHERE se.class_id = $4 AND se.company_id = $2
+          AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')`
+    : '';
   const params: any[] = [courseId, companyId, studentId];
   if (byClass) params.push(classId);
   const row = await queryOne<any>(
@@ -122,6 +133,7 @@ async function isEnrolledInCourse(
         UNION
         SELECT student_id FROM master_class_enrollments
         WHERE course_id = $1 AND company_id = $2 ${clause} AND status != 'DROPPED'
+        ${substitutes}
      ) enrolled
      WHERE student_id = $3`,
     params,
@@ -422,14 +434,29 @@ export const examsRoutes = {
 
       // An exam is course-wide, but a homework is set for one class — so when the
       // row carries a class_id the roster narrows to that class's students. The
-      // extra $4 is folded into both halves of the UNION.
+      // extra $4 is folded into every branch of the UNION.
+      //
+      // SUBSTITUTING STUDENTS: someone who sat this class's lesson as a
+      // substitute (their own group was cancelled, they came to another) was in
+      // the room and was given the homework, but is enrolled in a DIFFERENT
+      // class — so a roster built from enrolments alone leaves them off, and
+      // there is no way to mark work they were actually set. They are added
+      // here from the attendance they have against this class's sessions.
+      // Stamped SUBSTITUTION or TRIAL only: a NORMAL row is already covered by
+      // the enrolment halves above.
       const byClass = !!exam.class_id;
       const enrolledSql = byClass
         ? `SELECT student_id FROM enrollments
              WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status NOT IN ('DROPPED', 'CANCELLED')
            UNION
            SELECT student_id FROM master_class_enrollments
-             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status != 'DROPPED'`
+             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status != 'DROPPED'
+           UNION
+           SELECT sa.student_id
+             FROM session_attendance sa
+             JOIN sessions se ON se.id = sa.session_id
+            WHERE se.class_id = $4 AND se.company_id = $2
+              AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')`
         : `SELECT student_id FROM enrollments
              WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
            UNION
@@ -758,6 +785,11 @@ export const examsRoutes = {
                UNION
                SELECT student_id FROM master_class_enrollments
                  WHERE course_id = $3 AND company_id = $2 ${classClause} AND status != 'DROPPED'
+               ${byClass ? `UNION
+               SELECT sa.student_id FROM session_attendance sa
+                 JOIN sessions se ON se.id = sa.session_id
+                WHERE se.class_id = $4 AND se.company_id = $2
+                  AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')` : ''}
               ) en
          JOIN students s ON s.id = en.student_id AND s.company_id = $2 AND s.is_active = true
          WHERE NOT EXISTS (SELECT 1 FROM exam_results r WHERE r.exam_id = $1 AND r.student_id = en.student_id)
