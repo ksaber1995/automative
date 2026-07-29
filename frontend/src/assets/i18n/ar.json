@@ -4436,7 +4436,9 @@
       "NOTES_LABEL": "ملاحظات (اختياري)",
       "NOTES_PLACEHOLDER": "أضف أي ملاحظات...",
       "CANCEL": "إلغاء",
-      "RECORD_PAYMENT": "تسجيل الدفعة"
+      "RECORD_PAYMENT": "تسجيل الدفعة",
+      "PRINT_RECEIPT": "طباعة الإيصال",
+      "NO_RECEIPT": "لا يوجد إيصال لهذا بعد"
     },
     "PAYMENT_RECORDED": "تم تسجيل الدفعة بنجاح"
   },

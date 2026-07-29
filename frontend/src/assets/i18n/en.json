@@ -4312,7 +4312,9 @@
       "NOTES_LABEL": "Notes (optional)",
       "NOTES_PLACEHOLDER": "Add any notes...",
       "CANCEL": "Cancel",
-      "RECORD_PAYMENT": "Record Payment"
+      "RECORD_PAYMENT": "Record Payment",
+      "PRINT_RECEIPT": "Print receipt",
+      "NO_RECEIPT": "No receipt for this yet"
     },
     "PAYMENT_RECORDED": "Payment recorded successfully"
   },

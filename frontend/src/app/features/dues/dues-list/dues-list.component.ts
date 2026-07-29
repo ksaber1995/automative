@@ -23,6 +23,7 @@ import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly
 import { SessionPaymentsService } from '../../session-payments/session-payments.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ReceiptService } from '../../../core/services/receipt.service';
+import { ApiService } from '../../../core/services/api.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 import { toLocalYmd } from '../../../core/utils/date.util';
@@ -48,6 +49,7 @@ export class DuesListComponent implements OnInit {
   private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
   private receiptService = inject(ReceiptService);
+  private api = inject(ApiService);
   private router = inject(Router);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
@@ -183,6 +185,43 @@ export class DuesListComponent implements OnInit {
       }
     });
   }
+
+  /**
+   * Reprint the last receipt for THIS due.
+   *
+   * A due is usually part-paid rather than untouched, so there is normally a
+   * slip behind it. Looked up on click rather than pre-fetched for every row:
+   * one request when someone asks beats a request per page load.
+   *
+   * Monthly and per-session dues match their receipt exactly — the due id IS
+   * the bill/charge the receipt was issued against. A one-time course payment
+   * has no such handle (its receipt points at the payment row, not the
+   * enrolment), so it falls back to that student's most recent receipt of the
+   * same kind, which at a front desk is the one being asked for.
+   */
+  printReceipt(due: DueEnrollment) {
+    const wanted = due.type === 'MASTER_ENROLLMENT' ? 'MASTER'
+      : due.type === 'MONTHLY' ? 'MONTHLY'
+      : due.type === 'SESSION' ? 'SESSION' : 'ENROLLMENT';
+    this.printingFor.set(due.id);
+    this.api.get<any[]>(`receipts/student/${due.studentId}`).subscribe({
+      next: (rows) => {
+        this.printingFor.set(null);
+        const mine = (rows || []).filter(r => !r.voidedAt);
+        const exact = mine.find(r => r.sourceId === due.id);
+        const hit = exact || mine.find(r => r.sourceType === wanted);
+        if (!hit) {
+          this.notificationService.error(this.translate.instant('DUES.LIST.NO_RECEIPT'));
+          return;
+        }
+        this.receiptService.openPrint(hit);
+      },
+      error: () => this.printingFor.set(null),
+    });
+  }
+
+  /** Which row is mid-lookup, so only its button spins. */
+  printingFor = signal<string | null>(null);
 
   viewStudent(due: DueEnrollment) {
     this.router.navigate(['/students', due.studentId]);

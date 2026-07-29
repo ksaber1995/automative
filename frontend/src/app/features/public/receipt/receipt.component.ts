@@ -11,6 +11,7 @@ export interface PaymentReceipt {
   receiptNumber: number;
   publicToken: string;
   sourceType: string;
+  sourceId: string | null;
   studentName: string | null;
   studentPhone: string | null;
   parentPhone: string | null;

@@ -109,6 +109,8 @@ export interface ReceiptRow {
   receiptNumber: number;
   publicToken: string;
   sourceType: string;
+  /** The bill/charge/payment this was issued against — lets a caller match a receipt to the thing it paid. */
+  sourceId: string | null;
   studentName: string | null;
   studentPhone: string | null;
   parentPhone: string | null;
@@ -137,6 +139,7 @@ export function mapReceipt(row: any): ReceiptRow {
     receiptNumber: Number(row.receipt_number),
     publicToken: row.public_token,
     sourceType: row.source_type,
+    sourceId: row.source_id ?? null,
     studentName: row.student_name ?? null,
     studentPhone: row.student_phone ?? null,
     parentPhone: row.parent_phone ?? null,

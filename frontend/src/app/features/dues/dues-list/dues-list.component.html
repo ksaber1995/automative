@@ -121,6 +121,17 @@
                 [pTooltip]="'DUES.LIST.ADD_PAYMENT' | translate"
                 (onClick)="openPaymentDialog(due)"
               ></p-button>
+              <!-- Reprints the last slip behind this due (they are usually
+                   part-paid, so there is normally one). -->
+              <p-button
+                icon="pi pi-print"
+                [rounded]="true"
+                [text]="true"
+                severity="secondary"
+                [loading]="printingFor() === due.id"
+                [pTooltip]="'DUES.LIST.PRINT_RECEIPT' | translate"
+                (onClick)="printReceipt(due)"
+              ></p-button>
               <p-button
                 icon="pi pi-user"
                 [rounded]="true"

@@ -635,6 +635,7 @@ const ReceiptSchema = z.object({
   receiptNumber: z.number(),
   publicToken: z.string(),
   sourceType: z.string(),
+  sourceId: z.string().nullable(),
   studentName: z.string().nullable(),
   studentPhone: z.string().nullable(),
   parentPhone: z.string().nullable(),
