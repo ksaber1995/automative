@@ -1,0 +1,108 @@
+<div class="receipt-page">
+  @if (loading()) {
+    <div class="state"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
+  } @else if (error() || !receipt()) {
+    <div class="state">
+      <i class="pi pi-times-circle text-3xl text-gray-400"></i>
+      <p class="mt-2 text-gray-600">{{ 'RECEIPT.NOT_FOUND' | translate }}</p>
+    </div>
+  } @else if (receipt(); as r) {
+    <!-- The slip. Sized for an 80mm roll; the same markup is what prints. -->
+    <div class="slip">
+      @if (r.voidedAt) {
+        <!-- The receipt still resolves after a void; it must say so plainly,
+             or a cancelled slip reads as proof of payment. -->
+        <div class="void-banner">{{ 'RECEIPT.VOIDED' | translate }}</div>
+      }
+
+      <header class="head">
+        <h1>{{ r.companyName }}</h1>
+        @if (r.branchName) { <div class="sub">{{ r.branchName }}</div> }
+        <div class="title">{{ 'RECEIPT.TITLE' | translate }}</div>
+        <div class="no">#{{ r.receiptNumber }}</div>
+      </header>
+
+      <div class="rule"></div>
+
+      <section class="rows">
+        <div class="row">
+          <span>{{ 'RECEIPT.STUDENT' | translate }}</span>
+          <strong>{{ r.studentName || '—' }}</strong>
+        </div>
+        @if (r.studentCode) {
+          <div class="row"><span>{{ 'RECEIPT.CODE' | translate }}</span><strong>{{ r.studentCode }}</strong></div>
+        }
+        @if (r.studentPhone) {
+          <div class="row"><span>{{ 'RECEIPT.PHONE' | translate }}</span><strong dir="ltr">{{ r.studentPhone }}</strong></div>
+        }
+        @if (r.parentPhone) {
+          <div class="row"><span>{{ 'RECEIPT.PARENT_PHONE' | translate }}</span><strong dir="ltr">{{ r.parentPhone }}</strong></div>
+        }
+      </section>
+
+      <div class="rule"></div>
+
+      <section class="rows">
+        <div class="row"><span>{{ 'RECEIPT.FOR' | translate }}</span><strong>{{ kindLabel() }}</strong></div>
+        @if (r.courseName) {
+          <div class="row"><span>{{ 'RECEIPT.COURSE' | translate }}</span><strong>{{ r.courseName }}</strong></div>
+        }
+        @if (r.className) {
+          <div class="row"><span>{{ 'RECEIPT.CLASS' | translate }}</span><strong>{{ r.className }}</strong></div>
+        }
+        @if (r.periodLabel) {
+          <div class="row"><span>{{ 'RECEIPT.PERIOD' | translate }}</span><strong>{{ r.periodLabel }}</strong></div>
+        }
+        <div class="row"><span>{{ 'RECEIPT.DATE' | translate }}</span><strong>{{ formatDate(r.paymentDate) }}</strong></div>
+      </section>
+
+      <div class="rule"></div>
+
+      <section class="amounts">
+        <div class="paid">
+          <span>{{ 'RECEIPT.PAID' | translate }}</span>
+          <strong>{{ money(r.amount) }}</strong>
+        </div>
+        <!-- Partial vs full is the thing a parent checks first, so the balance
+             is spelled out rather than left to be inferred from two numbers. -->
+        @if (r.totalDue !== null) {
+          <div class="row small"><span>{{ 'RECEIPT.TOTAL_DUE' | translate }}</span><strong>{{ money(r.totalDue) }}</strong></div>
+        }
+        @if (r.remaining !== null) {
+          <div class="row small"><span>{{ 'RECEIPT.REMAINING' | translate }}</span><strong>{{ money(r.remaining) }}</strong></div>
+        }
+        <div class="stamp" [class.full]="r.isFullPayment">
+          {{ (r.isFullPayment ? 'RECEIPT.PAID_IN_FULL' : 'RECEIPT.PARTIAL') | translate }}
+        </div>
+      </section>
+
+      @if (r.notes) {
+        <div class="rule"></div>
+        <div class="notes">{{ r.notes }}</div>
+      }
+
+      <div class="rule"></div>
+
+      <footer class="foot">
+        @if (qrDataUrl()) {
+          <img [src]="qrDataUrl()" alt="QR" class="qr" />
+          <div class="qr-hint">{{ 'RECEIPT.QR_HINT' | translate }}</div>
+        }
+        @if (r.recordedBy) {
+          <div class="by">{{ 'RECEIPT.RECEIVED_BY' | translate }}: {{ r.recordedBy }}</div>
+        }
+        <div class="ts">{{ formatDate(r.createdAt) }}</div>
+      </footer>
+    </div>
+
+    <!-- Screen-only controls; `no-print` keeps them off the paper. -->
+    <div class="actions no-print">
+      <button type="button" class="print-btn" (click)="print()">
+        <i class="pi pi-print"></i> {{ 'RECEIPT.PRINT' | translate }}
+      </button>
+      <button type="button" class="lang-btn" (click)="languageService.toggle()">
+        {{ languageService.currentLang() === 'ar' ? 'English' : 'العربية' }}
+      </button>
+    </div>
+  }
+</div>

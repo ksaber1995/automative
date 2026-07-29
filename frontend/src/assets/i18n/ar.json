@@ -764,6 +764,10 @@
       "UPDATE_TEMPLATES_FAILED": "فشل تحديث القوالب",
       "INVALID_BODY": "نص القالب يجب أن يكون نصًا",
       "INVALID_TYPE": "نوع القالب غير صالح"
+    },
+    "RECEIPTS": {
+      "NOT_FOUND": "الإيصال غير موجود",
+      "LIST_FAILED": "تعذر تحميل الإيصالات"
     }
   },
   "BREADCRUMBS": {
@@ -5494,5 +5498,34 @@
     "MARKED_PRINTED": "تم تحديد {{count}} كرت كمطبوعة",
     "UNMARK_PRINTED": "لم تُطبع — أعدها إلى الدفعة القادمة",
     "UNMARKED_PRINTED": "تمت إعادة {{serial}} إلى دفعة الطباعة القادمة"
+  },
+  "RECEIPT": {
+    "TITLE": "إيصال دفع",
+    "NOT_FOUND": "تعذر العثور على هذا الإيصال.",
+    "VOIDED": "ملغي",
+    "STUDENT": "الطالب",
+    "CODE": "الكود",
+    "PHONE": "الهاتف",
+    "PARENT_PHONE": "هاتف ولي الأمر",
+    "FOR": "عن",
+    "COURSE": "الكورس",
+    "CLASS": "المجموعة",
+    "PERIOD": "الفترة",
+    "DATE": "التاريخ",
+    "PAID": "المدفوع",
+    "TOTAL_DUE": "الإجمالي المستحق",
+    "REMAINING": "المتبقي",
+    "PAID_IN_FULL": "مدفوع بالكامل",
+    "PARTIAL": "دفعة جزئية",
+    "RECEIVED_BY": "استلمها",
+    "PRINT": "طباعة الإيصال",
+    "QR_HINT": "امسح الكود لعرض الإيصال في أي وقت",
+    "KIND": {
+      "MONTHLY": "اشتراك شهري",
+      "SESSION": "حصة",
+      "PACKAGE": "باقة حصص",
+      "ENROLLMENT": "دفعة كورس",
+      "MASTER": "دفعة باقة"
+    }
   }
 }

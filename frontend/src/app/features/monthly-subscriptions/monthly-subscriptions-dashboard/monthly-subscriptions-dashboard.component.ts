@@ -29,6 +29,7 @@ import { LookupService, LookupOption } from '../../../core/services/lookup.servi
 import { CourseService } from '../../courses/services/course.service';
 import { StudentService } from '../../students/services/student.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ReceiptService } from '../../../core/services/receipt.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
@@ -187,6 +188,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private globalScan: GlobalScanService,
     private sessionService: SessionService,
     private attendanceService: AttendanceService,
+    private receiptService: ReceiptService,
   ) {}
 
   /**
@@ -607,12 +609,14 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
           notes: this.payNotes || undefined,
         });
     req$.pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.payingId.set(null);
         this.closePayDialog();
         this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_RECORDED'));
         if (alsoMarkPresent) this.markPresentForSession(session!, token);
         this.loadData();
+        // Straight to the printer while the payer is still at the desk.
+        this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         this.payingId.set(null);

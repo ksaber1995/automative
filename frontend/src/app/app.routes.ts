@@ -22,6 +22,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/public/public-student/public-student.component').then(m => m.PublicStudentComponent)
   },
   {
+    // A printed payment receipt, and the target of the QR printed on it. Public
+    // and chrome-free for the same reasons as the profile above: whoever scans a
+    // slip has no login. Kept SHORT (`/r/:token`) because the whole URL has to
+    // fit legibly in a ~28mm QR on a thermal roll.
+    // `?print=1` opens the browser print dialog straight away — how the app
+    // opens it the moment a payment is recorded.
+    path: 'r/:token',
+    loadComponent: () => import('./features/public/receipt/receipt.component').then(m => m.ReceiptComponent)
+  },
+  {
     path: '',
     component: LayoutComponent,
     canActivate: [authGuard],

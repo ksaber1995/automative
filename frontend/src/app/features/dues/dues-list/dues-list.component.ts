@@ -22,6 +22,7 @@ import { MasterEnrollmentService } from '../../master-courses/services/master-en
 import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
 import { SessionPaymentsService } from '../../session-payments/session-payments.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ReceiptService } from '../../../core/services/receipt.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { DueEnrollment } from '@shared/interfaces/enrollment.interface';
 import { toLocalYmd } from '../../../core/utils/date.util';
@@ -46,6 +47,7 @@ export class DuesListComponent implements OnInit {
   private sessionService = inject(SessionPaymentsService);
   private lookupService = inject(LookupService);
   private notificationService = inject(NotificationService);
+  private receiptService = inject(ReceiptService);
   private router = inject(Router);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
@@ -166,11 +168,13 @@ export class DuesListComponent implements OnInit {
     }
 
     request$.subscribe({
-      next: () => {
+      next: (res: any) => {
         this.notificationService.success(this.translate.instant('DUES.PAYMENT_RECORDED'));
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.load();
+        // Straight to the printer while the payer is still at the desk.
+        this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         // Interceptor toasted the translated error.

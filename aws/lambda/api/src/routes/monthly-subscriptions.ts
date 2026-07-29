@@ -7,6 +7,16 @@ import {
 import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { issueReceipt, voidReceiptsFor } from '../db/receipts';
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "March 2026" — the period a monthly receipt is for. */
+function monthLabel(year: any, month: any): string {
+  const m = Number(month);
+  return `${MONTH_NAMES[m - 1] || m} ${Number(year)}`;
+}
 
 function mapPaymentFromDB(row: any) {
   return {
@@ -803,12 +813,28 @@ export const monthlySubscriptionsRoutes = {
       // revenue, and the bill row for status/dues.
       await recordMonthlyInstallment(row, pay, effectiveDate, body.notes || null, context.userId);
 
+      const receipt = await issueReceipt({
+        companyId: context.companyId,
+        sourceType: 'MONTHLY',
+        sourceId: row.id,
+        studentId: row.student_id,
+        courseId: row.course_id,
+        branchId: row.branch_id,
+        amount: pay,
+        paymentDate: effectiveDate,
+        totalDue: amountDue,
+        paidToDate: newPaid,
+        periodLabel: monthLabel(row.billing_year, row.billing_month),
+        notes: body.notes || null,
+        recordedByUserId: context.userId,
+      });
+
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',
         [params.id]
       );
 
-      return { status: 200 as const, body: mapPaymentFromDB(updated) };
+      return { status: 200 as const, body: { ...mapPaymentFromDB(updated), receipt } };
     } catch (error) {
       console.error('Record monthly payment error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.PAY_FAILED', 'Failed to record payment', 400);
@@ -916,8 +942,24 @@ export const monthlySubscriptionsRoutes = {
       // This collection, on its own date — see recordPayment.
       await recordMonthlyInstallment(bill, pay, effectiveDate, notes || null, context.userId);
 
+      const receipt = await issueReceipt({
+        companyId: context.companyId,
+        sourceType: 'MONTHLY',
+        sourceId: bill.id,
+        studentId: bill.student_id,
+        courseId: bill.course_id,
+        branchId: bill.branch_id,
+        amount: pay,
+        paymentDate: effectiveDate,
+        totalDue: amountDue,
+        paidToDate: newPaid,
+        periodLabel: monthLabel(bill.billing_year, bill.billing_month),
+        notes: notes || null,
+        recordedByUserId: context.userId,
+      });
+
       const updated = await queryOne('SELECT * FROM monthly_subscription_payments WHERE id = $1', [bill.id]);
-      return { status: 200 as const, body: mapPaymentFromDB(updated) };
+      return { status: 200 as const, body: { ...mapPaymentFromDB(updated), receipt } };
     } catch (error) {
       console.error('Collect monthly payment error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.PAY_FAILED', 'Failed to collect payment', 400);
@@ -958,6 +1000,8 @@ export const monthlySubscriptionsRoutes = {
       );
 
       await clearMonthlyInstallments(params.id);
+      // The printed slip stays resolvable, but now reads "cancelled".
+      await voidReceiptsFor('MONTHLY', params.id);
 
       const updated = await queryOne(
         'SELECT * FROM monthly_subscription_payments WHERE id = $1',

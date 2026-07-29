@@ -619,6 +619,44 @@ const EventPLSchema = z.object({
 });
 
 // =============================================
+// Receipt Schemas
+// =============================================
+// A frozen snapshot of one collection. Every human field is nullable: a receipt
+// outlives the rows it was copied from, so a name can be absent without the
+// receipt itself being invalid.
+const ReceiptStubSchema = z.object({
+  id: UUIDSchema,
+  receiptNumber: z.number(),
+  publicToken: z.string(),
+});
+
+const ReceiptSchema = z.object({
+  id: UUIDSchema,
+  receiptNumber: z.number(),
+  publicToken: z.string(),
+  sourceType: z.string(),
+  studentName: z.string().nullable(),
+  studentPhone: z.string().nullable(),
+  parentPhone: z.string().nullable(),
+  studentCode: z.number().nullable(),
+  courseName: z.string().nullable(),
+  className: z.string().nullable(),
+  branchName: z.string().nullable(),
+  companyName: z.string().nullable(),
+  recordedBy: z.string().nullable(),
+  amount: z.number(),
+  totalDue: z.number().nullable(),
+  paidToDate: z.number().nullable(),
+  remaining: z.number().nullable(),
+  isFullPayment: z.boolean(),
+  periodLabel: z.string().nullable(),
+  paymentDate: z.string(),
+  notes: z.string().nullable(),
+  voidedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+// =============================================
 // Exam Schemas
 // =============================================
 const ExamStatusSchema = z.enum(['SCHEDULED', 'DONE']);
@@ -759,6 +797,8 @@ const MonthlySubscriptionPaymentSchema = z.object({
   refundedAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Present only on the response that RECORDED a payment — the slip to print. */
+  receipt: ReceiptStubSchema.nullable().optional(),
 });
 
 const MonthlyPaymentWithDetailsSchema = MonthlySubscriptionPaymentSchema.extend({
@@ -861,6 +901,8 @@ const SessionPaymentSchema = z.object({
   refundedAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Present only on the response that RECORDED a payment — the slip to print. */
+  receipt: ReceiptStubSchema.nullable().optional(),
 });
 
 const SessionPaymentWithDetailsSchema = SessionPaymentSchema.extend({
@@ -912,6 +954,8 @@ const SessionPackageSchema = z.object({
   notes: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Present only on the response that RECORDED a payment — the slip to print. */
+  receipt: ReceiptStubSchema.nullable().optional(),
 });
 
 const SessionPackageWithDetailsSchema = SessionPackageSchema.extend({
@@ -1105,6 +1149,8 @@ const EnrollmentPaymentSchema = z.object({
   paymentDate: z.string(),
   notes: z.string().nullable(),
   createdAt: z.string(),
+  /** Present only on the response that RECORDED a payment — the slip to print. */
+  receipt: ReceiptStubSchema.nullable().optional(),
 });
 
 const CreateEnrollmentPaymentSchema = z.object({
@@ -3120,6 +3166,30 @@ export const contract = c.router({
         200: z.array(z.any()),
         401: ApiErrorSchema,
       },
+    },
+  },
+
+  // Printed payment receipts. `byToken` is the QR target on every slip and is
+  // PUBLIC — it never calls extractTenantContext; the opaque token is the only
+  // credential. See routes/receipts.ts.
+  receipts: {
+    byToken: {
+      method: 'GET',
+      path: '/api/public/receipts/:token',
+      pathParams: z.object({ token: z.string().min(16).max(64) }),
+      responses: { 200: ReceiptSchema, 404: ApiErrorSchema },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/receipts',
+      query: z.object({ search: z.string().optional(), limit: z.string().optional() }),
+      responses: { 200: z.array(ReceiptSchema), 403: ApiErrorSchema },
+    },
+    listByStudent: {
+      method: 'GET',
+      path: '/api/receipts/student/:studentId',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: { 200: z.array(ReceiptSchema), 403: ApiErrorSchema },
     },
   },
 

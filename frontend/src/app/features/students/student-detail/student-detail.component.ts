@@ -38,6 +38,7 @@ import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly
 import { SessionPaymentsService } from '../../session-payments/session-payments.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ReceiptService } from '../../../core/services/receipt.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
@@ -108,6 +109,7 @@ export class StudentDetailComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
+  private receiptService = inject(ReceiptService);
   private translate = inject(TranslateService);
   private authService = inject(AuthService);
   private confirmationService = inject(ConfirmationService);
@@ -727,11 +729,13 @@ export class StudentDetailComponent implements OnInit {
           notes: this.monthlyDialogNotes || undefined,
         });
     req$.subscribe({
-      next: () => {
+      next: (res: any) => {
         this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
         this.showMonthlyPayDialog = false;
         this.actionLoading.set(false);
         if (this.studentId) this.loadMonthlySubscriptions(this.studentId);
+        // Straight to the printer while the payer is still standing there.
+        this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         this.actionLoading.set(false);
@@ -985,11 +989,12 @@ export class StudentDetailComponent implements OnInit {
       paymentDate: dateStr,
       notes: this.dialogPaymentNotes || undefined,
     }).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.notificationService.success(this.translate.instant('STUDENTS.PAYMENT_RECORDED'));
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
+        this.receiptService.openPrint(res?.receipt);
       },
       error: () => {
         // Interceptor toasted the translated error.

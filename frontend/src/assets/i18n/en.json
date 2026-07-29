@@ -764,6 +764,10 @@
       "UPDATE_TEMPLATES_FAILED": "Failed to update templates",
       "INVALID_BODY": "Template body must be text",
       "INVALID_TYPE": "Invalid template type"
+    },
+    "RECEIPTS": {
+      "NOT_FOUND": "Receipt not found",
+      "LIST_FAILED": "Could not load receipts"
     }
   },
   "BREADCRUMBS": {
@@ -5494,5 +5498,34 @@
     "MARKED_PRINTED": "{{count}} card(s) marked as printed",
     "UNMARK_PRINTED": "Not printed after all — put back in the next run",
     "UNMARKED_PRINTED": "{{serial}} is back in the next print run"
+  },
+  "RECEIPT": {
+    "TITLE": "Payment Receipt",
+    "NOT_FOUND": "This receipt could not be found.",
+    "VOIDED": "Cancelled",
+    "STUDENT": "Student",
+    "CODE": "Code",
+    "PHONE": "Phone",
+    "PARENT_PHONE": "Parent phone",
+    "FOR": "For",
+    "COURSE": "Course",
+    "CLASS": "Class",
+    "PERIOD": "Period",
+    "DATE": "Date",
+    "PAID": "Paid",
+    "TOTAL_DUE": "Total due",
+    "REMAINING": "Remaining",
+    "PAID_IN_FULL": "Paid in full",
+    "PARTIAL": "Partial payment",
+    "RECEIVED_BY": "Received by",
+    "PRINT": "Print receipt",
+    "QR_HINT": "Scan to view this receipt any time",
+    "KIND": {
+      "MONTHLY": "Monthly subscription",
+      "SESSION": "Session",
+      "PACKAGE": "Session package",
+      "ENROLLMENT": "Course payment",
+      "MASTER": "Bundle payment"
+    }
   }
 }

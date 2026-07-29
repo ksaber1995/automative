@@ -4,6 +4,7 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { insertProductSaleWithClient } from './product-sales';
 import { ensurePerSessionSchema } from './session-payments';
 import { ensureMonthlyInstallmentLedger, ensurePaymentRecorderColumns, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
+import { issueReceipt } from '../db/receipts';
 
 function mapEnrollmentFromDB(row: any) {
   return {
@@ -1341,6 +1342,22 @@ export const enrollmentsRoutes = {
         [newAmountPaid, newPaymentStatus, params.id]
       );
 
+      const receipt = await issueReceipt({
+        companyId: context.companyId,
+        sourceType: 'ENROLLMENT',
+        sourceId: payment.id,
+        studentId: enrollment.student_id,
+        courseId: enrollment.course_id,
+        classId: enrollment.class_id,
+        branchId: enrollment.branch_id,
+        amount: parseFloat(body.amount),
+        paymentDate: body.paymentDate,
+        totalDue: finalPrice,
+        paidToDate: newAmountPaid,
+        notes: body.notes || null,
+        recordedByUserId: context.userId,
+      });
+
       return {
         status: 201 as const,
         body: {
@@ -1351,6 +1368,7 @@ export const enrollmentsRoutes = {
           paymentDate: payment.payment_date,
           notes: payment.notes,
           createdAt: payment.created_at,
+          receipt,
         },
       };
     } catch (error) {

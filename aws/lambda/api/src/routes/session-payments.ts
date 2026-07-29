@@ -8,6 +8,7 @@ import {
 import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { issueReceipt, voidReceiptsFor } from '../db/receipts';
 
 // ============================================================
 // Idempotent runtime schema guard (migration 050 self-applied).
@@ -832,8 +833,23 @@ export const sessionPaymentsRoutes = {
 
       await recordSessionInstallment(row, pay, effectiveDate, body.notes || null, context.userId);
 
+      const receipt = await issueReceipt({
+        companyId: context.companyId,
+        sourceType: 'SESSION',
+        sourceId: row.id,
+        studentId: row.student_id,
+        courseId: row.course_id,
+        branchId: row.branch_id,
+        amount: pay,
+        paymentDate: effectiveDate,
+        totalDue: amountDue,
+        paidToDate: newPaid,
+        notes: body.notes || null,
+        recordedByUserId: context.userId,
+      });
+
       const updated = await queryOne('SELECT * FROM session_payments WHERE id = $1', [params.id]);
-      return { status: 200 as const, body: mapSessionPaymentFromDB(updated) };
+      return { status: 200 as const, body: { ...mapSessionPaymentFromDB(updated), receipt } };
     } catch (error) {
       console.error('Record session payment error:', error);
       return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.PAY_FAILED', 'Failed to record payment', 400);
@@ -865,6 +881,8 @@ export const sessionPaymentsRoutes = {
       );
       // The money never happened — drop the days it was booked on with it.
       await clearSessionInstallments(params.id);
+      // The printed slip stays resolvable, but now reads "cancelled".
+      await voidReceiptsFor('SESSION', params.id);
       const updated = await queryOne('SELECT * FROM session_payments WHERE id = $1', [params.id]);
       return { status: 200 as const, body: mapSessionPaymentFromDB(updated) };
     } catch (error) {
@@ -1112,8 +1130,24 @@ export const sessionPaymentsRoutes = {
       // booked this money onto a day that had already been reported.
       await recordPackageInstallment(pkg, amount, body.paymentDate || null, body.notes || null, context.userId);
 
+      const receipt = await issueReceipt({
+        companyId: context.companyId,
+        sourceType: 'PACKAGE',
+        sourceId: pkg.id,
+        studentId: pkg.student_id,
+        courseId: pkg.course_id,
+        branchId: pkg.branch_id,
+        amount,
+        paymentDate: body.paymentDate || null,
+        totalDue: parseFloat(pkg.amount_due ?? 0) || null,
+        paidToDate: newPaid,
+        periodLabel: pkg.sessions_total ? `${pkg.sessions_total} sessions` : null,
+        notes: body.notes || null,
+        recordedByUserId: context.userId,
+      });
+
       const fresh = await queryOne('SELECT * FROM session_packages WHERE id = $1', [params.id]);
-      return { status: 200 as const, body: mapPackageFromDB(fresh) };
+      return { status: 200 as const, body: { ...mapPackageFromDB(fresh), receipt } };
     } catch (error) {
       console.error('Pay session package error:', error);
       return mapThrownError(error, 'ERRORS.SESSION_PAYMENTS.PACKAGE_PAY_FAILED', 'Failed to record package payment', 400);
