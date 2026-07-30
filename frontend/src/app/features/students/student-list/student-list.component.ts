@@ -37,8 +37,8 @@ import { BranchStateService } from '../../../core/services/branch-state.service'
 import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
 import { Class } from '@shared/interfaces/class.interface';
 import {
-  STUDENT_EXPORT_COLUMNS, StudentExportRow,
-  downloadStudentsPdf, exportStudentsToExcel, formatClassSchedule,
+  ScheduleLabels, StudentExportColumn, StudentExportRow,
+  downloadStudentsPdf, exportStudentsToExcel, formatClassSchedule, studentExportColumns,
 } from '../student-export.util';
 
 interface EnrollmentCounts {
@@ -284,6 +284,33 @@ export class StudentListComponent implements OnInit {
    * and folding them into a single cell would defeat sorting or filtering by
    * class in Excel. A student with no enrolment still gets a row.
    */
+  /**
+   * Branch is only worth a column when it can differ between rows: a solo teacher
+   * has no branches to tell apart, and a single-branch academy would get the same
+   * value repeated on every row.
+   */
+  private exportColumns(): StudentExportColumn[] {
+    return studentExportColumns({
+      includeBranch: !this.authService.isTeacher() && this.allBranches().length > 1,
+    });
+  }
+
+  /** Day names and AM/PM follow the UI language, so an Arabic export reads Arabic. */
+  private scheduleLabels(): ScheduleLabels {
+    return {
+      dayLabel: (day: string) => {
+        if (!day) return '';
+        const key = `CLASSES.LIST.DAY_${day.toUpperCase()}`;
+        const label = this.translate.instant(key);
+        // ngx-translate echoes the key back when it is missing — fall back to the
+        // English short form rather than printing "CLASSES.LIST.DAY_MONDAY".
+        return label && label !== key ? label : day.slice(0, 3).toUpperCase();
+      },
+      am: this.translate.instant('STUDENTS.EXPORT.AM'),
+      pm: this.translate.instant('STUDENTS.EXPORT.PM'),
+    };
+  }
+
   private buildExportRows(): StudentExportRow[] {
     const classById = new Map(this.allClasses().map((c) => [c.id, c]));
     const courseNameById = new Map(this.allCourses().map((c) => [c.id, c.label]));
@@ -293,6 +320,7 @@ export class StudentListComponent implements OnInit {
       byStudent.get(e.studentId)!.push(e);
     }
     const dash = '';
+    const labels = this.scheduleLabels();
     const rows: StudentExportRow[] = [];
 
     for (const s of this.filteredStudents()) {
@@ -329,15 +357,15 @@ export class StudentListComponent implements OnInit {
           ...base,
           course: (cid && courseNameById.get(cid)) || dash,
           class: cls?.name || dash,
-          schedule: formatClassSchedule(cls, dash),
+          schedule: formatClassSchedule(cls, labels, dash),
         });
       }
     }
     return rows;
   }
 
-  private exportHeaders(): string[] {
-    return STUDENT_EXPORT_COLUMNS.map((c) => this.translate.instant(c.labelKey));
+  private exportHeaders(columns: StudentExportColumn[]): string[] {
+    return columns.map((c) => this.translate.instant(c.labelKey));
   }
 
   /** What the filters narrowed to, printed under the title so a saved file says what it is. */
@@ -373,11 +401,14 @@ export class StudentListComponent implements OnInit {
     }
     this.exporting.set(true);
     try {
+      const columns = this.exportColumns();
       exportStudentsToExcel(
         rows,
-        this.exportHeaders(),
+        columns,
+        this.exportHeaders(columns),
         `${this.exportFileStem()}.xlsx`,
         this.translate.instant('STUDENTS.LIST.TITLE'),
+        (this.translate.currentLang || 'en').startsWith('ar'),
       );
       this.notificationService.success(this.translate.instant('STUDENTS.EXPORT.DONE', { count: rows.length }));
     } catch {
@@ -397,9 +428,11 @@ export class StudentListComponent implements OnInit {
     // seconds — the button has to show it is working.
     this.exportingPdf.set(true);
     try {
+      const columns = this.exportColumns();
       await downloadStudentsPdf({
         rows,
-        headers: this.exportHeaders(),
+        columns,
+        headers: this.exportHeaders(columns),
         title: this.translate.instant('STUDENTS.LIST.TITLE'),
         subtitle: this.exportSubtitle(rows.length),
         filename: `${this.exportFileStem()}.pdf`,

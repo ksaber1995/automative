@@ -24,8 +24,9 @@ export interface StudentExportRow {
   status: string;
 }
 
-/** Column order, shared by both outputs so they can't drift apart. */
-export const STUDENT_EXPORT_COLUMNS: { key: keyof StudentExportRow; labelKey: string }[] = [
+export type StudentExportColumn = { key: keyof StudentExportRow; labelKey: string };
+
+const ALL_COLUMNS: StudentExportColumn[] = [
   { key: 'code', labelKey: 'STUDENTS.EXPORT.COL_CODE' },
   { key: 'name', labelKey: 'STUDENTS.EXPORT.COL_NAME' },
   { key: 'phone', labelKey: 'STUDENTS.EXPORT.COL_PHONE' },
@@ -39,27 +40,67 @@ export const STUDENT_EXPORT_COLUMNS: { key: keyof StudentExportRow; labelKey: st
 ];
 
 /**
- * "SAT, MON 10:00 - 11:00", or a per-day list when the days don't share a time.
- * Prefers the per-day rows and falls back to the class-level start/end, which is
- * all an older class carries.
+ * Column order, shared by both outputs so they can't drift apart.
+ *
+ * Branch is dropped for a solo teacher and for any academy with a single branch:
+ * a column repeating the same value on every row is noise, and on the PDF it
+ * costs width the class time actually needs.
  */
-export function formatClassSchedule(cls: Partial<Class> | undefined | null, fallback = ''): string {
+export function studentExportColumns(opts: { includeBranch: boolean }): StudentExportColumn[] {
+  return ALL_COLUMNS.filter((c) => c.key !== 'branch' || opts.includeBranch);
+}
+
+/** Localisation the schedule text needs — day names and the meridiem markers. */
+export interface ScheduleLabels {
+  /** Short localised day name for an UPPER weekday, e.g. MONDAY → Mon / إثنين. */
+  dayLabel: (day: string) => string;
+  am: string;
+  pm: string;
+}
+
+/**
+ * "2:00 PM" from the stored "14:00" / "14:00:00".
+ *
+ * Digits stay Latin even in Arabic: the cell also carries Latin-digit dates and
+ * phone numbers, and Arabic-Indic numerals here would sort and read
+ * inconsistently against them in Excel. Only the marker is localised.
+ */
+function to12h(time: string, labels: ScheduleLabels): string {
+  const [hRaw, mRaw] = (time || '').split(':');
+  const h = Number(hRaw);
+  const m = Number(mRaw);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return (time || '').slice(0, 5);
+  const suffix = h < 12 ? labels.am : labels.pm;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+/**
+ * "Sat, Mon 10:00 AM - 11:00 AM", or a per-day list when the days don't share a
+ * time. Prefers the per-day rows and falls back to the class-level start/end,
+ * which is all an older class carries.
+ */
+export function formatClassSchedule(
+  cls: Partial<Class> | undefined | null,
+  labels: ScheduleLabels,
+  fallback = '',
+): string {
   if (!cls) return fallback;
-  const short = (d: string) => (d || '').trim().slice(0, 3).toUpperCase();
-  const hm = (t: string) => (t || '').slice(0, 5);
+  const day = (d: string) => labels.dayLabel((d || '').trim());
+  const t = (x: string) => to12h(x, labels);
   const dayTimes = cls.dayTimes as ClassDayTime[] | undefined;
 
   if (dayTimes && dayTimes.length) {
     const distinct = new Set(dayTimes.map((d) => `${d.startTime}-${d.endTime}`));
     if (distinct.size === 1) {
-      return `${dayTimes.map((d) => short(d.day)).join(', ')} ${hm(dayTimes[0].startTime)} - ${hm(dayTimes[0].endTime)}`;
+      return `${dayTimes.map((d) => day(d.day)).join(', ')} ${t(dayTimes[0].startTime)} - ${t(dayTimes[0].endTime)}`;
     }
-    return dayTimes.map((d) => `${short(d.day)} ${hm(d.startTime)}-${hm(d.endTime)}`).join(', ');
+    return dayTimes.map((d) => `${day(d.day)} ${t(d.startTime)}-${t(d.endTime)}`).join(', ');
   }
 
   if (cls.daysOfWeek || cls.startTime) {
-    const days = String(cls.daysOfWeek || '').split(',').filter(Boolean).map(short).join(', ');
-    const time = cls.startTime ? `${hm(cls.startTime)} - ${hm(cls.endTime || '')}` : '';
+    const days = String(cls.daysOfWeek || '').split(',').filter(Boolean).map(day).join(', ');
+    const time = cls.startTime ? `${t(cls.startTime)} - ${t(cls.endTime || '')}` : '';
     return [days, time].filter(Boolean).join(' ') || fallback;
   }
   return fallback;
@@ -68,16 +109,18 @@ export function formatClassSchedule(cls: Partial<Class> | undefined | null, fall
 /** A .xlsx of the rows, column widths sized to the content. */
 export function exportStudentsToExcel(
   rows: StudentExportRow[],
+  columns: StudentExportColumn[],
   headers: string[],
   filename: string,
   sheetName: string,
+  rtl = false,
 ): void {
-  const body = rows.map((r) => STUDENT_EXPORT_COLUMNS.map((c) => r[c.key]));
+  const body = rows.map((r) => columns.map((c) => r[c.key]));
   const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
 
   // Without this every column is the same default width and the schedule — the
   // reason for the export — is the one that gets cut off.
-  sheet['!cols'] = STUDENT_EXPORT_COLUMNS.map((c, i) => {
+  sheet['!cols'] = columns.map((c, i) => {
     const longest = Math.max(headers[i]?.length ?? 0, ...body.map((r) => String(r[i] ?? '').length));
     return { wch: Math.min(Math.max(longest + 2, 10), 40) };
   });
@@ -87,12 +130,16 @@ export function exportStudentsToExcel(
     sheet['!autofilter'] = {
       ref: XLSX.utils.encode_range({
         s: { r: 0, c: 0 },
-        e: { r: rows.length, c: STUDENT_EXPORT_COLUMNS.length - 1 },
+        e: { r: rows.length, c: columns.length - 1 },
       }),
     };
   }
 
   const book = XLSX.utils.book_new();
+  // Arabic: open the sheet right-to-left, so column A sits on the right and the
+  // reading order matches the app. This is Excel's own sheet view flag, so the
+  // column ORDER stays as built — reversing the array here would double-flip it.
+  if (rtl) book.Workbook = { Views: [{ RTL: true }] };
   // Excel rejects sheet names over 31 chars or containing []:*?/\
   XLSX.utils.book_append_sheet(book, sheet, sheetName.replace(/[[\]:*?/\\]/g, '').slice(0, 31) || 'Students');
   XLSX.writeFile(book, filename);
@@ -134,8 +181,8 @@ function makeStage(rtl: boolean): HTMLDivElement {
   return stage;
 }
 
-function rowHtml(r: StudentExportRow, rtl: boolean): string {
-  return `<tr>${STUDENT_EXPORT_COLUMNS.map((c) => {
+function rowHtml(r: StudentExportRow, columns: StudentExportColumn[], rtl: boolean): string {
+  return `<tr>${columns.map((c) => {
     // Codes and phone numbers are Latin digits; in an RTL page they belong on
     // the left, and without an explicit dir they get reordered by the bidi
     // algorithm when they sit next to Arabic.
@@ -161,13 +208,14 @@ function rowHtml(r: StudentExportRow, rtl: boolean): string {
  */
 export async function downloadStudentsPdf(opts: {
   rows: StudentExportRow[];
+  columns: StudentExportColumn[];
   headers: string[];
   title: string;
   subtitle: string;
   filename: string;
   rtl: boolean;
 }): Promise<void> {
-  const { rows, headers, title, subtitle, filename, rtl } = opts;
+  const { rows, columns, headers, title, subtitle, filename, rtl } = opts;
 
   // Loaded on demand: together these are ~600 KB, and most sessions never export.
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -184,7 +232,7 @@ export async function downloadStudentsPdf(opts: {
     // height (a long class name wraps, so they are not uniform).
     const probe = document.createElement('div');
     probe.className = 'pg';
-    probe.innerHTML = `${titleHtml}<table><thead>${headHtml}</thead><tbody>${rows.map((r) => rowHtml(r, rtl)).join('')}</tbody></table>`;
+    probe.innerHTML = `${titleHtml}<table><thead>${headHtml}</thead><tbody>${rows.map((r) => rowHtml(r, columns, rtl)).join('')}</tbody></table>`;
     stage.appendChild(probe);
 
     const titleH = (probe.querySelector('table') as HTMLElement).offsetTop;
@@ -215,7 +263,7 @@ export async function downloadStudentsPdf(opts: {
       const page = document.createElement('div');
       page.className = 'pg';
       page.innerHTML = (p === 0 ? titleHtml : '')
-        + `<table><thead>${headHtml}</thead><tbody>${pages[p].map((r) => rowHtml(r, rtl)).join('')}</tbody></table>`;
+        + `<table><thead>${headHtml}</thead><tbody>${pages[p].map((r) => rowHtml(r, columns, rtl)).join('')}</tbody></table>`;
       stage.appendChild(page);
 
       // scale 1.5 puts ~1684px across 277mm (~154 dpi) — crisp enough to print.

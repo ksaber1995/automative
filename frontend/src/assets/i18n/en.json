@@ -3583,6 +3583,8 @@
       "FAILED": "Could not create the file",
       "ACTIVE": "Active",
       "INACTIVE": "Inactive",
+      "AM": "AM",
+      "PM": "PM",
       "COL_CODE": "Code",
       "COL_NAME": "Student",
       "COL_PHONE": "Phone",
