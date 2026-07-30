@@ -354,6 +354,14 @@
                 (onClick)="openPaymentDetails(p)"
               ></p-button>
               <p-button
+                icon="pi pi-calculator"
+                severity="secondary"
+                [text]="true"
+                size="small"
+                [pTooltip]="'EXPENSES.SALARIES.BRK_OPEN' | translate"
+                (onClick)="openSalaryBreakdown(p)"
+              ></p-button>
+              <p-button
                 icon="pi pi-trash"
                 severity="danger"
                 [text]="true"
@@ -555,4 +563,10 @@
       </div>
     }
   </p-dialog>
+
+  <!-- "How was this calculated?" — the same answer the employee page gives -->
+  <app-salary-breakdown-dialog
+    [(visible)]="breakdownVisible"
+    [(paymentId)]="breakdownPaymentId">
+  </app-salary-breakdown-dialog>
 </div>

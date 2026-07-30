@@ -178,6 +178,30 @@
                 [loading]="withdrawing()"
                 (click)="confirmWithdrawPercentage()"
               ></button>
+
+              <!-- Money students owe for classes they already sat in. Below the
+                   withdraw button on purpose: none of it is available to draw. -->
+              @if (s.unpaidTotal > 0) {
+                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs text-amber-700/80">{{ 'EXPENSES.SALARIES.PCT_UNPAID_TOTAL' | translate }}</span>
+                    <span class="font-bold text-amber-800">{{ s.unpaidTotal | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="flex justify-between items-center mt-1">
+                    <span class="text-xs text-amber-700/80">{{ 'EXPENSES.SALARIES.PCT_UNPAID_SHARE' | translate }}</span>
+                    <span class="font-semibold text-amber-800">{{ s.unpaidShare | number:'1.2-2' }}</span>
+                  </div>
+                  <p class="text-xs text-amber-700/60 mt-1">
+                    {{ 'EMPLOYEES.DETAIL.PCT_UNPAID_NOTE' | translate: { students: s.unpaidStudents } }}
+                  </p>
+                </div>
+              }
+
+              <a [routerLink]="['/salaries/percentage', employee()!.id]" target="_blank"
+                 class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                <i class="pi pi-external-link text-xs"></i>
+                {{ 'EMPLOYEES.DETAIL.PCT_FULL_BREAKDOWN' | translate }}
+              </a>
             }
           } @else {
             <div class="flex justify-between items-center">
@@ -252,6 +276,7 @@
               <th pSortableColumn="discountAmount" class="text-right text-red-600">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }} <p-sortIcon field="discountAmount"></p-sortIcon></th>
               <th pSortableColumn="amount" class="text-right font-semibold">{{ 'EMPLOYEES.DETAIL.COL_TOTAL_PAID' | translate }} <p-sortIcon field="amount"></p-sortIcon></th>
               <th pSortableColumn="adjustmentReason">{{ 'EMPLOYEES.DETAIL.COL_REASON' | translate }} <p-sortIcon field="adjustmentReason"></p-sortIcon></th>
+              <th class="w-12"></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-item>
@@ -286,11 +311,16 @@
                   <span class="text-gray-300">—</span>
                 }
               </td>
+              <td class="text-right">
+                <button pButton type="button" class="p-button-text p-button-sm" icon="pi pi-calculator"
+                        [pTooltip]="'EXPENSES.SALARIES.BRK_OPEN' | translate" tooltipPosition="left"
+                        (click)="openSalaryBreakdown(item)"></button>
+              </td>
             </tr>
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="6" class="text-center py-8 text-gray-400">
+              <td colspan="7" class="text-center py-8 text-gray-400">
                 <i class="pi pi-inbox text-2xl mb-2 block"></i>
                 {{ 'EMPLOYEES.DETAIL.NO_PAYMENTS' | translate }}
               </td>
@@ -562,3 +592,9 @@
     </button>
   </ng-template>
 </p-dialog>
+
+<!-- "How was this calculated?" for one salary-history row -->
+<app-salary-breakdown-dialog
+  [(visible)]="breakdownVisible"
+  [(paymentId)]="breakdownPaymentId">
+</app-salary-breakdown-dialog>

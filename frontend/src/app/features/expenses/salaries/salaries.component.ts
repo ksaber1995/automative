@@ -20,6 +20,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
+import { SalaryBreakdownDialogComponent } from './salary-breakdown-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -56,6 +57,7 @@ interface SalaryAdjustment {
     TranslateModule,
     RouterLink,
     AmountPipe,
+    SalaryBreakdownDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './salaries.component.html'
@@ -227,6 +229,15 @@ export class SalariesComponent implements OnInit {
   pctData = signal<PercentageBreakdown | null>(null);
   /** The dialog opens on the summary; the history is a click away. */
   pctShowHistory = signal(false);
+
+  // "How was this calculated?" for one paid salary in the history table.
+  breakdownVisible = signal(false);
+  breakdownPaymentId = signal<string | null>(null);
+
+  openSalaryBreakdown(p: ExpensePayment) {
+    this.breakdownPaymentId.set(p.id);
+    this.breakdownVisible.set(true);
+  }
 
   openPercentageDetails(item: any) {
     this.pctEmployeeName.set(this.getEmployeeName(item.employeeId));

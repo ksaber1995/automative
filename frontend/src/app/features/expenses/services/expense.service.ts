@@ -46,6 +46,11 @@ export interface PercentageSummary {
   accrued: number;     // percentageRate% of totalPaid
   withdrawn: number;   // base salary already withdrawn
   owed: number;        // available to withdraw now (accrued - withdrawn, >= 0)
+  // Owed BY students who attended. Not earned yet, so deliberately outside
+  // totalPaid/accrued — see PercentageUnpaidLine.
+  unpaidTotal: number;
+  unpaidShare: number;
+  unpaidStudents: number;
 }
 
 /** One student payment that fed a percentage teacher's accrual. */
@@ -60,9 +65,72 @@ export interface PercentageLine {
   paidAt: string | null;
 }
 
+/**
+ * A student who sat in this teacher's class and still owes for it. Deliberately
+ * NOT counted in totalPaid/accrued — the teacher's cut is earned on money
+ * received — so it reads as what's coming once the office collects.
+ */
+export interface PercentageUnpaidLine {
+  studentName: string;
+  className: string | null;
+  courseName: string | null;
+  source: 'ENROLLMENT' | 'MONTHLY' | 'SESSION';
+  /** Still owed on this enrollment / month / session charge. */
+  outstanding: number;
+  /** The teacher's cut of it if it gets paid (rounded per line). */
+  potentialShare: number;
+  attendedSessions: number;
+  lastAttendedAt: string | null;
+}
+
 /** The summary plus the payments behind it, for auditing the accrual. */
 export interface PercentageBreakdown extends PercentageSummary {
   lines: PercentageLine[];
+  /** Total still owed by students who attended. */
+  unpaidTotal: number;
+  /** percentageRate% of unpaidTotal — the accrual this would unlock. */
+  unpaidShare: number;
+  unpaid: PercentageUnpaidLine[];
+}
+
+/** One session a SESSION_BASED salary payment paid for. */
+export interface SalarySessionLine {
+  date: string | null;
+  className: string | null;
+  courseName: string | null;
+  studentsPresent: number;
+}
+
+/**
+ * How ONE salary payment in the history reached its number. Which detail block
+ * is filled depends on salaryType — the others come back empty/null:
+ *   PERCENTAGE    → lines/linesTotal/percentageRate + the funding window
+ *   SESSION_BASED → sessions/sessionRate
+ *   MONTHLY       → monthLabel alone (the base IS the salary)
+ * All three end the same way: baseSalary + bonus − discount = amount.
+ */
+export interface SalaryPaymentBreakdown {
+  salaryType: string;
+  employeeName: string;
+  payment: {
+    id: string;
+    date: string;
+    amount: number;
+    bonusAmount: number;
+    discountAmount: number;
+    adjustmentReason: string | null;
+    notes: string | null;
+    baseSalary: number;
+  };
+  percentageRate: number | null;
+  /** Exclusive. null = the accrual ran from the beginning. */
+  windowStart: string | null;
+  windowEnd: string | null;
+  linesTotal: number;
+  lines: PercentageLine[];
+  sessionRate: number | null;
+  sessions: SalarySessionLine[];
+  monthLabel: string;
 }
 
 @Injectable({
@@ -137,6 +205,10 @@ export class ExpenseService {
 
   getEmployeePercentageBreakdown(employeeId: string): Observable<PercentageBreakdown> {
     return this.api.get<PercentageBreakdown>(`expenses/employee/${employeeId}/percentage-breakdown`);
+  }
+
+  getSalaryPaymentBreakdown(paymentId: string): Observable<SalaryPaymentBreakdown> {
+    return this.api.get<SalaryPaymentBreakdown>(`expenses/salary-payment/${paymentId}/breakdown`);
   }
 
   previewEmployeeBackPay(employeeId: string, upTo?: string): Observable<BackPayPreview> {

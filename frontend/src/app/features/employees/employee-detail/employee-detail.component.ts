@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
@@ -22,6 +22,7 @@ import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExpenseService, BackPayPreview, PercentageSummary } from '../../expenses/services/expense.service';
+import { SalaryBreakdownDialogComponent } from '../../expenses/salaries/salary-breakdown-dialog.component';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../attendance/services/teacher-attendance.service';
 import { Employee } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
@@ -31,9 +32,9 @@ import { UserRole } from '@shared/enums/user-role.enum';
   selector: 'app-employee-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DividerModule,
+    CommonModule, FormsModule, RouterLink, CardModule, ButtonModule, TagModule, DividerModule,
     DialogModule, ConfirmDialogModule, InputTextModule, PasswordModule, SelectModule, MultiSelectModule,
-    TableModule, TooltipModule, TranslateModule,
+    TableModule, TooltipModule, TranslateModule, SalaryBreakdownDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './employee-detail.component.html'
@@ -64,6 +65,15 @@ export class EmployeeDetailComponent implements OnInit {
   levelNames = computed(() => (this.employee()?.levels ?? []).map(l => l.name).filter(Boolean).join(', '));
   salaryHistory = signal<ExpensePayment[]>([]);
   historyLoading = signal(false);
+
+  // "How was this calculated?" for one row of the salary history.
+  breakdownVisible = signal(false);
+  breakdownPaymentId = signal<string | null>(null);
+
+  openSalaryBreakdown(item: ExpensePayment): void {
+    this.breakdownPaymentId.set(item.id);
+    this.breakdownVisible.set(true);
+  }
 
   attendanceHistory = signal<TeacherAttendanceHistoryRow[]>([]);
   attendanceLoading = signal(false);

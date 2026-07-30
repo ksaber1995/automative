@@ -1,0 +1,171 @@
+<p-dialog
+  [visible]="visible()"
+  (visibleChange)="visible.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  [dismissableMask]="true"
+  [style]="{ width: '820px', maxWidth: '95vw' }"
+  [header]="'EXPENSES.SALARIES.BRK_TITLE' | translate"
+>
+  @if (loading()) {
+    <div class="py-16 text-center text-gray-400"><i class="pi pi-spin pi-spinner text-3xl"></i></div>
+  } @else if (failed()) {
+    <div class="py-16 text-center text-gray-500">{{ 'ERRORS.EXPENSES.SALARY_BREAKDOWN_FAILED' | translate }}</div>
+  } @else if (data(); as d) {
+
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <div class="font-semibold text-gray-900">{{ d.employeeName }}</div>
+        <div class="text-sm text-gray-500">{{ d.payment.date | date: 'mediumDate' }}</div>
+      </div>
+      <p-button icon="pi pi-print" [label]="'EXPENSES.SALARIES.PCT_PRINT' | translate"
+                [outlined]="true" size="small" (onClick)="print()"></p-button>
+    </div>
+
+    <!-- Whichever rate produced the base, when there is one -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+      <div class="border rounded-lg p-3 bg-white">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.BRK_AMOUNT_PAID' | translate }}</div>
+        <div class="text-lg font-bold text-gray-900">{{ d.payment.amount | amount }}</div>
+      </div>
+      <div class="border rounded-lg p-3 bg-white">
+        <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.BRK_BASE' | translate }}</div>
+        <div class="text-lg font-bold text-gray-900">{{ d.payment.baseSalary | amount }}</div>
+      </div>
+      @if (d.percentageRate !== null) {
+        <div class="border rounded-lg p-3 bg-white">
+          <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.PCT_RATE' | translate }}</div>
+          <div class="text-lg font-bold text-green-600">{{ d.percentageRate }}%</div>
+        </div>
+      }
+      @if (d.sessionRate !== null) {
+        <div class="border rounded-lg p-3 bg-white">
+          <div class="text-xs text-gray-500 mb-1">{{ 'EXPENSES.SALARIES.BRK_SESSION_RATE' | translate }}</div>
+          <div class="text-lg font-bold text-gray-900">{{ d.sessionRate | amount }}</div>
+        </div>
+      }
+    </div>
+
+    <!-- The middle changes with how this employee is paid -->
+    @if (isPercentage()) {
+      <p class="text-sm text-gray-500 mb-2">
+        {{ (d.windowStart
+              ? ('EXPENSES.SALARIES.BRK_WINDOW' | translate: { from: (d.windowStart | date: 'mediumDate'), to: (d.windowEnd | date: 'mediumDate') })
+              : ('EXPENSES.SALARIES.BRK_WINDOW_OPEN' | translate: { to: (d.windowEnd | date: 'mediumDate') })) }}
+      </p>
+
+      @if (shareMismatch()) {
+        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {{ 'EXPENSES.SALARIES.BRK_MISMATCH' | translate: { expected: (expectedShare() | amount), actual: (d.payment.baseSalary | amount) } }}
+        </div>
+      }
+
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">
+        {{ 'EXPENSES.SALARIES.BRK_FUNDED_BY' | translate: { count: d.lines.length } }}
+      </h3>
+      @if (d.lines.length) {
+        <p-table [value]="d.lines" [paginator]="d.lines.length > 15" [rows]="15" styleClass="p-datatable-sm">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_STUDENT' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_CLASS' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_SOURCE' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_DATE' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.PCT_COL_PAID' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.PCT_COL_SHARE' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-l>
+            <tr>
+              <td class="font-medium">{{ l.studentName }}</td>
+              <td class="text-gray-600">
+                {{ l.className || '—' }}
+                @if (l.courseName) { <div class="text-xs text-gray-400">{{ l.courseName }}</div> }
+              </td>
+              <td><p-tag [value]="l.source" [severity]="sourceSeverity(l.source)"></p-tag></td>
+              <td class="text-gray-600 whitespace-nowrap">{{ l.paidAt ? (l.paidAt | date: 'MMM d, y') : '—' }}</td>
+              <td class="text-right whitespace-nowrap">{{ l.amount | amount }}</td>
+              <td class="text-right font-medium text-green-700 whitespace-nowrap">{{ l.share | amount }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="footer">
+            <tr class="font-semibold bg-gray-50">
+              <td colspan="4">{{ 'EXPENSES.SALARIES.PCT_TOTAL' | translate }}</td>
+              <td class="text-right">{{ d.linesTotal | amount }}</td>
+              <td class="text-right text-green-700">{{ expectedShare() | amount }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      } @else {
+        <div class="py-6 text-center text-gray-500 text-sm">{{ 'EXPENSES.SALARIES.BRK_NO_LINES' | translate }}</div>
+      }
+
+    } @else if (isSessionBased()) {
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">
+        {{ 'EXPENSES.SALARIES.BRK_SESSIONS_COVERED' | translate: { count: d.sessions.length } }}
+      </h3>
+      @if (d.sessions.length) {
+        <p-table [value]="d.sessions" [paginator]="d.sessions.length > 15" [rows]="15" styleClass="p-datatable-sm">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_DATE' | translate }}</th>
+              <th>{{ 'EXPENSES.SALARIES.PCT_COL_CLASS' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.BRK_COL_PRESENT' | translate }}</th>
+              <th class="text-right">{{ 'EXPENSES.SALARIES.BRK_COL_RATE' | translate }}</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-s>
+            <tr>
+              <td class="whitespace-nowrap">{{ s.date ? (s.date | date: 'MMM d, y') : '—' }}</td>
+              <td class="text-gray-600">
+                {{ s.className || '—' }}
+                @if (s.courseName) { <div class="text-xs text-gray-400">{{ s.courseName }}</div> }
+              </td>
+              <td class="text-right text-gray-600">{{ s.studentsPresent }}</td>
+              <td class="text-right whitespace-nowrap">{{ d.sessionRate | amount }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="footer">
+            <tr class="font-semibold bg-gray-50">
+              <td colspan="3">{{ 'EXPENSES.SALARIES.PCT_TOTAL' | translate }}</td>
+              <td class="text-right">{{ d.payment.baseSalary | amount }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      } @else {
+        <div class="py-6 text-center text-gray-500 text-sm">{{ 'EXPENSES.SALARIES.BRK_NO_SESSIONS' | translate }}</div>
+      }
+
+    } @else {
+      <div class="rounded-lg border bg-gray-50 p-4 text-sm text-gray-600">
+        {{ 'EXPENSES.SALARIES.BRK_MONTHLY_NOTE' | translate: { month: d.monthLabel } }}
+      </div>
+    }
+
+    <!-- The last step is the same for every salary type -->
+    <h3 class="text-sm font-semibold text-gray-700 mt-5 mb-2">{{ 'EXPENSES.SALARIES.BRK_HOW' | translate }}</h3>
+    <div class="border rounded-lg divide-y">
+      <div class="flex justify-between px-3 py-2 text-sm">
+        <span class="text-gray-500">{{ 'EXPENSES.SALARIES.BRK_BASE' | translate }}</span>
+        <span class="font-medium">{{ d.payment.baseSalary | amount }}</span>
+      </div>
+      <div class="flex justify-between px-3 py-2 text-sm">
+        <span class="text-gray-500">{{ 'EMPLOYEES.DETAIL.COL_BONUS' | translate }}</span>
+        <span class="font-medium text-green-600">+ {{ d.payment.bonusAmount | amount }}</span>
+      </div>
+      <div class="flex justify-between px-3 py-2 text-sm">
+        <span class="text-gray-500">{{ 'EMPLOYEES.DETAIL.COL_DISCOUNT' | translate }}</span>
+        <span class="font-medium text-red-600">− {{ d.payment.discountAmount | amount }}</span>
+      </div>
+      <div class="flex justify-between px-3 py-2 bg-gray-50">
+        <span class="font-semibold text-gray-700">{{ 'EXPENSES.SALARIES.BRK_AMOUNT_PAID' | translate }}</span>
+        <span class="text-lg font-bold text-gray-900">{{ d.payment.amount | amount }}</span>
+      </div>
+    </div>
+    @if (d.payment.adjustmentReason) {
+      <p class="text-sm text-gray-500 italic mt-2">
+        {{ 'EMPLOYEES.DETAIL.COL_REASON' | translate }}: "{{ d.payment.adjustmentReason }}"
+      </p>
+    }
+  }
+</p-dialog>

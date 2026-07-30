@@ -151,7 +151,15 @@ async function getWithdrawnSalaryBase(companyId: string, employeeId: string): Pr
 // be audited line by line instead of taken on trust. Same four sources, same
 // joins and filters — if you change one, change the other or the lines stop
 // adding up to the total.
-async function getTeacherPaidLines(companyId: string, employeeId: string): Promise<any[]> {
+//
+// `window` narrows to the money that funded ONE withdrawal: (after, upTo]. Rows
+// with no date are dropped there — they can't be placed in a window — which is
+// why the unwindowed call keeps NULLS LAST instead of filtering them out.
+async function getTeacherPaidLines(
+  companyId: string,
+  employeeId: string,
+  window?: { after: string | null; upTo: string },
+): Promise<any[]> {
   const reg = await queryOne<any>(
     `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
             to_regclass('public.session_payments')            IS NOT NULL AS has_sp,
@@ -209,8 +217,116 @@ async function getTeacherPaidLines(companyId: string, employeeId: string): Promi
     );
   }
 
+  const union = parts.join(' UNION ALL ');
+  if (!window) {
+    return query<any>(`${union} ORDER BY paid_at DESC NULLS LAST, student_name`, [companyId, employeeId]);
+  }
   return query<any>(
-    `${parts.join(' UNION ALL ')} ORDER BY paid_at DESC NULLS LAST, student_name`,
+    `SELECT * FROM (${union}) x
+      WHERE x.paid_at IS NOT NULL
+        AND x.paid_at <= $4::date
+        AND ($3::date IS NULL OR x.paid_at > $3::date)
+      ORDER BY x.paid_at DESC, x.student_name`,
+    [companyId, employeeId, window.after, window.upTo]
+  );
+}
+
+// The mirror image of getTeacherPaidLines: students who ATTENDED this teacher's
+// classes and still owe for it. None of this is in `accrued` — a percentage is
+// taken on money received, not money billed — so it reads as what the teacher
+// stands to earn once the office collects, never as pay already due.
+//
+// "Attended" is proven per billing model, because each stores it differently:
+//   • PER_SESSION — the pending charge IS the attendance (attendance raised it)
+//   • MONTHLY     — an unpaid month they actually showed up in
+//   • ONE_TIME    — a part-paid enrollment they have attended at least once
+// The unpaid predicates deliberately match /dues (enrollments.listDues) so the
+// two screens never disagree about who owes what.
+async function getTeacherUnpaidLines(companyId: string, employeeId: string): Promise<any[]> {
+  const reg = await queryOne<any>(
+    `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
+            to_regclass('public.session_payments')            IS NOT NULL AS has_sp`
+  );
+
+  // Attendance rows are keyed by session, so "did they attend this class" is a
+  // session_attendance ⋈ sessions lookup. LATERAL + `ON att.sessions > 0` turns
+  // the count into the filter as well as a displayed column.
+  const parts: string[] = [
+    `SELECT s.name AS student_name, c.name AS class_name, co.name AS course_name,
+            'ENROLLMENT' AS source,
+            (e.final_price - COALESCE(e.amount_paid,0)) AS outstanding,
+            att.sessions AS attended_sessions,
+            att.last_at  AS last_attended_at
+       FROM enrollments e
+       JOIN classes  c  ON c.id = e.class_id
+       JOIN students s  ON s.id = e.student_id
+       LEFT JOIN courses co ON co.id = c.course_id
+       JOIN LATERAL (
+         SELECT COUNT(*)::int AS sessions, MAX(se.start_date)::date AS last_at
+           FROM session_attendance sa
+           JOIN sessions se ON se.id = sa.session_id
+          WHERE sa.student_id = e.student_id AND se.class_id = e.class_id
+       ) att ON att.sessions > 0
+      WHERE c.instructor_id = $2 AND e.company_id = $1
+        AND e.payment_type = 'ONE_TIME'
+        AND COALESCE(e.amount_paid,0) < e.final_price
+        AND COALESCE(e.total_refunded,0) = 0
+        AND e.status <> 'DROPPED'`,
+  ];
+
+  if (reg?.has_msp) {
+    // Only months that have come due — a future month isn't owed yet, and
+    // materialising one would be phantom debt.
+    parts.push(
+      `SELECT s.name, c.name, co.name, 'MONTHLY',
+              (msp.amount_due - COALESCE(msp.amount_paid,0)),
+              att.sessions, att.last_at
+         FROM monthly_subscription_payments msp
+         JOIN enrollments e ON e.id = msp.enrollment_id
+         JOIN classes  c  ON c.id = e.class_id
+         JOIN students s  ON s.id = msp.student_id
+         LEFT JOIN courses co ON co.id = c.course_id
+         JOIN LATERAL (
+           SELECT COUNT(*)::int AS sessions, MAX(se.start_date)::date AS last_at
+             FROM session_attendance sa
+             JOIN sessions se ON se.id = sa.session_id
+            WHERE sa.student_id = msp.student_id AND se.class_id = e.class_id
+              AND EXTRACT(YEAR  FROM se.start_date)::int = msp.billing_year
+              AND EXTRACT(MONTH FROM se.start_date)::int = msp.billing_month
+         ) att ON att.sessions > 0
+        WHERE c.instructor_id = $2 AND msp.company_id = $1
+          AND msp.amount_due > COALESCE(msp.amount_paid,0)
+          AND msp.payment_status NOT IN ('PAID', 'REFUNDED')
+          AND COALESCE(msp.refunded_amount,0) = 0
+          AND e.status = 'ACTIVE'
+          AND (msp.billing_year * 12 + msp.billing_month)
+              <= (EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int)`
+    );
+  }
+  if (reg?.has_sp) {
+    // PRESENT only: an ABSENT charge (a no-show fee, where the course charges
+    // for those) is money owed but not a session they sat in.
+    parts.push(
+      `SELECT s.name, c.name, co.name, 'SESSION',
+              (sp.amount_due - COALESCE(sp.amount_paid,0)),
+              1, se.start_date::date
+         FROM session_payments sp
+         JOIN enrollments e ON e.id = sp.enrollment_id
+         JOIN classes  c  ON c.id = e.class_id
+         JOIN students s  ON s.id = sp.student_id
+         JOIN sessions se ON se.id = sp.session_id
+         LEFT JOIN courses co ON co.id = c.course_id
+        WHERE c.instructor_id = $2 AND sp.company_id = $1
+          AND sp.payment_status = 'PENDING'
+          AND sp.attendance_state = 'PRESENT'
+          AND sp.amount_due > COALESCE(sp.amount_paid,0)
+          AND COALESCE(sp.refunded_amount,0) = 0
+          AND e.status = 'ACTIVE'`
+    );
+  }
+
+  return query<any>(
+    `${parts.join(' UNION ALL ')} ORDER BY last_attended_at DESC NULLS LAST, student_name`,
     [companyId, employeeId]
   );
 }
@@ -992,9 +1108,22 @@ export const expensesRoutes = {
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
       const summary = await getPercentageSummary(context.companyId, emp);
+      // The unpaid totals ride along here rather than inside getPercentageSummary:
+      // that helper also runs per-employee on the pay-salaries list and at payout
+      // time, where this extra query would be pure waste.
+      const unpaidRows = await getTeacherUnpaidLines(context.companyId, emp.id);
+      const unpaidTotal = Math.round(
+        unpaidRows.reduce((s, r) => s + Math.max(0, r.outstanding != null ? parseFloat(r.outstanding) : 0), 0) * 100
+      ) / 100;
       return {
         status: 200 as const,
-        body: { salaryType: emp.salary_type || 'MONTHLY', ...summary },
+        body: {
+          salaryType: emp.salary_type || 'MONTHLY',
+          ...summary,
+          unpaidTotal,
+          unpaidShare: Math.round(unpaidTotal * summary.percentageRate) / 100,
+          unpaidStudents: new Set(unpaidRows.map((r) => r.student_name || '')).size,
+        },
       };
     } catch (error) {
       console.error('Get employee percentage summary error:', error);
@@ -1022,13 +1151,38 @@ export const expensesRoutes = {
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
       const summary = await getPercentageSummary(context.companyId, emp);
-      const rows = await getTeacherPaidLines(context.companyId, params.employeeId);
+      const [rows, unpaidRows] = await Promise.all([
+        getTeacherPaidLines(context.companyId, params.employeeId),
+        getTeacherUnpaidLines(context.companyId, params.employeeId),
+      ]);
+
+      const unpaid = unpaidRows.map((r) => {
+        const outstanding = r.outstanding != null ? Math.max(0, parseFloat(r.outstanding)) : 0;
+        return {
+          studentName: r.student_name || '',
+          className: r.class_name ?? null,
+          courseName: r.course_name ?? null,
+          source: r.source,
+          outstanding,
+          // What this line WOULD add to the accrual once collected. Kept apart
+          // from `share` on purpose — it is not earned yet.
+          potentialShare: Math.round(outstanding * summary.percentageRate) / 100,
+          attendedSessions: r.attended_sessions != null ? Number(r.attended_sessions) : 0,
+          lastAttendedAt: r.last_attended_at ? new Date(r.last_attended_at).toISOString() : null,
+        };
+      });
+      const unpaidTotal = Math.round(unpaid.reduce((s, u) => s + u.outstanding, 0) * 100) / 100;
 
       return {
         status: 200 as const,
         body: {
           salaryType: emp.salary_type || 'MONTHLY',
           ...summary,
+          unpaidTotal,
+          // Rounded once on the total, the same way `accrued` is — so it doesn't
+          // drift from the sum of the per-line potentialShare column.
+          unpaidShare: Math.round(unpaidTotal * summary.percentageRate) / 100,
+          unpaid,
           lines: rows.map((r) => {
             const amount = r.amount != null ? parseFloat(r.amount) : 0;
             return {
@@ -1049,6 +1203,139 @@ export const expensesRoutes = {
     } catch (error) {
       console.error('Get employee percentage breakdown error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.PERCENTAGE_SUMMARY_FAILED', 'Failed to get percentage breakdown');
+    }
+  },
+
+  /**
+   * GET /api/expenses/salary-payment/:paymentId/breakdown
+   * How ONE salary payment in the history got to its number. What that means
+   * depends on how the employee is paid, so the reply carries whichever of the
+   * three shapes applies:
+   *   • PERCENTAGE    — the student payments that funded this withdrawal
+   *   • SESSION_BASED — the exact sessions it covered (a stored link, not a guess)
+   *   • MONTHLY       — the flat salary for that month
+   * Every type then shares the same last step: base + bonus − discount = paid.
+   */
+  getSalaryPaymentBreakdown: async ({ params, headers }: { params: { paymentId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureSalaryColumns();
+
+      const pay = await queryOne<any>(
+        `SELECT * FROM expense_payments
+          WHERE id = $1 AND company_id = $2 AND category = 'SALARIES'`,
+        [params.paymentId, context.companyId]
+      );
+      if (!pay) return apiError(404, 'ERRORS.EXPENSES.PAYMENT_NOT_FOUND', 'Salary payment not found');
+      if (pay.branch_id && !canAccessBranch(context, pay.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this payment');
+      }
+
+      const emp = pay.employee_id
+        ? await queryOne<any>('SELECT * FROM employees WHERE id = $1 AND company_id = $2', [pay.employee_id, context.companyId])
+        : null;
+
+      const amount = pay.amount != null ? parseFloat(pay.amount) : 0;
+      const bonus = pay.bonus_amount != null ? parseFloat(pay.bonus_amount) : 0;
+      const discount = pay.discount_amount != null ? parseFloat(pay.discount_amount) : 0;
+      // The stored figure is the final amount; the base is recovered the same way
+      // getWithdrawnSalaryBase does it, so both agree on what was really drawn.
+      const baseSalary = Math.round((amount - bonus + discount) * 100) / 100;
+      const payDate = typeof pay.date === 'string' ? pay.date.substring(0, 10) : new Date(pay.date).toISOString().substring(0, 10);
+      const salaryType = emp?.salary_type || 'MONTHLY';
+
+      const body: any = {
+        salaryType,
+        employeeName: emp ? `${emp.first_name || ''} ${emp.last_name || ''}`.trim() : '',
+        payment: {
+          id: pay.id,
+          date: new Date(payDate).toISOString(),
+          amount,
+          bonusAmount: bonus,
+          discountAmount: discount,
+          adjustmentReason: pay.adjustment_reason ?? null,
+          notes: pay.notes ?? null,
+          baseSalary,
+        },
+        percentageRate: null,
+        windowStart: null,
+        windowEnd: null,
+        linesTotal: 0,
+        lines: [],
+        sessionRate: null,
+        sessions: [],
+        monthLabel: new Date(payDate).toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      };
+
+      if (emp && salaryType === 'PERCENTAGE') {
+        const percentageRate = emp.percentage_rate ? parseFloat(emp.percentage_rate) : 0;
+        // A withdrawal always takes the WHOLE available balance (payEmployeeSalary
+        // sets base = owed), so consecutive withdrawals partition the accrual
+        // exactly: this one was funded by the student money that came in after
+        // the previous withdrawal. Nothing stores that link, so the window is
+        // reconstructed from the payment dates — ordered by (date, created_at) so
+        // two withdrawals on the same day still fall in the right order.
+        const prev = await queryOne<any>(
+          `SELECT date FROM expense_payments
+            WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES'
+              AND (date, created_at) < ($3::date, $4::timestamptz)
+            ORDER BY date DESC, created_at DESC
+            LIMIT 1`,
+          [context.companyId, emp.id, payDate, pay.created_at]
+        );
+        const prevDate = prev?.date
+          ? (typeof prev.date === 'string' ? prev.date.substring(0, 10) : new Date(prev.date).toISOString().substring(0, 10))
+          : null;
+
+        const rows = await getTeacherPaidLines(context.companyId, emp.id, { after: prevDate, upTo: payDate });
+        const lines = rows.map((r) => {
+          const paid = r.amount != null ? parseFloat(r.amount) : 0;
+          return {
+            studentName: r.student_name || '',
+            className: r.class_name ?? null,
+            courseName: r.course_name ?? null,
+            source: r.source,
+            amount: paid,
+            share: Math.round(paid * percentageRate) / 100,
+            paidAt: r.paid_at ? new Date(r.paid_at).toISOString() : null,
+          };
+        });
+
+        body.percentageRate = percentageRate;
+        body.windowStart = prevDate ? new Date(prevDate).toISOString() : null;
+        body.windowEnd = new Date(payDate).toISOString();
+        body.linesTotal = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
+        body.lines = lines;
+      } else if (emp && salaryType === 'SESSION_BASED') {
+        // Which sessions this payment covered is recorded at pay time, so this
+        // is the real list rather than a re-derivation that could drift.
+        const rows = await query<any>(
+          `SELECT se.start_date, c.name AS class_name, co.name AS course_name,
+                  (SELECT COUNT(*) FROM session_attendance sa WHERE sa.session_id = se.id) AS students_present
+             FROM session_salary_payments ssp
+             JOIN sessions se ON se.id = ssp.session_id
+             JOIN classes  c  ON c.id = se.class_id
+             LEFT JOIN courses co ON co.id = c.course_id
+            WHERE ssp.payment_id = $1 AND ssp.company_id = $2
+            ORDER BY se.start_date`,
+          [pay.id, context.companyId]
+        );
+        body.sessionRate = emp.session_rate ? parseFloat(emp.session_rate) : 0;
+        body.sessions = rows.map((r) => ({
+          date: r.start_date ? new Date(r.start_date).toISOString() : null,
+          className: r.class_name ?? null,
+          courseName: r.course_name ?? null,
+          studentsPresent: r.students_present != null ? Number(r.students_present) : 0,
+        }));
+      }
+
+      return { status: 200 as const, body };
+    } catch (error) {
+      console.error('Get salary payment breakdown error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.SALARY_BREAKDOWN_FAILED', 'Failed to get salary payment breakdown');
     }
   },
 

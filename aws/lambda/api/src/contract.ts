@@ -4082,6 +4082,11 @@ export const contract = c.router({
           accrued: z.number(),     // percentageRate% of totalPaid
           withdrawn: z.number(),   // base salary already withdrawn
           owed: z.number(),        // accrued - withdrawn (>= 0), available to withdraw now
+          // Attended-but-unpaid money. NOT in totalPaid/accrued — it is what the
+          // accrual would grow by once the office collects.
+          unpaidTotal: z.number(),
+          unpaidShare: z.number(),
+          unpaidStudents: z.number(),
         }),
         404: ApiErrorSchema,
       },
@@ -4108,7 +4113,73 @@ export const contract = c.router({
             share: z.number(),
             paidAt: z.string().nullable(),
           })),
+          // Students who attended this teacher's classes and still owe for it.
+          // NOT part of totalPaid/accrued — a percentage is earned on money
+          // received. unpaidShare is what the accrual grows by once collected.
+          unpaidTotal: z.number(),
+          unpaidShare: z.number(),
+          unpaid: z.array(z.object({
+            studentName: z.string(),
+            className: z.string().nullable(),
+            courseName: z.string().nullable(),
+            source: z.enum(['ENROLLMENT', 'MONTHLY', 'SESSION']),
+            outstanding: z.number(),
+            potentialShare: z.number(),
+            attendedSessions: z.number(),
+            lastAttendedAt: z.string().nullable(),
+          })),
         }),
+        404: ApiErrorSchema,
+      },
+    },
+    // How ONE salary payment reached its number. Which of the three detail
+    // shapes is filled depends on salaryType; the rest come back empty/null.
+    getSalaryPaymentBreakdown: {
+      method: 'GET',
+      path: '/api/expenses/salary-payment/:paymentId/breakdown',
+      pathParams: z.object({ paymentId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          salaryType: z.string(),
+          employeeName: z.string(),
+          payment: z.object({
+            id: z.string(),
+            date: z.string(),
+            amount: z.number(),
+            bonusAmount: z.number(),
+            discountAmount: z.number(),
+            adjustmentReason: z.string().nullable(),
+            notes: z.string().nullable(),
+            // amount − bonus + discount: what was actually drawn against earnings.
+            baseSalary: z.number(),
+          }),
+          // PERCENTAGE: the student money that funded this withdrawal. The window
+          // is (windowStart, windowEnd] — windowStart null means "from the start".
+          percentageRate: z.number().nullable(),
+          windowStart: z.string().nullable(),
+          windowEnd: z.string().nullable(),
+          linesTotal: z.number(),
+          lines: z.array(z.object({
+            studentName: z.string(),
+            className: z.string().nullable(),
+            courseName: z.string().nullable(),
+            source: z.enum(['ENROLLMENT', 'MONTHLY', 'SESSION', 'PACKAGE']),
+            amount: z.number(),
+            share: z.number(),
+            paidAt: z.string().nullable(),
+          })),
+          // SESSION_BASED: the sessions this payment covered (a stored link).
+          sessionRate: z.number().nullable(),
+          sessions: z.array(z.object({
+            date: z.string().nullable(),
+            className: z.string().nullable(),
+            courseName: z.string().nullable(),
+            studentsPresent: z.number(),
+          })),
+          // MONTHLY: the month the flat salary was for.
+          monthLabel: z.string(),
+        }),
+        403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },
