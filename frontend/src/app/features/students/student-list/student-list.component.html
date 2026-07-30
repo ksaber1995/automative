@@ -12,6 +12,7 @@
                   (click)="exportExcel()"></button>
           <button pButton severity="secondary" [outlined]="true"
                   [label]="'STUDENTS.EXPORT.PDF' | translate" icon="pi pi-file-pdf"
+                  [loading]="exportingPdf()"
                   [pTooltip]="'STUDENTS.EXPORT.PDF_TOOLTIP' | translate"
                   (click)="exportPdf()"></button>
           <button pButton severity="secondary" [outlined]="true" [label]="'STUDENTS.IMPORT.BUTTON' | translate" icon="pi pi-file-import" (click)="openImport()"></button>

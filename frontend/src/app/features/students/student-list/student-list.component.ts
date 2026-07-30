@@ -38,7 +38,7 @@ import { Student, AcquisitionChannel } from '@shared/interfaces/student.interfac
 import { Class } from '@shared/interfaces/class.interface';
 import {
   STUDENT_EXPORT_COLUMNS, StudentExportRow,
-  exportStudentsToExcel, formatClassSchedule, printStudentsPdf,
+  downloadStudentsPdf, exportStudentsToExcel, formatClassSchedule,
 } from '../student-export.util';
 
 interface EnrollmentCounts {
@@ -111,6 +111,7 @@ export class StudentListComponent implements OnInit {
   /** Non-dropped enrolments, so the export can name each student's classes. */
   enrollments = signal<{ studentId: string; classId: string; courseId?: string }[]>([]);
   exporting = signal(false);
+  exportingPdf = signal(false);
   activeTab = signal<'active' | 'inactive'>('active');
 
   // Type-to-confirm permanent-delete dialog state.
@@ -386,20 +387,30 @@ export class StudentListComponent implements OnInit {
     }
   }
 
-  exportPdf(): void {
+  async exportPdf(): Promise<void> {
     const rows = this.buildExportRows();
     if (!rows.length) {
       this.notificationService.error(this.translate.instant('STUDENTS.EXPORT.EMPTY'));
       return;
     }
-    printStudentsPdf({
-      rows,
-      headers: this.exportHeaders(),
-      title: this.translate.instant('STUDENTS.LIST.TITLE'),
-      subtitle: this.exportSubtitle(rows.length),
-      emptyLabel: this.translate.instant('STUDENTS.EXPORT.EMPTY'),
-      rtl: (this.translate.currentLang || 'en').startsWith('ar'),
-    });
+    // Rendering is a page-at-a-time canvas capture, so a long roster takes a few
+    // seconds — the button has to show it is working.
+    this.exportingPdf.set(true);
+    try {
+      await downloadStudentsPdf({
+        rows,
+        headers: this.exportHeaders(),
+        title: this.translate.instant('STUDENTS.LIST.TITLE'),
+        subtitle: this.exportSubtitle(rows.length),
+        filename: `${this.exportFileStem()}.pdf`,
+        rtl: (this.translate.currentLang || 'en').startsWith('ar'),
+      });
+      this.notificationService.success(this.translate.instant('STUDENTS.EXPORT.DONE', { count: rows.length }));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.EXPORT.FAILED'));
+    } finally {
+      this.exportingPdf.set(false);
+    }
   }
 
   loadBranches() {

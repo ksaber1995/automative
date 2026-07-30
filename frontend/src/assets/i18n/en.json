@@ -3576,7 +3576,7 @@
       "EXCEL": "Excel",
       "PDF": "PDF",
       "TOOLTIP": "Download the filtered list as an .xlsx file, one row per student and class",
-      "PDF_TOOLTIP": "Open a printable list — choose \"Save as PDF\" in the print dialog",
+      "PDF_TOOLTIP": "Download the filtered list as a PDF file",
       "SUBTITLE": "{{filters}} · {{rows}} rows · {{date}}",
       "DONE": "Exported {{count}} rows",
       "EMPTY": "Nothing to export — no students match the current filters",
