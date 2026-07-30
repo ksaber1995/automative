@@ -9,7 +9,7 @@ import { TagModule } from 'primeng/tag';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { EmployeeService } from '../../employees/services/employee.service';
-import { esc, kpi, openPrintWindow, section, th } from './print-report.util';
+import { esc, kpi, openPrintWindow, section, th } from '../../../core/utils/print-report.util';
 
 /** One course's contribution to a percentage teacher's earnings. */
 interface CourseRollup {

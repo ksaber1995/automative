@@ -3572,6 +3572,28 @@
     "UPDATED": "Revenue updated successfully"
   },
   "STUDENTS": {
+    "EXPORT": {
+      "EXCEL": "Excel",
+      "PDF": "PDF",
+      "TOOLTIP": "Download the filtered list as an .xlsx file, one row per student and class",
+      "PDF_TOOLTIP": "Open a printable list — choose \"Save as PDF\" in the print dialog",
+      "SUBTITLE": "{{filters}} · {{rows}} rows · {{date}}",
+      "DONE": "Exported {{count}} rows",
+      "EMPTY": "Nothing to export — no students match the current filters",
+      "FAILED": "Could not create the file",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "COL_CODE": "Code",
+      "COL_NAME": "Student",
+      "COL_PHONE": "Phone",
+      "COL_PARENT": "Parent",
+      "COL_PARENT_PHONE": "Parent phone",
+      "COL_BRANCH": "Branch",
+      "COL_COURSE": "Course",
+      "COL_CLASS": "Class",
+      "COL_SCHEDULE": "Class time",
+      "COL_STATUS": "Status"
+    },
     "IMPORT": {
       "BUTTON": "Import",
       "TITLE": "Import Students",

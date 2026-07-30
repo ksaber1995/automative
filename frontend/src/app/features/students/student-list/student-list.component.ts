@@ -36,6 +36,10 @@ import { shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { Student, AcquisitionChannel } from '@shared/interfaces/student.interface';
 import { Class } from '@shared/interfaces/class.interface';
+import {
+  STUDENT_EXPORT_COLUMNS, StudentExportRow,
+  exportStudentsToExcel, formatClassSchedule, printStudentsPdf,
+} from '../student-export.util';
 
 interface EnrollmentCounts {
   active: number;
@@ -104,6 +108,9 @@ export class StudentListComponent implements OnInit {
   studentClassMap = signal<Map<string, Set<string>>>(new Map());
   // Every class, kept whole so the dropdown can narrow itself by branch/course.
   allClasses = signal<Class[]>([]);
+  /** Non-dropped enrolments, so the export can name each student's classes. */
+  enrollments = signal<{ studentId: string; classId: string; courseId?: string }[]>([]);
+  exporting = signal(false);
   activeTab = signal<'active' | 'inactive'>('active');
 
   // Type-to-confirm permanent-delete dialog state.
@@ -247,6 +254,10 @@ export class StudentListComponent implements OnInit {
       this.enrollmentCounts.set(map);
       this.studentCourseMap.set(courseMap);
       this.studentClassMap.set(classMap);
+      // Kept whole for the export, which needs the class behind each enrolment,
+      // not just how many there were. DROPPED is left out: that student is no
+      // longer in the class, so listing them against its time would be wrong.
+      this.enrollments.set(enrollments.filter((e: any) => e.status !== 'DROPPED'));
     };
     this.enrollmentService.getAllEnrollments().subscribe({
       next: (list) => { enrollments = list; finalize(); },
@@ -260,6 +271,135 @@ export class StudentListComponent implements OnInit {
 
   getCounts(studentId: string): EnrollmentCounts {
     return this.enrollmentCounts()[studentId] || { active: 0, completed: 0 };
+  }
+
+  // --- Export the list ------------------------------------------------------
+  // Exports exactly what the filters are showing, not the whole database: the
+  // tab, branch, course, class and search box have already been used to answer
+  // a question, and the export is that answer.
+
+  /**
+   * One row per student-and-class. A student in two classes has two class times,
+   * and folding them into a single cell would defeat sorting or filtering by
+   * class in Excel. A student with no enrolment still gets a row.
+   */
+  private buildExportRows(): StudentExportRow[] {
+    const classById = new Map(this.allClasses().map((c) => [c.id, c]));
+    const courseNameById = new Map(this.allCourses().map((c) => [c.id, c.label]));
+    const byStudent = new Map<string, { studentId: string; classId: string; courseId?: string }[]>();
+    for (const e of this.enrollments()) {
+      if (!byStudent.has(e.studentId)) byStudent.set(e.studentId, []);
+      byStudent.get(e.studentId)!.push(e);
+    }
+    const dash = '';
+    const rows: StudentExportRow[] = [];
+
+    for (const s of this.filteredStudents()) {
+      const base = {
+        // The same "A5" the list shows, not the raw 100005 — and blank until the
+        // QR is active, matching the column on screen.
+        code: this.showCode(s) ? formatStudentCode(s.studentCode) : dash,
+        name: s.name || dash,
+        phone: s.phone || dash,
+        parentName: s.parentName || dash,
+        parentPhone: s.parentPhone || dash,
+        branch: this.getBranchName(s.branchId) || dash,
+        status: this.translate.instant(s.isActive ? 'STUDENTS.EXPORT.ACTIVE' : 'STUDENTS.EXPORT.INACTIVE'),
+      };
+
+      // Only the classes still offered by the current filters — exporting a
+      // class the user filtered out would contradict what they asked for.
+      const classId = this.selectedClassId();
+      const courseId = this.selectedCourseId();
+      const enrolments = (byStudent.get(s.id) || []).filter((e) => {
+        if (classId && e.classId !== classId) return false;
+        if (courseId && (e.courseId || classById.get(e.classId)?.courseId) !== courseId) return false;
+        return true;
+      });
+
+      if (!enrolments.length) {
+        rows.push({ ...base, course: dash, class: dash, schedule: dash });
+        continue;
+      }
+      for (const e of enrolments) {
+        const cls = classById.get(e.classId);
+        const cid = e.courseId || cls?.courseId;
+        rows.push({
+          ...base,
+          course: (cid && courseNameById.get(cid)) || dash,
+          class: cls?.name || dash,
+          schedule: formatClassSchedule(cls, dash),
+        });
+      }
+    }
+    return rows;
+  }
+
+  private exportHeaders(): string[] {
+    return STUDENT_EXPORT_COLUMNS.map((c) => this.translate.instant(c.labelKey));
+  }
+
+  /** What the filters narrowed to, printed under the title so a saved file says what it is. */
+  private exportSubtitle(rows: number): string {
+    const parts = [this.translate.instant(
+      this.activeTab() === 'active' ? 'STUDENTS.EXPORT.ACTIVE' : 'STUDENTS.EXPORT.INACTIVE'
+    )];
+    const branch = this.getBranchName(this.selectedBranchId);
+    if (branch) parts.push(branch);
+    const course = this.allCourses().find((c) => c.id === this.selectedCourseId())?.label;
+    if (course) parts.push(course);
+    const cls = this.allClasses().find((c) => c.id === this.selectedClassId())?.name;
+    if (cls) parts.push(cls);
+    if (this.searchTerm().trim()) parts.push(`"${this.searchTerm().trim()}"`);
+    return this.translate.instant('STUDENTS.EXPORT.SUBTITLE', {
+      filters: parts.join(' · '),
+      rows,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    });
+  }
+
+  private exportFileStem(): string {
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `students-${stamp}`;
+  }
+
+  exportExcel(): void {
+    const rows = this.buildExportRows();
+    if (!rows.length) {
+      this.notificationService.error(this.translate.instant('STUDENTS.EXPORT.EMPTY'));
+      return;
+    }
+    this.exporting.set(true);
+    try {
+      exportStudentsToExcel(
+        rows,
+        this.exportHeaders(),
+        `${this.exportFileStem()}.xlsx`,
+        this.translate.instant('STUDENTS.LIST.TITLE'),
+      );
+      this.notificationService.success(this.translate.instant('STUDENTS.EXPORT.DONE', { count: rows.length }));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.EXPORT.FAILED'));
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  exportPdf(): void {
+    const rows = this.buildExportRows();
+    if (!rows.length) {
+      this.notificationService.error(this.translate.instant('STUDENTS.EXPORT.EMPTY'));
+      return;
+    }
+    printStudentsPdf({
+      rows,
+      headers: this.exportHeaders(),
+      title: this.translate.instant('STUDENTS.LIST.TITLE'),
+      subtitle: this.exportSubtitle(rows.length),
+      emptyLabel: this.translate.instant('STUDENTS.EXPORT.EMPTY'),
+      rtl: (this.translate.currentLang || 'en').startsWith('ar'),
+    });
   }
 
   loadBranches() {

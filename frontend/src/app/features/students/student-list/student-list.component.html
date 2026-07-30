@@ -4,6 +4,16 @@
       <div class="flex justify-between items-center p-4">
         <h2 class="text-2xl font-bold">{{ 'STUDENTS.LIST.TITLE' | translate }}</h2>
         <div class="flex gap-2">
+          <!-- Exports what the filters are showing, one row per student-and-class -->
+          <button pButton severity="secondary" [outlined]="true"
+                  [label]="'STUDENTS.EXPORT.EXCEL' | translate" icon="pi pi-file-excel"
+                  [loading]="exporting()"
+                  [pTooltip]="'STUDENTS.EXPORT.TOOLTIP' | translate"
+                  (click)="exportExcel()"></button>
+          <button pButton severity="secondary" [outlined]="true"
+                  [label]="'STUDENTS.EXPORT.PDF' | translate" icon="pi pi-file-pdf"
+                  [pTooltip]="'STUDENTS.EXPORT.PDF_TOOLTIP' | translate"
+                  (click)="exportPdf()"></button>
           <button pButton severity="secondary" [outlined]="true" [label]="'STUDENTS.IMPORT.BUTTON' | translate" icon="pi pi-file-import" (click)="openImport()"></button>
           <button pButton [label]="'STUDENTS.LIST.ADD' | translate" icon="pi pi-plus" (click)="createStudent()"></button>
         </div>

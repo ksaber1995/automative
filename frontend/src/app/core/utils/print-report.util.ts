@@ -1,11 +1,12 @@
 /**
- * The shared look for printed salary reports (the percentage breakdown page and
- * the per-payment "how was this calculated" dialog). They are two views of the
- * same money, so they print as one house style rather than drifting apart.
+ * The shared look for anything this app prints — the salary reports, the
+ * students export — so they read as one house style rather than drifting apart.
  *
- * A popup window rather than window.print() on the page: both live inside the
- * app shell, so printing in place would carry the sidebar and header onto the
- * paper.
+ * A popup window rather than window.print() on the page: every caller lives
+ * inside the app shell, so printing in place would carry the sidebar and header
+ * onto the paper. It doubles as the "save as PDF" path, which is why the pages
+ * are built from ordinary HTML — the browser shapes Arabic correctly, where a
+ * JS PDF library needs a whole embedded font to come close.
  */
 
 /** Report content is user data — a student named with an "&" must not become markup. */
@@ -28,15 +29,16 @@ export function th(labels: [string, boolean][]): string {
   return labels.map(([l, num]) => `<th class="${num ? 'num' : ''}">${esc(l)}</th>`).join('');
 }
 
-/** A titled table, or the empty message when there are no rows to show. */
+/** A titled table, or the empty message when there are no rows to show. An
+ *  empty title omits the heading — for a page whose <h1> already said it. */
 export function section(title: string, head: string, body: string, empty: string, foot = ''): string {
-  return `<h2>${esc(title)}</h2>` + (body
+  return (title ? `<h2>${esc(title)}</h2>` : '') + (body
     ? `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>`
     : `<p class="empty">${esc(empty)}</p>`);
 }
 
-export function openPrintWindow(opts: { title: string; rtl: boolean; body: string }): void {
-  const { title, rtl, body } = opts;
+export function openPrintWindow(opts: { title: string; rtl: boolean; body: string; landscape?: boolean }): void {
+  const { title, rtl, body, landscape } = opts;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
 
@@ -46,7 +48,7 @@ export function openPrintWindow(opts: { title: string; rtl: boolean; body: strin
         <meta charset="utf-8" />
         <title>${esc(title)}</title>
         <style>
-          @page { margin: 14mm; }
+          @page { margin: ${landscape ? '10mm' : '14mm'}; ${landscape ? 'size: landscape;' : ''} }
           * { box-sizing: border-box; }
           body { font-family: system-ui, "Segoe UI", Tahoma, sans-serif; color: #111827; margin: 0; font-size: 11px; }
           h1 { font-size: 18px; margin: 0; }

@@ -3696,6 +3696,28 @@
     "UPDATED": "تم تحديث الإيراد بنجاح"
   },
   "STUDENTS": {
+    "EXPORT": {
+      "EXCEL": "إكسل",
+      "PDF": "PDF",
+      "TOOLTIP": "تنزيل القائمة المعروضة كملف ‎.xlsx، صف لكل طالب ومجموعة",
+      "PDF_TOOLTIP": "فتح نسخة للطباعة — اختر «حفظ بصيغة PDF» من نافذة الطباعة",
+      "SUBTITLE": "{{filters}} · {{rows}} صف · {{date}}",
+      "DONE": "تم تصدير {{count}} صف",
+      "EMPTY": "لا يوجد ما يُصدَّر — لا طلاب مطابقين للفلاتر الحالية",
+      "FAILED": "تعذّر إنشاء الملف",
+      "ACTIVE": "نشط",
+      "INACTIVE": "غير نشط",
+      "COL_CODE": "الرقم",
+      "COL_NAME": "الطالب",
+      "COL_PHONE": "الهاتف",
+      "COL_PARENT": "ولي الأمر",
+      "COL_PARENT_PHONE": "هاتف ولي الأمر",
+      "COL_BRANCH": "الفرع",
+      "COL_COURSE": "الكورس",
+      "COL_CLASS": "المجموعة",
+      "COL_SCHEDULE": "موعد المجموعة",
+      "COL_STATUS": "الحالة"
+    },
     "IMPORT": {
       "BUTTON": "استيراد",
       "TITLE": "استيراد الطلاب",

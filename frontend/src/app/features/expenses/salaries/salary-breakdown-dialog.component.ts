@@ -7,7 +7,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { ExpenseService, SalaryPaymentBreakdown } from '../services/expense.service';
-import { esc, kpi, openPrintWindow, section, th } from './print-report.util';
+import { esc, kpi, openPrintWindow, section, th } from '../../../core/utils/print-report.util';
 
 /**
  * "How was this salary calculated?" for ONE payment in the salary history —
