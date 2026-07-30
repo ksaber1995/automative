@@ -203,6 +203,15 @@
               }
               @if (authService.canDelete('students')) {
                 @if (student.isActive) {
+                  <!-- Leaving is not deleting: the student and their history stay,
+                       they just move to the Inactive tab and can be brought back. -->
+                  <button
+                    pButton
+                    icon="pi pi-sign-out"
+                    class="p-button-rounded p-button-text p-button-secondary"
+                    [pTooltip]="'STUDENTS.LIST.LEAVE' | translate"
+                    (click)="markStudentLeft(student)"
+                  ></button>
                   <button
                     pButton
                     icon="pi pi-trash"

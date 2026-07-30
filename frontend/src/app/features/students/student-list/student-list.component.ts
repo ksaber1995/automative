@@ -494,17 +494,22 @@ export class StudentListComponent implements OnInit {
     this.router.navigate(['/students', student.id, 'edit']);
   }
 
-  deleteStudent(student: Student) {
+  /**
+   * The student has left the academy. A soft deactivation, not a delete: the
+   * record and all its history stay put, the student moves to the Inactive tab,
+   * and the tick button there brings them back if they return. The endpoint is
+   * the same soft DELETE the API has always exposed — only reachable from the UI
+   * now, since the trash button next to it is the permanent one.
+   */
+  markStudentLeft(student: Student) {
     this.confirmationService.confirm({
-      message: this.translate.instant('STUDENTS.DEACTIVATE_CONFIRM', {
-        name: student.name,
-      }),
-      header: this.translate.instant('STUDENTS.DEACTIVATE_HEADER'),
-      icon: 'pi pi-exclamation-triangle',
+      message: this.translate.instant('STUDENTS.LEAVE_CONFIRM', { name: student.name }),
+      header: this.translate.instant('STUDENTS.LEAVE_HEADER'),
+      icon: 'pi pi-sign-out',
       accept: () => {
         this.studentService.deleteStudent(student.id).subscribe({
           next: () => {
-            this.notificationService.success(this.translate.instant('STUDENTS.DEACTIVATED'));
+            this.notificationService.success(this.translate.instant('STUDENTS.LEFT', { name: student.name }));
             this.loadStudents();
           }
         });
