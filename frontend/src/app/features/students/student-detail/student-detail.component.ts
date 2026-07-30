@@ -1446,9 +1446,12 @@ export class StudentDetailComponent implements OnInit {
   linkingCard = signal(false);
   /**
    * The one link field. It takes anything printed on the card: the serial number,
-   * the raw QR token, OR a full scanned profile URL. The dialog autofocuses it, so
-   * a USB scanner (which the global capture ignores while a field is focused —
-   * see the layout's keydown guard) types straight into here and Enter submits.
+   * the raw QR token, OR a full scanned profile URL. It is for TYPING only — the
+   * dialog opens with nothing focused ([focusOnShow]="false") on purpose. A focused
+   * field swallows the scanner's keystrokes (see the layout's keydown guard) and
+   * they arrive through the OS keyboard layout, so on an Arabic layout the scan
+   * came out as Arabic letters. Unfocused, the burst goes to the global capture,
+   * which reads the raw keys and hands us the token.
    */
   linkInput = '';
   cardLabel = serialLabel;
