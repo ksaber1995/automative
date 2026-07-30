@@ -298,6 +298,40 @@ async function fetchDetailsByIds(companyId: string, ids: string[]) {
   return rows.map(mapSessionPaymentWithDetailsFromDB);
 }
 
+/**
+ * Still-unpaid charges these students already carry for this session.
+ *
+ * Marking a student present is what should prompt for their money, but a charge
+ * is only ever created ONCE per (enrollment, session): the second time the same
+ * student is marked present — from the dashboard after the attendance page, or
+ * after a QR check-in already billed them — nothing new is created, so the
+ * caller has nothing to prompt with. This finds the charge that is already
+ * there, so the prompt follows the act of marking present rather than the
+ * accident of which screen happened to create the row.
+ *
+ * PENDING only: COVERED (a prepaid package paid it) and PAID need no collection.
+ * Tolerant of a database where the per-session schema has not self-applied yet.
+ */
+export async function pendingChargesForStudents(
+  companyId: string,
+  sessionId: string,
+  studentIds: string[],
+): Promise<any[]> {
+  if (!studentIds.length) return [];
+  try {
+    const rows = await query(
+      `SELECT ${DETAILS_SELECT} ${DETAILS_FROM}
+       WHERE sp.company_id = $1 AND sp.session_id = $2
+         AND sp.student_id = ANY($3::uuid[])
+         AND sp.payment_status = 'PENDING'`,
+      [companyId, sessionId, studentIds]
+    );
+    return rows.map(mapSessionPaymentWithDetailsFromDB);
+  } catch {
+    return [];
+  }
+}
+
 // ============================================================
 // Core: charge attendance for PER_SESSION courses.
 // Called from routes/attendance.ts when attendance is taken.

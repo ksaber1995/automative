@@ -7,7 +7,7 @@ import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
 import { isCompanyQrFree } from '../utils/qr-pricing';
-import { DEFAULT_CARD_DESIGN, ensureCardDesignColumn } from './companies';
+import { DEFAULT_CARD_DESIGN, ensureCardDesignColumn, ensureAutoManageSessionsColumn } from './companies';
 import { ensureQrCardSchema } from './qr-cards';
 
 function generateOtp(): string {
@@ -273,6 +273,10 @@ export const authRoutes = {
       // so the card-design page opens on a real record instead of an implicit
       // default that only exists until someone saves.
       await ensureCardDesignColumn();
+      // The INSERT below never names auto_manage_sessions — it takes the column
+      // default — so the column has to exist, and carry the right default,
+      // before a tenant is created.
+      await ensureAutoManageSessionsColumn();
 
       const companyRes = await client.query(
         `INSERT INTO companies

@@ -476,12 +476,21 @@ export const qrCardsRoutes = {
       // Scanned value wins; a typed serial is the fallback for a damaged QR.
       const token = (body?.token || '').trim();
       const serial = Number(body?.serial);
+      // qr_cards.serial is an INTEGER. A scanner that dumps a QR's payload into
+      // the serial box sends something like 515747443904367600 — a whole number,
+      // so Number.isInteger says yes, but far past int4. Postgres then dies with
+      // 22003 mid-query and the caller gets a 500 for what is really a typo.
+      // Rejecting it here keeps that a validation error the cashier can act on.
+      const serialInRange = Number.isInteger(serial) && serial > 0 && serial <= 2147483647;
+      if (!token && body?.serial !== undefined && body?.serial !== null && !serialInRange) {
+        return apiError(400, 'ERRORS.QR_CARDS.BAD_SERIAL', 'That is not a card number');
+      }
       const card = token
         ? await queryOne<any>(
             'SELECT * FROM qr_cards WHERE token = $1 AND company_id = $2',
             [token, context.companyId],
           )
-        : Number.isInteger(serial)
+        : serialInRange
           ? await queryOne<any>(
               'SELECT * FROM qr_cards WHERE serial = $1 AND company_id = $2',
               [serial, context.companyId],

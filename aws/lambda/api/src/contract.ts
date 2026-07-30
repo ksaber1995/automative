@@ -2684,6 +2684,9 @@ export const contract = c.router({
       }),
       responses: {
         200: QrCardSchema.extend({ alreadyLinked: z.boolean() }),
+        // A serial that cannot be a card number (a scanned QR payload typed into
+        // the serial box) is the caller's mistake, not a missing card.
+        400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
         409: ApiErrorSchema,

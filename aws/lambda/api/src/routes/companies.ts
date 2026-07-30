@@ -2,14 +2,22 @@ import { query, queryOne, update } from '../db/connection';
 import { extractTenantContext } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
-// Auto start/end sessions on schedule (opt-in per company). Added idempotently
-// at runtime so the setting works even before a SQL migration is applied.
+// Auto start/end sessions on schedule. ON by default for new tenants: a class
+// with a weekly schedule is expected to run at that time, and making every
+// academy find a setting before their timetable does anything is a worse
+// default than starting the lesson they already told us about.
+//
+// Added idempotently at runtime so the setting works before any SQL migration.
+// The second statement matters as much as the first: on every database that
+// already HAS the column, ADD COLUMN IF NOT EXISTS is a no-op and would leave
+// the old FALSE default in place, so new tenants would keep opting out.
 let autoManageColumnInitPromise: Promise<void> | null = null;
 export async function ensureAutoManageSessionsColumn(): Promise<void> {
   if (!autoManageColumnInitPromise) {
     autoManageColumnInitPromise = (async () => {
       try {
-        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS auto_manage_sessions BOOLEAN NOT NULL DEFAULT FALSE`);
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS auto_manage_sessions BOOLEAN NOT NULL DEFAULT TRUE`);
+        await query(`ALTER TABLE companies ALTER COLUMN auto_manage_sessions SET DEFAULT TRUE`);
       } catch (e) {
         autoManageColumnInitPromise = null;
         throw e;

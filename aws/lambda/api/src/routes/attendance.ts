@@ -4,7 +4,7 @@ import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPerm
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns, ensureFreeSessionSchema } from './sessions';
 import { notifyCheckin } from './telegram';
-import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema } from './session-payments';
+import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema, pendingChargesForStudents } from './session-payments';
 
 export const attendanceRoutes = {
   /**
@@ -226,6 +226,17 @@ export const attendanceRoutes = {
 
       const presentIds: string[] = body.presentStudentIds || [];
 
+      // Who was already on the roster before this save. Used below to prompt for
+      // money only for students this save actually marks present — re-saving an
+      // unchanged roster (the debounced editor fires on every toggle) must not
+      // re-open the pay dialog for someone who was already there.
+      const previouslyPresent = new Set(
+        (await query<any>(
+          `SELECT student_id FROM session_attendance WHERE session_id = $1 AND attendance_type = 'NORMAL'`,
+          [params.sessionId]
+        )).map((r: any) => r.student_id)
+      );
+
       // Only NORMAL (enrolled-roster) rows are managed by the checkbox editor.
       // SUBSTITUTION and TRIAL rows come from QR check-in and must survive a
       // bulk save — neither has an enrolment, so neither can be re-created from
@@ -251,6 +262,23 @@ export const attendanceRoutes = {
       let sessionCharges: any[] = [];
       try {
         sessionCharges = await chargeSessionAttendance(context.companyId, session, presentIds);
+        // A charge exists once per (enrollment, session), so the call above only
+        // reports the ones IT created. A student marked present here whose charge
+        // was created earlier — by a QR check-in, or by the attendance page before
+        // the cashier reopened this class on the dashboard — would otherwise be
+        // billed silently and never prompted for. Marking present is what asks for
+        // the money, whichever screen it happens on, so their outstanding charge
+        // joins the list.
+        const newlyPresent = presentIds.filter((id) => !previouslyPresent.has(id));
+        const alreadyReturned = new Set(sessionCharges.map((c: any) => c.id));
+        const outstanding = await pendingChargesForStudents(
+          context.companyId,
+          params.sessionId,
+          newlyPresent
+        );
+        sessionCharges = sessionCharges.concat(
+          outstanding.filter((c: any) => !alreadyReturned.has(c.id))
+        );
       } catch (billErr) {
         console.error('Per-session charge (saveForSession) error:', billErr);
       }
