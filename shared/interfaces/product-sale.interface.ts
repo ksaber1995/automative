@@ -9,6 +9,13 @@ export interface ProductSale {
   productName: string | null;
   studentId?: string | null;
   studentName?: string | null;
+  /**
+   * The buyer's name as written down at sale time. student_id is cleared when a
+   * student is deleted, so this is all that is left of who bought it.
+   */
+  studentNameAtSale?: string | null;
+  /** A name but no live student: they have been deleted. */
+  studentDeleted?: boolean;
   courseId?: string | null;
   enrollmentId?: string | null;
   quantity: number;

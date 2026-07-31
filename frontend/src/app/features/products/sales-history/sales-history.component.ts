@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
@@ -26,7 +26,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
   selector: 'app-sales-history',
   standalone: true,
   imports: [
-    CommonModule, TableModule, ButtonModule, CardModule, DialogModule, TagModule,
+    CommonModule, RouterLink, TableModule, ButtonModule, CardModule, DialogModule, TagModule,
     InputNumberModule, CheckboxModule, DatePickerModule, SelectModule, TextareaModule, TooltipModule,
     FormsModule, TranslateModule, AmountPipe,
   ],

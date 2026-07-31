@@ -3,6 +3,38 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, isGloba
 import { getClient } from '../db/connection';
 import { apiError, mapThrownError } from '../utils/api-error';
 
+/**
+ * Who bought this, kept as a name rather than only a link.
+ *
+ * product_sales.student_id is ON DELETE SET NULL, so deleting a student silently
+ * erases the buyer from every sale they ever made — the row survives with the
+ * money on it and nothing to say whose it was, indistinguishable from a walk-in
+ * purchase. A name written down at sale time is the only thing that outlives the
+ * student record, the same way payment_receipts snapshots its student details.
+ *
+ * The backfill fills this in for sales whose student is still around, so the
+ * next deletion does not lose them too. It cannot recover buyers already erased.
+ */
+let studentSnapshotInitPromise: Promise<void> | null = null;
+export async function ensureProductSaleStudentSnapshot(): Promise<void> {
+  if (!studentSnapshotInitPromise) {
+    studentSnapshotInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE product_sales ADD COLUMN IF NOT EXISTS student_name_at_sale TEXT`);
+        await query(
+          `UPDATE product_sales ps SET student_name_at_sale = s.name
+             FROM students s
+            WHERE s.id = ps.student_id AND ps.student_name_at_sale IS NULL`
+        );
+      } catch (e) {
+        studentSnapshotInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return studentSnapshotInitPromise;
+}
+
 function mapProductSaleFromDB(row: any) {
   return {
     id: row.id,
@@ -12,6 +44,12 @@ function mapProductSaleFromDB(row: any) {
     branchId: row.branch_id,
     studentId: row.student_id || null,
     studentName: row.student_name || null,
+    // The name as it was when the book was sold. Still there after the student
+    // is deleted, which is the only way the page can say who bought it.
+    studentNameAtSale: row.student_name_at_sale || null,
+    // student_id is nulled by the FK on delete, so a snapshot with no live link
+    // means exactly one thing: that student is gone.
+    studentDeleted: !row.student_id && !!row.student_name_at_sale,
     courseId: row.course_id || null,
     enrollmentId: row.enrollment_id || null,
     quantity: parseInt(row.quantity),
@@ -113,16 +151,28 @@ export async function insertProductSaleWithClient(
   else if (discountType === 'FIXED_AMOUNT') discountAmount = discountValue;
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
+  // Written down now, because the link to the student does not survive their
+  // deletion — see ensureProductSaleStudentSnapshot.
+  await ensureProductSaleStudentSnapshot();
+  let studentNameAtSale: string | null = null;
+  if (input.studentId) {
+    const st = (await client.query(
+      'SELECT name FROM students WHERE id = $1 AND company_id = $2',
+      [input.studentId, companyId]
+    )).rows[0];
+    studentNameAtSale = st?.name || null;
+  }
+
   const saleResult = await client.query(
     `INSERT INTO product_sales
-       (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes, event_id, student_id, course_id, enrollment_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+       (company_id, product_id, branch_id, quantity, unit_price, discount_type, discount_value, discount_amount, subtotal, total_amount, sale_date, payment_method, receipt_number, customer_name, customer_phone, notes, event_id, student_id, course_id, enrollment_id, student_name_at_sale)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
     [companyId, input.productId, input.branchId, input.quantity, unitPrice,
      discountType, discountValue, discountAmount, subtotal, totalAmount,
      input.date, input.paymentMethod || 'CASH', input.receiptNumber || null,
      input.customerName || null, input.customerPhone || null, input.notes || null,
      input.eventId || null, input.studentId || null, input.courseId || null,
-     input.enrollmentId || null]
+     input.enrollmentId || null, studentNameAtSale]
   );
   const sale = saleResult.rows[0];
 
@@ -194,6 +244,7 @@ export const productSalesRoutes = {
 
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; productId?: string; studentId?: string; startDate?: string; endDate?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureProductSaleStudentSnapshot();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'product_sales', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');

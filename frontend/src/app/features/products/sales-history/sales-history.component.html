@@ -91,6 +91,7 @@
         <tr>
           <th pSortableColumn="saleDate">{{ 'PRODUCTS.SALES.COL_DATE' | translate }} <p-sortIcon field="saleDate"></p-sortIcon></th>
           <th pSortableColumn="productName">{{ 'PRODUCTS.SALES.COL_PRODUCT' | translate }} <p-sortIcon field="productName"></p-sortIcon></th>
+          <th pSortableColumn="studentName">{{ 'PRODUCTS.SALES.COL_BUYER' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
           @if (!authService.isTeacher()) {
             <th pSortableColumn="branchId">{{ 'PRODUCTS.SALES.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
@@ -111,6 +112,23 @@
             <div class="font-medium">{{ sale.productName || sale.productId }}</div>
             @if (sale.receiptNumber) {
               <div class="text-sm text-gray-500">{{ 'PRODUCTS.SALES.RECEIPT' | translate }} {{ sale.receiptNumber }}</div>
+            }
+          </td>
+          <td>
+            @if (sale.studentId && sale.studentName) {
+              <!-- Still a real student: link straight to them -->
+              <a [routerLink]="['/students', sale.studentId]"
+                 class="text-blue-600 hover:text-blue-800 hover:underline">{{ sale.studentName }}</a>
+            } @else if (sale.studentDeleted) {
+              <!-- The link is gone, but the name we wrote down at sale time is not -->
+              <span class="text-gray-700">{{ sale.studentNameAtSale }}</span>
+              <span class="ms-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                {{ 'PRODUCTS.SALES.STUDENT_DELETED' | translate }}
+              </span>
+            } @else if (sale.customerName) {
+              <span class="text-gray-700">{{ sale.customerName }}</span>
+            } @else {
+              <span class="text-gray-300">—</span>
             }
           </td>
           @if (!authService.isTeacher()) {
@@ -164,7 +182,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 9 : 10" class="text-center py-8 text-gray-500">
+          <td [attr.colspan]="authService.isTeacher() ? 10 : 11" class="text-center py-8 text-gray-500">
             {{ 'PRODUCTS.SALES.NO_SALES' | translate }}
           </td>
         </tr>

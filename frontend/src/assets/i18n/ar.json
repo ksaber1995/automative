@@ -4648,6 +4648,8 @@
       "TOTAL_QTY": "إجمالي الكمية المباعة",
       "COL_DATE": "التاريخ",
       "COL_PRODUCT": "المنتج",
+      "COL_BUYER": "المشتري",
+      "STUDENT_DELETED": "محذوف",
       "COL_BRANCH": "الفرع",
       "COL_QTY": "الكمية",
       "COL_UNIT_PRICE": "سعر الوحدة",

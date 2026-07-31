@@ -4524,6 +4524,8 @@
       "TOTAL_QTY": "Total Quantity Sold",
       "COL_DATE": "Date",
       "COL_PRODUCT": "Product",
+      "COL_BUYER": "Bought by",
+      "STUDENT_DELETED": "deleted",
       "COL_BRANCH": "Branch",
       "COL_QTY": "Quantity",
       "COL_UNIT_PRICE": "Unit Price",

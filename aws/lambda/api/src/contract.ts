@@ -1581,6 +1581,14 @@ const ProductSaleSchema = z.object({
   branchId: UUIDSchema,
   studentId: UUIDSchema.nullable().optional(),
   studentName: z.string().nullable().optional(),
+  /**
+   * The buyer's name written down at sale time. Outlives the student record —
+   * student_id is ON DELETE SET NULL, so it is the only thing left once a
+   * student is deleted.
+   */
+  studentNameAtSale: z.string().nullable().optional(),
+  /** A snapshot with no live link: that student has been deleted. */
+  studentDeleted: z.boolean().optional(),
   courseId: UUIDSchema.nullable().optional(),
   enrollmentId: UUIDSchema.nullable().optional(),
   quantity: z.number(),
