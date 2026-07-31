@@ -897,21 +897,38 @@ export class StudentDetailComponent implements OnInit {
     });
   }
 
-  deleteMonthlyEnrollment(enrollment: Enrollment) {
+  /**
+   * End a course enrolment of any kind — monthly subscription, per-session or
+   * one-time.
+   *
+   * The server decides which of the two things happens, and it is the only place
+   * that can: an enrolment counts as having money behind it through eight
+   * different routes (payments, refunds, session packages, revenue rows, a parent
+   * bundle…). Paid ones are DROPPED so the history survives; ones nothing was
+   * ever paid on are removed outright. Re-checking that rule in the client would
+   * mean two definitions of "has money" that drift apart, so the dialog names
+   * both outcomes and the result message reports whichever actually happened.
+   */
+  cancelEnrollment(enrollment: Enrollment) {
     this.confirmationService.confirm({
-      header: this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION'),
-      message: this.translate.instant('STUDENTS.DETAIL.DELETE_SUBSCRIPTION_CONFIRM'),
+      header: this.translate.instant('STUDENTS.DETAIL.CANCEL_ENROLLMENT'),
+      message: this.translate.instant('STUDENTS.DETAIL.CANCEL_ENROLLMENT_CONFIRM'),
       icon: 'pi pi-exclamation-triangle',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.actionLoading.set(true);
         this.enrollmentService.deleteEnrollment(enrollment.id).subscribe({
-          next: () => {
-            this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.SUBSCRIPTION_DELETED'));
+          next: (res: any) => {
+            this.notificationService.success(this.translate.instant(
+              res?.code === 'ENROLLMENTS.DELETED'
+                ? 'STUDENTS.DETAIL.ENROLLMENT_DELETED'
+                : 'STUDENTS.DETAIL.ENROLLMENT_CANCELLED',
+            ));
             this.actionLoading.set(false);
             if (this.studentId) {
               this.loadEnrollments(this.studentId);
               this.loadMonthlySubscriptions(this.studentId);
+              this.loadSessionPayments(this.studentId);
             }
           },
           error: () => {

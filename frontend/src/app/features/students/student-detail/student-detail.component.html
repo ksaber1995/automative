@@ -746,20 +746,19 @@
                       [pTooltip]="'STUDENTS.DETAIL.RESUME_SUBSCRIPTION' | translate"
                     ></p-button>
                   }
-                  <!-- Also offered for a DROPPED subscription: a student added to the
-                       wrong class is usually dropped first, and until now that left the
-                       mistake on their profile with no way to remove it. The API only
-                       deletes outright when no money ever touched the enrollment. -->
-                  @if (!hasAnyMonthlyPayment(enrollment.id)) {
-                    <p-button
-                      icon="pi pi-trash"
-                      [rounded]="true"
-                      [text]="true"
-                      severity="danger"
-                      (onClick)="deleteMonthlyEnrollment(enrollment)"
-                      [pTooltip]="'STUDENTS.DETAIL.DELETE_SUBSCRIPTION' | translate"
-                    ></p-button>
-                  }
+                  <!-- Always offered, including for a DROPPED subscription. It used to
+                       be hidden as soon as any bill was paid, which removed the option
+                       exactly when it was needed: a subscription being cancelled has
+                       usually been paid at some point. The API keeps a paid one as
+                       DROPPED and only deletes outright when no money ever touched it. -->
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="cancelEnrollment(enrollment)"
+                    [pTooltip]="'STUDENTS.DETAIL.CANCEL_ENROLLMENT' | translate"
+                  ></p-button>
                   @if (enrollment.status !== 'DROPPED') {
                     <p-button
                       icon="pi pi-arrow-right-arrow-left"
@@ -783,6 +782,14 @@
                       [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
                     ></p-button>
                   }
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="cancelEnrollment(enrollment)"
+                    [pTooltip]="'STUDENTS.DETAIL.CANCEL_ENROLLMENT' | translate"
+                  ></p-button>
                 </div>
               } @else {
               <div class="flex gap-1">
@@ -823,6 +830,14 @@
                   severity="info"
                   (onClick)="openChangeClassDialog(enrollment)"
                   [pTooltip]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
+                ></p-button>
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="cancelEnrollment(enrollment)"
+                  [pTooltip]="'STUDENTS.DETAIL.CANCEL_ENROLLMENT' | translate"
                 ></p-button>
               </div>
               }
