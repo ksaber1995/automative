@@ -36,6 +36,28 @@ function mapProductSaleFromDB(row: any) {
 }
 
 /**
+ * The date a sale is booked under, never later than today.
+ *
+ * A book bought alongside an enrolment used to inherit the ENROLMENT date, and
+ * an enrolment is routinely dated to when the course starts — so cash taken on
+ * 31 July for a course beginning 23 August was landing in August's revenue and
+ * showing an August pay date. The money arrived when it arrived.
+ *
+ * Clamped rather than forced to today, so recording an enrolment that genuinely
+ * happened last week still books its book sale on that day; only dates that have
+ * not happened yet are pulled back.
+ *
+ * Plain YYYY-MM-DD string compare — same lexical order as chronological, and it
+ * avoids dragging a timezone into a value that has no time attached.
+ */
+export function saleDateNotInFuture(requested: string | null | undefined, now = new Date()): string {
+  const today = now.toISOString().substring(0, 10);
+  if (!requested) return today;
+  const asked = String(requested).substring(0, 10);
+  return asked > today ? today : asked;
+}
+
+/**
  * Insert a single product sale on an existing transaction client: deduct stock,
  * auto-create the COGS expense, and persist optional student/course/enrollment
  * attribution. Shared by productSales.create and the enroll-and-buy flow so the

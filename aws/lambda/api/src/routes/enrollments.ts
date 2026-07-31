@@ -1,7 +1,7 @@
 import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
-import { insertProductSaleWithClient } from './product-sales';
+import { insertProductSaleWithClient, saleDateNotInFuture } from './product-sales';
 import { ensurePerSessionSchema } from './session-payments';
 import { ensureMonthlyInstallmentLedger, ensurePaymentRecorderColumns, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
 import { issueReceipt } from '../db/receipts';
@@ -176,7 +176,8 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
           quantity: p.quantity ?? 1,
           discountType: p.discountType,
           discountValue: p.discountValue,
-          date: body.enrollmentDate,
+          // The book was paid for now, not on the course's start date.
+          date: saleDateNotInFuture(body.enrollmentDate),
           paymentMethod: p.paymentMethod || null,
           studentId: body.studentId,
           courseId: body.courseId,
@@ -386,7 +387,8 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
         quantity: p.quantity ?? 1,
         discountType: p.discountType,
         discountValue: p.discountValue,
-        date: body.enrollmentDate,
+        // The book was paid for now, not on the course's start date.
+        date: saleDateNotInFuture(body.enrollmentDate),
         paymentMethod: p.paymentMethod || null,
         studentId: body.studentId,
         courseId: body.courseId,
@@ -495,7 +497,8 @@ export const enrollmentsRoutes = {
               quantity: p.quantity ?? 1,
               discountType: p.discountType,
               discountValue: p.discountValue,
-              date: body.enrollmentDate,
+              // The book was paid for now, not on the course's start date.
+              date: saleDateNotInFuture(body.enrollmentDate),
               paymentMethod: p.paymentMethod || null,
               studentId: body.studentId,
               courseId: body.courseId,
