@@ -36,6 +36,22 @@ export const CARD_SERIAL_BASE = 100000;
 export const CARD_SERIAL_BASE_V2 = 900000;
 
 /**
+ * A THIRD reserved range, printing a fixed three digits: 001, 005, 011, 099,
+ * 100, 500.
+ *
+ * The earlier styles are not a fixed width — V2 prints "0" then the number, so 5
+ * is "05" but 100 is "0100" — and an academy ordering a 500-card run wanted every
+ * card the same length. Giving that its own range rather than a per-company
+ * setting keeps formatStudentCode a pure function of the number, which is what
+ * lets it be called from a dozen screens without any of them knowing whose card
+ * it is. It also means no card already in a pocket changes meaning: only cards
+ * minted into THIS range read the new way.
+ *
+ * Mirrors CARD_SERIAL_BASE_V3 in the API.
+ */
+export const CARD_SERIAL_BASE_V3 = 800000;
+
+/**
  * A code as a human should SEE it.
  *
  * A card's number is stored as an integer in a reserved range but prints short and
@@ -47,6 +63,8 @@ export function formatStudentCode(code: string | number | null | undefined): str
   const n = Number(code);
   if (!Number.isFinite(n)) return String(code);
   if (n >= CARD_SERIAL_BASE_V2) return `0${n - CARD_SERIAL_BASE_V2}`;
+  // Fixed three digits — checked before the "A" range, which starts lower.
+  if (n >= CARD_SERIAL_BASE_V3) return String(n - CARD_SERIAL_BASE_V3).padStart(3, '0');
   return n > CARD_SERIAL_BASE ? `A${n - CARD_SERIAL_BASE}` : String(n);
 }
 

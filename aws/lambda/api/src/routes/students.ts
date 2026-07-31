@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { ensureQrCardSchema, qrStudentMatch, codeDigits, CARD_SERIAL_BASE } from './qr-cards';
+import { ensureQrCardSchema, qrStudentMatch, codeDigits, CARD_SERIAL_BASE, CARD_SERIAL_BASE_V2, CARD_SERIAL_BASE_V3 } from './qr-cards';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
@@ -497,12 +497,35 @@ export const studentsRoutes = {
         return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');
       }
 
+      /**
+       * The same typed digits can mean a card in more than one reserved range.
+       *
+       * A card's printed number drops its range — "005" is card 5 — and the
+       * client normalises that to a range without knowing which one this academy
+       * was issued. Only the company knows: it holds cards from one range, so at
+       * most one of these can match. Trying the alternatives is what lets a card
+       * printed "005" be typed as "005" whichever run it came from.
+       *
+       * Ordered exact-first, so an organic code always beats a card reading the
+       * same — a student whose own code is 100 is not displaced by card 100.
+       */
+      const offset = code > CARD_SERIAL_BASE_V3 ? code % 100000 : code;
+      const candidates = [code];
+      if (offset >= 1 && offset < 100000) {
+        for (const base of [CARD_SERIAL_BASE_V3, CARD_SERIAL_BASE_V2, CARD_SERIAL_BASE]) {
+          const alt = base + offset;
+          if (!candidates.includes(alt)) candidates.push(alt);
+        }
+      }
+
       // Codes are unique per company and only assigned to active students for
       // lookup purposes; an inactive/unknown code must not resolve.
       const student = await queryOne<any>(
         `SELECT id, qr_token FROM students
-         WHERE student_code = $1 AND company_id = $2 AND is_active = true`,
-        [code, context.companyId]
+         WHERE student_code = ANY($1::int[]) AND company_id = $2 AND is_active = true
+         ORDER BY array_position($1::int[], student_code)
+         LIMIT 1`,
+        [candidates, context.companyId]
       );
       if (!student) {
         return apiError(404, 'ERRORS.STUDENTS.CODE_NOT_FOUND', 'No student exists with this code');

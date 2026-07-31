@@ -152,6 +152,18 @@ export const CARD_SERIAL_BASE = 100000;
 export const CARD_SERIAL_BASE_V2 = 900000;
 
 /**
+ * A THIRD reserved range, printing a fixed three digits: 001, 005, 011, 100, 500.
+ *
+ * V2 is not a fixed width — "0" then the number, so 5 prints "05" but 100 prints
+ * "0100" — and an academy ordering a 500-card run wanted every card the same
+ * length. A range of its own carries that style without a per-company setting,
+ * and leaves every card already printed reading exactly as it does now.
+ *
+ * Mirrors CARD_SERIAL_BASE_V3 in the frontend.
+ */
+export const CARD_SERIAL_BASE_V3 = 800000;
+
+/**
  * A code as typed, turned back into the integer stored in student_code.
  *
  * A card prints its number short and unmistakable: "A5" for an old card, "05" for
@@ -485,6 +497,28 @@ export const qrCardsRoutes = {
       if (!token && body?.serial !== undefined && body?.serial !== null && !serialInRange) {
         return apiError(400, 'ERRORS.QR_CARDS.BAD_SERIAL', 'That is not a card number');
       }
+      /**
+       * A typed card number does not say which reserved range it came from.
+       *
+       * The printed form drops the base — "001" is card 1 — and the client has to
+       * guess a range to turn it back into a serial. It guesses the newest style
+       * it knows, which is wrong for a pool minted into a different range: typing
+       * "001" for an 800001 card looked for 900001 and reported the card as not
+       * in the pool. A company's pool sits in one range, so trying the others can
+       * only ever match the card the cashier is holding.
+       */
+      const serialCandidates = (): number[] => {
+        const offset = serial > CARD_SERIAL_BASE ? serial % 100000 : serial;
+        const out = [serial];
+        if (offset >= 1 && offset < 100000) {
+          for (const base of [CARD_SERIAL_BASE_V3, CARD_SERIAL_BASE_V2, CARD_SERIAL_BASE]) {
+            const alt = base + offset;
+            if (!out.includes(alt)) out.push(alt);
+          }
+        }
+        return out;
+      };
+
       const card = token
         ? await queryOne<any>(
             'SELECT * FROM qr_cards WHERE token = $1 AND company_id = $2',
@@ -492,8 +526,11 @@ export const qrCardsRoutes = {
           )
         : serialInRange
           ? await queryOne<any>(
-              'SELECT * FROM qr_cards WHERE serial = $1 AND company_id = $2',
-              [serial, context.companyId],
+              `SELECT * FROM qr_cards
+                WHERE serial = ANY($1::int[]) AND company_id = $2
+                ORDER BY array_position($1::int[], serial)
+                LIMIT 1`,
+              [serialCandidates(), context.companyId],
             )
           : null;
 
