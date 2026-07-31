@@ -1,5 +1,5 @@
-<div class="container mx-auto p-6">
-  <p-card>
+<!-- No page wrapper: this is a view inside the timetable, which owns the padding -->
+<p-card>
     <ng-template pTemplate="header">
       <div class="flex justify-between items-start p-4 flex-wrap gap-3">
         <div>
@@ -11,13 +11,23 @@
       </div>
     </ng-template>
 
-    <!-- Filters: the working day, and how long a gap has to be to be worth offering -->
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
+    <!-- Filters: which rooms, the working day, and how long a gap has to be to
+         be worth offering -->
+    <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-5">
       <div>
         <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.BRANCH' | translate }}</label>
         <p-select styleClass="w-full" [options]="branches()" optionLabel="label" optionValue="id"
           [showClear]="true" [placeholder]="'ROOM_FREE.ALL_BRANCHES' | translate"
-          [ngModel]="branchId()" (ngModelChange)="branchId.set($event ?? '')"></p-select>
+          [ngModel]="branchId()" (ngModelChange)="onBranchChange($event)"></p-select>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.ROOMS' | translate }}</label>
+        <!-- Empty = every room, so the default needs no ticking -->
+        <p-multiselect styleClass="w-full" [options]="roomOptions()" optionLabel="label" optionValue="value"
+          [filter]="true" [showToggleAll]="true" [maxSelectedLabels]="2"
+          [placeholder]="'ROOM_FREE.ALL_ROOMS' | translate"
+          [selectedItemsLabel]="'ROOM_FREE.ROOMS_SELECTED' | translate"
+          [ngModel]="roomIds()" (ngModelChange)="roomIds.set($event ?? [])"></p-multiselect>
       </div>
       <div>
         <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.DAY_FROM' | translate }}</label>
@@ -101,5 +111,4 @@
         </table>
       </div>
     }
-  </p-card>
-</div>
+</p-card>

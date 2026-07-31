@@ -262,14 +262,6 @@ export const routes: Routes = [
         data: { breadcrumb: 'BREADCRUMBS.USERS' },
         loadChildren: () => import('./features/users/users.routes').then(m => m.USERS_ROUTES)
       },
-      // Before 'rooms': the router tries these in order, so the more specific
-      // path has to come first rather than relying on it backtracking.
-      {
-        path: 'rooms/free',
-        canActivate: [permissionGuard('academy')],
-        data: { breadcrumb: 'BREADCRUMBS.ROOM_FREE' },
-        loadComponent: () => import('./features/rooms/room-availability/room-availability.component').then(m => m.RoomAvailabilityComponent)
-      },
       {
         path: 'rooms',
         canActivate: [permissionGuard('academy')],

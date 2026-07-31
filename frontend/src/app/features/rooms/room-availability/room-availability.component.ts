@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RoomService } from '../services/room.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -25,7 +26,7 @@ import { RoomWeek, WEEK_DAYS, buildRoomWeeks, deriveWindow } from '../room-avail
 @Component({
   selector: 'app-room-availability',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, SelectModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, ButtonModule, SelectModule, MultiSelectModule, TranslateModule],
   templateUrl: './room-availability.component.html',
 })
 export class RoomAvailabilityComponent implements OnInit {
@@ -40,6 +41,12 @@ export class RoomAvailabilityComponent implements OnInit {
   branches = signal<LookupOption[]>([]);
 
   branchId = signal<string>('');
+  /**
+   * Which rooms to show. Empty means all — the common case, and it keeps "show
+   * me everything" from needing every room ticked. Narrowing to one or a few is
+   * what you do once you know which rooms you would actually put a class in.
+   */
+  roomIds = signal<string[]>([]);
   /**
    * The hours the academy actually runs; gaps outside these are not offerable.
    * Seeded from the real class times once they load — see deriveWindow — because
@@ -83,7 +90,10 @@ export class RoomAvailabilityComponent implements OnInit {
     if (end <= start) return [];
 
     const branch = this.branchId();
-    const rooms = branch ? this.rooms().filter((r) => r.branchId === branch) : this.rooms();
+    const picked = new Set(this.roomIds());
+    const rooms = this.rooms()
+      .filter((r) => !branch || r.branchId === branch)
+      .filter((r) => picked.size === 0 || picked.has(r.id));
 
     return buildRoomWeeks({
       rooms,
@@ -103,6 +113,25 @@ export class RoomAvailabilityComponent implements OnInit {
 
   totalFreeHours = computed(() =>
     Math.round(this.roomWeeks().reduce((sum, r) => sum + r.freeMinutes, 0) / 6) / 10);
+
+  /** The rooms offered in the picker, narrowed by the chosen branch. */
+  roomOptions = computed(() => {
+    const branch = this.branchId();
+    return this.rooms()
+      .filter((r) => !branch || r.branchId === branch)
+      .map((r) => ({ label: r.branchName ? `${r.code} — ${r.branchName}` : r.code, value: r.id }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
+
+  /**
+   * Switching branch can leave rooms selected that the new branch does not have,
+   * which would show an empty grid with no visible reason. Drop those.
+   */
+  onBranchChange(id: string | null): void {
+    this.branchId.set(id ?? '');
+    const allowed = new Set(this.roomOptions().map((o) => o.value));
+    this.roomIds.set(this.roomIds().filter((r) => allowed.has(r)));
+  }
 
   ngOnInit(): void {
     this.lookupService.branches().subscribe({ next: (b) => this.branches.set(b) });

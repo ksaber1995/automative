@@ -8,16 +8,22 @@
 
     <!-- Date navigation -->
     <div class="flex flex-wrap items-center gap-2">
-      <!-- Day / week toggle -->
+      <!-- Day / week / free-rooms toggle -->
       <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden">
         <button type="button" class="px-3 py-2 text-sm font-medium transition-colors"
-          [class]="!isWeek() ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          [class]="viewMode() === 'DAY' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
           (click)="setViewMode('DAY')">{{ 'TIMETABLE.VIEW_DAY' | translate }}</button>
         <button type="button" class="px-3 py-2 text-sm font-medium border-s border-gray-300 transition-colors"
           [class]="isWeek() ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
           (click)="setViewMode('WEEK')">{{ 'TIMETABLE.VIEW_WEEK' | translate }}</button>
+        <button type="button" class="px-3 py-2 text-sm font-medium border-s border-gray-300 transition-colors"
+          [class]="isFree() ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+          (click)="setViewMode('FREE')">{{ 'TIMETABLE.VIEW_FREE' | translate }}</button>
       </div>
 
+      <!-- The date and layout controls belong to the day/week grid; the free-rooms
+           view is a whole week at once and carries its own filters. -->
+      @if (!isFree()) {
       <p-button [icon]="languageService.isRtl() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
         [outlined]="true" severity="secondary"
         (onClick)="shiftDay(-1)"
@@ -53,8 +59,14 @@
           [pTooltip]="'TIMETABLE.LAYOUT_STACKED' | translate"
           (click)="setLayout('STACKED')"><i class="pi pi-bars"></i></button>
       </div>
+      }
     </div>
   </div>
+
+  @if (isFree()) {
+    <!-- Where could a new class go — its own panel, with its own filters -->
+    <app-room-availability></app-room-availability>
+  } @else {
 
   <!-- Day banner -->
   <div class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl p-5 mb-5 shadow-md">
@@ -498,5 +510,6 @@
         </div>
       </div>
     </div>
+  }
   }
 </div>

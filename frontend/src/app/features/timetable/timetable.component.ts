@@ -17,6 +17,7 @@ import { CourseService } from '../courses/services/course.service';
 import { EmployeeService } from '../employees/services/employee.service';
 import { LanguageService } from '../../core/services/language.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RoomAvailabilityComponent } from '../rooms/room-availability/room-availability.component';
 
 interface PositionedEntry extends TimetableEntry {
   topPx: number;
@@ -32,7 +33,13 @@ interface WeekColumn {
   entries: TimetableEntry[];
 }
 
-type ViewMode = 'DAY' | 'WEEK';
+/**
+ * FREE is a different question from the other two — not "what is on" but "where
+ * could something go" — so it replaces the grid entirely rather than filtering
+ * it, and brings its own controls. It lives here because that question is asked
+ * while looking at the timetable, not from a separate page.
+ */
+type ViewMode = 'DAY' | 'WEEK' | 'FREE';
 type Layout = 'GRID' | 'STACKED';
 
 /**
@@ -190,6 +197,7 @@ function layoutEntries(entries: TimetableEntry[], totalGridHeight: number): Posi
     CommonModule,
     FormsModule,
     ButtonModule,
+    RoomAvailabilityComponent,
     SelectModule,
     DatePickerModule,
     DialogModule,
@@ -245,6 +253,8 @@ export class TimetableComponent implements OnInit {
   nowTick = signal<number>(Date.now());
 
   isWeek = computed(() => this.viewMode() === 'WEEK');
+  /** The free-rooms view: its own panel, so the date nav and filters don't apply. */
+  isFree = computed(() => this.viewMode() === 'FREE');
 
   filteredEntries = computed(() => this.entries());
 
@@ -486,7 +496,9 @@ export class TimetableComponent implements OnInit {
   setViewMode(mode: ViewMode) {
     if (!mode || mode === this.viewMode()) return;
     this.viewMode.set(mode);
-    this.load();
+    // The free-rooms panel loads its own data (rooms + the whole class schedule),
+    // so there is nothing for the day/week feed to fetch.
+    if (mode !== 'FREE') this.load();
   }
 
   /** Layout only — both shapes read what's already loaded, so no reload. */
