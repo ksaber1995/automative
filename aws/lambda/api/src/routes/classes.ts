@@ -180,6 +180,12 @@ function timeToMinutes(time: string | null | undefined): number {
   return (hh || 0) * 60 + (mm || 0);
 }
 
+/** "13:00" from 780 — for reporting the clashing day's own times back. */
+function minutesToTimeText(mins: number): string {
+  const m = Math.max(0, Math.round(mins));
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
 function deriveStatus(row: any): 'SCHEDULED' | 'IN_PROGRESS' | 'DONE' {
   if (row.is_finished) return 'DONE';
   const today = new Date();
@@ -643,7 +649,7 @@ export const classesRoutes = {
     }
   },
 
-  checkTeacherAvailability: async ({ query: queryParams, headers }: { query: { instructorId?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
+  checkTeacherAvailability: async ({ query: queryParams, headers }: { query: { instructorId?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; dayTimes?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
@@ -651,9 +657,15 @@ export const classesRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const { instructorId, startDate, endDate, startTime, endTime, daysOfWeek, excludeClassId } = queryParams;
+      const { instructorId, startDate, endDate, startTime, endTime, daysOfWeek, dayTimes, excludeClassId } = queryParams;
 
-      if (!startDate || !endDate || !startTime || !endTime || !daysOfWeek) {
+      // Per-day mode leaves the single start/end inputs empty and sends dayTimes
+      // instead, so requiring the envelope here skipped the check entirely for
+      // exactly the classes it most needed to run on.
+      if (!startDate || !endDate || !daysOfWeek) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+      if (!dayTimes && (!startTime || !endTime)) {
         return { status: 200 as const, body: { available: true, conflicts: [] } };
       }
 
@@ -675,6 +687,34 @@ export const classesRoutes = {
         return { status: 200 as const, body: { available: true, conflicts: [] } };
       }
 
+      /**
+       * Compare DAY BY DAY, never on the envelope.
+       *
+       * classes.start_time/end_time are the earliest start and latest end across
+       * all of a class's days, so a class sitting Fri 10:00-11:30 and Mon
+       * 16:00-17:30 flattens to 10:00-17:30. Comparing envelopes reported that
+       * class as clashing with a Fri 11:30-13:00 / Mon 13:00-14:30 one, which
+       * shares no minute with it on either day — and the form then refused to
+       * save. The room check next door already got this right; this is the same
+       * rule applied to the teacher.
+       *
+       * `dayTimes` carries the incoming per-day slots as DAY|START|END. Callers
+       * that only send the envelope still work: it is spread across every listed
+       * day, which is exactly what a same-time-every-day class means.
+       */
+      const incoming = (dayTimes || '')
+        .split(',')
+        .map(part => part.split('|').map(s => s.trim()))
+        .filter(bits => bits.length === 3 && bits[0] && bits[1] && bits[2])
+        .map(([day, s, e]) => ({ day: day.toUpperCase(), start: timeToMinutes(s), end: timeToMinutes(e) }));
+      const wanted = incoming.length
+        ? incoming
+        : newDays.map(day => ({
+            day: day.toUpperCase(),
+            start: timeToMinutes(startTime),
+            end: timeToMinutes(endTime),
+          }));
+
       const params: any[] = [context.companyId, endDate, startDate];
       let instructorClause = '';
       if (!checkWholeCompany) {
@@ -682,7 +722,13 @@ export const classesRoutes = {
         instructorClause = `AND c.instructor_id = $${params.length}`;
       }
       let sql = `
-        SELECT c.id, c.name, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date
+        SELECT c.id, c.name, c.days_of_week, c.start_time, c.end_time, c.start_date, c.end_date,
+               COALESCE((
+                 SELECT json_agg(json_build_object('day', UPPER(cdt.day_of_week),
+                                                   'startTime', cdt.start_time,
+                                                   'endTime', cdt.end_time))
+                 FROM class_day_times cdt WHERE cdt.class_id = c.id
+               ), '[]'::json) AS day_times_json
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
         WHERE co.company_id = $1
@@ -692,9 +738,6 @@ export const classesRoutes = {
           AND COALESCE(c.is_finished, false) = false
           AND c.start_date <= $2
           AND c.end_date >= $3
-          AND c.start_time IS NOT NULL
-          AND c.end_time IS NOT NULL
-          AND c.days_of_week IS NOT NULL
       `;
       if (excludeClassId) {
         params.push(excludeClassId);
@@ -703,29 +746,45 @@ export const classesRoutes = {
 
       const rows = await query(sql, params);
 
-      const newStart = timeToMinutes(startTime);
-      const newEnd = timeToMinutes(endTime);
-
       const conflicts = rows
-        .filter((row: any) => {
-          const existingDays: string[] = String(row.days_of_week || '')
-            .split(',')
-            .map((d: string) => d.trim())
-            .filter(Boolean);
-          if (!existingDays.some(d => newDays.includes(d))) return false;
+        .map((row: any) => {
+          // Per-day rows are the truth; a class predating that table falls back
+          // to its one time repeated across every day it lists.
+          const perDay = parseDayTimes(row.day_times_json);
+          const slots = perDay.length
+            ? perDay.map(d => ({
+                day: String(d.day).toUpperCase(),
+                start: timeToMinutes(d.startTime),
+                end: timeToMinutes(d.endTime),
+              }))
+            : String(row.days_of_week || '')
+                .split(',')
+                .map((d: string) => d.trim())
+                .filter(Boolean)
+                .map((day: string) => ({
+                  day: day.toUpperCase(),
+                  start: timeToMinutes(row.start_time),
+                  end: timeToMinutes(row.end_time),
+                }));
 
-          const existingStart = timeToMinutes(row.start_time);
-          const existingEnd = timeToMinutes(row.end_time);
-          return newStart < existingEnd && existingStart < newEnd;
+          // The first day that genuinely overlaps — named so the message can say
+          // which one, instead of leaving the user to work it out.
+          const hit = slots.find(s =>
+            wanted.some(w => w.day === s.day && w.start < s.end && s.start < w.end));
+          return hit ? { row, hit } : null;
         })
-        .map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          daysOfWeek: row.days_of_week,
-          startTime: row.start_time,
-          endTime: row.end_time,
-          startDate: row.start_date,
-          endDate: row.end_date,
+        .filter(Boolean)
+        .map((m: any) => ({
+          id: m.row.id,
+          name: m.row.name,
+          daysOfWeek: m.row.days_of_week,
+          // The clashing day's own times, not the envelope — otherwise the
+          // warning quotes hours the class does not actually run.
+          conflictDay: m.hit.day,
+          startTime: minutesToTimeText(m.hit.start),
+          endTime: minutesToTimeText(m.hit.end),
+          startDate: m.row.start_date,
+          endDate: m.row.end_date,
         }));
 
       return { status: 200 as const, body: { available: conflicts.length === 0, conflicts } };

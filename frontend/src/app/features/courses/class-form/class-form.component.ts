@@ -220,7 +220,11 @@ export class ClassFormComponent implements OnInit {
     // Teacher companies have no instructor field — every class implicitly
     // belongs to the owner-teacher, so the overlap check runs without one.
     const isTeacherCompany = this.authService.isTeacher();
-    if ((!instructorId && !isTeacherCompany) || !startTime || !endTime || days.length === 0 || !v.startDate) {
+    // The real per-day slots. In per-day mode the two shared time inputs are
+    // deliberately empty, so requiring them here skipped the check for exactly
+    // the classes whose times differ by day.
+    const dayTimes = this.buildDayTimes();
+    if ((!instructorId && !isTeacherCompany) || days.length === 0 || !v.startDate || dayTimes.length === 0) {
       this.availabilityConflicts.set([]);
       return;
     }
@@ -250,6 +254,9 @@ export class ClassFormComponent implements OnInit {
       startTime,
       endTime,
       daysOfWeek: days.join(','),
+      // Compared day by day server-side; the envelope above cannot express a
+      // class that runs at different hours on different days.
+      dayTimes: dayTimes.map(d => `${d.day}|${d.startTime}|${d.endTime}`).join(','),
       excludeClassId: this.classId || undefined,
     }).subscribe({
       next: (result) => {

@@ -74,6 +74,8 @@ export class ClassService {
     startTime?: string;
     endTime?: string;
     daysOfWeek?: string;
+    /** Per-day slots as DAY|START|END, comma joined — preferred over the envelope. */
+    dayTimes?: string;
     excludeClassId?: string;
   }): Observable<{ available: boolean; conflicts: TeacherAvailabilityConflict[] }> {
     return this.api.get<{ available: boolean; conflicts: TeacherAvailabilityConflict[] }>(
@@ -87,6 +89,9 @@ export interface TeacherAvailabilityConflict {
   id: string;
   name: string;
   daysOfWeek: string | null;
+  /** The weekday that actually clashes — the others are not in dispute. */
+  conflictDay?: string;
+  /** That day's own start/end, not the class-wide envelope. */
   startTime: string | null;
   endTime: string | null;
   startDate: string;

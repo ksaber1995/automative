@@ -3666,9 +3666,18 @@ export const contract = c.router({
         instructorId: OptionalUUIDSchema,
         startDate: z.string(),
         endDate: z.string(),
+        // The envelope: one time applied to every listed day. Kept for callers
+        // that only have that, and for a class that really does run at one time.
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         daysOfWeek: z.string().optional(),
+        /**
+         * The real per-day slots, as DAY|START|END joined by commas. Preferred
+         * over the envelope: a class sitting Fri 10:00-11:30 and Mon 16:00-17:30
+         * has an envelope of 10:00-17:30, and comparing that reports clashes on
+         * hours it does not run.
+         */
+        dayTimes: z.string().optional(),
         excludeClassId: OptionalUUIDSchema,
       }),
       responses: {
@@ -3679,6 +3688,9 @@ export const contract = c.router({
             name: z.string(),
             code: z.string(),
             daysOfWeek: z.string().nullable(),
+            /** The weekday that actually clashes. */
+            conflictDay: z.string().optional(),
+            // That day's own times, not the class-wide envelope.
             startTime: z.string().nullable(),
             endTime: z.string().nullable(),
             startDate: z.string(),
