@@ -5,6 +5,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { LanguageService } from '../../../core/services/language.service';
 import { PublicStudentService, PublicStudentProfile, PublicUnassignedCard } from '../public-student.service';
 import { formatStudentCode } from '../../../core/utils/student-code.util';
+import { ratingLabelKey } from '../../exams/homework-rating.util';
 
 /**
  * Public, read-only student profile shown when a student's QR code is scanned
@@ -53,6 +54,17 @@ export class PublicStudentComponent implements OnInit {
   // "are they doing the work" — so the page shows them as two sections.
   examOnly = () => (this.profile()?.exams ?? []).filter(e => !e.isHomework);
   homeworkOnly = () => (this.profile()?.exams ?? []).filter(e => e.isHomework === true);
+
+  /**
+   * A mark recorded by rating reads as the word the teacher chose — "Excellent",
+   * not a bare 5, which would mean nothing to a parent without the scale. Returns
+   * '' for anything that isn't one of the five, and the page falls back to the
+   * number.
+   */
+  ratingLabel(grade: string | number | null | undefined): string {
+    const key = ratingLabelKey(grade);
+    return key ? this.translate.instant(key) : '';
+  }
 
   ngOnInit(): void {
     const token = this.route.snapshot.paramMap.get('qrToken') || '';

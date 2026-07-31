@@ -4,6 +4,7 @@ import { enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { apiError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
 import { resolveStatus } from './monthly-subscriptions';
+import { HOMEWORK_RATING_MAX, isRatingCompany } from './exams';
 
 type AuthHeaders = { authorization?: string };
 
@@ -322,6 +323,10 @@ export const publicStudentsRoutes = {
         exams = [];
       }
 
+      // Does this academy mark by rating? Decides whether a 5 below reads as
+      // "Excellent" or stays a number.
+      const ratingCompany = await isRatingCompany(student.company_id);
+
       // Derive status per session: SUBSTITUTED counts as present.
       const withStatus = [...attendance, ...orphanSubs]
         .map((a: any) => ({
@@ -505,15 +510,21 @@ export const publicStudentsRoutes = {
               isPresent: row.status !== 'ABSENT',
             })),
           },
-          exams: exams.map((row: any) => ({
-            examName: row.exam_name,
-            courseName: row.course_name,
-            className: row.class_name ?? null,
-            examDate: row.exam_date,
-            grade: row.grade,
-            maxGrade: row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null,
-            isHomework: row.is_homework === true,
-          })),
+          exams: exams.map((row: any) => {
+            const maxGrade = row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null;
+            return {
+              examName: row.exam_name,
+              courseName: row.course_name,
+              className: row.class_name ?? null,
+              examDate: row.exam_date,
+              grade: row.grade,
+              maxGrade,
+              isHomework: row.is_homework === true,
+              // The parent reading this page should see the same words the
+              // teacher picked — "Excellent", not a bare 5.
+              isRating: ratingCompany && maxGrade === HOMEWORK_RATING_MAX,
+            };
+          }),
         },
       };
     } catch (error) {

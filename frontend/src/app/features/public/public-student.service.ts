@@ -113,6 +113,8 @@ export interface PublicStudentExam {
   maxGrade?: number | null;
   /** Homework shares the exams table; the portal lists the two apart. */
   isHomework?: boolean;
+  /** Show this mark as a rating (Excellent…Weak) instead of a number. */
+  isRating?: boolean;
 }
 
 export interface PublicStudentProfile {

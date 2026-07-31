@@ -9,8 +9,37 @@ import {
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { sendExamResultNotifications } from './telegram';
+import { ensureHomeworkGradingColumn } from './companies';
 
 type AuthHeaders = { authorization: string };
+
+/**
+ * Rating homework is always out of this — see homework-rating.util.ts on the
+ * client, which owns the labels. Keep the two in step.
+ */
+export const HOMEWORK_RATING_MAX = 5;
+
+/**
+ * Whether a mark should READ as a rating rather than a number. Same rule the
+ * marking panel uses: the company is in RATING mode and the item is out of 5.
+ * An older homework out of 10 keeps its number, because relabelling a stored 7
+ * would invent a meaning nobody recorded.
+ *
+ * Tolerant of a database that has not had the column added yet — that is a
+ * number-marking company by definition.
+ */
+export async function isRatingCompany(companyId: string): Promise<boolean> {
+  try {
+    await ensureHomeworkGradingColumn();
+    const row = await queryOne<any>(
+      'SELECT homework_grading_mode FROM companies WHERE id = $1',
+      [companyId],
+    );
+    return row?.homework_grading_mode === 'RATING';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Idempotent runtime guard — creates the exam tables if a DB hasn't had
@@ -860,18 +889,24 @@ export const examsRoutes = {
         [params.studentId, context.companyId],
       );
 
+      const rating = await isRatingCompany(context.companyId);
+
       // Exams and homework come back in one feed; the student page splits them.
       return {
         status: 200 as const,
-        body: rows.map((row) => ({
-          examName: row.exam_name,
-          courseName: row.course_name,
-          className: row.class_name ?? null,
-          examDate: row.exam_date,
-          grade: row.grade,
-          maxGrade: row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null,
-          isHomework: row.is_homework === true,
-        })),
+        body: rows.map((row) => {
+          const maxGrade = row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null;
+          return {
+            examName: row.exam_name,
+            courseName: row.course_name,
+            className: row.class_name ?? null,
+            examDate: row.exam_date,
+            grade: row.grade,
+            maxGrade,
+            isHomework: row.is_homework === true,
+            isRating: rating && maxGrade === HOMEWORK_RATING_MAX,
+          };
+        }),
       };
     } catch (error: any) {
       console.error('Exam getByStudent error:', error);

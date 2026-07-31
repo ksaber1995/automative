@@ -1285,7 +1285,13 @@
               <td>{{ row.examDate | date: 'mediumDate' }}</td>
               <td>{{ row.courseName }}</td>
               <td class="font-medium">{{ row.examName }}</td>
-              <td><span class="font-semibold text-indigo-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span></td>
+              <td>
+                @if (row.isRating && ratingLabel(row.grade)) {
+                  <span class="font-semibold text-indigo-600">{{ ratingLabel(row.grade) }}</span>
+                } @else {
+                  <span class="font-semibold text-indigo-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span>
+                }
+              </td>
             </tr>
           </ng-template>
         </p-table>
@@ -1331,7 +1337,13 @@
                 @if (row.className) { <span class="text-gray-400 text-xs block">{{ row.className }}</span> }
               </td>
               <td class="font-medium">{{ row.examName }}</td>
-              <td><span class="font-semibold text-purple-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span></td>
+              <td>
+                @if (row.isRating && ratingLabel(row.grade)) {
+                  <span class="font-semibold text-purple-600">{{ ratingLabel(row.grade) }}</span>
+                } @else {
+                  <span class="font-semibold text-purple-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span>
+                }
+              </td>
             </tr>
           </ng-template>
         </p-table>

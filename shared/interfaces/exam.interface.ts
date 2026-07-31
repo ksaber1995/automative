@@ -76,5 +76,12 @@ export interface StudentExamResult {
   maxGrade?: number | null;
   /** Exams and homework share this feed; the student page splits them by this. */
   isHomework?: boolean;
+  /**
+   * Show this mark as a rating (Excellent…Weak) rather than a number — the
+   * company marks by rating and this one is out of 5. The server decides, so the
+   * rule can't drift from the marking screen; the label is looked up client-side
+   * because it is translated.
+   */
+  isRating?: boolean;
   className?: string | null;
 }

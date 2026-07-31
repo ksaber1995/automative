@@ -736,6 +736,12 @@ const StudentExamResultSchema = z.object({
   maxGrade: z.number().nullable().optional(),
   /** Homework and exams share this table; the student page lists them separately. */
   isHomework: z.boolean().optional(),
+  /**
+   * Read this mark as a rating (Excellent…Weak) rather than a number: the company
+   * marks by rating AND this one is out of 5. The label itself is the client's
+   * job, since it is translated.
+   */
+  isRating: z.boolean().optional(),
   className: z.string().nullable().optional(),
 });
 
@@ -3275,6 +3281,8 @@ export const contract = c.router({
             maxGrade: z.number().nullable().optional(),
             /** Homework shares the exams table; the portal lists the two apart. */
             isHomework: z.boolean().optional(),
+            /** Show this mark as a rating (Excellent…Weak) instead of a number. */
+            isRating: z.boolean().optional(),
             className: z.string().nullable().optional(),
           })).optional(),
           /**

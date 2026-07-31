@@ -45,6 +45,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AttendanceService, StudentAttendanceRecord } from '../../rooms/services/attendance.service';
 import { ProductSaleService } from '../../products/services/product-sale.service';
 import { ExamService } from '../../exams/services/exam.service';
+import { ratingLabelKey } from '../../exams/homework-rating.util';
 import { Student } from '@shared/interfaces/student.interface';
 import { StudentExamResult } from '@shared/interfaces/exam.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
@@ -323,6 +324,17 @@ export class StudentDetailComponent implements OnInit {
 
   /** Class filter shared by the exam and homework cards (null = every class). */
   examClassFilter = signal<string | null>(null);
+
+  /**
+   * The words the teacher actually picked, for a mark recorded by rating. Returns
+   * '' when the mark isn't one of the five, and the caller falls back to the
+   * number — so a homework marked 7/10 before the academy switched to ratings
+   * still reads as 7/10.
+   */
+  ratingLabel(grade: string | number | null | undefined): string {
+    const key = ratingLabelKey(grade);
+    return key ? this.translate.instant(key) : '';
+  }
 
   /** Classes this student has results in. */
   examClassOptions = computed(() => {
