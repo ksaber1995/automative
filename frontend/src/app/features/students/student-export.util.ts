@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Class, ClassDayTime } from '@shared/interfaces/class.interface';
 import { esc } from '../../core/utils/print-report.util';
+import { to12h } from '../../core/utils/time-format.util';
 
 /**
  * Exporting the students list with the class times each student is booked into.
@@ -59,23 +60,6 @@ export interface ScheduleLabels {
 }
 
 /**
- * "2:00 PM" from the stored "14:00" / "14:00:00".
- *
- * Digits stay Latin even in Arabic: the cell also carries Latin-digit dates and
- * phone numbers, and Arabic-Indic numerals here would sort and read
- * inconsistently against them in Excel. Only the marker is localised.
- */
-function to12h(time: string, labels: ScheduleLabels): string {
-  const [hRaw, mRaw] = (time || '').split(':');
-  const h = Number(hRaw);
-  const m = Number(mRaw);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return (time || '').slice(0, 5);
-  const suffix = h < 12 ? labels.am : labels.pm;
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
-/**
  * "Sat, Mon 10:00 AM - 11:00 AM", or a per-day list when the days don't share a
  * time. Prefers the per-day rows and falls back to the class-level start/end,
  * which is all an older class carries.
@@ -87,7 +71,7 @@ export function formatClassSchedule(
 ): string {
   if (!cls) return fallback;
   const day = (d: string) => labels.dayLabel((d || '').trim());
-  const t = (x: string) => to12h(x, labels);
+  const t = (x: string) => to12h(x, labels.am, labels.pm);
   const dayTimes = cls.dayTimes as ClassDayTime[] | undefined;
 
   if (dayTimes && dayTimes.length) {

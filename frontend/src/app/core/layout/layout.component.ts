@@ -206,6 +206,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
       { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') && !auth.isTeacher() },
+      // Hidden for teachers alongside Rooms: a solo teacher has no room pool to
+      // find a gap in.
+      { labelKey: 'NAV.ROOM_FREE', icon: 'pi pi-calendar-plus', routerLink: ['/rooms/free'], visible: auth.canRead('academy') && !auth.isTeacher() },
       // Session history is the Sessions page's History tab now; the route stays
       // reachable by URL, it just doesn't need its own sidebar entry.
       { labelKey: 'NAV.SESSIONS', icon: 'pi pi-clock', routerLink: ['/sessions'], visible: auth.canRead('academy') },

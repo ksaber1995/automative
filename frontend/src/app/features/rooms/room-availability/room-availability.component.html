@@ -1,0 +1,105 @@
+<div class="container mx-auto p-6">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-between items-start p-4 flex-wrap gap-3">
+        <div>
+          <h2 class="text-2xl font-bold">{{ 'ROOM_FREE.TITLE' | translate }}</h2>
+          <p class="text-gray-500 text-sm mt-1">{{ 'ROOM_FREE.SUBTITLE' | translate }}</p>
+        </div>
+        <p-button icon="pi pi-print" [label]="'ROOM_FREE.PRINT' | translate"
+                  [outlined]="true" [disabled]="loading() || badWindow()" (onClick)="print()"></p-button>
+      </div>
+    </ng-template>
+
+    <!-- Filters: the working day, and how long a gap has to be to be worth offering -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.BRANCH' | translate }}</label>
+        <p-select styleClass="w-full" [options]="branches()" optionLabel="label" optionValue="id"
+          [showClear]="true" [placeholder]="'ROOM_FREE.ALL_BRANCHES' | translate"
+          [ngModel]="branchId()" (ngModelChange)="branchId.set($event ?? '')"></p-select>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.DAY_FROM' | translate }}</label>
+        <input type="time" class="w-full border border-gray-300 rounded-md px-3 py-2"
+          [ngModel]="windowStart()" (ngModelChange)="windowStart.set($event)" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.DAY_TO' | translate }}</label>
+        <input type="time" class="w-full border border-gray-300 rounded-md px-3 py-2"
+          [ngModel]="windowEnd()" (ngModelChange)="windowEnd.set($event)" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">{{ 'ROOM_FREE.MIN_SLOT' | translate }}</label>
+        <p-select styleClass="w-full" [options]="minOptions()" optionLabel="label" optionValue="value"
+          [ngModel]="minMinutes()" (ngModelChange)="minMinutes.set($event)"></p-select>
+      </div>
+    </div>
+
+    @if (badWindow()) {
+      <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        {{ 'ROOM_FREE.BAD_WINDOW' | translate }}
+      </div>
+    } @else if (loading()) {
+      <div class="py-16 text-center text-gray-400"><i class="pi pi-spin pi-spinner text-3xl"></i></div>
+    } @else if (!roomWeeks().length) {
+      <div class="py-16 text-center text-gray-500">{{ 'ROOM_FREE.EMPTY' | translate }}</div>
+    } @else {
+      <p class="text-sm text-gray-500 mb-3">
+        {{ 'ROOM_FREE.SUMMARY' | translate: { rooms: roomWeeks().length, hours: totalFreeHours() } }}
+      </p>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="p-2 text-start font-medium border border-gray-200 sticky start-0 bg-gray-50">
+                {{ 'ROOM_FREE.COL_ROOM' | translate }}
+              </th>
+              @for (d of weekDays; track d) {
+                <th class="p-2 text-start font-medium border border-gray-200 whitespace-nowrap">{{ dayLabel(d) }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (rw of roomWeeks(); track rw.roomId) {
+              <tr class="align-top">
+                <td class="p-2 border border-gray-200 whitespace-nowrap">
+                  <div class="font-semibold text-gray-900">{{ rw.roomCode }}</div>
+                  @if (rw.branchName) { <div class="text-xs text-gray-400">{{ rw.branchName }}</div> }
+                  <div class="text-xs text-green-700 mt-0.5">
+                    {{ 'ROOM_FREE.FREE_TOTAL' | translate: { hours: (rw.freeMinutes / 60) | number: '1.0-1' } }}
+                  </div>
+                </td>
+                @for (d of rw.days; track d.day) {
+                  <td class="p-2 border border-gray-200"
+                      [class.bg-green-50]="d.emptyAllDay">
+                    @if (d.free.length) {
+                      @for (f of d.free; track f.start) {
+                        <div class="text-green-800 whitespace-nowrap">
+                          {{ time(f.startLabel) }} – {{ time(f.endLabel) }}
+                          <span class="text-gray-400 text-xs">({{ duration(f.minutes) }})</span>
+                        </div>
+                      }
+                    } @else {
+                      <span class="text-gray-400 text-xs">{{ 'ROOM_FREE.NONE' | translate }}</span>
+                    }
+                    <!-- What is already booked, kept quiet: it explains the gaps
+                         without competing with them -->
+                    @if (d.busy.length) {
+                      <div class="mt-1 pt-1 border-t border-dashed border-gray-200">
+                        @for (b of d.busy; track b.start) {
+                          <div class="text-xs text-gray-400 whitespace-nowrap">{{ b.className }}</div>
+                        }
+                      </div>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>
