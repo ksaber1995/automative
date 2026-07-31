@@ -465,6 +465,14 @@ export const examsRoutes = {
       // row carries a class_id the roster narrows to that class's students. The
       // extra $4 is folded into every branch of the UNION.
       //
+      // Membership is decided by the ENROLMENT, never by students.is_active. That
+      // flag means "has left the academy", which is an office fact: a student can
+      // be marked as left while their enrolment in this class is still ACTIVE, and
+      // filtering on it here emptied the roster for a class the attendance page
+      // was still listing two students for. The attendance roster keys off the
+      // enrolment alone, and these two lists have to agree — a student you can
+      // take attendance for is a student whose work you must be able to mark.
+      //
       // SUBSTITUTING STUDENTS: someone who sat this class's lesson as a
       // substitute (their own group was cancelled, they came to another) was in
       // the room and was given the homework, but is enrolled in a DIFFERENT
@@ -502,7 +510,7 @@ export const examsRoutes = {
          FROM students s
          JOIN (${enrolledSql}) en ON en.student_id = s.id
          LEFT JOIN exam_results r ON r.exam_id = $3 AND r.student_id = s.id
-         WHERE s.company_id = $2 AND s.is_active = true
+         WHERE s.company_id = $2
          ORDER BY s.name`,
         rosterParams,
       );
@@ -555,9 +563,13 @@ export const examsRoutes = {
       if (!grade) return apiError(400, 'ERRORS.EXAMS.GRADE_REQUIRED', 'Grade is required');
 
       await ensureQrCardSchema();   // the lookup below reads qr_cards
+      // No is_active filter: the enrolment check below is what decides whether
+      // this student may be marked. Filtering here as well meant a card that the
+      // roster now lists came back "not found" when scanned — the same student,
+      // two answers depending on which control the teacher used.
       const student = await queryOne<any>(
         `SELECT s.id, s.name FROM students s
-         WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2 AND s.is_active = true`,
+         WHERE ${qrStudentMatch('$1', '$2')} AND s.company_id = $2`,
         [token, context.companyId],
       );
       if (!student) {
@@ -625,7 +637,8 @@ export const examsRoutes = {
       }
 
       const student = await queryOne<any>(
-        'SELECT id, name FROM students WHERE student_code = $1 AND company_id = $2 AND is_active = true',
+        // Same as the QR lookup: enrolment decides, not the left-the-academy flag.
+        'SELECT id, name FROM students WHERE student_code = $1 AND company_id = $2',
         [code, context.companyId],
       );
       if (!student) {
@@ -820,7 +833,7 @@ export const examsRoutes = {
                 WHERE se.class_id = $4 AND se.company_id = $2
                   AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')` : ''}
               ) en
-         JOIN students s ON s.id = en.student_id AND s.company_id = $2 AND s.is_active = true
+         JOIN students s ON s.id = en.student_id AND s.company_id = $2
          WHERE NOT EXISTS (SELECT 1 FROM exam_results r WHERE r.exam_id = $1 AND r.student_id = en.student_id)
          ON CONFLICT (exam_id, student_id) DO NOTHING
          RETURNING student_id`,
