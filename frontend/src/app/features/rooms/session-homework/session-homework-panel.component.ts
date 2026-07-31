@@ -5,11 +5,15 @@ import { RouterModule } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../../exams/services/exam.service';
+import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX, ratingLabelKey } from '../../exams/homework-rating.util';
+import { CompanyService } from '../../../core/services/company.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
@@ -24,7 +28,11 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
  * upsert. A homework carries a classId, so the roster the API returns is already
  * narrowed to this class.
  *
- * Two steps: pick an existing homework for the class (or create one), then record.
+ * Either kind can be created here: the same table stores both, and a teacher
+ * sitting in a session marks a quiz the same way they mark homework. The picker
+ * lists both for this class — course-wide exams have no class_id and stay out.
+ *
+ * Two steps: pick an existing item for the class (or create one), then record.
  * Scans are NOT registered with GlobalScanService here — the attendance page owns
  * that single handler and forwards to `handleScan()` while this card is open,
  * which avoids the two of them fighting over it.
@@ -34,12 +42,13 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterModule, CardModule, ButtonModule,
-    InputTextModule, TableModule, TooltipModule, TranslateModule,
+    InputTextModule, SelectModule, TableModule, TagModule, TooltipModule, TranslateModule,
   ],
   templateUrl: './session-homework-panel.component.html',
 })
 export class SessionHomeworkPanelComponent implements OnDestroy {
   private service = inject(ExamService);
+  private companyService = inject(CompanyService);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   private confirmationService = inject(ConfirmationService);
@@ -58,9 +67,61 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   creating = signal(false);
   deletingId = signal<string | null>(null);
 
-  // New-homework form.
+  // New homework / exam form.
   newName = signal('');
   newMax = signal<number | null>(10);
+  /** Which kind is being created. Homework is the common case, so it leads. */
+  newIsHomework = signal(true);
+  /**
+   * The last name this panel generated. Used to tell an untouched field from one
+   * the teacher typed into, so switching the type renames the former and leaves
+   * the latter alone.
+   */
+  private autoName = '';
+
+  typeOptions = computed(() => [
+    { label: this.translate.instant('SESSION_HOMEWORK.TYPE_HOMEWORK'), value: true },
+    { label: this.translate.instant('SESSION_HOMEWORK.TYPE_EXAM'), value: false },
+  ]);
+
+  // ── Rating mode (company setting) ─────────────────────────────────────────
+  /** The company marks by rating rather than by number. */
+  ratingMode = signal(false);
+  ratingMax = HOMEWORK_RATING_MAX;
+
+  ratingOptions = computed(() =>
+    HOMEWORK_RATINGS.map((r) => ({ label: this.translate.instant(r.labelKey), value: String(r.value) })));
+
+  /**
+   * Whether THIS item is marked by rating. The company setting alone isn't
+   * enough: a homework created earlier out of 10 keeps its number box, because
+   * relabelling a 7 as a rating would invent a meaning the teacher never gave it.
+   * Everything created while the setting is on is out of 5, so it qualifies.
+   */
+  useRating = computed(() => this.ratingMode() && this.active()?.maxGrade === HOMEWORK_RATING_MAX);
+
+  /** The label for a stored mark, or '' when it isn't one of the five. */
+  ratingLabel(grade: string | number | null | undefined): string {
+    const key = ratingLabelKey(grade);
+    return key ? this.translate.instant(key) : '';
+  }
+
+  setType(isHomework: boolean): void {
+    this.newIsHomework.set(isHomework);
+    // Only re-seed a name the teacher hasn't edited.
+    if (this.newName() === this.autoName) this.seedName();
+  }
+
+  /** "Homework 3" / "Exam 2" — numbered within its own kind, not the whole list. */
+  private seedName(): void {
+    const isHw = this.newIsHomework();
+    const n = this.homeworks().filter((x) => x.isHomework === isHw).length + 1;
+    const label = this.translate.instant(
+      isHw ? 'SESSION_HOMEWORK.DEFAULT_NAME' : 'SESSION_HOMEWORK.DEFAULT_NAME_EXAM', { n },
+    );
+    this.autoName = label;
+    this.newName.set(label);
+  }
 
   // Active homework + its roster.
   active = signal<ExamModel | null>(null);
@@ -116,6 +177,17 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
         this.loadList();
       }
     });
+
+    // Which marking control to show. Read once — an admin changing it mid-session
+    // is not worth a request every time this panel opens, and it takes effect on
+    // the next page load.
+    this.companyService.getSettings().subscribe({
+      next: (s) => {
+        this.ratingMode.set(s.homeworkGradingMode === 'RATING');
+        if (this.ratingMode()) this.newMax.set(HOMEWORK_RATING_MAX);
+      },
+      error: () => {}, // stay on the number box if settings can't be read
+    });
   }
 
   ngOnDestroy(): void {
@@ -125,12 +197,11 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   // ── Step 1: pick or create ────────────────────────────────────────────────
   private loadList(): void {
     this.loadingList.set(true);
-    this.service.getHomeworkForClass(this.classId()).subscribe({
+    this.service.getForClass(this.classId()).subscribe({
       next: (rows) => {
         this.homeworks.set(rows);
         this.loadingList.set(false);
-        const label = this.translate.instant('SESSION_HOMEWORK.DEFAULT_NAME', { n: rows.length + 1 });
-        this.newName.set(label);
+        this.seedName();
       },
       error: () => this.loadingList.set(false),
     });
@@ -152,8 +223,10 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     this.service.create({
       name,
       examDate: today,
-      maxGrade: this.newMax(),
-      isHomework: true,
+      // In rating mode the max is the scale itself, not the teacher's choice —
+      // that is what makes a stored 4 always read back as "Very good".
+      maxGrade: this.ratingMode() ? HOMEWORK_RATING_MAX : this.newMax(),
+      isHomework: this.newIsHomework(),
       classId: this.classId(),
       sessionId: this.sessionId(),
       status: 'DONE',
@@ -333,6 +406,22 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
     const existing = this.rowSaveTimers.get(row.studentId);
     if (existing) clearTimeout(existing);
     this.rowSaveTimers.set(row.studentId, setTimeout(() => this.flushRowSave(row.studentId, raw), this.ROW_DEBOUNCE_MS));
+  }
+
+  /**
+   * A rating is picked, not typed, so it saves at once — there is no half-typed
+   * state to wait out. Clearing the dropdown removes the mark, same as emptying
+   * the number box.
+   */
+  onRatingPick(row: ExamResultRow, value: string | null): void {
+    const raw = value ?? '';
+    this.grades.update((g) => ({ ...g, [row.studentId]: raw }));
+    const pending = this.rowSaveTimers.get(row.studentId);
+    if (pending) {
+      clearTimeout(pending);
+      this.rowSaveTimers.delete(row.studentId);
+    }
+    this.flushRowSave(row.studentId, raw);
   }
 
   /** Enter / leaving the box saves straight away instead of waiting out the debounce. */

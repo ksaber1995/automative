@@ -23,9 +23,13 @@ export class ExamService {
     return this.api.get<ExamModel[]>('exams', filters);
   }
 
-  /** Homework set for one class, newest first. */
-  getHomeworkForClass(classId: string): Observable<ExamModel[]> {
-    return this.api.get<ExamModel[]>('exams', { classId, isHomework: 'true' });
+  /**
+   * Everything set for one class, newest first — homework AND exams, since the
+   * in-session panel can now create either and both must show up in its picker.
+   * Course-wide exams have no class_id, so they stay out of this list.
+   */
+  getForClass(classId: string): Observable<ExamModel[]> {
+    return this.api.get<ExamModel[]>('exams', { classId });
   }
 
   getById(id: string): Observable<ExamModel> {

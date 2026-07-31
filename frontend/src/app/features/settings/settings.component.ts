@@ -6,9 +6,10 @@ import { RadioButtonModule } from 'primeng/radiobutton';
 import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { CompanyService, GlobalExpenseAllocation } from '../../core/services/company.service';
+import { CompanyService, GlobalExpenseAllocation, HomeworkGradingMode } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { AuthService } from '../../core/services/auth.service';
+import { HOMEWORK_RATINGS } from '../exams/homework-rating.util';
 
 interface AllocationOption {
   value: GlobalExpenseAllocation;
@@ -43,6 +44,10 @@ export class SettingsComponent implements OnInit {
   selectedMethod = signal<GlobalExpenseAllocation>('OVERHEAD');
   /** Opt-in: auto start/end sessions on their scheduled times. */
   autoManageSessions = signal(false);
+  /** Number box vs Excellent…Weak when marking homework. */
+  homeworkGradingMode = signal<HomeworkGradingMode>('NUMERIC');
+  /** Shown on the card so the number behind each rating is never a surprise. */
+  ratingPreview = HOMEWORK_RATINGS;
 
   get selectedMethodValue(): GlobalExpenseAllocation {
     return this.selectedMethod();
@@ -94,6 +99,7 @@ export class SettingsComponent implements OnInit {
       next: (settings) => {
         this.selectedMethod.set(settings.globalExpenseAllocation);
         this.autoManageSessions.set(settings.autoManageSessions === true);
+        this.homeworkGradingMode.set(settings.homeworkGradingMode === 'RATING' ? 'RATING' : 'NUMERIC');
         this.loading.set(false);
       },
       error: () => {
@@ -107,6 +113,7 @@ export class SettingsComponent implements OnInit {
     this.companyService.updateSettings({
       globalExpenseAllocation: this.selectedMethod(),
       autoManageSessions: this.autoManageSessions(),
+      homeworkGradingMode: this.homeworkGradingMode(),
     }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('SETTINGS.SAVED'));

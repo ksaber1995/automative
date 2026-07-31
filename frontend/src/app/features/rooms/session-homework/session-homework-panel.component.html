@@ -49,6 +49,10 @@
               <span class="min-w-0">
                 <span class="font-semibold text-gray-800">{{ hw.name }}</span>
                 <span class="block text-xs text-gray-500">
+                  <!-- The list holds both kinds now, so each row has to say which it is -->
+                  <p-tag styleClass="me-1 text-[10px]"
+                    [value]="(hw.isHomework ? 'SESSION_HOMEWORK.TYPE_HOMEWORK' : 'SESSION_HOMEWORK.TYPE_EXAM') | translate"
+                    [severity]="hw.isHomework ? 'info' : 'warn'"></p-tag>
                   {{ hw.examDate | date: 'mediumDate' }}
                   @if (hw.maxGrade != null) { · {{ 'SESSION_HOMEWORK.OUT_OF' | translate }} {{ hw.maxGrade }} }
                 </span>
@@ -79,19 +83,27 @@
 
     <div class="border-t border-gray-200 pt-4">
       <h4 class="font-semibold text-gray-800 mb-3">{{ 'SESSION_HOMEWORK.NEW_TITLE' | translate }}</h4>
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-        <div class="sm:col-span-2">
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">{{ 'SESSION_HOMEWORK.TYPE' | translate }}</label>
+          <p-select styleClass="w-full" [options]="typeOptions()" optionLabel="label" optionValue="value"
+            [ngModel]="newIsHomework()" (ngModelChange)="setType($event)"></p-select>
+        </div>
+        <div [class.sm:col-span-2]="!ratingMode()" [class.sm:col-span-3]="ratingMode()">
           <label class="block text-sm text-gray-600 mb-1">{{ 'SESSION_HOMEWORK.NAME' | translate }}</label>
           <input pInputText type="text" class="w-full"
             [ngModel]="newName()" (ngModelChange)="newName.set($event)"
             (keyup.enter)="create()" />
         </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">{{ 'SESSION_HOMEWORK.MAX' | translate }}</label>
-          <input pInputText type="number" min="1" class="w-full"
-            [ngModel]="newMax()" (ngModelChange)="newMax.set($event)"
-            (keyup.enter)="create()" />
-        </div>
+        @if (!ratingMode()) {
+          <!-- Rating marks are always out of 5, so there is nothing to choose -->
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">{{ 'SESSION_HOMEWORK.MAX' | translate }}</label>
+            <input pInputText type="number" min="1" class="w-full"
+              [ngModel]="newMax()" (ngModelChange)="newMax.set($event)"
+              (keyup.enter)="create()" />
+          </div>
+        }
         <p-button icon="pi pi-plus" [label]="'SESSION_HOMEWORK.CREATE' | translate"
           [loading]="creating()" (onClick)="create()"></p-button>
       </div>
@@ -106,11 +118,31 @@
         {{ 'SESSION_HOMEWORK.MARK_TO_APPLY' | translate }}
       </label>
       <div class="flex items-center gap-2 flex-wrap">
-        <input pInputText type="number" min="0" [max]="active()?.maxGrade ?? null"
-          class="w-24" [ngModel]="currentGrade()" (ngModelChange)="setCurrentGrade($event)"
-          [placeholder]="'SESSION_HOMEWORK.MARK' | translate" />
-        @if (active()?.maxGrade != null) {
-          <span class="text-gray-500">/ {{ active()?.maxGrade }}</span>
+        @if (useRating()) {
+          <!-- Buttons, not a dropdown: the teacher taps one rating then scans a
+               queue of students, so the choice has to be one touch away. -->
+          <div class="flex gap-1 flex-wrap">
+            @for (r of ratingOptions(); track r.value) {
+              <button type="button"
+                class="px-3 py-1.5 rounded-lg border text-sm font-medium transition"
+                [class.bg-purple-600]="currentGrade() === r.value"
+                [class.text-white]="currentGrade() === r.value"
+                [class.border-purple-600]="currentGrade() === r.value"
+                [class.bg-white]="currentGrade() !== r.value"
+                [class.text-gray-700]="currentGrade() !== r.value"
+                [class.border-gray-300]="currentGrade() !== r.value"
+                (click)="setCurrentGrade(r.value)">
+                {{ r.label }}
+              </button>
+            }
+          </div>
+        } @else {
+          <input pInputText type="number" min="0" [max]="active()?.maxGrade ?? null"
+            class="w-24" [ngModel]="currentGrade()" (ngModelChange)="setCurrentGrade($event)"
+            [placeholder]="'SESSION_HOMEWORK.MARK' | translate" />
+          @if (active()?.maxGrade != null) {
+            <span class="text-gray-500">/ {{ active()?.maxGrade }}</span>
+          }
         }
         <input pInputText type="text" class="flex-1 min-w-[14rem]"
           [ngModel]="manualEntry()" (ngModelChange)="manualEntry.set($event)"
@@ -124,7 +156,7 @@
         <div class="mt-3 rounded-lg bg-white border border-purple-200 px-3 py-2 text-sm">
           <i class="pi pi-check-circle text-green-600 me-1"></i>
           <span class="font-semibold">{{ r.name }}</span>
-          <span class="text-gray-500"> — {{ r.grade }}</span>
+          <span class="text-gray-500"> — {{ useRating() ? ratingLabel(r.grade) : r.grade }}</span>
           @if (r.updated) {
             <span class="text-amber-600 ms-1">({{ 'SESSION_HOMEWORK.UPDATED' | translate }})</span>
           }
@@ -145,7 +177,7 @@
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_HOMEWORK.COL_STUDENT' | translate }}</th>
-            <th class="w-32">{{ 'SESSION_HOMEWORK.COL_MARK' | translate }}</th>
+            <th [class]="useRating() ? 'w-48' : 'w-32'">{{ 'SESSION_HOMEWORK.COL_MARK' | translate }}</th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-row>
@@ -156,9 +188,19 @@
             </td>
             <td>
               <div class="flex items-center gap-1">
-                <input pInputText type="number" min="0" [max]="active()?.maxGrade ?? null" class="w-20"
-                  [ngModel]="grades()[row.studentId] ?? ''" (ngModelChange)="onGradeInput(row, $event)"
-                  (blur)="flushNow(row)" (keyup.enter)="flushNow(row)" />
+                @if (useRating()) {
+                  <!-- A dropdown here rather than five buttons per row: the roster
+                       is the long list, and buttons on every row would bury it. -->
+                  <p-select styleClass="w-40" [options]="ratingOptions()" optionLabel="label" optionValue="value"
+                    [showClear]="true" appendTo="body"
+                    [placeholder]="'SESSION_HOMEWORK.MARK' | translate"
+                    [ngModel]="grades()[row.studentId] || null"
+                    (ngModelChange)="onRatingPick(row, $event)"></p-select>
+                } @else {
+                  <input pInputText type="number" min="0" [max]="active()?.maxGrade ?? null" class="w-20"
+                    [ngModel]="grades()[row.studentId] ?? ''" (ngModelChange)="onGradeInput(row, $event)"
+                    (blur)="flushNow(row)" (keyup.enter)="flushNow(row)" />
+                }
                 @if (rowState()[row.studentId] === 'saving') { <i class="pi pi-spin pi-spinner text-gray-400 text-xs"></i> }
                 @if (rowState()[row.studentId] === 'saved') { <i class="pi pi-check text-green-600 text-xs"></i> }
                 @if (rowState()[row.studentId] === 'error') { <i class="pi pi-times text-red-500 text-xs"></i> }

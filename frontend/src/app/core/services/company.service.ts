@@ -5,12 +5,20 @@ import { CardDesign } from '@shared/interfaces/card-design.interface';
 
 export type GlobalExpenseAllocation = 'PROPORTIONAL' | 'EQUAL' | 'OVERHEAD';
 
+/**
+ * How a homework mark is entered. RATING replaces the number box with a fixed
+ * list — Excellent down to Weak — which is still stored as a number (5…1), so
+ * results, reports and the student page are unchanged.
+ */
+export type HomeworkGradingMode = 'NUMERIC' | 'RATING';
+
 export interface CompanySettings {
   id: string;
   name: string;
   globalExpenseAllocation: GlobalExpenseAllocation;
   /** Opt-in: auto start/end sessions on their scheduled times (client-polled). */
   autoManageSessions: boolean;
+  homeworkGradingMode: HomeworkGradingMode;
 }
 
 export interface CompanyProfileData {

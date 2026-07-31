@@ -53,6 +53,71 @@
       </ng-template>
     </p-card>
 
+    <!-- How a homework mark is entered. Both modes store a number — the rating
+         is 5 down to 1 — so reports and the student page are unaffected. -->
+    <p-card styleClass="mb-6">
+      <ng-template pTemplate="header">
+        <div class="px-6 pt-6 pb-2">
+          <div class="flex items-center gap-3 mb-1">
+            <i class="pi pi-book text-purple-500 text-xl"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ 'SETTINGS.HW_GRADING_TITLE' | translate }}</h2>
+          </div>
+          <p class="text-gray-500 text-sm ml-8">{{ 'SETTINGS.HW_GRADING_DESC' | translate }}</p>
+        </div>
+      </ng-template>
+
+      <div class="px-2 pb-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="flex items-start gap-4 border-2 rounded-xl p-5 cursor-pointer transition-all"
+          [class.border-purple-500]="homeworkGradingMode() === 'NUMERIC'"
+          [class.bg-purple-50]="homeworkGradingMode() === 'NUMERIC'"
+          [class.border-gray-200]="homeworkGradingMode() !== 'NUMERIC'">
+          <p-radiobutton name="hwGrading" value="NUMERIC"
+            [ngModel]="homeworkGradingMode()" (ngModelChange)="homeworkGradingMode.set($event)"
+            inputId="hwNumeric"></p-radiobutton>
+          <span class="flex-1">
+            <span class="font-bold text-gray-900 text-lg block mb-1">{{ 'SETTINGS.HW_GRADING_NUMERIC' | translate }}</span>
+            <span class="text-gray-600 text-sm block mb-2">{{ 'SETTINGS.HW_GRADING_NUMERIC_HINT' | translate }}</span>
+            <span class="inline-flex gap-1 text-xs font-mono text-gray-500">
+              <span class="px-2 py-0.5 rounded bg-white border">7</span>
+              <span class="px-2 py-0.5 rounded bg-white border">9</span>
+              <span class="px-2 py-0.5 rounded bg-white border">10</span>
+            </span>
+          </span>
+        </label>
+
+        <label class="flex items-start gap-4 border-2 rounded-xl p-5 cursor-pointer transition-all"
+          [class.border-purple-500]="homeworkGradingMode() === 'RATING'"
+          [class.bg-purple-50]="homeworkGradingMode() === 'RATING'"
+          [class.border-gray-200]="homeworkGradingMode() !== 'RATING'">
+          <p-radiobutton name="hwGrading" value="RATING"
+            [ngModel]="homeworkGradingMode()" (ngModelChange)="homeworkGradingMode.set($event)"
+            inputId="hwRating"></p-radiobutton>
+          <span class="flex-1">
+            <span class="font-bold text-gray-900 text-lg block mb-1">{{ 'SETTINGS.HW_GRADING_RATING' | translate }}</span>
+            <span class="text-gray-600 text-sm block mb-2">{{ 'SETTINGS.HW_GRADING_RATING_HINT' | translate }}</span>
+            <span class="flex flex-wrap gap-1 text-xs">
+              @for (r of ratingPreview; track r.value) {
+                <span class="px-2 py-0.5 rounded bg-white border text-gray-600">
+                  {{ r.labelKey | translate }} <span class="text-gray-400">= {{ r.value }}</span>
+                </span>
+              }
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <ng-template pTemplate="footer">
+        <div class="flex justify-end pt-2">
+          <p-button
+            [label]="'SETTINGS.SAVE' | translate"
+            icon="pi pi-check"
+            [loading]="saving()"
+            (onClick)="save()">
+          </p-button>
+        </div>
+      </ng-template>
+    </p-card>
+
     <!-- Global Expense Allocation — academies only (teachers have no branches) -->
     @if (!isTeacher()) {
     <p-card>

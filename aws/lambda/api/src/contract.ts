@@ -92,6 +92,11 @@ const WithdrawalCategorySchema = z.enum(['OWNER_DRAW', 'PROFIT_DISTRIBUTION', 'D
 // Global Expense Allocation Method
 const GlobalExpenseAllocationSchema = z.enum(['PROPORTIONAL', 'EQUAL', 'OVERHEAD']);
 
+// How homework marks are entered. RATING swaps the number box for a fixed list
+// (Excellent … Weak); the mark is still stored as a number, 5 down to 1, so
+// results, reports and the student page are unaffected.
+const HomeworkGradingModeSchema = z.enum(['NUMERIC', 'RATING']);
+
 // Student ID card — the shared back face, configured once per company.
 // Lengths are capped so a pasted essay can't blow up the rendered card.
 // Per-card-set tuning: logo size/offset, photo offset, and the three colours the
@@ -4509,6 +4514,7 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
+          homeworkGradingMode: HomeworkGradingModeSchema,
         }),
         401: ApiErrorSchema,
       },
@@ -4537,6 +4543,7 @@ export const contract = c.router({
       body: z.object({
         globalExpenseAllocation: GlobalExpenseAllocationSchema.optional(),
         autoManageSessions: z.boolean().optional(),
+        homeworkGradingMode: HomeworkGradingModeSchema.optional(),
       }),
       responses: {
         200: z.object({
@@ -4544,6 +4551,7 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
+          homeworkGradingMode: HomeworkGradingModeSchema,
         }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,

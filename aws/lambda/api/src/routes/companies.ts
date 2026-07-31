@@ -11,6 +11,33 @@ import { apiError, mapThrownError } from '../utils/api-error';
 // The second statement matters as much as the first: on every database that
 // already HAS the column, ADD COLUMN IF NOT EXISTS is a no-op and would leave
 // the old FALSE default in place, so new tenants would keep opting out.
+// How homework marks are entered: a number (the original behaviour) or a rating
+// picked from a fixed list. A rating IS a number underneath — Excellent is 5,
+// Weak is 1 — so nothing about how results are stored or reported changes; only
+// the marking control does. NUMERIC stays the default so existing tenants are
+// untouched.
+//
+// Added idempotently at runtime, same as the column above.
+let homeworkGradingColumnInitPromise: Promise<void> | null = null;
+export async function ensureHomeworkGradingColumn(): Promise<void> {
+  if (!homeworkGradingColumnInitPromise) {
+    homeworkGradingColumnInitPromise = (async () => {
+      try {
+        await query(
+          `ALTER TABLE companies ADD COLUMN IF NOT EXISTS homework_grading_mode VARCHAR(10) NOT NULL DEFAULT 'NUMERIC'`
+        );
+      } catch (e) {
+        homeworkGradingColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return homeworkGradingColumnInitPromise;
+}
+
+/** The only two values the column may hold; anything else is rejected. */
+const HOMEWORK_GRADING_MODES = ['NUMERIC', 'RATING'] as const;
+
 let autoManageColumnInitPromise: Promise<void> | null = null;
 export async function ensureAutoManageSessionsColumn(): Promise<void> {
   if (!autoManageColumnInitPromise) {
@@ -317,10 +344,10 @@ export const companiesRoutes = {
 
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      await ensureAutoManageSessionsColumn();
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn()]);
       const context = await extractTenantContext(headers.authorization);
       const company = await queryOne(
-        'SELECT id, name, global_expense_allocation, auto_manage_sessions FROM companies WHERE id = $1',
+        'SELECT id, name, global_expense_allocation, auto_manage_sessions, homework_grading_mode FROM companies WHERE id = $1',
         [context.companyId]
       );
       if (!company) {
@@ -333,6 +360,7 @@ export const companiesRoutes = {
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
+          homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
         },
       };
     } catch (error) {
@@ -341,9 +369,9 @@ export const companiesRoutes = {
     }
   },
 
-  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean }; headers: { authorization: string } }) => {
+  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; homeworkGradingMode?: string }; headers: { authorization: string } }) => {
     try {
-      await ensureAutoManageSessionsColumn();
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn()]);
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -356,6 +384,12 @@ export const companiesRoutes = {
       }
       if (body.autoManageSessions !== undefined) {
         updateData.auto_manage_sessions = body.autoManageSessions === true;
+      }
+      if (body.homeworkGradingMode !== undefined) {
+        if (!HOMEWORK_GRADING_MODES.includes(body.homeworkGradingMode as any)) {
+          return apiError(400, 'ERRORS.COMPANIES.BAD_GRADING_MODE', 'Unknown homework grading mode');
+        }
+        updateData.homework_grading_mode = body.homeworkGradingMode;
       }
 
       const company = await update('companies', context.companyId, updateData);
@@ -370,6 +404,7 @@ export const companiesRoutes = {
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
+          homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
         },
       };
     } catch (error) {
