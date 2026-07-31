@@ -194,7 +194,7 @@ export class UserDetailComponent implements OnInit {
     const map: Record<string, string> = {
       GLOBAL_ADMIN: '#7C3AED', ADMIN: '#7C3AED',
       BRANCH_ADMIN: '#2563EB', BRANCH_MANAGER: '#2563EB',
-      ACADEMIC_MANAGER: '#059669', SALES_MANAGER: '#D97706',
+      ACADEMIC_MANAGER: '#059669', SALES_MANAGER: '#D97706', SECRETARY: '#DB2777',
       ACCOUNTANT: '#0891B2', VIEWER: '#6B7280',
     };
     return map[role] || '#6B7280';
@@ -212,6 +212,7 @@ export class UserDetailComponent implements OnInit {
       BRANCH_MANAGER: 'bg-blue-100 text-blue-700',
       ACADEMIC_MANAGER: 'bg-emerald-100 text-emerald-700',
       SALES_MANAGER: 'bg-amber-100 text-amber-700',
+      SECRETARY: 'bg-pink-100 text-pink-700',
       ACCOUNTANT: 'bg-cyan-100 text-cyan-700',
       VIEWER: 'bg-gray-100 text-gray-600',
     };
@@ -222,7 +223,7 @@ export class UserDetailComponent implements OnInit {
     const map: Record<string, string> = {
       GLOBAL_ADMIN: 'pi pi-crown', ADMIN: 'pi pi-crown',
       BRANCH_ADMIN: 'pi pi-building', BRANCH_MANAGER: 'pi pi-building',
-      ACADEMIC_MANAGER: 'pi pi-book', SALES_MANAGER: 'pi pi-shopping-cart',
+      ACADEMIC_MANAGER: 'pi pi-book', SALES_MANAGER: 'pi pi-shopping-cart', SECRETARY: 'pi pi-id-card',
       ACCOUNTANT: 'pi pi-calculator', VIEWER: 'pi pi-eye',
     };
     return map[role] || 'pi pi-user';

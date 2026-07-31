@@ -73,6 +73,12 @@ const FULL: ResourcePermission = { read: true, write: true, delete: true };
 const READ_WRITE: ResourcePermission = { read: true, write: true, delete: false };
 const READ_ONLY: ResourcePermission = { read: true, write: false, delete: false };
 const NO_ACCESS: ResourcePermission = { read: false, write: false, delete: false };
+/**
+ * Record it, but don't get to read the books. Used by SECRETARY for the money
+ * resources: the front desk takes a payment or issues a refund, without the
+ * revenue and expense lists — the totals — being theirs to browse.
+ */
+const RECORD_ONLY: ResourcePermission = { read: false, write: true, delete: true };
 
 /**
  * Default permissions for each role.
@@ -174,6 +180,32 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     revenues:     NO_ACCESS,
     expenses:     NO_ACCESS,
     refunds:      NO_ACCESS,
+    debts:        NO_ACCESS,
+    products:     FULL,
+    product_sales: FULL,
+    reports:      NO_ACCESS,
+    users:        NO_ACCESS,
+    cash: NO_ACCESS,
+  },
+  /**
+   * The front desk. Modelled on how a real secretary account was already being
+   * run by hand before this role existed: they register students, enrol them,
+   * take the money and sell books, and they run the academy day to day
+   * (classes, sessions, attendance) — but staff, users, reports, debts and the
+   * cash drawer are not theirs, and neither is browsing the revenue, expense or
+   * refund lists. RECORD_ONLY on those three is the point of the role: take a
+   * payment, don't read the books.
+   */
+  [UserRole.SECRETARY]: {
+    dashboard:    NO_ACCESS,
+    branches:     READ_ONLY,
+    academy:      FULL,
+    students:     FULL,
+    enrollments:  READ_WRITE,
+    employees:    NO_ACCESS,
+    revenues:     RECORD_ONLY,
+    expenses:     RECORD_ONLY,
+    refunds:      RECORD_ONLY,
     debts:        NO_ACCESS,
     products:     FULL,
     product_sales: FULL,

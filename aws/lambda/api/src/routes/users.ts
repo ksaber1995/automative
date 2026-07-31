@@ -7,6 +7,42 @@ import {
 import { apiError, mapThrownError } from '../utils/api-error';
 import { DEBUG_ACCOUNT_EMAIL } from '../utils/debug-account';
 
+/**
+ * users.role carries a CHECK listing every allowed value, so a new role is
+ * rejected by the database until the constraint knows about it.
+ *
+ * Guarded on the constraint's current definition rather than dropped and re-added
+ * every cold start: re-adding a CHECK re-validates every row in the table, and
+ * doing that on each container start is exactly the kind of repeated full scan
+ * that has bitten this codebase before.
+ */
+let roleCheckInitPromise: Promise<void> | null = null;
+async function ensureSecretaryRoleAllowed(): Promise<void> {
+  if (!roleCheckInitPromise) {
+    roleCheckInitPromise = (async () => {
+      try {
+        const row = await queryOne<{ def: string }>(
+          `SELECT pg_get_constraintdef(con.oid) AS def
+             FROM pg_constraint con JOIN pg_class t ON t.oid = con.conrelid
+            WHERE t.relname = 'users' AND con.conname = 'users_role_check'`
+        );
+        // No constraint at all, or it already allows SECRETARY: nothing to do.
+        if (!row || row.def.includes('SECRETARY')) return;
+        await query(`ALTER TABLE users DROP CONSTRAINT users_role_check`);
+        await query(
+          `ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (
+             'GLOBAL_ADMIN','ADMIN','ACADEMIC_MANAGER','SALES_MANAGER','SECRETARY',
+             'BRANCH_ADMIN','BRANCH_MANAGER','ACCOUNTANT','VIEWER'))`
+        );
+      } catch (e) {
+        roleCheckInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return roleCheckInitPromise;
+}
+
 /** Convenience: build a parameterised UPDATE returning the updated row */
 async function updateUser(
   userId: string,
@@ -160,6 +196,7 @@ export const usersRoutes = {
 
   create: async ({ body, headers }: any) => {
     try {
+      await ensureSecretaryRoleAllowed();
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {
@@ -210,6 +247,7 @@ export const usersRoutes = {
 
   update: async ({ params, body, headers }: any) => {
     try {
+      await ensureSecretaryRoleAllowed();
       const context = await extractTenantContext(headers.authorization);
 
       if (!isGlobalAdmin(context)) {

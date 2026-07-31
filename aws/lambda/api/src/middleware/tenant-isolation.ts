@@ -31,6 +31,12 @@ const FULL: ResourcePermission = { read: true, write: true, delete: true };
 const READ_WRITE: ResourcePermission = { read: true, write: true, delete: false };
 const READ_ONLY: ResourcePermission = { read: true, write: false, delete: false };
 const NO_ACCESS: ResourcePermission = { read: false, write: false, delete: false };
+/**
+ * Record it, but don't get to read the books — see SECRETARY below. Write and
+ * delete without read is deliberate, not a typo: the front desk takes a payment
+ * or issues a refund without the revenue and expense lists being theirs.
+ */
+const RECORD_ONLY: ResourcePermission = { read: false, write: true, delete: true };
 
 const ROLE_DEFAULTS: Record<string, UserPermissions> = {
   GLOBAL_ADMIN: {
@@ -76,6 +82,16 @@ const ROLE_DEFAULTS: Record<string, UserPermissions> = {
     refunds: NO_ACCESS, debts: NO_ACCESS, products: FULL,
     product_sales: FULL, reports: NO_ACCESS, users: NO_ACCESS,
     cash: NO_ACCESS,
+  },
+  // The front desk: register and enrol students, take the money, sell books, run
+  // the day (classes, sessions, attendance). No staff, users, reports, debts or
+  // cash drawer — and no browsing the revenue/expense/refund lists.
+  SECRETARY: {
+    dashboard: NO_ACCESS, branches: READ_ONLY, academy: FULL,
+    students: FULL, enrollments: READ_WRITE, employees: NO_ACCESS,
+    revenues: RECORD_ONLY, expenses: RECORD_ONLY, refunds: RECORD_ONLY,
+    debts: NO_ACCESS, products: FULL, product_sales: FULL,
+    reports: NO_ACCESS, users: NO_ACCESS, cash: NO_ACCESS,
   },
   ACCOUNTANT: {
     dashboard: READ_ONLY, branches: READ_ONLY, academy: READ_ONLY,

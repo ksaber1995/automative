@@ -9,6 +9,7 @@ export enum UserRole {
   BRANCH_ADMIN = 'BRANCH_ADMIN',       // Full access to one or more assigned branches
   ACADEMIC_MANAGER = 'ACADEMIC_MANAGER', // Manage students/courses/classes/enrollments — no financials
   SALES_MANAGER = 'SALES_MANAGER',     // Manage products/sales/enrollments — no financials
+  SECRETARY = 'SECRETARY',             // Front desk: students, enrolments, take payments — cannot read the books
   VIEWER = 'VIEWER',                   // Read-only access to academic data
 }
 
@@ -17,6 +18,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.BRANCH_ADMIN]: 'Branch Admin',
   [UserRole.ACADEMIC_MANAGER]: 'Academic Manager',
   [UserRole.SALES_MANAGER]: 'Sales Manager',
+  [UserRole.SECRETARY]: 'Secretary',
   [UserRole.VIEWER]: 'Viewer',
   // Legacy
   [UserRole.ADMIN]: 'Administrator',
@@ -29,6 +31,7 @@ export const NEW_ROLES: UserRole[] = [
   UserRole.BRANCH_ADMIN,
   UserRole.ACADEMIC_MANAGER,
   UserRole.SALES_MANAGER,
+  UserRole.SECRETARY,
   UserRole.VIEWER,
 ];
 
@@ -37,6 +40,7 @@ export const ALL_ROLES: UserRole[] = [
   UserRole.BRANCH_ADMIN,
   UserRole.ACADEMIC_MANAGER,
   UserRole.SALES_MANAGER,
+  UserRole.SECRETARY,
   UserRole.VIEWER,
   UserRole.ADMIN,
   UserRole.BRANCH_MANAGER,

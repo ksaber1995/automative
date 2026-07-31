@@ -22,7 +22,7 @@ const ApiErrorSchema = z.object({
 
 // User Roles (extended RBAC)
 const UserRoleSchema = z.enum([
-  'GLOBAL_ADMIN', 'BRANCH_ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER', 'VIEWER',
+  'GLOBAL_ADMIN', 'BRANCH_ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER', 'SECRETARY', 'VIEWER',
   'ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT',
 ]);
 

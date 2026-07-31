@@ -120,6 +120,7 @@ export class UserFormComponent implements OnInit {
     { label: 'USERS.FORM.ROLE_BRANCH_ADMIN', value: UserRole.BRANCH_ADMIN },
     { label: 'USERS.FORM.ROLE_ACADEMIC_MANAGER', value: UserRole.ACADEMIC_MANAGER },
     { label: 'USERS.FORM.ROLE_SALES_MANAGER', value: UserRole.SALES_MANAGER },
+    { label: 'USERS.FORM.ROLE_SECRETARY', value: UserRole.SECRETARY },
     { label: 'USERS.FORM.ROLE_ACCOUNTANT', value: UserRole.ACCOUNTANT },
     { label: 'USERS.FORM.ROLE_VIEWER', value: UserRole.VIEWER },
   ];
@@ -407,6 +408,7 @@ export class UserFormComponent implements OnInit {
       GLOBAL_ADMIN: 'pi pi-crown', ADMIN: 'pi pi-crown',
       BRANCH_ADMIN: 'pi pi-building', BRANCH_MANAGER: 'pi pi-building',
       ACADEMIC_MANAGER: 'pi pi-book', SALES_MANAGER: 'pi pi-shopping-cart',
+      SECRETARY: 'pi pi-id-card',
       ACCOUNTANT: 'pi pi-calculator', VIEWER: 'pi pi-eye',
     };
     return map[role] || 'pi pi-user';
@@ -417,6 +419,7 @@ export class UserFormComponent implements OnInit {
       GLOBAL_ADMIN: 'text-purple-500', ADMIN: 'text-purple-500',
       BRANCH_ADMIN: 'text-blue-500', BRANCH_MANAGER: 'text-blue-500',
       ACADEMIC_MANAGER: 'text-emerald-500', SALES_MANAGER: 'text-amber-500',
+      SECRETARY: 'text-pink-500',
       ACCOUNTANT: 'text-cyan-500', VIEWER: 'text-gray-400',
     };
     return map[role] || 'text-gray-400';
@@ -428,6 +431,7 @@ export class UserFormComponent implements OnInit {
       BRANCH_ADMIN: 'USERS.FORM.ROLE_DESC_BRANCH_ADMIN',
       ACADEMIC_MANAGER: 'USERS.FORM.ROLE_DESC_ACADEMIC_MANAGER',
       SALES_MANAGER: 'USERS.FORM.ROLE_DESC_SALES_MANAGER',
+      SECRETARY: 'USERS.FORM.ROLE_DESC_SECRETARY',
       ACCOUNTANT: 'USERS.FORM.ROLE_DESC_ACCOUNTANT',
       VIEWER: 'USERS.FORM.ROLE_DESC_VIEWER',
     };

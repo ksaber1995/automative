@@ -60,6 +60,7 @@ export class UserListComponent implements OnInit {
     { label: 'Branch Admin', value: UserRole.BRANCH_ADMIN },
     { label: 'Academic Manager', value: UserRole.ACADEMIC_MANAGER },
     { label: 'Sales Manager', value: UserRole.SALES_MANAGER },
+    { label: 'Secretary', value: UserRole.SECRETARY },
     { label: 'Viewer', value: UserRole.VIEWER },
     { label: 'Accountant', value: UserRole.ACCOUNTANT },
   ];
@@ -190,6 +191,7 @@ export class UserListComponent implements OnInit {
       BRANCH_MANAGER: '#2563EB',
       ACADEMIC_MANAGER: '#059669',
       SALES_MANAGER: '#D97706',
+      SECRETARY: '#DB2777',
       ACCOUNTANT: '#0891B2',
       VIEWER: '#6B7280',
     };
@@ -208,6 +210,7 @@ export class UserListComponent implements OnInit {
       BRANCH_MANAGER: 'bg-blue-100 text-blue-700',
       ACADEMIC_MANAGER: 'bg-emerald-100 text-emerald-700',
       SALES_MANAGER: 'bg-amber-100 text-amber-700',
+      SECRETARY: 'bg-pink-100 text-pink-700',
       ACCOUNTANT: 'bg-cyan-100 text-cyan-700',
       VIEWER: 'bg-gray-100 text-gray-600',
     };
@@ -222,6 +225,7 @@ export class UserListComponent implements OnInit {
       BRANCH_MANAGER: 'pi pi-building',
       ACADEMIC_MANAGER: 'pi pi-book',
       SALES_MANAGER: 'pi pi-shopping-cart',
+      SECRETARY: 'pi pi-id-card',
       ACCOUNTANT: 'pi pi-calculator',
       VIEWER: 'pi pi-eye',
     };
