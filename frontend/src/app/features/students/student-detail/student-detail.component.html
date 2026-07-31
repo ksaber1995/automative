@@ -1286,7 +1286,11 @@
               <td>{{ row.courseName }}</td>
               <td class="font-medium">{{ row.examName }}</td>
               <td>
-                @if (row.isRating && ratingLabel(row.grade)) {
+                @if (row.notMarked || row.isAbsent) {
+                  <span class="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                    {{ 'STUDENTS.DETAIL.EXAM_ABSENT' | translate }}
+                  </span>
+                } @else if (row.isRating && ratingLabel(row.grade)) {
                   <span class="font-semibold text-indigo-600">{{ ratingLabel(row.grade) }}</span>
                 } @else {
                   <span class="font-semibold text-indigo-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span>
@@ -1338,7 +1342,12 @@
               </td>
               <td class="font-medium">{{ row.examName }}</td>
               <td>
-                @if (row.isRating && ratingLabel(row.grade)) {
+                @if (row.notMarked || row.isAbsent) {
+                  <!-- Homework isn't sat, it's handed in — so the wording differs -->
+                  <span class="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                    {{ 'STUDENTS.DETAIL.HOMEWORK_NOT_DONE' | translate }}
+                  </span>
+                } @else if (row.isRating && ratingLabel(row.grade)) {
                   <span class="font-semibold text-purple-600">{{ ratingLabel(row.grade) }}</span>
                 } @else {
                   <span class="font-semibold text-purple-600">{{ row.grade }}@if (row.maxGrade != null) { <span class="text-gray-400 font-normal">/ {{ row.maxGrade }}</span> }</span>

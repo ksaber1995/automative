@@ -115,6 +115,10 @@ export interface PublicStudentExam {
   isHomework?: boolean;
   /** Show this mark as a rating (Excellent…Weak) instead of a number. */
   isRating?: boolean;
+  /** Recorded as not there. */
+  isAbsent?: boolean;
+  /** Nobody recorded anything — shown as a miss, same as absent. */
+  notMarked?: boolean;
 }
 
 export interface PublicStudentProfile {

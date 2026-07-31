@@ -3851,6 +3851,8 @@
       "EXAMS_COL_COURSE": "Course",
       "EXAMS_COL_EXAM": "Exam",
       "EXAMS_COL_GRADE": "Grade",
+      "EXAM_ABSENT": "Absent",
+      "HOMEWORK_NOT_DONE": "Not done",
       "HOMEWORK_TITLE": "Homework",
       "HOMEWORK_LOADING": "Loading homework…",
       "HOMEWORK_EMPTY": "No homework marks yet.",
@@ -4758,6 +4760,8 @@
     "NO_TIME_HINT": "These classes run on this day but have no start/end time, so they cannot be placed on the hour grid. Edit the class to add times."
   },
   "PUBLIC_PROFILE": {
+    "EXAM_ABSENT": "Absent",
+    "HOMEWORK_NOT_DONE": "Not done",
     "LANGUAGE_TOGGLE": "العربية",
     "LOADING": "Loading…",
     "NOT_AVAILABLE_TITLE": "Profile not available",

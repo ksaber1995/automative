@@ -742,6 +742,10 @@ const StudentExamResultSchema = z.object({
    * job, since it is translated.
    */
   isRating: z.boolean().optional(),
+  /** Recorded as not there — someone made that call. */
+  isAbsent: z.boolean().optional(),
+  /** Nobody recorded anything for this student on this one. */
+  notMarked: z.boolean().optional(),
   className: z.string().nullable().optional(),
 });
 
@@ -3283,6 +3287,8 @@ export const contract = c.router({
             isHomework: z.boolean().optional(),
             /** Show this mark as a rating (Excellent…Weak) instead of a number. */
             isRating: z.boolean().optional(),
+            isAbsent: z.boolean().optional(),
+            notMarked: z.boolean().optional(),
             className: z.string().nullable().optional(),
           })).optional(),
           /**

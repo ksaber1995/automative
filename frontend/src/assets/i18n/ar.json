@@ -3975,6 +3975,8 @@
       "EXAMS_COL_COURSE": "الدورة",
       "EXAMS_COL_EXAM": "الامتحان",
       "EXAMS_COL_GRADE": "الدرجة",
+      "EXAM_ABSENT": "غائب",
+      "HOMEWORK_NOT_DONE": "لم يحل",
       "HOMEWORK_TITLE": "الواجبات",
       "HOMEWORK_LOADING": "جاري تحميل الواجبات…",
       "HOMEWORK_EMPTY": "لا توجد درجات واجبات بعد.",
@@ -4882,6 +4884,8 @@
     "NO_TIME_HINT": "هذه الفصول تعمل في هذا اليوم لكن بدون وقت بداية أو نهاية، لذلك لا يمكن عرضها على شبكة الساعات. عدّل الفصل لإضافة الأوقات."
   },
   "PUBLIC_PROFILE": {
+    "EXAM_ABSENT": "غائب",
+    "HOMEWORK_NOT_DONE": "لم يحل",
     "LANGUAGE_TOGGLE": "English",
     "LOADING": "جارٍ التحميل…",
     "NOT_AVAILABLE_TITLE": "الملف غير متاح",

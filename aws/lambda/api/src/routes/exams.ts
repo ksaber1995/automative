@@ -170,6 +170,84 @@ async function isEnrolledInCourse(
   return !!row;
 }
 
+/**
+ * A student's exam/homework feed — everything they were expected to sit, not
+ * only what someone got round to marking.
+ *
+ * Driving this from exam_results (as it used to) meant an unmarked student
+ * simply had no row, so a homework they never handed in and a homework that was
+ * never set looked identical on their page. Starting from `exams` and LEFT
+ * JOINing the result makes the gap visible: `not_marked` says nobody recorded
+ * anything, `is_absent` says someone recorded that they were not there.
+ *
+ * Membership repeats the roster rule — enrolment in the course, narrowed to the
+ * class when the row is class-scoped, plus substitutes who sat the lesson. The
+ * last OR keeps a row the student HAS a mark for even if they have since moved
+ * class, so marks never disappear from a page they were already on.
+ *
+ * SCHEDULED rows are left out unless already marked: an exam that has not
+ * happened yet is not an absence.
+ *
+ * $1 = studentId, $2 = companyId.
+ */
+export const studentExamFeedSql = `
+  SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
+         e.exam_date, e.max_grade, e.is_homework,
+         r.grade, r.is_absent,
+         (r.exam_id IS NULL) AS not_marked
+    FROM exams e
+    JOIN courses c ON c.id = e.course_id
+    LEFT JOIN classes cl ON cl.id = e.class_id
+    LEFT JOIN exam_results r ON r.exam_id = e.id AND r.student_id = $1
+   WHERE e.company_id = $2
+     AND e.is_active = true
+     AND (r.exam_id IS NOT NULL OR e.status = 'DONE')
+     AND (
+       r.exam_id IS NOT NULL
+       OR EXISTS (
+            SELECT 1 FROM enrollments en
+             WHERE en.student_id = $1 AND en.company_id = $2
+               AND en.course_id = e.course_id
+               AND (e.class_id IS NULL OR en.class_id = e.class_id)
+               AND en.status NOT IN ('DROPPED', 'CANCELLED')
+          )
+       OR EXISTS (
+            SELECT 1 FROM master_class_enrollments m
+             WHERE m.student_id = $1 AND m.company_id = $2
+               AND m.course_id = e.course_id
+               AND (e.class_id IS NULL OR m.class_id = e.class_id)
+               AND m.status <> 'DROPPED'
+          )
+       OR (e.class_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM session_attendance sa
+              JOIN sessions se ON se.id = sa.session_id
+             WHERE sa.student_id = $1 AND se.class_id = e.class_id AND se.company_id = $2
+               AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')
+          ))
+     )
+   ORDER BY e.exam_date DESC`;
+
+/** Shared shape for both student feeds, so the two pages can't disagree. */
+export function mapStudentExamRow(row: any, rating: boolean) {
+  const maxGrade = row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null;
+  const notMarked = row.not_marked === true;
+  return {
+    examName: row.exam_name,
+    courseName: row.course_name,
+    className: row.class_name ?? null,
+    examDate: row.exam_date,
+    grade: row.grade ?? '',
+    maxGrade,
+    isHomework: row.is_homework === true,
+    isRating: rating && maxGrade === HOMEWORK_RATING_MAX,
+    // Recorded as not there, vs never recorded at all. Both read as a miss on
+    // the page, but they are different facts and only one of them is a decision
+    // someone made.
+    isAbsent: row.is_absent === true,
+    notMarked,
+  };
+}
+
 export const examsRoutes = {
   create: async ({ body, headers }: { body: any; headers: AuthHeaders }) => {
     try {
@@ -880,7 +958,8 @@ export const examsRoutes = {
 
   /**
    * GET /api/exams/student/:studentId
-   * All of a student's recorded grades (for the student-detail page).
+   * Everything the student was expected to sit, marked or not — see
+   * studentExamFeedSql for why the unmarked ones are included.
    */
   getByStudent: async ({ params, headers }: { params: { studentId: string }; headers: AuthHeaders }) => {
     try {
@@ -890,36 +969,14 @@ export const examsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const rows = await query<any>(
-        `SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
-                e.exam_date, e.max_grade, e.is_homework, r.grade
-         FROM exam_results r
-         JOIN exams e   ON e.id = r.exam_id AND e.is_active = true
-         JOIN courses c ON c.id = e.course_id
-         LEFT JOIN classes cl ON cl.id = e.class_id
-         WHERE r.student_id = $1 AND r.company_id = $2
-         ORDER BY e.exam_date DESC`,
-        [params.studentId, context.companyId],
-      );
+      const rows = await query<any>(studentExamFeedSql, [params.studentId, context.companyId]);
 
       const rating = await isRatingCompany(context.companyId);
 
       // Exams and homework come back in one feed; the student page splits them.
       return {
         status: 200 as const,
-        body: rows.map((row) => {
-          const maxGrade = row.max_grade !== null && row.max_grade !== undefined ? parseFloat(row.max_grade) : null;
-          return {
-            examName: row.exam_name,
-            courseName: row.course_name,
-            className: row.class_name ?? null,
-            examDate: row.exam_date,
-            grade: row.grade,
-            maxGrade,
-            isHomework: row.is_homework === true,
-            isRating: rating && maxGrade === HOMEWORK_RATING_MAX,
-          };
-        }),
+        body: rows.map((row) => mapStudentExamRow(row, rating)),
       };
     } catch (error: any) {
       console.error('Exam getByStudent error:', error);

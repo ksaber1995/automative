@@ -83,5 +83,11 @@ export interface StudentExamResult {
    * because it is translated.
    */
   isRating?: boolean;
+  /**
+   * Recorded as not there. Distinct from `notMarked`, where nobody recorded
+   * anything at all — both read as a miss, but only this one was a decision.
+   */
+  isAbsent?: boolean;
+  notMarked?: boolean;
   className?: string | null;
 }
