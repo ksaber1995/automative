@@ -4038,8 +4038,6 @@
       "SESSION_COL_PAID": "المبلغ المدفوع",
       "SESSION_COL_STATUS": "الحالة",
       "MONTHLY_BILLS": "فواتير الاشتراك الشهري",
-      "COLLECT_NEXT_MONTH": "تحصيل الشهر القادم",
-      "COLLECT_NEXT_MONTH_HINT": "استلام دفعة عن الشهر القادم — تُنشأ الفاتورة فقط عند التحصيل.",
       "NO_MONTHLY_BILLS": "لم يتم إنشاء فواتير شهرية بعد.",
       "MONTHLY_PERIOD": "الفترة",
       "MONTHLY_AMOUNT_DUE": "المبلغ المستحق",

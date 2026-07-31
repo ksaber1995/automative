@@ -840,19 +840,6 @@
                     <h4 class="font-semibold text-gray-700 flex items-center gap-2">
                       <i class="pi pi-calendar text-amber-600"></i> {{ 'STUDENTS.DETAIL.MONTHLY_BILLS' | translate }}
                     </h4>
-                    <!-- Never for a dropped subscription: the student has left, so
-                         billing them for a month still to come is a bill nobody owes. -->
-                    @if (enrollment.status !== 'DROPPED') {
-                      <p-button
-                        icon="pi pi-forward"
-                        size="small"
-                        [outlined]="true"
-                        severity="success"
-                        [label]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH' | translate"
-                        [pTooltip]="'STUDENTS.DETAIL.COLLECT_NEXT_MONTH_HINT' | translate"
-                        (onClick)="collectNextMonth(enrollment)"
-                      ></p-button>
-                    }
                   </div>
                   @if (getMonthlyPayments(enrollment.id).length === 0) {
                     <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</p>

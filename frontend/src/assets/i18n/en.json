@@ -3914,8 +3914,6 @@
       "SESSION_COL_PAID": "Amount Paid",
       "SESSION_COL_STATUS": "Status",
       "MONTHLY_BILLS": "Monthly Subscription Bills",
-      "COLLECT_NEXT_MONTH": "Collect next month",
-      "COLLECT_NEXT_MONTH_HINT": "Take a payment for the upcoming month — the bill is created only when you collect.",
       "NO_MONTHLY_BILLS": "No monthly bills generated yet.",
       "MONTHLY_PERIOD": "Period",
       "MONTHLY_AMOUNT_DUE": "Amount Due",
