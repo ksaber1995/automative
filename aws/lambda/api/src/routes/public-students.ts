@@ -446,9 +446,10 @@ export const publicStudentsRoutes = {
         return paid >= due ? 'PAID' : 'PARTIAL';
       };
 
-      const totalPaid = monthly.reduce((t, m) => t + m.amountPaid, 0)
-        + sessions.reduce((t, s) => t + s.amountPaid, 0)
-        + oneTime.reduce((t, o) => t + o.amountPaid, 0);
+      // No paid-to-date total: that is a statement of account, and this page is
+      // behind nothing but the QR token printed on the student's card. The one
+      // number a parent scanning at the desk wants is what is still owed.
+      //
       // What is still owed right now — future months a student has not reached are
       // real bills, so they count, but nothing already settled does.
       const totalOutstanding = monthly.reduce((t, m) => t + Math.max(0, m.amountDue - m.amountPaid), 0)
@@ -496,7 +497,6 @@ export const publicStudentsRoutes = {
             packages: packagesDue,
             oneTime: oneTimeDue,
             refunds,
-            totalPaid,
             totalOutstanding,
             totalRefunded: refunds.reduce((t, r) => t + r.amount, 0),
           },

@@ -3363,7 +3363,13 @@ export const contract = c.router({
               refundDate: z.string().nullable(),
               type: z.string().nullable(),
             })),
-            totalPaid: z.number(),
+            /**
+             * Deliberately not sent any more. A running paid-to-date total is a
+             * statement of account, and this page is behind nothing but the QR
+             * token on the student's card — the same reason settled bills are
+             * filtered out. Optional so an older client still parses.
+             */
+            totalPaid: z.number().optional(),
             totalOutstanding: z.number(),
             totalRefunded: z.number(),
           }).optional(),

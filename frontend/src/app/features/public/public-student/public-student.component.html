@@ -240,31 +240,20 @@
            can be on more than one model, so each section stands alone and hides
            when nothing is outstanding on it. -->
       @if (p.payments) {
-        <!-- Totals first: the question a parent actually opened this to answer. -->
+        <!-- One number, the only one this page is opened to answer: what is owed.
+             A running paid-to-date total is a statement of account, which is not
+             what a parent scanning a card at the desk is asking for. -->
         <div class="bg-white rounded-xl shadow-sm p-5 mt-6 mb-6">
           <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
             <i class="pi pi-wallet text-xs"></i> {{ 'PUBLIC_PROFILE.PAYMENTS' | translate }}
           </h2>
-          <div class="grid grid-cols-2 gap-3"
-               [class.grid-cols-3]="p.payments.totalRefunded > 0">
-            <div class="text-center bg-green-50 rounded-lg py-3">
-              <div class="text-lg font-bold text-green-700">{{ money(p.payments.totalPaid) }}</div>
-              <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_PAID' | translate }}</div>
+          <div class="text-center rounded-lg py-4"
+               [class]="p.payments.totalOutstanding > 0 ? 'bg-amber-50' : 'bg-gray-50'">
+            <div class="text-2xl font-bold"
+                 [class]="p.payments.totalOutstanding > 0 ? 'text-amber-700' : 'text-gray-500'">
+              {{ money(p.payments.totalOutstanding) }}
             </div>
-            <div class="text-center rounded-lg py-3"
-                 [class]="p.payments.totalOutstanding > 0 ? 'bg-amber-50' : 'bg-gray-50'">
-              <div class="text-lg font-bold"
-                   [class]="p.payments.totalOutstanding > 0 ? 'text-amber-700' : 'text-gray-500'">
-                {{ money(p.payments.totalOutstanding) }}
-              </div>
-              <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_OUTSTANDING' | translate }}</div>
-            </div>
-            @if (p.payments.totalRefunded > 0) {
-              <div class="text-center bg-red-50 rounded-lg py-3">
-                <div class="text-lg font-bold text-red-700">{{ money(p.payments.totalRefunded) }}</div>
-                <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_REFUNDED' | translate }}</div>
-              </div>
-            }
+            <div class="text-xs text-gray-500">{{ 'PUBLIC_PROFILE.TOTAL_OUTSTANDING' | translate }}</div>
           </div>
 
           <!-- Nothing outstanding anywhere: say so plainly, rather than leaving

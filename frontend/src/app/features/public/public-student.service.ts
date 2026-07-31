@@ -98,7 +98,12 @@ export interface PublicStudentPayments {
   packages: PublicSessionPackage[];
   oneTime: PublicOneTimePayment[];
   refunds: PublicRefund[];
-  totalPaid: number;
+  /**
+   * No longer sent: a paid-to-date total is a statement of account, and this
+   * page is behind nothing but the QR token on the student's card. Optional so
+   * a cached older payload still parses.
+   */
+  totalPaid?: number;
   totalOutstanding: number;
   totalRefunded: number;
 }
