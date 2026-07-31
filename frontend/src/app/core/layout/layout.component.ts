@@ -9,6 +9,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import type { Html5Qrcode } from 'html5-qrcode';
+import { cameraScanConfig } from '../utils/scanner-formats.util';
 import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
@@ -440,11 +441,11 @@ export class LayoutComponent implements OnInit, OnDestroy {
     if (this.html5Qr) return;
     this.qrScanning.set(true);
     try {
-      const { Html5Qrcode } = await import('html5-qrcode');
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
       this.html5Qr = new Html5Qrcode(this.QR_SCANNER_ID);
       await this.html5Qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        cameraScanConfig(Html5QrcodeSupportedFormats),
         (decodedText) => this.handleQrScan(decodedText),
         () => {},
       );

@@ -14,6 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../../exams/services/exam.service';
 import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX, ratingLabelKey } from '../../exams/homework-rating.util';
 import { CompanyService } from '../../../core/services/company.service';
+import { normalizeStudentCode } from '../../../core/utils/student-code.util';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
@@ -343,7 +344,12 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
       this.notifications.error(this.translate.instant('SESSION_HOMEWORK.ENTER_MARK_FIRST'));
       return;
     }
-    if (/^\d+$/.test(v) && v.length < 6) this.recordCode(v);
+    // A printed code — typed, or read off a barcode. The old rule was "digits and
+    // shorter than 6", which quietly excluded card serials: those are six digits
+    // (901997), so a scanned card was sent to the API as a QR token and never
+    // found. Normalised because the prefix IS the range — "A5" is card 100005,
+    // not student 5 — and the API matches student_code exactly.
+    if (/^[Aa]?-?\d{1,8}$/.test(v)) this.recordCode(normalizeStudentCode(v));
     else this.record(this.extractToken(v));
   }
 

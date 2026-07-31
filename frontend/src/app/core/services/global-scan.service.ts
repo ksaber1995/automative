@@ -1,4 +1,6 @@
 import { Injectable, inject } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { StudentService } from '../../features/students/services/student.service';
@@ -52,14 +54,73 @@ export class GlobalScanService {
   }
 
   /**
+   * A scanned value that is the student's PRINTED code rather than a QR token.
+   *
+   * A barcode carries the number printed on the card — "116", "A5", "05",
+   * "A-100001" — where a QR carries the profile URL or its 32-char hex token.
+   * The digit cap is what keeps them apart: printed codes never run past a card
+   * serial's six digits, so a token that happens to be 'a' followed by digits
+   * cannot be mistaken for one.
+   */
+  private looksLikePrintedCode(raw: string): boolean {
+    return /^[Aa]?-?\d{1,8}$/.test(raw);
+  }
+
+  /**
+   * Turn ANY scanned value into a QR token: a profile URL, a raw token, or a
+   * BARCODE of the student's printed code.
+   *
+   * The app-wide USB capture goes through dispatch(), but a page running its own
+   * camera decodes straight into its own handler — so this is what those pages
+   * call to get the same barcode support without each of them re-deriving what a
+   * printed code looks like.
+   */
+  resolveScan(scanned: string): Observable<string> {
+    const raw = (scanned || '').trim();
+    if (!raw) return of('');
+    if (!this.looksLikePrintedCode(raw)) return of(this.extractToken(raw));
+    return this.studentService.lookupByCode(raw).pipe(map(({ qrToken }) => qrToken));
+  }
+
+  /**
    * Route a scanned value to the active page's handler, else find the student.
+   *
+   * Takes a QR (URL or raw token) or a BARCODE of the student's printed code.
+   * A code is resolved to that student's QR token first, so everything
+   * downstream — every page handler, check-in, payment flow — keeps working on
+   * a token and none of them had to learn about barcodes.
    *
    * `forceOpen` is set when the scan comes from the navbar's explicit QR-search
    * dialog: that's a deliberate "open this student" action, so it bypasses any
    * page-registered handler and always navigates (after taking attendance).
    */
   dispatch(decodedText: string, forceOpen = false): void {
-    const token = this.extractToken(decodedText);
+    const raw = (decodedText || '').trim();
+    if (!raw) return;
+
+    if (this.looksLikePrintedCode(raw)) {
+      // One in-flight lookup at a time: a scanner can fire twice on one swipe.
+      if (this.looking) return;
+      this.looking = true;
+      this.studentService.lookupByCode(raw).subscribe({
+        next: ({ qrToken }) => {
+          this.looking = false;
+          if (qrToken) this.dispatchToken(qrToken, forceOpen);
+          else this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND'));
+        },
+        error: () => {
+          this.looking = false;
+          this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND'));
+        },
+      });
+      return;
+    }
+
+    this.dispatchToken(this.extractToken(raw), forceOpen);
+  }
+
+  /** The QR path, once whatever was scanned has become a token. */
+  private dispatchToken(token: string, forceOpen: boolean): void {
     if (!token) return;
     if (this.handler && !forceOpen) {
       this.handler(token);

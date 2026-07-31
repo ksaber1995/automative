@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil, forkJoin } from 'rxjs';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
 import { InputTextModule } from 'primeng/inputtext';
 
 import { CardModule } from 'primeng/card';
@@ -325,7 +326,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
       await this.html5Qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        cameraScanConfig(Html5QrcodeSupportedFormats),
         (decodedText) => this.handleScan(decodedText),
         // Per-frame decode failures are normal (no code in view) — ignore.
         () => {},
@@ -359,14 +360,24 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   /** Camera decode callback. */
+  /**
+   * A camera decode — a QR, or a barcode of the student's printed code. The
+   * service turns either into a token, so the pay flow below is unchanged.
+   */
   private handleScan(decodedText: string): void {
-    const token = this.extractToken(decodedText);
-    if (!token) return;
+    // Dedup on the raw scan: a camera fires the same frame repeatedly, and a
+    // barcode must not trigger a lookup per frame while that resolves.
+    const raw = (decodedText || '').trim();
+    if (!raw) return;
     const now = Date.now();
-    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
-    this.lastToken = token;
+    if (raw === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = raw;
     this.lastTokenAt = now;
-    this.resolveToken(token);
+
+    this.globalScan.resolveScan(raw).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (token) => { if (token) this.resolveToken(token); },
+      error: () => this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND')),
+    });
   }
 
   /** USB scanner / manual entry submit (Enter key). */

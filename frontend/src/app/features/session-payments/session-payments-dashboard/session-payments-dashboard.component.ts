@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin, Observable } from 'rxjs';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
 
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
@@ -451,7 +452,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
       this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
       await this.html5Qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        cameraScanConfig(Html5QrcodeSupportedFormats),
         (decodedText) => this.handleScan(decodedText),
         // Per-frame decode failures are normal (no code in view) — ignore.
         () => {},
@@ -482,14 +483,24 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     return raw;
   }
 
+  /**
+   * A camera decode — a QR, or a barcode of the student's printed code. The
+   * service turns either into a token, so the flow below is unchanged.
+   */
   private handleScan(decodedText: string): void {
-    const token = this.extractToken(decodedText);
-    if (!token) return;
+    // Dedup on the RAW scan: a camera repeats the same frame, and a barcode must
+    // not fire a lookup per frame while the first one is still resolving.
+    const raw = (decodedText || '').trim();
+    if (!raw) return;
     const now = Date.now();
-    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
-    this.lastToken = token;
+    if (raw === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = raw;
     this.lastTokenAt = now;
-    this.resolveToken(token);
+
+    this.globalScan.resolveScan(raw).subscribe({
+      next: (token) => { if (token) this.resolveToken(token); },
+      error: () => this.notify.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND')),
+    });
   }
 
   /** USB scanner / manual entry submit (Enter key). */

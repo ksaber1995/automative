@@ -10,7 +10,8 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
 import { ExamService } from '../services/exam.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -284,7 +285,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
       this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
       await this.html5Qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        cameraScanConfig(Html5QrcodeSupportedFormats),
         (decodedText) => this.handleScan(decodedText),
         () => {},
       );
@@ -311,14 +312,24 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     return raw;
   }
 
+  /**
+   * A camera decode — a QR, or a barcode of the student's printed code. The
+   * service turns either into a token, so recording below is unchanged.
+   */
   private handleScan(decodedText: string) {
-    const token = this.extractToken(decodedText);
-    if (!token) return;
+    // Dedup on the RAW scan: a camera repeats the same frame, and a barcode must
+    // not fire a lookup per frame while the first one is still resolving.
+    const raw = (decodedText || '').trim();
+    if (!raw) return;
     const now = Date.now();
-    if (token === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
-    this.lastToken = token;
+    if (raw === this.lastToken && now - this.lastTokenAt < this.SCAN_DEDUP_MS) return;
+    this.lastToken = raw;
     this.lastTokenAt = now;
-    this.record(token);
+
+    this.globalScan.resolveScan(raw).subscribe({
+      next: (token) => { if (token) this.record(token); },
+      error: () => this.notifications.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND')),
+    });
   }
 
   /**
