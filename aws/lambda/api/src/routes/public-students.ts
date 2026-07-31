@@ -455,6 +455,26 @@ export const publicStudentsRoutes = {
         + sessions.reduce((t, s) => t + Math.max(0, s.amountDue - s.amountPaid), 0)
         + oneTime.reduce((t, o) => t + o.remaining, 0);
 
+      /**
+       * The parent sees what is still OWED, not what has already been settled.
+       *
+       * This page is opened by scanning the card, so it is read standing at a
+       * desk to answer one question — "what do I owe?" — and a list of every
+       * bill ever paid buries that answer. It also narrows what the QR token
+       * exposes: a settled bill is history that nobody needs to hand over.
+       *
+       * The unfiltered lists above still drive statusFor and the totals, so the
+       * course badges and "paid to date" stay right — only the line items shown
+       * are narrowed. A refunded per-session charge is not a due either.
+       */
+      const owed = (due: number, paid: number) => Math.max(0, due - paid) > 0.005;
+      const monthlyDue = monthly.filter((m) => owed(m.amountDue, m.amountPaid));
+      const sessionsDue = sessions.filter(
+        (s) => s.status !== 'REFUNDED' && s.status !== 'WAIVED' && owed(s.amountDue, s.amountPaid));
+      const packagesDue = packages.filter(
+        (p) => p.status !== 'REFUNDED' && owed(p.amountDue, p.amountPaid));
+      const oneTimeDue = oneTime.filter((o) => o.remaining > 0.005);
+
       return {
         status: 200 as const,
         body: {
@@ -471,10 +491,10 @@ export const publicStudentsRoutes = {
             enrollmentDate: row.enrollment_date,
           })),
           payments: {
-            monthly,
-            sessions,
-            packages,
-            oneTime,
+            monthly: monthlyDue,
+            sessions: sessionsDue,
+            packages: packagesDue,
+            oneTime: oneTimeDue,
             refunds,
             totalPaid,
             totalOutstanding,

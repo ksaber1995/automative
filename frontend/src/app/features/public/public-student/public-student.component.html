@@ -234,8 +234,11 @@
       }
 
       <!-- ── Payments ─────────────────────────────────────────────────────────
-           Every billing model the student is on. A student can be on more than
-           one at a time, so each section stands alone and hides when empty. -->
+           What is still OWED, across every billing model the student is on. A
+           settled bill is not listed: this page is read standing at a desk to
+           answer "what do I owe?", and past bills bury that answer. A student
+           can be on more than one model, so each section stands alone and hides
+           when nothing is outstanding on it. -->
       @if (p.payments) {
         <!-- Totals first: the question a parent actually opened this to answer. -->
         <div class="bg-white rounded-xl shadow-sm p-5 mt-6 mb-6">
@@ -263,9 +266,20 @@
               </div>
             }
           </div>
+
+          <!-- Nothing outstanding anywhere: say so plainly, rather than leaving
+               the parent looking at a blank space wondering if it failed to load. -->
+          @if (nothingDue()) {
+            <div class="mt-4 rounded-lg bg-green-50 border border-green-100 px-4 py-3 text-center">
+              <i class="pi pi-check-circle text-green-600"></i>
+              <span class="ms-2 text-sm font-medium text-green-800">
+                {{ 'PUBLIC_PROFILE.NOTHING_DUE' | translate }}
+              </span>
+            </div>
+          }
         </div>
 
-        <!-- Monthly subscription: one row per billed month, newest first. -->
+        <!-- Monthly subscription: one row per month still owed, newest first. -->
         @if (p.payments.monthly.length > 0) {
           <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
             <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
