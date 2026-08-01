@@ -242,10 +242,14 @@
     </p-table>
     } @else {
     <!-- Payments Table -->
+    <!-- expandedRowKeys is input-only in PrimeNG (there is no ...Change output),
+         and the table mutates this very object when a row is toggled — so a
+         one-way binding is right here and manual expand/collapse still sticks. -->
     <p-table
       [value]="filteredPayments()"
       [loading]="loading()"
       dataKey="id"
+      [expandedRowKeys]="expandedRows"
       [paginator]="filteredPayments().length > 10"
       [rows]="10"
       [rowsPerPageOptions]="[10, 20, 50]"

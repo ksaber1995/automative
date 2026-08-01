@@ -80,6 +80,17 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   heldSubscriptions = signal<HeldSubscription[]>([]);
   summary = signal<MonthlyPaymentSummary | null>(null);
 
+  /**
+   * Rows the table opens on its own — every bill that carries a note.
+   *
+   * The note IS the reason the expander exists, and one folded behind a chevron
+   * on a fifty-row table is a note nobody reads. Keyed by the table's dataKey
+   * (`id`) and seeded from the full result, not the filtered view, so a noted row
+   * is already open whenever a status tab or a name search brings it into sight —
+   * and so re-filtering never collapses a row the user opened by hand.
+   */
+  expandedRows: Record<string, boolean> = {};
+
   // UI state
   loading = signal(false);
   generating = signal(false);
@@ -510,6 +521,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         this.payments.set(payments);
         this.summary.set(summary);
         this.heldSubscriptions.set(held);
+        this.expandedRows = Object.fromEntries(
+          payments.filter(p => `${p.notes ?? ''}`.trim()).map(p => [p.id, true]),
+        );
         this.applyStatusFilter();
         this.loading.set(false);
       },
