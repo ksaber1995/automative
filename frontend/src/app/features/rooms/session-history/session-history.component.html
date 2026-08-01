@@ -165,10 +165,28 @@
                 </td>
                 @for (s of matrixSessions(); track s.id) {
                   <td class="px-3 py-2 text-center border-b border-gray-100">
-                    @switch (cellState(st.studentId, s.id)) {
-                      @case (true) { <i class="pi pi-check text-green-600 font-bold"></i> }
-                      @case (false) { <i class="pi pi-times text-red-500 font-bold"></i> }
-                      @default { <span class="text-gray-300">—</span> }
+                    <!-- Click a cell to flip that student's attendance for that
+                         session. A "—" cell has nobody to flip (not on the roster). -->
+                    @if (canEdit() && cellState(st.studentId, s.id) !== null) {
+                      <button
+                        type="button"
+                        class="w-full py-1 rounded hover:bg-gray-100 disabled:opacity-40"
+                        [disabled]="isBusy(s.id, st.studentId)"
+                        [pTooltip]="(cellState(st.studentId, s.id) ? 'SESSION_HISTORY.UNMARK' : 'SESSION_HISTORY.MARK_PRESENT') | translate"
+                        (click)="toggleAttendance(s.id, st.studentId, !cellState(st.studentId, s.id))"
+                      >
+                        @if (cellState(st.studentId, s.id)) {
+                          <i class="pi pi-check text-green-600 font-bold"></i>
+                        } @else {
+                          <i class="pi pi-times text-red-500 font-bold"></i>
+                        }
+                      </button>
+                    } @else {
+                      @switch (cellState(st.studentId, s.id)) {
+                        @case (true) { <i class="pi pi-check text-green-600 font-bold"></i> }
+                        @case (false) { <i class="pi pi-times text-red-500 font-bold"></i> }
+                        @default { <span class="text-gray-300">—</span> }
+                      }
                     }
                   </td>
                 }
@@ -291,13 +309,29 @@
                     {{ 'SESSION_HISTORY.PRESENT_LIST' | translate }} ({{ d.present.length }})
                   </div>
                   @if (d.present.length) {
-                    <ul class="list-disc ms-5 text-sm text-gray-700">
+                    <ul class="text-sm text-gray-700 space-y-0.5">
                       @for (s of d.present; track s.studentId) {
-                        <li>
-                          {{ s.studentName }}
+                        <li class="flex items-center gap-2">
+                          <!-- Marked by mistake? Take them off the session. -->
+                          @if (canEdit()) {
+                            <p-button
+                              icon="pi pi-times"
+                              severity="danger"
+                              [text]="true"
+                              [rounded]="true"
+                              size="small"
+                              [loading]="isBusy(session.id, s.studentId)"
+                              [pTooltip]="'SESSION_HISTORY.UNMARK' | translate"
+                              [attr.aria-label]="'SESSION_HISTORY.UNMARK' | translate"
+                              (onClick)="toggleAttendance(session.id, s.studentId, false)"
+                            ></p-button>
+                          } @else {
+                            <i class="pi pi-check text-green-600 text-xs"></i>
+                          }
+                          <span>{{ s.studentName }}</span>
                           <!-- When they arrived, not just that they did. -->
                           @if (s.checkedInAt) {
-                            <span class="text-gray-400 text-xs ms-1">{{ s.checkedInAt | date: 'h:mm a' }}</span>
+                            <span class="text-gray-400 text-xs">{{ s.checkedInAt | date: 'h:mm a' }}</span>
                           }
                         </li>
                       }
@@ -311,9 +345,27 @@
                     {{ 'SESSION_HISTORY.ABSENT_LIST' | translate }} ({{ d.absent.length }})
                   </div>
                   @if (d.absent.length) {
-                    <ul class="list-disc ms-5 text-sm text-gray-700">
+                    <ul class="text-sm text-gray-700 space-y-0.5">
                       @for (s of d.absent; track s.studentId) {
-                        <li>{{ s.studentName }}</li>
+                        <li class="flex items-center gap-2">
+                          <!-- Turned up but never got scanned — mark them now. -->
+                          @if (canEdit()) {
+                            <p-button
+                              icon="pi pi-check"
+                              severity="success"
+                              [text]="true"
+                              [rounded]="true"
+                              size="small"
+                              [loading]="isBusy(session.id, s.studentId)"
+                              [pTooltip]="'SESSION_HISTORY.MARK_PRESENT' | translate"
+                              [attr.aria-label]="'SESSION_HISTORY.MARK_PRESENT' | translate"
+                              (onClick)="toggleAttendance(session.id, s.studentId, true)"
+                            ></p-button>
+                          } @else {
+                            <i class="pi pi-times text-red-500 text-xs"></i>
+                          }
+                          <span>{{ s.studentName }}</span>
+                        </li>
                       }
                     </ul>
                   } @else {
@@ -337,4 +389,6 @@
   }
 
   <p-confirmDialog></p-confirmDialog>
+  <!-- PER_SESSION: marking someone present here raises their fee — collect it now. -->
+  <app-session-pay-dialog></app-session-pay-dialog>
 </div>

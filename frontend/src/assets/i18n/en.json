@@ -4973,7 +4973,10 @@
     "DELETE_MSG": "{{session}} — {{date}}. This permanently removes the session and its attendance ({{present}} present). It cannot be undone.",
     "DELETE_ACCEPT": "Delete session",
     "DELETE_REJECT": "Keep it",
-    "MSG_DELETED": "Session deleted"
+    "MSG_DELETED": "Session deleted",
+    "MARK_PRESENT": "Mark present",
+    "UNMARK": "Mark absent (remove)",
+    "MSG_ATT_UPDATED": "Attendance updated"
   },
   "SESSION_ATTENDANCE": {
     "UNCHECK_TITLE": "Remove session payment?",

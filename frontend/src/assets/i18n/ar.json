@@ -5097,7 +5097,10 @@
     "DELETE_MSG": "{{session}} — {{date}}. سيتم حذف الحصة وحضورها نهائيًا ({{present}} حاضر). لا يمكن التراجع عن هذا.",
     "DELETE_ACCEPT": "حذف الحصة",
     "DELETE_REJECT": "الاحتفاظ بها",
-    "MSG_DELETED": "تم حذف الحصة"
+    "MSG_DELETED": "تم حذف الحصة",
+    "MARK_PRESENT": "تسجيل حضور",
+    "UNMARK": "إلغاء الحضور",
+    "MSG_ATT_UPDATED": "تم تحديث الحضور"
   },
   "SESSION_ATTENDANCE": {
     "UNCHECK_TITLE": "حذف دفعة الحصة؟",

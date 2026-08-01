@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, input, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, inject, input, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CardModule } from 'primeng/card';
@@ -19,6 +19,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
+import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { Class } from '@shared/interfaces/class.interface';
 
 /**
@@ -28,11 +29,16 @@ import { Class } from '@shared/interfaces/class.interface';
  *
  * Lives as the History tab of the Sessions page (`embedded`), and stays reachable
  * on its own /session-history route, which is what the standalone header is for.
+ *
+ * Attendance is editable here after the fact — see `toggleAttendance`. A roster is
+ * routinely wrong once the lesson is over (a card scanned twice, a student who
+ * turned up and was never marked), and this is the screen people look at when they
+ * notice.
  */
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, ConfirmDialogModule, TooltipModule, TranslateModule],
+  imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, ConfirmDialogModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
   templateUrl: './session-history.component.html',
   // Own instance so the delete confirmation targets THIS component's dialog and
   // not the Sessions page's, which hosts us as its History tab.
@@ -41,6 +47,9 @@ import { Class } from '@shared/interfaces/class.interface';
 export class SessionHistoryComponent implements OnInit, OnDestroy {
   /** True when hosted inside the Sessions page's History tab (see the template). */
   embedded = input<boolean>(false);
+
+  /** PER_SESSION courses: collects a fee raised by marking someone present. */
+  @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
 
   private sessionService = inject(SessionService);
   private attendanceService = inject(AttendanceService);
@@ -267,6 +276,179 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
     this.clearScanFilter();
     this.load();
     if (this.matrixView()) this.loadMatrix();
+  }
+
+  // ── Edit attendance ─────────────────────────────────────────────────────────
+  //
+  // Both views correct a finished session's roster, through one path. Marking
+  // present goes through the bulk save, because that is what raises a PER_SESSION
+  // fee (handed straight to the pay dialog). Un-marking deletes the single
+  // attendance row instead of re-saving the list: the row may be a SUBSTITUTION or
+  // TRIAL scan, which the bulk save deliberately doesn't manage, and the delete
+  // reverses whatever fee that attendance raised. Un-marking someone who already
+  // has a charge asks first — their payment goes with it.
+
+  /** Read-only users see the roster but no toggles (the API would 403 anyway). */
+  canEdit = (): boolean => this.authService.canWrite('academy');
+
+  /** `${sessionId}|${studentId}` for every toggle in flight, so it can't double-fire. */
+  private busy = signal<Set<string>>(new Set());
+
+  isBusy(sessionId: string, studentId: string): boolean {
+    return this.busy().has(`${sessionId}|${studentId}`);
+  }
+
+  private setBusy(key: string, on: boolean): void {
+    this.busy.update((s) => {
+      const next = new Set(s);
+      if (on) next.add(key); else next.delete(key);
+      return next;
+    });
+  }
+
+  /**
+   * The session's roster. The expanded row already loaded it; the grid never does
+   * (it only keeps a present/absent bitmap), so fetch it there — the toggle needs
+   * the student's charge and enrolment to decide what it's allowed to do.
+   */
+  private withRoster(sessionId: string, run: (roster: SessionAttendanceStudent[]) => void): void {
+    const cached = this.attDetail().get(sessionId);
+    if (cached && !cached.loading) {
+      run([...cached.present, ...cached.absent]);
+      return;
+    }
+    this.attendanceService.getBySession(sessionId).subscribe({
+      next: (rows) => {
+        this.attDetail.update((m) =>
+          new Map(m).set(sessionId, {
+            loading: false,
+            present: rows.filter((r) => r.isPresent),
+            absent: rows.filter((r) => !r.isPresent),
+          }),
+        );
+        run(rows);
+      },
+      error: () => {},
+    });
+  }
+
+  /** Mark one student present, or un-mark them, on an already-finished session. */
+  toggleAttendance(sessionId: string, studentId: string, present: boolean): void {
+    if (!this.canEdit() || this.isBusy(sessionId, studentId)) return;
+    this.withRoster(sessionId, (roster) => {
+      const student = roster.find((r) => r.studentId === studentId);
+      if (!student) return;
+      if (!present && student.charge) {
+        this.confirmChargeThen(student, () => this.applyToggle(sessionId, roster, student, false));
+        return;
+      }
+      this.applyToggle(sessionId, roster, student, present);
+    });
+  }
+
+  /**
+   * Un-checking a student with a per-session charge deletes that charge, and any
+   * payment already taken against it. Name the amount before doing it.
+   */
+  private confirmChargeThen(student: SessionAttendanceStudent, onAccept: () => void): void {
+    const c = student.charge;
+    if (!c) { onAccept(); return; }
+    const detail = c.amountPaid > 0
+      ? this.translate.instant('SESSION_ATTENDANCE.UNCHECK_PAID', { amount: c.amountPaid })
+      : this.translate.instant('SESSION_ATTENDANCE.UNCHECK_UNPAID', { amount: c.amountDue });
+    this.confirmationService.confirm({
+      header: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_TITLE'),
+      message: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_MSG', { name: `${student.studentName}`.trim() }) + ' ' + detail,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_ACCEPT'),
+      rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: onAccept,
+    });
+  }
+
+  private applyToggle(
+    sessionId: string,
+    roster: SessionAttendanceStudent[],
+    student: SessionAttendanceStudent,
+    present: boolean,
+  ): void {
+    const key = `${sessionId}|${student.studentId}`;
+    this.setBusy(key, true);
+
+    if (present) {
+      // The bulk save owns the whole present list, and reverses the fee of anyone
+      // left out of it — so send everyone still present, off-roster attendees
+      // included, plus this student. The server keeps each existing row's type.
+      const presentIds = roster.filter((r) => r.isPresent).map((r) => r.studentId);
+      presentIds.push(student.studentId);
+      this.attendanceService.saveForSession(sessionId, presentIds).subscribe({
+        next: (res) => {
+          this.setBusy(key, false);
+          this.afterToggle(sessionId, student, true);
+          if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
+        },
+        // Interceptor toasted the translated error.
+        error: () => this.setBusy(key, false),
+      });
+    } else {
+      this.attendanceService.removeAttendee(sessionId, student.studentId).subscribe({
+        next: () => {
+          this.setBusy(key, false);
+          this.afterToggle(sessionId, student, false);
+        },
+        error: () => this.setBusy(key, false),
+      });
+    }
+  }
+
+  /**
+   * Fold the change into what's on screen instead of reloading: the expanded row's
+   * two lists, the Present/Absent column, and the grid cell — so the list and grid
+   * views never disagree about a session someone just edited.
+   */
+  private afterToggle(sessionId: string, student: SessionAttendanceStudent, present: boolean): void {
+    // A substitution/trial attendee has no enrolment to be "absent" from, so
+    // un-marking drops them off the roster entirely rather than moving them.
+    const dropped = !present && student.isEnrolled === false;
+
+    this.attDetail.update((m) => {
+      const d = m.get(sessionId);
+      if (!d) return m;
+      const all = [...d.present, ...d.absent]
+        .filter((s) => !(dropped && s.studentId === student.studentId))
+        .map((s) =>
+          s.studentId === student.studentId
+            ? { ...s, isPresent: present, charge: present ? s.charge : null }
+            : s,
+        );
+      return new Map(m).set(sessionId, {
+        loading: false,
+        present: all.filter((s) => s.isPresent),
+        absent: all.filter((s) => !s.isPresent),
+      });
+    });
+
+    this.attCounts.update((m) => {
+      const c = m.get(sessionId);
+      if (!c) return m;
+      const next = present
+        ? { ...c, present: c.present + 1, absent: Math.max(0, c.absent - 1) }
+        : dropped
+          ? { ...c, present: Math.max(0, c.present - 1) }
+          : { ...c, present: Math.max(0, c.present - 1), absent: c.absent + 1 };
+      return new Map(m).set(sessionId, next);
+    });
+
+    this.matrixAtt.update((m) => {
+      const cellKey = `${student.studentId}|${sessionId}`;
+      if (!m.has(cellKey)) return m;
+      const next = new Map(m);
+      if (dropped) next.delete(cellKey); else next.set(cellKey, present);
+      return next;
+    });
+
+    this.notify.success(this.translate.instant('SESSION_HISTORY.MSG_ATT_UPDATED'));
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────────
