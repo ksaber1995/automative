@@ -4,6 +4,37 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { ensurePerSessionSchema } from './session-payments';
 import { ensureMonthlyInstallmentLedger } from '../db/payment-ledger';
 
+/** The revenue streams the list and the summary agree on. */
+const REVENUE_SOURCES = [
+  'ENROLLMENT',
+  'PRODUCT_SALE',
+  'MASTER_ENROLLMENT',
+  'EVENT',
+  'SUBSCRIPTION',
+  'SESSION',
+] as const;
+type RevenueSourceKey = (typeof REVENUE_SOURCES)[number];
+
+/**
+ * Which refunds belong to each source.
+ *
+ * The refunds table is polymorphic and a refund names EVERY level it touches —
+ * a monthly-subscription refund carries the enrollment it belongs to as well as
+ * the bill (verified in prod: every subscription refund has enrollment_id set
+ * too). So ENROLLMENT has to exclude the rows a more specific key claims, or
+ * subscription and per-session money would be given back twice: once from its
+ * own source and again from course revenue.
+ */
+const REFUND_SOURCE_MATCH: Record<RevenueSourceKey, string> = {
+  ENROLLMENT:
+    'r.enrollment_id IS NOT NULL AND r.monthly_payment_id IS NULL AND r.session_payment_id IS NULL AND r.session_package_id IS NULL',
+  MASTER_ENROLLMENT: 'r.master_enrollment_id IS NOT NULL',
+  PRODUCT_SALE: 'r.product_sale_id IS NOT NULL',
+  EVENT: 'r.subscription_id IS NOT NULL',
+  SUBSCRIPTION: 'r.monthly_payment_id IS NOT NULL',
+  SESSION: '(r.session_payment_id IS NOT NULL OR r.session_package_id IS NOT NULL)',
+};
+
 export const revenuesRoutes = {
   list: async ({ query: queryParams, headers }: {
     query: {
@@ -375,6 +406,7 @@ export const revenuesRoutes = {
   summary: async ({ query: queryParams, headers }: {
     query: {
       branchId?: string;
+      source?: 'ENROLLMENT' | 'PRODUCT_SALE' | 'MASTER_ENROLLMENT' | 'EVENT' | 'SUBSCRIPTION' | 'SESSION' | 'ALL';
       startDate?: string;
       endDate?: string;
     };
@@ -424,6 +456,36 @@ export const revenuesRoutes = {
         LEFT JOIN event_subscriptions esr ON r.subscription_id = esr.id`;
       const REFUND_BRANCH = 'COALESCE(er.branch_id, mer.branch_id, psr.branch_id, esr.branch_id, r.branch_id)';
       let refundConditions = 'WHERE r.company_id = $1';
+
+      // ── Source filter ────────────────────────────────────────────────────────
+      //
+      // The headline has to mean what the page is showing. Filtering the list to
+      // one source used to leave the total reading the whole company's income,
+      // because `source` never reached this endpoint at all.
+      //
+      // Each stream is switched OFF with `AND FALSE` rather than by rebuilding
+      // the queries: a filtered summary keeps the exact shape of an unfiltered
+      // one, so the total, the per-source tiles, the by-month plot and the
+      // by-branch split all narrow together and cannot drift apart.
+      const source =
+        queryParams.source && queryParams.source !== 'ALL' ? queryParams.source : null;
+      if (source && !REVENUE_SOURCES.includes(source)) {
+        return apiError(400, 'ERRORS.REVENUES.BAD_SOURCE', 'Unknown revenue source');
+      }
+      /** '' for the selected source (or no filter), ' AND FALSE' for the rest. */
+      const off = (s: RevenueSourceKey): string => (source && source !== s ? ' AND FALSE' : '');
+      /** Refunds belong to a source too — see REFUND_SOURCE_MATCH. */
+      const refundSourceClause = source ? ` AND ${REFUND_SOURCE_MATCH[source]}` : '';
+
+      enrollmentConditions += off('ENROLLMENT');
+      productConditions += off('PRODUCT_SALE');
+      masterConditions += off('MASTER_ENROLLMENT');
+      eventConditions += off('EVENT');
+      subscriptionConditions += off('SUBSCRIPTION');
+      // Per-session money arrives on two ledgers; both are the SESSION source.
+      pkgConditions += off('SESSION');
+      sessionConditions += off('SESSION');
+      refundConditions += refundSourceClause;
 
       // Placeholder positions are captured where the value is PUSHED. They used
       // to be recovered further down with params.indexOf(value), which silently
@@ -568,7 +630,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount_paid) as total
           FROM enrollments
-          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')
+          WHERE company_id = $1 AND payment_status IN ('PAID', 'PARTIAL')${off('ENROLLMENT')}
           ${startIdx ? `AND enrollment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND enrollment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -576,7 +638,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(total_amount) as total
           FROM product_sales
-          WHERE company_id = $1
+          WHERE company_id = $1${off('PRODUCT_SALE')}
           ${startIdx ? `AND sale_date >= $${startIdx}` : ''}
           ${endIdx ? `AND sale_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -584,7 +646,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount_paid) as total
           FROM master_enrollments
-          WHERE company_id = $1 AND amount_paid > 0
+          WHERE company_id = $1 AND amount_paid > 0${off('MASTER_ENROLLMENT')}
           ${startIdx ? `AND enrollment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND enrollment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -592,7 +654,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount) as total
           FROM event_subscriptions
-          WHERE company_id = $1 AND amount > 0 AND branch_id IS NOT NULL
+          WHERE company_id = $1 AND amount > 0 AND branch_id IS NOT NULL${off('EVENT')}
           ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -600,7 +662,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount) as total
           FROM monthly_subscription_installments
-          WHERE company_id = $1 AND amount > 0
+          WHERE company_id = $1 AND amount > 0${off('SUBSCRIPTION')}
           ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -608,7 +670,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount) as total
           FROM session_package_installments
-          WHERE company_id = $1 AND amount > 0
+          WHERE company_id = $1 AND amount > 0${off('SESSION')}
           ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -616,7 +678,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT branch_id, SUM(amount) as total
           FROM session_payment_installments
-          WHERE company_id = $1 AND amount > 0
+          WHERE company_id = $1 AND amount > 0${off('SESSION')}
           ${startIdx ? `AND payment_date >= $${startIdx}` : ''}
           ${endIdx ? `AND payment_date <= $${endIdx}` : ''}
           GROUP BY branch_id
@@ -624,7 +686,7 @@ export const revenuesRoutes = {
         LEFT JOIN (
           SELECT ${REFUND_BRANCH} as branch_id, SUM(r.amount) as total
           ${REFUND_JOINS}
-          WHERE r.company_id = $1
+          WHERE r.company_id = $1${refundSourceClause}
           ${startIdx ? `AND r.refund_date >= $${startIdx}` : ''}
           ${endIdx ? `AND r.refund_date <= $${endIdx}` : ''}
           GROUP BY 1

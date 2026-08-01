@@ -67,6 +67,7 @@ export class RevenueService {
   // Get revenue summary with aggregated data
   getRevenueSummary(params?: {
     branchId?: string;
+    source?: RevenueSource | 'ALL';
     startDate?: string;
     endDate?: string;
   }): Observable<RevenueSummary> {

@@ -4014,6 +4014,9 @@ export const contract = c.router({
       path: '/api/revenues/summary',
       query: z.object({
         branchId: UUIDSchema.optional(),
+        // Same set as the list's: the headline has to be able to narrow to
+        // whatever the table is showing.
+        source: z.enum(['ENROLLMENT', 'PRODUCT_SALE', 'MASTER_ENROLLMENT', 'EVENT', 'SUBSCRIPTION', 'SESSION', 'ALL']).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
       }),

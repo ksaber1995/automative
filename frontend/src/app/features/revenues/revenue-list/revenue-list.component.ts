@@ -44,17 +44,19 @@ export class RevenueListComponent implements OnInit {
   activePreset = signal<string>('month');
 
   /**
-   * Period totals from /revenues/summary. It honours the branch and date filters
-   * but NOT the Source one — the breakdown below is what a source is worth, so
-   * narrowing it to a single source would defeat the point. Null while loading,
-   * or if the call failed (the page then falls back to the listed total).
+   * Period totals from /revenues/summary, under EVERY filter the table uses —
+   * branch, dates and source. The headline read the whole company's income while
+   * the table showed one source, which is the one thing a total must never do.
+   * Null while loading, or if the call failed (the page then falls back to the
+   * listed total).
    */
   summary = signal<RevenueSummary | null>(null);
 
   /**
    * The per-source tiles, gross. Sources worth nothing this period are dropped
    * rather than shown as a row of zeros — an academy that sells no products
-   * should not have to read past "Products 0" every time.
+   * should not have to read past "Products 0" every time. With a source filter
+   * on, only that one has a value, so the row collapses to it.
    */
   sourceTiles = computed<{ key: RevenueSource; value: number }[]>(() => {
     const s = this.summary();
@@ -203,10 +205,10 @@ export class RevenueListComponent implements OnInit {
       }
     });
 
-    // Same period and branch, every source. A failure here is silent: the table
-    // is the page, and it has already reported its own error if one occurred.
-    const { source, ...summaryParams } = params;
-    this.revenueService.getRevenueSummary(summaryParams).subscribe({
+    // The SAME filters as the table, source included — the headline has to be
+    // the total of what is on screen. A failure here is silent: the table is the
+    // page, and it has already reported its own error if one occurred.
+    this.revenueService.getRevenueSummary(params).subscribe({
       next: (summary: RevenueSummary) => this.summary.set(summary),
       error: () => this.summary.set(null),
     });
