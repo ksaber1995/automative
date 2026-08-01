@@ -41,6 +41,39 @@
         </div>
       </div>
 
+      <!-- A free session is open to the whole academy by design — that is what
+           the trial is for. This is the one lever that stops a prospect riding
+           free lessons for ever without ever enrolling. -->
+      <div class="px-2 pb-2">
+        <div class="flex items-start gap-4 border-2 rounded-xl p-5 border-gray-200">
+          <i class="pi pi-ticket text-2xl text-purple-500 mt-1"></i>
+          <div class="flex-1">
+            <label for="freeTrialLimit" class="font-bold text-gray-900 text-lg block mb-1">
+              {{ 'SETTINGS.TRIAL_LIMIT_LABEL' | translate }}
+            </label>
+            <span class="text-gray-600 text-sm block mb-3">{{ 'SETTINGS.TRIAL_LIMIT_HINT' | translate }}</span>
+            <div class="flex items-center gap-3 flex-wrap">
+              <input
+                id="freeTrialLimit"
+                type="number"
+                min="0"
+                step="1"
+                class="w-24 border border-gray-300 rounded-lg px-3 py-2"
+                [ngModel]="freeSessionTrialLimit()"
+                (ngModelChange)="freeSessionTrialLimit.set($event)"
+              />
+              <span class="text-sm" [class.text-purple-700]="freeSessionTrialLimit() > 0" [class.text-gray-500]="!freeSessionTrialLimit()">
+                @if (freeSessionTrialLimit() > 0) {
+                  {{ 'SETTINGS.TRIAL_LIMIT_ON' | translate: { count: freeSessionTrialLimit() } }}
+                } @else {
+                  {{ 'SETTINGS.TRIAL_LIMIT_OFF' | translate }}
+                }
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ng-template pTemplate="footer">
         <div class="flex justify-end pt-2">
           <p-button

@@ -54,6 +54,30 @@ export async function ensureAutoManageSessionsColumn(): Promise<void> {
   return autoManageColumnInitPromise;
 }
 
+/**
+ * How many free (TRIAL) sessions one student may ever attend, company-wide.
+ *
+ * 0 means unlimited, which is what every existing tenant gets — a free session
+ * has always been open to anyone, and silently capping it on deploy would start
+ * turning people away at the door. An academy opts in by setting a number.
+ */
+let freeTrialLimitColumnInitPromise: Promise<void> | null = null;
+export async function ensureFreeTrialLimitColumn(): Promise<void> {
+  if (!freeTrialLimitColumnInitPromise) {
+    freeTrialLimitColumnInitPromise = (async () => {
+      try {
+        await query(
+          `ALTER TABLE companies ADD COLUMN IF NOT EXISTS free_session_trial_limit INTEGER NOT NULL DEFAULT 0`
+        );
+      } catch (e) {
+        freeTrialLimitColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return freeTrialLimitColumnInitPromise;
+}
+
 // Student ID card back face — one shared design per company. Same idempotent
 // runtime-migration approach as above.
 let cardDesignColumnInitPromise: Promise<void> | null = null;
@@ -344,10 +368,10 @@ export const companiesRoutes = {
 
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
       const context = await extractTenantContext(headers.authorization);
       const company = await queryOne(
-        'SELECT id, name, global_expense_allocation, auto_manage_sessions, homework_grading_mode FROM companies WHERE id = $1',
+        'SELECT id, name, global_expense_allocation, auto_manage_sessions, homework_grading_mode, free_session_trial_limit FROM companies WHERE id = $1',
         [context.companyId]
       );
       if (!company) {
@@ -361,6 +385,7 @@ export const companiesRoutes = {
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
+          freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
         },
       };
     } catch (error) {
@@ -369,9 +394,9 @@ export const companiesRoutes = {
     }
   },
 
-  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; homeworkGradingMode?: string }; headers: { authorization: string } }) => {
+  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; homeworkGradingMode?: string; freeSessionTrialLimit?: number }; headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -391,6 +416,15 @@ export const companiesRoutes = {
         }
         updateData.homework_grading_mode = body.homeworkGradingMode;
       }
+      if (body.freeSessionTrialLimit !== undefined) {
+        // A negative cap would reject every trial while reading as a limit of
+        // "minus one"; 0 is the documented way to say unlimited.
+        const limit = Number(body.freeSessionTrialLimit);
+        if (!Number.isInteger(limit) || limit < 0) {
+          return apiError(400, 'ERRORS.COMPANIES.BAD_TRIAL_LIMIT', 'Trial limit must be zero or a positive whole number');
+        }
+        updateData.free_session_trial_limit = limit;
+      }
 
       const company = await update('companies', context.companyId, updateData);
       if (!company) {
@@ -405,6 +439,7 @@ export const companiesRoutes = {
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
+          freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
         },
       };
     } catch (error) {

@@ -4558,6 +4558,8 @@ export const contract = c.router({
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
           homeworkGradingMode: HomeworkGradingModeSchema,
+          // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
+          freeSessionTrialLimit: z.number().int().min(0),
         }),
         401: ApiErrorSchema,
       },
@@ -4587,6 +4589,7 @@ export const contract = c.router({
         globalExpenseAllocation: GlobalExpenseAllocationSchema.optional(),
         autoManageSessions: z.boolean().optional(),
         homeworkGradingMode: HomeworkGradingModeSchema.optional(),
+        freeSessionTrialLimit: z.number().int().min(0).optional(),
       }),
       responses: {
         200: z.object({
@@ -4595,6 +4598,8 @@ export const contract = c.router({
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
           homeworkGradingMode: HomeworkGradingModeSchema,
+          // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
+          freeSessionTrialLimit: z.number().int().min(0),
         }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,

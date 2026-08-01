@@ -46,6 +46,12 @@ export class SettingsComponent implements OnInit {
   autoManageSessions = signal(false);
   /** Number box vs Excellent…Weak when marking homework. */
   homeworkGradingMode = signal<HomeworkGradingMode>('NUMERIC');
+  /**
+   * How many free (trial) sessions one student may ever attend. 0 = unlimited,
+   * which is what a free session has always been — a taster is only a taster
+   * once the academy says how many it is worth.
+   */
+  freeSessionTrialLimit = signal<number>(0);
   /** Shown on the card so the number behind each rating is never a surprise. */
   ratingPreview = HOMEWORK_RATINGS;
 
@@ -100,6 +106,7 @@ export class SettingsComponent implements OnInit {
         this.selectedMethod.set(settings.globalExpenseAllocation);
         this.autoManageSessions.set(settings.autoManageSessions === true);
         this.homeworkGradingMode.set(settings.homeworkGradingMode === 'RATING' ? 'RATING' : 'NUMERIC');
+        this.freeSessionTrialLimit.set(settings.freeSessionTrialLimit ?? 0);
         this.loading.set(false);
       },
       error: () => {
@@ -114,6 +121,7 @@ export class SettingsComponent implements OnInit {
       globalExpenseAllocation: this.selectedMethod(),
       autoManageSessions: this.autoManageSessions(),
       homeworkGradingMode: this.homeworkGradingMode(),
+      freeSessionTrialLimit: Math.max(0, Math.trunc(Number(this.freeSessionTrialLimit()) || 0)),
     }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('SETTINGS.SAVED'));

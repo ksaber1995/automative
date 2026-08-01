@@ -3,6 +3,7 @@ import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns, ensureFreeSessionSchema } from './sessions';
+import { ensureFreeTrialLimitColumn } from './companies';
 import { notifyCheckin } from './telegram';
 import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema, pendingChargesForStudents } from './session-payments';
 
@@ -414,6 +415,45 @@ export const attendanceRoutes = {
           [session.class_id, context.companyId, student.id]
         );
         const type = enrolledHere ? 'NORMAL' : 'TRIAL';
+
+        // A trial is a taster, not a way to attend for ever. The company can cap
+        // how many free sessions one newcomer may ever sit (0 = unlimited, the
+        // default and what every tenant had before this existed).
+        //
+        // Only TRIAL counts. A student enrolled in THIS class is NORMAL — their
+        // own lesson simply wasn't billed — and must never be turned away by a
+        // cap aimed at prospects. The count is of sessions already attended, so
+        // a student on their last allowance still gets that session; and because
+        // the insert below is ON CONFLICT DO NOTHING, re-scanning someone who is
+        // already in the room can't consume a second slot.
+        if (type === 'TRIAL') {
+          await ensureFreeTrialLimitColumn();
+          const limitRow = await queryOne<any>(
+            'SELECT free_session_trial_limit AS lim FROM companies WHERE id = $1',
+            [context.companyId]
+          );
+          const limit = parseInt(limitRow?.lim ?? 0, 10) || 0;
+          if (limit > 0) {
+            const usedRow = await queryOne<any>(
+              `SELECT COUNT(*)::int AS n
+                 FROM session_attendance sa
+                 JOIN sessions s ON s.id = sa.session_id
+                WHERE sa.student_id = $1
+                  AND s.company_id = $2
+                  AND sa.attendance_type = 'TRIAL'
+                  AND sa.session_id <> $3`,
+              [student.id, context.companyId, params.sessionId]
+            );
+            const used = parseInt(usedRow?.n ?? 0, 10) || 0;
+            if (used >= limit) {
+              return apiError(
+                400,
+                'ERRORS.ATTENDANCE.TRIAL_LIMIT_REACHED',
+                `${student.name} has already used all ${limit} free session(s)`
+              );
+            }
+          }
+        }
 
         const insertedFree = await query(
           `INSERT INTO session_attendance (session_id, student_id, attendance_type)

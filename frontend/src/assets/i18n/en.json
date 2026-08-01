@@ -222,7 +222,8 @@
       "QR_STUDENT_NOT_FOUND": "No active student matches this QR code",
       "QR_TOKEN_REQUIRED": "QR token is required",
       "CHECKIN_FAILED": "Failed to check in student",
-      "REMOVE_FAILED": "Failed to remove attendee"
+      "REMOVE_FAILED": "Failed to remove attendee",
+      "TRIAL_LIMIT_REACHED": "This student has already used all their free sessions."
     },
     "CASH": {
       "NOT_AVAILABLE": "Cash is available for academies on the Advanced plan",
@@ -269,7 +270,8 @@
       "SETTINGS_FAILED": "Failed to load company settings",
       "PROFILE_FAILED": "Failed to load company profile",
       "PLAN_ACADEMY_ONLY": "Plans apply to academies only",
-      "PLAN_UPDATE_FAILED": "Failed to update plan"
+      "PLAN_UPDATE_FAILED": "Failed to update plan",
+      "BAD_TRIAL_LIMIT": "The free session limit must be zero or a positive whole number."
     },
     "COURSES": {
       "NOT_FOUND": "Course not found",
@@ -4195,7 +4197,11 @@
     "HW_GRADING_NUMERIC_HINT": "The teacher types a mark out of whatever the homework is set to.",
     "HW_GRADING_RATING": "By rating",
     "HW_GRADING_RATING_HINT": "The teacher picks a rating instead of typing a number. Each rating is still stored as a mark out of 5, so reports and the student's page are unchanged. Homework already marked out of something else keeps its number box.",
-    "HW_GRADING_CHANGED": "New homework will be marked this way."
+    "HW_GRADING_CHANGED": "New homework will be marked this way.",
+    "TRIAL_LIMIT_LABEL": "Free session limit per student",
+    "TRIAL_LIMIT_HINT": "How many free (trial) sessions one student may ever attend. Only newcomers count — a student already enrolled in the class is never turned away. Set 0 for no limit.",
+    "TRIAL_LIMIT_ON": "A student is turned away after {{count}} free session(s).",
+    "TRIAL_LIMIT_OFF": "No limit — anyone may attend any free session."
   },
   "REPORTS": {
     "TITLE": "Reports & Analytics",
