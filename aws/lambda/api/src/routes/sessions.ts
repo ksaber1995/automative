@@ -597,12 +597,22 @@ export const sessionsRoutes = {
                 -- OR this scheduled window ALREADY ran today and was ended (e.g. the
                 -- teacher finished a 1-hour lesson after 20 min). Without this, the
                 -- class is still inside its window with nothing running, so auto-start
-                -- would restart it — the bug. We treat it as "already ran" if a session
-                -- started at/after this window began. That instant is derived in UTC as
+                -- would restart it — the bug.
+                --
+                -- Judged on when the session ENDED, not when it started. A teacher who
+                -- opens the room 20 minutes early still ran THIS window, but their
+                -- session starts BEFORE it — so testing start_date declared the window
+                -- never run and auto-start reopened it seconds after they ended, over
+                -- and over. end_date is never earlier than start_date, so this still
+                -- covers every session that both started and ended inside the window,
+                -- while a lesson that finished before the window opened (a make-up
+                -- slot earlier in the day) correctly does not block it.
+                --
+                -- The window's start instant is derived in UTC as
                 -- NOW() - (localNow - windowStart): both are academy-local times so the
-                -- timezone offset cancels, which matters because start_date is UTC while
+                -- timezone offset cancels, which matters because end_date is UTC while
                 -- the schedule/localTime are local.
-                OR s.start_date >= NOW() - ($4::time - (
+                OR s.end_date >= NOW() - ($4::time - (
                      SELECT cdt2.start_time FROM class_day_times cdt2
                      WHERE cdt2.class_id = c.id AND cdt2.day_of_week = $2
                        AND cdt2.start_time <= $4::time AND cdt2.end_time > $4::time
