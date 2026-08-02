@@ -2551,6 +2551,8 @@
       "COL_ENROLLMENT": "Enrollment",
       "COL_STATUS": "Status",
       "COL_ACTIONS": "Actions",
+      "OVER_CAPACITY": "{{over}} over",
+      "OVER_CAPACITY_TOOLTIP": "This class is {{over}} student(s) over its limit of {{max}}",
       "NOT_ASSIGNED": "Not assigned",
       "NOT_SPECIFIED": "Not specified",
       "DATE_TO": "to",

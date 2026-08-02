@@ -12,6 +12,7 @@ import { DialogModule } from 'primeng/dialog';
 import { TabsModule } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ClassService } from '../services/class.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { LookupService } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -44,7 +45,17 @@ export class ClassListComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
+  private auth = inject(AuthService);
   protected branchState = inject(BranchStateService);
+
+  /**
+   * Rooms, branches and "which instructor" are academy concerns. A solo TEACHER
+   * tenant has no Rooms page (already hidden in the nav), one branch and one
+   * teacher — themselves — so those columns are three dashes and a repeated name,
+   * and the row checkboxes exist only to arm a bulk room assignment whose
+   * dropdown is always empty.
+   */
+  showAcademyColumns = () => !this.auth.isTeacher();
 
   classes = signal<ClassWithDetails[]>([]);
   courses = signal<any[]>([]);
@@ -64,6 +75,24 @@ export class ClassListComponent implements OnInit {
   activeStatus = signal<ClassStatus>('IN_PROGRESS');
 
   filteredClasses = () => this.classes().filter(c => (c.status ?? this.deriveStatus(c)) === this.activeStatus());
+
+  /** studentCount is the enriched field; currentEnrollment is the older name. */
+  enrolledCount(c: ClassWithDetails): number {
+    return (c as any).studentCount ?? (c as any).currentEnrollment ?? 0;
+  }
+
+  /**
+   * Nothing stops an enrollment once a class is full — maxStudents is a plan, not
+   * a lock — so a room can quietly end up over its seats. Flag it on the list
+   * rather than leaving "13 / 12" to be read as ordinary.
+   */
+  isOverCapacity(c: ClassWithDetails): boolean {
+    return !!c.maxStudents && this.enrolledCount(c) > c.maxStudents;
+  }
+
+  overCapacityBy(c: ClassWithDetails): number {
+    return this.enrolledCount(c) - (c.maxStudents || 0);
+  }
 
   countByStatus(status: ClassStatus): number {
     return this.classes().filter(c => (c.status ?? this.deriveStatus(c)) === status).length;
@@ -113,7 +142,7 @@ export class ClassListComponent implements OnInit {
 
     this.loadCourses();
     this.loadBranches();
-    this.loadRooms();
+    if (this.showAcademyColumns()) this.loadRooms();
     this.loadClasses();
   }
 

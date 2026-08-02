@@ -1,4 +1,4 @@
-<div class="container-custom py-8">
+﻿<div class="container-custom py-8">
   <div class="flex justify-between items-center mb-6">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">{{ 'CLASSES.LIST.TITLE' | translate }}</h1>
@@ -80,7 +80,7 @@
   </p-tabs>
 
   <!-- Bulk room assignment: only in the way once something is ticked -->
-  @if (selectedClasses.length) {
+  @if (showAcademyColumns() && selectedClasses.length) {
     <div class="flex flex-wrap items-center gap-3 mb-3 px-4 py-3 rounded-xl border border-indigo-200 bg-indigo-50">
       <span class="text-sm font-medium text-indigo-900">
         {{ 'CLASSES.LIST.SELECTED_COUNT' | translate: { count: selectedClasses.length } }}
@@ -92,6 +92,7 @@
     </div>
   }
 
+  @if (showAcademyColumns()) {
   <p-dialog
     [visible]="assignRoomDialogOpen()"
     (visibleChange)="$event ? null : assignRoomDialogOpen.set(false)"
@@ -125,6 +126,7 @@
         [loading]="assigningRoom()" (onClick)="confirmAssignRoom()"></p-button>
     </ng-template>
   </p-dialog>
+  }
 
   <p-card>
     <p-table
@@ -140,12 +142,18 @@
     >
       <ng-template pTemplate="header">
         <tr>
-          <th style="width: 3rem"><p-tableHeaderCheckbox></p-tableHeaderCheckbox></th>
+          @if (showAcademyColumns()) {
+            <th style="width: 3rem"><p-tableHeaderCheckbox></p-tableHeaderCheckbox></th>
+          }
           <th pSortableColumn="name">{{ 'CLASSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="courseName">{{ 'CLASSES.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
-          <th pSortableColumn="branchName">{{ 'CLASSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
-          <th pSortableColumn="instructorName">{{ 'CLASSES.LIST.COL_INSTRUCTOR' | translate }} <p-sortIcon field="instructorName"></p-sortIcon></th>
-          <th pSortableColumn="roomCode">{{ 'CLASSES.LIST.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+          @if (showAcademyColumns()) {
+            <th pSortableColumn="branchName">{{ 'CLASSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchName"></p-sortIcon></th>
+            <th pSortableColumn="instructorName">{{ 'CLASSES.LIST.COL_INSTRUCTOR' | translate }} <p-sortIcon field="instructorName"></p-sortIcon></th>
+          }
+          @if (showAcademyColumns()) {
+            <th pSortableColumn="roomCode">{{ 'CLASSES.LIST.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
+          }
           <th pSortableColumn="daysOfWeek">{{ 'CLASSES.LIST.COL_SCHEDULE' | translate }} <p-sortIcon field="daysOfWeek"></p-sortIcon></th>
           <th pSortableColumn="startDate">{{ 'CLASSES.LIST.COL_DATES' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
           <th pSortableColumn="studentCount">{{ 'CLASSES.LIST.COL_ENROLLMENT' | translate }} <p-sortIcon field="studentCount"></p-sortIcon></th>
@@ -155,24 +163,30 @@
       </ng-template>
       <ng-template pTemplate="body" let-classItem>
         <tr>
-          <td><p-tableCheckbox [value]="classItem"></p-tableCheckbox></td>
+          @if (showAcademyColumns()) {
+            <td><p-tableCheckbox [value]="classItem"></p-tableCheckbox></td>
+          }
           <td>
             <span class="font-medium text-blue-600 hover:underline cursor-pointer" (click)="viewClass(classItem)">
               {{ classItem.name }}
             </span>
           </td>
           <td>{{ classItem.courseName || 'N/A' }}</td>
-          <td>{{ classItem.branchName || 'N/A' }}</td>
-          <td>{{ classItem.instructorName || ('CLASSES.LIST.NOT_ASSIGNED' | translate) }}</td>
-          <td>
-            @if (classItem.roomCode) {
-              <span class="inline-flex items-center gap-1 rounded-full bg-slate-700 text-white text-[11px] font-semibold px-2 py-0.5">
-                <i class="pi pi-map-marker text-[10px]"></i>{{ classItem.roomCode }}
-              </span>
-            } @else {
-              <span class="text-gray-400">—</span>
-            }
-          </td>
+          @if (showAcademyColumns()) {
+            <td>{{ classItem.branchName || 'N/A' }}</td>
+            <td>{{ classItem.instructorName || ('CLASSES.LIST.NOT_ASSIGNED' | translate) }}</td>
+          }
+          @if (showAcademyColumns()) {
+            <td>
+              @if (classItem.roomCode) {
+                <span class="inline-flex items-center gap-1 rounded-full bg-slate-700 text-white text-[11px] font-semibold px-2 py-0.5">
+                  <i class="pi pi-map-marker text-[10px]"></i>{{ classItem.roomCode }}
+                </span>
+              } @else {
+                <span class="text-gray-400">â€”</span>
+              }
+            </td>
+          }
           <td>
             <div class="text-sm">
               @if (classItem.daysOfWeek) {
@@ -194,9 +208,16 @@
           </td>
           <td>
             <div class="text-sm">
-              <span class="font-medium">{{ classItem.studentCount ?? classItem.currentEnrollment ?? 0 }}</span>
+              <span class="font-medium" [class.text-red-600]="isOverCapacity(classItem)">{{ enrolledCount(classItem) }}</span>
               @if (classItem.maxStudents) {
-                <span class="text-gray-500"> / {{ classItem.maxStudents }}</span>
+                <span [class]="isOverCapacity(classItem) ? 'text-red-600' : 'text-gray-500'"> / {{ classItem.maxStudents }}</span>
+              }
+              @if (isOverCapacity(classItem)) {
+                <div class="inline-flex items-center gap-1 ml-1 text-red-600"
+                  [pTooltip]="'CLASSES.LIST.OVER_CAPACITY_TOOLTIP' | translate: { over: overCapacityBy(classItem), max: classItem.maxStudents }">
+                  <i class="pi pi-exclamation-triangle text-xs"></i>
+                  <span class="text-[11px] font-semibold">{{ 'CLASSES.LIST.OVER_CAPACITY' | translate: { over: overCapacityBy(classItem) } }}</span>
+                </div>
               }
             </div>
           </td>
@@ -242,7 +263,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="11" class="text-center py-8">
+          <td [attr.colspan]="showAcademyColumns() ? 11 : 7" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'CLASSES.LIST.NO_CLASSES' | translate }}</p>
@@ -260,3 +281,4 @@
     (confirm)="deleteClass()"
   ></app-delete-confirm-dialog>
 </div>
+

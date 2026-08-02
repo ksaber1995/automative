@@ -2551,6 +2551,8 @@
       "COL_ENROLLMENT": "التسجيل",
       "COL_STATUS": "الحالة",
       "COL_ACTIONS": "الإجراءات",
+      "OVER_CAPACITY": "زيادة {{over}}",
+      "OVER_CAPACITY_TOOLTIP": "هذه المجموعة تجاوزت الحد الأقصى ({{max}}) بـ {{over}} طالب",
       "NOT_ASSIGNED": "غير معيَّن",
       "NOT_SPECIFIED": "غير محدد",
       "DATE_TO": "إلى",
