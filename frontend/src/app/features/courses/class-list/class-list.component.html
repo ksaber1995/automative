@@ -156,8 +156,8 @@
           }
           <th pSortableColumn="daysOfWeek">{{ 'CLASSES.LIST.COL_SCHEDULE' | translate }} <p-sortIcon field="daysOfWeek"></p-sortIcon></th>
           <th pSortableColumn="startDate">{{ 'CLASSES.LIST.COL_DATES' | translate }} <p-sortIcon field="startDate"></p-sortIcon></th>
+          <!-- No status column: the tab above already fixes every row to one status. -->
           <th pSortableColumn="studentCount">{{ 'CLASSES.LIST.COL_ENROLLMENT' | translate }} <p-sortIcon field="studentCount"></p-sortIcon></th>
-          <th pSortableColumn="isActive">{{ 'CLASSES.LIST.COL_STATUS' | translate }} <p-sortIcon field="isActive"></p-sortIcon></th>
           <th>{{ 'CLASSES.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
       </ng-template>
@@ -222,12 +222,6 @@
             </div>
           </td>
           <td>
-            <p-tag
-              [value]="statusLabel(classItem.status)"
-              [severity]="statusSeverity(classItem.status)"
-            ></p-tag>
-          </td>
-          <td>
             <div class="flex gap-2">
               <p-button
                 icon="pi pi-eye"
@@ -263,7 +257,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="showAcademyColumns() ? 11 : 7" class="text-center py-8">
+          <td [attr.colspan]="showAcademyColumns() ? 10 : 6" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'CLASSES.LIST.NO_CLASSES' | translate }}</p>

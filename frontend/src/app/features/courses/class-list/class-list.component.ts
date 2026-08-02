@@ -5,7 +5,6 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
-import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { DialogModule } from 'primeng/dialog';
@@ -28,7 +27,6 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
     CardModule,
     TableModule,
     ButtonModule,
-    TagModule,
     TooltipModule,
     SelectModule,
     DialogModule,
@@ -101,24 +99,6 @@ export class ClassListComponent implements OnInit {
   onStatusTabChange(val: string | number | undefined) {
     const v = (val?.toString() ?? 'IN_PROGRESS') as ClassStatus;
     this.activeStatus.set(v);
-  }
-
-  statusLabel(status?: ClassStatus | string): string {
-    switch (status) {
-      case 'IN_PROGRESS': return this.translate.instant('CLASSES.LIST.STATUS_IN_PROGRESS');
-      case 'SCHEDULED': return this.translate.instant('CLASSES.LIST.STATUS_SCHEDULED');
-      case 'DONE': return this.translate.instant('CLASSES.LIST.STATUS_DONE');
-      default: return this.translate.instant('CLASSES.LIST.STATUS_UNKNOWN');
-    }
-  }
-
-  statusSeverity(status?: ClassStatus | string): 'success' | 'info' | 'secondary' | 'warn' {
-    switch (status) {
-      case 'IN_PROGRESS': return 'success';
-      case 'SCHEDULED': return 'info';
-      case 'DONE': return 'secondary';
-      default: return 'warn';
-    }
   }
 
   private deriveStatus(c: ClassWithDetails): ClassStatus {
