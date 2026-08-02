@@ -159,6 +159,15 @@ export class CourseDetailComponent implements OnInit {
     { label: this.translate.instant('MONTHS.DEC'), value: 12 },
   ]);
 
+  /**
+   * The enrollment payment columns (mode, progress, status) and their
+   * add-payment / refund actions only describe a ONE_TIME course, where the
+   * whole fee lives on the enrollment. Monthly and per-session courses bill
+   * through their own monthly bills / session payments, so those columns read
+   * an empty 0-of-0 here and the buttons would collect against the wrong ledger.
+   */
+  showPayments = computed(() => (this.course()?.paymentType ?? 'ONE_TIME') === 'ONE_TIME');
+
   // Products not yet linked, for the add-product select.
   availableProducts = computed(() => {
     const linkedIds = new Set(this.linkedProducts().map(lp => lp.productId));

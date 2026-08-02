@@ -138,9 +138,11 @@
             <th pSortableColumn="className">{{ 'COURSES.DETAIL.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
             <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_ENROLLED' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
             <th pSortableColumn="status">{{ 'COURSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
-            <th pSortableColumn="paymentMode">{{ 'COURSES.DETAIL.COL_PAYMENT_MODE' | translate }} <p-sortIcon field="paymentMode"></p-sortIcon></th>
-            <th pSortableColumn="amountPaid">{{ 'COURSES.DETAIL.COL_PAYMENT_PROGRESS' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
-            <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT_STATUS' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+            @if (showPayments()) {
+              <th pSortableColumn="paymentMode">{{ 'COURSES.DETAIL.COL_PAYMENT_MODE' | translate }} <p-sortIcon field="paymentMode"></p-sortIcon></th>
+              <th pSortableColumn="amountPaid">{{ 'COURSES.DETAIL.COL_PAYMENT_PROGRESS' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+              <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT_STATUS' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+            }
             <th>{{ 'COURSES.DETAIL.COL_ACTIONS' | translate }}</th>
           </tr>
         </ng-template>
@@ -153,59 +155,63 @@
             <td>
               <p-tag [value]="enrollmentStatusLabel(row.status)" [severity]="getEnrollmentStatusSeverity(row.status)"></p-tag>
             </td>
-            <td>
-              <span class="text-sm">
-                @if (row.paymentMode === 'INSTALLMENTS') {
-                  <span class="inline-flex items-center gap-1 text-blue-700">
-                    <i class="pi pi-credit-card text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_INSTALLMENTS' | translate }}
-                  </span>
-                } @else {
-                  <span class="inline-flex items-center gap-1 text-green-700">
-                    <i class="pi pi-check text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_FULL' | translate }}
-                  </span>
-                }
-              </span>
-            </td>
-            <td>
-              <div class="min-w-36">
-                <div class="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>{{ 'COURSES.DETAIL.PAID_LABEL' | translate: { amount: row.amountPaid.toFixed(0) } }}</span>
-                  <span>{{ 'COURSES.DETAIL.TOTAL_LABEL' | translate: { amount: row.finalPrice.toFixed(0) } }}</span>
+            @if (showPayments()) {
+              <td>
+                <span class="text-sm">
+                  @if (row.paymentMode === 'INSTALLMENTS') {
+                    <span class="inline-flex items-center gap-1 text-blue-700">
+                      <i class="pi pi-credit-card text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_INSTALLMENTS' | translate }}
+                    </span>
+                  } @else {
+                    <span class="inline-flex items-center gap-1 text-green-700">
+                      <i class="pi pi-check text-xs"></i> {{ 'COURSES.DETAIL.PAYMENT_MODE_FULL' | translate }}
+                    </span>
+                  }
+                </span>
+              </td>
+              <td>
+                <div class="min-w-36">
+                  <div class="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{{ 'COURSES.DETAIL.PAID_LABEL' | translate: { amount: row.amountPaid.toFixed(0) } }}</span>
+                    <span>{{ 'COURSES.DETAIL.TOTAL_LABEL' | translate: { amount: row.finalPrice.toFixed(0) } }}</span>
+                  </div>
+                  <p-progressbar
+                    [value]="row.finalPrice > 0 ? (row.amountPaid / row.finalPrice) * 100 : 0"
+                    [showValue]="false"
+                    [style]="{ height: '8px' }"
+                  ></p-progressbar>
+                  @if ((row.totalRefunded || 0) > 0) {
+                    <div class="text-xs text-orange-500 mt-0.5">{{ 'COURSES.DETAIL.REFUNDED_LABEL' | translate: { amount: row.totalRefunded.toFixed(0) } }}</div>
+                  }
                 </div>
-                <p-progressbar
-                  [value]="row.finalPrice > 0 ? (row.amountPaid / row.finalPrice) * 100 : 0"
-                  [showValue]="false"
-                  [style]="{ height: '8px' }"
-                ></p-progressbar>
-                @if ((row.totalRefunded || 0) > 0) {
-                  <div class="text-xs text-orange-500 mt-0.5">{{ 'COURSES.DETAIL.REFUNDED_LABEL' | translate: { amount: row.totalRefunded.toFixed(0) } }}</div>
-                }
-              </div>
-            </td>
-            <td>
-              <p-tag [value]="paymentLabel(row.paymentStatus)" [severity]="getPaymentStatusSeverity(row.paymentStatus)"></p-tag>
-            </td>
+              </td>
+              <td>
+                <p-tag [value]="paymentLabel(row.paymentStatus)" [severity]="getPaymentStatusSeverity(row.paymentStatus)"></p-tag>
+              </td>
+            }
             <td>
               <div class="flex gap-1">
-                @if (row.paymentStatus !== 'PAID' && row.paymentStatus !== 'REFUNDED') {
-                  <p-button
-                    icon="pi pi-wallet"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="success"
-                    (onClick)="openPaymentDialog(row)"
-                    [pTooltip]="'COURSES.DETAIL.TOOLTIP_ADD_PAYMENT' | translate"
-                  ></p-button>
-                }
-                @if (refundableAmount(row) > 0 && canRefund()) {
-                  <p-button
-                    icon="pi pi-replay"
-                    [rounded]="true"
-                    [text]="true"
-                    severity="warn"
-                    (onClick)="openRefundDialog(row)"
-                    [pTooltip]="'COURSES.DETAIL.TOOLTIP_PROCESS_REFUND' | translate"
-                  ></p-button>
+                @if (showPayments()) {
+                  @if (row.paymentStatus !== 'PAID' && row.paymentStatus !== 'REFUNDED') {
+                    <p-button
+                      icon="pi pi-wallet"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="success"
+                      (onClick)="openPaymentDialog(row)"
+                      [pTooltip]="'COURSES.DETAIL.TOOLTIP_ADD_PAYMENT' | translate"
+                    ></p-button>
+                  }
+                  @if (refundableAmount(row) > 0 && canRefund()) {
+                    <p-button
+                      icon="pi pi-replay"
+                      [rounded]="true"
+                      [text]="true"
+                      severity="warn"
+                      (onClick)="openRefundDialog(row)"
+                      [pTooltip]="'COURSES.DETAIL.TOOLTIP_PROCESS_REFUND' | translate"
+                    ></p-button>
+                  }
                 }
                 <p-button
                   icon="pi pi-external-link"
@@ -222,7 +228,7 @@
 
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="8" class="text-center py-8">
+            <td [attr.colspan]="showPayments() ? 8 : 5" class="text-center py-8">
               <div class="text-gray-500">
                 <i class="pi pi-users text-4xl mb-3 block"></i>
                 <p>{{ 'COURSES.DETAIL.NO_ENROLLMENTS' | translate }}</p>
@@ -502,19 +508,23 @@
                       <tr>
                         <th pSortableColumn="name">{{ 'COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
                         <th pSortableColumn="enrollmentDate">{{ 'COURSES.DETAIL.COL_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
-                        <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+                        @if (showPayments()) {
+                          <th pSortableColumn="paymentStatus">{{ 'COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+                        }
                       </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-student>
                       <tr>
                         <td>{{ student.name }}</td>
                         <td>{{ formatDate(student.enrollmentDate) }}</td>
-                        <td>
-                          <p-tag
-                            [value]="student.paymentStatus"
-                            [severity]="getPaymentStatusSeverity(student.paymentStatus)">
-                          </p-tag>
-                        </td>
+                        @if (showPayments()) {
+                          <td>
+                            <p-tag
+                              [value]="student.paymentStatus"
+                              [severity]="getPaymentStatusSeverity(student.paymentStatus)">
+                            </p-tag>
+                          </td>
+                        }
                       </tr>
                     </ng-template>
                   </p-table>
