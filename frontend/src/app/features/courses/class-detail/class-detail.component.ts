@@ -82,6 +82,24 @@ export class ClassDetailComponent implements OnInit {
 
   isFinished = () => this.classDetail()?.status === 'DONE' || !!this.classDetail()?.isFinished;
 
+  /** studentCount is the enriched field; currentEnrollment is the older name. */
+  enrolledCount = computed(() => {
+    const c = this.classDetail() as any;
+    return c?.studentCount ?? c?.currentEnrollment ?? 0;
+  });
+
+  /**
+   * maxStudents is a plan, not a lock — an enrollment goes through on a full
+   * class — so say it out loud rather than leaving "13 / 12" to be read as
+   * ordinary. Same warning as the class list.
+   */
+  isOverCapacity = computed(() => {
+    const max = this.classDetail()?.maxStudents;
+    return !!max && this.enrolledCount() > max;
+  });
+
+  overCapacityBy = computed(() => this.enrolledCount() - (this.classDetail()?.maxStudents || 0));
+
   // Free (trial) sessions — how many were run for this class, and who turned up.
   freeSummary = signal<FreeSessionSummary | null>(null);
   loadingFreeSessions = signal(false);

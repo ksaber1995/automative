@@ -71,9 +71,16 @@
         </div>
         <div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.ENROLLMENT' | translate }}</p>
-          <p class="font-semibold">{{ classDetail()?.studentCount ?? classDetail()?.currentEnrollment ?? 0 }}
-            @if (classDetail()?.maxStudents) { <span class="text-gray-400">/ {{ classDetail()?.maxStudents }}</span> }
+          <p class="font-semibold" [class.text-red-600]="isOverCapacity()">{{ enrolledCount() }}
+            @if (classDetail()?.maxStudents) { <span [class]="isOverCapacity() ? 'text-red-600' : 'text-gray-400'">/ {{ classDetail()?.maxStudents }}</span> }
           </p>
+          @if (isOverCapacity()) {
+            <div class="inline-flex items-center gap-1 mt-1 text-red-600"
+              [pTooltip]="'CLASSES.LIST.OVER_CAPACITY_TOOLTIP' | translate: { over: overCapacityBy(), max: classDetail()?.maxStudents }">
+              <i class="pi pi-exclamation-triangle text-xs"></i>
+              <span class="text-[11px] font-semibold">{{ 'CLASSES.LIST.OVER_CAPACITY' | translate: { over: overCapacityBy() } }}</span>
+            </div>
+          }
         </div>
         <div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ 'CLASSES.DETAIL.STATUS' | translate }}</p>
