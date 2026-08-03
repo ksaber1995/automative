@@ -255,6 +255,13 @@
             [placeholder]="'SESSIONS_DASHBOARD.SEARCH_OR_CODE' | translate"
             class="w-full" />
         </span>
+        <!-- Phones only: there is no wedge reader to type the code, so the camera
+             is the only way to scan a card here. -->
+        @if (isMobile()) {
+          <p-button icon="pi pi-camera" severity="info" size="small"
+            [label]="'SESSION_ATTENDANCE.SCAN_CAMERA' | translate"
+            (onClick)="openCameraScanner()"></p-button>
+        }
         @if (students().length > 0) {
           <p-button icon="pi pi-check-circle" severity="success" [outlined]="true" size="small"
             [label]="'SESSIONS_DASHBOARD.MARK_ALL_PRESENT' | translate"
@@ -441,6 +448,43 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'WHATSAPP.CLOSE' | translate" severity="secondary" [outlined]="true" (onClick)="skipAbsenceMessages()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Camera check-in. Stays open between scans so a queue of students can be
+     worked through one after another. -->
+<p-dialog
+  [visible]="scannerOpen()"
+  (visibleChange)="$event ? null : closeCameraScanner()"
+  [modal]="true"
+  [draggable]="false"
+  [dismissableMask]="true"
+  [style]="{ width: '22rem', maxWidth: '95vw' }"
+  [header]="'SESSION_ATTENDANCE.SCAN_TITLE' | translate"
+>
+  <div class="space-y-2">
+    <div id="session-attendance-qr-region" class="w-full rounded-lg overflow-hidden bg-black/90 min-h-[240px]"></div>
+    @if (cameraStarting()) {
+      <p class="text-center text-sm text-gray-500">
+        <i class="pi pi-spin pi-spinner me-1"></i>{{ 'SESSION_ATTENDANCE.SCAN_STARTING' | translate }}
+      </p>
+    } @else {
+      <p class="text-center text-xs text-gray-500">{{ 'SESSION_ATTENDANCE.SCAN_HINT' | translate }}</p>
+    }
+    @if (lastScanResult(); as res) {
+      <div class="rounded-md px-3 py-2 text-sm text-center"
+        [class.bg-green-50]="!res.alreadyPresent" [class.text-green-700]="!res.alreadyPresent"
+        [class.bg-gray-100]="res.alreadyPresent" [class.text-gray-600]="res.alreadyPresent">
+        <i class="pi" [class.pi-check-circle]="!res.alreadyPresent" [class.pi-info-circle]="res.alreadyPresent"></i>
+        {{ res.name }}
+        @if (res.alreadyPresent) { · {{ 'SESSIONS_DASHBOARD.PRESENT' | translate }} }
+      </div>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSION_ATTENDANCE.SCAN_DONE' | translate" icon="pi pi-check"
+      (onClick)="closeCameraScanner()"></p-button>
   </ng-template>
 </p-dialog>
 
