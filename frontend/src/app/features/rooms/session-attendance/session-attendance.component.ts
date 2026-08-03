@@ -29,7 +29,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { toLocalYmd } from '../../../core/utils/date.util';
-import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
+import { CameraScanDialogComponent } from '../../../shared/components/camera-scan/camera-scan-dialog.component';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
 
@@ -67,7 +67,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, CameraScanDialogComponent, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
@@ -177,14 +177,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // Everything else on this page assumes a USB/keyboard-wedge reader: it types
   // the code and the app-wide handler catches it. A phone has no such reader, so
   // without this the only way to take attendance on one is tapping 40 checkboxes.
-  private readonly SCANNER_ELEMENT_ID = 'session-attendance-qr-region';
-  private html5Qr?: any;
-  scannerOpen = signal(false);
-  cameraStarting = signal(false);
-  /** Suppress the rapid repeat decodes html5-qrcode fires for one physical scan. */
-  private lastScan = '';
-  private lastScanAt = 0;
-  private readonly SCAN_DEDUP_MS = 2500;
+  @ViewChild(CameraScanDialogComponent) cameraDialog?: CameraScanDialogComponent;
 
   /**
    * Phone-sized viewport. Live, not read once: a tablet rotating into portrait
@@ -280,73 +273,15 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Camera check-in ─────────────────────────────────────────────────────────
-
+  /** Open the camera. Scans land in the same handler a wedge reader's do. */
   openCameraScanner() {
-    this.scannerOpen.set(true);
-    this.lastScan = '';
-    // The preview element only exists once the dialog has rendered.
-    setTimeout(() => this.startCamera(), 100);
+    this.cameraDialog?.open();
   }
 
-  closeCameraScanner() {
-    this.stopCamera();
-    this.scannerOpen.set(false);
-  }
-
-  private async startCamera() {
-    if (this.html5Qr) return;
-    this.cameraStarting.set(true);
-    try {
-      // Loaded on demand: html5-qrcode is heavy and most attendance is taken
-      // with a reader, so it must not sit in this page's chunk.
-      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-      this.html5Qr = new Html5Qrcode(this.SCANNER_ELEMENT_ID);
-      await this.html5Qr.start(
-        { facingMode: 'environment' },
-        cameraScanConfig(Html5QrcodeSupportedFormats),
-        (decodedText: string) => this.handleCameraScan(decodedText),
-        // Per-frame decode failures are normal (no code in view) — ignore.
-        () => {},
-      );
-    } catch {
-      // Close rather than leave a black rectangle with no way forward.
-      this.html5Qr = undefined;
-      this.scannerOpen.set(false);
-      this.notificationService.warning(this.translate.instant('NAV.QR_CAMERA_FAILED'));
-    } finally {
-      this.cameraStarting.set(false);
-    }
-  }
-
-  private stopCamera() {
-    const qr = this.html5Qr;
-    this.html5Qr = undefined;
-    if (!qr) return;
-    // stop() rejects if it already stopped; swallow it.
-    qr.stop().then(() => qr.clear()).catch(() => {});
-  }
-
-  /**
-   * A camera decode: a card QR, or a barcode of the printed student code. Both
-   * resolve to a token, so this lands in exactly the same handler a wedge scan
-   * does — including the homework-mode branch and the check-in beep. The camera
-   * keeps running, so a queue of students can be scanned one after another.
-   */
-  private handleCameraScan(decodedText: string) {
-    const raw = (decodedText || '').trim();
-    if (!raw) return;
-    // Dedup on the RAW value: a camera re-reads the same frame many times a
-    // second, and a barcode must not fire a lookup per frame.
-    const now = Date.now();
-    if (raw === this.lastScan && now - this.lastScanAt < this.SCAN_DEDUP_MS) return;
-    this.lastScan = raw;
-    this.lastScanAt = now;
-
-    this.globalScan.resolveScan(raw).subscribe({
-      next: (token) => { if (token) this.scanHandler(token); },
-      error: () => this.notificationService.error(this.translate.instant('NAV.QR_STUDENT_NOT_FOUND')),
-    });
+  /** A resolved token from the camera — identical treatment to a wedge scan,
+   *  homework-mode branch and check-in beep included. */
+  onCameraScan(token: string) {
+    this.scanHandler(token);
   }
 
   loadStudents() {
@@ -852,7 +787,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.globalScan.unregister(this.scanHandler);
-    this.stopCamera();
     this.mobileQuery?.removeEventListener('change', this.onViewportChange);
     this.audioCtx?.close().catch(() => {});
     if (this.saveTimer) clearTimeout(this.saveTimer);

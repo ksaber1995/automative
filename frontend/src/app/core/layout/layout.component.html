@@ -6,7 +6,8 @@
         <button pButton icon="pi pi-bars" class="p-button-text p-button-rounded"
           (click)="toggleSidebar()">
         </button>
-        <img src="assets/img/logo-white.png" alt="Netrofit" style="height:40px" class="w-auto">
+        <!-- Hidden on phones: the navbar there needs its width for the actions. -->
+        <img src="assets/img/logo-white.png" alt="Netrofit" style="height:40px" class="w-auto hidden md:block">
       </div>
 
       <div class="flex items-center gap-4">
@@ -53,10 +54,13 @@
           (click)="languageService.toggle()">
         </button>
 
+        <!-- Icon only on phones; the tooltip carries the word instead. -->
         <button pButton
           icon="pi pi-sign-out"
-          [label]="'HEADER.LOGOUT' | translate"
+          [label]="isMobile() ? undefined : ('HEADER.LOGOUT' | translate)"
+          [pTooltip]="'HEADER.LOGOUT' | translate"
           class="p-button-text"
+          [class.p-button-rounded]="isMobile()"
           (click)="logout()">
         </button>
       </div>

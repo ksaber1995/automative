@@ -451,42 +451,13 @@
   </ng-template>
 </p-dialog>
 
-<!-- Camera check-in. Stays open between scans so a queue of students can be
-     worked through one after another. -->
-<p-dialog
-  [visible]="scannerOpen()"
-  (visibleChange)="$event ? null : closeCameraScanner()"
-  [modal]="true"
-  [draggable]="false"
-  [dismissableMask]="true"
-  [style]="{ width: '22rem', maxWidth: '95vw' }"
-  [header]="'SESSION_ATTENDANCE.SCAN_TITLE' | translate"
->
-  <div class="space-y-2">
-    <div id="session-attendance-qr-region" class="w-full rounded-lg overflow-hidden bg-black/90 min-h-[240px]"></div>
-    @if (cameraStarting()) {
-      <p class="text-center text-sm text-gray-500">
-        <i class="pi pi-spin pi-spinner me-1"></i>{{ 'SESSION_ATTENDANCE.SCAN_STARTING' | translate }}
-      </p>
-    } @else {
-      <p class="text-center text-xs text-gray-500">{{ 'SESSION_ATTENDANCE.SCAN_HINT' | translate }}</p>
-    }
-    @if (lastScanResult(); as res) {
-      <div class="rounded-md px-3 py-2 text-sm text-center"
-        [class.bg-green-50]="!res.alreadyPresent" [class.text-green-700]="!res.alreadyPresent"
-        [class.bg-gray-100]="res.alreadyPresent" [class.text-gray-600]="res.alreadyPresent">
-        <i class="pi" [class.pi-check-circle]="!res.alreadyPresent" [class.pi-info-circle]="res.alreadyPresent"></i>
-        {{ res.name }}
-        @if (res.alreadyPresent) { · {{ 'SESSIONS_DASHBOARD.PRESENT' | translate }} }
-      </div>
-    }
-  </div>
-
-  <ng-template pTemplate="footer">
-    <p-button [label]="'SESSION_ATTENDANCE.SCAN_DONE' | translate" icon="pi pi-check"
-      (onClick)="closeCameraScanner()"></p-button>
-  </ng-template>
-</p-dialog>
+<!-- Camera check-in (phones). Emits a resolved token into the same handler a
+     wedge reader's scan goes through. -->
+<app-camera-scan-dialog
+  regionId="session-attendance-qr-region"
+  [feedback]="lastScanResult()"
+  (scanned)="onCameraScan($event)"
+></app-camera-scan-dialog>
 
 <!-- Collect a due at the door: the oldest outstanding item, one at a time -->
 <app-dues-collect-dialog (collected)="loadDues()"></app-dues-collect-dialog>

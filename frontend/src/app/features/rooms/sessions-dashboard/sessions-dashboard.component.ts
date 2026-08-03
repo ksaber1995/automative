@@ -34,6 +34,7 @@ import { SessionHistoryComponent } from '../session-history/session-history.comp
 import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
 import { StudentAbsenceBadgeComponent } from '../../../shared/components/student-dues/student-absence-badge.component';
 import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
+import { CameraScanDialogComponent, CameraScanFeedback } from '../../../shared/components/camera-scan/camera-scan-dialog.component';
 import { StudentSessionDues } from '../services/attendance.service';
 
 interface DialogTeacherRow {
@@ -95,6 +96,7 @@ function endTimeAfterStartValidator(startDate: string) {
     StudentDuesBadgeComponent,
     StudentAbsenceBadgeComponent,
     DuesCollectDialogComponent,
+    CameraScanDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './sessions-dashboard.component.html',
@@ -102,6 +104,7 @@ function endTimeAfterStartValidator(startDate: string) {
 export class SessionsDashboardComponent implements OnInit {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
+  @ViewChild(CameraScanDialogComponent) cameraDialog?: CameraScanDialogComponent;
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
@@ -439,6 +442,11 @@ export class SessionsDashboardComponent implements OnInit {
     this.loadBranches();
     this.loadAll();
     this.loadUpcoming();
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      this.mobileQuery = window.matchMedia('(max-width: 767px)');
+      this.onViewportChange(this.mobileQuery);
+      this.mobileQuery.addEventListener('change', this.onViewportChange);
+    }
     // Refresh upcoming entries every minute
     setInterval(() => {
       this.upcomingTick.set(Date.now());
@@ -1001,6 +1009,68 @@ export class SessionsDashboardComponent implements OnInit {
 
   openCollect(sessionId: string, student: SessionAttendanceStudent) {
     this.collectDialog?.open(`${student.studentName}`.trim(), this.duesFor(sessionId, student.studentId));
+  }
+
+  // ── Camera check-in (phones) ────────────────────────────────────────────────
+  // The inline roster is the fastest way to register a class, but on a phone
+  // there is no wedge reader to feed it — so the camera does.
+  /** Phone-sized viewport, tracked live so a rotate does not need a reload. */
+  isMobile = signal(false);
+  private mobileQuery?: MediaQueryList;
+  private readonly onViewportChange = (e: MediaQueryListEvent | MediaQueryList) =>
+    this.isMobile.set(e.matches);
+  /** Which session the open camera is checking students into. */
+  private scanTargetSessionId = '';
+  scanFeedback = signal<CameraScanFeedback | null>(null);
+
+  openCameraScanner(sessionId: string) {
+    this.scanTargetSessionId = sessionId;
+    this.scanFeedback.set(null);
+    this.cameraDialog?.open();
+  }
+
+  /** A resolved token from the camera: check that student into the open roster. */
+  onCameraScan(token: string) {
+    const sessionId = this.scanTargetSessionId;
+    if (!sessionId) return;
+    this.attendanceService.checkinByQr(sessionId, token).subscribe({
+      next: (res) => {
+        const name = `${res.studentName}`.trim();
+        this.scanFeedback.set({ name, alreadyPresent: res.alreadyPresent });
+        // Reflect locally so the next debounced save does not drop the row —
+        // a substitution or trial attendee is not on the enrolled roster at all.
+        this.attendanceBySession.set({
+          ...this.attendanceBySession(),
+          [sessionId]: (() => {
+            const list = this.getAttendanceStudents(sessionId);
+            if (list.some((s) => s.studentId === res.studentId)) {
+              return list.map((s) => (s.studentId === res.studentId
+                ? { ...s, isPresent: true, attendanceType: res.attendanceType ?? s.attendanceType, homeClassName: res.homeClassName ?? s.homeClassName }
+                : s));
+            }
+            return [...list, {
+              studentId: res.studentId,
+              studentName: res.studentName,
+              studentCode: res.studentCode ?? null,
+              isPresent: true,
+              attendanceType: res.attendanceType ?? null,
+              homeClassName: res.homeClassName ?? null,
+              isEnrolled: res.attendanceType !== 'SUBSTITUTION' && res.attendanceType !== 'TRIAL',
+            }];
+          })(),
+        });
+        if (res.alreadyPresent) {
+          this.notificationService.info(this.translate.instant('SESSION_QR.ALREADY_PRESENT', { name }));
+        } else {
+          this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
+          // PER_SESSION courses: collect the charge this check-in just raised.
+          if (res.sessionCharge) this.payDialog?.enqueue([res.sessionCharge]);
+          this.loadDuesForSession(sessionId);
+        }
+      },
+      // Interceptor toasts the translated server error (unknown token / not enrolled).
+      error: () => this.scanFeedback.set(null),
+    });
   }
 
   /** After a collection: refresh every roster whose dues are already on screen.

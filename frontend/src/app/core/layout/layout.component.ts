@@ -56,6 +56,16 @@ type NavEntry =
   styleUrl: './layout.component.scss'})
 export class LayoutComponent implements OnInit, OnDestroy {
   sidebarVisible = signal(true);
+
+  /**
+   * Phone-sized viewport. An open sidebar there eats 16rem of a 20rem screen and
+   * pushes the page off the side, so it starts collapsed — and the navbar sheds
+   * the logo and the word "Logout" to fit what is left.
+   *
+   * Read once at startup, not watched: after that the burger button is the
+   * user's, and a resize must not slam their sidebar shut mid-task.
+   */
+  isMobile = signal(false);
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
   languageService = inject(LanguageService);
@@ -162,6 +172,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    const mobile = typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false;
+    this.isMobile.set(mobile);
+    if (mobile) this.sidebarVisible.set(false);
+
     this.subscriptionService.load().subscribe({ error: () => {} });
     this.syncOpenGroupFromUrl(this.router.url);
     this.router.events

@@ -236,13 +236,21 @@
                         <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_STUDENTS' | translate }}</p>
                       </div>
                     } @else {
-                      <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
                         <span class="text-sm font-medium text-gray-700">
                           {{ 'SESSIONS_DASHBOARD.STUDENT_COUNT' | translate: { count: getAttendanceStudents(sessionId).length } }}
                         </span>
-                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
-                          {{ 'SESSIONS_DASHBOARD.UPCOMING_PRE_ATTENDANCE' | translate }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                          <!-- Phones only: no wedge reader to feed this roster. -->
+                          @if (isMobile()) {
+                            <p-button icon="pi pi-camera" severity="info" size="small"
+                              [label]="'SESSION_ATTENDANCE.SCAN_CAMERA' | translate"
+                              (onClick)="openCameraScanner(sessionId)"></p-button>
+                          }
+                          <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                            {{ 'SESSIONS_DASHBOARD.UPCOMING_PRE_ATTENDANCE' | translate }}
+                          </span>
+                        </div>
                       </div>
                       @if (getAttendanceStudents(sessionId).length === 0) {
                         <div class="text-center py-6 text-gray-400 text-sm">
@@ -536,10 +544,16 @@
                         <p class="text-sm">{{ 'SESSIONS_DASHBOARD.LOADING_STUDENTS' | translate }}</p>
                       </div>
                     } @else {
-                      <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
                         <span class="text-sm font-medium text-gray-700">
                           {{ 'SESSIONS_DASHBOARD.STUDENT_COUNT' | translate: { count: getAttendanceStudents(session.id).length } }}
                         </span>
+                        <!-- Phones only: no wedge reader to feed this roster. -->
+                        @if (isMobile()) {
+                          <p-button icon="pi pi-camera" severity="info" size="small"
+                            [label]="'SESSION_ATTENDANCE.SCAN_CAMERA' | translate"
+                            (onClick)="openCameraScanner(session.id)"></p-button>
+                        }
                       </div>
                       @if (getAttendanceStudents(session.id).length === 0) {
                         <div class="text-center py-6 text-gray-400 text-sm">
@@ -1017,6 +1031,13 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog></app-session-pay-dialog>
+
+<!-- Camera check-in (phones) for whichever roster is open -->
+<app-camera-scan-dialog
+  regionId="sessions-dashboard-qr-region"
+  [feedback]="scanFeedback()"
+  (scanned)="onCameraScan($event)"
+></app-camera-scan-dialog>
 
 <!-- Collect a due from the inline roster: oldest outstanding item, one at a time -->
 <app-dues-collect-dialog (collected)="reloadOpenDues()"></app-dues-collect-dialog>
