@@ -331,29 +331,10 @@
               <!-- Absence panel: the unbroken run AND the month's scattered misses.
                    A student who skips every other week never builds a streak, so
                    the run alone would leave them looking fine. -->
-              @if (hasAbsenceHistory(student)) {
-                <div class="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-700">
-                  <i class="pi pi-calendar-times text-xs"></i>
-                  @if ((student.absentStreak ?? 0) > 0) {
-                    <span class="text-[11px] font-semibold"
-                      [pTooltip]="'SESSIONS_DASHBOARD.ABSENCE_WARN_TOOLTIP' | translate: { count: student.absentStreak }">
-                      {{ 'SESSION_ATTENDANCE.ABSENCE_STREAK' | translate: { count: student.absentStreak } }}
-                    </span>
-                  }
-                  @if ((student.absentStreak ?? 0) > 0 && (student.monthAbsences ?? 0) > 0) {
-                    <span class="text-red-300">·</span>
-                  }
-                  @if ((student.monthAbsences ?? 0) > 0) {
-                    <span class="text-[11px]">
-                      {{ 'SESSION_ATTENDANCE.ABSENCE_MONTH' | translate: {
-                          count: student.monthAbsences,
-                          total: student.monthSessions,
-                          month: sessionMonthName()
-                        } }}
-                    </span>
-                  }
-                </div>
-              }
+              <app-student-absence-badge
+                [student]="student"
+                [sessionDate]="session()?.startDate"
+              ></app-student-absence-badge>
 
               <!-- Money panel: clear, or owing with a way to collect it on the spot.
                    Renders nothing for a student the dues endpoint can't speak for. -->

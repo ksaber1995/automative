@@ -17,6 +17,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent, AttendanceType, StudentSessionDues } from '../services/attendance.service';
 import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
+import { StudentAbsenceBadgeComponent } from '../../../shared/components/student-dues/student-absence-badge.component';
 import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
 import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
@@ -65,7 +66,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, StudentDuesBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
@@ -155,22 +156,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   bannerMore = computed(() => Math.max(0, this.atRiskStudents().length - 8));
   isAtRisk = (s: SessionAttendanceStudent): boolean =>
     (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD;
-
-  /**
-   * The absence panel appears for a run of misses OR for scattered ones inside
-   * the month. The two answer different questions — "have they stopped coming?"
-   * and "how much of this month did they actually attend?" — and a student who
-   * misses every other week trips only the second.
-   */
-  hasAbsenceHistory = (s: SessionAttendanceStudent): boolean =>
-    (s.absentStreak ?? 0) > 0 || (s.monthAbsences ?? 0) > 0;
-
-  /** "July" — the month the panel's scattered-absence count is scoped to. */
-  sessionMonthName = computed(() => {
-    const start = this.session()?.startDate;
-    if (!start) return '';
-    return this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + (new Date(start).getMonth() + 1));
-  });
   /** Top banner shown briefly when the roster loads with at-risk students. */
   showAbsenceBanner = signal(false);
   private absenceBannerTimer?: ReturnType<typeof setTimeout>;

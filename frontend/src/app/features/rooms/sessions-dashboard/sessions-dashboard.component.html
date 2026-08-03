@@ -283,6 +283,10 @@
                                 </span>
                               </div>
                             </div>
+                            <app-student-absence-badge
+                              [student]="student"
+                              [sessionDate]="getUpcomingSessionStart(entry.classId)"
+                            ></app-student-absence-badge>
                             <app-student-dues-badge
                               [dues]="duesFor(sessionId, student.studentId)"
                               (pay)="openCollect(sessionId, student)"
@@ -587,6 +591,10 @@
                                 </span>
                               }
                             </div>
+                            <app-student-absence-badge
+                              [student]="student"
+                              [sessionDate]="session.startDate"
+                            ></app-student-absence-badge>
                             <app-student-dues-badge
                               [dues]="duesFor(session.id, student.studentId)"
                               (pay)="openCollect(session.id, student)"

@@ -32,6 +32,7 @@ import { TimetableService, TimetableEntry } from '../../timetable/timetable.serv
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHistoryComponent } from '../session-history/session-history.component';
 import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
+import { StudentAbsenceBadgeComponent } from '../../../shared/components/student-dues/student-absence-badge.component';
 import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
 import { StudentSessionDues } from '../services/attendance.service';
 
@@ -92,6 +93,7 @@ function endTimeAfterStartValidator(startDate: string) {
     SessionPayDialogComponent,
     SessionHistoryComponent,
     StudentDuesBadgeComponent,
+    StudentAbsenceBadgeComponent,
     DuesCollectDialogComponent,
   ],
   providers: [ConfirmationService],
@@ -912,6 +914,11 @@ export class SessionsDashboardComponent implements OnInit {
 
   getUpcomingSessionId(classId: string): string | null {
     return this.upcomingSessionByClass()[classId]?.id || null;
+  }
+
+  /** Scopes the absence panel's month count to the session being registered. */
+  getUpcomingSessionStart(classId: string): string | null {
+    return this.upcomingSessionByClass()[classId]?.startDate || null;
   }
 
   formatTime(dateStr: string): string {
