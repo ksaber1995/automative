@@ -91,3 +91,7 @@ frontend/.angular/
 
 # Build output of a stray root-level electron build (not source).
 /electron/
+
+# Claude Code local runtime state: a session id + PID rewritten every session,
+# so tracking it means a dirty tree and a noise commit on every run.
+.claude/scheduled_tasks.lock
