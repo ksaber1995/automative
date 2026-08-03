@@ -4994,7 +4994,7 @@
     "UNCHECK_UNPAID": "The pending charge of {{amount}} will be removed.",
     "UNCHECK_MANY": "This will delete the session charge/payment for {{count}} student(s). Continue?",
     "UNCHECK_ACCEPT": "Delete & un-check",
-    "UNCHECK_CANCEL": "Keep present",
+    "UNCHECK_CANCEL": "Skip",
     "MARK_ALL_TITLE": "Mark everyone present?",
     "MARK_ALL_CONFIRM": "This marks {{count}} student(s) present in one go. Any per-session fees they owe will be raised now.",
     "MARK_ALL_ACCEPT": "Mark all present",
