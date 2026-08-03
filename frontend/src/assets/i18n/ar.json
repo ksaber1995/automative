@@ -5133,7 +5133,9 @@
     "COLLECT_DATE": "تاريخ الدفع",
     "COLLECT_NOTES": "ملاحظات",
     "COLLECT_CONFIRM": "تحصيل",
-    "COLLECT_PRINT": "تحصيل وطباعة"
+    "COLLECT_PRINT": "تحصيل وطباعة",
+    "ABSENCE_STREAK": "غاب آخر {{count}} حصص متتالية",
+    "ABSENCE_MONTH": "غاب {{count}} من {{total}} في {{month}}"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الحصص",

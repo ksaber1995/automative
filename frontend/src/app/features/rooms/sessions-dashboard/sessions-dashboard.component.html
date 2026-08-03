@@ -252,10 +252,11 @@
                       } @else {
                         <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
                           @for (student of getAttendanceStudents(sessionId); track student.studentId) {
-                            <div class="flex items-center justify-between p-2 rounded-lg border"
+                            <div class="p-2 rounded-lg border"
                               [class.border-green-200]="student.isPresent"
                               [class.bg-green-50]="student.isPresent"
                               [class.border-gray-200]="!student.isPresent">
+                            <div class="flex items-center justify-between">
                               <div class="flex items-center gap-3">
                                 <p-checkbox
                                   [ngModel]="student.isPresent"
@@ -281,6 +282,11 @@
                                   {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
                                 </span>
                               </div>
+                            </div>
+                            <app-student-dues-badge
+                              [dues]="duesFor(sessionId, student.studentId)"
+                              (pay)="openCollect(sessionId, student)"
+                            ></app-student-dues-badge>
                             </div>
                           }
                         </div>
@@ -539,10 +545,11 @@
                       } @else {
                         <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
                           @for (student of getAttendanceStudents(session.id); track student.studentId) {
-                            <div class="flex items-center justify-between p-2 rounded-lg border"
+                            <div class="p-2 rounded-lg border"
                               [class.border-green-200]="student.isPresent"
                               [class.bg-green-50]="student.isPresent"
                               [class.border-gray-200]="!student.isPresent">
+                            <div class="flex items-center justify-between">
                               <div class="flex items-center gap-3">
                                 <p-checkbox
                                   [ngModel]="student.isPresent"
@@ -579,6 +586,11 @@
                                   {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
                                 </span>
                               }
+                            </div>
+                            <app-student-dues-badge
+                              [dues]="duesFor(session.id, student.studentId)"
+                              (pay)="openCollect(session.id, student)"
+                            ></app-student-dues-badge>
                             </div>
                           }
                         </div>
@@ -997,6 +1009,9 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog></app-session-pay-dialog>
+
+<!-- Collect a due from the inline roster: oldest outstanding item, one at a time -->
+<app-dues-collect-dialog (collected)="reloadOpenDues()"></app-dues-collect-dialog>
 
 <!-- The timetable entry carries no room, and an academy's offline class needs one.
      Ask, rather than failing with "Room is required" and no way to act on it. -->

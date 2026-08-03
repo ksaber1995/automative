@@ -6325,6 +6325,12 @@ export const contract = c.router({
             amountDue: z.number(),
             amountPaid: z.number(),
           }).nullable().optional(),
+          /** Unbroken run of missed sessions counting back from the latest. */
+          absentStreak: z.number().nullable().optional(),
+          /** Missed sessions in the session's own month, streak or not, and how
+           *  many ended sessions that month had to be missed. */
+          monthAbsences: z.number().nullable().optional(),
+          monthSessions: z.number().nullable().optional(),
         })),
         401: ApiErrorSchema,
         402: ApiErrorSchema,

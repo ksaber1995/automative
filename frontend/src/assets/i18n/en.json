@@ -5009,7 +5009,9 @@
     "COLLECT_DATE": "Payment date",
     "COLLECT_NOTES": "Notes",
     "COLLECT_CONFIRM": "Collect",
-    "COLLECT_PRINT": "Collect & print"
+    "COLLECT_PRINT": "Collect & print",
+    "ABSENCE_STREAK": "Missed the last {{count}} in a row",
+    "ABSENCE_MONTH": "{{count}} of {{total}} missed in {{month}}"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",

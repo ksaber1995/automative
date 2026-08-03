@@ -173,6 +173,58 @@ export const attendanceRoutes = {
         absentStreakByStudent.set(r.student_id, Number(r.absent_streak ?? 0));
       }
 
+      // Absences within the session's own month, streak or not. A student who
+      // misses every other week never builds a streak, so the run above alone
+      // makes them look fine; this counts the scattered ones. Same month the
+      // dues panel bills for, and the same "a substitution elsewhere counts as
+      // present" fairness as the streak.
+      const monthAbsenceByStudent = new Map<string, { absences: number; sessions: number }>();
+      const monthRows = await query<any>(
+        `WITH month_sessions AS (
+            SELECT s.id, s.session_number
+            FROM sessions s
+            WHERE s.class_id = $1 AND s.company_id = $2
+              AND s.id <> $3
+              AND s.end_date IS NOT NULL
+              AND COALESCE(s.is_free, false) = false
+              AND date_trunc('month', s.start_date) = date_trunc('month', $4::timestamp)
+         ),
+         enrolled AS (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+         )
+         SELECT e.student_id,
+                COUNT(*) AS session_count,
+                COUNT(*) FILTER (WHERE NOT (
+                  EXISTS (
+                    SELECT 1 FROM session_attendance sa
+                    WHERE sa.session_id = m.id AND sa.student_id = e.student_id
+                      AND sa.attendance_type = 'NORMAL'
+                  )
+                  OR (m.session_number IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM session_attendance sub
+                    JOIN sessions s2 ON s2.id = sub.session_id
+                    JOIN classes c2 ON c2.id = s2.class_id
+                    WHERE sub.student_id = e.student_id
+                      AND sub.attendance_type = 'SUBSTITUTION'
+                      AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
+                      AND s2.session_number = m.session_number
+                  ))
+                )) AS absent_count
+           FROM month_sessions m CROSS JOIN enrolled e
+          GROUP BY e.student_id`,
+        [session.class_id, context.companyId, params.sessionId, session.start_date]
+      );
+      for (const r of monthRows) {
+        monthAbsenceByStudent.set(r.student_id, {
+          absences: Number(r.absent_count ?? 0),
+          sessions: Number(r.session_count ?? 0),
+        });
+      }
+
       return {
         status: 200 as const,
         body: students.map((row: any) => ({
@@ -192,6 +244,8 @@ export const attendanceRoutes = {
           isEnrolled: row.is_enrolled === true,
           charge: chargeByStudent.get(row.student_id) || null,
           absentStreak: absentStreakByStudent.get(row.student_id) ?? 0,
+          monthAbsences: monthAbsenceByStudent.get(row.student_id)?.absences ?? 0,
+          monthSessions: monthAbsenceByStudent.get(row.student_id)?.sessions ?? 0,
         })),
       };
     } catch (error) {

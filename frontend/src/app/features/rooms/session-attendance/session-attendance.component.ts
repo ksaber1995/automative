@@ -15,14 +15,9 @@ import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
-import { AttendanceService, SessionAttendanceStudent, AttendanceType, SessionDueItem, StudentSessionDues } from '../services/attendance.service';
-import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
-import { SessionPaymentsService } from '../../session-payments/session-payments.service';
-import { EnrollmentService } from '../../enrollments/services/enrollment.service';
-import { ReceiptService } from '../../../core/services/receipt.service';
-import { AmountPipe } from '../../../shared/pipes/amount.pipe';
-import { InputNumberModule } from 'primeng/inputnumber';
-import { DatePickerModule } from 'primeng/datepicker';
+import { AttendanceService, SessionAttendanceStudent, AttendanceType, StudentSessionDues } from '../services/attendance.service';
+import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
+import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
 import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -70,7 +65,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, InputNumberModule, DatePickerModule, AmountPipe, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, StudentDuesBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
@@ -79,6 +74,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   code = formatStudentCode;
 
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
+  @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
   @ViewChild(SessionHomeworkPanelComponent) homeworkPanel?: SessionHomeworkPanelComponent;
 
   /** Homework marking is open — scans record a mark instead of checking in. */
@@ -98,10 +94,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
-  private monthlySubs = inject(MonthlySubscriptionsService);
-  private sessionPayments = inject(SessionPaymentsService);
-  private enrollmentService = inject(EnrollmentService);
-  private receiptService = inject(ReceiptService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
   // it and forwards to the homework panel while that's open — otherwise the two
@@ -163,6 +155,22 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   bannerMore = computed(() => Math.max(0, this.atRiskStudents().length - 8));
   isAtRisk = (s: SessionAttendanceStudent): boolean =>
     (s.absentStreak ?? 0) >= this.ABSENCE_WARN_THRESHOLD;
+
+  /**
+   * The absence panel appears for a run of misses OR for scattered ones inside
+   * the month. The two answer different questions — "have they stopped coming?"
+   * and "how much of this month did they actually attend?" — and a student who
+   * misses every other week trips only the second.
+   */
+  hasAbsenceHistory = (s: SessionAttendanceStudent): boolean =>
+    (s.absentStreak ?? 0) > 0 || (s.monthAbsences ?? 0) > 0;
+
+  /** "July" — the month the panel's scattered-absence count is scoped to. */
+  sessionMonthName = computed(() => {
+    const start = this.session()?.startDate;
+    if (!start) return '';
+    return this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + (new Date(start).getMonth() + 1));
+  });
   /** Top banner shown briefly when the roster loads with at-risk students. */
   showAbsenceBanner = signal(false);
   private absenceBannerTimer?: ReturnType<typeof setTimeout>;
@@ -175,24 +183,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   duesPaymentType = signal<string>('');
   loadingDues = signal(false);
 
+  /** Undefined for a student the endpoint can't speak for — the badge then
+   *  renders nothing rather than an unverified green. */
   dues = (studentId: string): StudentSessionDues | undefined => this.duesByStudent().get(studentId);
-  /** Owed money. Green badge is the absence of this, not just a missing entry. */
-  hasDues = (studentId: string): boolean => (this.dues(studentId)?.totalDue ?? 0) > 0.009;
-  /**
-   * Only students we can actually speak for get a badge. A trial/substitution
-   * attendee or a bundle enrollee is absent from the dues response, and a green
-   * "no dues" on them would be a claim we haven't checked.
-   */
-  duesKnown = (studentId: string): boolean => this.duesByStudent().has(studentId);
-
-  // Collect dialog — one outstanding item at a time, oldest first.
-  showCollectDialog = signal(false);
-  collectStudent = signal<SessionAttendanceStudent | null>(null);
-  collectItem = signal<SessionDueItem | null>(null);
-  collectAmount: number | null = null;
-  collectDate: Date = new Date();
-  collectNotes = '';
-  collecting = signal(false);
 
   /** TEACHER-type company — used to hide staff/teacher management. */
   isTeacherCompany = computed(() => this.auth.isTeacher());
@@ -300,80 +293,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** "June 2026" for a monthly item; the server's own label for anything else. */
-  dueItemLabel(item: SessionDueItem): string {
-    if (item.kind !== 'MONTHLY' || !item.billingMonth) return item.label;
-    const month = this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + item.billingMonth);
-    return `${month} ${item.billingYear}`;
-  }
-
-  /** The oldest unpaid item — what the Pay button collects. */
-  oldestDue(studentId: string): SessionDueItem | null {
-    return this.dues(studentId)?.items[0] ?? null;
-  }
-
+  /** Open the shared collect dialog on this student's oldest outstanding item. */
   openCollect(student: SessionAttendanceStudent) {
-    const item = this.oldestDue(student.studentId);
-    if (!item) return;
-    this.collectStudent.set(student);
-    this.collectItem.set(item);
-    this.collectAmount = parseFloat(item.amount.toFixed(2));
-    this.collectDate = new Date();
-    this.collectNotes = '';
-    this.showCollectDialog.set(true);
-  }
-
-  closeCollect() {
-    this.showCollectDialog.set(false);
-    this.collectStudent.set(null);
-    this.collectItem.set(null);
-  }
-
-  /**
-   * Collect against the oldest outstanding item, through the same endpoints the
-   * dedicated pages use — so receipts, the installment ledger and the revenue
-   * reads all behave exactly as they would there. A monthly month with no stored
-   * bill goes through /collect, which materialises the row and pays it in one go.
-   */
-  submitCollect(print = false) {
-    const item = this.collectItem();
-    const amount = this.collectAmount;
-    if (!item || !amount || amount <= 0 || this.collecting()) return;
-    const paymentDate = toLocalYmd(this.collectDate);
-    const notes = this.collectNotes || undefined;
-
-    let req$;
-    if (item.kind === 'MONTHLY') {
-      req$ = item.paymentId
-        ? this.monthlySubs.recordPayment(item.paymentId, { amount, paymentDate, notes })
-        : this.monthlySubs.collect({
-            enrollmentId: item.enrollmentId,
-            billingYear: item.billingYear!,
-            billingMonth: item.billingMonth!,
-            amount,
-            paymentDate,
-            notes,
-          });
-    } else if (item.kind === 'SESSION') {
-      req$ = this.sessionPayments.recordPayment(item.paymentId!, { amount, paymentDate, notes });
-    } else {
-      req$ = this.enrollmentService.addPayment(item.enrollmentId, { amount, paymentDate, notes });
-    }
-
-    this.collecting.set(true);
-    req$.subscribe({
-      next: (res: any) => {
-        this.collecting.set(false);
-        this.closeCollect();
-        this.notificationService.success(this.translate.instant('SESSION_ATTENDANCE.DUES_PAID'));
-        this.loadDues();
-        if (print) this.receiptService.openPrint(res?.receipt);
-      },
-      error: () => {
-        // Interceptor toasted the translated error.
-        this.collecting.set(false);
-      },
-    });
+    this.collectDialog?.open(`${student.studentName}`.trim(), this.dues(student.studentId));
   }
 
   /** Flash the top banner for a few seconds when the roster has at-risk students.

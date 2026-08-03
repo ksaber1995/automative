@@ -31,6 +31,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { TimetableService, TimetableEntry } from '../../timetable/timetable.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHistoryComponent } from '../session-history/session-history.component';
+import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
+import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
+import { StudentSessionDues } from '../services/attendance.service';
 
 interface DialogTeacherRow {
   employeeId: string;
@@ -88,12 +91,15 @@ function endTimeAfterStartValidator(startDate: string) {
     TranslateModule,
     SessionPayDialogComponent,
     SessionHistoryComponent,
+    StudentDuesBadgeComponent,
+    DuesCollectDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './sessions-dashboard.component.html',
 })
 export class SessionsDashboardComponent implements OnInit {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
+  @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
@@ -957,6 +963,43 @@ export class SessionsDashboardComponent implements OnInit {
         this.loadingAttendanceFor.set(null);
       },
     });
+    this.loadDuesForSession(sessionId);
+  }
+
+  // ── Money owed, per student, on the inline roster ──────────────────────────
+  // Same panel the full attendance page shows: whoever is taking the register
+  // can see who owes and collect it before the student walks out. Loaded beside
+  // the roster rather than with it — the roster must not wait on the slower query.
+  duesBySession = signal<Record<string, Map<string, StudentSessionDues>>>({});
+
+  loadDuesForSession(sessionId: string) {
+    this.attendanceService.getSessionDues(sessionId).subscribe({
+      next: (res) => {
+        this.duesBySession.set({
+          ...this.duesBySession(),
+          [sessionId]: new Map(res.students.map((s) => [s.studentId, s])),
+        });
+      },
+      error: () => {
+        // Interceptor toasted the translated error. No entry means no badge,
+        // which beats a green one we could not verify.
+      },
+    });
+  }
+
+  /** Undefined for a student the endpoint can't speak for — the badge hides. */
+  duesFor(sessionId: string, studentId: string): StudentSessionDues | undefined {
+    return this.duesBySession()[sessionId]?.get(studentId);
+  }
+
+  openCollect(sessionId: string, student: SessionAttendanceStudent) {
+    this.collectDialog?.open(`${student.studentName}`.trim(), this.duesFor(sessionId, student.studentId));
+  }
+
+  /** After a collection: refresh every roster whose dues are already on screen.
+   *  One dialog serves both accordions, so it can't say which one it came from. */
+  reloadOpenDues() {
+    for (const sessionId of Object.keys(this.duesBySession())) this.loadDuesForSession(sessionId);
   }
 
   getAttendanceStudents(sessionId: string): SessionAttendanceStudent[] {
@@ -1043,6 +1086,8 @@ export class SessionsDashboardComponent implements OnInit {
         }, 2000);
         // PER_SESSION courses: prompt to collect any newly-created dues.
         if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
+        // Marking someone present can raise (or un-checking can drop) a charge.
+        this.loadDuesForSession(sessionId);
         // Keep the "students in place" stat live without a full reload.
         this.activeSessions.set(this.activeSessions().map(s =>
           s.id === sessionId ? { ...s, presentCount: presentIds.length } : s

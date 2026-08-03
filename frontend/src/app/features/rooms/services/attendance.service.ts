@@ -26,6 +26,11 @@ export interface SessionAttendanceStudent {
   charge?: { status: string; amountDue: number; amountPaid: number } | null;
   /** How many of this class's most recent ended sessions the student missed in a row. */
   absentStreak?: number | null;
+  /** Missed sessions inside the session's own month — scattered ones included,
+   *  which a streak alone never catches. */
+  monthAbsences?: number | null;
+  /** Ended sessions that month there were to attend, so the count has a scale. */
+  monthSessions?: number | null;
 }
 
 export interface StudentAttendanceRecord {
