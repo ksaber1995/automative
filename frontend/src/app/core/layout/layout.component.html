@@ -67,6 +67,13 @@
     </div>
   </header>
 
+  <!-- Backdrop: only on phones, where the sidebar floats over the page instead of
+       pushing it. Tapping outside is how you close it there — the burger is all
+       the way up in the header. -->
+  @if (isMobile() && sidebarVisible()) {
+    <div class="fixed inset-0 top-16 bg-black/40 z-[15]" (click)="sidebarVisible.set(false)"></div>
+  }
+
   <!-- Sidebar -->
   <aside
     class="neon-chrome neon-sidebar neon-scroll fixed top-16 bottom-0 transition-all duration-300 z-20 overflow-y-auto"
@@ -130,8 +137,8 @@
   <!-- Expiry Warning Banner -->
   @if (subscriptionService.showExpiryWarning()) {
     <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
-      [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
-      [class.mr-64]="sidebarVisible() && languageService.isRtl()">
+      [class.ml-64]="pushedBySidebar() && !languageService.isRtl()"
+      [class.mr-64]="pushedBySidebar() && languageService.isRtl()">
       <div class="flex items-center gap-2 text-amber-800">
         <i class="pi pi-exclamation-triangle text-amber-600"></i>
         <span class="text-sm font-medium">
@@ -146,10 +153,10 @@
     class="transition-all duration-300"
     [class.pt-16]="!subscriptionService.showExpiryWarning()"
     [class.pt-24]="subscriptionService.showExpiryWarning()"
-    [class.ml-64]="sidebarVisible() && !languageService.isRtl()"
-    [class.ml-0]="!sidebarVisible() && !languageService.isRtl()"
-    [class.mr-64]="sidebarVisible() && languageService.isRtl()"
-    [class.mr-0]="!sidebarVisible() && languageService.isRtl()">
+    [class.ml-64]="pushedBySidebar() && !languageService.isRtl()"
+    [class.ml-0]="!pushedBySidebar() && !languageService.isRtl()"
+    [class.mr-64]="pushedBySidebar() && languageService.isRtl()"
+    [class.mr-0]="!pushedBySidebar() && languageService.isRtl()">
     <div class="p-6">
       <app-breadcrumbs></app-breadcrumbs>
       <router-outlet></router-outlet>

@@ -58,14 +58,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
   sidebarVisible = signal(true);
 
   /**
-   * Phone-sized viewport. An open sidebar there eats 16rem of a 20rem screen and
-   * pushes the page off the side, so it starts collapsed — and the navbar sheds
-   * the logo and the word "Logout" to fit what is left.
+   * Phone-sized viewport. The sidebar starts collapsed there, floats over the
+   * page rather than pushing it, and closes itself on navigation; the navbar
+   * also sheds the logo and the word "Logout" to fit what is left.
    *
-   * Read once at startup, not watched: after that the burger button is the
-   * user's, and a resize must not slam their sidebar shut mid-task.
+   * Tracked live so a rotate or resize re-lays-out correctly. Only the INITIAL
+   * collapse is one-time — after that the burger belongs to the user, and a
+   * resize must not slam their sidebar shut mid-task.
    */
   isMobile = signal(false);
+  private mobileQuery?: MediaQueryList;
+  private readonly onViewportChange = (e: MediaQueryListEvent | MediaQueryList) =>
+    this.isMobile.set(e.matches);
+
+  /**
+   * Whether the sidebar displaces the content. On a phone it overlays instead:
+   * a 16rem push on a 20rem screen leaves a sliver of page hanging off the edge.
+   */
+  pushedBySidebar = computed(() => this.sidebarVisible() && !this.isMobile());
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
   languageService = inject(LanguageService);
@@ -172,17 +182,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    const mobile = typeof window !== 'undefined' && window.matchMedia
-      ? window.matchMedia('(max-width: 767px)').matches
-      : false;
-    this.isMobile.set(mobile);
-    if (mobile) this.sidebarVisible.set(false);
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      this.mobileQuery = window.matchMedia('(max-width: 767px)');
+      this.onViewportChange(this.mobileQuery);
+      this.mobileQuery.addEventListener('change', this.onViewportChange);
+    }
+    if (this.isMobile()) this.sidebarVisible.set(false);
 
     this.subscriptionService.load().subscribe({ error: () => {} });
     this.syncOpenGroupFromUrl(this.router.url);
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(e => this.syncOpenGroupFromUrl(e.urlAfterRedirects || e.url));
+      .subscribe(e => {
+        this.syncOpenGroupFromUrl(e.urlAfterRedirects || e.url);
+        // On a phone the sidebar covers the page it just navigated to, so
+        // picking an item has to put it away. On desktop it stays: there it is
+        // permanent furniture, not a menu you dismiss.
+        if (this.isMobile()) this.sidebarVisible.set(false);
+      });
   }
 
   // ─── Computed menu (permission-aware, grouped) ──────────────────────────
@@ -511,6 +528,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopQrCamera();
+    this.mobileQuery?.removeEventListener('change', this.onViewportChange);
   }
 
   logout() {
