@@ -15,7 +15,14 @@ import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session } from '../services/session.service';
-import { AttendanceService, SessionAttendanceStudent, AttendanceType } from '../services/attendance.service';
+import { AttendanceService, SessionAttendanceStudent, AttendanceType, SessionDueItem, StudentSessionDues } from '../services/attendance.service';
+import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
+import { SessionPaymentsService } from '../../session-payments/session-payments.service';
+import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { ReceiptService } from '../../../core/services/receipt.service';
+import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { DatePickerModule } from 'primeng/datepicker';
 import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -25,6 +32,7 @@ import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { toLocalYmd } from '../../../core/utils/date.util';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
 
@@ -62,7 +70,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, InputNumberModule, DatePickerModule, AmountPipe, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
@@ -90,6 +98,10 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
+  private monthlySubs = inject(MonthlySubscriptionsService);
+  private sessionPayments = inject(SessionPaymentsService);
+  private enrollmentService = inject(EnrollmentService);
+  private receiptService = inject(ReceiptService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
   // it and forwards to the homework panel while that's open — otherwise the two
@@ -154,6 +166,33 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   /** Top banner shown briefly when the roster loads with at-risk students. */
   showAbsenceBanner = signal(false);
   private absenceBannerTimer?: ReturnType<typeof setTimeout>;
+
+  // ── Money owed, per student ─────────────────────────────────────────────────
+  // Attendance is the one moment the student is standing there, so the roster
+  // says who is clear and who owes before they walk out. Loaded separately from
+  // the roster: it is the slower query and the roster must not wait on it.
+  duesByStudent = signal<Map<string, StudentSessionDues>>(new Map());
+  duesPaymentType = signal<string>('');
+  loadingDues = signal(false);
+
+  dues = (studentId: string): StudentSessionDues | undefined => this.duesByStudent().get(studentId);
+  /** Owed money. Green badge is the absence of this, not just a missing entry. */
+  hasDues = (studentId: string): boolean => (this.dues(studentId)?.totalDue ?? 0) > 0.009;
+  /**
+   * Only students we can actually speak for get a badge. A trial/substitution
+   * attendee or a bundle enrollee is absent from the dues response, and a green
+   * "no dues" on them would be a claim we haven't checked.
+   */
+  duesKnown = (studentId: string): boolean => this.duesByStudent().has(studentId);
+
+  // Collect dialog — one outstanding item at a time, oldest first.
+  showCollectDialog = signal(false);
+  collectStudent = signal<SessionAttendanceStudent | null>(null);
+  collectItem = signal<SessionDueItem | null>(null);
+  collectAmount: number | null = null;
+  collectDate: Date = new Date();
+  collectNotes = '';
+  collecting = signal(false);
 
   /** TEACHER-type company — used to hide staff/teacher management. */
   isTeacherCompany = computed(() => this.auth.isTeacher());
@@ -223,6 +262,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       },
     });
     this.loadStudents();
+    this.loadDues();
     this.loadEmployees();
     // Warm the click-to-chat templates cache (fire-and-forget).
     this.templatesSvc.load().subscribe({ error: () => {} });
@@ -241,6 +281,98 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.maybeShowAbsenceBanner();
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  loadDues() {
+    this.loadingDues.set(true);
+    this.attendanceService.getSessionDues(this.sessionId).subscribe({
+      next: (res) => {
+        this.duesPaymentType.set(res.paymentType);
+        this.duesByStudent.set(new Map(res.students.map((s) => [s.studentId, s])));
+        this.loadingDues.set(false);
+      },
+      error: () => {
+        // Interceptor toasted the translated error. Leave the map empty: no badge
+        // at all beats a green one we couldn't verify.
+        this.loadingDues.set(false);
+      },
+    });
+  }
+
+  /** "June 2026" for a monthly item; the server's own label for anything else. */
+  dueItemLabel(item: SessionDueItem): string {
+    if (item.kind !== 'MONTHLY' || !item.billingMonth) return item.label;
+    const month = this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTHS.' + item.billingMonth);
+    return `${month} ${item.billingYear}`;
+  }
+
+  /** The oldest unpaid item — what the Pay button collects. */
+  oldestDue(studentId: string): SessionDueItem | null {
+    return this.dues(studentId)?.items[0] ?? null;
+  }
+
+  openCollect(student: SessionAttendanceStudent) {
+    const item = this.oldestDue(student.studentId);
+    if (!item) return;
+    this.collectStudent.set(student);
+    this.collectItem.set(item);
+    this.collectAmount = parseFloat(item.amount.toFixed(2));
+    this.collectDate = new Date();
+    this.collectNotes = '';
+    this.showCollectDialog.set(true);
+  }
+
+  closeCollect() {
+    this.showCollectDialog.set(false);
+    this.collectStudent.set(null);
+    this.collectItem.set(null);
+  }
+
+  /**
+   * Collect against the oldest outstanding item, through the same endpoints the
+   * dedicated pages use — so receipts, the installment ledger and the revenue
+   * reads all behave exactly as they would there. A monthly month with no stored
+   * bill goes through /collect, which materialises the row and pays it in one go.
+   */
+  submitCollect(print = false) {
+    const item = this.collectItem();
+    const amount = this.collectAmount;
+    if (!item || !amount || amount <= 0 || this.collecting()) return;
+    const paymentDate = toLocalYmd(this.collectDate);
+    const notes = this.collectNotes || undefined;
+
+    let req$;
+    if (item.kind === 'MONTHLY') {
+      req$ = item.paymentId
+        ? this.monthlySubs.recordPayment(item.paymentId, { amount, paymentDate, notes })
+        : this.monthlySubs.collect({
+            enrollmentId: item.enrollmentId,
+            billingYear: item.billingYear!,
+            billingMonth: item.billingMonth!,
+            amount,
+            paymentDate,
+            notes,
+          });
+    } else if (item.kind === 'SESSION') {
+      req$ = this.sessionPayments.recordPayment(item.paymentId!, { amount, paymentDate, notes });
+    } else {
+      req$ = this.enrollmentService.addPayment(item.enrollmentId, { amount, paymentDate, notes });
+    }
+
+    this.collecting.set(true);
+    req$.subscribe({
+      next: (res: any) => {
+        this.collecting.set(false);
+        this.closeCollect();
+        this.notificationService.success(this.translate.instant('SESSION_ATTENDANCE.DUES_PAID'));
+        this.loadDues();
+        if (print) this.receiptService.openPrint(res?.receipt);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.collecting.set(false);
+      },
     });
   }
 
@@ -391,6 +523,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.savedClearTimer = setTimeout(() => this.saveState.set(undefined), 2000);
         // PER_SESSION courses: prompt to collect any newly-created dues.
         if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
+        // Marking someone present can raise (or un-checking can drop) a charge.
+        this.loadDues();
       },
       error: () => this.saveState.set('error'),
     });
@@ -701,6 +835,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         }
         // PER_SESSION courses: prompt to collect this check-in's charge (fresh only).
         if (!res.alreadyPresent && res.sessionCharge) this.payDialog?.enqueue([res.sessionCharge]);
+        if (!res.alreadyPresent) this.loadDues();
       },
       error: () => {
         // Interceptor toasts the translated server error (unknown token / not enrolled).

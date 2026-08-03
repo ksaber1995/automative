@@ -5121,7 +5121,19 @@
     "UNCHECK_CANCEL": "إبقاؤه حاضرًا",
     "MARK_ALL_TITLE": "تسجيل حضور الجميع؟",
     "MARK_ALL_CONFIRM": "سيتم تسجيل حضور {{count}} طالب دفعة واحدة، وستُحتسب الرسوم المستحقة عن الحصة الآن.",
-    "MARK_ALL_ACCEPT": "تسجيل حضور الجميع"
+    "MARK_ALL_ACCEPT": "تسجيل حضور الجميع",
+    "DUES_CLEAR": "لا توجد مستحقات",
+    "DUES_ITEMS": "{{count}} غير مدفوعة",
+    "DUES_PAY": "تحصيل",
+    "DUES_PAID": "تم تسجيل الدفعة",
+    "COLLECT_TITLE": "تحصيل من {{name}}",
+    "COLLECT_FOR": "مستحق عن",
+    "COLLECT_OLDEST_HINT": "يتم تحصيل الأقدم من {{count}} مستحقات. اضغط تحصيل مرة أخرى للتالي.",
+    "COLLECT_AMOUNT": "المبلغ",
+    "COLLECT_DATE": "تاريخ الدفع",
+    "COLLECT_NOTES": "ملاحظات",
+    "COLLECT_CONFIRM": "تحصيل",
+    "COLLECT_PRINT": "تحصيل وطباعة"
   },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الحصص",

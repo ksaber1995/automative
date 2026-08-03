@@ -282,10 +282,11 @@
         } @else {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             @for (student of filteredStudents(); track student.studentId) {
-              <div class="flex items-center justify-between p-2.5 rounded-lg border"
+              <div class="p-2.5 rounded-lg border"
                 [class.border-green-200]="student.isPresent"
                 [class.bg-green-50]="student.isPresent"
                 [class.border-gray-200]="!student.isPresent">
+              <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <p-checkbox
                     [ngModel]="student.isPresent"
@@ -332,6 +333,38 @@
                     {{ (student.isPresent ? 'SESSIONS_DASHBOARD.PRESENT' : 'SESSIONS_DASHBOARD.ABSENT') | translate }}
                   </span>
                 }
+              </div>
+
+              <!-- Money panel: clear, or owing with a way to collect it on the spot.
+                   Students we can't speak for (trial/substitution/bundle) get neither. -->
+              @if (duesKnown(student.studentId)) {
+                @if (hasDues(student.studentId)) {
+                  <div class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5">
+                    <div class="flex items-center gap-2 text-amber-800">
+                      <i class="pi pi-exclamation-triangle text-xs"></i>
+                      <span class="text-xs font-semibold">{{ dues(student.studentId)!.totalDue | amount }}</span>
+                      <span class="text-[11px]">
+                        {{ 'SESSION_ATTENDANCE.DUES_ITEMS' | translate: { count: dues(student.studentId)!.items.length } }}
+                        @if (oldestDue(student.studentId); as item) {
+                          <span class="text-amber-600">· {{ dueItemLabel(item) }}</span>
+                        }
+                      </span>
+                    </div>
+                    <p-button
+                      [label]="'SESSION_ATTENDANCE.DUES_PAY' | translate"
+                      icon="pi pi-wallet"
+                      size="small"
+                      severity="warn"
+                      (onClick)="openCollect(student)"
+                    ></p-button>
+                  </div>
+                } @else {
+                  <div class="mt-2 flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-2.5 py-1.5 text-green-700">
+                    <i class="pi pi-check-circle text-xs"></i>
+                    <span class="text-[11px] font-semibold">{{ 'SESSION_ATTENDANCE.DUES_CLEAR' | translate }}</span>
+                  </div>
+                }
+              }
               </div>
             }
           </div>
@@ -435,7 +468,57 @@
 </p-dialog>
 
 <!-- PER_SESSION pay-confirmation popup -->
-<app-session-pay-dialog (settled)="loadStudents()"></app-session-pay-dialog>
+<!-- Collect a due at the door: the oldest outstanding item, one at a time -->
+<p-dialog
+  [visible]="showCollectDialog()"
+  (visibleChange)="$event ? null : closeCollect()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '26rem', maxWidth: '95vw' }"
+  [header]="'SESSION_ATTENDANCE.COLLECT_TITLE' | translate: { name: collectStudent()?.studentName || '' }"
+>
+  @if (collectItem(); as item) {
+    <div class="space-y-3 pt-1">
+      <div class="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+        <span class="text-gray-600">
+          {{ 'SESSION_ATTENDANCE.COLLECT_FOR' | translate }}
+          @if (dueItemLabel(item)) { <span class="font-medium text-gray-800">{{ dueItemLabel(item) }}</span> }
+        </span>
+        <span class="font-semibold">{{ item.amount | amount }}</span>
+      </div>
+      @if ((dues(collectStudent()!.studentId)?.items?.length || 0) > 1) {
+        <p class="text-xs text-gray-500">
+          {{ 'SESSION_ATTENDANCE.COLLECT_OLDEST_HINT' | translate: { count: dues(collectStudent()!.studentId)!.items.length } }}
+        </p>
+      }
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSION_ATTENDANCE.COLLECT_AMOUNT' | translate }}</label>
+        <p-inputnumber [(ngModel)]="collectAmount" [min]="0" [max]="item.amount" [style]="{ width: '100%' }" [inputStyle]="{ width: '100%' }"></p-inputnumber>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSION_ATTENDANCE.COLLECT_DATE' | translate }}</label>
+        <p-datepicker [(ngModel)]="collectDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'SESSION_ATTENDANCE.COLLECT_NOTES' | translate }}</label>
+        <textarea pTextarea [(ngModel)]="collectNotes" rows="2" class="w-full"></textarea>
+      </div>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'SESSION_ATTENDANCE.UNCHECK_CANCEL' | translate" [text]="true" severity="secondary" (onClick)="closeCollect()"></p-button>
+    <p-button [label]="'SESSION_ATTENDANCE.COLLECT_PRINT' | translate" icon="pi pi-print" [outlined]="true"
+      [disabled]="!collectAmount || collecting()" (onClick)="submitCollect(true)"></p-button>
+    <p-button [label]="'SESSION_ATTENDANCE.COLLECT_CONFIRM' | translate" icon="pi pi-check"
+      [loading]="collecting()" [disabled]="!collectAmount" (onClick)="submitCollect()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<app-session-pay-dialog (settled)="loadStudents(); loadDues()"></app-session-pay-dialog>
 
 <!-- Confirm before un-checking deletes a per-session charge/payment -->
 <p-confirmDialog></p-confirmDialog>

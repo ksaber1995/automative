@@ -6333,6 +6333,40 @@ export const contract = c.router({
         500: ApiErrorSchema,
       },
     },
+    sessionDues: {
+      method: 'GET' as const,
+      path: '/api/attendance/session/:sessionId/dues',
+      pathParams: z.object({ sessionId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          paymentType: z.string(),
+          // Only students with a direct ACTIVE enrollment on this class appear:
+          // an absent studentId means "we can't speak for their money", which is
+          // different from "they owe nothing".
+          students: z.array(z.object({
+            studentId: UUIDSchema,
+            enrollmentId: UUIDSchema,
+            totalDue: z.number(),
+            items: z.array(z.object({
+              kind: z.enum(['MONTHLY', 'SESSION', 'ENROLLMENT']),
+              label: z.string(),
+              amount: z.number(),
+              // null for a monthly month with no stored bill yet — paying it
+              // materialises the row through /monthly-subscriptions/collect.
+              paymentId: z.string().nullable(),
+              enrollmentId: UUIDSchema,
+              billingYear: z.number().optional(),
+              billingMonth: z.number().optional(),
+            })),
+          })),
+        }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
     saveForSession: {
       method: 'POST' as const,
       path: '/api/attendance/session/:sessionId',

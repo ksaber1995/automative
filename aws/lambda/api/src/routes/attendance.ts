@@ -201,6 +201,218 @@ export const attendanceRoutes = {
   },
 
   /**
+   * GET /api/attendance/session/:sessionId/dues
+   *
+   * What each student on this roster still owes for THIS class, so the person
+   * taking attendance can collect while the student is in front of them instead
+   * of finding out weeks later from the dues report.
+   *
+   * Nothing is written: monthly months with no stored bill are projected the
+   * same way the subscriptions dashboard projects them (see projectedBills) and
+   * only materialise if someone actually pays. Months after the session's own
+   * month are never counted — that would be billing for classes not yet run.
+   *
+   * A student with no direct enrollment in this class (bundle enrollees, trial
+   * and substitution attendees) is left out of the response entirely rather than
+   * reported as clear: their money lives elsewhere and a green "no dues" badge
+   * would be a lie.
+   */
+  sessionDues: async ({ params, headers }: { params: { sessionId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const session = await queryOne<any>(
+        'SELECT id, class_id, branch_id, start_date FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) {
+        return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      }
+      if (!canAccessBranch(context, session.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+
+      const course = await queryOne<any>(
+        `SELECT co.id, co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
+        [session.class_id]
+      );
+      const paymentType: string = course?.payment_type || 'ONE_TIME';
+
+      const start = new Date(session.start_date);
+      const sessionKey = start.getFullYear() * 12 + (start.getMonth() + 1);
+
+      type Item = {
+        kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
+        label: string;
+        amount: number;
+        paymentId: string | null;
+        enrollmentId: string;
+        billingYear?: number;
+        billingMonth?: number;
+      };
+      const byStudent = new Map<string, { enrollmentId: string; items: Item[] }>();
+      const push = (studentId: string, enrollmentId: string, item: Item) => {
+        const entry = byStudent.get(studentId) || { enrollmentId, items: [] };
+        entry.items.push(item);
+        byStudent.set(studentId, entry);
+      };
+
+      // Every ACTIVE direct enrollment on this class — the set we can speak for.
+      // Listed even when nothing is owed, so the roster can show a green badge.
+      const enrollments = await query<any>(
+        `SELECT e.id, e.student_id, e.enrollment_date, e.final_price, e.amount_paid, c.price AS course_price
+           FROM enrollments e
+           JOIN courses c ON c.id = e.course_id
+          WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'`,
+        [session.class_id, context.companyId]
+      );
+      for (const e of enrollments) {
+        byStudent.set(e.student_id, { enrollmentId: e.id, items: [] });
+      }
+
+      // Both monthly tables arrive by migration and may be absent on an
+      // environment that has never run one — guarded like expenses.ts does.
+      const monthlyTables = paymentType === 'MONTHLY_SUBSCRIPTION'
+        ? await queryOne<any>(
+            `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
+                    to_regclass('public.course_monthly_price_overrides') IS NOT NULL AS has_ov`
+          )
+        : null;
+
+      if (paymentType === 'MONTHLY_SUBSCRIPTION' && monthlyTables?.has_msp && monthlyTables?.has_ov) {
+        // One row per unpaid month from the student's first billable month up to
+        // the session's month, stored or projected. Capped at 24 months back so a
+        // long-running enrollment can't build an unbounded scan.
+        const rows = await query<any>(
+          `WITH enr AS (
+             SELECT e.id, e.student_id, e.course_id,
+                    COALESCE(e.final_price, c.price) AS fee,
+                    c.price AS course_price,
+                    GREATEST(
+                      EXTRACT(YEAR FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int * 12
+                        + EXTRACT(MONTH FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int,
+                      $3::int - 23
+                    ) AS from_key
+               FROM enrollments e
+               JOIN courses c ON c.id = e.course_id
+              WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'
+                AND c.payment_type = 'MONTHLY_SUBSCRIPTION' AND c.is_active = true
+           ),
+           periods AS (
+             SELECT enr.id AS enrollment_id, enr.student_id, enr.course_id,
+                    enr.fee, enr.course_price,
+                    ((k - 1) / 12) AS billing_year,
+                    ((k - 1) % 12) + 1 AS billing_month
+               FROM enr
+               CROSS JOIN LATERAL generate_series(enr.from_key, $3::int) AS k
+           ),
+           resolved AS (
+             SELECT p.enrollment_id, p.student_id, p.billing_year, p.billing_month,
+                    msp.id AS payment_id,
+                    COALESCE(msp.payment_status, 'PENDING') AS payment_status,
+                    COALESCE(
+                      msp.amount_due,
+                      CASE
+                        WHEN ov.override_price IS NOT NULL AND p.course_price > 0
+                          THEN ROUND(ov.override_price * (p.fee / p.course_price), 2)
+                        ELSE p.fee
+                      END
+                    ) AS amount_due,
+                    COALESCE(msp.amount_paid, 0) AS amount_paid
+               FROM periods p
+               LEFT JOIN monthly_subscription_payments msp
+                 ON msp.enrollment_id = p.enrollment_id
+                AND msp.billing_year = p.billing_year
+                AND msp.billing_month = p.billing_month
+               LEFT JOIN course_monthly_price_overrides ov
+                 ON ov.course_id = p.course_id
+                AND ov.billing_year = p.billing_year
+                AND ov.billing_month = p.billing_month
+           )
+           SELECT * FROM resolved
+            WHERE payment_status NOT IN ('PAID', 'REFUNDED')
+              AND amount_due > amount_paid
+            ORDER BY billing_year, billing_month`,
+          [session.class_id, context.companyId, sessionKey]
+        );
+        for (const r of rows) {
+          push(r.student_id, r.enrollment_id, {
+            kind: 'MONTHLY',
+            // The month name is built client-side from the year/month below —
+            // it has to read in the UI's language, not the Lambda's.
+            label: '',
+            amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
+            paymentId: r.payment_id || null,
+            enrollmentId: r.enrollment_id,
+            billingYear: Number(r.billing_year),
+            billingMonth: Number(r.billing_month),
+          });
+        }
+      } else if (paymentType === 'PER_SESSION') {
+        await ensurePerSessionSchema();
+        // Unpaid charges for sessions of this class up to and including this one.
+        // COVERED (a prepaid package absorbed it) and WAIVED are not money owed.
+        const rows = await query<any>(
+          `SELECT sp.id, sp.enrollment_id, sp.student_id, sp.amount_due, sp.amount_paid,
+                  s.session_number, s.start_date
+             FROM session_payments sp
+             JOIN sessions s ON s.id = sp.session_id
+            WHERE sp.company_id = $2 AND s.class_id = $1
+              AND sp.payment_status = 'PENDING'
+              AND sp.amount_due > sp.amount_paid
+              AND s.start_date <= $3
+            ORDER BY s.start_date`,
+          [session.class_id, context.companyId, session.start_date]
+        );
+        for (const r of rows) {
+          push(r.student_id, r.enrollment_id, {
+            kind: 'SESSION',
+            label: r.session_number != null ? `#${r.session_number}` : new Date(r.start_date).toISOString().slice(0, 10),
+            amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
+            paymentId: r.id,
+            enrollmentId: r.enrollment_id,
+          });
+        }
+      } else if (paymentType === 'ONE_TIME') {
+        // Whatever is left on the enrollment itself. Deliberately not the
+        // fallback branch: a monthly course whose tables are missing must report
+        // nothing owed rather than mistake the monthly fee for a balance.
+        for (const e of enrollments) {
+          const remaining = parseFloat(e.final_price || 0) - parseFloat(e.amount_paid || 0);
+          if (remaining > 0.009) {
+            push(e.student_id, e.id, {
+              kind: 'ENROLLMENT',
+              label: '',
+              amount: remaining,
+              paymentId: null,
+              enrollmentId: e.id,
+            });
+          }
+        }
+      }
+
+      return {
+        status: 200 as const,
+        body: {
+          paymentType,
+          students: Array.from(byStudent.entries()).map(([studentId, v]) => ({
+            studentId,
+            enrollmentId: v.enrollmentId,
+            totalDue: Math.round(v.items.reduce((sum, i) => sum + i.amount, 0) * 100) / 100,
+            items: v.items,
+          })),
+        },
+      };
+    } catch (error) {
+      console.error('Get session dues error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.GET_FAILED', 'Failed to get session dues');
+    }
+  },
+
+  /**
    * POST /api/attendance/session/:sessionId
    * Bulk save attendance: insert records for present students, delete for absent ones.
    * Body: { presentStudentIds: string[] }

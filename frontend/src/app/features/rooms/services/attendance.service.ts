@@ -60,6 +60,32 @@ export interface QrCheckinResult {
   sessionCharge?: SessionPaymentWithDetails | null;
 }
 
+/** One thing a student still owes for the class a session belongs to. */
+export interface SessionDueItem {
+  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
+  /** Pre-rendered for SESSION ("#12"); MONTHLY is formatted from the year/month. */
+  label: string;
+  amount: number;
+  /** null for a monthly month with no stored bill yet — paying it creates one. */
+  paymentId: string | null;
+  enrollmentId: string;
+  billingYear?: number;
+  billingMonth?: number;
+}
+
+export interface StudentSessionDues {
+  studentId: string;
+  enrollmentId: string;
+  totalDue: number;
+  items: SessionDueItem[];
+}
+
+export interface SessionDues {
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION' | string;
+  /** Only students with a direct ACTIVE enrollment on the class are listed. */
+  students: StudentSessionDues[];
+}
+
 export interface ClassAttendanceSummary {
   sessionId: string;
   sessionStartDate: string;
@@ -78,6 +104,12 @@ export class AttendanceService {
   /** Get all enrolled students for a session with their attendance status */
   getBySession(sessionId: string): Observable<SessionAttendanceStudent[]> {
     return this.api.get<SessionAttendanceStudent[]>(`attendance/session/${sessionId}`);
+  }
+
+  /** What each enrolled student still owes for this session's class. Read-only —
+   *  projected monthly bills are computed, not written. */
+  getSessionDues(sessionId: string): Observable<SessionDues> {
+    return this.api.get<SessionDues>(`attendance/session/${sessionId}/dues`);
   }
 
   /** Bulk save attendance for a session */
