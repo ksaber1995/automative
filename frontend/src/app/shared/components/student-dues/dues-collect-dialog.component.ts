@@ -77,7 +77,9 @@ import { dueItemLabel } from './student-dues.util';
       }
 
       <ng-template pTemplate="footer">
-        <p-button [label]="'SESSION_ATTENDANCE.UNCHECK_CANCEL' | translate" [text]="true" severity="secondary" (onClick)="close()"></p-button>
+        <!-- Its own key, not the un-check dialog's "Keep present": dismissing a
+             collection is skipping the payment, and says nothing about attendance. -->
+        <p-button [label]="'SESSION_ATTENDANCE.COLLECT_SKIP' | translate" [text]="true" severity="secondary" (onClick)="close()"></p-button>
         <p-button [label]="'SESSION_ATTENDANCE.COLLECT_PRINT' | translate" icon="pi pi-print" [outlined]="true"
           [disabled]="!amount || submitting()" (onClick)="submit(true)"></p-button>
         <p-button [label]="'SESSION_ATTENDANCE.COLLECT_CONFIRM' | translate" icon="pi pi-check"

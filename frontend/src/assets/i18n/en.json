@@ -5008,6 +5008,7 @@
     "COLLECT_AMOUNT": "Amount",
     "COLLECT_DATE": "Payment date",
     "COLLECT_NOTES": "Notes",
+    "COLLECT_SKIP": "Skip",
     "COLLECT_CONFIRM": "Collect",
     "COLLECT_PRINT": "Collect & print",
     "ABSENCE_STREAK": "Missed the last {{count}} in a row",

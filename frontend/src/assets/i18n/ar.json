@@ -5132,6 +5132,7 @@
     "COLLECT_AMOUNT": "المبلغ",
     "COLLECT_DATE": "تاريخ الدفع",
     "COLLECT_NOTES": "ملاحظات",
+    "COLLECT_SKIP": "تخطي",
     "COLLECT_CONFIRM": "تحصيل",
     "COLLECT_PRINT": "تحصيل وطباعة",
     "ABSENCE_STREAK": "غاب آخر {{count}} حصص متتالية",
