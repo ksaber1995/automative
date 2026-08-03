@@ -7,6 +7,324 @@ import { ensureFreeTrialLimitColumn } from './companies';
 import { notifyCheckin } from './telegram';
 import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema, pendingChargesForStudents } from './session-payments';
 
+/** What the roster panels say about a student's attendance record. */
+export interface AbsenceStats {
+  /** Unbroken run of missed sessions, counting back from the latest ended one. */
+  absentStreak: number;
+  /** Misses inside `monthAnchor`'s month — scattered ones included. */
+  monthAbsences: number;
+  /** Ended sessions that month there were to attend, so the count has a scale. */
+  monthSessions: number;
+}
+
+/**
+ * Absence figures for every student enrolled on a class.
+ *
+ * Only ended, non-free sessions count, and a SUBSTITUTION into another class of
+ * the same course + session_number counts as present — same fairness as the
+ * student attendance history, so someone who attended elsewhere is not flagged.
+ *
+ * `excludeSessionId` drops the session currently being registered (it has not
+ * happened yet from the roster's point of view); pass null from a class page,
+ * where there is no such session.
+ */
+export async function absenceStats(
+  companyId: string,
+  classId: string,
+  excludeSessionId: string | null,
+  monthAnchor: Date | string,
+): Promise<Map<string, AbsenceStats>> {
+  const out = new Map<string, AbsenceStats>();
+  const ensure = (id: string): AbsenceStats => {
+    const existing = out.get(id);
+    if (existing) return existing;
+    const fresh = { absentStreak: 0, monthAbsences: 0, monthSessions: 0 };
+    out.set(id, fresh);
+    return fresh;
+  };
+
+  // Streak, capped at the last 20 sessions.
+  const streakRows = await query<any>(
+    `WITH recent AS (
+        SELECT s.id, s.session_number,
+               ROW_NUMBER() OVER (ORDER BY s.start_date DESC) AS rn
+        FROM sessions s
+        WHERE s.class_id = $1 AND s.company_id = $2
+          AND ($3::uuid IS NULL OR s.id <> $3::uuid)
+          AND s.end_date IS NOT NULL
+          AND COALESCE(s.is_free, false) = false
+        ORDER BY s.start_date DESC
+        LIMIT 20
+     ),
+     enrolled AS (
+        SELECT student_id FROM enrollments
+        WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+        UNION
+        SELECT student_id FROM master_class_enrollments
+        WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+     ),
+     presence AS (
+        SELECT e.student_id, r.rn,
+          (
+            EXISTS (
+              SELECT 1 FROM session_attendance sa
+              WHERE sa.session_id = r.id AND sa.student_id = e.student_id
+                AND sa.attendance_type = 'NORMAL'
+            )
+            OR (r.session_number IS NOT NULL AND EXISTS (
+              SELECT 1 FROM session_attendance sub
+              JOIN sessions s2 ON s2.id = sub.session_id
+              JOIN classes c2 ON c2.id = s2.class_id
+              WHERE sub.student_id = e.student_id
+                AND sub.attendance_type = 'SUBSTITUTION'
+                AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
+                AND s2.session_number = r.session_number
+            ))
+          ) AS present
+        FROM recent r CROSS JOIN enrolled e
+     )
+     SELECT student_id,
+       CASE WHEN bool_or(present) THEN MIN(rn) FILTER (WHERE present) - 1
+            ELSE COUNT(*) END AS absent_streak
+     FROM presence
+     GROUP BY student_id`,
+    [classId, companyId, excludeSessionId],
+  );
+  for (const r of streakRows) ensure(r.student_id).absentStreak = Number(r.absent_streak ?? 0);
+
+  // Absences within the anchor month, streak or not. A student who misses every
+  // other week never builds a run, so the streak alone makes them look fine.
+  const monthRows = await query<any>(
+    `WITH month_sessions AS (
+        SELECT s.id, s.session_number
+        FROM sessions s
+        WHERE s.class_id = $1 AND s.company_id = $2
+          AND ($3::uuid IS NULL OR s.id <> $3::uuid)
+          AND s.end_date IS NOT NULL
+          AND COALESCE(s.is_free, false) = false
+          AND date_trunc('month', s.start_date) = date_trunc('month', $4::timestamp)
+     ),
+     enrolled AS (
+        SELECT student_id FROM enrollments
+        WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+        UNION
+        SELECT student_id FROM master_class_enrollments
+        WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+     )
+     SELECT e.student_id,
+            COUNT(*) AS session_count,
+            COUNT(*) FILTER (WHERE NOT (
+              EXISTS (
+                SELECT 1 FROM session_attendance sa
+                WHERE sa.session_id = m.id AND sa.student_id = e.student_id
+                  AND sa.attendance_type = 'NORMAL'
+              )
+              OR (m.session_number IS NOT NULL AND EXISTS (
+                SELECT 1 FROM session_attendance sub
+                JOIN sessions s2 ON s2.id = sub.session_id
+                JOIN classes c2 ON c2.id = s2.class_id
+                WHERE sub.student_id = e.student_id
+                  AND sub.attendance_type = 'SUBSTITUTION'
+                  AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
+                  AND s2.session_number = m.session_number
+              ))
+            )) AS absent_count
+       FROM month_sessions m CROSS JOIN enrolled e
+      GROUP BY e.student_id`,
+    [classId, companyId, excludeSessionId, monthAnchor instanceof Date ? monthAnchor.toISOString() : monthAnchor],
+  );
+  for (const r of monthRows) {
+    const stat = ensure(r.student_id);
+    stat.monthAbsences = Number(r.absent_count ?? 0);
+    stat.monthSessions = Number(r.session_count ?? 0);
+  }
+
+  return out;
+}
+
+/** One thing a student still owes for a class. */
+export interface DueItem {
+  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
+  label: string;
+  amount: number;
+  /** null for a monthly month with no stored bill yet — paying it creates one. */
+  paymentId: string | null;
+  enrollmentId: string;
+  billingYear?: number;
+  billingMonth?: number;
+}
+
+/**
+ * What every student on a class still owes, by course type: unpaid months for a
+ * subscription, unpaid charges for a per-session course, the remaining balance
+ * for a one-time one.
+ *
+ * Writes nothing. Monthly months with no stored bill are projected the way the
+ * subscriptions dashboard projects them (see projectedBills) and only
+ * materialise if someone pays. `monthKey` (year*12+month) and `upTo` bound it —
+ * counting past them would be billing for classes not yet run.
+ *
+ * Students with no direct ACTIVE enrollment — bundle enrollees, trial and
+ * substitution attendees, held subscriptions — are absent from the result
+ * entirely rather than reported as clear: their money lives elsewhere and a
+ * green "no dues" would be a lie.
+ */
+export async function classDues(
+  context: any,
+  classId: string,
+  monthKey: number,
+  upTo: Date | string,
+): Promise<{ paymentType: string; byStudent: Map<string, { enrollmentId: string; items: DueItem[] }> }> {
+  const course = await queryOne<any>(
+    `SELECT co.id, co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
+    [classId]
+  );
+  const paymentType: string = course?.payment_type || 'ONE_TIME';
+
+    const byStudent = new Map<string, { enrollmentId: string; items: DueItem[] }>();
+  const push = (studentId: string, enrollmentId: string, item: DueItem) => {
+    const entry = byStudent.get(studentId) || { enrollmentId, items: [] };
+    entry.items.push(item);
+    byStudent.set(studentId, entry);
+  };
+
+  // Every ACTIVE direct enrollment on this class — the set we can speak for.
+  // Listed even when nothing is owed, so the roster can show a green badge.
+  const enrollments = await query<any>(
+    `SELECT e.id, e.student_id, e.enrollment_date, e.final_price, e.amount_paid, c.price AS course_price
+       FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+      WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'`,
+    [classId, context.companyId]
+  );
+  for (const e of enrollments) {
+    byStudent.set(e.student_id, { enrollmentId: e.id, items: [] });
+  }
+
+  // Both monthly tables arrive by migration and may be absent on an
+  // environment that has never run one — guarded like expenses.ts does.
+  const monthlyTables = paymentType === 'MONTHLY_SUBSCRIPTION'
+    ? await queryOne<any>(
+        `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
+                to_regclass('public.course_monthly_price_overrides') IS NOT NULL AS has_ov`
+      )
+    : null;
+
+  if (paymentType === 'MONTHLY_SUBSCRIPTION' && monthlyTables?.has_msp && monthlyTables?.has_ov) {
+    // One row per unpaid month from the student's first billable month up to
+    // the session's month, stored or projected. Capped at 24 months back so a
+    // long-running enrollment can't build an unbounded scan.
+    const rows = await query<any>(
+      `WITH enr AS (
+         SELECT e.id, e.student_id, e.course_id,
+                COALESCE(e.final_price, c.price) AS fee,
+                c.price AS course_price,
+                GREATEST(
+                  EXTRACT(YEAR FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int * 12
+                    + EXTRACT(MONTH FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int,
+                  $3::int - 23
+                ) AS from_key
+           FROM enrollments e
+           JOIN courses c ON c.id = e.course_id
+          WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'
+            AND c.payment_type = 'MONTHLY_SUBSCRIPTION' AND c.is_active = true
+       ),
+       periods AS (
+         SELECT enr.id AS enrollment_id, enr.student_id, enr.course_id,
+                enr.fee, enr.course_price,
+                ((k - 1) / 12) AS billing_year,
+                ((k - 1) % 12) + 1 AS billing_month
+           FROM enr
+           CROSS JOIN LATERAL generate_series(enr.from_key, $3::int) AS k
+       ),
+       resolved AS (
+         SELECT p.enrollment_id, p.student_id, p.billing_year, p.billing_month,
+                msp.id AS payment_id,
+                COALESCE(msp.payment_status, 'PENDING') AS payment_status,
+                COALESCE(
+                  msp.amount_due,
+                  CASE
+                    WHEN ov.override_price IS NOT NULL AND p.course_price > 0
+                      THEN ROUND(ov.override_price * (p.fee / p.course_price), 2)
+                    ELSE p.fee
+                  END
+                ) AS amount_due,
+                COALESCE(msp.amount_paid, 0) AS amount_paid
+           FROM periods p
+           LEFT JOIN monthly_subscription_payments msp
+             ON msp.enrollment_id = p.enrollment_id
+            AND msp.billing_year = p.billing_year
+            AND msp.billing_month = p.billing_month
+           LEFT JOIN course_monthly_price_overrides ov
+             ON ov.course_id = p.course_id
+            AND ov.billing_year = p.billing_year
+            AND ov.billing_month = p.billing_month
+       )
+       SELECT * FROM resolved
+        WHERE payment_status NOT IN ('PAID', 'REFUNDED')
+          AND amount_due > amount_paid
+        ORDER BY billing_year, billing_month`,
+      [classId, context.companyId, monthKey]
+    );
+    for (const r of rows) {
+      push(r.student_id, r.enrollment_id, {
+        kind: 'MONTHLY',
+        // The month name is built client-side from the year/month below —
+        // it has to read in the UI's language, not the Lambda's.
+        label: '',
+        amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
+        paymentId: r.payment_id || null,
+        enrollmentId: r.enrollment_id,
+        billingYear: Number(r.billing_year),
+        billingMonth: Number(r.billing_month),
+      });
+    }
+  } else if (paymentType === 'PER_SESSION') {
+    await ensurePerSessionSchema();
+    // Unpaid charges for sessions of this class up to and including this one.
+    // COVERED (a prepaid package absorbed it) and WAIVED are not money owed.
+    const rows = await query<any>(
+      `SELECT sp.id, sp.enrollment_id, sp.student_id, sp.amount_due, sp.amount_paid,
+              s.session_number, s.start_date
+         FROM session_payments sp
+         JOIN sessions s ON s.id = sp.session_id
+        WHERE sp.company_id = $2 AND s.class_id = $1
+          AND sp.payment_status = 'PENDING'
+          AND sp.amount_due > sp.amount_paid
+          AND s.start_date <= $3
+        ORDER BY s.start_date`,
+      [classId, context.companyId, upTo]
+    );
+    for (const r of rows) {
+      push(r.student_id, r.enrollment_id, {
+        kind: 'SESSION',
+        label: r.session_number != null ? `#${r.session_number}` : new Date(r.start_date).toISOString().slice(0, 10),
+        amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
+        paymentId: r.id,
+        enrollmentId: r.enrollment_id,
+      });
+    }
+  } else if (paymentType === 'ONE_TIME') {
+    // Whatever is left on the enrollment itself. Deliberately not the
+    // fallback branch: a monthly course whose tables are missing must report
+    // nothing owed rather than mistake the monthly fee for a balance.
+    for (const e of enrollments) {
+      const remaining = parseFloat(e.final_price || 0) - parseFloat(e.amount_paid || 0);
+      if (remaining > 0.009) {
+        push(e.student_id, e.id, {
+          kind: 'ENROLLMENT',
+          label: '',
+          amount: remaining,
+          paymentId: null,
+          enrollmentId: e.id,
+        });
+      }
+    }
+  }
+
+  return { paymentType, byStudent };
+}
+
 export const attendanceRoutes = {
   /**
    * GET /api/attendance/session/:sessionId
@@ -115,115 +433,12 @@ export const attendanceRoutes = {
         }
       }
 
-      // Consecutive-absence warning: for each enrolled student, how many of this
-      // class's most recent ENDED sessions they have missed in an unbroken run
-      // (counting back from the latest). Only ended, non-free sessions count and
-      // the current (still-running) session is excluded. A SUBSTITUTION into
-      // another class of the same course + session_number counts as present —
-      // same fairness as the student attendance history — so a student who
-      // attended elsewhere is not flagged. Capped at the last 20 sessions.
-      const absentStreakByStudent = new Map<string, number>();
-      const streakRows = await query<any>(
-        `WITH recent AS (
-            SELECT s.id, s.session_number,
-                   ROW_NUMBER() OVER (ORDER BY s.start_date DESC) AS rn
-            FROM sessions s
-            WHERE s.class_id = $1 AND s.company_id = $2
-              AND s.id <> $3
-              AND s.end_date IS NOT NULL
-              AND COALESCE(s.is_free, false) = false
-            ORDER BY s.start_date DESC
-            LIMIT 20
-         ),
-         enrolled AS (
-            SELECT student_id FROM enrollments
-            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-            UNION
-            SELECT student_id FROM master_class_enrollments
-            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
-         ),
-         presence AS (
-            SELECT e.student_id, r.rn,
-              (
-                EXISTS (
-                  SELECT 1 FROM session_attendance sa
-                  WHERE sa.session_id = r.id AND sa.student_id = e.student_id
-                    AND sa.attendance_type = 'NORMAL'
-                )
-                OR (r.session_number IS NOT NULL AND EXISTS (
-                  SELECT 1 FROM session_attendance sub
-                  JOIN sessions s2 ON s2.id = sub.session_id
-                  JOIN classes c2 ON c2.id = s2.class_id
-                  WHERE sub.student_id = e.student_id
-                    AND sub.attendance_type = 'SUBSTITUTION'
-                    AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
-                    AND s2.session_number = r.session_number
-                ))
-              ) AS present
-            FROM recent r CROSS JOIN enrolled e
-         )
-         SELECT student_id,
-           CASE WHEN bool_or(present) THEN MIN(rn) FILTER (WHERE present) - 1
-                ELSE COUNT(*) END AS absent_streak
-         FROM presence
-         GROUP BY student_id`,
-        [session.class_id, context.companyId, params.sessionId]
+      // Absence figures for the roster panels: the unbroken run, plus the
+      // scattered misses inside this session's month. The session being
+      // registered is excluded — it has not happened yet.
+      const absences = await absenceStats(
+        context.companyId, session.class_id, params.sessionId, session.start_date,
       );
-      for (const r of streakRows) {
-        absentStreakByStudent.set(r.student_id, Number(r.absent_streak ?? 0));
-      }
-
-      // Absences within the session's own month, streak or not. A student who
-      // misses every other week never builds a streak, so the run above alone
-      // makes them look fine; this counts the scattered ones. Same month the
-      // dues panel bills for, and the same "a substitution elsewhere counts as
-      // present" fairness as the streak.
-      const monthAbsenceByStudent = new Map<string, { absences: number; sessions: number }>();
-      const monthRows = await query<any>(
-        `WITH month_sessions AS (
-            SELECT s.id, s.session_number
-            FROM sessions s
-            WHERE s.class_id = $1 AND s.company_id = $2
-              AND s.id <> $3
-              AND s.end_date IS NOT NULL
-              AND COALESCE(s.is_free, false) = false
-              AND date_trunc('month', s.start_date) = date_trunc('month', $4::timestamp)
-         ),
-         enrolled AS (
-            SELECT student_id FROM enrollments
-            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-            UNION
-            SELECT student_id FROM master_class_enrollments
-            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
-         )
-         SELECT e.student_id,
-                COUNT(*) AS session_count,
-                COUNT(*) FILTER (WHERE NOT (
-                  EXISTS (
-                    SELECT 1 FROM session_attendance sa
-                    WHERE sa.session_id = m.id AND sa.student_id = e.student_id
-                      AND sa.attendance_type = 'NORMAL'
-                  )
-                  OR (m.session_number IS NOT NULL AND EXISTS (
-                    SELECT 1 FROM session_attendance sub
-                    JOIN sessions s2 ON s2.id = sub.session_id
-                    JOIN classes c2 ON c2.id = s2.class_id
-                    WHERE sub.student_id = e.student_id
-                      AND sub.attendance_type = 'SUBSTITUTION'
-                      AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
-                      AND s2.session_number = m.session_number
-                  ))
-                )) AS absent_count
-           FROM month_sessions m CROSS JOIN enrolled e
-          GROUP BY e.student_id`,
-        [session.class_id, context.companyId, params.sessionId, session.start_date]
-      );
-      for (const r of monthRows) {
-        monthAbsenceByStudent.set(r.student_id, {
-          absences: Number(r.absent_count ?? 0),
-          sessions: Number(r.session_count ?? 0),
-        });
-      }
 
       return {
         status: 200 as const,
@@ -243,9 +458,9 @@ export const attendanceRoutes = {
           homeClassName: row.home_class_name || null,
           isEnrolled: row.is_enrolled === true,
           charge: chargeByStudent.get(row.student_id) || null,
-          absentStreak: absentStreakByStudent.get(row.student_id) ?? 0,
-          monthAbsences: monthAbsenceByStudent.get(row.student_id)?.absences ?? 0,
-          monthSessions: monthAbsenceByStudent.get(row.student_id)?.sessions ?? 0,
+          absentStreak: absences.get(row.student_id)?.absentStreak ?? 0,
+          monthAbsences: absences.get(row.student_id)?.monthAbsences ?? 0,
+          monthSessions: absences.get(row.student_id)?.monthSessions ?? 0,
         })),
       };
     } catch (error) {
@@ -289,165 +504,13 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
-      const course = await queryOne<any>(
-        `SELECT co.id, co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
-        [session.class_id]
-      );
-      const paymentType: string = course?.payment_type || 'ONE_TIME';
-
       const start = new Date(session.start_date);
-      const sessionKey = start.getFullYear() * 12 + (start.getMonth() + 1);
-
-      type Item = {
-        kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
-        label: string;
-        amount: number;
-        paymentId: string | null;
-        enrollmentId: string;
-        billingYear?: number;
-        billingMonth?: number;
-      };
-      const byStudent = new Map<string, { enrollmentId: string; items: Item[] }>();
-      const push = (studentId: string, enrollmentId: string, item: Item) => {
-        const entry = byStudent.get(studentId) || { enrollmentId, items: [] };
-        entry.items.push(item);
-        byStudent.set(studentId, entry);
-      };
-
-      // Every ACTIVE direct enrollment on this class — the set we can speak for.
-      // Listed even when nothing is owed, so the roster can show a green badge.
-      const enrollments = await query<any>(
-        `SELECT e.id, e.student_id, e.enrollment_date, e.final_price, e.amount_paid, c.price AS course_price
-           FROM enrollments e
-           JOIN courses c ON c.id = e.course_id
-          WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'`,
-        [session.class_id, context.companyId]
+      const { paymentType, byStudent } = await classDues(
+        context,
+        session.class_id,
+        start.getFullYear() * 12 + (start.getMonth() + 1),
+        session.start_date,
       );
-      for (const e of enrollments) {
-        byStudent.set(e.student_id, { enrollmentId: e.id, items: [] });
-      }
-
-      // Both monthly tables arrive by migration and may be absent on an
-      // environment that has never run one — guarded like expenses.ts does.
-      const monthlyTables = paymentType === 'MONTHLY_SUBSCRIPTION'
-        ? await queryOne<any>(
-            `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
-                    to_regclass('public.course_monthly_price_overrides') IS NOT NULL AS has_ov`
-          )
-        : null;
-
-      if (paymentType === 'MONTHLY_SUBSCRIPTION' && monthlyTables?.has_msp && monthlyTables?.has_ov) {
-        // One row per unpaid month from the student's first billable month up to
-        // the session's month, stored or projected. Capped at 24 months back so a
-        // long-running enrollment can't build an unbounded scan.
-        const rows = await query<any>(
-          `WITH enr AS (
-             SELECT e.id, e.student_id, e.course_id,
-                    COALESCE(e.final_price, c.price) AS fee,
-                    c.price AS course_price,
-                    GREATEST(
-                      EXTRACT(YEAR FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int * 12
-                        + EXTRACT(MONTH FROM COALESCE(e.enrollment_date, CURRENT_DATE))::int,
-                      $3::int - 23
-                    ) AS from_key
-               FROM enrollments e
-               JOIN courses c ON c.id = e.course_id
-              WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'
-                AND c.payment_type = 'MONTHLY_SUBSCRIPTION' AND c.is_active = true
-           ),
-           periods AS (
-             SELECT enr.id AS enrollment_id, enr.student_id, enr.course_id,
-                    enr.fee, enr.course_price,
-                    ((k - 1) / 12) AS billing_year,
-                    ((k - 1) % 12) + 1 AS billing_month
-               FROM enr
-               CROSS JOIN LATERAL generate_series(enr.from_key, $3::int) AS k
-           ),
-           resolved AS (
-             SELECT p.enrollment_id, p.student_id, p.billing_year, p.billing_month,
-                    msp.id AS payment_id,
-                    COALESCE(msp.payment_status, 'PENDING') AS payment_status,
-                    COALESCE(
-                      msp.amount_due,
-                      CASE
-                        WHEN ov.override_price IS NOT NULL AND p.course_price > 0
-                          THEN ROUND(ov.override_price * (p.fee / p.course_price), 2)
-                        ELSE p.fee
-                      END
-                    ) AS amount_due,
-                    COALESCE(msp.amount_paid, 0) AS amount_paid
-               FROM periods p
-               LEFT JOIN monthly_subscription_payments msp
-                 ON msp.enrollment_id = p.enrollment_id
-                AND msp.billing_year = p.billing_year
-                AND msp.billing_month = p.billing_month
-               LEFT JOIN course_monthly_price_overrides ov
-                 ON ov.course_id = p.course_id
-                AND ov.billing_year = p.billing_year
-                AND ov.billing_month = p.billing_month
-           )
-           SELECT * FROM resolved
-            WHERE payment_status NOT IN ('PAID', 'REFUNDED')
-              AND amount_due > amount_paid
-            ORDER BY billing_year, billing_month`,
-          [session.class_id, context.companyId, sessionKey]
-        );
-        for (const r of rows) {
-          push(r.student_id, r.enrollment_id, {
-            kind: 'MONTHLY',
-            // The month name is built client-side from the year/month below —
-            // it has to read in the UI's language, not the Lambda's.
-            label: '',
-            amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
-            paymentId: r.payment_id || null,
-            enrollmentId: r.enrollment_id,
-            billingYear: Number(r.billing_year),
-            billingMonth: Number(r.billing_month),
-          });
-        }
-      } else if (paymentType === 'PER_SESSION') {
-        await ensurePerSessionSchema();
-        // Unpaid charges for sessions of this class up to and including this one.
-        // COVERED (a prepaid package absorbed it) and WAIVED are not money owed.
-        const rows = await query<any>(
-          `SELECT sp.id, sp.enrollment_id, sp.student_id, sp.amount_due, sp.amount_paid,
-                  s.session_number, s.start_date
-             FROM session_payments sp
-             JOIN sessions s ON s.id = sp.session_id
-            WHERE sp.company_id = $2 AND s.class_id = $1
-              AND sp.payment_status = 'PENDING'
-              AND sp.amount_due > sp.amount_paid
-              AND s.start_date <= $3
-            ORDER BY s.start_date`,
-          [session.class_id, context.companyId, session.start_date]
-        );
-        for (const r of rows) {
-          push(r.student_id, r.enrollment_id, {
-            kind: 'SESSION',
-            label: r.session_number != null ? `#${r.session_number}` : new Date(r.start_date).toISOString().slice(0, 10),
-            amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
-            paymentId: r.id,
-            enrollmentId: r.enrollment_id,
-          });
-        }
-      } else if (paymentType === 'ONE_TIME') {
-        // Whatever is left on the enrollment itself. Deliberately not the
-        // fallback branch: a monthly course whose tables are missing must report
-        // nothing owed rather than mistake the monthly fee for a balance.
-        for (const e of enrollments) {
-          const remaining = parseFloat(e.final_price || 0) - parseFloat(e.amount_paid || 0);
-          if (remaining > 0.009) {
-            push(e.student_id, e.id, {
-              kind: 'ENROLLMENT',
-              label: '',
-              amount: remaining,
-              paymentId: null,
-              enrollmentId: e.id,
-            });
-          }
-        }
-      }
-
       return {
         status: 200 as const,
         body: {
@@ -463,6 +526,68 @@ export const attendanceRoutes = {
     } catch (error) {
       console.error('Get session dues error:', error);
       return mapThrownError(error, 'ERRORS.ATTENDANCE.GET_FAILED', 'Failed to get session dues');
+    }
+  },
+
+  /**
+   * GET /api/attendance/class/:classId/student-status
+   *
+   * The same two roster panels — absences and money owed — for a class page,
+   * which has no session to anchor to. Both are scoped to the CURRENT calendar
+   * month; the session variants use the session's own month instead.
+   *
+   * Absences are reported for everyone enrolled; dues only for students the
+   * money query can speak for (see classDues), which is why they are separate
+   * lists rather than one merged row per student.
+   */
+  classStudentStatus: async ({ params, headers }: { params: { classId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const cls = await queryOne<any>(
+        'SELECT id, branch_id FROM classes WHERE id = $1 AND company_id = $2',
+        [params.classId, context.companyId]
+      );
+      if (!cls) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+      if (!canAccessBranch(context, cls.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const now = new Date();
+      const [absences, dues] = await Promise.all([
+        absenceStats(context.companyId, params.classId, null, now),
+        classDues(context, params.classId, now.getFullYear() * 12 + (now.getMonth() + 1), now),
+      ]);
+
+      return {
+        status: 200 as const,
+        body: {
+          paymentType: dues.paymentType,
+          /** The month both counts are scoped to, so the UI can name it. */
+          month: now.getMonth() + 1,
+          year: now.getFullYear(),
+          absences: Array.from(absences.entries()).map(([studentId, a]) => ({
+            studentId,
+            absentStreak: a.absentStreak,
+            monthAbsences: a.monthAbsences,
+            monthSessions: a.monthSessions,
+          })),
+          students: Array.from(dues.byStudent.entries()).map(([studentId, v]) => ({
+            studentId,
+            enrollmentId: v.enrollmentId,
+            totalDue: Math.round(v.items.reduce((sum, i) => sum + i.amount, 0) * 100) / 100,
+            items: v.items,
+          })),
+        },
+      };
+    } catch (error) {
+      console.error('Get class student status error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.GET_FAILED', 'Failed to get class student status');
     }
   },
 

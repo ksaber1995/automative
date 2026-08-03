@@ -22,6 +22,10 @@ import { SessionService, Session, FreeSessionSummary } from '../../rooms/service
 import { RoomService, Room } from '../../rooms/services/room.service';
 import { AttendanceService, SessionAttendanceStudent, ClassAttendanceSummary } from '../../rooms/services/attendance.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
+import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
+import { StudentAbsenceBadgeComponent } from '../../../shared/components/student-dues/student-absence-badge.component';
+import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
+import { StudentSessionDues, StudentAbsenceStats } from '../../rooms/services/attendance.service';
 import { ClassWithDetails } from '@shared/interfaces/class.interface';
 
 @Component({
@@ -44,12 +48,16 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
     ConfirmDialogModule,
     FormsModule,
     SessionPayDialogComponent,
+    StudentDuesBadgeComponent,
+    StudentAbsenceBadgeComponent,
+    DuesCollectDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './class-detail.component.html'
 })
 export class ClassDetailComponent implements OnInit {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
+  @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
   private classService = inject(ClassService);
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
@@ -138,6 +146,7 @@ export class ClassDetailComponent implements OnInit {
     if (this.classId) {
       this.loadClassDetail();
       this.loadEnrollments();
+      this.loadStudentStatus();
     }
   }
 
@@ -158,6 +167,38 @@ export class ClassDetailComponent implements OnInit {
       next: (e) => { this.enrollments.set(e); this.loadingEnrollments.set(false); },
       error: () => this.loadingEnrollments.set(false)
     });
+  }
+
+  // ── Absences + money owed, per student, on the Students tab ────────────────
+  // Same two strips the attendance rosters carry. There is no session here to
+  // anchor to, so both are scoped to the CURRENT calendar month.
+  duesByStudent = signal<Map<string, StudentSessionDues>>(new Map());
+  absenceByStudent = signal<Map<string, StudentAbsenceStats>>(new Map());
+
+  loadStudentStatus() {
+    this.attendanceService.getClassStudentStatus(this.classId).subscribe({
+      next: (res) => {
+        this.duesByStudent.set(new Map(res.students.map((s) => [s.studentId, s])));
+        this.absenceByStudent.set(new Map(res.absences.map((a) => [a.studentId, a])));
+      },
+      error: () => {
+        // Interceptor toasted the translated error. No entry means no badge,
+        // which beats a green one we could not verify.
+      },
+    });
+  }
+
+  /** Undefined for a student the dues query can't speak for — the badge hides. */
+  duesFor(studentId: string): StudentSessionDues | undefined {
+    return this.duesByStudent().get(studentId);
+  }
+
+  absenceFor(studentId: string): StudentAbsenceStats | undefined {
+    return this.absenceByStudent().get(studentId);
+  }
+
+  openCollect(row: { studentId: string; studentName?: string }) {
+    this.collectDialog?.open(`${row.studentName ?? ''}`.trim(), this.duesFor(row.studentId));
   }
 
   loadSessions() {

@@ -6339,6 +6339,44 @@ export const contract = c.router({
         500: ApiErrorSchema,
       },
     },
+    classStudentStatus: {
+      method: 'GET' as const,
+      path: '/api/attendance/class/:classId/student-status',
+      pathParams: z.object({ classId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          paymentType: z.string(),
+          /** The calendar month both counts are scoped to. */
+          month: z.number(),
+          year: z.number(),
+          absences: z.array(z.object({
+            studentId: UUIDSchema,
+            absentStreak: z.number(),
+            monthAbsences: z.number(),
+            monthSessions: z.number(),
+          })),
+          students: z.array(z.object({
+            studentId: UUIDSchema,
+            enrollmentId: UUIDSchema,
+            totalDue: z.number(),
+            items: z.array(z.object({
+              kind: z.enum(['MONTHLY', 'SESSION', 'ENROLLMENT']),
+              label: z.string(),
+              amount: z.number(),
+              paymentId: z.string().nullable(),
+              enrollmentId: UUIDSchema,
+              billingYear: z.number().optional(),
+              billingMonth: z.number().optional(),
+            })),
+          })),
+        }),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
     sessionDues: {
       method: 'GET' as const,
       path: '/api/attendance/session/:sessionId/dues',

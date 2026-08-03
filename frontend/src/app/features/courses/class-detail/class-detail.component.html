@@ -155,6 +155,15 @@
                   @if (row.enrollmentType === 'MASTER') {
                     <div class="text-xs text-purple-600 font-normal mt-0.5">{{ 'CLASSES.DETAIL.BUNDLE_PREFIX' | translate }} {{ row.masterCourseName }}</div>
                   }
+                  <!-- Same two strips as the attendance rosters, scoped to this
+                       calendar month since a class page has no session to anchor to. -->
+                  <div class="font-normal">
+                    <app-student-absence-badge [student]="absenceFor(row.studentId)"></app-student-absence-badge>
+                    <app-student-dues-badge
+                      [dues]="duesFor(row.studentId)"
+                      (pay)="openCollect(row)"
+                    ></app-student-dues-badge>
+                  </div>
                 </td>
                 <td class="text-sm">{{ formatDate(row.enrollmentDate) }}</td>
                 <td>
@@ -525,3 +534,6 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog (settled)="loadAttendanceSummary()"></app-session-pay-dialog>
+
+<!-- Collect from the Students tab: oldest outstanding item, one at a time -->
+<app-dues-collect-dialog (collected)="loadStudentStatus()"></app-dues-collect-dialog>

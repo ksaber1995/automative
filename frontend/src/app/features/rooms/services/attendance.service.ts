@@ -91,6 +91,22 @@ export interface SessionDues {
   students: StudentSessionDues[];
 }
 
+export interface StudentAbsenceStats {
+  studentId: string;
+  absentStreak: number;
+  monthAbsences: number;
+  monthSessions: number;
+}
+
+/** The two roster panels for a class page, scoped to the current calendar month. */
+export interface ClassStudentStatus {
+  paymentType: string;
+  month: number;
+  year: number;
+  absences: StudentAbsenceStats[];
+  students: StudentSessionDues[];
+}
+
 export interface ClassAttendanceSummary {
   sessionId: string;
   sessionStartDate: string;
@@ -115,6 +131,12 @@ export class AttendanceService {
    *  projected monthly bills are computed, not written. */
   getSessionDues(sessionId: string): Observable<SessionDues> {
     return this.api.get<SessionDues>(`attendance/session/${sessionId}/dues`);
+  }
+
+  /** Absences and dues for a class's students, scoped to the current month —
+   *  the class-page counterpart of getSessionDues. Read-only. */
+  getClassStudentStatus(classId: string): Observable<ClassStudentStatus> {
+    return this.api.get<ClassStudentStatus>(`attendance/class/${classId}/student-status`);
   }
 
   /** Bulk save attendance for a session */

@@ -2,7 +2,13 @@ import { Component, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { SessionAttendanceStudent } from '../../../features/rooms/services/attendance.service';
+/** Structurally what the badge needs — SessionAttendanceStudent satisfies it,
+ *  and so does the class page's leaner per-student row. */
+export interface AbsenceLike {
+  absentStreak?: number | null;
+  monthAbsences?: number | null;
+  monthSessions?: number | null;
+}
 
 /**
  * The absence strip under a student on an attendance roster. It carries TWO
@@ -49,7 +55,7 @@ import { SessionAttendanceStudent } from '../../../features/rooms/services/atten
 export class StudentAbsenceBadgeComponent {
   private translate = inject(TranslateService);
 
-  @Input() student?: SessionAttendanceStudent;
+  @Input() student?: AbsenceLike;
   /** The session's start date — the month the scattered count is scoped to.
    *  Falls back to today, which is the same month for a session running now. */
   @Input() sessionDate?: string | null;
