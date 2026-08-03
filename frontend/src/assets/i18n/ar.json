@@ -2735,6 +2735,7 @@
     "LABEL_CLASS": "المجموعة",
     "PLACEHOLDER_CLASS": "اختر مجموعةاً",
     "ERR_CLASS_REQUIRED": "المجموعة مطلوب",
+    "CLASS_FULL_WARN": "هذه المجموعة بها {{enrolled}} من {{max}} طالب بالفعل. التسجيل هنا يتجاوز الحد بـ {{over}}.",
     "LABEL_ENROLLMENT_DATE": "تاريخ التسجيل",
     "PLACEHOLDER_DATE": "اختر التاريخ",
     "LABEL_STATUS": "الحالة",

@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, Signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -263,6 +264,37 @@ export class EnrollmentFormComponent implements OnInit {
     ];
   }
 
+  /**
+   * The chosen class, tracked off the control rather than set in onClassChange:
+   * classId also arrives pre-filled from a query param (enrolling straight from a
+   * class page) and from the edit-mode patch, and the capacity warning has to
+   * hold in those cases too.
+   */
+  private classIdSig!: Signal<string>;
+  selectedClass = computed(() => this.classes().find(c => c.id === this.classIdSig()) || null);
+
+  /** Seats already taken. studentCount is the enriched field, currentEnrollment the older name. */
+  classEnrolledCount = computed(() => {
+    const c = this.selectedClass() as any;
+    return c?.studentCount ?? c?.currentEnrollment ?? 0;
+  });
+
+  /**
+   * maxStudents is a plan, not a lock — the API takes the enrollment either way —
+   * so warn before the click instead of only flagging it afterwards on the class
+   * page. Fires at the limit too: the seat this form is about to fill is the one
+   * that puts the class over.
+   */
+  classAtCapacity = computed(() => {
+    const max = this.selectedClass()?.maxStudents;
+    return !!max && this.classEnrolledCount() >= max && !this.isEditMode();
+  });
+
+  /** How far over the limit this enrollment leaves the class. */
+  classOverBy = computed(() =>
+    this.classEnrolledCount() + 1 - (this.selectedClass()?.maxStudents || 0)
+  );
+
   constructor() {
     this.enrollmentForm = this.fb.group({
       studentId: ['', [Validators.required]],
@@ -285,6 +317,7 @@ export class EnrollmentFormComponent implements OnInit {
       sessionPackageDownPayment: [0],
       notes: ['']
     });
+    this.classIdSig = toSignal(this.enrollmentForm.get('classId')!.valueChanges, { initialValue: '' });
   }
 
   ngOnInit() {

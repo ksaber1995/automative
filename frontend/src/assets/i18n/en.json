@@ -2735,6 +2735,7 @@
     "LABEL_CLASS": "Class",
     "PLACEHOLDER_CLASS": "Select a class",
     "ERR_CLASS_REQUIRED": "Class is required",
+    "CLASS_FULL_WARN": "This class already has {{enrolled}} of {{max}} students. Enrolling here puts it {{over}} over its limit.",
     "LABEL_ENROLLMENT_DATE": "Enrollment Date",
     "PLACEHOLDER_DATE": "Select date",
     "LABEL_STATUS": "Status",
