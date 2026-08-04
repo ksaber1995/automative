@@ -547,8 +547,12 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      // Company and branch live on the linked course, not on the class itself.
       const cls = await queryOne<any>(
-        'SELECT id, branch_id FROM classes WHERE id = $1 AND company_id = $2',
+        `SELECT c.id, co.branch_id
+         FROM classes c
+         INNER JOIN courses co ON c.course_id = co.id
+         WHERE c.id = $1 AND co.company_id = $2`,
         [params.classId, context.companyId]
       );
       if (!cls) {
