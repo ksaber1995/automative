@@ -82,13 +82,17 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   const rows = [
     { label: 'اسم الطالب', value: d.name, dir: 'rtl' as const },
     { label: 'الصف الدراسي', value: d.level, dir: 'rtl' as const },
+    // Dropped entirely when blank: a lone "—" on a printed card reads as a mistake.
+    ...(d.school ? [{ label: 'المدرسة', value: d.school, dir: 'rtl' as const }] : []),
     { label: 'المجموعة', value: d.group, dir: 'rtl' as const },
     { label: 'العام الدراسي', value: d.year, dir: 'ltr' as const },
   ];
   const rR = 700;      // right edge of the rows column
   const rL = 300;      // left edge
   const top = 178;
-  const rowH = 78;
+  // Rows must clear the subject pill at y=528. Four fit at 78 (last rule at 462);
+  // a fifth needs the tighter step or its rule would land on the pill.
+  const rowH = rows.length >= 5 ? 70 : 78;
 
   rows.forEach((row, i) => {
     const y = top + i * rowH;

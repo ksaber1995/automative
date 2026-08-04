@@ -224,6 +224,9 @@ export class CardDesignComponent implements OnInit, OnDestroy {
       name: this.translate.instant('CARD_DESIGN.SAMPLE_NAME'),
       code: '#1024',
       level: this.translate.instant('CARD_DESIGN.SAMPLE_LEVEL'),
+      // Shown in the preview so the designer sees the densest layout a real card
+      // can reach — a card with a school has one more row than one without.
+      school: this.translate.instant('CARD_DESIGN.SAMPLE_SCHOOL'),
       group: this.translate.instant('CARD_DESIGN.SAMPLE_GROUP'),
       year: currentAcademicYear(),
       subject: this.translate.instant('CARD_DESIGN.SAMPLE_SUBJECT'),

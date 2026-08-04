@@ -87,6 +87,8 @@ export interface StudentCardData {
   name: string;
   code: string;
   level: string;
+  /** The student's school. Optional: the row is dropped when it is blank. */
+  school?: string;
   group: string;
   year: string;
   subject: string;
@@ -527,6 +529,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
     { icon: 'user', label: 'اسم الطالب', value: data.name, dir: 'rtl' },
     { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
     ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
+    ...(data.school ? [{ icon: 'cap' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
     { icon: 'group', label: 'المجموعة', value: data.group, dir: 'rtl' },
     { icon: 'cal', label: 'العام الدراسي', value: data.year, dir: 'ltr' },
   ];
@@ -541,7 +544,11 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // grey used to hide this; the gutter has to do it now.
   const valueR = 626;
   const valueMaxW = valueR - (rx + chip + 14);
-  const rowH = 66;
+  // The rows must end before the subject banner at y=544. Five fit at 66 (last
+  // chip ends at 478); a sixth — level AND school both set — would end at 544,
+  // exactly on the banner, so the block tightens instead of overrunning it. At
+  // 59 the sixth chip ends at 506, and 46px of chip still clears a 59px row.
+  const rowH = rows.length >= 6 ? 59 : 66;
 
   rows.forEach((row, i) => {
     const cy = 158 + rowH * i + rowH / 2;

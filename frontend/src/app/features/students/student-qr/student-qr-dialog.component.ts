@@ -207,6 +207,7 @@ export class StudentQrDialogComponent {
       name: this.studentName(),
       code: formatStudentCode(s.studentCode),
       level: course?.levelName || '',
+      school: s.schoolName || '',
       group: cls?.name || '',
       year: currentAcademicYear(),
       subject: course?.name || '',

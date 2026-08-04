@@ -823,6 +823,7 @@ export class StudentListComponent implements OnInit {
           name: student.name,
           code: formatStudentCode(student.studentCode),
           level: '',
+          school: student.schoolName || '',
           group: '',
           year,
           subject: '',
