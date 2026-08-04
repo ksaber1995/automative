@@ -356,6 +356,27 @@
         </div>
       </div>
 
+      <!-- End-before-start: caught here as well as at the API, because such a
+           class can never overlap anything and so slips the clash check too. -->
+      @if (invalidTimeSlots().length > 0) {
+        <div class="mt-6 p-4 border border-red-300 bg-red-50 rounded-md">
+          <div class="flex items-start gap-2">
+            <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5"></i>
+            <div class="flex-1">
+              <p class="font-semibold text-red-700">{{ 'CLASSES.FORM.TIME_RANGE_TITLE' | translate }}</p>
+              <ul class="mt-2 list-disc ms-6 text-sm text-red-700">
+                @for (slot of invalidTimeSlots(); track slot.day) {
+                  <li>
+                    <strong>{{ formatDaysOfWeek(slot.day) }}</strong> —
+                    {{ formatTime(slot.startTime) }} → {{ formatTime(slot.endTime) }}
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Teacher Availability Warning -->
       @if (availabilityConflicts().length > 0) {
         <div class="mt-6 p-4 border border-red-300 bg-red-50 rounded-md">
@@ -410,7 +431,7 @@
           type="submit"
           [label]="isEditMode() ? ('CLASSES.FORM.UPDATE' | translate) : ('CLASSES.FORM.CREATE' | translate)"
           icon="pi pi-check"
-          [disabled]="classForm.invalid || loading() || availabilityConflicts().length > 0">
+          [disabled]="classForm.invalid || loading() || availabilityConflicts().length > 0 || invalidTimeSlots().length > 0">
           @if (loading()) {
             <i class="pi pi-spin pi-spinner"></i>
           }

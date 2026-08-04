@@ -142,6 +142,21 @@ function resolveDayTimes(body: any): DayTime[] | null {
   return null;
 }
 
+/**
+ * A slot whose end is not after its start — "12:08 to 01:08", the 12-hour clock
+ * mistake. Nothing rejected it before, so prod carries 25 such rows: they break
+ * a session's duration, and because an inverted range can never overlap another
+ * one, they also make the class INVISIBLE to the clash check that is supposed to
+ * protect it. Rejected at the API, not just in the form.
+ */
+function invalidTimeSlot(dayTimes: DayTime[]): DayTime | null {
+  const mins = (t: string) => {
+    const [hh, mm] = String(t).split(':').map(Number);
+    return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
+  };
+  return dayTimes.find(dt => mins(dt.endTime) <= mins(dt.startTime)) ?? null;
+}
+
 // Replace a class's day-time rows with exactly `dayTimes`.
 async function setClassDayTimes(classId: string, dayTimes: DayTime[]) {
   await query('DELETE FROM class_day_times WHERE class_id = $1', [classId]);
@@ -429,6 +444,15 @@ export const classesRoutes = {
       const legacy = dayTimes
         ? legacyColumnsFromDayTimes(dayTimes)
         : { days_of_week: body.daysOfWeek || null, start_time: body.startTime || null, end_time: body.endTime || null };
+
+      const badSlot = invalidTimeSlot(dayTimes ?? []);
+      if (badSlot) {
+        return apiError(
+          400, 'ERRORS.CLASSES.INVALID_TIME_RANGE',
+          `${badSlot.day} ends at ${badSlot.endTime}, which is not after ${badSlot.startTime}`,
+          { day: badSlot.day, start: String(badSlot.startTime).slice(0, 5), end: String(badSlot.endTime).slice(0, 5) },
+        );
+      }
 
       const roomId = await resolveRoomId(body.roomId, context.companyId);
       if (roomId === INVALID_ROOM) {
@@ -935,6 +959,15 @@ export const classesRoutes = {
         updateData.days_of_week = legacy.days_of_week;
         updateData.start_time = legacy.start_time;
         updateData.end_time = legacy.end_time;
+      }
+
+      const badSlot = effectiveDayTimes ? invalidTimeSlot(effectiveDayTimes) : null;
+      if (badSlot) {
+        return apiError(
+          400, 'ERRORS.CLASSES.INVALID_TIME_RANGE',
+          `${badSlot.day} ends at ${badSlot.endTime}, which is not after ${badSlot.startTime}`,
+          { day: badSlot.day, start: String(badSlot.startTime).slice(0, 5), end: String(badSlot.endTime).slice(0, 5) },
+        );
       }
 
       // Moving a class's room, dates or times can double-book a room just as

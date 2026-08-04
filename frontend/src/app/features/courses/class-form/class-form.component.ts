@@ -484,6 +484,20 @@ export class ClassFormComponent implements OnInit {
   }
 
   /** The per-day times to send: single time expanded across days, or each day's own. */
+  /**
+   * Slots whose end is not after their start — the 12-hour clock slip that saved
+   * "12:08 to 01:08". Worth blocking here as well as at the API: such a class
+   * can never overlap anything, so it also slips past the clash check meant to
+   * protect it, and nothing downstream would ever complain.
+   */
+  invalidTimeSlots(): { day: string; startTime: string; endTime: string }[] {
+    const mins = (t: string) => {
+      const [hh, mm] = String(t ?? '').split(':').map(Number);
+      return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
+    };
+    return this.buildDayTimes().filter(dt => mins(dt.endTime) <= mins(dt.startTime));
+  }
+
   private buildDayTimes(): { day: string; startTime: string; endTime: string }[] {
     const days = this.selectedDays();
     if (this.sameTime()) {
