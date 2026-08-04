@@ -61,8 +61,12 @@
           <select [(ngModel)]="selectedSource" (change)="onFilterChange()" class="px-3 py-2 border border-gray-300 rounded-md" style="min-width: 160px;">
             <option value="ALL">{{ 'REVENUES.LIST.ALL_SOURCES' | translate }}</option>
             <option value="ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_ENROLLMENT' | translate }}</option>
-            <option value="MASTER_ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_MASTER_ENROLLMENT' | translate }}</option>
-            <option value="EVENT">{{ 'REVENUES.LIST.SOURCE_EVENT' | translate }}</option>
+            <!-- Bundles and events are academy-only, so a teacher can never have
+                 income from either — offering the filters only invites an empty table. -->
+            @if (!authService.isTeacher()) {
+              <option value="MASTER_ENROLLMENT">{{ 'REVENUES.LIST.SOURCE_MASTER_ENROLLMENT' | translate }}</option>
+              <option value="EVENT">{{ 'REVENUES.LIST.SOURCE_EVENT' | translate }}</option>
+            }
             <option value="SUBSCRIPTION">{{ 'REVENUES.LIST.SOURCE_SUBSCRIPTION' | translate }}</option>
             <option value="SESSION">{{ 'REVENUES.LIST.SOURCE_SESSION' | translate }}</option>
             <option value="PRODUCT_SALE">{{ 'REVENUES.LIST.SOURCE_PRODUCT_SALE' | translate }}</option>
