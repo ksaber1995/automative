@@ -484,18 +484,29 @@ export class ClassFormComponent implements OnInit {
   }
 
   /** The per-day times to send: single time expanded across days, or each day's own. */
+  private slotMinutes(t: string): number {
+    const [hh, mm] = String(t ?? '').split(':').map(Number);
+    return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
+  }
+
   /**
-   * Slots whose end is not after their start — the 12-hour clock slip that saved
-   * "12:08 to 01:08". Worth blocking here as well as at the API: such a class
-   * can never overlap anything, so it also slips past the clash check meant to
-   * protect it, and nothing downstream would ever complain.
+   * Slots that occupy no time at all — start equal to end. Blocked: nothing
+   * downstream can make sense of a lesson with no duration.
    */
   invalidTimeSlots(): { day: string; startTime: string; endTime: string }[] {
-    const mins = (t: string) => {
-      const [hh, mm] = String(t ?? '').split(':').map(Number);
-      return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
-    };
-    return this.buildDayTimes().filter(dt => mins(dt.endTime) <= mins(dt.startTime));
+    return this.buildDayTimes()
+      .filter(dt => this.slotMinutes(dt.endTime) === this.slotMinutes(dt.startTime));
+  }
+
+  /**
+   * Slots that end before they start, which means they run past midnight — a
+   * real thing for a late class. Said out loud rather than blocked, because the
+   * same shape is also how the 12-hour clock slip looks ("12:08 to 01:08"), and
+   * only the person typing it knows which they meant.
+   */
+  midnightSlots(): { day: string; startTime: string; endTime: string }[] {
+    return this.buildDayTimes()
+      .filter(dt => this.slotMinutes(dt.endTime) < this.slotMinutes(dt.startTime));
   }
 
   private buildDayTimes(): { day: string; startTime: string; endTime: string }[] {

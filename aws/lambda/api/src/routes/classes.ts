@@ -142,19 +142,49 @@ function resolveDayTimes(body: any): DayTime[] | null {
   return null;
 }
 
+/** Weekday → the day after it, for slots that run past midnight. */
+const NEXT_DAY: Record<string, string> = {
+  SATURDAY: 'SUNDAY', SUNDAY: 'MONDAY', MONDAY: 'TUESDAY', TUESDAY: 'WEDNESDAY',
+  WEDNESDAY: 'THURSDAY', THURSDAY: 'FRIDAY', FRIDAY: 'SATURDAY',
+};
+
 /**
- * A slot whose end is not after its start — "12:08 to 01:08", the 12-hour clock
- * mistake. Nothing rejected it before, so prod carries 25 such rows: they break
- * a session's duration, and because an inverted range can never overlap another
- * one, they also make the class INVISIBLE to the clash check that is supposed to
- * protect it. Rejected at the API, not just in the form.
+ * A slot as the minutes it actually occupies, split at midnight when it wraps.
+ *
+ * A 23:30-01:30 class is not a mistake — it is half an hour of Saturday and an
+ * hour and a half of Sunday. Comparing it as one 23:30>01:30 interval made it
+ * overlap NOTHING (the test is start<end on both sides), so such a class was
+ * invisible to the very clash check meant to protect it, in both directions.
+ */
+type Seg = { day: string; start: number; end: number };
+const MINUTES_IN_DAY = 24 * 60;
+
+function slotMinutes(t: string): number {
+  const [hh, mm] = String(t).split(':').map(Number);
+  return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
+}
+
+function toSegments(day: string, startTime: string, endTime: string): Seg[] {
+  const d = String(day).toUpperCase();
+  const start = slotMinutes(startTime);
+  const end = slotMinutes(endTime);
+  if (end > start) return [{ day: d, start, end }];
+  // Wraps: the tail of its own day, then the head of the next one.
+  return [
+    { day: d, start, end: MINUTES_IN_DAY },
+    { day: NEXT_DAY[d] ?? d, start: 0, end },
+  ];
+}
+
+const segmentsOverlap = (a: Seg, b: Seg) => a.day === b.day && a.start < b.end && b.start < a.end;
+
+/**
+ * A slot that occupies no time at all — start equal to end. End BEFORE start is
+ * allowed and means "runs past midnight" (see toSegments); a zero-length slot is
+ * simply not a lesson, and nothing downstream can make sense of it.
  */
 function invalidTimeSlot(dayTimes: DayTime[]): DayTime | null {
-  const mins = (t: string) => {
-    const [hh, mm] = String(t).split(':').map(Number);
-    return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
-  };
-  return dayTimes.find(dt => mins(dt.endTime) <= mins(dt.startTime)) ?? null;
+  return dayTimes.find(dt => slotMinutes(dt.endTime) === slotMinutes(dt.startTime)) ?? null;
 }
 
 // Replace a class's day-time rows with exactly `dayTimes`.
@@ -337,9 +367,25 @@ async function findRoomConflicts(
   // Same room, overlapping date range, still running. `candidates` is that set;
   // `booked` expands each one into its individual weekday slots.
   const rows = await query(
-    `WITH incoming AS (
+    `WITH next_day(d, nd) AS (VALUES
+       ('SATURDAY','SUNDAY'), ('SUNDAY','MONDAY'), ('MONDAY','TUESDAY'), ('TUESDAY','WEDNESDAY'),
+       ('WEDNESDAY','THURSDAY'), ('THURSDAY','FRIDAY'), ('FRIDAY','SATURDAY')
+     ),
+     incoming_raw AS (
        SELECT UPPER(d) AS day, s::time AS st, e::time AS et
        FROM unnest($5::text[], $6::text[], $7::text[]) AS t(d, s, e)
+     ),
+     -- A slot whose end is not after its start runs PAST MIDNIGHT: it is the
+     -- tail of its own day plus the head of the next. Split both sides the same
+     -- way, or such a class overlaps nothing and silently double-books.
+     incoming AS (
+       SELECT day, st, et FROM incoming_raw WHERE et > st
+       UNION ALL
+       SELECT day, st, TIME '24:00' FROM incoming_raw WHERE et <= st
+       UNION ALL
+       SELECT COALESCE(n.nd, i.day), TIME '00:00', i.et
+       FROM incoming_raw i LEFT JOIN next_day n ON n.d = i.day
+       WHERE i.et <= i.st AND i.et > TIME '00:00'
      ),
      candidates AS (
        SELECT c.id, c.name, c.start_time, c.end_time, c.days_of_week, r.code AS room_code
@@ -355,7 +401,7 @@ async function findRoomConflicts(
          AND c.end_date >= $4
          ${exclude}
      ),
-     booked AS (
+     booked_raw AS (
        -- per-day times: the source of truth
        SELECT cd.id, cd.name, cd.room_code,
               UPPER(cdt.day_of_week) AS day, cdt.start_time AS st, cdt.end_time AS et
@@ -371,6 +417,16 @@ async function findRoomConflicts(
          AND cd.start_time IS NOT NULL AND cd.end_time IS NOT NULL
          AND COALESCE(cd.days_of_week, '') <> ''
          AND TRIM(d) <> ''
+     ),
+     -- Split past-midnight bookings exactly as the incoming slots are split.
+     booked AS (
+       SELECT id, name, room_code, day, st, et FROM booked_raw WHERE et > st
+       UNION ALL
+       SELECT id, name, room_code, day, st, TIME '24:00' FROM booked_raw WHERE et <= st
+       UNION ALL
+       SELECT b.id, b.name, b.room_code, COALESCE(n.nd, b.day), TIME '00:00', b.et
+       FROM booked_raw b LEFT JOIN next_day n ON n.d = b.day
+       WHERE b.et <= b.st AND b.et > TIME '00:00'
      )
      SELECT DISTINCT b.id, b.name, b.room_code, b.day,
             b.st::text AS start_time, b.et::text AS end_time
@@ -449,7 +505,7 @@ export const classesRoutes = {
       if (badSlot) {
         return apiError(
           400, 'ERRORS.CLASSES.INVALID_TIME_RANGE',
-          `${badSlot.day} ends at ${badSlot.endTime}, which is not after ${badSlot.startTime}`,
+          `${badSlot.day} starts and ends at ${badSlot.startTime} — a class must have a duration`,
           { day: badSlot.day, start: String(badSlot.startTime).slice(0, 5), end: String(badSlot.endTime).slice(0, 5) },
         );
       }
@@ -747,14 +803,12 @@ export const classesRoutes = {
         .split(',')
         .map(part => part.split('|').map(s => s.trim()))
         .filter(bits => bits.length === 3 && bits[0] && bits[1] && bits[2])
-        .map(([day, s, e]) => ({ day: day.toUpperCase(), start: timeToMinutes(s), end: timeToMinutes(e) }));
-      const wanted = incoming.length
+        .flatMap(([day, s, e]) => toSegments(day, s, e));
+      // Segments, so a class running past midnight is compared against the day
+      // it actually spills into rather than against nothing at all.
+      const wanted: Seg[] = incoming.length
         ? incoming
-        : newDays.map(day => ({
-            day: day.toUpperCase(),
-            start: timeToMinutes(startTime),
-            end: timeToMinutes(endTime),
-          }));
+        : newDays.flatMap(day => toSegments(day, startTime || '', endTime || ''));
 
       const params: any[] = [context.companyId, endDate, startDate];
       let instructorClause = '';
@@ -792,26 +846,17 @@ export const classesRoutes = {
           // Per-day rows are the truth; a class predating that table falls back
           // to its one time repeated across every day it lists.
           const perDay = parseDayTimes(row.day_times_json);
-          const slots = perDay.length
-            ? perDay.map(d => ({
-                day: String(d.day).toUpperCase(),
-                start: timeToMinutes(d.startTime),
-                end: timeToMinutes(d.endTime),
-              }))
+          const slots: Seg[] = perDay.length
+            ? perDay.flatMap(d => toSegments(String(d.day), d.startTime, d.endTime))
             : String(row.days_of_week || '')
                 .split(',')
                 .map((d: string) => d.trim())
                 .filter(Boolean)
-                .map((day: string) => ({
-                  day: day.toUpperCase(),
-                  start: timeToMinutes(row.start_time),
-                  end: timeToMinutes(row.end_time),
-                }));
+                .flatMap((day: string) => toSegments(day, row.start_time, row.end_time));
 
-          // The first day that genuinely overlaps — named so the message can say
-          // which one, instead of leaving the user to work it out.
-          const hit = slots.find(s =>
-            wanted.some(w => w.day === s.day && w.start < s.end && s.start < w.end));
+          // The first segment that genuinely overlaps — named so the message can
+          // say which day, instead of leaving the user to work it out.
+          const hit = slots.find(s => wanted.some(w => segmentsOverlap(w, s)));
           return hit ? { row, hit } : null;
         })
         .filter(Boolean)
@@ -965,7 +1010,7 @@ export const classesRoutes = {
       if (badSlot) {
         return apiError(
           400, 'ERRORS.CLASSES.INVALID_TIME_RANGE',
-          `${badSlot.day} ends at ${badSlot.endTime}, which is not after ${badSlot.startTime}`,
+          `${badSlot.day} starts and ends at ${badSlot.startTime} — a class must have a duration`,
           { day: badSlot.day, start: String(badSlot.startTime).slice(0, 5), end: String(badSlot.endTime).slice(0, 5) },
         );
       }
