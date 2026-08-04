@@ -254,7 +254,7 @@
       "LIST_FAILED": "Failed to load classes",
       "ENROLLMENTS_FAILED": "Failed to load enrollments",
       "CHECK_AVAILABILITY_FAILED": "Failed to check teacher availability",
-      "ROOM_CONFLICT": "That room is already booked by another class at this time. Pick another room or time.",
+      "ROOM_CONFLICT": "Room {{room}} is already taken by \"{{name}}\" on {{day}} {{start}}–{{end}}. Pick another room or time.",
       "CANNOT_DEACTIVATE_FINISHED": "Finished classes cannot be deactivated",
       "ALREADY_FINISHED": "Class is already finished",
       "HAS_ACTIVE_SESSION": "Class has an active session and cannot be finished",

@@ -11,7 +11,8 @@ import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { CheckboxModule } from 'primeng/checkbox';
 import { ClassService, TeacherAvailabilityConflict } from '../services/class.service';
-import { debounceTime } from 'rxjs/operators';
+import { debounceTime, switchMap, catchError } from 'rxjs/operators';
+import { Subject, of } from 'rxjs';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { CourseService } from '../services/course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
@@ -72,6 +73,8 @@ export class ClassFormComponent implements OnInit {
   courseDefaultInstructor = signal<string | null>(null);
   isGlobalCreate = signal(false);
   availabilityConflicts = signal<TeacherAvailabilityConflict[]>([]);
+  /** Availability checks, funnelled through one switchMap — see ngOnInit. */
+  private availabilityQuery$ = new Subject<Parameters<ClassService['checkTeacherAvailability']>[0]>();
   checkingAvailability = signal(false);
 
   // Per-day times. When sameTime is true the two single time inputs apply to every
@@ -208,6 +211,28 @@ export class ClassFormComponent implements OnInit {
     this.classForm.valueChanges
       .pipe(debounceTime(400))
       .subscribe(() => this.checkAvailability());
+
+    /**
+     * switchMap, not a subscribe per check: every keystroke past the debounce
+     * fires another request, and they do not have to come back in order. A slow
+     * reply describing the time you have already changed away from used to land
+     * last and win, leaving the form warning about a clash with a class that is
+     * nowhere near the slot on screen — and the Save button disabled with it.
+     * Only the newest request's answer is allowed to set the warning now.
+     */
+    this.availabilityQuery$
+      .pipe(
+        switchMap(params =>
+          this.classService.checkTeacherAvailability(params).pipe(
+            // Interceptor toasted it; an unreachable check must not read as a clash.
+            catchError(() => of({ available: true, conflicts: [] as TeacherAvailabilityConflict[] })),
+          ),
+        ),
+      )
+      .subscribe(result => {
+        this.availabilityConflicts.set(result.conflicts || []);
+        this.checkingAvailability.set(false);
+      });
   }
 
   private checkAvailability() {
@@ -247,7 +272,7 @@ export class ClassFormComponent implements OnInit {
     }
 
     this.checkingAvailability.set(true);
-    this.classService.checkTeacherAvailability({
+    this.availabilityQuery$.next({
       instructorId: instructorId || undefined,
       startDate,
       endDate,
@@ -258,15 +283,6 @@ export class ClassFormComponent implements OnInit {
       // class that runs at different hours on different days.
       dayTimes: dayTimes.map(d => `${d.day}|${d.startTime}|${d.endTime}`).join(','),
       excludeClassId: this.classId || undefined,
-    }).subscribe({
-      next: (result) => {
-        this.availabilityConflicts.set(result.conflicts || []);
-        this.checkingAvailability.set(false);
-      },
-      error: () => {
-        this.checkingAvailability.set(false);
-        this.availabilityConflicts.set([]);
-      },
     });
   }
 

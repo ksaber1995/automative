@@ -10,7 +10,13 @@
 
 import { isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 
-export type ApiErrorBody = { message: string; code?: string };
+/**
+ * `params` are interpolation values for `code`'s translation — the frontend's
+ * error interceptor passes them to ngx-translate. It lets an error name the
+ * thing it is about ("Room A is taken by Group 3") in the user's own language,
+ * instead of the generic sentence the key alone can carry.
+ */
+export type ApiErrorBody = { message: string; code?: string; params?: Record<string, string | number> };
 
 export type ApiErrorResponse<S extends number = number> = {
   status: S;
@@ -21,9 +27,10 @@ export type ApiErrorResponse<S extends number = number> = {
 export function apiError<S extends number>(
   status: S,
   code: string,
-  message: string
+  message: string,
+  params?: Record<string, string | number>
 ): ApiErrorResponse<S> {
-  return { status, body: { message, code } };
+  return { status, body: params ? { message, code, params } : { message, code } };
 }
 
 /**

@@ -379,6 +379,23 @@ function roomConflictMessage(conflicts: Array<{ name: string; day: string; start
   return `${where} is already taken by "${c.name}" on ${c.day} ${hhmm(c.startTime)}-${hhmm(c.endTime)}`;
 }
 
+/**
+ * The same facts as interpolation values, so the TRANSLATED error can name the
+ * class too. "That room is already booked by another class" left the user to go
+ * and find which one; the clash is only actionable once it is named.
+ */
+function roomConflictParams(conflicts: Array<{ name: string; day: string; startTime: string; endTime: string; roomCode: string | null }>) {
+  const c = conflicts[0];
+  const hhmm = (t: string) => String(t).slice(0, 5);
+  return {
+    room: c.roomCode ?? '',
+    name: c.name,
+    day: c.day,
+    start: hhmm(c.startTime),
+    end: hhmm(c.endTime),
+  };
+}
+
 export const classesRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -422,7 +439,7 @@ export const classesRoutes = {
         roomId, startDate: body.startDate, endDate: body.endDate, dayTimes: dayTimes ?? [],
       });
       if (clashes.length) {
-        return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes));
+        return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes), roomConflictParams(clashes));
       }
 
       const insertData = {
@@ -934,7 +951,7 @@ export const classesRoutes = {
           excludeClassId: params.id,
         });
         if (clashes.length) {
-          return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes));
+          return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes), roomConflictParams(clashes));
         }
       }
 

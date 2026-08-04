@@ -54,7 +54,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         // the user's current language. ngx-translate returns the key itself
         // when no translation exists, in which case we fall back to the
         // server's English message.
-        const translated = translate.instant(serverCode);
+        // `params` let the server's key name the thing it is about — which
+        // class took the room, say — while still reading in the user's language.
+        const translated = translate.instant(serverCode, error.error?.params);
         errorMessage = translated === serverCode
           ? (serverMessage || translated)
           : translated;

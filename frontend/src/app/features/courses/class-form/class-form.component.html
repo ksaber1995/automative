@@ -375,8 +375,11 @@
               <ul class="mt-2 list-disc ms-6 text-sm text-red-700">
                 @for (c of availabilityConflicts(); track c.id) {
                   <li>
+                    <!-- The clashing day only. Listing every day the other class
+                         runs made the user hunt for which one was in dispute. -->
                     <strong>{{ c.name }}</strong> —
-                    {{ formatDaysOfWeek(c.daysOfWeek) }} {{ formatTime(c.startTime) }}–{{ formatTime(c.endTime) }}
+                    {{ formatDaysOfWeek(c.conflictDay || c.daysOfWeek) }}
+                    {{ formatTime(c.startTime) }}–{{ formatTime(c.endTime) }}
                   </li>
                 }
               </ul>

@@ -18,6 +18,10 @@ const DateStringSchema = z.string().datetime();
 const ApiErrorSchema = z.object({
   message: z.string(),
   code: z.string().optional(),
+  // Interpolation values for `code`'s translation — see apiError(). Typed
+  // loosely on purpose: a precise record type here is inferred into every one of
+  // the contract's hundreds of error responses and tips tsc over TS7056.
+  params: z.any().optional(),
 });
 
 // User Roles (extended RBAC)
