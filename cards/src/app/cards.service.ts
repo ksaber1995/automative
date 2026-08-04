@@ -55,6 +55,28 @@ export class CardsService {
     );
   }
 
+  /**
+   * One client by id, for the detail route. Two requests (the company list, then
+   * that client's pool) rather than `loadActiveClients`, which fans out a
+   * card-stats call per active client — a detail page needs exactly one.
+   *
+   * Deliberately not filtered to ACTIVE subscriptions: the report only lists
+   * paying clients, but a URL kept in someone's tab should still open rather
+   * than claim the tenant doesn't exist. Emits null when the id is unknown.
+   */
+  loadClient(companyId: string): Observable<ClientRow | null> {
+    return this.listCompanies().pipe(
+      mergeMap((companies) => {
+        const company = companies.find((c) => c.company_id === companyId);
+        if (!company) return of(null);
+        return this.http.get<QrCardStats>(`${this.base}/companies/${companyId}/qr-cards`).pipe(
+          catchError(() => of({} as QrCardStats)),
+          map((stats) => this.toRow(company, stats)),
+        );
+      }),
+    );
+  }
+
   /** One client's cards, for printing. Defaults to the pending run. */
   listCards(companyId: string, status: CardStatus = 'unprinted'): Observable<AdminQrCard[]> {
     return this.http.get<AdminQrCard[]>(`${this.base}/companies/${companyId}/qr-cards/list`, {
