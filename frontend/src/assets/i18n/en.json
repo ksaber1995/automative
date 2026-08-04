@@ -5663,7 +5663,8 @@
     "MARK_PRINTED_MSG": "Mark {{count}} card(s) as sent to the printer? They will be left out of the next download.",
     "MARKED_PRINTED": "{{count}} card(s) marked as printed",
     "UNMARK_PRINTED": "Not printed after all — put back in the next run",
-    "UNMARKED_PRINTED": "{{serial}} is back in the next print run"
+    "UNMARKED_PRINTED": "{{serial}} is back in the next print run",
+    "UNLINK_TOOLTIP": "Unlink this card"
   },
   "RECEIPT": {
     "TITLE": "Payment Receipt",

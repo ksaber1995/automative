@@ -1441,6 +1441,8 @@ export class StudentDetailComponent implements OnInit {
    */
   linkInput = '';
   cardLabel = serialLabel;
+  /** The card being handed back, so only its own chip shows a spinner. */
+  unlinkingCardId = signal<string | null>(null);
 
   openLinkCard(): void {
     this.linkInput = '';
@@ -1492,6 +1494,51 @@ export class StudentDetailComponent implements OnInit {
     // Not a recognisable card number — treat the raw value as a token (a hand-typed
     // token from a damaged QR); the API will reject it if it isn't one.
     this.linkCard({ token: raw });
+  }
+
+  /**
+   * Hand a card back to the pool. Confirmed first: unlinking is not cosmetic —
+   * the printed card in the student's hand stops opening their profile, and
+   * their student code changes back, so a card already given out is worth a
+   * question before it is undone.
+   */
+  confirmUnlinkCard(card: QrCard): void {
+    const s = this.student();
+    if (!s) return;
+    this.confirmationService.confirm({
+      header: this.translate.instant('QR_CARDS.UNLINK_TITLE'),
+      message: this.translate.instant('QR_CARDS.UNLINK_MSG', {
+        serial: serialLabel(card.serial),
+        name: s.name,
+      }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('QR_CARDS.UNLINK'),
+      rejectLabel: this.translate.instant('STUDENTS.DETAIL.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.unlinkCard(card),
+    });
+  }
+
+  private unlinkCard(card: QrCard): void {
+    const s = this.student();
+    if (!s || this.unlinkingCardId()) return;
+
+    this.unlinkingCardId.set(card.id);
+    this.qrCardService.unlink(card.id).subscribe({
+      next: () => {
+        this.unlinkingCardId.set(null);
+        this.notificationService.success(this.translate.instant('QR_CARDS.UNLINKED'));
+        this.loadLinkedCards(s.id);
+        // Unlinking gives the student a plain code back, server-side — the same
+        // refresh the link path needs, for the same reason: the header reads the
+        // code straight off this signal and would otherwise show the card's.
+        this.studentService.getStudentById(s.id).subscribe({
+          next: (updated) => this.student.set(updated),
+        });
+      },
+      // Interceptor toasts the reason.
+      error: () => this.unlinkingCardId.set(null),
+    });
   }
 
   private linkCard(by: { token?: string; serial?: number }): void {

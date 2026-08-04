@@ -103,10 +103,24 @@
       @if (linkedCards().length) {
         <div class="mt-4 border-t border-gray-200 pt-3">
           <p class="text-sm text-gray-600 mb-2">{{ 'QR_CARDS.ALREADY_LINKED_LIST' | translate }}</p>
+          <!-- Each card carries its own unlink: with several linked, one shared
+               button would still have to ask WHICH, so the choice is the click. -->
           <div class="flex flex-wrap gap-2">
             @for (c of linkedCards(); track c.id) {
-              <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1 font-mono">
+              <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold ps-3 pe-1 py-1 font-mono">
                 <i class="pi pi-id-card text-xs"></i>{{ cardLabel(c.serial) }}
+                <button type="button"
+                  class="ms-1 w-5 h-5 inline-flex items-center justify-center rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  [disabled]="unlinkingCardId() === c.id"
+                  [pTooltip]="'QR_CARDS.UNLINK_TOOLTIP' | translate"
+                  [attr.aria-label]="'QR_CARDS.UNLINK_TOOLTIP' | translate"
+                  (click)="confirmUnlinkCard(c)">
+                  @if (unlinkingCardId() === c.id) {
+                    <i class="pi pi-spin pi-spinner" style="font-size:10px"></i>
+                  } @else {
+                    <i class="pi pi-times" style="font-size:10px"></i>
+                  }
+                </button>
               </span>
             }
           </div>

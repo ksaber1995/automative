@@ -5663,7 +5663,8 @@
     "MARK_PRINTED_MSG": "تحديد {{count}} كرت كمُرسل للمطبعة؟ لن تظهر في التحميل القادم.",
     "MARKED_PRINTED": "تم تحديد {{count}} كرت كمطبوعة",
     "UNMARK_PRINTED": "لم تُطبع — أعدها إلى الدفعة القادمة",
-    "UNMARKED_PRINTED": "تمت إعادة {{serial}} إلى دفعة الطباعة القادمة"
+    "UNMARKED_PRINTED": "تمت إعادة {{serial}} إلى دفعة الطباعة القادمة",
+    "UNLINK_TOOLTIP": "إلغاء ربط هذا الكارت"
   },
   "RECEIPT": {
     "TITLE": "إيصال دفع",
