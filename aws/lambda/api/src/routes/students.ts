@@ -11,6 +11,25 @@ function generateQrToken(): string {
   return randomBytes(16).toString('hex');
 }
 
+/**
+ * students.school_name (migration 081). Applied at runtime so a deploy is enough
+ * — no SQL run has to be remembered before the new code starts writing it.
+ * Idempotent and cheap; guarded so it runs once per warm container.
+ */
+let schoolColumnReady: Promise<void> | null = null;
+export function ensureStudentSchoolColumn(): Promise<void> {
+  if (!schoolColumnReady) {
+    schoolColumnReady = query(
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS school_name VARCHAR(200)`
+    ).then(() => undefined).catch((e) => {
+      // Let the next call retry rather than caching a failure for the container's life.
+      schoolColumnReady = null;
+      throw e;
+    });
+  }
+  return schoolColumnReady;
+}
+
 function mapStudentFromDB(row: any) {
   return {
     id: row.id,
@@ -23,6 +42,7 @@ function mapStudentFromDB(row: any) {
     parentName: row.parent_name,
     parentPhone: row.parent_phone,
     address: row.address,
+    schoolName: row.school_name ?? null,
     branchId: row.branch_id,
     isActive: row.is_active,
     inactiveDate: row.inactive_date,
@@ -48,6 +68,7 @@ const STUDENT_SUBSCRIPTIONS_EXISTS = `
 export const studentsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
+      await ensureStudentSchoolColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -80,6 +101,7 @@ export const studentsRoutes = {
         parent_name: body.parentName || null,
         parent_phone: body.parentPhone || null,
         address: body.address || null,
+        school_name: body.schoolName || null,
         branch_id: body.branchId,
         notes: body.notes || null,
         acquisition_channel: body.acquisitionChannel || null,
@@ -191,6 +213,7 @@ export const studentsRoutes = {
 
   list: async ({ query: queryParams, headers }: { query: { branchId?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureStudentSchoolColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -226,6 +249,7 @@ export const studentsRoutes = {
 
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
+      await ensureStudentSchoolColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -257,6 +281,7 @@ export const studentsRoutes = {
 
   update: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     try {
+      await ensureStudentSchoolColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -285,6 +310,7 @@ export const studentsRoutes = {
       if (body.parentName !== undefined) updateData.parent_name = body.parentName;
       if (body.parentPhone !== undefined) updateData.parent_phone = body.parentPhone;
       if (body.address !== undefined) updateData.address = body.address;
+      if (body.schoolName !== undefined) updateData.school_name = body.schoolName || null;
       if (body.branchId !== undefined) {
         if (!canAccessBranch(context, body.branchId)) {
           return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_TARGET_BRANCH', 'Access denied to target branch');

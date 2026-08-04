@@ -382,6 +382,9 @@ CREATE TABLE students (
     parent_name VARCHAR(200),
     parent_phone VARCHAR(50),
     address TEXT,
+    -- The school the student attends. Optional: a teacher tenant coaching adults
+    -- has none to record, and NULL means "not recorded". See migration 081.
+    school_name VARCHAR(200),
     branch_id UUID NOT NULL,
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT true,

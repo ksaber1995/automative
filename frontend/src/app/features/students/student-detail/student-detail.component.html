@@ -209,6 +209,12 @@
                 <span>{{ s.phone }}</span>
               </div>
             }
+            @if (s.schoolName) {
+              <div class="flex">
+                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.SCHOOL_NAME' | translate }}</span>
+                <span>{{ s.schoolName }}</span>
+              </div>
+            }
             @if (s.address) {
               <div class="flex">
                 <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ADDRESS' | translate }}</span>

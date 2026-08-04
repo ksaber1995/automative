@@ -31,6 +31,8 @@ export interface Student {
   parentName?: string | null;
   parentPhone?: string | null;
   address?: string;
+  /** The school the student attends. Optional; null means "not recorded". */
+  schoolName?: string | null;
   branchId: string;
   isActive: boolean;
   inactiveDate?: string;
@@ -55,6 +57,7 @@ export interface StudentCreateDto {
   parentName?: string;
   parentPhone?: string;
   address?: string;
+  schoolName?: string | null;
   branchId: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel;
@@ -88,6 +91,7 @@ export interface StudentUpdateDto {
   parentName?: string;
   parentPhone?: string;
   address?: string;
+  schoolName?: string | null;
   branchId?: string;
   isActive?: boolean;
   notes?: string;

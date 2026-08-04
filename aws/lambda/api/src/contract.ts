@@ -353,6 +353,9 @@ const CreateStudentSchema = z.object({
   parentName: z.string().nullable().optional(),
   parentPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  // The school the student attends. Optional — a teacher tenant coaching adults
+  // has none to record.
+  schoolName: z.string().nullable().optional(),
   branchId: UUIDSchema,
   notes: z.string().nullable().optional(),
   acquisitionChannel: AcquisitionChannelSchema.nullable().optional(),
@@ -398,6 +401,7 @@ const StudentSchema = z.object({
   parentName: z.string().nullable(),
   parentPhone: z.string().nullable(),
   address: z.string().nullable(),
+  schoolName: z.string().nullable().optional(),
   branchId: UUIDSchema,
   isActive: z.boolean(),
   inactiveDate: z.string().nullable(),

@@ -70,6 +70,7 @@ export class StudentFormComponent implements OnInit {
       parentName: [''],
       parentPhone: [''],
       address: [''],
+      schoolName: [''],
       branchId: ['', [Validators.required]],
       notes: [''],
       acquisitionChannel: [null]
