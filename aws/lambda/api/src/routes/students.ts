@@ -126,6 +126,7 @@ export const studentsRoutes = {
   // user can fix the bad rows and re-import just those.
   bulkImport: async ({ body, headers }: { body: { branchId: string; students: any[] }; headers: { authorization: string } }) => {
     try {
+      await ensureStudentSchoolColumn();
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'students', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -184,6 +185,7 @@ export const studentsRoutes = {
             parent_name: emptyToNull(r.parentName),
             parent_phone: emptyToNull(r.parentPhone),
             address: emptyToNull(r.address),
+            school_name: emptyToNull(r.schoolName),
             branch_id: body.branchId,
             notes: emptyToNull(r.notes),
             qr_token: generateQrToken(),

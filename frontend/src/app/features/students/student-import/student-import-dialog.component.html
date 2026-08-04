@@ -87,6 +87,7 @@
             <th>{{ 'STUDENTS.IMPORT.COL_PARENT_PHONE' | translate }}</th>
             <th>{{ 'STUDENTS.IMPORT.COL_GENDER' | translate }}</th>
             <th>{{ 'STUDENTS.IMPORT.COL_DOB' | translate }}</th>
+            <th>{{ 'STUDENTS.IMPORT.COL_SCHOOL' | translate }}</th>
           </tr>
         </ng-template>
         <ng-template pTemplate="body" let-row>
@@ -97,6 +98,7 @@
             <td>{{ row.parentPhone }}</td>
             <td>{{ row.gender }}</td>
             <td>{{ row.dateOfBirth }}</td>
+            <td>{{ row.schoolName }}</td>
           </tr>
         </ng-template>
       </p-table>

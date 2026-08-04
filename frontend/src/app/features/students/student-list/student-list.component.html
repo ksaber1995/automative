@@ -68,6 +68,23 @@
         </select>
       </div>
       <div class="flex-1">
+        <label for="schoolFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SCHOOL_FILTER' | translate }}</label>
+        <select
+          id="schoolFilter"
+          [ngModel]="selectedSchool()"
+          (ngModelChange)="selectedSchool.set($event)"
+          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">{{ 'STUDENTS.LIST.ALL_SCHOOLS' | translate }}</option>
+          @for (school of schoolOptions().names; track school) {
+            <option [value]="school">{{ school }}</option>
+          }
+          @if (schoolOptions().anyBlank) {
+            <option value="NONE">{{ 'STUDENTS.LIST.NO_SCHOOL' | translate }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex-1">
         <label for="studentSearch" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SEARCH' | translate }}</label>
         <span class="p-input-icon-left w-full md:w-80 block relative">
           <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
@@ -136,6 +153,7 @@
           <th pSortableColumn="name">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
+          <th pSortableColumn="schoolName">{{ 'STUDENTS.LIST.COL_SCHOOL' | translate }} <p-sortIcon field="schoolName"></p-sortIcon></th>
           @if (!authService.isTeacher()) {
             <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
@@ -159,6 +177,13 @@
             <div class="text-sm">
               <div>{{ student.parentPhone }}</div>
             </div>
+          </td>
+          <td>
+            @if (student.schoolName) {
+              <span class="text-sm">{{ student.schoolName }}</span>
+            } @else {
+              <span class="text-gray-400">—</span>
+            }
           </td>
           @if (!authService.isTeacher()) {
             <td>{{ getBranchName(student.branchId) }}</td>
@@ -236,7 +261,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 8 : 9" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td [attr.colspan]="authService.isTeacher() ? 9 : 10" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

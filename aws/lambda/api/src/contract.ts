@@ -376,6 +376,7 @@ const BulkImportStudentRowSchema = z.object({
   parentName: z.string().nullable().optional(),
   parentPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  schoolName: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 

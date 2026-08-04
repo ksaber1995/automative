@@ -18,6 +18,7 @@ export interface StudentExportRow {
   phone: string;
   parentName: string;
   parentPhone: string;
+  school: string;
   branch: string;
   course: string;
   class: string;
@@ -33,6 +34,7 @@ const ALL_COLUMNS: StudentExportColumn[] = [
   { key: 'phone', labelKey: 'STUDENTS.EXPORT.COL_PHONE' },
   { key: 'parentName', labelKey: 'STUDENTS.EXPORT.COL_PARENT' },
   { key: 'parentPhone', labelKey: 'STUDENTS.EXPORT.COL_PARENT_PHONE' },
+  { key: 'school', labelKey: 'STUDENTS.EXPORT.COL_SCHOOL' },
   { key: 'branch', labelKey: 'STUDENTS.EXPORT.COL_BRANCH' },
   { key: 'course', labelKey: 'STUDENTS.EXPORT.COL_COURSE' },
   { key: 'class', labelKey: 'STUDENTS.EXPORT.COL_CLASS' },

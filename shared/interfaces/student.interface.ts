@@ -73,6 +73,7 @@ export interface StudentImportRow {
   parentName?: string | null;
   parentPhone?: string | null;
   address?: string | null;
+  schoolName?: string | null;
   notes?: string | null;
 }
 
