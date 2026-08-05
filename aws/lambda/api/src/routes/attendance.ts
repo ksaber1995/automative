@@ -6,6 +6,15 @@ import { ensureAttendanceMagicColumns, ensureFreeSessionSchema } from './session
 import { ensureFreeTrialLimitColumn } from './companies';
 import { notifyCheckin } from './telegram';
 import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema, pendingChargesForStudents } from './session-payments';
+import {
+  ensureSubstitutionLinkSchema,
+  linkSubstitution,
+  claimPendingSubstitutions,
+  releaseSubstitutionClaims,
+  substitutionCoversExists,
+  substitutionCoversLateral,
+  substitutionIsOrphanClause,
+} from '../db/substitutions';
 
 /** What the roster panels say about a student's attendance record. */
 export interface AbsenceStats {
@@ -20,9 +29,9 @@ export interface AbsenceStats {
 /**
  * Absence figures for every student enrolled on a class.
  *
- * Only ended, non-free sessions count, and a SUBSTITUTION into another class of
- * the same course + session_number counts as present — same fairness as the
- * student attendance history, so someone who attended elsewhere is not flagged.
+ * Only ended, non-free sessions count, and a SUBSTITUTION standing in for the
+ * session counts as present — same fairness as the student attendance history,
+ * so someone who took the lesson in a sibling class is not flagged.
  *
  * `excludeSessionId` drops the session currently being registered (it has not
  * happened yet from the roster's point of view); pass null from a class page,
@@ -34,6 +43,7 @@ export async function absenceStats(
   excludeSessionId: string | null,
   monthAnchor: Date | string,
 ): Promise<Map<string, AbsenceStats>> {
+  await ensureSubstitutionLinkSchema();   // the presence checks read the link column
   const out = new Map<string, AbsenceStats>();
   const ensure = (id: string): AbsenceStats => {
     const existing = out.get(id);
@@ -71,15 +81,12 @@ export async function absenceStats(
               WHERE sa.session_id = r.id AND sa.student_id = e.student_id
                 AND sa.attendance_type = 'NORMAL'
             )
-            OR (r.session_number IS NOT NULL AND EXISTS (
-              SELECT 1 FROM session_attendance sub
-              JOIN sessions s2 ON s2.id = sub.session_id
-              JOIN classes c2 ON c2.id = s2.class_id
-              WHERE sub.student_id = e.student_id
-                AND sub.attendance_type = 'SUBSTITUTION'
-                AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
-                AND s2.session_number = r.session_number
-            ))
+            OR ${substitutionCoversExists({
+              student: 'e.student_id',
+              sessionId: 'r.id',
+              courseId: '(SELECT course_id FROM classes WHERE id = $1)',
+              sessionNumber: 'r.session_number',
+            })}
           ) AS present
         FROM recent r CROSS JOIN enrolled e
      )
@@ -119,15 +126,12 @@ export async function absenceStats(
                 WHERE sa.session_id = m.id AND sa.student_id = e.student_id
                   AND sa.attendance_type = 'NORMAL'
               )
-              OR (m.session_number IS NOT NULL AND EXISTS (
-                SELECT 1 FROM session_attendance sub
-                JOIN sessions s2 ON s2.id = sub.session_id
-                JOIN classes c2 ON c2.id = s2.class_id
-                WHERE sub.student_id = e.student_id
-                  AND sub.attendance_type = 'SUBSTITUTION'
-                  AND c2.course_id = (SELECT course_id FROM classes WHERE id = $1)
-                  AND s2.session_number = m.session_number
-              ))
+              OR ${substitutionCoversExists({
+                student: 'e.student_id',
+                sessionId: 'm.id',
+                courseId: '(SELECT course_id FROM classes WHERE id = $1)',
+                sessionNumber: 'm.session_number',
+              })}
             )) AS absent_count
        FROM month_sessions m CROSS JOIN enrolled e
       GROUP BY e.student_id`,
@@ -652,6 +656,17 @@ export const attendanceRoutes = {
         );
       }
 
+      // Re-settle make-ups against this session: whoever is now marked present
+      // releases the substitution that was covering them, and whoever was just
+      // un-checked becomes an absence a pending make-up can claim. Best-effort —
+      // never fail the save over it.
+      try {
+        await releaseSubstitutionClaims(context.companyId, params.sessionId, presentIds);
+        await claimPendingSubstitutions(context.companyId, params.sessionId);
+      } catch (subErr) {
+        console.error('Substitution re-settle (saveForSession) error:', subErr);
+      }
+
       // PER_SESSION courses: create/consume per-session charges for this save.
       // Returns the newly-created PENDING charges that still need collection.
       // Best-effort: a billing hiccup must never fail the attendance save itself.
@@ -724,6 +739,13 @@ export const attendanceRoutes = {
         'DELETE FROM session_attendance WHERE session_id = $1 AND student_id = $2',
         [params.sessionId, params.studentId]
       );
+      // The student is absent from this session again, so a make-up waiting for
+      // a lesson to cover can now claim it. Best-effort.
+      try {
+        await claimPendingSubstitutions(context.companyId, params.sessionId);
+      } catch (subErr) {
+        console.error('Substitution claim (removeAttendee) error:', subErr);
+      }
       // Un-checking a student drops the per-session charge raised for their
       // attendance (and restores any package credit). Best-effort.
       try {
@@ -904,6 +926,15 @@ export const attendanceRoutes = {
         );
         const alreadyPresent = inserted.length === 0;
 
+        // They came to their own lesson after all — a make-up that was standing
+        // in for it now stands in for nothing. Best-effort: the check-in itself
+        // must never fail over bookkeeping.
+        try {
+          await releaseSubstitutionClaims(context.companyId, params.sessionId, [student.id]);
+        } catch (subErr) {
+          console.error('Substitution release (checkinByQr) error:', subErr);
+        }
+
         // Best-effort Telegram present notification (no-op unless enabled).
         await notifyCheckin(context.companyId, params.sessionId, student.id);
 
@@ -975,6 +1006,21 @@ export const attendanceRoutes = {
       );
       const alreadyPresentSub = insertedSub.length === 0;
 
+      // Say which of their own lessons this makes up for, so the home session
+      // reads "attended elsewhere" instead of absent. Nothing to point at yet
+      // when they came EARLY — that lesson has not been opened — and the link is
+      // made from the other side when it is (claimPendingSubstitutions).
+      let coversSessionId: string | null = null;
+      try {
+        const subRowId = insertedSub[0]?.id ?? (await queryOne<any>(
+          `SELECT id FROM session_attendance WHERE session_id = $1 AND student_id = $2`,
+          [params.sessionId, student.id]
+        ))?.id;
+        if (subRowId) coversSessionId = await linkSubstitution(context.companyId, subRowId);
+      } catch (subErr) {
+        console.error('Substitution link (checkinByQr) error:', subErr);
+      }
+
       // Best-effort Telegram present notification (no-op unless enabled).
       await notifyCheckin(context.companyId, params.sessionId, student.id);
 
@@ -986,6 +1032,7 @@ export const attendanceRoutes = {
           studentCode: student.student_code ?? null,
           attendanceType: 'SUBSTITUTION' as const,
           homeClassName: siblingClass.name,
+          substitutesForSessionId: coversSessionId,
           sessionNumber: session.session_number ?? null,
           alreadyPresent: alreadyPresentSub,
           code: alreadyPresentSub ? 'ATTENDANCE.ALREADY_PRESENT_SUB' : 'ATTENDANCE.CHECKED_IN_SUB',
@@ -1013,11 +1060,12 @@ export const attendanceRoutes = {
 
       await ensureAttendanceMagicColumns();
       await ensureFreeSessionSchema();   // the queries below read sessions.is_free
+      await ensureSubstitutionLinkSchema();
 
       // For each session of the student's enrolled classes, derive a status:
       //   PRESENT     — a NORMAL attendance row exists for this session.
-      //   SUBSTITUTED — no NORMAL row, but the student has a SUBSTITUTION row on a
-      //                 session of the SAME course with the SAME session_number.
+      //   SUBSTITUTED — no NORMAL row, but a SUBSTITUTION of theirs stands in for
+      //                 this session (linked by id; see db/substitutions.ts).
       //   ABSENT      — neither.
       // SUBSTITUTED counts as present for the attendance rate.
       const records = await query(
@@ -1033,7 +1081,9 @@ export const attendanceRoutes = {
           co.name AS course_name,
           r.code AS room_code,
           CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
-          sub.sub_class_name AS substituted_in_class_name
+          subst.sub_class_name AS substituted_in_class_name,
+          subst.sub_session_id AS substituted_in_session_id,
+          subst.sub_session_date AS substituted_session_date
         FROM sessions s
         JOIN classes cl ON s.class_id = cl.id
         JOIN courses co ON co.id = cl.course_id
@@ -1041,17 +1091,13 @@ export const attendanceRoutes = {
         LEFT JOIN session_attendance sa
           ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
         LEFT JOIN LATERAL (
-          SELECT c2.name AS sub_class_name
-          FROM session_attendance sub2
-          JOIN sessions s2 ON s2.id = sub2.session_id
-          JOIN classes c2 ON c2.id = s2.class_id
-          WHERE sub2.student_id = $1
-            AND sub2.attendance_type = 'SUBSTITUTION'
-            AND c2.course_id = cl.course_id
-            AND s2.session_number = s.session_number
-            AND s.session_number IS NOT NULL
-          LIMIT 1
-        ) sub ON true
+          ${substitutionCoversLateral({
+            student: '$1',
+            sessionId: 's.id',
+            courseId: 'cl.course_id',
+            sessionNumber: 's.session_number',
+          })}
+        ) subst ON true
         WHERE s.company_id = $2
           AND s.class_id IN (
             SELECT class_id FROM enrollments
@@ -1064,47 +1110,34 @@ export const attendanceRoutes = {
         [params.studentId, context.companyId]
       );
 
-      // Substitutions the student made into a class they're NOT enrolled in, where
-      // no enrolled-class session of the same (course, session_number) exists yet
-      // to carry the SUBSTITUTED status above. Without this, a substitution made
-      // before the home session is started would never appear on the student page.
+      // Make-ups that cover nothing on the student's own timetable — taken before
+      // the lesson they stand in for was opened (so there is no home session to
+      // carry the SUBSTITUTED status above), or for a lesson that never ran.
+      // Without these, attending early would leave no trace at all on the page.
       const orphanSubs = await query(
         `SELECT
-          s2.id AS session_id,
-          s2.start_date AS session_start_date,
-          s2.end_date AS session_end_date,
-          s2.session_number AS session_number,
-          s2.is_free AS is_free,
-          c2.id AS class_id,
-          c2.name AS class_name,
+          sub_session.id AS session_id,
+          sub_session.start_date AS session_start_date,
+          sub_session.end_date AS session_end_date,
+          sub_session.session_number AS session_number,
+          sub_session.is_free AS is_free,
+          sub_class.id AS class_id,
+          sub_class.name AS class_name,
           co2.id AS course_id,
           co2.name AS course_name,
           r2.code AS room_code,
           hc.name AS home_class_name
         FROM session_attendance sub
-        JOIN sessions s2 ON s2.id = sub.session_id
-        JOIN classes c2 ON c2.id = s2.class_id
-        JOIN courses co2 ON co2.id = c2.course_id
-        LEFT JOIN rooms r2 ON r2.id = s2.room_id
+        JOIN sessions sub_session ON sub_session.id = sub.session_id
+        JOIN classes sub_class ON sub_class.id = sub_session.class_id
+        JOIN courses co2 ON co2.id = sub_class.course_id
+        LEFT JOIN rooms r2 ON r2.id = sub_session.room_id
         LEFT JOIN classes hc ON hc.id = sub.home_class_id
         WHERE sub.student_id = $1
           AND sub.attendance_type = 'SUBSTITUTION'
-          AND s2.company_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM sessions hs
-            JOIN classes hcc ON hcc.id = hs.class_id
-            WHERE hcc.course_id = c2.course_id
-              AND hs.session_number = s2.session_number
-              AND s2.session_number IS NOT NULL
-              AND hs.class_id IN (
-                SELECT class_id FROM enrollments
-                WHERE student_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-                UNION
-                SELECT class_id FROM master_class_enrollments
-                WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
-              )
-          )
-        ORDER BY s2.start_date DESC`,
+          AND sub_session.company_id = $2
+          AND ${substitutionIsOrphanClause('$1', '$2')}
+        ORDER BY sub_session.start_date DESC`,
         [params.studentId, context.companyId]
       );
 
@@ -1157,6 +1190,10 @@ export const attendanceRoutes = {
           roomCode: row.room_code,
           status,
           substitutedInClassName: row.substituted_in_class_name || null,
+          // The lesson they actually sat, named by id and date: "absent" and
+          // "made it up on Saturday" must not look the same on the page.
+          substitutedInSessionId: row.substituted_in_session_id || null,
+          substitutedSessionDate: row.substituted_session_date || null,
           // Backward-compatible: present OR substituted.
           isPresent: status !== 'ABSENT',
         };
@@ -1178,6 +1215,8 @@ export const attendanceRoutes = {
         roomCode: row.room_code,
         status: 'SUBSTITUTED' as const,
         substitutedInClassName: row.class_name,
+        substitutedInSessionId: row.session_id,
+        substitutedSessionDate: row.session_start_date,
         isPresent: true,
       }));
 
@@ -1196,6 +1235,8 @@ export const attendanceRoutes = {
         roomCode: row.room_code,
         status: 'TRIAL' as const,
         substitutedInClassName: null,
+        substitutedInSessionId: null,
+        substitutedSessionDate: null,
         isPresent: true,
       }));
 

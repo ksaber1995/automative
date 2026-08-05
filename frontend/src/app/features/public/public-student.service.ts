@@ -20,6 +20,8 @@ export interface PublicStudentAttendanceRecent {
   /** When the student was marked in; null for an absence. */
   checkedInAt?: string | null;
   substitutedInClassName?: string | null;
+  /** The day the make-up was sat, when this session was substituted. */
+  substitutedSessionDate?: string | null;
 }
 
 /** A billed month of a monthly subscription. */

@@ -153,6 +153,9 @@
                   <span class="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full whitespace-nowrap">
                     {{ 'PUBLIC_PROFILE.SUBSTITUTED' | translate }}
                     @if (r.substitutedInClassName) { · {{ r.substitutedInClassName }} }
+                    <!-- The day it was actually sat — otherwise a make-up on the
+                         Saturday looks like a missed Sunday with a label on it. -->
+                    @if (r.substitutedSessionDate) { · {{ formatDate(r.substitutedSessionDate) }} }
                   </span>
                 } @else if (r.isPresent) {
                   <span class="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">{{ 'PUBLIC_PROFILE.PRESENT' | translate }}</span>

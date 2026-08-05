@@ -48,6 +48,9 @@ export interface StudentAttendanceRecord {
   isPresent: boolean;
   status?: AttendanceStatus;
   substitutedInClassName?: string | null;
+  /** The lesson actually sat in place of this one, when substituted. */
+  substitutedInSessionId?: string | null;
+  substitutedSessionDate?: string | null;
 }
 
 export interface QrCheckinResult {

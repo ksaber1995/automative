@@ -1236,6 +1236,14 @@
                       <span class="text-xs text-gray-400 font-normal">({{ rec.substitutedInClassName }})</span>
                     }
                   </span>
+                  <!-- The day they actually sat it: "made up on Sat 12 Jul" is the
+                       whole point of the row, and without it this reads as a guess. -->
+                  @if (rec.substitutedSessionDate) {
+                    <div class="text-xs text-gray-400 mt-0.5">
+                      {{ 'STUDENTS.DETAIL.ATTENDANCE_SUBSTITUTED_ON' | translate }}
+                      {{ rec.substitutedSessionDate | date: 'EEE d MMM' }}
+                    </div>
+                  }
                 } @else if (rec.status === 'TRIAL') {
                   <span class="inline-flex items-center gap-1.5 text-emerald-700 font-semibold text-sm"
                     [pTooltip]="'STUDENTS.DETAIL.ATTENDANCE_TRIAL_HINT' | translate">

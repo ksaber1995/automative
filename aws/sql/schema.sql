@@ -1100,10 +1100,15 @@ CREATE INDEX idx_sessions_session_number ON sessions(session_number);
 --   NORMAL       — an enrolled student attended their own class (default).
 --   SUBSTITUTION — a student attended a sibling class of the SAME course they
 --                  are NOT enrolled in (they were/are absent from their own
---                  class's session of the same session_number). home_class_id
---                  points at the enrolled class the attendance substitutes for.
+--                  class's session). home_class_id points at the enrolled class
+--                  the attendance substitutes for, and substitute_for_session_id
+--                  at the exact lesson of that class it makes up for.
 -- "Absent-with-substitution" on the home class is derived: no NORMAL row there
--- + a SUBSTITUTION row for the same (course, session_number).
+-- + a SUBSTITUTION row pointing at it (migration 082). Session numbers are
+-- per-class, so they drift between sibling classes and cannot carry this — the
+-- id can, in both directions: the make-up may be sat before OR after the lesson
+-- it covers, and when it comes first the link is attached once that lesson is
+-- opened. See aws/lambda/api/src/db/substitutions.ts.
 -- =============================================
 CREATE TABLE session_attendance (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1112,6 +1117,10 @@ CREATE TABLE session_attendance (
     attendance_type VARCHAR(16) NOT NULL DEFAULT 'NORMAL'
         CHECK (attendance_type IN ('NORMAL', 'SUBSTITUTION')),
     home_class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
+    -- The home-class lesson this SUBSTITUTION stands in for. NULL while that
+    -- lesson has not been opened yet (attended early), or when the make-up
+    -- covers nothing.
+    substitute_for_session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (session_id, student_id)
@@ -1120,6 +1129,12 @@ CREATE TABLE session_attendance (
 CREATE INDEX idx_session_attendance_session ON session_attendance(session_id);
 CREATE INDEX idx_session_attendance_student ON session_attendance(student_id);
 CREATE INDEX idx_session_attendance_home_class ON session_attendance(home_class_id);
+CREATE INDEX idx_session_attendance_substitute_for ON session_attendance(substitute_for_session_id);
+-- One missed lesson is covered once: two make-ups by the same student cannot
+-- both claim the same home session.
+CREATE UNIQUE INDEX uq_session_attendance_substitute_claim
+    ON session_attendance(student_id, substitute_for_session_id)
+    WHERE substitute_for_session_id IS NOT NULL;
 
 -- =============================================
 -- SESSION TEACHER ATTENDANCE TABLE

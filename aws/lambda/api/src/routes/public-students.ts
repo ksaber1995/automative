@@ -3,6 +3,11 @@ import { ensureQrCardSchema, qrStudentMatchPublic } from './qr-cards';
 import { enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { apiError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns } from './sessions';
+import {
+  ensureSubstitutionLinkSchema,
+  substitutionCoversLateral,
+  substitutionIsOrphanClause,
+} from '../db/substitutions';
 import { resolveStatus } from './monthly-subscriptions';
 import { isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
 
@@ -96,6 +101,7 @@ export const publicStudentsRoutes = {
     enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);
     try {
       await ensureAttendanceMagicColumns();
+      await ensureSubstitutionLinkSchema();   // the attendance reads below use the link
       const token = (params.qrToken || '').trim();
       // Cheap shape check before hitting the DB; tokens are 32 hex chars.
       if (!/^[a-f0-9]{16,64}$/i.test(token)) {
@@ -146,27 +152,24 @@ export const publicStudentsRoutes = {
             cl.name AS class_name,
             r.code AS room_code,
             CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
-            sub.sub_class_name AS substituted_in_class_name,
+            subst.sub_class_name AS substituted_in_class_name,
+            subst.sub_session_date AS substituted_session_date,
             -- When the student was actually marked in, which is not the same as
             -- when the session started: a parent wants to see the arrival time.
-            COALESCE(sa.created_at, sub.sub_checked_in_at) AS checked_in_at
+            COALESCE(sa.created_at, subst.sub_checked_in_at) AS checked_in_at
          FROM sessions s
          JOIN classes cl ON s.class_id = cl.id
          LEFT JOIN rooms r ON s.room_id = r.id
          LEFT JOIN session_attendance sa
            ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
          LEFT JOIN LATERAL (
-           SELECT c2.name AS sub_class_name, sub2.created_at AS sub_checked_in_at
-           FROM session_attendance sub2
-           JOIN sessions s2 ON s2.id = sub2.session_id
-           JOIN classes c2 ON c2.id = s2.class_id
-           WHERE sub2.student_id = $1
-             AND sub2.attendance_type = 'SUBSTITUTION'
-             AND c2.course_id = cl.course_id
-             AND s2.session_number = s.session_number
-             AND s.session_number IS NOT NULL
-           LIMIT 1
-         ) sub ON true
+           ${substitutionCoversLateral({
+             student: '$1',
+             sessionId: 's.id',
+             courseId: 'cl.course_id',
+             sessionNumber: 's.session_number',
+           })}
+         ) subst ON true
          WHERE s.company_id = $2
            AND s.class_id IN (
              SELECT class_id FROM enrollments
@@ -179,38 +182,26 @@ export const publicStudentsRoutes = {
         [student.id, student.company_id]
       );
 
-      // Substitutions into a non-enrolled class with no matching home-class session
-      // yet — surfaced so they show even before the home session is started.
+      // Make-ups with nothing on the student's own timetable to attach to — taken
+      // before that lesson was opened, so they'd otherwise leave no trace here.
       const orphanSubs = await query<any>(
         `SELECT
-            s2.start_date AS session_start_date,
-            s2.session_number AS session_number,
-            c2.name AS class_name,
+            sub_session.start_date AS session_start_date,
+            sub_session.session_number AS session_number,
+            sub_class.name AS class_name,
             r2.code AS room_code,
             false AS is_present_normal,
-            c2.name AS substituted_in_class_name,
+            sub_class.name AS substituted_in_class_name,
+            sub_session.start_date AS substituted_session_date,
             sub.created_at AS checked_in_at
          FROM session_attendance sub
-         JOIN sessions s2 ON s2.id = sub.session_id
-         JOIN classes c2 ON c2.id = s2.class_id
-         LEFT JOIN rooms r2 ON r2.id = s2.room_id
+         JOIN sessions sub_session ON sub_session.id = sub.session_id
+         JOIN classes sub_class ON sub_class.id = sub_session.class_id
+         LEFT JOIN rooms r2 ON r2.id = sub_session.room_id
          WHERE sub.student_id = $1
            AND sub.attendance_type = 'SUBSTITUTION'
-           AND s2.company_id = $2
-           AND NOT EXISTS (
-             SELECT 1 FROM sessions hs
-             JOIN classes hcc ON hcc.id = hs.class_id
-             WHERE hcc.course_id = c2.course_id
-               AND hs.session_number = s2.session_number
-               AND s2.session_number IS NOT NULL
-               AND hs.class_id IN (
-                 SELECT class_id FROM enrollments
-                 WHERE student_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-                 UNION
-                 SELECT class_id FROM master_class_enrollments
-                 WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
-               )
-           )`,
+           AND sub_session.company_id = $2
+           AND ${substitutionIsOrphanClause('$1', '$2')}`,
         [student.id, student.company_id]
       );
 
@@ -518,6 +509,9 @@ export const publicStudentsRoutes = {
               // there is no arrival time for someone who never arrived.
               checkedInAt: row.checked_in_at || null,
               substitutedInClassName: row.substituted_in_class_name || null,
+              // The day the make-up was actually sat, so "attended Saturday
+              // instead" reads as exactly that and not as a missed Sunday.
+              substitutedSessionDate: row.substituted_session_date || null,
               // Backward-compatible: present OR substituted.
               isPresent: row.status !== 'ABSENT',
             })),

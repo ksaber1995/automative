@@ -5,6 +5,7 @@ import { notifySessionAttendance } from './telegram';
 import { ensureAutoManageSessionsColumn } from './companies';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { ensureClassDayTimesSchema } from './classes';
+import { claimPendingSubstitutions } from '../db/substitutions';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -424,6 +425,15 @@ export const sessionsRoutes = {
         notes: body.notes || null,
       });
 
+      // A student who took this lesson early, in a sibling class, has been
+      // waiting for it to exist — attach their make-up to it now. Best-effort:
+      // starting the lesson must not fail over attendance bookkeeping.
+      try {
+        await claimPendingSubstitutions(context.companyId, session.id);
+      } catch (subErr) {
+        console.error('Substitution claim (start) error:', subErr);
+      }
+
       // Teacher attendance — optional. If the caller provided an explicit list,
       // use it verbatim. Otherwise the default teacher (the class's instructor,
       // else the course's) is marked PRIMARY/PRESENT, so no session is left
@@ -523,6 +533,13 @@ export const sessionsRoutes = {
         started: false,
         notes: null,
       });
+
+      // Make-ups taken ahead of this lesson can now point at it (see start).
+      try {
+        await claimPendingSubstitutions(context.companyId, session.id);
+      } catch (subErr) {
+        console.error('Substitution claim (prepare) error:', subErr);
+      }
 
       return { status: 201 as const, body: mapSessionFromDB(session) };
     } catch (error) {
@@ -659,6 +676,13 @@ export const sessionsRoutes = {
             notes: null,
           });
         }
+        // Make-ups taken ahead of this lesson can now point at it (see start).
+        try {
+          await claimPendingSubstitutions(context.companyId, session.id);
+        } catch (subErr) {
+          console.error('Substitution claim (autoSchedule) error:', subErr);
+        }
+
         // Mark the class instructor present (so the session has a teacher on record
         // and can be auto-ended later for company tenants).
         if (cls.instructor_id) {
@@ -1421,6 +1445,12 @@ export const sessionsRoutes = {
           notes: null,
         });
         session = { ...inserted, class_name: cls.class_name, course_name: cls.course_name, room_code: null };
+        // Make-ups taken ahead of this lesson can now point at it (see start).
+        try {
+          await claimPendingSubstitutions(context.companyId, session.id);
+        } catch (subErr) {
+          console.error('Substitution claim (checkinTarget) error:', subErr);
+        }
       }
 
       return {

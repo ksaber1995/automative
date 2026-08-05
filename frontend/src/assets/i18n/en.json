@@ -3894,6 +3894,7 @@
       "ATTENDANCE_PRESENT_LABEL": "Present",
       "ATTENDANCE_ABSENT_LABEL": "Absent",
       "ATTENDANCE_SUBSTITUTED_LABEL": "Substituted",
+      "ATTENDANCE_SUBSTITUTED_ON": "Attended on",
       "NOTES_PLACEHOLDER": "Optional notes...",
       "REASON_PLACEHOLDER": "Reason for refund...",
       "MASTER_INSTALL_DIALOG_TITLE": "Record Installment Payment",

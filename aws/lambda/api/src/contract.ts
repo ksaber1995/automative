@@ -3294,6 +3294,8 @@ export const contract = c.router({
               /** When the student was marked in; null for an absence. */
               checkedInAt: z.string().nullable().optional(),
               substitutedInClassName: z.string().nullable().optional(),
+              /** The day the make-up was sat, when this session was substituted. */
+              substitutedSessionDate: z.string().nullable().optional(),
             })),
           }),
           exams: z.array(z.object({
@@ -6471,6 +6473,9 @@ export const contract = c.router({
           // TRIAL: attended a free session without being enrolled in the class.
           attendanceType: z.enum(['NORMAL', 'SUBSTITUTION', 'TRIAL']).optional(),
           homeClassName: z.string().nullable().optional(),
+          /** SUBSTITUTION: the student's own lesson this check-in makes up for.
+           *  Null when they came early and that lesson has yet to be opened. */
+          substitutesForSessionId: UUIDSchema.nullable().optional(),
           sessionNumber: z.number().nullable().optional(),
           code: z.string(),
           message: z.string(),
@@ -6503,6 +6508,9 @@ export const contract = c.router({
           isPresent: z.boolean(),
           status: z.enum(['PRESENT', 'ABSENT', 'SUBSTITUTED']).optional(),
           substitutedInClassName: z.string().nullable().optional(),
+          /** The lesson actually sat instead of this one, when substituted. */
+          substitutedInSessionId: UUIDSchema.nullable().optional(),
+          substitutedSessionDate: z.string().nullable().optional(),
         })),
         401: ApiErrorSchema,
         402: ApiErrorSchema,

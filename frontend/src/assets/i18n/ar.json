@@ -4018,6 +4018,7 @@
       "ATTENDANCE_PRESENT_LABEL": "حاضر",
       "ATTENDANCE_ABSENT_LABEL": "غائب",
       "ATTENDANCE_SUBSTITUTED_LABEL": "تعويضي",
+      "ATTENDANCE_SUBSTITUTED_ON": "حضر يوم",
       "NOTES_PLACEHOLDER": "ملاحظات اختيارية...",
       "REASON_PLACEHOLDER": "سبب الاسترداد...",
       "MASTER_INSTALL_DIALOG_TITLE": "تسجيل دفعة قسط",

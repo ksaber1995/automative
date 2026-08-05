@@ -3,6 +3,7 @@ import { ensureQrCardSchema, qrStudentMatch, codeDigits } from './qr-cards';
 import { query, queryOne } from '../db/connection';
 import { extractTenantContext, checkGranularPermission, canAccessBranch } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { releaseSubstitutionClaims } from '../db/substitutions';
 
 /**
  * Telegram attendance bot + auto-notifications (Phase 1, Bot API only).
@@ -432,6 +433,12 @@ async function handleAttendanceCommand(settings: TgSettings, chatId: number, tex
     [session.id, student.id]
   );
   const already = inserted.length === 0;
+  // They made their own lesson, so any make-up covering it covers nothing now.
+  try {
+    await releaseSubstitutionClaims(settings.company_id, session.id, [student.id]);
+  } catch (subErr) {
+    console.error('Substitution release (telegram check-in) error:', subErr);
+  }
   await sendMessage(token, chatId,
     `${already ? 'ℹ️' : '✅'} ${name} (كود ${code}) ${already ? 'مسجّل حاضر بالفعل' : 'تم تسجيل حضوره'} في ${session.class_name} - حصة #${session.session_number ?? ''}.`);
 
