@@ -67,7 +67,15 @@ export async function ensureSubstitutionLinkSchema(): Promise<void> {
              ON session_attendance(student_id, substitute_for_session_id)
            WHERE substitute_for_session_id IS NOT NULL`
         );
-        await backfillSubstitutionLinks();
+        // Best-effort, unlike the DDL above. The backfill only fills in history;
+        // reads work without it (they fall back to the old number match), and
+        // two containers running it at the same moment can collide on the claim
+        // index. That must never be the reason an attendance page 500s.
+        try {
+          await backfillSubstitutionLinks();
+        } catch (backfillErr) {
+          console.error('Substitution backfill error (non-fatal):', backfillErr);
+        }
       } catch (e) {
         substitutionLinkInitPromise = null;
         throw e;
@@ -111,6 +119,14 @@ async function backfillSubstitutionLinks(): Promise<void> {
              SELECT 1 FROM session_attendance na
              WHERE na.session_id = hs.id AND na.student_id = p.student_id
                AND na.attendance_type = 'NORMAL'
+           )
+           -- Skip a lesson another make-up of theirs already covers, or this
+           -- would hand two rows the same claim and the unique index would
+           -- reject the whole statement.
+           AND NOT EXISTS (
+             SELECT 1 FROM session_attendance claimed
+             WHERE claimed.student_id = p.student_id
+               AND claimed.substitute_for_session_id = hs.id
            )
          ORDER BY (hs.session_number IS NOT NULL AND hs.session_number = p.session_number) DESC,
                   ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) ASC

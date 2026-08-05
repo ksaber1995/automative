@@ -62,6 +62,14 @@ matched AS (
               WHERE na.session_id = hs.id AND na.student_id = p.student_id
                 AND na.attendance_type = 'NORMAL'
           )
+          -- Skip a lesson another make-up of theirs already covers: two rows
+          -- with the same claim would trip the unique index above and abort the
+          -- whole backfill.
+          AND NOT EXISTS (
+              SELECT 1 FROM session_attendance claimed
+              WHERE claimed.student_id = p.student_id
+                AND claimed.substitute_for_session_id = hs.id
+          )
         ORDER BY (hs.session_number IS NOT NULL AND hs.session_number = p.session_number) DESC,
                  ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) ASC
         LIMIT 1
