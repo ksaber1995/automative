@@ -1174,10 +1174,12 @@
               </div>
               <span class="text-sm text-gray-500">
                 <span class="text-green-600 font-semibold">{{ attendancePresentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_PRESENT' | translate }} ·
-                <span class="text-red-500 font-semibold">{{ attendanceAbsentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_ABSENT' | translate }} ·
+                <!-- Made up in a sibling class: its own figure, between the two
+                     it used to be muddled with. -->
                 @if (attendanceSubstitutedCount() > 0) {
                   <span class="text-amber-600 font-semibold">{{ attendanceSubstitutedCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_SUBSTITUTED' | translate }} ·
                 }
+                <span class="text-red-500 font-semibold">{{ attendanceAbsentCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_ABSENT' | translate }} ·
                 @if (attendanceTrialCount() > 0) {
                   <span class="text-emerald-600 font-semibold">{{ attendanceTrialCount() }}</span> {{ 'STUDENTS.DETAIL.ATTENDANCE_TRIAL' | translate }} ·
                 }
@@ -1209,7 +1211,9 @@
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-rec>
-            <tr>
+            <!-- Tinted like the class register, so a made-up lesson reads the
+                 same wherever it is shown. -->
+            <tr [class.bg-amber-50]="rec.status === 'SUBSTITUTED'">
               <td class="font-medium">{{ formatDate(rec.sessionStartDate) }}</td>
               <td>
                 <div class="font-medium text-sm">

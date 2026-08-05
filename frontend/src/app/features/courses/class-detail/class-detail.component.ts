@@ -364,6 +364,7 @@ export class ClassDetailComponent implements OnInit {
   openAttendanceDialog(session: Session) {
     this.attendanceSession.set(session);
     this.showAttendanceDialog = true;
+    this.attendanceFilter.set('ALL');
     this.loadingAttendanceStudents.set(true);
     this.attendanceService.getBySession(session.id).subscribe({
       next: (students) => {
@@ -391,9 +392,27 @@ export class ClassDetailComponent implements OnInit {
     }
   }
 
-  markAll(present: boolean) {
-    this.attendanceStudents.set(this.attendanceStudents().map(s => ({ ...s, isPresent: present })));
-  }
+  /**
+   * Which students the register lists. A view only — the save still reads the
+   * whole roster, so filtering to the absentees cannot drop anyone's attendance.
+   */
+  attendanceFilter = signal<'ALL' | 'PRESENT' | 'ABSENT' | 'SUBSTITUTED'>('ALL');
+
+  /** Made-up is offered only when this session actually has one. */
+  attendanceFilterOptions = computed<string[]>(() =>
+    this.substitutedCount() > 0
+      ? ['ALL', 'PRESENT', 'ABSENT', 'SUBSTITUTED']
+      : ['ALL', 'PRESENT', 'ABSENT'],
+  );
+
+  visibleAttendanceStudents = computed(() => {
+    const filter = this.attendanceFilter();
+    const students = this.attendanceStudents();
+    if (filter === 'ALL') return students;
+    if (filter === 'PRESENT') return students.filter(s => s.isPresent);
+    if (filter === 'SUBSTITUTED') return students.filter(this.isSubstituted);
+    return students.filter(s => !s.isPresent && !this.isSubstituted(s));
+  });
 
   saveAttendance() {
     const session = this.attendanceSession();

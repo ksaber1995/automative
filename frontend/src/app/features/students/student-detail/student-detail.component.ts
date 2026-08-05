@@ -417,15 +417,21 @@ export class StudentDetailComponent implements OnInit {
    * still listed, and counted separately.
    */
   private ratedAttendance = computed(() => this.filteredAttendance().filter(r => r.status !== 'TRIAL'));
-  // Present count includes substitutions (they count as present for the rate).
-  attendancePresentCount = computed(() => this.ratedAttendance().filter(r => r.isPresent).length);
-  attendanceAbsentCount = computed(() => this.ratedAttendance().filter(r => !r.isPresent).length);
+  /**
+   * Three states that do not overlap: sat in their own class, sat the lesson with
+   * a sibling class, or missed it. Present used to include the make-ups, which
+   * were then listed again beside it — the same lesson counted twice in a row of
+   * figures meant to add up.
+   */
+  attendancePresentCount = computed(() => this.ratedAttendance().filter(r => r.isPresent && r.status !== 'SUBSTITUTED').length);
   attendanceSubstitutedCount = computed(() => this.ratedAttendance().filter(r => r.status === 'SUBSTITUTED').length);
+  attendanceAbsentCount = computed(() => this.ratedAttendance().filter(r => !r.isPresent).length);
   attendanceTrialCount = computed(() => this.filteredAttendance().filter(r => r.status === 'TRIAL').length);
   attendanceRate = computed(() => {
     const total = this.ratedAttendance().length;
     if (!total) return 0;
-    return Math.round((this.attendancePresentCount() / total) * 100);
+    // A lesson made up elsewhere was attended, so it still counts towards the rate.
+    return Math.round(((this.attendancePresentCount() + this.attendanceSubstitutedCount()) / total) * 100);
   });
 
   /**

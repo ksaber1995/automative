@@ -514,15 +514,28 @@
       <p>{{ 'CLASSES.DETAIL.LOADING_STUDENTS' | translate }}</p>
     </div>
   } @else {
-    <div class="mb-3 flex items-center justify-between">
+    <div class="mb-3 flex items-center justify-between gap-2 flex-wrap">
       <span class="text-sm text-gray-500">{{ 'CLASSES.DETAIL.STUDENTS_ENROLLED_COUNT' | translate: { count: attendanceStudents().length } }}</span>
-      <div class="flex gap-2">
-        <p-button [label]="'CLASSES.DETAIL.ALL_PRESENT' | translate" size="small" severity="success" [outlined]="true" (onClick)="markAll(true)"></p-button>
-        <p-button [label]="'CLASSES.DETAIL.ALL_ABSENT' | translate" size="small" severity="danger" [outlined]="true" (onClick)="markAll(false)"></p-button>
+      <!-- Narrow the register to the state you came to look at — reading down a
+           roster of 150 for the handful who were missing is the slow way. The
+           made-up option only appears when there is one. -->
+      <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
+        @for (f of attendanceFilterOptions(); track f) {
+          <button type="button" class="px-2.5 py-1 font-medium"
+            [class.bg-indigo-600]="attendanceFilter() === f"
+            [class.text-white]="attendanceFilter() === f"
+            [class.text-gray-600]="attendanceFilter() !== f"
+            (click)="attendanceFilter.set($any(f))">
+            {{ ('CLASSES.DETAIL.FILTER_' + f) | translate }}
+          </button>
+        }
       </div>
     </div>
     <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
-      @for (student of attendanceStudents(); track student.studentId) {
+      @if (visibleAttendanceStudents().length === 0) {
+        <div class="text-center py-6 text-sm text-gray-400">{{ 'CLASSES.DETAIL.NO_STUDENTS_IN_FILTER' | translate }}</div>
+      }
+      @for (student of visibleAttendanceStudents(); track student.studentId) {
         <!-- Three states, not two: present here, made up with a sibling class,
              or actually missing. The middle one used to look like the last. -->
         <div class="flex items-center justify-between p-3 rounded-lg border"
