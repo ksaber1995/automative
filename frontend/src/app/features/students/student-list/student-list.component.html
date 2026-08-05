@@ -67,23 +67,8 @@
           }
         </select>
       </div>
-      <div class="flex-1">
-        <label for="schoolFilter" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SCHOOL_FILTER' | translate }}</label>
-        <select
-          id="schoolFilter"
-          [ngModel]="selectedSchool()"
-          (ngModelChange)="selectedSchool.set($event)"
-          class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">{{ 'STUDENTS.LIST.ALL_SCHOOLS' | translate }}</option>
-          @for (school of schoolOptions().names; track school) {
-            <option [value]="school">{{ school }}</option>
-          }
-          @if (schoolOptions().anyBlank) {
-            <option value="NONE">{{ 'STUDENTS.LIST.NO_SCHOOL' | translate }}</option>
-          }
-        </select>
-      </div>
+      <!-- School has no dropdown: it is free text a school can be typed into a
+           dozen ways, so the search box below matches it alongside the name. -->
       <div class="flex-1">
         <label for="studentSearch" class="block text-sm font-medium mb-2">{{ 'STUDENTS.LIST.SEARCH' | translate }}</label>
         <span class="p-input-icon-left w-full md:w-80 block relative">

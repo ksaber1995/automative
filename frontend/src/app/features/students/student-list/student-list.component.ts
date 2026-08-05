@@ -100,8 +100,6 @@ export class StudentListComponent implements OnInit {
   branchFilter = signal('');
   selectedCourseId = signal('');
   selectedClassId = signal('');
-  /** Exact school name, or '' for all. Blank-school students are their own option. */
-  selectedSchool = signal('');
   searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
   // studentId → set of courseIds the student is enrolled in (drives the course filter).
@@ -154,22 +152,6 @@ export class StudentListComponent implements OnInit {
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  /**
-   * Schools actually present on the roster, so the filter can never offer one
-   * that returns nothing. Sorted, with a "not recorded" bucket at the end when
-   * some students have no school — filtering for the gaps is how you fill them.
-   */
-  schoolOptions = computed(() => {
-    const names = new Set<string>();
-    let anyBlank = false;
-    for (const s of this.students()) {
-      const v = (s.schoolName || '').trim();
-      if (v) names.add(v); else anyBlank = true;
-    }
-    const sorted = [...names].sort((a, b) => a.localeCompare(b));
-    return { names: sorted, anyBlank };
-  });
-
   filteredStudents = computed(() => {
     const list = this.students();
     let filtered = this.activeTab() === 'active'
@@ -185,14 +167,6 @@ export class StudentListComponent implements OnInit {
       const map = this.studentClassMap();
       filtered = filtered.filter(s => map.get(s.id)?.has(classId));
     }
-    const school = this.selectedSchool();
-    if (school) {
-      // NONE is the sentinel for "no school recorded" — a real value can't be
-      // empty, so it cannot collide with a school actually named in the data.
-      filtered = school === 'NONE'
-        ? filtered.filter(s => !(s.schoolName || '').trim())
-        : filtered.filter(s => (s.schoolName || '').trim() === school);
-    }
     const term = this.searchTerm();
     if (!term.trim()) return filtered;
     // Every word of the term must appear somewhere across these fields, in any
@@ -207,6 +181,8 @@ export class StudentListComponent implements OnInit {
       s.studentCode,
       s.phone,
       s.parentPhone,
+      // School is only reachable from here — it has no filter of its own,
+      // because the same school gets typed a dozen different ways.
       s.schoolName,
     ]));
   });
