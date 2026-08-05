@@ -394,6 +394,35 @@ export class SessionsDashboardComponent implements OnInit {
     });
   }
 
+  /**
+   * What the list adds up to, for the filter currently applied.
+   *
+   * Rows are per (student, class), so a student in two classes appears twice —
+   * the headline counts distinct people, or the number reads higher than the
+   * number of parents there are to call.
+   */
+  absenceSummary = computed(() => {
+    const rows = this.absenceRows();
+    const students = new Set(rows.map(r => r.studentId));
+    const classes = new Set(rows.map(r => r.classId));
+    const contactable = new Set(
+      rows.filter(r => r.parentPhone || r.studentPhone).map(r => r.studentId),
+    );
+    const neverAttended = new Set(rows.filter(r => !r.lastPresentDate).map(r => r.studentId));
+    const tally = new Map<number, number>();
+    for (const r of rows) tally.set(r.streak, (tally.get(r.streak) ?? 0) + 1);
+    return {
+      rows: rows.length,
+      students: students.size,
+      classes: classes.size,
+      contactable: contactable.size,
+      neverAttended: neverAttended.size,
+      longest: rows.reduce((max, r) => Math.max(max, r.streak), 0),
+      // Longest run first: that end of the list is the one worth acting on.
+      byStreak: [...tally.entries()].sort((a, b) => b[0] - a[0]).map(([streak, count]) => ({ streak, count })),
+    };
+  });
+
   /** WhatsApp click-to-chat, same as the absence dialogs elsewhere. */
   waLink(phone: string | null | undefined): string | null {
     const digits = (phone || '').replace(/[^\d]/g, '');

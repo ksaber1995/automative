@@ -756,6 +756,46 @@
             <p>{{ 'SESSIONS_DASHBOARD.ABSENCE_NONE' | translate: { count: absenceMinStreak() } }}</p>
           </div>
         } @else {
+          <!-- What the current filter adds up to, before the list itself. -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p class="text-2xl font-bold text-amber-700">{{ absenceSummary().students }}</p>
+              <p class="text-xs text-amber-700 mt-1">{{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_STUDENTS' | translate }}</p>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4">
+              <p class="text-2xl font-bold text-gray-800">{{ absenceSummary().classes }}</p>
+              <p class="text-xs text-gray-500 mt-1">{{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_CLASSES' | translate }}</p>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4">
+              <p class="text-2xl font-bold text-red-600">{{ absenceSummary().longest }}</p>
+              <p class="text-xs text-gray-500 mt-1">{{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_LONGEST' | translate }}</p>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4">
+              <p class="text-2xl font-bold text-green-700">{{ absenceSummary().contactable }}</p>
+              <p class="text-xs text-gray-500 mt-1">{{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_CONTACTABLE' | translate }}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap mb-4 text-xs">
+            <span class="text-gray-500">{{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_BREAKDOWN' | translate }}</span>
+            @for (b of absenceSummary().byStreak; track b.streak) {
+              <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium"
+                [class.border-red-200]="b.streak >= 3"
+                [class.bg-red-50]="b.streak >= 3"
+                [class.text-red-700]="b.streak >= 3"
+                [class.border-amber-200]="b.streak < 3"
+                [class.bg-amber-50]="b.streak < 3"
+                [class.text-amber-700]="b.streak < 3">
+                {{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_TALLY' | translate: { streak: b.streak, count: b.count } }}
+              </span>
+            }
+            @if (absenceSummary().neverAttended > 0) {
+              <span class="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 text-gray-600 px-2 py-0.5 font-medium">
+                {{ 'SESSIONS_DASHBOARD.ABSENCE_SUM_NEVER' | translate: { count: absenceSummary().neverAttended } }}
+              </span>
+            }
+          </div>
+
           <p-table [value]="absenceRows()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
             <ng-template pTemplate="header">
               <tr>
