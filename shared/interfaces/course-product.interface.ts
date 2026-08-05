@@ -55,6 +55,10 @@ export interface BookBuyer {
   quantity: number;
   totalAmount: number;
   saleDate: string;
+  /** Money already refunded against this sale (0 unless partly refunded). */
+  totalRefunded?: number;
+  /** Units an earlier refund already put back on the shelf. */
+  restockedQuantity?: number;
 }
 
 export interface BookNonBuyer {

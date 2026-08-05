@@ -74,6 +74,11 @@ export class ProductSaleService {
     return this.api.patch<ProductSale>(`product-sales/${id}`, sale);
   }
 
+  /** Undo a sale entirely: the row goes and the unrefunded units return to stock. */
+  deleteSale(id: string): Observable<{ message: string; code: string; restockedQuantity: number }> {
+    return this.api.delete<{ message: string; code: string; restockedQuantity: number }>(`product-sales/${id}`);
+  }
+
   createRefund(saleId: string, dto: {
     type: 'FULL' | 'PARTIAL';
     amount: number;

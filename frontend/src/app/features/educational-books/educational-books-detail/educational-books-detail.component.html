@@ -118,6 +118,7 @@
                       <th>{{ 'EDUCATIONAL_BOOKS.COL_QTY' | translate }}</th>
                       <th>{{ 'EDUCATIONAL_BOOKS.COL_AMOUNT' | translate }}</th>
                       <th>{{ 'EDUCATIONAL_BOOKS.COL_DATE' | translate }}</th>
+                      <th class="text-right"></th>
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="body" let-buyer>
@@ -129,8 +130,39 @@
                         }
                       </td>
                       <td>{{ buyer.quantity }}</td>
-                      <td class="text-green-600 font-medium">{{ buyer.totalAmount | amount }}</td>
+                      <td class="text-green-600 font-medium">
+                        {{ buyer.totalAmount | amount }}
+                        @if (buyer.totalRefunded > 0) {
+                          <div class="text-xs text-orange-600 font-normal">
+                            -{{ buyer.totalRefunded | amount }} {{ 'EDUCATIONAL_BOOKS.REFUNDED' | translate }}
+                          </div>
+                        }
+                      </td>
                       <td>{{ buyer.saleDate | date: 'shortDate' }}</td>
+                      <td class="text-right whitespace-nowrap">
+                        @if (canRefund()) {
+                          <p-button
+                            icon="pi pi-replay"
+                            size="small"
+                            severity="warn"
+                            [rounded]="true"
+                            [text]="true"
+                            [pTooltip]="'EDUCATIONAL_BOOKS.REFUND' | translate"
+                            (onClick)="openRefundDialog(product, buyer)">
+                          </p-button>
+                        }
+                        @if (canDeleteSale()) {
+                          <p-button
+                            icon="pi pi-trash"
+                            size="small"
+                            severity="danger"
+                            [rounded]="true"
+                            [text]="true"
+                            [pTooltip]="'EDUCATIONAL_BOOKS.DELETE_PAYMENT' | translate"
+                            (onClick)="openDeleteDialog(product, buyer)">
+                          </p-button>
+                        }
+                      </td>
                     </tr>
                   </ng-template>
                 </p-table>
@@ -417,5 +449,176 @@
       [outlined]="true"
       (onClick)="closeProductPicker()">
     </p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Refund a recorded book payment (with or without the book coming back) -->
+<p-dialog
+  [visible]="showRefundDialog()"
+  (visibleChange)="$event ? null : closeRefundDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '480px' }"
+  [closable]="!processingRefund()"
+  [header]="'EDUCATIONAL_BOOKS.REFUND_TITLE' | translate">
+
+  @if (targetProduct() && targetBuyer()) {
+    <div class="flex flex-col gap-4 py-2">
+      <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <p class="text-sm text-orange-900 font-semibold">{{ targetProduct()!.productName }}</p>
+        <p class="text-xs text-orange-800 mt-1">
+          {{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}: {{ targetBuyer()!.studentName || '—' }}
+          @if (targetBuyer()!.studentCode != null) {
+            <span class="font-mono">({{ code(targetBuyer()!.studentCode) }})</span>
+          }
+        </p>
+        <p class="text-xs text-orange-800 mt-1">
+          {{ 'EDUCATIONAL_BOOKS.REFUNDABLE' | translate }}: <strong>{{ refundableAmount() | amount }}</strong>
+        </p>
+      </div>
+
+      <!-- Amount -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.REFUND_AMOUNT' | translate }} *</label>
+        <p-inputnumber
+          [ngModel]="refundAmount()"
+          (ngModelChange)="refundAmount.set($event || 0)"
+          [min]="0"
+          [max]="refundableAmount()"
+          [minFractionDigits]="0"
+          [maxFractionDigits]="2"
+          class="w-full">
+        </p-inputnumber>
+      </div>
+
+      <!-- Return the book, or not -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.RETURN_ITEM' | translate }}</label>
+        <p-select
+          [options]="returnItemOptions"
+          [ngModel]="refundReturn()"
+          (ngModelChange)="refundReturn.set($event)"
+          optionValue="value"
+          appendTo="body"
+          [style]="{ width: '100%' }">
+          <ng-template let-opt pTemplate="selectedItem">{{ opt.label | translate }}</ng-template>
+          <ng-template let-opt pTemplate="item">{{ opt.label | translate }}</ng-template>
+        </p-select>
+        @if (returningItem() && restockableUnits() > 1) {
+          <div class="mt-2">
+            <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.RETURN_QUANTITY' | translate }}</label>
+            <p-inputnumber
+              [ngModel]="refundReturnQuantity()"
+              (ngModelChange)="refundReturnQuantity.set($event || 1)"
+              [min]="1"
+              [max]="restockableUnits()"
+              [showButtons]="true"
+              class="w-full">
+            </p-inputnumber>
+          </div>
+        }
+        <p class="text-xs text-gray-500 mt-2">
+          {{ (returningItem() ? 'EDUCATIONAL_BOOKS.RETURN_ITEM_HINT' : 'EDUCATIONAL_BOOKS.NO_RETURN_ITEM_HINT') | translate }}
+        </p>
+      </div>
+
+      <!-- Refund date -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.REFUND_DATE' | translate }} *</label>
+        <p-datepicker
+          [(ngModel)]="refundDate"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          class="w-full"
+          appendTo="body">
+        </p-datepicker>
+      </div>
+
+      <!-- Reason -->
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'EDUCATIONAL_BOOKS.REFUND_REASON' | translate }}</label>
+        <textarea
+          pTextarea
+          [(ngModel)]="refundReason"
+          rows="2"
+          class="w-full"
+          [placeholder]="'EDUCATIONAL_BOOKS.REFUND_REASON_PLACEHOLDER' | translate">
+        </textarea>
+      </div>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.CANCEL' | translate"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="processingRefund()"
+        (onClick)="closeRefundDialog()">
+      </p-button>
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.REFUND' | translate"
+        icon="pi pi-replay"
+        severity="warn"
+        [loading]="processingRefund()"
+        [disabled]="!canSubmitRefund()"
+        (onClick)="confirmRefund()">
+      </p-button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<!-- Delete a recorded book payment (always puts the book back on the shelf) -->
+<p-dialog
+  [visible]="showDeleteDialog()"
+  (visibleChange)="$event ? null : closeDeleteDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '440px' }"
+  [closable]="!deleting()"
+  [header]="'EDUCATIONAL_BOOKS.DELETE_TITLE' | translate">
+
+  @if (targetProduct() && targetBuyer()) {
+    <div class="flex flex-col gap-3 py-2">
+      <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm text-red-900 font-semibold">{{ targetProduct()!.productName }}</p>
+        <p class="text-xs text-red-800 mt-1">
+          {{ 'EDUCATIONAL_BOOKS.COL_STUDENT' | translate }}: {{ targetBuyer()!.studentName || '—' }}
+          @if (targetBuyer()!.studentCode != null) {
+            <span class="font-mono">({{ code(targetBuyer()!.studentCode) }})</span>
+          }
+        </p>
+        <p class="text-xs text-red-800 mt-1">
+          {{ 'EDUCATIONAL_BOOKS.COL_AMOUNT' | translate }}: <strong>{{ targetBuyer()!.totalAmount | amount }}</strong>
+        </p>
+      </div>
+      <p class="text-sm text-gray-700">{{ 'EDUCATIONAL_BOOKS.DELETE_CONFIRM' | translate }}</p>
+      @if (restockableUnits() > 0) {
+        <p class="text-sm text-gray-600">
+          <i class="pi pi-box mr-1"></i>
+          {{ 'EDUCATIONAL_BOOKS.DELETE_RESTOCK_NOTE' | translate: { count: restockableUnits() } }}
+        </p>
+      }
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.CANCEL' | translate"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="deleting()"
+        (onClick)="closeDeleteDialog()">
+      </p-button>
+      <p-button
+        [label]="'EDUCATIONAL_BOOKS.DELETE_PAYMENT' | translate"
+        icon="pi pi-trash"
+        severity="danger"
+        [loading]="deleting()"
+        (onClick)="confirmDelete()">
+      </p-button>
+    </div>
   </ng-template>
 </p-dialog>

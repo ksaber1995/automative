@@ -520,6 +520,75 @@ export const productSalesRoutes = {
     }
   },
 
+  /**
+   * DELETE /api/product-sales/:id — the sale never should have happened.
+   *
+   * A refund keeps the sale on the books and reverses money against it, which is
+   * the right record when a real purchase is undone. A sale entered by mistake —
+   * wrong student, a double scan — has no such history worth keeping, so the row,
+   * its refunds and the COGS expense it booked all go, and the book goes back on
+   * the shelf.
+   *
+   * Only the units still out are restocked: whatever an earlier partial refund
+   * already returned to inventory is not counted a second time.
+   */
+  remove: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    const client = await getClient();
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'product_sales', 'delete')) {
+        client.release();
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const sale = (await client.query(
+        'SELECT * FROM product_sales WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      )).rows[0];
+      if (!sale) { client.release(); return apiError(404, 'ERRORS.PRODUCT_SALES.NOT_FOUND', 'Product sale not found'); }
+      if (sale.branch_id && !canAccessBranch(context, sale.branch_id)) {
+        client.release();
+        return apiError(403, 'ERRORS.PRODUCT_SALES.ACCESS_DENIED', 'Access denied to this product sale');
+      }
+
+      await client.query('BEGIN');
+
+      const alreadyRestocked = parseInt((await client.query(
+        'SELECT COALESCE(SUM(restock_quantity), 0) AS restocked FROM refunds WHERE product_sale_id = $1',
+        [params.id]
+      )).rows[0]?.restocked || 0) || 0;
+      const returnToStock = Math.max(0, (parseInt(sale.quantity) || 0) - alreadyRestocked);
+      if (returnToStock > 0) {
+        await client.query(
+          'UPDATE products SET stock = stock + $1 WHERE id = $2 AND company_id = $3',
+          [returnToStock, sale.product_id, context.companyId]
+        );
+      }
+
+      // The COGS expense exists only because of this sale. The FK would merely
+      // null the link and leave the cost sitting in the P&L, so drop it here.
+      await client.query(
+        'DELETE FROM expenses WHERE product_sale_id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      // refunds.product_sale_id is ON DELETE CASCADE — they go with the sale.
+      await client.query('DELETE FROM product_sales WHERE id = $1 AND company_id = $2', [params.id, context.companyId]);
+
+      await client.query('COMMIT');
+
+      return {
+        status: 200 as const,
+        body: { message: 'Product sale deleted', code: 'PRODUCT_SALES.DELETED', restockedQuantity: returnToStock },
+      };
+    } catch (error: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('Delete product sale error:', error);
+      return mapThrownError(error, 'ERRORS.PRODUCT_SALES.DELETE_FAILED', 'Failed to delete product sale', 400);
+    } finally {
+      client.release();
+    }
+  },
+
   createRefund: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
     const client = await getClient();
     try {

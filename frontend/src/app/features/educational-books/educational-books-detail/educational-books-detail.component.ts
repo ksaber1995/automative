@@ -12,6 +12,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
+import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
@@ -23,9 +24,11 @@ import { ProductSaleService } from '../../products/services/product-sale.service
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { StudentService } from '../../students/services/student.service';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   EducationalBooksCourseDetail,
   EducationalBooksProductDetail,
+  BookBuyer,
   BookNonBuyer,
 } from '@shared/interfaces/course-product.interface';
 import { DiscountType } from '@shared/enums/product.enum';
@@ -42,8 +45,8 @@ interface ScanSellOption {
   standalone: true,
   imports: [
     CommonModule, FormsModule, CardModule, ButtonModule, TagModule, DialogModule,
-    InputNumberModule, InputTextModule, DatePickerModule, SelectModule, TableModule, TooltipModule,
-    TranslateModule, AmountPipe,
+    InputNumberModule, InputTextModule, DatePickerModule, SelectModule, TableModule, TextareaModule,
+    TooltipModule, TranslateModule, AmountPipe,
   ],
   templateUrl: './educational-books-detail.component.html',
 })
@@ -60,6 +63,7 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private globalScan = inject(GlobalScanService);
   private studentService = inject(StudentService);
+  private authService = inject(AuthService);
 
   DiscountType = DiscountType;
 
@@ -121,6 +125,49 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
   sellDate: Date = new Date();
   sellPaymentMethod = signal<PaymentMethod | null>(PaymentMethod.CASH);
   sellBranchId = signal<string | null>(null);
+
+  // ── Undo a payment: refund (money back, book optionally returned) or delete ───
+  showRefundDialog = signal(false);
+  showDeleteDialog = signal(false);
+  targetProduct = signal<EducationalBooksProductDetail | null>(null);
+  targetBuyer = signal<BookBuyer | null>(null);
+  refundAmount = signal<number>(0);
+  refundDate: Date = new Date();
+  refundReason = '';
+  /**
+   * The refund's second question: did the student hand the book back? Kept as
+   * 'RETURN'/'KEEP' rather than a boolean — a p-select whose value is `false`
+   * falls back to showing its placeholder.
+   */
+  refundReturn = signal<'RETURN' | 'KEEP'>('RETURN');
+  refundReturnQuantity = signal<number>(1);
+  processingRefund = signal(false);
+  deleting = signal(false);
+
+  returnItemOptions = [
+    { label: 'EDUCATIONAL_BOOKS.RETURN_ITEM_YES', value: 'RETURN' },
+    { label: 'EDUCATIONAL_BOOKS.RETURN_ITEM_NO', value: 'KEEP' },
+  ];
+
+  returningItem = computed(() => this.refundReturn() === 'RETURN');
+
+  /** Reversing money is its own permission — see the sales-history page. */
+  canRefund = (): boolean => this.authService.canWrite('refunds');
+  canDeleteSale = (): boolean => this.authService.canDelete('product_sales');
+
+  /** What is left to refund on the targeted sale (a partial refund may precede). */
+  refundableAmount = computed(() => {
+    const buyer = this.targetBuyer();
+    if (!buyer) return 0;
+    return Math.max(0, buyer.totalAmount - (buyer.totalRefunded || 0));
+  });
+
+  /** Units that can still come back: never more than were sold, minus earlier returns. */
+  restockableUnits = computed(() => {
+    const buyer = this.targetBuyer();
+    if (!buyer) return 0;
+    return Math.max(0, buyer.quantity - (buyer.restockedQuantity || 0));
+  });
 
   // ── Pay by QR / scan-to-sell (mirrors the monthly-subscriptions flow) ─────────
   scannerOpen = signal(false);
@@ -433,6 +480,91 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
       error: () => {
         // Interceptor toasted the translated error.
         this.submitting.set(false);
+      },
+    });
+  }
+
+  // ── Undoing a recorded payment ───────────────────────────────────────────────
+
+  openRefundDialog(product: EducationalBooksProductDetail, buyer: BookBuyer) {
+    this.targetProduct.set(product);
+    this.targetBuyer.set(buyer);
+    this.refundAmount.set(this.refundableAmount());
+    this.refundDate = new Date();
+    this.refundReason = '';
+    // The common case is the student handing the book back, so start there —
+    // the operator flips it when the money goes back but the book does not.
+    this.refundReturn.set('RETURN');
+    this.refundReturnQuantity.set(Math.max(1, this.restockableUnits()));
+    this.showRefundDialog.set(true);
+  }
+
+  closeRefundDialog() {
+    this.showRefundDialog.set(false);
+  }
+
+  canSubmitRefund(): boolean {
+    if (!this.targetBuyer()) return false;
+    const amount = this.refundAmount() || 0;
+    if (amount <= 0 || amount > this.refundableAmount()) return false;
+    if (!this.refundDate) return false;
+    if (this.returningItem()) {
+      const qty = this.refundReturnQuantity() || 0;
+      if (qty < 1 || qty > this.restockableUnits()) return false;
+    }
+    return true;
+  }
+
+  confirmRefund() {
+    const buyer = this.targetBuyer();
+    if (!buyer || !this.canSubmitRefund()) return;
+
+    const amount = this.refundAmount();
+    this.processingRefund.set(true);
+    this.productSaleService.createRefund(buyer.saleId, {
+      // Full only when it clears the whole remaining balance.
+      type: amount >= this.refundableAmount() ? 'FULL' : 'PARTIAL',
+      amount,
+      refundDate: this.formatLocalDate(this.refundDate),
+      reason: this.refundReason || undefined,
+      restockQuantity: this.returningItem() ? this.refundReturnQuantity() : 0,
+    }).subscribe({
+      next: () => {
+        this.processingRefund.set(false);
+        this.showRefundDialog.set(false);
+        this.notificationService.success(this.translate.instant('EDUCATIONAL_BOOKS.REFUND_SUCCESS'));
+        this.loadDetail();
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.processingRefund.set(false);
+      },
+    });
+  }
+
+  openDeleteDialog(product: EducationalBooksProductDetail, buyer: BookBuyer) {
+    this.targetProduct.set(product);
+    this.targetBuyer.set(buyer);
+    this.showDeleteDialog.set(true);
+  }
+
+  closeDeleteDialog() {
+    this.showDeleteDialog.set(false);
+  }
+
+  confirmDelete() {
+    const buyer = this.targetBuyer();
+    if (!buyer) return;
+    this.deleting.set(true);
+    this.productSaleService.deleteSale(buyer.saleId).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.showDeleteDialog.set(false);
+        this.notificationService.success(this.translate.instant('EDUCATIONAL_BOOKS.DELETE_SUCCESS'));
+        this.loadDetail();
+      },
+      error: () => {
+        this.deleting.set(false);
       },
     });
   }

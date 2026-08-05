@@ -1685,6 +1685,8 @@ const EducationalBooksCourseDetailSchema = z.object({
       quantity: z.number(),
       totalAmount: z.number(),
       saleDate: z.string(),
+      totalRefunded: z.number().optional(),
+      restockedQuantity: z.number().optional(),
     })),
     nonBuyers: z.array(z.object({
       studentId: UUIDSchema,
@@ -4937,6 +4939,18 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: ProductSaleSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    remove: {
+      method: 'DELETE',
+      path: '/api/product-sales/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string(), restockedQuantity: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },

@@ -114,7 +114,8 @@ export const educationalBooksRoutes = {
       // All attributed, not-fully-refunded sales for this course.
       const sales = await query(
         `SELECT ps.id, ps.product_id, ps.student_id, ps.quantity, ps.total_amount, ps.sale_date,
-                COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded
+                COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_refunded,
+                COALESCE((SELECT SUM(r.restock_quantity) FROM refunds r WHERE r.product_sale_id = ps.id), 0) AS total_restocked
          FROM product_sales ps
          WHERE ps.course_id = $1 AND ps.company_id = $2 AND ps.student_id IS NOT NULL`,
         [params.courseId, context.companyId]
@@ -139,6 +140,10 @@ export const educationalBooksRoutes = {
               quantity: parseInt(sale.quantity),
               totalAmount: parseFloat(sale.total_amount),
               saleDate: sale.sale_date,
+              // What a partial refund already took back, so the refund dialog
+              // can't over-refund the sale or restock units twice.
+              totalRefunded: parseFloat(sale.total_refunded || 0),
+              restockedQuantity: parseInt(sale.total_restocked || 0) || 0,
             });
           } else {
             nonBuyers.push({
