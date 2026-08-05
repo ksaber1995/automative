@@ -1,7 +1,7 @@
 <div class="container-custom py-8">
   <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
-    <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSION_PAYMENTS.TITLE' | translate }}</h1>
-    <div class="flex items-center gap-2">
+    <h1 class="text-xl sm:text-2xl font-bold text-gray-900">{{ 'SESSION_PAYMENTS.TITLE' | translate }}</h1>
+    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
       <p-button
         [label]="'SESSION_PAYMENTS.SCAN_BUTTON' | translate"
         icon="pi pi-qrcode"
@@ -10,7 +10,7 @@
         (onClick)="openScanner()"
       ></p-button>
       <!-- QR-less scan-to-pay: type the student's short code, press Enter. -->
-      <input pInputText type="text" inputmode="numeric" style="width: 150px;"
+      <input pInputText type="text" inputmode="numeric" class="w-full sm:w-[150px]"
         [ngModel]="manualCode()" (ngModelChange)="manualCode.set($event)"
         (keyup.enter)="submitManualCode()"
         [disabled]="resolvingCode()"
@@ -20,9 +20,11 @@
 
   <p-card>
     <!-- Primary view switch — obvious tabs: session charges, prepaid packages, or all. -->
-    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 mb-5">
+    <!-- Full width on a phone so the three tabs split the row evenly instead of
+         running off the card. -->
+    <div class="flex w-full sm:inline-flex sm:w-auto rounded-lg border border-gray-200 bg-gray-50 p-1 mb-5">
       <button type="button"
-        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        class="flex-1 sm:flex-none px-2 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors"
         [class.bg-white]="view() === 'CHARGES'"
         [class.shadow-sm]="view() === 'CHARGES'"
         [class.text-blue-600]="view() === 'CHARGES'"
@@ -31,7 +33,7 @@
         <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}
       </button>
       <button type="button"
-        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        class="flex-1 sm:flex-none px-2 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors"
         [class.bg-white]="view() === 'PACKAGES'"
         [class.shadow-sm]="view() === 'PACKAGES'"
         [class.text-blue-600]="view() === 'PACKAGES'"
@@ -40,7 +42,7 @@
         <i class="pi pi-box"></i> {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}
       </button>
       <button type="button"
-        class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+        class="flex-1 sm:flex-none px-2 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors"
         [class.bg-white]="view() === 'ALL'"
         [class.shadow-sm]="view() === 'ALL'"
         [class.text-blue-600]="view() === 'ALL'"
@@ -58,24 +60,28 @@
         <p-button [label]="'SESSION_PAYMENTS.RANGE_MONTH' | translate" size="small" [outlined]="rangePreset() !== 'MONTH'" (onClick)="setRange('MONTH')"></p-button>
       </div>
 
-      <div class="flex flex-wrap gap-3 items-end">
-        <div class="flex flex-col gap-1">
+      <div class="flex flex-wrap gap-3 items-end w-full sm:w-auto">
+        <div class="flex flex-col gap-1 flex-1 min-w-[9rem] sm:flex-none">
           <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_FROM' | translate }}</label>
-          <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
+          <p-datepicker [(ngModel)]="fromDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"
+            styleClass="w-full sm:w-auto"></p-datepicker>
         </div>
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col gap-1 flex-1 min-w-[9rem] sm:flex-none">
           <label class="text-xs text-gray-500">{{ 'SESSION_PAYMENTS.FILTER_TO' | translate }}</label>
-          <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"></p-datepicker>
+          <p-datepicker [(ngModel)]="toDate" dateFormat="yy-mm-dd" (onSelect)="onDateChanged()"
+            styleClass="w-full sm:w-auto"></p-datepicker>
         </div>
         @if (!isTeacher()) {
           <p-select
             [options]="branches()" [(ngModel)]="selectedBranchId" optionLabel="label" optionValue="id"
             [placeholder]="'SESSION_PAYMENTS.FILTER_BRANCH' | translate" [showClear]="true" (onChange)="loadData()"
+            styleClass="w-full sm:w-auto"
           ></p-select>
         }
         <p-select
           [options]="courses()" [(ngModel)]="selectedCourseId" optionLabel="label" optionValue="id"
           [placeholder]="'SESSION_PAYMENTS.FILTER_COURSE' | translate" [showClear]="true" (onChange)="loadData()"
+          styleClass="w-full sm:w-auto"
         ></p-select>
       </div>
     </div>
@@ -87,10 +93,10 @@
     @if (showMoney()) {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-        <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+        <div class="flex items-center gap-2 flex-wrap text-sm font-semibold text-emerald-800">
           <i class="pi pi-wallet"></i> {{ 'SESSION_PAYMENTS.SUMMARY_CASH' | translate }}@if (view() !== 'CHARGES') { <span class="font-normal text-emerald-600">· {{ (view() === 'ALL' ? 'SESSION_PAYMENTS.VIEW_ALL' : 'SESSION_PAYMENTS.VIEW_PACKAGES') | translate }}</span> }
         </div>
-        <div class="text-3xl font-bold text-emerald-600 mt-1">{{ cashForView() | amount }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1 break-words">{{ cashForView() | amount }}</div>
         @if (view() === 'ALL') {
           <div class="text-xs text-emerald-700 mt-2 leading-5">
             {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}: {{ sessionCash() | amount }} · {{ 'SESSION_PAYMENTS.VIEW_PACKAGES' | translate }}: {{ packageCash() | amount }}
@@ -104,7 +110,7 @@
           <div class="flex items-center gap-2 text-sm font-semibold text-purple-800">
             <i class="pi pi-chart-line"></i> {{ 'SESSION_PAYMENTS.SUMMARY_EARNED' | translate }}
           </div>
-          <div class="text-3xl font-bold text-purple-600 mt-1">{{ (summary()?.totalRevenue ?? 0) | amount }}</div>
+          <div class="text-2xl sm:text-3xl font-bold text-purple-600 mt-1 break-words">{{ (summary()?.totalRevenue ?? 0) | amount }}</div>
           <div class="text-xs text-purple-700 mt-2 leading-5">{{ 'SESSION_PAYMENTS.SUMMARY_EARNED_HINT' | translate }}</div>
         </div>
       }
@@ -137,13 +143,15 @@
         <h3 class="text-base font-semibold text-gray-700 mb-2 flex items-center gap-2"><i class="pi pi-wallet text-gray-400"></i> {{ 'SESSION_PAYMENTS.VIEW_CHARGES' | translate }}</h3>
       }
       <!-- Table -->
+      <!-- On a phone course, session and date fold under the student name; the
+           columns come back as the screen widens. -->
       <p-table [value]="filtered()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_SESSION' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_DATE' | translate }}</th>
+            <th class="hidden md:table-cell">{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</th>
+            <th class="hidden sm:table-cell">{{ 'SESSION_PAYMENTS.COL_SESSION' | translate }}</th>
+            <th class="hidden lg:table-cell">{{ 'SESSION_PAYMENTS.COL_DATE' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_AMOUNT' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_STATUS' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_ACTIONS' | translate }}</th>
@@ -151,9 +159,16 @@
         </ng-template>
         <ng-template pTemplate="body" let-row>
           <tr [class.bg-yellow-50]="row.paymentStatus === 'PENDING'">
-            <td>{{ row.studentName }}</td>
-            <td>{{ row.courseName }}</td>
             <td>
+              {{ row.studentName }}
+              <div class="sm:hidden text-xs text-gray-500 mt-0.5">
+                {{ row.courseName }}
+                · {{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}
+                @if (row.sessionDate) { · {{ row.sessionDate | date:'mediumDate' }} }
+              </div>
+            </td>
+            <td class="hidden md:table-cell">{{ row.courseName }}</td>
+            <td class="hidden sm:table-cell">
               <div class="flex items-center gap-2 flex-wrap">
                 <span>{{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}</span>
                 @if (row.packageId) {
@@ -165,8 +180,8 @@
                 }
               </div>
             </td>
-            <td>{{ row.sessionDate ? (row.sessionDate | date:'mediumDate') : '—' }}</td>
-            <td>{{ row.amountPaid | amount }} / {{ row.amountDue | amount }}</td>
+            <td class="hidden lg:table-cell">{{ row.sessionDate ? (row.sessionDate | date:'mediumDate') : '—' }}</td>
+            <td class="whitespace-nowrap">{{ row.amountPaid | amount }} / {{ row.amountDue | amount }}</td>
             <td>
               <div class="flex items-center gap-1 flex-wrap">
                 <p-tag [value]="('SESSION_PAYMENTS.STATUS_' + rowTag(row)) | translate" [severity]="statusSeverity(rowTag(row))"></p-tag>
@@ -178,14 +193,16 @@
                 }
               </div>
             </td>
-            <td class="flex gap-2">
-              @if (row.paymentStatus === 'PENDING') {
-                <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPay(row)"></p-button>
-              }
-              @if (row.paymentStatus === 'PAID' && canRefund()) {
-                <p-button icon="pi pi-times" severity="secondary" size="small" [pTooltip]="'SESSION_PAYMENTS.VOID_BTN' | translate" (onClick)="openVoid(row)"></p-button>
-                <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openRefund(row)"></p-button>
-              }
+            <td>
+              <div class="flex gap-2 flex-wrap">
+                @if (row.paymentStatus === 'PENDING') {
+                  <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPay(row)"></p-button>
+                }
+                @if (row.paymentStatus === 'PAID' && canRefund()) {
+                  <p-button icon="pi pi-times" severity="secondary" size="small" [pTooltip]="'SESSION_PAYMENTS.VOID_BTN' | translate" (onClick)="openVoid(row)"></p-button>
+                  <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openRefund(row)"></p-button>
+                }
+              </div>
             </td>
           </tr>
         </ng-template>
@@ -208,10 +225,10 @@
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_PACKAGE' | translate }}</th>
-            <th>{{ 'SESSION_PAYMENTS.COL_SESSIONS_LEFT' | translate }}</th>
-            <th class="text-right">{{ 'SESSION_PAYMENTS.COL_PKG_PAID' | translate }}</th>
+            <th class="hidden md:table-cell">{{ 'SESSION_PAYMENTS.COL_COURSE' | translate }}</th>
+            <th class="hidden sm:table-cell">{{ 'SESSION_PAYMENTS.COL_PACKAGE' | translate }}</th>
+            <th class="hidden sm:table-cell">{{ 'SESSION_PAYMENTS.COL_SESSIONS_LEFT' | translate }}</th>
+            <th class="hidden lg:table-cell text-right">{{ 'SESSION_PAYMENTS.COL_PKG_PAID' | translate }}</th>
             <th class="text-right">{{ 'SESSION_PAYMENTS.COL_PKG_REMAINING' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_STATUS' | translate }}</th>
             <th>{{ 'SESSION_PAYMENTS.COL_ACTIONS' | translate }}</th>
@@ -220,9 +237,15 @@
         <ng-template pTemplate="body" let-row>
           @if (row.kind === 'renewal') {
             <tr class="bg-amber-50">
-              <td>{{ row.r.studentName }}</td>
-              <td>{{ row.r.courseName }}</td>
               <td>
+                {{ row.r.studentName }}
+                <div class="sm:hidden text-xs text-gray-500 mt-0.5">
+                  {{ row.r.courseName }}
+                  · {{ 'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: row.r.lastSessionsUsed, total: row.r.lastSessionsTotal } }}
+                </div>
+              </td>
+              <td class="hidden md:table-cell">{{ row.r.courseName }}</td>
+              <td class="hidden sm:table-cell">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span>{{ 'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: row.r.lastSessionsUsed, total: row.r.lastSessionsTotal } }}</span>
                   @if (row.r.unpaidSessions > 0) {
@@ -230,10 +253,20 @@
                   }
                 </div>
               </td>
-              <td>0</td>
-              <td class="text-right"><span class="text-gray-300">—</span></td>
+              <td class="hidden sm:table-cell">0</td>
+              <td class="hidden lg:table-cell text-right"><span class="text-gray-300">—</span></td>
               <td class="text-right"><span class="font-semibold text-red-600">{{ (row.r.packagePrice || 0) | amount }}</span></td>
-              <td><p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_DUE_STATUS' | translate"></p-tag></td>
+              <td>
+                <div class="flex items-center gap-1 flex-wrap">
+                  <p-tag severity="warn" [value]="'SESSION_PAYMENTS.RENEWAL_DUE_STATUS' | translate"></p-tag>
+                  <!-- The unpaid-overflow tag rides here on a phone, where the package column is gone. -->
+                  @if (row.r.unpaidSessions > 0) {
+                    <span class="sm:hidden">
+                      <p-tag severity="danger" [value]="'SESSION_PAYMENTS.RENEWAL_UNPAID' | translate: { count: row.r.unpaidSessions }"></p-tag>
+                    </span>
+                  }
+                </div>
+              </td>
               <td>
                 <div class="flex items-center gap-2 flex-wrap">
                   <p-button icon="pi pi-box" severity="warn" size="small"
@@ -248,11 +281,18 @@
             </tr>
           } @else {
             <tr>
-              <td>{{ row.p.studentName }}</td>
-              <td>{{ row.p.courseName }}</td>
-              <td>{{ row.p.sessionsUsed }} / {{ row.p.sessionsTotal }}</td>
-              <td>{{ row.p.sessionsTotal - row.p.sessionsUsed }}</td>
-              <td class="text-right">
+              <td>
+                {{ row.p.studentName }}
+                <div class="sm:hidden text-xs text-gray-500 mt-0.5">
+                  {{ row.p.courseName }}
+                  · {{ row.p.sessionsUsed }} / {{ row.p.sessionsTotal }}
+                  · <span class="text-green-600">{{ (row.p.amountPaid || 0) | amount }}</span>
+                </div>
+              </td>
+              <td class="hidden md:table-cell">{{ row.p.courseName }}</td>
+              <td class="hidden sm:table-cell">{{ row.p.sessionsUsed }} / {{ row.p.sessionsTotal }}</td>
+              <td class="hidden sm:table-cell">{{ row.p.sessionsTotal - row.p.sessionsUsed }}</td>
+              <td class="hidden lg:table-cell text-right">
                 <span class="font-semibold text-green-600">{{ (row.p.amountPaid || 0) | amount }}</span>
                 <span class="text-gray-400"> / {{ (row.p.amountDue || 0) | amount }}</span>
               </td>
@@ -272,7 +312,7 @@
                 </div>
               </td>
               <td>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   @if (row.p.status !== 'REFUNDED' && packageRemaining(row.p) > 0) {
                     <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(row.p)"></p-button>
                   }
@@ -295,10 +335,10 @@
 <!-- Pay popup (shared) -->
 <app-session-pay-dialog (settled)="loadData()"></app-session-pay-dialog>
 
-<p-confirmDialog [style]="{ width: '440px' }"></p-confirmDialog>
+<p-confirmDialog [style]="{ width: '440px' }" [breakpoints]="{ '640px': '95vw' }"></p-confirmDialog>
 
 <!-- Collect next package (renewal) dialog -->
-<p-dialog [(visible)]="showRenewalPay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.RENEWAL_TITLE' | translate">
+<p-dialog [(visible)]="showRenewalPay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [breakpoints]="{ '640px': '95vw' }" [header]="'SESSION_PAYMENTS.RENEWAL_TITLE' | translate">
   @if (selectedRenewal(); as r) {
     <div class="flex flex-col gap-3 pt-2">
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
@@ -328,7 +368,7 @@
   (visibleChange)="$event ? null : closeScanner()"
   [modal]="true"
   [draggable]="false"
-  [style]="{ width: '420px' }"
+  [style]="{ width: '420px' }" [breakpoints]="{ '640px': '95vw' }"
   [header]="'SESSION_PAYMENTS.SCAN_TITLE' | translate"
 >
   <div class="flex flex-col gap-3 pt-2">
@@ -378,7 +418,7 @@
 </p-dialog>
 
 <!-- Void dialog -->
-<p-dialog [(visible)]="showVoid" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.VOID_TITLE' | translate">
+<p-dialog [(visible)]="showVoid" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [breakpoints]="{ '640px': '95vw' }" [header]="'SESSION_PAYMENTS.VOID_TITLE' | translate">
   <div class="flex flex-col gap-3 pt-2">
     <p class="text-sm text-gray-600">{{ 'SESSION_PAYMENTS.VOID_CONFIRM' | translate }}</p>
     <textarea pTextarea [(ngModel)]="voidReason" rows="2" [placeholder]="'SESSION_PAYMENTS.VOID_REASON' | translate"></textarea>
@@ -390,7 +430,7 @@
 </p-dialog>
 
 <!-- Refund dialog (charges + prepaid packages) -->
-<p-dialog [(visible)]="showRefund" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.REFUND_TITLE' | translate">
+<p-dialog [(visible)]="showRefund" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [breakpoints]="{ '640px': '95vw' }" [header]="'SESSION_PAYMENTS.REFUND_TITLE' | translate">
   <div class="flex flex-col gap-3 pt-2">
     <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">
       <div class="flex justify-between">
@@ -432,7 +472,7 @@
 </p-dialog>
 
 <!-- Package pay dialog (collect remaining balance) -->
-<p-dialog [(visible)]="showPackagePay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [header]="'SESSION_PAYMENTS.PACKAGE_PAY_TITLE' | translate">
+<p-dialog [(visible)]="showPackagePay" [modal]="true" [draggable]="false" [style]="{ width: '420px' }" [breakpoints]="{ '640px': '95vw' }" [header]="'SESSION_PAYMENTS.PACKAGE_PAY_TITLE' | translate">
   @if (selectedPackage(); as p) {
     <div class="flex flex-col gap-3 pt-2">
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600">

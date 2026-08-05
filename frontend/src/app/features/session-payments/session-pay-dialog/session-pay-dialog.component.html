@@ -3,7 +3,7 @@
   (visibleChange)="$event ? null : onHide()"
   [modal]="true"
   [draggable]="false"
-  [style]="{ width: '440px' }"
+  [style]="{ width: '440px' }" [breakpoints]="{ '640px': '95vw' }"
   [header]="'SESSION_PAYMENTS.PAY_DIALOG_TITLE' | translate: { name: currentName() }"
 >
   @if (current(); as c) {
@@ -70,14 +70,17 @@
   }
 
   <ng-template pTemplate="footer">
-    <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" [outlined]="true" (onClick)="skip()" [disabled]="submitting()"></p-button>
-    <!-- Printing is the deliberate action; most collections are never printed. -->
-    <p-button
-      [label]="'RECEIPT.PAY_AND_PRINT' | translate"
-      icon="pi pi-print" severity="secondary" [outlined]="true"
-      (onClick)="pay(true)" [loading]="submitting()"></p-button>
-    <p-button
-      [label]="(mode() === 'PACKAGE' ? 'SESSION_PAYMENTS.PAY_PACKAGE_SUBMIT' : 'SESSION_PAYMENTS.PAY_SUBMIT') | translate"
-      icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
+    <!-- Three buttons do not fit a phone in one row; the footer itself never wraps. -->
+    <div class="flex flex-wrap justify-end gap-2">
+      <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" [outlined]="true" (onClick)="skip()" [disabled]="submitting()"></p-button>
+      <!-- Printing is the deliberate action; most collections are never printed. -->
+      <p-button
+        [label]="'RECEIPT.PAY_AND_PRINT' | translate"
+        icon="pi pi-print" severity="secondary" [outlined]="true"
+        (onClick)="pay(true)" [loading]="submitting()"></p-button>
+      <p-button
+        [label]="(mode() === 'PACKAGE' ? 'SESSION_PAYMENTS.PAY_PACKAGE_SUBMIT' : 'SESSION_PAYMENTS.PAY_SUBMIT') | translate"
+        icon="pi pi-check" (onClick)="pay()" [loading]="submitting()"></p-button>
+    </div>
   </ng-template>
 </p-dialog>
