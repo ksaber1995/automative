@@ -44,6 +44,28 @@
   .p-toast-summary, .p-toast-message-icon { color: #1d4ed8; }
 }
 
+/* ── Dialogs on a phone ───────────────────────────────────────────
+   Nearly every dialog in the app is opened at a fixed pixel width — 420px,
+   520px, 820px — which is wider than the screen it opens on. The theme sets
+   no max-width of its own, so capping it here needs no !important and no
+   per-dialog change; a dialog narrower than 95vw keeps the width it asked for.
+
+   The footer is a flex row that never wraps, so three buttons (cancel,
+   pay-and-print, confirm) ran off the edge once the dialog stopped being
+   wide enough to hold them.
+
+   Phone-only: above 640px nothing here applies and every dialog renders
+   exactly as it did before. */
+@media (max-width: 640px) {
+  .p-dialog {
+    max-width: 95vw;
+  }
+
+  .p-dialog-footer {
+    flex-wrap: wrap;
+  }
+}
+
 /* ── RTL / Arabic font support ───────────────────────────── */
 [dir='rtl'] {
   font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
