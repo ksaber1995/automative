@@ -56,7 +56,13 @@ matched AS (
         WHERE hs.class_id = p.home_class_id
           AND hs.company_id = p.company_id
           AND COALESCE(hs.is_free, false) = false
-          AND ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) <= 7 * 86400
+          -- Same lesson number (the academy's own statement that these are the
+          -- same lesson), or within a week counted in CALENDAR days — in seconds,
+          -- "same weekday one week on" is 7 days plus a few hours and was lost.
+          AND (
+              (hs.session_number IS NOT NULL AND hs.session_number = p.session_number)
+              OR ABS(hs.start_date::date - p.start_date::date) <= 7
+          )
           AND NOT EXISTS (
               SELECT 1 FROM session_attendance na
               WHERE na.session_id = hs.id AND na.student_id = p.student_id

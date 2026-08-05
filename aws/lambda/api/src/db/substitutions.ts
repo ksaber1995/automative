@@ -30,9 +30,12 @@ import { query, queryOne } from './connection';
 /**
  * How far a substitution may reach to cover a lesson of the student's own class.
  *
- * A week. The pairing that actually happens is "I took Sunday's lesson on
- * Saturday" (or Saturday's on Sunday) within the same week; a wider window would
- * let one make-up quietly excuse an absence from a month ago.
+ * A week, counted in CALENDAR days rather than elapsed time. The pairing that
+ * actually happens is "I took Sunday's lesson on Saturday" (or the week's lesson
+ * a week later); measured in seconds, "same weekday, one week on" lands at 7 days
+ * and a few hours — because lessons start at different times of day — and a hard
+ * 7×86400 threshold threw exactly those away. A wider window would let one
+ * make-up quietly excuse an absence from a month ago.
  */
 export const SUBSTITUTION_WINDOW_DAYS = 7;
 
@@ -114,7 +117,12 @@ async function backfillSubstitutionLinks(): Promise<void> {
          WHERE hs.class_id = p.home_class_id
            AND hs.company_id = p.company_id
            AND COALESCE(hs.is_free, false) = false
-           AND ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) <= ${SUBSTITUTION_WINDOW_DAYS} * 86400
+           AND (
+             -- Carrying the same number is the academy saying these are the same
+             -- lesson, however far apart the two classes ran it.
+             (hs.session_number IS NOT NULL AND hs.session_number = p.session_number)
+             OR ABS(hs.start_date::date - p.start_date::date) <= ${SUBSTITUTION_WINDOW_DAYS}
+           )
            AND NOT EXISTS (
              SELECT 1 FROM session_attendance na
              WHERE na.session_id = hs.id AND na.student_id = p.student_id
@@ -175,7 +183,10 @@ export async function linkSubstitution(companyId: string, attendanceId: string):
         AND hs.company_id = $2
         AND hs.id <> $3
         AND COALESCE(hs.is_free, false) = false
-        AND ABS(EXTRACT(EPOCH FROM (hs.start_date - $4::timestamptz))) <= $5 * 86400
+        AND (
+          (hs.session_number IS NOT NULL AND hs.session_number = $8::int)
+          OR ABS(hs.start_date::date - $4::timestamptz::date) <= $5
+        )
         AND NOT EXISTS (
           SELECT 1 FROM session_attendance na
           WHERE na.session_id = hs.id AND na.student_id = $6 AND na.attendance_type = 'NORMAL'
@@ -227,7 +238,10 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
          AND sub.home_class_id = t.class_id
          AND ss.company_id = $2
          AND ss.id <> t.id
-         AND ABS(EXTRACT(EPOCH FROM (ss.start_date - t.start_date))) <= $3 * 86400
+         AND (
+           (ss.session_number IS NOT NULL AND ss.session_number = t.session_number)
+           OR ABS(ss.start_date::date - t.start_date::date) <= $3
+         )
          AND NOT EXISTS (
            SELECT 1 FROM session_attendance na
            WHERE na.session_id = t.id AND na.student_id = sub.student_id
