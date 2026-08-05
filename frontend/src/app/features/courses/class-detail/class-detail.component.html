@@ -235,6 +235,7 @@
                   <th pSortableColumn="endDate">{{ 'CLASSES.DETAIL.COL_ENDED' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
                   <th pSortableColumn="durationMinutes">{{ 'CLASSES.DETAIL.COL_DURATION' | translate }} <p-sortIcon field="durationMinutes"></p-sortIcon></th>
                   <th pSortableColumn="endDate">{{ 'CLASSES.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="endDate"></p-sortIcon></th>
+                  <th>{{ 'CLASSES.DETAIL.COL_REGISTER' | translate }}</th>
                   <th>{{ 'CLASSES.DETAIL.COL_ATTENDANCE' | translate }}</th>
                 </tr>
               </ng-template>
@@ -251,6 +252,23 @@
                   <td>
                     <p-tag [value]="(s.endDate ? 'CLASSES.DETAIL.SESSION_ENDED' : 'CLASSES.DETAIL.SESSION_ACTIVE') | translate" [severity]="s.endDate ? 'secondary' : 'success'"></p-tag>
                   </td>
+                  <!-- Who was accounted for: here, made up elsewhere, or missing. -->
+                  <td class="text-sm whitespace-nowrap">
+                    @if (summaryFor(s.id); as sum) {
+                      <span class="font-semibold text-green-600">{{ sum.presentCount }}</span>
+                      <span class="text-gray-400"> / </span>
+                      <span class="font-semibold text-red-600">{{ sum.absentCount }}</span>
+                      @if (sum.substitutedCount) {
+                        <span class="text-gray-400"> / </span>
+                        <span class="font-semibold text-amber-600"
+                          [pTooltip]="'CLASSES.DETAIL.SUBSTITUTED_HINT' | translate">
+                          <i class="pi pi-sync text-xs"></i> {{ sum.substitutedCount }}
+                        </span>
+                      }
+                    } @else {
+                      <span class="text-gray-300">—</span>
+                    }
+                  </td>
                   <td>
                     <p-button icon="pi pi-check-square" [rounded]="true" [text]="true" severity="info"
                       (onClick)="openAttendanceDialog(s)" [pTooltip]="'CLASSES.DETAIL.MANAGE_ATTENDANCE' | translate"></p-button>
@@ -263,7 +281,7 @@
               </ng-template>
               <ng-template pTemplate="emptymessage">
                 <tr>
-                  <td colspan="6" class="text-center py-8 text-gray-400">{{ 'CLASSES.DETAIL.NO_SESSIONS' | translate }}</td>
+                  <td colspan="7" class="text-center py-8 text-gray-400">{{ 'CLASSES.DETAIL.NO_SESSIONS' | translate }}</td>
                 </tr>
               </ng-template>
             </p-table>
@@ -306,6 +324,7 @@
                     <th pSortableColumn="sessionStartDate">{{ 'CLASSES.DETAIL.COL_SESSION_DATE' | translate }} <p-sortIcon field="sessionStartDate"></p-sortIcon></th>
                     <th pSortableColumn="roomCode">{{ 'CLASSES.DETAIL.COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
                     <th pSortableColumn="presentCount">{{ 'CLASSES.DETAIL.COL_PRESENT' | translate }} <p-sortIcon field="presentCount"></p-sortIcon></th>
+                    <th pSortableColumn="substitutedCount">{{ 'CLASSES.DETAIL.COL_SUBSTITUTED' | translate }} <p-sortIcon field="substitutedCount"></p-sortIcon></th>
                     <th pSortableColumn="absentCount">{{ 'CLASSES.DETAIL.COL_ABSENT' | translate }} <p-sortIcon field="absentCount"></p-sortIcon></th>
                     <th pSortableColumn="presentCount">{{ 'CLASSES.DETAIL.COL_RATE' | translate }} <p-sortIcon field="presentCount"></p-sortIcon></th>
                     <th>{{ 'CLASSES.DETAIL.COL_ACTIONS' | translate }}</th>
@@ -320,6 +339,19 @@
                         <i class="pi pi-check-circle text-green-500"></i>
                         {{ row.presentCount }}
                       </span>
+                    </td>
+                    <!-- Sat the lesson with a sibling class: counted in the rate,
+                         never in the absences. -->
+                    <td>
+                      @if (row.substitutedCount) {
+                        <span class="inline-flex items-center gap-1 text-amber-600 font-semibold"
+                          [pTooltip]="'CLASSES.DETAIL.SUBSTITUTED_HINT' | translate">
+                          <i class="pi pi-sync text-amber-500"></i>
+                          {{ row.substitutedCount }}
+                        </span>
+                      } @else {
+                        <span class="text-gray-300">—</span>
+                      }
                     </td>
                     <td>
                       <span class="inline-flex items-center gap-1 text-red-600 font-semibold">
@@ -491,27 +523,55 @@
     </div>
     <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
       @for (student of attendanceStudents(); track student.studentId) {
+        <!-- Three states, not two: present here, made up with a sibling class,
+             or actually missing. The middle one used to look like the last. -->
         <div class="flex items-center justify-between p-3 rounded-lg border"
           [class.border-green-200]="student.isPresent"
           [class.bg-green-50]="student.isPresent"
-          [class.border-gray-200]="!student.isPresent"
-          [class.bg-white]="!student.isPresent">
+          [class.border-amber-200]="isSubstituted(student)"
+          [class.bg-amber-50]="isSubstituted(student)"
+          [class.border-gray-200]="!student.isPresent && !isSubstituted(student)"
+          [class.bg-white]="!student.isPresent && !isSubstituted(student)">
           <div class="flex items-center gap-3">
             <p-checkbox
               [(ngModel)]="student.isPresent"
               [binary]="true"
               [inputId]="'att-' + student.studentId"
             ></p-checkbox>
-            <label [for]="'att-' + student.studentId" class="cursor-pointer font-medium text-gray-800">
-              {{ student.studentName }}
-            </label>
+            <div>
+              <label [for]="'att-' + student.studentId" class="cursor-pointer font-medium text-gray-800">
+                {{ student.studentName }}
+              </label>
+              <!-- Which lesson they actually sat, so nobody has to guess whether
+                   the amber row is a mistake. -->
+              @if (isSubstituted(student)) {
+                <div class="text-xs text-amber-700">
+                  {{ 'CLASSES.DETAIL.SUBSTITUTED_IN' | translate }} {{ student.substitutedInClassName }}
+                  @if (student.substitutedSessionDate) {
+                    · {{ student.substitutedSessionDate | date: 'EEE d MMM' }}
+                  }
+                </div>
+              }
+              <!-- A visitor from another class sitting in on this lesson. -->
+              @if (student.isPresent && student.attendanceType === 'SUBSTITUTION') {
+                <div class="text-xs text-amber-700">
+                  {{ 'CLASSES.DETAIL.SUBSTITUTION_FROM' | translate }} {{ student.homeClassName }}
+                </div>
+              }
+            </div>
           </div>
           <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
             [class.bg-green-100]="student.isPresent"
             [class.text-green-700]="student.isPresent"
-            [class.bg-gray-100]="!student.isPresent"
-            [class.text-gray-500]="!student.isPresent">
-            {{ (student.isPresent ? 'CLASSES.DETAIL.PRESENT' : 'CLASSES.DETAIL.ABSENT') | translate }}
+            [class.bg-amber-100]="isSubstituted(student)"
+            [class.text-amber-700]="isSubstituted(student)"
+            [class.bg-gray-100]="!student.isPresent && !isSubstituted(student)"
+            [class.text-gray-500]="!student.isPresent && !isSubstituted(student)">
+            {{ (student.isPresent
+                  ? 'CLASSES.DETAIL.PRESENT'
+                  : isSubstituted(student)
+                    ? 'CLASSES.DETAIL.SUBSTITUTED'
+                    : 'CLASSES.DETAIL.ABSENT') | translate }}
           </span>
         </div>
       }
@@ -519,6 +579,13 @@
     <div class="mt-3 pt-3 border-t flex items-center justify-between text-sm text-gray-500">
       <span>
         <span class="text-green-600 font-semibold">{{ 'CLASSES.DETAIL.PRESENT_COUNT' | translate: { count: presentCount() } }}</span>
+        @if (substitutedCount()) {
+          &nbsp;·&nbsp;
+          <span class="text-amber-600 font-semibold">
+            <i class="pi pi-sync text-xs"></i>
+            {{ 'CLASSES.DETAIL.SUBSTITUTED_COUNT' | translate: { count: substitutedCount() } }}
+          </span>
+        }
         &nbsp;·&nbsp;
         <span class="text-red-500 font-semibold">{{ 'CLASSES.DETAIL.ABSENT_COUNT' | translate: { count: absentCount() } }}</span>
       </span>

@@ -133,13 +133,29 @@ export class ClassDetailComponent implements OnInit {
 
   activeSession = () => this.sessions().find(s => !s.endDate) ?? null;
   presentCount = () => this.attendanceStudents().filter(s => s.isPresent).length;
-  absentCount = () => this.attendanceStudents().filter(s => !s.isPresent).length;
+
+  /**
+   * Someone who sat this lesson with a sibling class. They were not in this room,
+   * so they get no attendance row here — but they did not miss the lesson, and
+   * the register must not call them absent.
+   */
+  isSubstituted = (s: SessionAttendanceStudent): boolean => !s.isPresent && !!s.substitutedInClassName;
+  substitutedCount = () => this.attendanceStudents().filter(this.isSubstituted).length;
+  absentCount = () => this.attendanceStudents().filter(s => !s.isPresent && !this.isSubstituted(s)).length;
+
+  /** Attended, whether in this room or in the class they made it up with. */
+  private coveredOf = (s: ClassAttendanceSummary): number => s.presentCount + (s.substitutedCount ?? 0);
+
   avgAttendanceRate = () => {
     const summaries = this.attendanceSummary();
     if (!summaries.length) return 0;
-    const total = summaries.reduce((sum, s) => sum + (s.totalStudents > 0 ? (s.presentCount / s.totalStudents) * 100 : 0), 0);
+    const total = summaries.reduce((sum, s) => sum + (s.totalStudents > 0 ? (this.coveredOf(s) / s.totalStudents) * 100 : 0), 0);
     return Math.round(total / summaries.length);
   };
+
+  /** Per-session summary by id, so the Sessions tab can show the same figures. */
+  summaryFor = (sessionId: string): ClassAttendanceSummary | null =>
+    this.attendanceSummary().find(s => s.sessionId === sessionId) ?? null;
 
   ngOnInit() {
     this.classId = this.route.snapshot.paramMap.get('id') || '';
@@ -232,7 +248,9 @@ export class ClassDetailComponent implements OnInit {
 
   onTabChange(val: string | number | undefined) {
     this.activeTab = val?.toString() ?? 'students';
-    if (this.activeTab === 'sessions') this.loadSessions();
+    // The Sessions tab shows each session's register too, so it needs the same
+    // per-session figures the Attendance tab reads.
+    if (this.activeTab === 'sessions') { this.loadSessions(); this.loadAttendanceSummary(); }
     if (this.activeTab === 'attendance') this.loadAttendanceSummary();
     if (this.activeTab === 'free') this.loadFreeSessions();
   }
@@ -387,8 +405,9 @@ export class ClassDetailComponent implements OnInit {
         this.savingAttendance.set(false);
         this.showAttendanceDialog = false;
         this.notificationService.success(this.translate.instant('CLASSES.DETAIL.ATTENDANCE_SAVED', { count: res.presentCount }));
-        // Refresh attendance summary if on that tab
-        if (this.activeTab === 'attendance') this.loadAttendanceSummary();
+        // Both tabs show these figures now, and a save can re-settle a make-up
+        // (marking someone present releases the one that was covering them).
+        if (this.activeTab === 'attendance' || this.activeTab === 'sessions') this.loadAttendanceSummary();
         // PER_SESSION courses: prompt to collect any newly-created dues.
         if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
       },
@@ -401,7 +420,8 @@ export class ClassDetailComponent implements OnInit {
 
   getRate(row: ClassAttendanceSummary): number {
     if (!row.totalStudents) return 0;
-    return Math.round((row.presentCount / row.totalStudents) * 100);
+    // A made-up lesson counts towards the rate — it was attended, elsewhere.
+    return Math.round((this.coveredOf(row) / row.totalStudents) * 100);
   }
 
   addStudent() {
