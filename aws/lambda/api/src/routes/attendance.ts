@@ -338,6 +338,7 @@ export const attendanceRoutes = {
     try {
       await ensureAttendanceMagicColumns();
       await ensureFreeSessionSchema();
+      await ensureSubstitutionLinkSchema();   // the roster reads the make-up link
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -373,7 +374,9 @@ export const attendanceRoutes = {
             sa.attendance_type AS attendance_type,
             sa.created_at AS checked_in_at,
             hc.name AS home_class_name,
-            true AS is_enrolled
+            true AS is_enrolled,
+            subst.sub_class_name AS substituted_in_class_name,
+            subst.sub_session_date AS substituted_session_date
          FROM (
             SELECT student_id FROM enrollments
             WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
@@ -384,6 +387,17 @@ export const attendanceRoutes = {
          JOIN students s ON s.id = enrolled.student_id
          LEFT JOIN session_attendance sa ON sa.session_id = $3 AND sa.student_id = s.id
          LEFT JOIN classes hc ON hc.id = sa.home_class_id
+         -- Missing from THIS room is not the same as missing the lesson: someone
+         -- who sat it with a sibling class belongs on the roster as a make-up,
+         -- not in the absent column.
+         LEFT JOIN LATERAL (
+           ${substitutionCoversLateral({
+             student: 's.id',
+             sessionId: '$3',
+             courseId: '(SELECT course_id FROM classes WHERE id = $1)',
+             sessionNumber: '$4::int',
+           })}
+         ) subst ON true
 
          UNION ALL
 
@@ -398,7 +412,9 @@ export const attendanceRoutes = {
             sa.attendance_type AS attendance_type,
             sa.created_at AS checked_in_at,
             hc.name AS home_class_name,
-            false AS is_enrolled
+            false AS is_enrolled,
+            NULL::text AS substituted_in_class_name,
+            NULL::timestamptz AS substituted_session_date
          FROM session_attendance sa
          JOIN students s ON s.id = sa.student_id
          LEFT JOIN classes hc ON hc.id = sa.home_class_id
@@ -411,7 +427,7 @@ export const attendanceRoutes = {
              WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
            )
          ORDER BY student_name`,
-        [session.class_id, context.companyId, params.sessionId]
+        [session.class_id, context.companyId, params.sessionId, session.session_number ?? null]
       );
 
       // PER_SESSION courses: attach each student's existing session charge so the
@@ -460,6 +476,10 @@ export const attendanceRoutes = {
           // "present" cannot answer who arrived late.
           checkedInAt: row.checked_in_at || null,
           homeClassName: row.home_class_name || null,
+          // Set only when they were not in this room but sat the lesson with
+          // another class — the roster says "made up", never "absent".
+          substitutedInClassName: row.substituted_in_class_name || null,
+          substitutedSessionDate: row.substituted_session_date || null,
           isEnrolled: row.is_enrolled === true,
           charge: chargeByStudent.get(row.student_id) || null,
           absentStreak: absences.get(row.student_id)?.absentStreak ?? 0,
@@ -1258,6 +1278,7 @@ export const attendanceRoutes = {
   getByClass: async ({ params, headers }: { params: { classId: string }; headers: { authorization: string } }) => {
     try {
       await ensureAttendanceMagicColumns();
+      await ensureSubstitutionLinkSchema();   // the substituted tally reads the link
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -1297,13 +1318,38 @@ export const attendanceRoutes = {
           s.end_date AS session_end_date,
           s.session_number AS session_number,
           r.code AS room_code,
-          COUNT(sa.id) AS present_count
+          COUNT(sa.id) AS present_count,
+          subst.n AS substituted_count
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN session_attendance sa
           ON sa.session_id = s.id AND sa.attendance_type = 'NORMAL'
+        -- Enrolled students who weren't here but sat the lesson elsewhere. They
+        -- come out of the absent tally, or the summary contradicts the roster
+        -- the row expands into.
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS n
+          FROM (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+          ) e
+          WHERE NOT EXISTS (
+            SELECT 1 FROM session_attendance na
+            WHERE na.session_id = s.id AND na.student_id = e.student_id
+              AND na.attendance_type = 'NORMAL'
+          )
+          AND ${substitutionCoversExists({
+            student: 'e.student_id',
+            sessionId: 's.id',
+            courseId: '(SELECT course_id FROM classes WHERE id = $1)',
+            sessionNumber: 's.session_number',
+          })}
+        ) subst ON true
         WHERE s.class_id = $1 AND s.company_id = $2
-        GROUP BY s.id, s.start_date, s.end_date, s.session_number, r.code
+        GROUP BY s.id, s.start_date, s.end_date, s.session_number, r.code, subst.n
         ORDER BY s.start_date DESC`,
         [params.classId, context.companyId]
       );
@@ -1320,7 +1366,11 @@ export const attendanceRoutes = {
           roomCode: row.room_code,
           totalStudents,
           presentCount: parseInt(row.present_count, 10),
-          absentCount: Math.max(0, totalStudents - parseInt(row.present_count, 10)),
+          substitutedCount: parseInt(row.substituted_count ?? '0', 10) || 0,
+          absentCount: Math.max(
+            0,
+            totalStudents - parseInt(row.present_count, 10) - (parseInt(row.substituted_count ?? '0', 10) || 0),
+          ),
         })),
       };
     } catch (error) {

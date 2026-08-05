@@ -21,6 +21,9 @@ export interface SessionAttendanceStudent {
   /** When the student was marked in; null when they were absent. */
   checkedInAt?: string | null;
   homeClassName?: string | null;
+  /** Absent from this room, but the lesson was sat with this class instead. */
+  substitutedInClassName?: string | null;
+  substitutedSessionDate?: string | null;
   isEnrolled?: boolean;
   /** PER_SESSION: the student's existing charge for this session (null if none). */
   charge?: { status: string; amountDue: number; amountPaid: number } | null;
@@ -118,6 +121,8 @@ export interface ClassAttendanceSummary {
   roomCode?: string | null;
   totalStudents: number;
   presentCount: number;
+  /** Missed here but made up with a sibling class — kept out of absentCount. */
+  substitutedCount?: number;
   absentCount: number;
 }
 

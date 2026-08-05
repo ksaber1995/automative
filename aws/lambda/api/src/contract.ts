@@ -6344,6 +6344,9 @@ export const contract = c.router({
           /** When the student was marked in; null when they were not. */
           checkedInAt: z.string().nullable().optional(),
           homeClassName: z.string().nullable().optional(),
+          /** Not in this room, but the lesson was sat with this class instead. */
+          substitutedInClassName: z.string().nullable().optional(),
+          substitutedSessionDate: z.string().nullable().optional(),
           isEnrolled: z.boolean().optional(),
           charge: z.object({
             status: z.string(),
@@ -6531,6 +6534,8 @@ export const contract = c.router({
           roomCode: z.string().nullable(),
           totalStudents: z.number(),
           presentCount: z.number(),
+          /** Missed here but made up with a sibling class — not counted absent. */
+          substitutedCount: z.number().optional(),
           absentCount: z.number(),
         })),
         401: ApiErrorSchema,

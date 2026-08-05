@@ -5,7 +5,7 @@ import { notifySessionAttendance } from './telegram';
 import { ensureAutoManageSessionsColumn } from './companies';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { ensureClassDayTimesSchema } from './classes';
-import { claimPendingSubstitutions } from '../db/substitutions';
+import { claimPendingSubstitutions, ensureSubstitutionLinkSchema, substitutionCoversExists } from '../db/substitutions';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -271,6 +271,10 @@ function mapSessionWithDetailsFromDB(row: any) {
     branchName: row.branch_name,
     durationMinutes,
     studentPresent: row.student_present === null || row.student_present === undefined ? null : !!row.student_present,
+    // Not in this room, but the lesson was sat with a sibling class.
+    studentSubstituted: row.student_substituted === null || row.student_substituted === undefined
+      ? null
+      : !!row.student_substituted,
     presentCount: row.present_count === null || row.present_count === undefined ? null : parseInt(row.present_count, 10),
   };
 }
@@ -1081,6 +1085,7 @@ export const sessionsRoutes = {
 
   list: async ({ query: queryParams, headers }: { query: { branchId?: string; classId?: string; roomId?: string; courseId?: string; studentId?: string; attendance?: string }; headers: { authorization: string } }) => {
     try {
+      await ensureSubstitutionLinkSchema();   // student_substituted reads the link
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'academy', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
@@ -1099,6 +1104,16 @@ export const sessionsRoutes = {
       const presentExpr = studentIdx
         ? `EXISTS (SELECT 1 FROM session_attendance sa WHERE sa.session_id = s.id AND sa.student_id = $${studentIdx}) AS student_present`
         : `NULL::boolean AS student_present`;
+      // …and whether a lesson they missed here was sat with a sibling class, so
+      // the column can say "made up" rather than flatly "absent".
+      const substitutedExpr = studentIdx
+        ? `${substitutionCoversExists({
+            student: `$${studentIdx}`,
+            sessionId: 's.id',
+            courseId: 'cl.course_id',
+            sessionNumber: 's.session_number',
+          })} AS student_substituted`
+        : `NULL::boolean AS student_substituted`;
 
       let sql = `
         SELECT
@@ -1108,7 +1123,8 @@ export const sessionsRoutes = {
           cl.name as class_name,
           co.name as course_name,
           b.name as branch_name,
-          ${presentExpr}
+          ${presentExpr},
+          ${substitutedExpr}
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN classes cl ON s.class_id = cl.id

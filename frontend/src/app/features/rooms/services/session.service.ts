@@ -25,6 +25,8 @@ export interface Session {
   durationMinutes?: number | null;
   /** When filtering history by a student: was that student present this session? (null otherwise) */
   studentPresent?: boolean | null;
+  /** …and if not, did they sit the lesson with a sibling class instead? */
+  studentSubstituted?: boolean | null;
   /** Students checked in so far (active-sessions list only). */
   presentCount?: number | null;
 }

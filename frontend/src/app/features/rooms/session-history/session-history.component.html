@@ -172,11 +172,16 @@
                         type="button"
                         class="w-full py-1 rounded hover:bg-gray-100 disabled:opacity-40"
                         [disabled]="isBusy(s.id, st.studentId)"
-                        [pTooltip]="(cellState(st.studentId, s.id) ? 'SESSION_HISTORY.UNMARK' : 'SESSION_HISTORY.MARK_PRESENT') | translate"
+                        [pTooltip]="(cellSubstituted(st.studentId, s.id)
+                                      ? 'SESSION_HISTORY.SUBSTITUTED_CELL_HINT'
+                                      : cellState(st.studentId, s.id) ? 'SESSION_HISTORY.UNMARK' : 'SESSION_HISTORY.MARK_PRESENT') | translate"
                         (click)="toggleAttendance(s.id, st.studentId, !cellState(st.studentId, s.id))"
                       >
                         @if (cellState(st.studentId, s.id)) {
                           <i class="pi pi-check text-green-600 font-bold"></i>
+                        } @else if (cellSubstituted(st.studentId, s.id)) {
+                          <!-- Sat elsewhere: a cross here would be a lie. -->
+                          <i class="pi pi-sync text-amber-500 font-bold"></i>
                         } @else {
                           <i class="pi pi-times text-red-500 font-bold"></i>
                         }
@@ -184,7 +189,14 @@
                     } @else {
                       @switch (cellState(st.studentId, s.id)) {
                         @case (true) { <i class="pi pi-check text-green-600 font-bold"></i> }
-                        @case (false) { <i class="pi pi-times text-red-500 font-bold"></i> }
+                        @case (false) {
+                          @if (cellSubstituted(st.studentId, s.id)) {
+                            <i class="pi pi-sync text-amber-500 font-bold"
+                               [pTooltip]="'SESSION_HISTORY.SUBSTITUTED_CELL_HINT' | translate"></i>
+                          } @else {
+                            <i class="pi pi-times text-red-500 font-bold"></i>
+                          }
+                        }
                         @default { <span class="text-gray-300">—</span> }
                       }
                     }
@@ -267,15 +279,28 @@
             <span class="font-semibold text-green-600">{{ c.present }}</span>
             <span class="text-gray-400"> / </span>
             <span class="font-semibold text-red-600">{{ c.absent }}</span>
+            <!-- Made the lesson up elsewhere: neither here nor absent. -->
+            @if (c.substituted) {
+              <span class="text-gray-400"> / </span>
+              <span class="font-semibold text-amber-600"
+                [pTooltip]="'SESSION_HISTORY.SUBSTITUTED_COUNT_HINT' | translate">
+                <i class="pi pi-sync text-xs"></i> {{ c.substituted }}
+              </span>
+            }
           } @else {
             <span class="text-gray-300">—</span>
           }
         </td>
         @if (showAttendanceCol()) {
           <td>
+            <!-- A lesson sat with a sibling class is not an absence. -->
             <p-tag
-              [value]="(session.studentPresent ? 'SESSION_HISTORY.PRESENT' : 'SESSION_HISTORY.ABSENT') | translate"
-              [severity]="session.studentPresent ? 'success' : 'danger'"
+              [value]="(session.studentPresent
+                          ? 'SESSION_HISTORY.PRESENT'
+                          : session.studentSubstituted
+                            ? 'SESSION_HISTORY.SUBSTITUTED'
+                            : 'SESSION_HISTORY.ABSENT') | translate"
+              [severity]="session.studentPresent ? 'success' : session.studentSubstituted ? 'warn' : 'danger'"
             ></p-tag>
           </td>
         }
@@ -329,6 +354,15 @@
                             <i class="pi pi-check text-green-600 text-xs"></i>
                           }
                           <span>{{ s.studentName }}</span>
+                          <!-- Sitting in from another class: say whose student
+                               they are, or the roster reads as a stranger. -->
+                          @if (s.attendanceType === 'SUBSTITUTION') {
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              <i class="pi pi-sync text-[10px]"></i>
+                              {{ 'SESSION_HISTORY.SUBSTITUTED' | translate }}
+                              @if (s.homeClassName) { · {{ s.homeClassName }} }
+                            </span>
+                          }
                           <!-- When they arrived, not just that they did. -->
                           @if (s.checkedInAt) {
                             <span class="text-gray-400 text-xs">{{ s.checkedInAt | date: 'h:mm a' }}</span>
@@ -370,6 +404,29 @@
                     </ul>
                   } @else {
                     <div class="text-sm text-gray-400">—</div>
+                  }
+
+                  <!-- Made up elsewhere. Listed under the absentees but apart
+                       from them: they did sit this lesson, just not in here. -->
+                  @if (d.substituted.length) {
+                    <div class="font-semibold text-amber-700 mt-4 mb-2">
+                      <i class="pi pi-sync text-amber-500 text-xs"></i>
+                      {{ 'SESSION_HISTORY.SUBSTITUTED_LIST' | translate }} ({{ d.substituted.length }})
+                    </div>
+                    <ul class="text-sm text-gray-700 space-y-0.5">
+                      @for (s of d.substituted; track s.studentId) {
+                        <li class="flex items-center gap-2">
+                          <i class="pi pi-sync text-amber-500 text-xs"></i>
+                          <span>{{ s.studentName }}</span>
+                          <span class="text-xs text-gray-500">
+                            {{ 'SESSION_HISTORY.SUBSTITUTED_IN' | translate }} {{ s.substitutedInClassName }}
+                            @if (s.substitutedSessionDate) {
+                              · {{ s.substitutedSessionDate | date: 'EEE d MMM' }}
+                            }
+                          </span>
+                        </li>
+                      }
+                    </ul>
                   }
                 </div>
               </div>

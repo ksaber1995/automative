@@ -95,9 +95,13 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   showAttendanceCol = computed<boolean>(() => !!this.selectedStudentId());
 
   /** Present/absent counts per session id (server-computed via class summaries). */
-  attCounts = signal<Map<string, { present: number; absent: number; total: number }>>(new Map());
-  /** Lazily-loaded present/absent student lists per session id (loaded on expand). */
-  attDetail = signal<Map<string, { loading: boolean; present: SessionAttendanceStudent[]; absent: SessionAttendanceStudent[] }>>(new Map());
+  attCounts = signal<Map<string, { present: number; absent: number; substituted: number; total: number }>>(new Map());
+  /**
+   * Lazily-loaded rosters per session id (loaded on expand). `substituted` are
+   * enrolled students who were not in this room but sat the lesson with a
+   * sibling class — they are not absentees and are listed apart from them.
+   */
+  attDetail = signal<Map<string, { loading: boolean; present: SessionAttendanceStudent[]; absent: SessionAttendanceStudent[]; substituted: SessionAttendanceStudent[] }>>(new Map());
 
   counts(sessionId: string) {
     return this.attCounts().get(sessionId) ?? null;
@@ -129,6 +133,8 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   matrixStudents = signal<{ studentId: string; name: string }[]>([]);
   /** Present/absent per cell, keyed `${studentId}|${sessionId}`. */
   matrixAtt = signal<Map<string, boolean>>(new Map());
+  /** Cells the student missed here but sat with a sibling class — same keying. */
+  matrixSub = signal<Set<string>>(new Set());
   /** When a QR is scanned, narrow the grid to that single student. */
   scanFilterStudentId = signal<string | null>(null);
   scanFilterName = signal<string>('');
@@ -144,6 +150,11 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   cellState(studentId: string, sessionId: string): boolean | null {
     const v = this.matrixAtt().get(`${studentId}|${sessionId}`);
     return v === undefined ? null : v;
+  }
+
+  /** An absent-looking cell that is really a make-up taken in another class. */
+  cellSubstituted(studentId: string, sessionId: string): boolean {
+    return this.matrixSub().has(`${studentId}|${sessionId}`);
   }
 
   ngOnInit(): void {
@@ -208,7 +219,12 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
           this.attCounts.update((m) => {
             const next = new Map(m);
             for (const su of summaries) {
-              next.set(su.sessionId, { present: su.presentCount, absent: su.absentCount, total: su.totalStudents });
+              next.set(su.sessionId, {
+                present: su.presentCount,
+                absent: su.absentCount,
+                substituted: su.substitutedCount ?? 0,
+                total: su.totalStudents,
+              });
             }
             return next;
           });
@@ -222,14 +238,18 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   onRowExpand(event: { data: Session }): void {
     const id = event.data.id;
     if (this.attDetail().get(id)) return; // already loaded / loading
-    this.attDetail.update((m) => new Map(m).set(id, { loading: true, present: [], absent: [] }));
+    this.attDetail.update((m) => new Map(m).set(id, { loading: true, present: [], absent: [], substituted: [] }));
     this.attendanceService.getBySession(id).subscribe({
       next: (rows) => {
         const present = rows.filter((r) => r.isPresent);
-        const absent = rows.filter((r) => !r.isPresent);
-        this.attDetail.update((m) => new Map(m).set(id, { loading: false, present, absent }));
+        // Missing from the room but not from the lesson — kept out of the
+        // absent list, which is the whole point of recording a make-up.
+        const substituted = rows.filter((r) => !r.isPresent && !!r.substitutedInClassName);
+        const absent = rows.filter((r) => !r.isPresent && !r.substitutedInClassName);
+        this.attDetail.update((m) => new Map(m).set(id, { loading: false, present, absent, substituted }));
       },
-      error: () => this.attDetail.update((m) => new Map(m).set(id, { loading: false, present: [], absent: [] })),
+      error: () =>
+        this.attDetail.update((m) => new Map(m).set(id, { loading: false, present: [], absent: [], substituted: [] })),
     });
   }
 
@@ -314,7 +334,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
   private withRoster(sessionId: string, run: (roster: SessionAttendanceStudent[]) => void): void {
     const cached = this.attDetail().get(sessionId);
     if (cached && !cached.loading) {
-      run([...cached.present, ...cached.absent]);
+      run([...cached.present, ...cached.absent, ...cached.substituted]);
       return;
     }
     this.attendanceService.getBySession(sessionId).subscribe({
@@ -323,7 +343,8 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
           new Map(m).set(sessionId, {
             loading: false,
             present: rows.filter((r) => r.isPresent),
-            absent: rows.filter((r) => !r.isPresent),
+            absent: rows.filter((r) => !r.isPresent && !r.substitutedInClassName),
+            substituted: rows.filter((r) => !r.isPresent && !!r.substitutedInClassName),
           }),
         );
         run(rows);
@@ -415,7 +436,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
     this.attDetail.update((m) => {
       const d = m.get(sessionId);
       if (!d) return m;
-      const all = [...d.present, ...d.absent]
+      const all = [...d.present, ...d.absent, ...d.substituted]
         .filter((s) => !(dropped && s.studentId === student.studentId))
         .map((s) =>
           s.studentId === student.studentId
@@ -425,18 +446,26 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
       return new Map(m).set(sessionId, {
         loading: false,
         present: all.filter((s) => s.isPresent),
-        absent: all.filter((s) => !s.isPresent),
+        absent: all.filter((s) => !s.isPresent && !s.substitutedInClassName),
+        substituted: all.filter((s) => !s.isPresent && !!s.substitutedInClassName),
       });
     });
 
     this.attCounts.update((m) => {
       const c = m.get(sessionId);
       if (!c) return m;
+      // A student who made the lesson up comes out of the substituted tally, not
+      // the absent one — they were never in it.
+      const madeUp = !!student.substitutedInClassName;
       const next = present
-        ? { ...c, present: c.present + 1, absent: Math.max(0, c.absent - 1) }
+        ? madeUp
+          ? { ...c, present: c.present + 1, substituted: Math.max(0, c.substituted - 1) }
+          : { ...c, present: c.present + 1, absent: Math.max(0, c.absent - 1) }
         : dropped
           ? { ...c, present: Math.max(0, c.present - 1) }
-          : { ...c, present: Math.max(0, c.present - 1), absent: c.absent + 1 };
+          : madeUp
+            ? { ...c, present: Math.max(0, c.present - 1), substituted: c.substituted + 1 }
+            : { ...c, present: Math.max(0, c.present - 1), absent: c.absent + 1 };
       return new Map(m).set(sessionId, next);
     });
 
@@ -506,6 +535,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
     this.matrixSessions.set([]);
     this.matrixStudents.set([]);
     this.matrixAtt.set(new Map());
+    this.matrixSub.set(new Set());
     if (!classId) return;
 
     this.matrixLoading.set(true);
@@ -525,6 +555,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
         // Pull each session's roster (with present/absent) and fold into the grid.
         const studentMap = new Map<string, string>();
         const att = new Map<string, boolean>();
+        const subs = new Set<string>();
         let remaining = sorted.length;
         const done = () => {
           if (--remaining > 0) return;
@@ -533,6 +564,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
           );
           this.matrixStudents.set(students);
           this.matrixAtt.set(att);
+          this.matrixSub.set(subs);
           this.matrixLoading.set(false);
         };
         for (const sess of sorted) {
@@ -541,6 +573,7 @@ export class SessionHistoryComponent implements OnInit, OnDestroy {
               for (const r of rows) {
                 if (!studentMap.has(r.studentId)) studentMap.set(r.studentId, `${r.studentName}`);
                 att.set(`${r.studentId}|${sess.id}`, r.isPresent);
+                if (!r.isPresent && r.substitutedInClassName) subs.add(`${r.studentId}|${sess.id}`);
               }
             },
             error: () => {},
