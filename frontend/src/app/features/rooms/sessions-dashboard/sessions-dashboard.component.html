@@ -65,7 +65,7 @@
       <p-select
         [options]="classFilterOptions()"
         [ngModel]="selectedClassId()"
-        (ngModelChange)="selectedClassId.set($event)"
+        (ngModelChange)="onClassFilterChange($event)"
         optionLabel="label"
         optionValue="id"
         appendTo="body"
@@ -88,7 +88,7 @@
   </div>
 
   <!-- Tabs -->
-  <p-tabs [value]="activeTab" (valueChange)="activeTab = $event?.toString() ?? 'active'">
+  <p-tabs [value]="activeTab" (valueChange)="onTabChange($event)">
     <p-tablist>
       <p-tab value="active">
         <i class="pi pi-circle-fill text-green-500 mr-2"></i>
@@ -113,6 +113,10 @@
       <p-tab value="history">
         <i class="pi pi-history mr-2"></i>
         {{ 'SESSIONS_DASHBOARD.TAB_HISTORY' | translate }}
+      </p-tab>
+      <p-tab value="absences">
+        <i class="pi pi-exclamation-triangle text-amber-500 mr-2"></i>
+        {{ 'SESSIONS_DASHBOARD.TAB_ABSENCES' | translate }}
       </p-tab>
     </p-tablist>
 
@@ -724,6 +728,90 @@
       <p-tabpanel value="history">
         @if (activeTab === 'history') {
           <app-session-history [embedded]="true"></app-session-history>
+        }
+      </p-tabpanel>
+
+      <!-- Who has stopped turning up. A lesson made up with a sibling class
+           breaks the run, so nobody is chased for absences they didn't have. -->
+      <p-tabpanel value="absences">
+        <div class="flex items-center gap-3 flex-wrap mb-4">
+          <label class="text-sm text-gray-600" for="min-streak">
+            {{ 'SESSIONS_DASHBOARD.ABSENCE_MIN_STREAK' | translate }}
+          </label>
+          <input id="min-streak" pInputText type="number" min="1" max="20" style="width: 90px;"
+            [ngModel]="absenceMinStreak()" (ngModelChange)="setMinStreak($event)" />
+          <span class="text-sm text-gray-400">{{ 'SESSIONS_DASHBOARD.ABSENCE_STREAK_HINT' | translate }}</span>
+          <p-button icon="pi pi-refresh" size="small" [text]="true"
+            [pTooltip]="'SESSIONS_DASHBOARD.REFRESH' | translate"
+            (onClick)="loadAbsenceStreaks()"></p-button>
+        </div>
+
+        @if (loadingAbsences()) {
+          <div class="text-center py-12 text-gray-400">
+            <i class="pi pi-spin pi-spinner text-3xl mb-2"></i>
+          </div>
+        } @else if (absenceRows().length === 0) {
+          <div class="text-center py-12 text-gray-400">
+            <i class="pi pi-check-circle text-4xl mb-3 block text-green-300"></i>
+            <p>{{ 'SESSIONS_DASHBOARD.ABSENCE_NONE' | translate: { count: absenceMinStreak() } }}</p>
+          </div>
+        } @else {
+          <p-table [value]="absenceRows()" [paginator]="true" [rows]="15" responsiveLayout="scroll">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'SESSIONS_DASHBOARD.ABSENCE_COL_STUDENT' | translate }}</th>
+                <th>{{ 'SESSIONS_DASHBOARD.ABSENCE_COL_CLASS' | translate }}</th>
+                <th pSortableColumn="streak">{{ 'SESSIONS_DASHBOARD.ABSENCE_COL_STREAK' | translate }} <p-sortIcon field="streak"></p-sortIcon></th>
+                <th>{{ 'SESSIONS_DASHBOARD.ABSENCE_COL_LAST_SEEN' | translate }}</th>
+                <th>{{ 'SESSIONS_DASHBOARD.ABSENCE_COL_CONTACT' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-row>
+              <tr>
+                <td>
+                  <a [routerLink]="['/students', row.studentId]" class="font-medium text-indigo-700 hover:underline">
+                    {{ row.studentName }}
+                  </a>
+                  @if (row.studentCode != null) {
+                    <span class="ml-2 text-xs font-mono text-gray-400">{{ code(row.studentCode) }}</span>
+                  }
+                </td>
+                <td class="text-sm">
+                  <div>{{ row.className }}</div>
+                  <div class="text-xs text-gray-400">{{ row.courseName }}</div>
+                </td>
+                <td>
+                  <span class="inline-flex items-center gap-1 text-sm font-bold px-2 py-0.5 rounded-full"
+                    [class.bg-amber-100]="row.streak < 3"
+                    [class.text-amber-700]="row.streak < 3"
+                    [class.bg-red-100]="row.streak >= 3"
+                    [class.text-red-700]="row.streak >= 3">
+                    <i class="pi pi-times-circle text-xs"></i> {{ row.streak }}
+                  </span>
+                </td>
+                <td class="text-sm text-gray-600">
+                  <!-- The last lesson they actually attended, made up or not.
+                       Nothing to show means they missed every one looked at. -->
+                  @if (row.lastPresentDate) {
+                    {{ row.lastPresentDate | date: 'EEE d MMM' }}
+                  } @else {
+                    <span class="text-gray-400">{{ 'SESSIONS_DASHBOARD.ABSENCE_NEVER' | translate }}</span>
+                  }
+                </td>
+                <td class="text-sm">
+                  @if (waLink(row.parentPhone || row.studentPhone); as link) {
+                    <a [href]="link" target="_blank" rel="noopener"
+                      class="inline-flex items-center gap-1 text-green-700 hover:underline">
+                      <i class="pi pi-whatsapp"></i>
+                      {{ row.parentPhone || row.studentPhone }}
+                    </a>
+                  } @else {
+                    <span class="text-gray-300">—</span>
+                  }
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
         }
       </p-tabpanel>
 

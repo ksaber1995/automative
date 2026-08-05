@@ -126,6 +126,25 @@ export interface ClassAttendanceSummary {
   absentCount: number;
 }
 
+/** A student on an unbroken run of missed lessons. A make-up breaks the run. */
+export interface AbsenceStreakRow {
+  studentId: string;
+  studentName: string;
+  studentCode?: number | null;
+  studentPhone?: string | null;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  classId: string;
+  className: string;
+  courseId: string;
+  courseName: string;
+  streak: number;
+  /** Null when they missed every lesson looked at. */
+  lastPresentDate?: string | null;
+  lastMissedDate?: string | null;
+  sessionsConsidered?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
   private api = inject(ApiService);
@@ -176,5 +195,19 @@ export class AttendanceService {
   /** Get per-session attendance summary for a class */
   getByClass(classId: string): Observable<ClassAttendanceSummary[]> {
     return this.api.get<ClassAttendanceSummary[]>(`attendance/class/${classId}`);
+  }
+
+  /** Students who have missed `minStreak` lessons in a row (make-ups excluded). */
+  getAbsenceStreaks(params: {
+    minStreak: number;
+    branchId?: string | null;
+    courseId?: string | null;
+    classId?: string | null;
+  }): Observable<AbsenceStreakRow[]> {
+    const q: Record<string, string> = { minStreak: String(params.minStreak) };
+    if (params.branchId) q['branchId'] = params.branchId;
+    if (params.courseId) q['courseId'] = params.courseId;
+    if (params.classId) q['classId'] = params.classId;
+    return this.api.get<AbsenceStreakRow[]>('attendance/absence-streaks', q);
   }
 }

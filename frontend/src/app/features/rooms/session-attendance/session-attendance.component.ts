@@ -142,8 +142,41 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     });
   });
 
+  /**
+   * Not in this room, but the lesson was sat with a sibling class. They are not
+   * absentees and must not be counted as such — the register just has nothing
+   * for them to be checked into here.
+   */
+  isSubstituted = (s: SessionAttendanceStudent): boolean => !s.isPresent && !!s.substitutedInClassName;
+
+  /** Which state the roster is narrowed to. A view; the save reads every row. */
+  stateFilter = signal<'ALL' | 'PRESENT' | 'ABSENT' | 'SUBSTITUTED'>('ALL');
+
+  /** Offered only when this session actually has a made-up lesson on it. */
+  stateFilterOptions = computed<string[]>(() =>
+    this.substitutedCount() > 0
+      ? ['ALL', 'PRESENT', 'ABSENT', 'SUBSTITUTED']
+      : ['ALL', 'PRESENT', 'ABSENT'],
+  );
+
+  /**
+   * What the roster renders: the search results, narrowed to the chosen state.
+   * Kept separate from filteredStudents because that one drives check-in by
+   * search — hiding a student behind a state filter must not stop a typed code
+   * from marking them in.
+   */
+  visibleStudents = computed(() => {
+    const state = this.stateFilter();
+    const list = this.filteredStudents();
+    if (state === 'ALL') return list;
+    if (state === 'PRESENT') return list.filter((s) => s.isPresent);
+    if (state === 'SUBSTITUTED') return list.filter(this.isSubstituted);
+    return list.filter((s) => !s.isPresent && !this.isSubstituted(s));
+  });
+
   presentCount = computed(() => this.students().filter((s) => s.isPresent).length);
-  absentCount = computed(() => this.students().filter((s) => !s.isPresent).length);
+  substitutedCount = computed(() => this.students().filter(this.isSubstituted).length);
+  absentCount = computed(() => this.students().filter((s) => !s.isPresent && !this.isSubstituted(s)).length);
 
   /** A student absent this many of the class's recent sessions in a row is flagged.
    *  1 = flag any student who missed the previous session (don't wait for a streak). */
@@ -410,37 +443,6 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         // Interceptor toasts the translated error.
       },
     });
-  }
-
-  /**
-   * Mark everyone currently matching the search as present, after confirming.
-   * It's one click that writes attendance for the whole visible roster — and on
-   * a PER_SESSION course that raises a charge per student — so it asks first and
-   * says how many people it is about to affect.
-   *
-   * Already-present students are excluded so the count reflects what actually
-   * changes; substitution and trial attendees are present by definition and so
-   * fall out of it too.
-   */
-  confirmMarkAllPresent() {
-    const targets = this.filteredStudents().filter((s) => !s.isPresent);
-    if (targets.length === 0) return;
-    this.confirmationService.confirm({
-      header: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_TITLE'),
-      message: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_CONFIRM', { count: targets.length }),
-      icon: 'pi pi-check-circle',
-      acceptLabel: this.translate.instant('SESSION_ATTENDANCE.MARK_ALL_ACCEPT'),
-      rejectLabel: this.translate.instant('SESSION_ATTENDANCE.UNCHECK_CANCEL'),
-      accept: () => this.applyMarkAll(targets, true),
-    });
-  }
-
-  private applyMarkAll(targets: SessionAttendanceStudent[], present: boolean) {
-    const ids = new Set(targets.map((s) => s.studentId));
-    this.students.update((list) =>
-      list.map((s) => (ids.has(s.studentId) ? { ...s, isPresent: present } : s)),
-    );
-    this.scheduleSave();
   }
 
   private scheduleSave() {

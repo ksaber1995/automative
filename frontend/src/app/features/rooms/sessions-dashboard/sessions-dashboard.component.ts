@@ -19,7 +19,8 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SessionService, Session, StartSessionTeacher } from '../services/session.service';
 import { RoomService, Room } from '../services/room.service';
-import { AttendanceService, SessionAttendanceStudent } from '../services/attendance.service';
+import { AttendanceService, SessionAttendanceStudent, AbsenceStreakRow } from '../services/attendance.service';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -102,6 +103,9 @@ function endTimeAfterStartValidator(startDate: string) {
   templateUrl: './sessions-dashboard.component.html',
 })
 export class SessionsDashboardComponent implements OnInit {
+  /** A card-derived code reads "A5", not 100005. */
+  code = formatStudentCode;
+
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
   @ViewChild(CameraScanDialogComponent) cameraDialog?: CameraScanDialogComponent;
@@ -344,11 +348,56 @@ export class SessionsDashboardComponent implements OnInit {
     if (picked && !this.classFilterOptions().some(c => c.id === picked)) {
       this.selectedClassId.set(null);
     }
+    if (this.activeTab === 'absences') this.loadAbsenceStreaks();
   }
 
   clearPageFilters() {
     this.selectedBranchId.set(null);
     this.selectedClassId.set(null);
+    if (this.activeTab === 'absences') this.loadAbsenceStreaks();
+  }
+
+  // ── Absences tab: who has stopped turning up ────────────────────────────────
+
+  /** How many missed lessons in a row before a student is worth listing. */
+  absenceMinStreak = signal(2);
+  absenceRows = signal<AbsenceStreakRow[]>([]);
+  loadingAbsences = signal(false);
+
+  onTabChange(value: string | number | undefined) {
+    this.activeTab = value?.toString() ?? 'active';
+    // Only fetched when the tab is opened — it is the one view here that scans
+    // every class's recent lessons.
+    if (this.activeTab === 'absences') this.loadAbsenceStreaks();
+  }
+
+  onClassFilterChange(classId: string | null) {
+    this.selectedClassId.set(classId);
+    if (this.activeTab === 'absences') this.loadAbsenceStreaks();
+  }
+
+  setMinStreak(value: unknown) {
+    const n = parseInt(`${value}`, 10);
+    this.absenceMinStreak.set(Number.isFinite(n) && n > 0 ? n : 1);
+    this.loadAbsenceStreaks();
+  }
+
+  loadAbsenceStreaks() {
+    this.loadingAbsences.set(true);
+    this.attendanceService.getAbsenceStreaks({
+      minStreak: this.absenceMinStreak(),
+      branchId: this.selectedBranchId(),
+      classId: this.selectedClassId(),
+    }).subscribe({
+      next: (rows) => { this.absenceRows.set(rows); this.loadingAbsences.set(false); },
+      error: () => this.loadingAbsences.set(false),
+    });
+  }
+
+  /** WhatsApp click-to-chat, same as the absence dialogs elsewhere. */
+  waLink(phone: string | null | undefined): string | null {
+    const digits = (phone || '').replace(/[^\d]/g, '');
+    return digits ? `https://wa.me/${digits}` : null;
   }
 
   hasPageFilters(): boolean {

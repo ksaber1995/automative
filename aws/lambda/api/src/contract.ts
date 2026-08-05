@@ -6521,6 +6521,41 @@ export const contract = c.router({
         500: ApiErrorSchema,
       },
     },
+    // Registered before /class/:classId — itty-router matches in registration
+    // order, and a static path listed after a param one is never reached.
+    absenceStreaks: {
+      method: 'GET' as const,
+      path: '/api/attendance/absence-streaks',
+      query: z.object({
+        minStreak: z.string().optional(),
+        classId: OptionalUUIDSchema,
+        courseId: OptionalUUIDSchema,
+        branchId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.array(z.object({
+          studentId: UUIDSchema,
+          studentName: z.string(),
+          studentCode: z.number().nullable().optional(),
+          studentPhone: z.string().nullable().optional(),
+          parentName: z.string().nullable().optional(),
+          parentPhone: z.string().nullable().optional(),
+          classId: UUIDSchema,
+          className: z.string(),
+          courseId: UUIDSchema,
+          courseName: z.string(),
+          /** Consecutive missed lessons; a made-up one breaks the run. */
+          streak: z.number(),
+          lastPresentDate: z.string().nullable().optional(),
+          lastMissedDate: z.string().nullable().optional(),
+          sessionsConsidered: z.number().optional(),
+        })),
+        401: ApiErrorSchema,
+        402: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
     getByClass: {
       method: 'GET' as const,
       path: '/api/attendance/class/:classId',

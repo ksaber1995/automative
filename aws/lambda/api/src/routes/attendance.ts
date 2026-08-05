@@ -1272,6 +1272,155 @@ export const attendanceRoutes = {
   },
 
   /**
+   * GET /api/attendance/absence-streaks?minStreak=&classId=&courseId=&branchId=
+   *
+   * Students on an unbroken run of missed lessons, counting back from each
+   * class's most recent ended one — the list worth picking up the phone about.
+   *
+   * A lesson made up with a sibling class breaks the run: it was attended, just
+   * elsewhere, and calling that student's parent about "three missed lessons"
+   * when they came to all three is exactly the mistake this whole feature is
+   * about. Same presence rule as the roster panels (see absenceStats), so the
+   * two never disagree.
+   *
+   * Free sessions and still-running ones are ignored, and the search goes back
+   * at most 20 lessons per class — a streak longer than that is "they stopped
+   * coming", which no number makes clearer.
+   */
+  absenceStreaks: async ({ query: q, headers }: {
+    query: { minStreak?: string; classId?: string; courseId?: string; branchId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
+      await ensureSubstitutionLinkSchema();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const minStreak = Math.max(1, parseInt(q.minStreak ?? '2', 10) || 2);
+      const params: any[] = [context.companyId];
+      let scopeSql = '';
+
+      if (q.classId) {
+        params.push(q.classId);
+        scopeSql += ` AND c.id = $${params.length}`;
+      }
+      if (q.courseId) {
+        params.push(q.courseId);
+        scopeSql += ` AND co.id = $${params.length}`;
+      }
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        scopeSql += ` AND co.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+        if (branchClause) scopeSql += ` AND ${branchClause}`;
+      }
+
+      params.push(minStreak);
+      const minIdx = params.length;
+
+      const rows = await query(
+        `WITH scope AS (
+           SELECT c.id AS class_id, c.name AS class_name, co.id AS course_id, co.name AS course_name
+           FROM classes c
+           JOIN courses co ON co.id = c.course_id
+           WHERE co.company_id = $1
+             AND c.deleted_at IS NULL
+             AND COALESCE(c.is_finished, false) = false
+             ${scopeSql}
+         ),
+         recent AS (
+           SELECT s.id, s.class_id, s.session_number, s.start_date,
+                  ROW_NUMBER() OVER (PARTITION BY s.class_id ORDER BY s.start_date DESC) AS rn
+           FROM sessions s
+           JOIN scope sc ON sc.class_id = s.class_id
+           WHERE s.company_id = $1
+             AND s.end_date IS NOT NULL
+             AND COALESCE(s.is_free, false) = false
+         ),
+         recent20 AS (SELECT * FROM recent WHERE rn <= 20),
+         enrolled AS (
+           SELECT DISTINCT student_id, class_id FROM enrollments
+           WHERE company_id = $1 AND status NOT IN ('DROPPED', 'CANCELLED')
+           UNION
+           SELECT DISTINCT student_id, class_id FROM master_class_enrollments
+           WHERE company_id = $1 AND status != 'DROPPED'
+         ),
+         presence AS (
+           SELECT e.student_id, r.class_id, r.rn, r.start_date,
+             (
+               EXISTS (
+                 SELECT 1 FROM session_attendance sa
+                 WHERE sa.session_id = r.id AND sa.student_id = e.student_id
+                   AND sa.attendance_type = 'NORMAL'
+               )
+               OR ${substitutionCoversExists({
+                 student: 'e.student_id',
+                 sessionId: 'r.id',
+                 courseId: '(SELECT course_id FROM classes WHERE id = r.class_id)',
+                 sessionNumber: 'r.session_number',
+               })}
+             ) AS present
+           FROM recent20 r
+           JOIN enrolled e ON e.class_id = r.class_id
+         ),
+         streaks AS (
+           SELECT student_id, class_id,
+                  CASE WHEN bool_or(present) THEN MIN(rn) FILTER (WHERE present) - 1
+                       ELSE COUNT(*) END AS streak,
+                  MAX(start_date) FILTER (WHERE present) AS last_present,
+                  MAX(start_date) FILTER (WHERE NOT present) AS last_missed,
+                  COUNT(*) AS sessions_considered
+           FROM presence
+           GROUP BY student_id, class_id
+         )
+         SELECT st.student_id, st.class_id, st.streak, st.last_present, st.last_missed,
+                st.sessions_considered,
+                sc.class_name, sc.course_id, sc.course_name,
+                s.name AS student_name, s.student_code, s.phone AS student_phone,
+                s.parent_name, s.parent_phone
+         FROM streaks st
+         JOIN scope sc ON sc.class_id = st.class_id
+         JOIN students s ON s.id = st.student_id
+         WHERE st.streak >= $${minIdx} AND s.is_active = true
+         ORDER BY st.streak DESC, s.name ASC`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          studentId: r.student_id,
+          studentName: r.student_name,
+          studentCode: r.student_code ?? null,
+          studentPhone: r.student_phone || null,
+          parentName: r.parent_name || null,
+          parentPhone: r.parent_phone || null,
+          classId: r.class_id,
+          className: r.class_name,
+          courseId: r.course_id,
+          courseName: r.course_name,
+          streak: parseInt(r.streak, 10) || 0,
+          /** Null when they have missed every lesson we looked at. */
+          lastPresentDate: r.last_present || null,
+          lastMissedDate: r.last_missed || null,
+          sessionsConsidered: parseInt(r.sessions_considered, 10) || 0,
+        })),
+      };
+    } catch (error) {
+      console.error('Absence streaks error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.STREAKS_FAILED', 'Failed to load absence streaks');
+    }
+  },
+
+  /**
    * GET /api/attendance/class/:classId
    * Returns per-session attendance summary for a class.
    */

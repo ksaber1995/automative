@@ -229,6 +229,14 @@
             <i class="pi pi-check-circle text-xs"></i>
             {{ 'SESSIONS_DASHBOARD.PRESENT_COUNT' | translate: { count: presentCount() } }}
           </span>
+          <!-- Made up with a sibling class: its own chip, out of the absences. -->
+          @if (substitutedCount() > 0) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold px-3 py-1"
+              [pTooltip]="'SESSION_ATTENDANCE.SUBSTITUTED_HINT' | translate">
+              <i class="pi pi-sync text-xs"></i>
+              {{ 'SESSION_ATTENDANCE.SUBSTITUTED_COUNT' | translate: { count: substitutedCount() } }}
+            </span>
+          }
           <span class="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold px-3 py-1">
             <i class="pi pi-circle text-xs"></i>
             {{ 'SESSIONS_DASHBOARD.ABSENT_COUNT' | translate: { count: absentCount() } }}
@@ -262,10 +270,21 @@
             [label]="'SESSION_ATTENDANCE.SCAN_CAMERA' | translate"
             (onClick)="openCameraScanner()"></p-button>
         }
+        <!-- Narrow the roster to one state. A view only: the debounced save
+             still writes every row, and a code typed into the search box still
+             checks its student in even when the filter is hiding them. -->
         @if (students().length > 0) {
-          <p-button icon="pi pi-check-circle" severity="success" [outlined]="true" size="small"
-            [label]="'SESSIONS_DASHBOARD.MARK_ALL_PRESENT' | translate"
-            (onClick)="confirmMarkAllPresent()"></p-button>
+          <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
+            @for (f of stateFilterOptions(); track f) {
+              <button type="button" class="px-2.5 py-1 font-medium"
+                [class.bg-indigo-600]="stateFilter() === f"
+                [class.text-white]="stateFilter() === f"
+                [class.text-gray-600]="stateFilter() !== f"
+                (click)="stateFilter.set($any(f))">
+                {{ ('SESSION_ATTENDANCE.FILTER_' + f) | translate }}
+              </button>
+            }
+          </div>
         }
       </div>
 
@@ -278,21 +297,23 @@
       } @else {
 
         <div class="text-xs text-gray-500 mb-2">
-          {{ 'SESSIONS_DASHBOARD.SHOWING_COUNT' | translate: { shown: filteredStudents().length, total: students().length } }}
+          {{ 'SESSIONS_DASHBOARD.SHOWING_COUNT' | translate: { shown: visibleStudents().length, total: students().length } }}
         </div>
 
-        @if (filteredStudents().length === 0) {
+        @if (visibleStudents().length === 0) {
           <div class="text-center py-8 text-gray-400 text-sm">
             <i class="pi pi-search text-2xl mb-2 text-gray-300"></i>
             <p>{{ 'SESSIONS_DASHBOARD.NO_MATCH' | translate }}</p>
           </div>
         } @else {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            @for (student of filteredStudents(); track student.studentId) {
+            @for (student of visibleStudents(); track student.studentId) {
               <div class="p-2.5 rounded-lg border"
                 [class.border-green-200]="student.isPresent"
                 [class.bg-green-50]="student.isPresent"
-                [class.border-gray-200]="!student.isPresent">
+                [class.border-amber-200]="isSubstituted(student)"
+                [class.bg-amber-50]="isSubstituted(student)"
+                [class.border-gray-200]="!student.isPresent && !isSubstituted(student)">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <p-checkbox
@@ -323,6 +344,13 @@
                   <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"
                     [pTooltip]="'SESSIONS_DASHBOARD.TRIAL_HINT' | translate">
                     {{ 'SESSIONS_DASHBOARD.TRIAL' | translate }}
+                  </span>
+                } @else if (isSubstituted(student)) {
+                  <!-- They sat this lesson, just not in this room. -->
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"
+                    [pTooltip]="'SESSION_ATTENDANCE.SUBSTITUTED_HINT' | translate">
+                    <i class="pi pi-sync text-[10px]"></i>
+                    {{ 'SESSION_ATTENDANCE.SUBSTITUTED' | translate }}
                   </span>
                 } @else {
                   <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
