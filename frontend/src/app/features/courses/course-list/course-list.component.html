@@ -101,8 +101,12 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          @if (!authService.isTeacher()) {
+          <!-- One branch means every course is in it; the column says the same
+               thing on every row. Matches the branch filter above. -->
+          @if (!authService.isTeacher() && !branchState.isSingleBranch()) {
             <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
+          }
+          @if (!authService.isTeacher()) {
             <th pSortableColumn="levelName">{{ 'COURSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
           }
           @if (showTeacher()) {
@@ -130,7 +134,7 @@
               </span>
             }
           </td>
-          @if (!authService.isTeacher()) {
+          @if (!authService.isTeacher() && !branchState.isSingleBranch()) {
             <td>{{ getBranchName(course) }}</td>
           }
           @if (!authService.isTeacher()) {
@@ -231,8 +235,9 @@
       <ng-template pTemplate="emptymessage">
         <tr>
           <!-- A teacher sees name / price / enrollments / actions; an academy adds
-               Branch, Level and Teacher on top of those. -->
-          <td [attr.colspan]="authService.isTeacher() ? 4 : 7" class="text-center py-8">
+               Level and Teacher on top of those, plus Branch when it has more
+               than one. -->
+          <td [attr.colspan]="authService.isTeacher() ? 4 : (branchState.isSingleBranch() ? 6 : 7)" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>
