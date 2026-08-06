@@ -4962,6 +4962,8 @@
     "PRESENT": "حاضر",
     "ABSENT": "غائب",
     "SUBSTITUTED": "تعويضي",
+    "ATTENDED_AS_SUBSTITUTION": "حضر حضورًا تعويضيًا",
+    "ATTENDED_FROM_GROUP": "— وكان وقتها مسجَّلًا في",
     "COURSES": "الدورات",
     "NO_COURSES": "لا توجد دورات مسجّلة.",
     "RECENT_SESSIONS": "الحصص الأخيرة",

@@ -4838,6 +4838,8 @@
     "PRESENT": "Present",
     "ABSENT": "Absent",
     "SUBSTITUTED": "Substituted",
+    "ATTENDED_AS_SUBSTITUTION": "Attended as a substitution",
+    "ATTENDED_FROM_GROUP": "— enrolled at the time in",
     "COURSES": "Courses",
     "NO_COURSES": "No course enrollments.",
     "RECENT_SESSIONS": "Recent sessions",

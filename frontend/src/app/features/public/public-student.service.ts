@@ -19,6 +19,10 @@ export interface PublicStudentAttendanceRecent {
   status?: 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
   /** When the student was marked in; null for an absence. */
   checkedInAt?: string | null;
+  /** How their attendance on this session was recorded, when they were here. */
+  attendedAs?: 'NORMAL' | 'SUBSTITUTION' | 'TRIAL' | null;
+  /** The group they belonged to when they sat it as a substitution. */
+  attendedFromClassName?: string | null;
   substitutedInClassName?: string | null;
   /** The day the make-up was sat, when this session was substituted. */
   substitutedSessionDate?: string | null;

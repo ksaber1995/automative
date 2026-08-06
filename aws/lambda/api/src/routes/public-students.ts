@@ -152,6 +152,9 @@ export const publicStudentsRoutes = {
             cl.name AS class_name,
             r.code AS room_code,
             CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
+            -- Recorded as a visitor's row, and the group they were in then.
+            sa.attendance_type AS attended_as,
+            attended_home.name AS attended_from_class_name,
             subst.sub_class_name AS substituted_in_class_name,
             subst.sub_session_date AS substituted_session_date,
             -- When the student was actually marked in, which is not the same as
@@ -165,6 +168,7 @@ export const publicStudentsRoutes = {
          LEFT JOIN session_attendance sa
            ON sa.session_id = s.id AND sa.student_id = $1
               AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
+         LEFT JOIN classes attended_home ON attended_home.id = sa.home_class_id
          LEFT JOIN LATERAL (
            ${substitutionCoversLateral({
              student: '$1',
@@ -511,6 +515,10 @@ export const publicStudentsRoutes = {
               // When the student was actually marked in. Null for an absence —
               // there is no arrival time for someone who never arrived.
               checkedInAt: row.checked_in_at || null,
+              // Present, but on another group's register — and which group they
+              // belonged to when they sat it.
+              attendedAs: row.attended_as || null,
+              attendedFromClassName: row.attended_from_class_name || null,
               substitutedInClassName: row.substituted_in_class_name || null,
               // The day the make-up was actually sat, so "attended Saturday
               // instead" reads as exactly that and not as a missed Sunday.

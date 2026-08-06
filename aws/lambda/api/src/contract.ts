@@ -3293,6 +3293,10 @@ export const contract = c.router({
               status: z.enum(['PRESENT', 'ABSENT', 'SUBSTITUTED']).optional(),
               /** When the student was marked in; null for an absence. */
               checkedInAt: z.string().nullable().optional(),
+              /** How the attendance was recorded on this session, when present. */
+              attendedAs: z.enum(['NORMAL', 'SUBSTITUTION', 'TRIAL']).nullable().optional(),
+              /** The group they belonged to when they sat it as a substitution. */
+              attendedFromClassName: z.string().nullable().optional(),
               substitutedInClassName: z.string().nullable().optional(),
               /** The day the make-up was sat, when this session was substituted. */
               substitutedSessionDate: z.string().nullable().optional(),
