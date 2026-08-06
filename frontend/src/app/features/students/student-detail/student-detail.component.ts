@@ -1497,6 +1497,21 @@ export class StudentDetailComponent implements OnInit {
       this.linkCard({ serial });
       return;
     }
+    /**
+     * A bare number is still a card number.
+     *
+     * normalizeStudentCode only lifts a code into a reserved range when it can
+     * see which one — an "A" prefix or a leading zero. A pool printed at a fixed
+     * three digits reads "100" for card 100, which carries neither, so it fell
+     * through to the token branch below and was looked up as a QR token: cards
+     * 001-099 linked (their zero gave the range away) and 100 upwards reported
+     * "not in this pool" unless the cashier typed "0100". Send the number as a
+     * number — the API tries each reserved range and only one can match.
+     */
+    if (/^\d{1,6}$/.test(raw)) {
+      this.linkCard({ serial: Number(raw) });
+      return;
+    }
     // Not a recognisable card number — treat the raw value as a token (a hand-typed
     // token from a damaged QR); the API will reject it if it isn't one.
     this.linkCard({ token: raw });
