@@ -363,6 +363,24 @@ export class SessionsDashboardComponent implements OnInit {
   absenceMinStreak = signal(2);
   absenceRows = signal<AbsenceStreakRow[]>([]);
   loadingAbsences = signal(false);
+  /** Narrow the list to one student by name or code. */
+  absenceSearch = signal('');
+
+  /**
+   * The list as shown. Filtered here rather than server-side: the rows are
+   * already loaded, so a name types through instantly, and the summary above
+   * counts exactly what is on screen.
+   */
+  filteredAbsenceRows = computed(() => {
+    const q = this.absenceSearch().trim().toLowerCase();
+    const rows = this.absenceRows();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const name = (r.studentName || '').toLowerCase();
+      const code = formatStudentCode(r.studentCode).toLowerCase();
+      return name.includes(q) || (code !== '' && code.includes(q));
+    });
+  });
 
   onTabChange(value: string | number | undefined) {
     this.activeTab = value?.toString() ?? 'active';
@@ -402,7 +420,7 @@ export class SessionsDashboardComponent implements OnInit {
    * number of parents there are to call.
    */
   absenceSummary = computed(() => {
-    const rows = this.absenceRows();
+    const rows = this.filteredAbsenceRows();
     const students = new Set(rows.map(r => r.studentId));
     const classes = new Set(rows.map(r => r.classId));
     const contactable = new Set(
