@@ -79,7 +79,7 @@ export async function absenceStats(
             EXISTS (
               SELECT 1 FROM session_attendance sa
               WHERE sa.session_id = r.id AND sa.student_id = e.student_id
-                AND sa.attendance_type = 'NORMAL'
+                AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
             )
             OR ${substitutionCoversExists({
               student: 'e.student_id',
@@ -124,7 +124,7 @@ export async function absenceStats(
               EXISTS (
                 SELECT 1 FROM session_attendance sa
                 WHERE sa.session_id = m.id AND sa.student_id = e.student_id
-                  AND sa.attendance_type = 'NORMAL'
+                  AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
               )
               OR ${substitutionCoversExists({
                 student: 'e.student_id',
@@ -1108,8 +1108,14 @@ export const attendanceRoutes = {
         JOIN classes cl ON s.class_id = cl.id
         JOIN courses co ON co.id = cl.course_id
         LEFT JOIN rooms r ON s.room_id = r.id
+        -- SUBSTITUTION counts here, not just NORMAL: this session belongs to a
+        -- class they are enrolled in, and a row on it means they were in the
+        -- room. The type only records how they got onto the roster — a student
+        -- moved into the class they had been visiting would otherwise have
+        -- their real attendance read back as absence.
         LEFT JOIN session_attendance sa
-          ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
+          ON sa.session_id = s.id AND sa.student_id = $1
+             AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
         LEFT JOIN LATERAL (
           ${substitutionCoversLateral({
             student: '$1',
@@ -1359,7 +1365,7 @@ export const attendanceRoutes = {
                EXISTS (
                  SELECT 1 FROM session_attendance sa
                  WHERE sa.session_id = r.id AND sa.student_id = e.student_id
-                   AND sa.attendance_type = 'NORMAL'
+                   AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
                )
                OR ${substitutionCoversExists({
                  student: 'e.student_id',
@@ -1471,8 +1477,25 @@ export const attendanceRoutes = {
           subst.n AS substituted_count
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
+        -- Counts the class's own students, however their row was typed: a
+        -- student moved into the class they used to visit still has a
+        -- SUBSTITUTION row on the lessons they sat here. Visitors and trials
+        -- are left out by the enrolment check — they are not this class's.
         LEFT JOIN session_attendance sa
-          ON sa.session_id = s.id AND sa.attendance_type = 'NORMAL'
+          ON sa.session_id = s.id
+             AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
+             AND (
+               EXISTS (
+                 SELECT 1 FROM enrollments en
+                 WHERE en.student_id = sa.student_id AND en.class_id = $1
+                   AND en.company_id = $2 AND en.status NOT IN ('DROPPED', 'CANCELLED')
+               )
+               OR EXISTS (
+                 SELECT 1 FROM master_class_enrollments mn
+                 WHERE mn.student_id = sa.student_id AND mn.class_id = $1
+                   AND mn.company_id = $2 AND mn.status != 'DROPPED'
+               )
+             )
         -- Enrolled students who weren't here but sat the lesson elsewhere. They
         -- come out of the absent tally, or the summary contradicts the roster
         -- the row expands into.
@@ -1486,9 +1509,10 @@ export const attendanceRoutes = {
             WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
           ) e
           WHERE NOT EXISTS (
+            -- Any row at all: counting someone as both present and made-up
+            -- would push the two figures past the roster they came from.
             SELECT 1 FROM session_attendance na
             WHERE na.session_id = s.id AND na.student_id = e.student_id
-              AND na.attendance_type = 'NORMAL'
           )
           AND ${substitutionCoversExists({
             student: 'e.student_id',

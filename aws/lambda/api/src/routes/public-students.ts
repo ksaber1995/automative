@@ -160,8 +160,11 @@ export const publicStudentsRoutes = {
          FROM sessions s
          JOIN classes cl ON s.class_id = cl.id
          LEFT JOIN rooms r ON s.room_id = r.id
+         -- Any row on a session of their own class means they were there; see
+         -- the same join in attendance.getByStudent.
          LEFT JOIN session_attendance sa
-           ON sa.session_id = s.id AND sa.student_id = $1 AND sa.attendance_type = 'NORMAL'
+           ON sa.session_id = s.id AND sa.student_id = $1
+              AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
          LEFT JOIN LATERAL (
            ${substitutionCoversLateral({
              student: '$1',

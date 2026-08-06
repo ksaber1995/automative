@@ -369,6 +369,18 @@ export function substitutionCoversLateral(e: SubstitutionMatchExprs): string {
 export function substitutionIsOrphanClause(studentExpr: string, companyExpr: string): string {
   return `sub.substitute_for_session_id IS NULL
       AND NOT EXISTS (
+        -- Not an orphan if they have since been moved INTO the class they were
+        -- visiting: that lesson is on their own timetable now and is listed
+        -- there as attended, so listing it again here would double it up.
+        SELECT 1 FROM enrollments own
+        WHERE own.student_id = ${studentExpr} AND own.class_id = sub_session.class_id
+          AND own.company_id = ${companyExpr} AND own.status NOT IN ('DROPPED', 'CANCELLED')
+        UNION
+        SELECT 1 FROM master_class_enrollments own2
+        WHERE own2.student_id = ${studentExpr} AND own2.class_id = sub_session.class_id
+          AND own2.company_id = ${companyExpr} AND own2.status != 'DROPPED'
+      )
+      AND NOT EXISTS (
         SELECT 1 FROM sessions home_s
         JOIN classes home_c ON home_c.id = home_s.class_id
         WHERE home_c.course_id = sub_class.course_id
