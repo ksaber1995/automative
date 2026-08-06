@@ -1,6 +1,51 @@
 <div class="container mx-auto p-6">
   <p-confirmDialog></p-confirmDialog>
 
+  <!-- Permanent delete. A confirm button is too easy to hit for something this
+       final, so the word has to be typed before it lights up. -->
+  <p-dialog
+    [(visible)]="hardDeleteVisible"
+    [modal]="true"
+    [dismissableMask]="true"
+    [draggable]="false"
+    [style]="{ width: '30rem', maxWidth: '95vw' }"
+    [header]="'STUDENTS.HARD_DELETE_HEADER' | translate"
+  >
+    @if (student(); as s) {
+      <div class="flex flex-col gap-3">
+        <div class="flex items-start gap-2">
+          <i class="pi pi-exclamation-triangle text-red-500 text-2xl mt-1"></i>
+          <p class="m-0">
+            {{ (s.hasSubscriptions ? 'STUDENTS.HARD_DELETE_WARN_CONFIRM' : 'STUDENTS.HARD_DELETE_CONFIRM') | translate: { name: s.name } }}
+          </p>
+        </div>
+        <label class="text-sm" for="detailDeleteConfirmInput">
+          {{ 'STUDENTS.HARD_DELETE_TYPE_PROMPT' | translate }}
+        </label>
+        <input
+          id="detailDeleteConfirmInput"
+          pInputText
+          type="text"
+          class="w-full"
+          autocomplete="off"
+          placeholder="delete"
+          [(ngModel)]="hardDeleteConfirmText"
+          (keyup.enter)="confirmHardDelete()"
+        />
+      </div>
+    }
+    <ng-template pTemplate="footer">
+      <button pButton type="button" class="p-button-text"
+        [label]="'STUDENTS.HARD_DELETE_CANCEL' | translate"
+        (click)="hardDeleteVisible = false"></button>
+      <button pButton type="button" class="p-button-danger" icon="pi pi-trash"
+        [label]="'STUDENTS.LIST.HARD_DELETE' | translate"
+        [loading]="hardDeleting()"
+        [disabled]="!canConfirmHardDelete"
+        (click)="confirmHardDelete()"></button>
+    </ng-template>
+  </p-dialog>
+
   <!-- Change Class Dialog -->
   <p-dialog
     [header]="'STUDENTS.DETAIL.CHANGE_CLASS' | translate"
@@ -196,6 +241,21 @@
               [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
               (click)="openNotesDialog()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
+            <!-- Leaving the academy is reversible and keeps every record; the
+                 trash next to it does not. Only offered while they are still
+                 active — an inactive student is brought back from the list. -->
+            @if (canDeleteStudents() && student()?.isActive) {
+              <button pButton [label]="'STUDENTS.DETAIL.MARK_LEFT' | translate" icon="pi pi-sign-out"
+                class="p-button-outlined p-button-warning"
+                [pTooltip]="'STUDENTS.DETAIL.MARK_LEFT_TOOLTIP' | translate"
+                (click)="markStudentLeft()"></button>
+            }
+            @if (canDeleteStudents()) {
+              <button pButton [label]="'STUDENTS.DETAIL.HARD_DELETE' | translate" icon="pi pi-trash"
+                class="p-button-outlined p-button-danger"
+                [pTooltip]="'STUDENTS.DETAIL.HARD_DELETE_TOOLTIP' | translate"
+                (click)="openHardDelete()"></button>
+            }
             <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>
         </div>

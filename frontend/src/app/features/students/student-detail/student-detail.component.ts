@@ -1358,6 +1358,74 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     this.router.navigate(['/students']);
   }
 
+  // ── Leaving the academy, and leaving the database ───────────────────────────
+
+  /** Both actions are gated on the same permission the list page uses. */
+  canDeleteStudents = (): boolean => this.authService.canDelete('students');
+
+  /** Type-to-confirm state for the permanent delete (mirrors the list page). */
+  hardDeleteVisible = false;
+  hardDeleteConfirmText = '';
+  hardDeleting = signal(false);
+
+  /**
+   * The student has left. A soft deactivation: the record and every payment,
+   * attendance and exam on it stay exactly where they are, and the list's
+   * Inactive tab can bring them back. Confirmed because it removes them from
+   * rosters and attendance immediately.
+   */
+  markStudentLeft(): void {
+    const s = this.student();
+    if (!s) return;
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.LEAVE_HEADER'),
+      message: this.translate.instant('STUDENTS.LEAVE_CONFIRM', { name: s.name }),
+      icon: 'pi pi-sign-out',
+      accept: () => {
+        this.studentService.deleteStudent(s.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.LEFT', { name: s.name }));
+            // Re-pull rather than navigate away: the page is still theirs, it
+            // just says Inactive now.
+            this.studentService.getStudentById(s.id).subscribe({
+              next: (updated) => this.student.set(updated),
+            });
+          },
+        });
+      },
+    });
+  }
+
+  /**
+   * Permanent delete. Always allowed, never one click: the record and its
+   * history go for good, so the name has to be typed over before the button
+   * lights up — the same gate the list page uses.
+   */
+  openHardDelete(): void {
+    this.hardDeleteConfirmText = '';
+    this.hardDeleteVisible = true;
+  }
+
+  get canConfirmHardDelete(): boolean {
+    return this.hardDeleteConfirmText.trim().toLowerCase() === 'delete';
+  }
+
+  confirmHardDelete(): void {
+    const s = this.student();
+    if (!s || !this.canConfirmHardDelete || this.hardDeleting()) return;
+    this.hardDeleting.set(true);
+    this.studentService.hardDeleteStudent(s.id).subscribe({
+      next: () => {
+        this.hardDeleting.set(false);
+        this.hardDeleteVisible = false;
+        this.notificationService.success(this.translate.instant('STUDENTS.HARD_DELETED'));
+        // Nothing left to show on this page.
+        this.router.navigate(['/students']);
+      },
+      error: () => this.hardDeleting.set(false),
+    });
+  }
+
   /** Update the local student copy after the QR dialog rotates the token. */
   onQrRegenerated(updated: Student) {
     this.student.set(updated);

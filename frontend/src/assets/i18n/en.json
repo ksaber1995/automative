@@ -3769,6 +3769,10 @@
     },
     "DETAIL": {
       "EDIT": "Edit",
+      "MARK_LEFT": "Left the academy",
+      "MARK_LEFT_TOOLTIP": "Move the student to Inactive. Everything on their record is kept, and the students list can bring them back.",
+      "HARD_DELETE": "Delete",
+      "HARD_DELETE_TOOLTIP": "Erase the student and their history for good. This cannot be undone.",
       "BACK": "Back",
       "CODE_TOOLTIP": "Student code — use it to record attendance or payment when the QR isn't handy",
       "YEARS_OLD": "years old",
