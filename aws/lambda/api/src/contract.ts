@@ -6510,6 +6510,10 @@ export const contract = c.router({
           roomCode: z.string().nullable(),
           isPresent: z.boolean(),
           status: z.enum(['PRESENT', 'ABSENT', 'SUBSTITUTED']).optional(),
+          /** How the attendance was recorded on this session, when present. */
+          attendedAs: z.enum(['NORMAL', 'SUBSTITUTION', 'TRIAL']).nullable().optional(),
+          /** The group they belonged to when they sat it as a substitution. */
+          attendedFromClassName: z.string().nullable().optional(),
           substitutedInClassName: z.string().nullable().optional(),
           /** The lesson actually sat instead of this one, when substituted. */
           substitutedInSessionId: UUIDSchema.nullable().optional(),

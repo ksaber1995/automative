@@ -50,6 +50,10 @@ export interface StudentAttendanceRecord {
   roomCode?: string | null;
   isPresent: boolean;
   status?: AttendanceStatus;
+  /** How their attendance on this session was recorded, when they were here. */
+  attendedAs?: AttendanceType | null;
+  /** The group they belonged to when they sat it as a substitution. */
+  attendedFromClassName?: string | null;
   substitutedInClassName?: string | null;
   /** The lesson actually sat in place of this one, when substituted. */
   substitutedInSessionId?: string | null;

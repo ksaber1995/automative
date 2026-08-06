@@ -1101,6 +1101,10 @@ export const attendanceRoutes = {
           co.name AS course_name,
           r.code AS room_code,
           CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
+          -- How they got onto this roster, and which group they belonged to at
+          -- the time: "present" alone cannot answer "in whose lesson?".
+          sa.attendance_type AS attended_as,
+          attended_home.name AS attended_from_class_name,
           subst.sub_class_name AS substituted_in_class_name,
           subst.sub_session_id AS substituted_in_session_id,
           subst.sub_session_date AS substituted_session_date
@@ -1116,6 +1120,7 @@ export const attendanceRoutes = {
         LEFT JOIN session_attendance sa
           ON sa.session_id = s.id AND sa.student_id = $1
              AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
+        LEFT JOIN classes attended_home ON attended_home.id = sa.home_class_id
         LEFT JOIN LATERAL (
           ${substitutionCoversLateral({
             student: '$1',
@@ -1215,6 +1220,10 @@ export const attendanceRoutes = {
           isFree: row.is_free === true,
           roomCode: row.room_code,
           status,
+          // They were here, but on someone else's register: the lesson belongs
+          // to this class and their row still carries the group they came from.
+          attendedAs: row.attended_as || null,
+          attendedFromClassName: row.attended_from_class_name || null,
           substitutedInClassName: row.substituted_in_class_name || null,
           // The lesson they actually sat, named by id and date: "absent" and
           // "made it up on Saturday" must not look the same on the page.
