@@ -25,6 +25,7 @@ export class GlobalScanService {
   private translate = inject(TranslateService);
 
   private handler: ((token: string) => void) | null = null;
+  private rawHandler: ((scanned: string) => void) | null = null;
   private looking = false;
 
   /** A page takes over scan handling for as long as it is mounted. */
@@ -35,6 +36,24 @@ export class GlobalScanService {
   /** Release the handler (only if it's still the one this page registered). */
   unregister(fn: (token: string) => void): void {
     if (this.handler === fn) this.handler = null;
+  }
+
+  /**
+   * Take the scan verbatim, before it is read as a student.
+   *
+   * Everything else here assumes a scan identifies a STUDENT — a barcode of a
+   * printed code is looked up as a student code and turned into their token. But
+   * a blank card being linked is nobody's yet: its barcode is a CARD number, and
+   * that lookup can only fail (or, worse, land on the student whose own code
+   * reads the same). A page doing that registers here instead and decides for
+   * itself what it just read.
+   */
+  registerRaw(fn: (scanned: string) => void): void {
+    this.rawHandler = fn;
+  }
+
+  unregisterRaw(fn: (scanned: string) => void): void {
+    if (this.rawHandler === fn) this.rawHandler = null;
   }
 
   /**
@@ -97,6 +116,13 @@ export class GlobalScanService {
   dispatch(decodedText: string, forceOpen = false): void {
     const raw = (decodedText || '').trim();
     if (!raw) return;
+
+    // A page that wants the scan as scanned gets it first — see registerRaw.
+    // The navbar's explicit "open this student" search still bypasses it.
+    if (this.rawHandler && !forceOpen) {
+      this.rawHandler(raw);
+      return;
+    }
 
     if (this.looksLikePrintedCode(raw)) {
       // One in-flight lookup at a time: a scanner can fire twice on one swipe.

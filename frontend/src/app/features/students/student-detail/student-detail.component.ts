@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, DestroyRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -95,7 +95,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
   styleUrl: './student-detail.component.scss',
   providers: [ConfirmationService],
 })
-export class StudentDetailComponent implements OnInit {
+export class StudentDetailComponent implements OnInit, OnDestroy {
   @ViewChild(SessionPayDialogComponent) sessionPayDialog?: SessionPayDialogComponent;
   private studentService = inject(StudentService);
   private enrollmentService = inject(EnrollmentService);
@@ -453,6 +453,15 @@ export class StudentDetailComponent implements OnInit {
         this.loadStudentData(id);
       }
     });
+  }
+
+  /**
+   * Leaving with the link dialog open must not leave its scan handler behind:
+   * the next scan anywhere in the app would try to link a card to the student
+   * whose page this was.
+   */
+  ngOnDestroy(): void {
+    this.globalScan.unregisterRaw(this.linkScanHandler);
   }
 
   private async loadStudentData(id: string) {
@@ -1431,7 +1440,7 @@ export class StudentDetailComponent implements OnInit {
   private qrCardService = inject(QrCardService);
   private globalScan = inject(GlobalScanService);
   /** Takes over the app-wide scanner ONLY while the link dialog is open. */
-  private readonly linkScanHandler = (token: string) => this.linkByToken(token);
+  private readonly linkScanHandler = (scanned: string) => this.linkByScan(scanned);
 
   linkCardVisible = signal(false);
   linkedCards = signal<QrCard[]>([]);
@@ -1454,12 +1463,14 @@ export class StudentDetailComponent implements OnInit {
     this.linkInput = '';
     this.linkCardVisible.set(true);
     // While this is open a scan links the card, instead of falling through to the
-    // global "find student / take attendance" behaviour.
-    this.globalScan.register(this.linkScanHandler);
+    // global "find student / take attendance" behaviour. Registered RAW: the card
+    // being linked is blank, so its barcode is a card number and there is no
+    // student for the usual lookup to find.
+    this.globalScan.registerRaw(this.linkScanHandler);
   }
 
   closeLinkCard(): void {
-    this.globalScan.unregister(this.linkScanHandler);
+    this.globalScan.unregisterRaw(this.linkScanHandler);
     this.linkCardVisible.set(false);
   }
 
@@ -1470,9 +1481,19 @@ export class StudentDetailComponent implements OnInit {
     });
   }
 
-  /** A scan from the USB reader (or the camera) while the dialog is open. */
-  private linkByToken(token: string): void {
-    this.linkCard({ token });
+  /**
+   * A scan from the USB reader while the dialog is open.
+   *
+   * Put it in the field and run the same resolution typing does, so a barcode of
+   * the printed number links the card the cashier is holding rather than being
+   * sent off as a QR token — which is all a scan used to be able to be, and why
+   * scanning a card printed by the academy's own printer failed where typing the
+   * same number worked. Showing it in the field also leaves something to correct
+   * when the read is wrong.
+   */
+  private linkByScan(scanned: string): void {
+    this.linkInput = (scanned || '').trim();
+    this.linkByInput();
   }
 
   /**
