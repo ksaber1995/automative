@@ -1257,16 +1257,19 @@
                   <span class="inline-flex items-center gap-1.5 text-green-700 font-semibold text-sm">
                     <i class="pi pi-check-circle text-green-500"></i> {{ 'STUDENTS.DETAIL.ATTENDANCE_PRESENT_LABEL' | translate }}
                   </span>
-                  <!-- Present, but sat with this group rather than on their own
-                       register — "attended" alone doesn't say whose lesson. -->
+                  <!-- Present, but scanned in as a visitor. The group whose
+                       lesson this was is already in the Class column — naming it
+                       again beside the group they belonged to only invites the
+                       two to be read as one. Say the part the row can't: which
+                       group they were in when they sat it. -->
                   @if (rec.attendedAs === 'SUBSTITUTION') {
-                    <div class="text-xs text-amber-700 mt-0.5 flex items-center gap-1">
+                    <div class="text-xs text-amber-700 mt-0.5 flex items-center gap-1 flex-wrap">
                       <i class="pi pi-sync text-[10px]"></i>
                       {{ 'STUDENTS.DETAIL.ATTENDANCE_AS_SUBSTITUTION' | translate }}
-                      <span class="font-semibold">{{ rec.className }}</span>
                       @if (rec.attendedFromClassName) {
-                        <span class="text-gray-400 font-normal">
-                          ({{ 'STUDENTS.DETAIL.ATTENDANCE_FROM_GROUP' | translate }} {{ rec.attendedFromClassName }})
+                        <span class="text-gray-500 font-normal">
+                          {{ 'STUDENTS.DETAIL.ATTENDANCE_FROM_GROUP' | translate }}
+                          <span class="font-semibold text-amber-700">{{ rec.attendedFromClassName }}</span>
                         </span>
                       }
                     </div>
