@@ -2951,7 +2951,8 @@
       "ROLE_TEACHERS": "المدرسون فقط",
       "PER_SESSION": "/ حصة",
       "OF_REVENUE": "من الإيراد",
-      "PER_MONTH": "/ شهر"
+      "PER_MONTH": "/ شهر",
+      "NO_SALARY": "بدون راتب"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل الموظف",

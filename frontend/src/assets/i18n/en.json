@@ -2951,7 +2951,8 @@
       "ROLE_TEACHERS": "Teachers only",
       "PER_SESSION": "/ session",
       "OF_REVENUE": "of revenue",
-      "PER_MONTH": "/ month"
+      "PER_MONTH": "/ month",
+      "NO_SALARY": "No salary"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Employee",

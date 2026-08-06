@@ -107,6 +107,14 @@
                sessionRate, PERCENTAGE uses percentageRate. Showing `salary` for
                all three left the last two blank. -->
           <td>
+            <!-- Nothing to pay: an UNPAID teacher (a founder teaching their own
+                 academy), or a figure never filled in. Both used to read "0 per
+                 month", which looks like a salary of zero rather than none. -->
+            @if (!hasPay(employee)) {
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap">
+                {{ 'EMPLOYEES.LIST.NO_SALARY' | translate }}
+              </span>
+            } @else {
             @switch (employee.salaryType) {
               @case ('SESSION_BASED') {
                 <div class="flex items-center gap-1 whitespace-nowrap">
@@ -130,6 +138,7 @@
                   <span class="text-xs text-gray-500">{{ 'EMPLOYEES.LIST.PER_MONTH' | translate }}</span>
                 </div>
               }
+            }
             }
           </td>
           <td>{{ employee.hireDate | date: 'MMM d, y' }}</td>

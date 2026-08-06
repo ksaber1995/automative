@@ -51,6 +51,20 @@ export class EmployeeListComponent implements OnInit {
   authService = inject(AuthService);
   protected branchState = inject(BranchStateService);
 
+  /**
+   * Is there anything to pay this person?
+   *
+   * UNPAID is the deliberate case — a founder teaching their own academy draws
+   * nothing — but a figure simply never entered means the same on this column,
+   * and each pay model reads its own field.
+   */
+  hasPay(employee: Employee): boolean {
+    if (employee.salaryType === 'UNPAID') return false;
+    if (employee.salaryType === 'SESSION_BASED') return (employee.sessionRate ?? 0) > 0;
+    if (employee.salaryType === 'PERCENTAGE') return (employee.percentageRate ?? 0) > 0;
+    return (employee.salary ?? 0) > 0;
+  }
+
   employees = signal<Employee[]>([]);
   branches = signal<LookupOption[]>([]);
   loading = signal(true);
