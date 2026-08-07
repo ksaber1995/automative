@@ -256,6 +256,7 @@
       "ENROLLMENTS_FAILED": "فشل تحميل التسجيلات",
       "CHECK_AVAILABILITY_FAILED": "فشل التحقق من توفر المعلم",
       "ROOM_CONFLICT": "القاعة {{room}} محجوزة لـ \"{{name}}\" يوم {{day}} {{start}}–{{end}}. اختر قاعة أو وقتًا آخر.",
+      "COURSE_PAYMENT_TYPE_MISMATCH": "لا يمكن نقل هذه المجموعة إلى كورس بنظام دفع مختلف ({{from}} ← {{to}}). الكورسان يحفظان المدفوعات في أماكن مختلفة.",
       "CANNOT_DEACTIVATE_FINISHED": "لا يمكن تعطيل المجموعات المنتهية",
       "ALREADY_FINISHED": "المجموعة منتهٍ بالفعل",
       "HAS_ACTIVE_SESSION": "المجموعة لديه حصة نشطة ولا يمكن إنهاؤه",

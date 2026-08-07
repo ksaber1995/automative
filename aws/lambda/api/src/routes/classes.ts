@@ -1,6 +1,80 @@
-import { insert, update, findById, query, queryOne } from '../db/connection';
+import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+
+/**
+ * Moving a class to another course is not one UPDATE.
+ *
+ * `enrollments.class_id` is the real link between a student and a class, but
+ * `course_id` (and `branch_id`) are denormalised onto the enrollment and onto
+ * every money row hanging off it, so per-course reads don't have to join back
+ * through classes. Change only `classes.course_id` and the class appears under
+ * the new course while every one of its enrollments and their bills still
+ * report under the old one — revenue-by-course, dashboards and filters quietly
+ * disagree with what the academy sees.
+ *
+ * These are the tables holding those copies. `class_id` itself never changes,
+ * so the subqueries stay valid no matter what order the updates run in.
+ * Anything NOT listed here is per-course CONFIG (course_levels, course_products,
+ * course_monthly_price_overrides, master_course_courses) and must stay put.
+ */
+const CLASS_COURSE_FANOUT: { table: string; where: string; hasBranch: boolean }[] = [
+  { table: 'enrollments', where: 'class_id = $2', hasBranch: true },
+  { table: 'monthly_subscription_payments', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'monthly_subscription_installments', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'session_packages', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'session_package_installments', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'session_payment_installments', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'session_payments', where: 'session_id IN (SELECT id FROM sessions WHERE class_id = $2)', hasBranch: true },
+  { table: 'exams', where: 'class_id = $2', hasBranch: true },
+  { table: 'exam_results', where: 'exam_id IN (SELECT id FROM exams WHERE class_id = $2)', hasBranch: false },
+  { table: 'revenues', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'product_sales', where: 'enrollment_id IN (SELECT id FROM enrollments WHERE class_id = $2)', hasBranch: true },
+  { table: 'master_class_enrollments', where: 'class_id = $2', hasBranch: true },
+];
+
+/**
+ * Move one class and everything denormalised off it onto `targetCourseId`.
+ *
+ * All-or-nothing: a partial move is worse than no move, because it strands
+ * money on a course the class no longer belongs to and nothing in the UI would
+ * show it. `branchId` is rewritten too — a class has no branch of its own, it
+ * inherits the course's, so moving across branches has to carry the copies with
+ * it or branch-scoped reads lose the rows.
+ *
+ * The `session_*` tables are created lazily by `ensurePerSessionSchema()`, so a
+ * tenant that never sold a per-session course simply doesn't have them — hence
+ * the existence check rather than an UPDATE that would abort the transaction.
+ */
+async function moveClassToCourse(classId: string, targetCourseId: string, branchId: string): Promise<void> {
+  const present = await query<{ table_name: string }>(
+    `SELECT table_name FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = ANY($1)`,
+    [CLASS_COURSE_FANOUT.map(f => f.table)],
+  );
+  const exists = new Set(present.map(r => r.table_name));
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE classes SET course_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [targetCourseId, classId],
+    );
+    for (const f of CLASS_COURSE_FANOUT) {
+      if (!exists.has(f.table)) continue;
+      const set = f.hasBranch ? 'course_id = $1, branch_id = $3' : 'course_id = $1';
+      const params = f.hasBranch ? [targetCourseId, classId, branchId] : [targetCourseId, classId];
+      await client.query(`UPDATE ${f.table} SET ${set} WHERE ${f.where}`, params);
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
 
 let classSchemaInitPromise: Promise<void> | null = null;
 async function ensureClassStatusColumns(): Promise<void> {
@@ -956,10 +1030,16 @@ export const classesRoutes = {
       await ensureClassDayTimesSchema();
       const updateData: any = {};
 
-      if (body.courseId !== undefined) {
+      // Set when this edit moves the class to a different course. The move is NOT
+      // folded into updateData: it has to rewrite the denormalised course_id on
+      // every enrollment and money row too, which only moveClassToCourse() does,
+      // and it has to be atomic. See CLASS_COURSE_FANOUT.
+      let moveTo: { courseId: string; branchId: string } | null = null;
+
+      if (body.courseId !== undefined && body.courseId !== existing.course_id) {
         // Switching course also implicitly switches branch/company. Re-validate.
         const newCourse = await queryOne(
-          'SELECT id, company_id, branch_id FROM courses WHERE id = $1',
+          'SELECT id, company_id, branch_id, payment_type FROM courses WHERE id = $1',
           [body.courseId]
         );
         if (!newCourse || newCourse.company_id !== context.companyId) {
@@ -968,7 +1048,24 @@ export const classesRoutes = {
         if (!canAccessBranch(context, newCourse.branch_id)) {
           return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS_TARGET', 'Access denied to target branch');
         }
-        updateData.course_id = body.courseId;
+        // Each payment model keeps its money in DIFFERENT tables (one-time
+        // installments vs monthly_subscription_* vs session_*), and enrollments
+        // carry a denormalised copy of payment_type. Moving across models would
+        // leave, say, monthly bills attached to a per-session course — money the
+        // new course's screens cannot show and its billing cannot maintain. That
+        // is a migration, not a move, so it is refused rather than half-done.
+        const currentCourse = await queryOne(
+          'SELECT payment_type FROM courses WHERE id = $1',
+          [existing.course_id]
+        );
+        if (currentCourse && newCourse.payment_type !== currentCourse.payment_type) {
+          return apiError(
+            400, 'ERRORS.CLASSES.COURSE_PAYMENT_TYPE_MISMATCH',
+            `Cannot move a class to a course with a different payment type (${currentCourse.payment_type} → ${newCourse.payment_type})`,
+            { from: currentCourse.payment_type, to: newCourse.payment_type },
+          );
+        }
+        moveTo = { courseId: body.courseId, branchId: newCourse.branch_id };
       }
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
       if (body.roomId !== undefined) {
@@ -1038,6 +1135,10 @@ export const classesRoutes = {
       if (!classRecord) {
         return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
       }
+
+      // After the plain field edits, so a failed move leaves the class exactly
+      // where it was rather than half-moved.
+      if (moveTo) await moveClassToCourse(params.id, moveTo.courseId, moveTo.branchId);
 
       if (effectiveDayTimes !== null) await setClassDayTimes(params.id, effectiveDayTimes);
 

@@ -256,6 +256,7 @@
       "ENROLLMENTS_FAILED": "Failed to load enrollments",
       "CHECK_AVAILABILITY_FAILED": "Failed to check teacher availability",
       "ROOM_CONFLICT": "Room {{room}} is already taken by \"{{name}}\" on {{day}} {{start}}–{{end}}. Pick another room or time.",
+      "COURSE_PAYMENT_TYPE_MISMATCH": "This class cannot be moved to a course with a different payment type ({{from}} → {{to}}). The two courses keep their payments in different places.",
       "CANNOT_DEACTIVATE_FINISHED": "Finished classes cannot be deactivated",
       "ALREADY_FINISHED": "Class is already finished",
       "HAS_ACTIVE_SESSION": "Class has an active session and cannot be finished",

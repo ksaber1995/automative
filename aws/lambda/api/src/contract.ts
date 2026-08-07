@@ -1046,6 +1046,11 @@ const CreateClassSchema = z.object({
 });
 
 const UpdateClassSchema = z.object({
+  // Moves the class to another course. NOT a plain column write: the route
+  // rewrites the denormalised course_id/branch_id on every enrollment and money
+  // row too, transactionally, and refuses a target whose payment_type differs.
+  // See moveClassToCourse() in routes/classes.ts.
+  courseId: OptionalUUIDSchema,
   instructorId: OptionalUUIDSchema,
   roomId: OptionalUUIDSchema,
   name: z.string().optional(),
