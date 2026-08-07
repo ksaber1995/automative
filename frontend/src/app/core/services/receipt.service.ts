@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import { ApiService } from './api.service';
 
 /** The receipt stub every payment response carries when a slip was issued. */
 export interface ReceiptStub {
@@ -7,8 +9,26 @@ export interface ReceiptStub {
   publicToken: string;
 }
 
+/** Which kind of money a receipt was issued against — mirrors ReceiptSource on the API. */
+export type ReceiptSourceType = 'MONTHLY' | 'SESSION' | 'PACKAGE' | 'ENROLLMENT' | 'MASTER';
+
 @Injectable({ providedIn: 'root' })
 export class ReceiptService {
+  private api = inject(ApiService);
+
+  /**
+   * The receipts already issued for one payment, newest first.
+   *
+   * Reprinting always goes through this: it returns the SAME slip — same
+   * number, same QR, same frozen snapshot — so asking for a receipt twice can
+   * never mint a second one. An empty array means none was ever issued (the
+   * payment predates receipts, or printing was skipped), which the caller
+   * reports rather than papering over.
+   */
+  bySource(sourceType: ReceiptSourceType, sourceId: string): Observable<ReceiptStub[]> {
+    return this.api.get<ReceiptStub[]>('receipts', { sourceType, sourceId });
+  }
+
   /**
    * Open a receipt and go straight to the printer.
    *

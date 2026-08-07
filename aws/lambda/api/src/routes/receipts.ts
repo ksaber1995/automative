@@ -64,8 +64,16 @@ export const receiptsRoutes = {
   /**
    * The tenant's receipts, newest first — for finding and reprinting one.
    * Bounded: a till roll grows without limit and nobody scrolls past a few hundred.
+   *
+   * `sourceType` + `sourceId` narrow it to the receipts for ONE payment, which
+   * is what the reprint button on a collected row asks for. Voided slips are
+   * included: when someone asks for that payment's receipt, the honest answer
+   * is the slip that says it was cancelled.
    */
-  list: async ({ query: q, headers }: { query: { search?: string; limit?: string }; headers: AuthHeaders }) => {
+  list: async ({ query: q, headers }: {
+    query: { search?: string; limit?: string; sourceType?: string; sourceId?: string };
+    headers: AuthHeaders;
+  }) => {
     try {
       await ensureReceiptSchema();
       const context = await extractTenantContext(headers.authorization);
@@ -74,6 +82,14 @@ export const receiptsRoutes = {
       }
       const params: any[] = [context.companyId];
       let sql = 'SELECT * FROM payment_receipts WHERE company_id = $1';
+      // Both or neither: a source id without its type could match another
+      // kind of payment that happens to share the uuid column.
+      const sourceType = (q.sourceType || '').trim();
+      const sourceId = (q.sourceId || '').trim();
+      if (sourceType && sourceId) {
+        params.push(sourceType, sourceId);
+        sql += ` AND source_type = $${params.length - 1} AND source_id = $${params.length}`;
+      }
       const search = (q.search || '').trim();
       if (search) {
         // A bare number is a receipt number (what staff read off the slip);

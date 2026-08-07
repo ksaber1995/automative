@@ -198,6 +198,13 @@
                 @if (row.paymentStatus === 'PENDING') {
                   <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPay(row)"></p-button>
                 }
+                <!-- Money actually changed hands here, so a slip exists to reprint.
+                     COVERED rows collected nothing — their receipt is on the package. -->
+                @if ((row.amountPaid || 0) > 0) {
+                  <p-button icon="pi pi-print" severity="secondary" [outlined]="true" size="small"
+                    [loading]="printingId() === row.id"
+                    [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printReceipt(row)"></p-button>
+                }
                 @if (row.paymentStatus === 'PAID' && canRefund()) {
                   <p-button icon="pi pi-times" severity="secondary" size="small" [pTooltip]="'SESSION_PAYMENTS.VOID_BTN' | translate" (onClick)="openVoid(row)"></p-button>
                   <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openRefund(row)"></p-button>
@@ -315,6 +322,11 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   @if (row.p.status !== 'REFUNDED' && packageRemaining(row.p) > 0) {
                     <p-button icon="pi pi-wallet" severity="success" size="small" [pTooltip]="'SESSION_PAYMENTS.PAY_BTN' | translate" (onClick)="openPackagePay(row.p)"></p-button>
+                  }
+                  @if ((row.p.amountPaid || 0) > 0) {
+                    <p-button icon="pi pi-print" severity="secondary" [outlined]="true" size="small"
+                      [loading]="printingId() === row.p.id"
+                      [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printPackageReceipt(row.p)"></p-button>
                   }
                   @if (row.p.status !== 'REFUNDED' && (row.p.amountPaid || 0) - (row.p.refundedAmount || 0) > 0 && canRefund()) {
                     <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openPackageRefund(row.p)"></p-button>

@@ -3217,10 +3217,23 @@ export const contract = c.router({
       pathParams: z.object({ token: z.string().min(16).max(64) }),
       responses: { 200: ReceiptSchema, 404: ApiErrorSchema },
     },
+    /**
+     * The tenant's receipts, newest first. `sourceType` + `sourceId` narrow it
+     * to the receipts issued against ONE payment — what a reprint button on a
+     * collected row needs. An empty array (not a 404) means none was ever
+     * issued: the payment predates receipts, or printing was skipped. Callers
+     * report that rather than minting a slip, because a receipt number must
+     * never be invented after the fact.
+     */
     list: {
       method: 'GET',
       path: '/api/receipts',
-      query: z.object({ search: z.string().optional(), limit: z.string().optional() }),
+      query: z.object({
+        search: z.string().optional(),
+        limit: z.string().optional(),
+        sourceType: z.string().optional(),
+        sourceId: z.string().optional(),
+      }),
       responses: { 200: z.array(ReceiptSchema), 403: ApiErrorSchema },
     },
     listByStudent: {

@@ -28,6 +28,7 @@ import { StudentService } from '../../students/services/student.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ReceiptService, ReceiptSourceType } from '../../../core/services/receipt.service';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import {
   SessionPaymentWithDetails,
@@ -63,6 +64,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   private globalScan = inject(GlobalScanService);
   private auth = inject(AuthService);
   private notify = inject(NotificationService);
+  private receiptService = inject(ReceiptService);
 
   /** Teacher-type companies have a single implicit branch — hide the filter. */
   isTeacher = (): boolean => this.auth.isTeacher();
@@ -111,6 +113,8 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   refundNote = signal('');
   refundPackageTarget = signal<SessionPackageWithDetails | null>(null);
   submitting = signal(false);
+  /** Id of the row whose receipt is being fetched — spins just that print button. */
+  printingId = signal<string | null>(null);
 
   // Package pay dialog
   showPackagePay = signal(false);
@@ -554,6 +558,39 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   // ── Actions ────────────────────────────────────────────────────────────────
   openPay(row: SessionPaymentWithDetails): void {
     this.payDialog?.enqueue([row]);
+  }
+
+  /**
+   * Reprint the slip for a collection. Printing at pay time is opt-in, so most
+   * money is taken without a slip and the parent asks for one afterwards —
+   * until now that meant leaving the page for the receipts desk.
+   *
+   * It reprints the receipt that was already issued; it never creates one, so a
+   * payment collected before receipts existed reports that instead.
+   */
+  printReceipt(row: SessionPaymentWithDetails): void {
+    this.printFor('SESSION', row.id);
+  }
+
+  printPackageReceipt(p: SessionPackageWithDetails): void {
+    this.printFor('PACKAGE', p.id);
+  }
+
+  private printFor(sourceType: ReceiptSourceType, sourceId: string): void {
+    if (this.printingId()) return;
+    this.printingId.set(sourceId);
+    this.receiptService.bySource(sourceType, sourceId).subscribe({
+      next: (list) => {
+        this.printingId.set(null);
+        const receipt = list[0];   // newest first
+        if (!receipt) {
+          this.notify.info(this.translate.instant('RECEIPT.NONE_FOR_PAYMENT'));
+          return;
+        }
+        this.receiptService.openPrint(receipt);
+      },
+      error: () => this.printingId.set(null),
+    });
   }
 
   openVoid(row: SessionPaymentWithDetails): void {

@@ -5738,6 +5738,7 @@
   "RECEIPT": {
     "TITLE": "Payment Receipt",
     "NOT_FOUND": "This receipt could not be found.",
+    "NONE_FOR_PAYMENT": "No receipt was issued for this payment.",
     "VOIDED": "Cancelled",
     "STUDENT": "Student",
     "CODE": "Code",
