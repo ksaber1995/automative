@@ -23,21 +23,22 @@ import { query, queryOne } from './connection';
  *     not been opened yet. The substitution stays pending until the home session
  *     is created, and claimPendingSubstitutions attaches it then.
  *
+ * WHAT MAY BE LINKED: the two sessions must carry the SAME `session_number`.
+ * Sitting lesson 2 with another class makes up lesson 2 and nothing else — never
+ * lesson 3, however conveniently the dates line up. Proximity in time used to be
+ * accepted as a second way to match (within a week of the make-up) and that is
+ * what went wrong: a make-up of lesson 1 sat on a Saturday was handed to lesson 3
+ * seven days later, so a student who had simply not turned up yet was displayed
+ * as having made the lesson up elsewhere. Nearness in the calendar says nothing
+ * about which lesson was taught; only the number does.
+ *
+ * A make-up whose numbered lesson does not exist on the student's own timetable
+ * (or that they attended anyway) stays unlinked, which is honest: it covers no
+ * absence, and the student page lists it in its own right.
+ *
  * Reads keep the old number-matching as a fallback so attendance recorded before
  * this existed still displays correctly.
  */
-
-/**
- * How far a substitution may reach to cover a lesson of the student's own class.
- *
- * A week, counted in CALENDAR days rather than elapsed time. The pairing that
- * actually happens is "I took Sunday's lesson on Saturday" (or the week's lesson
- * a week later); measured in seconds, "same weekday, one week on" lands at 7 days
- * and a few hours — because lessons start at different times of day — and a hard
- * 7×86400 threshold threw exactly those away. A wider window would let one
- * make-up quietly excuse an absence from a month ago.
- */
-export const SUBSTITUTION_WINDOW_DAYS = 7;
 
 let substitutionLinkInitPromise: Promise<void> | null = null;
 
@@ -70,11 +71,15 @@ export async function ensureSubstitutionLinkSchema(): Promise<void> {
              ON session_attendance(student_id, substitute_for_session_id)
            WHERE substitute_for_session_id IS NOT NULL`
         );
-        // Best-effort, unlike the DDL above. The backfill only fills in history;
-        // reads work without it (they fall back to the old number match), and
-        // two containers running it at the same moment can collide on the claim
+        // Best-effort, unlike the DDL above. These only fix up history; reads
+        // work without them (they fall back to the old number match), and two
+        // containers running them at the same moment can collide on the claim
         // index. That must never be the reason an attendance page 500s.
         try {
+          // Order matters: drop the links the date-window rule made across
+          // different lesson numbers first, so the backfill can then offer those
+          // rows the lesson they actually stand in for.
+          await unlinkMismatchedSubstitutions();
           await backfillSubstitutionLinks();
         } catch (backfillErr) {
           console.error('Substitution backfill error (non-fatal):', backfillErr);
@@ -86,6 +91,27 @@ export async function ensureSubstitutionLinkSchema(): Promise<void> {
     })();
   }
   return substitutionLinkInitPromise;
+}
+
+/**
+ * Undo the links the old date-window rule made between different lesson numbers.
+ *
+ * Those rows are the bug in the record: a make-up of lesson 1 pointing at lesson
+ * 3 because the two fell a week apart, which reads back as "made this lesson up
+ * elsewhere" on a lesson the student never sat. Cutting the link restores the
+ * truth (absent, or simply not yet attended); the backfill that runs next then
+ * offers the row its own numbered lesson if there is one.
+ */
+async function unlinkMismatchedSubstitutions(): Promise<void> {
+  await query(
+    `UPDATE session_attendance sa
+        SET substitute_for_session_id = NULL
+       FROM sessions ss, sessions hs
+      WHERE ss.id = sa.session_id
+        AND hs.id = sa.substitute_for_session_id
+        AND sa.attendance_type = 'SUBSTITUTION'
+        AND hs.session_number IS DISTINCT FROM ss.session_number`
+  );
 }
 
 /**
@@ -105,24 +131,22 @@ async function backfillSubstitutionLinks(): Promise<void> {
        WHERE sub.attendance_type = 'SUBSTITUTION'
          AND sub.substitute_for_session_id IS NULL
          AND sub.home_class_id IS NOT NULL
+         -- An unnumbered make-up names no lesson, so it can stand in for none.
+         AND ss.session_number IS NOT NULL
      ),
      matched AS (
        SELECT p.attendance_id, p.student_id, home.id AS home_session_id,
-              (home.session_number IS NOT NULL AND home.session_number = p.session_number) AS exact,
               ABS(EXTRACT(EPOCH FROM (home.start_date - p.start_date))) AS distance
        FROM pending p
        JOIN LATERAL (
-         SELECT hs.id, hs.start_date, hs.session_number
+         SELECT hs.id, hs.start_date
          FROM sessions hs
          WHERE hs.class_id = p.home_class_id
            AND hs.company_id = p.company_id
            AND COALESCE(hs.is_free, false) = false
-           AND (
-             -- Carrying the same number is the academy saying these are the same
-             -- lesson, however far apart the two classes ran it.
-             (hs.session_number IS NOT NULL AND hs.session_number = p.session_number)
-             OR ABS(hs.start_date::date - p.start_date::date) <= ${SUBSTITUTION_WINDOW_DAYS}
-           )
+           -- The same lesson, and only the same lesson, however far apart the
+           -- two classes happened to run it.
+           AND hs.session_number = p.session_number
            AND NOT EXISTS (
              SELECT 1 FROM session_attendance na
              WHERE na.session_id = hs.id AND na.student_id = p.student_id
@@ -136,15 +160,16 @@ async function backfillSubstitutionLinks(): Promise<void> {
              WHERE claimed.student_id = p.student_id
                AND claimed.substitute_for_session_id = hs.id
            )
-         ORDER BY (hs.session_number IS NOT NULL AND hs.session_number = p.session_number) DESC,
-                  ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) ASC
+         -- Only a class that ran the same numbered lesson twice reaches this;
+         -- take the nearer one.
+         ORDER BY ABS(EXTRACT(EPOCH FROM (hs.start_date - p.start_date))) ASC
          LIMIT 1
        ) home ON true
      ),
      winners AS (
        SELECT DISTINCT ON (student_id, home_session_id) attendance_id, home_session_id
        FROM matched
-       ORDER BY student_id, home_session_id, exact DESC, distance ASC
+       ORDER BY student_id, home_session_id, distance ASC
      )
      UPDATE session_attendance sa
         SET substitute_for_session_id = w.home_session_id
@@ -157,11 +182,10 @@ async function backfillSubstitutionLinks(): Promise<void> {
 /**
  * Attach one substitution row to the home-class session it makes up for.
  *
- * Picks the session of the student's own class that they did NOT attend, nearest
- * in time to the make-up and inside the window — preferring one that carries the
- * same session number, which is the strongest statement that it is "the same
- * lesson". Returns the session it linked to, or null when there is nothing to
- * link yet (the home lesson has not been opened — the pending case).
+ * Picks the lesson of the student's own class that carries the SAME session
+ * number as the one they sat, and that they did not attend themselves. Returns
+ * the session it linked to, or null when there is nothing to link (the home
+ * lesson has not been opened yet — the pending case — or they were there for it).
  */
 export async function linkSubstitution(companyId: string, attendanceId: string): Promise<string | null> {
   await ensureSubstitutionLinkSchema();
@@ -174,7 +198,8 @@ export async function linkSubstitution(companyId: string, attendanceId: string):
       WHERE sa.id = $1 AND ss.company_id = $2 AND sa.attendance_type = 'SUBSTITUTION'`,
     [attendanceId, companyId]
   );
-  if (!sub || !sub.home_class_id) return null;
+  // No number on the make-up names no lesson, so there is nothing it can cover.
+  if (!sub || !sub.home_class_id || sub.session_number === null || sub.session_number === undefined) return null;
 
   const home = await queryOne<any>(
     `SELECT hs.id
@@ -183,24 +208,20 @@ export async function linkSubstitution(companyId: string, attendanceId: string):
         AND hs.company_id = $2
         AND hs.id <> $3
         AND COALESCE(hs.is_free, false) = false
-        AND (
-          (hs.session_number IS NOT NULL AND hs.session_number = $8::int)
-          OR ABS(hs.start_date::date - $4::timestamptz::date) <= $5
-        )
+        AND hs.session_number = $7::int
         AND NOT EXISTS (
           SELECT 1 FROM session_attendance na
-          WHERE na.session_id = hs.id AND na.student_id = $6 AND na.attendance_type = 'NORMAL'
+          WHERE na.session_id = hs.id AND na.student_id = $5 AND na.attendance_type = 'NORMAL'
         )
         AND NOT EXISTS (
           SELECT 1 FROM session_attendance claimed
-          WHERE claimed.student_id = $6 AND claimed.substitute_for_session_id = hs.id
-            AND claimed.id <> $7
+          WHERE claimed.student_id = $5 AND claimed.substitute_for_session_id = hs.id
+            AND claimed.id <> $6
         )
-      ORDER BY (hs.session_number IS NOT NULL AND hs.session_number = $8::int) DESC,
-               ABS(EXTRACT(EPOCH FROM (hs.start_date - $4::timestamptz))) ASC
+      ORDER BY ABS(EXTRACT(EPOCH FROM (hs.start_date - $4::timestamptz))) ASC
       LIMIT 1`,
-    [sub.home_class_id, companyId, sub.sub_session_id, sub.start_date, SUBSTITUTION_WINDOW_DAYS,
-     sub.student_id, sub.id, sub.session_number ?? null]
+    [sub.home_class_id, companyId, sub.sub_session_id, sub.start_date,
+     sub.student_id, sub.id, sub.session_number]
   );
   if (!home) return null;
 
@@ -227,6 +248,7 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
        SELECT s.id, s.class_id, s.start_date, s.session_number
        FROM sessions s
        WHERE s.id = $1 AND s.company_id = $2 AND COALESCE(s.is_free, false) = false
+         AND s.session_number IS NOT NULL
      ),
      pending AS (
        SELECT DISTINCT ON (sub.student_id) sub.id AS attendance_id
@@ -238,10 +260,9 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
          AND sub.home_class_id = t.class_id
          AND ss.company_id = $2
          AND ss.id <> t.id
-         AND (
-           (ss.session_number IS NOT NULL AND ss.session_number = t.session_number)
-           OR ABS(ss.start_date::date - t.start_date::date) <= $3
-         )
+         -- The lesson just opened can only be claimed by a make-up of the SAME
+         -- numbered lesson. Falling within a week of it means nothing.
+         AND ss.session_number = t.session_number
          AND NOT EXISTS (
            SELECT 1 FROM session_attendance na
            WHERE na.session_id = t.id AND na.student_id = sub.student_id
@@ -252,7 +273,6 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
            WHERE claimed.student_id = sub.student_id AND claimed.substitute_for_session_id = t.id
          )
        ORDER BY sub.student_id,
-                (ss.session_number IS NOT NULL AND ss.session_number = t.session_number) DESC,
                 ABS(EXTRACT(EPOCH FROM (ss.start_date - t.start_date))) ASC
      )
      UPDATE session_attendance sa
@@ -260,7 +280,7 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
        FROM pending p
       WHERE sa.id = p.attendance_id
       RETURNING sa.id`,
-    [sessionId, companyId, SUBSTITUTION_WINDOW_DAYS]
+    [sessionId, companyId]
   );
   return rows.length;
 }
