@@ -23,22 +23,58 @@ import { query, queryOne } from './connection';
  *     not been opened yet. The substitution stays pending until the home session
  *     is created, and claimPendingSubstitutions attaches it then.
  *
- * WHAT MAY BE LINKED: the two sessions must carry the SAME `session_number`.
- * Sitting lesson 2 with another class makes up lesson 2 and nothing else — never
- * lesson 3, however conveniently the dates line up. Proximity in time used to be
- * accepted as a second way to match (within a week of the make-up) and that is
- * what went wrong: a make-up of lesson 1 sat on a Saturday was handed to lesson 3
- * seven days later, so a student who had simply not turned up yet was displayed
- * as having made the lesson up elsewhere. Nearness in the calendar says nothing
- * about which lesson was taught; only the number does.
+ * WHAT MAY BE LINKED — both of these, not either:
+ *   1. the two sessions carry the SAME `session_number`. Sitting lesson 2 with
+ *      another class makes up lesson 2 and nothing else, never lesson 3.
+ *   2. they fall in the SAME WEEK, and the week here opens on SATURDAY.
  *
- * A make-up whose numbered lesson does not exist on the student's own timetable
- * (or that they attended anyway) stays unlinked, which is honest: it covers no
+ * Distance in days used to stand in for both, and that is what went wrong: any
+ * lesson of the student's own class within 7 calendar days was accepted. A class
+ * meeting Saturday and Tuesday runs lesson 1 and lesson 3 on consecutive
+ * Saturdays — exactly 7 days — so a make-up of lesson 1 was handed to lesson 3
+ * and a student who had simply not turned up yet was displayed as having made
+ * the lesson up elsewhere.
+ *
+ * The two conditions answer different questions and neither replaces the other.
+ * The number says WHICH LESSON was taught, which is the thing being made up. The
+ * week says the make-up belongs to the same teaching cycle, so a lesson 3 sat
+ * with a class running a month behind does not silently excuse an absence a
+ * month old. Sibling classes of one course normally teach the same numbered
+ * lesson in the same week, so in ordinary use the two agree; they disagree
+ * exactly when the classes have drifted apart, and then no link is the right
+ * answer.
+ *
+ * A make-up meeting neither test stays unlinked, which is honest: it covers no
  * absence, and the student page lists it in its own right.
  *
  * Reads keep the old number-matching as a fallback so attendance recorded before
- * this existed still displays correctly.
+ * this existed still displays correctly — under the same two rules.
  */
+
+/**
+ * Midnight on the Saturday that opens the week the given timestamptz falls in,
+ * read on the academy's own clock. Two sessions are in the same week when these
+ * are equal.
+ *
+ * Postgres cannot express this week: `date_trunc('week', …)` is ISO and always
+ * lands on Monday, which would put a Saturday lesson in the week BEFORE the
+ * Sunday and Tuesday lessons it was taught alongside — the very split this rule
+ * exists to prevent. `EXTRACT(DOW)` numbers Sunday 0 … Saturday 6, so
+ * `(dow + 1) % 7` is how many days back the opening Saturday sits.
+ *
+ * The timezone is not decoration: `start_date` is UTC, and an evening lesson in
+ * a negative-offset academy has already rolled over to the next UTC day — read
+ * in UTC, a Friday lesson would open the following week.
+ */
+function weekStart(ts: string, tz: string): string {
+  return `(((${ts}) AT TIME ZONE ${tz})::date
+           - ((EXTRACT(DOW FROM ((${ts}) AT TIME ZONE ${tz}))::int + 1) % 7))`;
+}
+
+/** The academy's timezone, for a query with a `sessions` row aliased `alias`. */
+function tzOf(alias: string): string {
+  return `COALESCE((SELECT c.timezone FROM companies c WHERE c.id = ${alias}.company_id), 'UTC')`;
+}
 
 let substitutionLinkInitPromise: Promise<void> | null = null;
 
@@ -94,13 +130,14 @@ export async function ensureSubstitutionLinkSchema(): Promise<void> {
 }
 
 /**
- * Undo the links the old date-window rule made between different lesson numbers.
+ * Undo links the old rules made between lessons that fail either test.
  *
- * Those rows are the bug in the record: a make-up of lesson 1 pointing at lesson
- * 3 because the two fell a week apart, which reads back as "made this lesson up
- * elsewhere" on a lesson the student never sat. Cutting the link restores the
- * truth (absent, or simply not yet attended); the backfill that runs next then
- * offers the row its own numbered lesson if there is one.
+ * These rows are the bug in the record: a make-up of lesson 1 pointing at lesson
+ * 3 because the two fell a week apart, or at a lesson 1 taught in a different
+ * week entirely. Either reads back as "made this lesson up elsewhere" on a
+ * lesson the student never sat. Cutting the link restores the truth (absent, or
+ * simply not yet attended); the backfill that runs next then offers the row a
+ * lesson that does pass both tests, if there is one.
  */
 async function unlinkMismatchedSubstitutions(): Promise<void> {
   await query(
@@ -110,7 +147,10 @@ async function unlinkMismatchedSubstitutions(): Promise<void> {
       WHERE ss.id = sa.session_id
         AND hs.id = sa.substitute_for_session_id
         AND sa.attendance_type = 'SUBSTITUTION'
-        AND hs.session_number IS DISTINCT FROM ss.session_number`
+        AND (
+          hs.session_number IS DISTINCT FROM ss.session_number
+          OR ${weekStart('hs.start_date', tzOf('ss'))} <> ${weekStart('ss.start_date', tzOf('ss'))}
+        )`
   );
 }
 
@@ -125,7 +165,7 @@ async function backfillSubstitutionLinks(): Promise<void> {
   await query(
     `WITH pending AS (
        SELECT sub.id AS attendance_id, sub.student_id, ss.start_date, ss.session_number, ss.company_id,
-              sub.home_class_id
+              sub.home_class_id, ${tzOf('ss')} AS tz
        FROM session_attendance sub
        JOIN sessions ss ON ss.id = sub.session_id
        WHERE sub.attendance_type = 'SUBSTITUTION'
@@ -144,9 +184,9 @@ async function backfillSubstitutionLinks(): Promise<void> {
          WHERE hs.class_id = p.home_class_id
            AND hs.company_id = p.company_id
            AND COALESCE(hs.is_free, false) = false
-           -- The same lesson, and only the same lesson, however far apart the
-           -- two classes happened to run it.
+           -- The same lesson, taught in the same Saturday-to-Friday week.
            AND hs.session_number = p.session_number
+           AND ${weekStart('hs.start_date', 'p.tz')} = ${weekStart('p.start_date', 'p.tz')}
            AND NOT EXISTS (
              SELECT 1 FROM session_attendance na
              WHERE na.session_id = hs.id AND na.student_id = p.student_id
@@ -183,16 +223,17 @@ async function backfillSubstitutionLinks(): Promise<void> {
  * Attach one substitution row to the home-class session it makes up for.
  *
  * Picks the lesson of the student's own class that carries the SAME session
- * number as the one they sat, and that they did not attend themselves. Returns
- * the session it linked to, or null when there is nothing to link (the home
- * lesson has not been opened yet — the pending case — or they were there for it).
+ * number as the one they sat, falls in the SAME Saturday-to-Friday week, and
+ * that they did not attend themselves. Returns the session it linked to, or null
+ * when there is nothing to link (the home lesson has not been opened yet — the
+ * pending case — or they were there for it).
  */
 export async function linkSubstitution(companyId: string, attendanceId: string): Promise<string | null> {
   await ensureSubstitutionLinkSchema();
 
   const sub = await queryOne<any>(
     `SELECT sa.id, sa.student_id, sa.home_class_id, ss.id AS sub_session_id,
-            ss.start_date, ss.session_number
+            ss.start_date, ss.session_number, ${tzOf('ss')} AS tz
        FROM session_attendance sa
        JOIN sessions ss ON ss.id = sa.session_id
       WHERE sa.id = $1 AND ss.company_id = $2 AND sa.attendance_type = 'SUBSTITUTION'`,
@@ -209,6 +250,7 @@ export async function linkSubstitution(companyId: string, attendanceId: string):
         AND hs.id <> $3
         AND COALESCE(hs.is_free, false) = false
         AND hs.session_number = $7::int
+        AND ${weekStart('hs.start_date', '$8')} = ${weekStart('$4::timestamptz', '$8')}
         AND NOT EXISTS (
           SELECT 1 FROM session_attendance na
           WHERE na.session_id = hs.id AND na.student_id = $5 AND na.attendance_type = 'NORMAL'
@@ -221,7 +263,7 @@ export async function linkSubstitution(companyId: string, attendanceId: string):
       ORDER BY ABS(EXTRACT(EPOCH FROM (hs.start_date - $4::timestamptz))) ASC
       LIMIT 1`,
     [sub.home_class_id, companyId, sub.sub_session_id, sub.start_date,
-     sub.student_id, sub.id, sub.session_number]
+     sub.student_id, sub.id, sub.session_number, sub.tz]
   );
   if (!home) return null;
 
@@ -245,7 +287,7 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
 
   const rows = await query<any>(
     `WITH target AS (
-       SELECT s.id, s.class_id, s.start_date, s.session_number
+       SELECT s.id, s.class_id, s.start_date, s.session_number, ${tzOf('s')} AS tz
        FROM sessions s
        WHERE s.id = $1 AND s.company_id = $2 AND COALESCE(s.is_free, false) = false
          AND s.session_number IS NOT NULL
@@ -261,8 +303,10 @@ export async function claimPendingSubstitutions(companyId: string, sessionId: st
          AND ss.company_id = $2
          AND ss.id <> t.id
          -- The lesson just opened can only be claimed by a make-up of the SAME
-         -- numbered lesson. Falling within a week of it means nothing.
+         -- numbered lesson, sat in the SAME Saturday-to-Friday week. Merely
+         -- falling within seven days of it means nothing.
          AND ss.session_number = t.session_number
+         AND ${weekStart('ss.start_date', 't.tz')} = ${weekStart('t.start_date', 't.tz')}
          AND NOT EXISTS (
            SELECT 1 FROM session_attendance na
            WHERE na.session_id = t.id AND na.student_id = sub.student_id
@@ -335,8 +379,14 @@ interface SubstitutionMatchExprs {
  * number) rule is kept for substitutions recorded before the link column, and is
  * applied ONLY to still-unlinked rows so a make-up that points at Sunday cannot
  * also excuse some other class's lesson that happens to share a number.
+ *
+ * That fallback carries the same week test as the writer. Without it the display
+ * would contradict the record: a row left deliberately unlinked because its
+ * lesson was taught in another week would still be read here as covering it, and
+ * the absence would vanish from the page anyway.
  */
 function coversClause(e: SubstitutionMatchExprs): string {
+  const tz = tzOf('sub_session');
   return `sub.attendance_type = 'SUBSTITUTION'
       AND sub.student_id = ${e.student}
       AND (
@@ -346,6 +396,10 @@ function coversClause(e: SubstitutionMatchExprs): string {
           AND sub_class.course_id = ${e.courseId}
           AND ${e.sessionNumber} IS NOT NULL
           AND sub_session.session_number = ${e.sessionNumber}
+          AND ${weekStart('sub_session.start_date', tz)} = (
+            SELECT ${weekStart('covered.start_date', tz)}
+            FROM sessions covered WHERE covered.id = ${e.sessionId}
+          )
         )
       )`;
 }
@@ -406,6 +460,11 @@ export function substitutionIsOrphanClause(studentExpr: string, companyExpr: str
         WHERE home_c.course_id = sub_class.course_id
           AND home_s.session_number = sub_session.session_number
           AND sub_session.session_number IS NOT NULL
+          -- Same test as the writer: a lesson of theirs carrying this number but
+          -- taught in another week is not what this make-up stood in for, so it
+          -- cannot be the reason to hide the make-up from their page.
+          AND ${weekStart('home_s.start_date', tzOf('sub_session'))}
+              = ${weekStart('sub_session.start_date', tzOf('sub_session'))}
           AND home_s.class_id IN (
             SELECT class_id FROM enrollments
             WHERE student_id = ${studentExpr} AND company_id = ${companyExpr}
