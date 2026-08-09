@@ -11,7 +11,10 @@
         <!-- The class, when set, is what the roster below is narrowed to. -->
         @if (exam()?.className) { · {{ exam()?.className }} }
         · {{ exam()?.examDate | date: 'mediumDate' }}
-        @if (exam()?.maxGrade != null) {
+        <!-- "out of 5" is not what a rating means, so say how it's marked instead. -->
+        @if (useRating()) {
+          · {{ 'EXAMS.DETAIL.RATED' | translate }}
+        } @else if (exam()?.maxGrade != null) {
           · {{ 'EXAMS.DETAIL.OUT_OF' | translate: { max: exam()?.maxGrade } }}
         }
       </p>
@@ -68,21 +71,42 @@
           <div class="flex-1 min-w-[180px]">
             <label class="block text-sm font-medium text-gray-700 mb-1">
               {{ 'EXAMS.DETAIL.GRADE_TO_APPLY' | translate }}
-              @if (exam()?.maxGrade != null) {
+              @if (!useRating() && exam()?.maxGrade != null) {
                 <span class="text-gray-400 font-normal">({{ 'EXAMS.DETAIL.OUT_OF' | translate: { max: exam()?.maxGrade } }})</span>
               }
             </label>
-            <input
-              type="number"
-              pInputText
-              class="w-full"
-              inputmode="decimal"
-              min="0"
-              [attr.max]="exam()?.maxGrade"
-              [value]="currentGrade()"
-              (input)="onCurrentGradeInput($event)"
-              [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
-            />
+            @if (useRating()) {
+              <!-- Buttons, not a dropdown: the teacher taps one rating then scans a
+                   queue of students, so the choice has to be one touch away. Same
+                   control as the session homework panel. -->
+              <div class="flex gap-1 flex-wrap">
+                @for (r of ratingOptions(); track r.value) {
+                  <button type="button"
+                    class="px-3 py-1.5 rounded-lg border text-sm font-medium transition"
+                    [class.bg-purple-600]="currentGrade() === r.value"
+                    [class.text-white]="currentGrade() === r.value"
+                    [class.border-purple-600]="currentGrade() === r.value"
+                    [class.bg-white]="currentGrade() !== r.value"
+                    [class.text-gray-700]="currentGrade() !== r.value"
+                    [class.border-gray-300]="currentGrade() !== r.value"
+                    (click)="setCurrentGrade(r.value)">
+                    {{ r.label }}
+                  </button>
+                }
+              </div>
+            } @else {
+              <input
+                type="number"
+                pInputText
+                class="w-full"
+                inputmode="decimal"
+                min="0"
+                [attr.max]="exam()?.maxGrade"
+                [value]="currentGrade()"
+                (input)="onCurrentGradeInput($event)"
+                [placeholder]="'EXAMS.DETAIL.GRADE_PLACEHOLDER' | translate"
+              />
+            }
           </div>
           <p-button
             [label]="'EXAMS.DETAIL.SCAN_QR' | translate"
@@ -132,7 +156,9 @@
             <div id="exam-qr-scanner-region" class="mx-auto" style="max-width: 320px;"></div>
             @if (lastScanResult(); as r) {
               <div class="mt-3 text-center text-green-700 font-medium">
-                <i class="pi pi-check-circle mr-1"></i>{{ r.name }} — {{ r.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }
+                <i class="pi pi-check-circle mr-1"></i>{{ r.name }} —
+                @if (useRating()) { {{ ratingLabel(r.grade) }} }
+                @else { {{ r.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} } }
                 @if (r.updated) { <span class="text-gray-500">({{ 'EXAMS.DETAIL.UPDATED' | translate }})</span> }
               </div>
             }
@@ -193,6 +219,15 @@
               <div class="flex items-center gap-2">
                 @if (row.isAbsent) {
                   <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate" class="flex-1"></p-tag>
+                } @else if (useRating()) {
+                  <!-- A dropdown here rather than five buttons per row: the roster
+                       is the long list, and buttons on every row would bury it.
+                       Same trade-off the session homework panel makes. -->
+                  <p-select styleClass="w-40" [options]="ratingOptions()" optionLabel="label" optionValue="value"
+                    [showClear]="true" appendTo="body"
+                    [placeholder]="'EXAMS.DETAIL.COL_GRADE' | translate"
+                    [ngModel]="ratingValue(row)"
+                    (ngModelChange)="onRatingPick(row.studentId, $event)"></p-select>
                 } @else {
                   <input
                     type="number"
@@ -220,7 +255,11 @@
               @if (row.isAbsent) {
                 <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate"></p-tag>
               } @else {
-                <span>{{ row.grade || '—' }}@if (row.grade && exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+                @if (useRating()) {
+                  <span>{{ row.grade ? ratingLabel(row.grade) : '—' }}</span>
+                } @else {
+                  <span>{{ row.grade || '—' }}@if (row.grade && exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+                }
               }
             }
           </td>
@@ -265,7 +304,10 @@
         <div class="flex items-center justify-between p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
           <div class="flex items-center gap-3">
             <span class="text-sm font-medium text-gray-800">{{ row.name }}</span>
-            <span class="text-sm font-semibold text-gray-500">{{ row.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} }</span>
+            <span class="text-sm font-semibold text-gray-500">
+              @if (useRating()) { {{ ratingLabel(row.grade) }} }
+              @else { {{ row.grade }}@if (exam()?.maxGrade != null) { / {{ exam()?.maxGrade }} } }
+            </span>
           </div>
           <p-button icon="pi pi-whatsapp" severity="success" size="small" [label]="'WHATSAPP.SEND' | translate" (onClick)="sendExamResult(row)"></p-button>
         </div>

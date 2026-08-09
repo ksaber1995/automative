@@ -102,24 +102,46 @@
         }
       </div>
 
-      <!-- Total marks (out of) -->
-      <div>
-        <label for="maxGrade" class="block text-sm font-medium text-gray-700 mb-2">
-          {{ 'EXAMS.FORM.MAX_GRADE' | translate }}
-        </label>
-        <p-inputNumber
-          inputId="maxGrade"
-          formControlName="maxGrade"
-          [min]="0"
-          [showButtons]="false"
-          mode="decimal"
-          [useGrouping]="false"
-          [style]="{ width: '100%' }"
-          styleClass="w-full"
-          [placeholder]="'EXAMS.FORM.MAX_GRADE_PLACEHOLDER' | translate"
-        ></p-inputNumber>
-        <small class="text-gray-400">{{ 'EXAMS.FORM.MAX_GRADE_HINT' | translate }}</small>
-      </div>
+      <!-- Total marks (out of) — replaced by the scale when this homework will be
+           marked by rating, because "out of" is not a question that applies then. -->
+      @if (useRating()) {
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'EXAMS.FORM.MAX_GRADE' | translate }}
+          </label>
+          <div class="rounded-lg border border-purple-100 bg-purple-50 p-3">
+            <p class="text-sm text-purple-900 font-medium mb-2">
+              {{ 'EXAMS.FORM.RATING_MODE' | translate }}
+            </p>
+            <div class="flex flex-wrap gap-1">
+              @for (label of ratingLabels(); track label) {
+                <span class="px-2 py-1 rounded-md bg-white border border-purple-200 text-xs text-gray-700">
+                  {{ label }}
+                </span>
+              }
+            </div>
+          </div>
+          <small class="text-gray-400">{{ 'EXAMS.FORM.RATING_MODE_HINT' | translate }}</small>
+        </div>
+      } @else {
+        <div>
+          <label for="maxGrade" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'EXAMS.FORM.MAX_GRADE' | translate }}
+          </label>
+          <p-inputNumber
+            inputId="maxGrade"
+            formControlName="maxGrade"
+            [min]="0"
+            [showButtons]="false"
+            mode="decimal"
+            [useGrouping]="false"
+            [style]="{ width: '100%' }"
+            styleClass="w-full"
+            [placeholder]="'EXAMS.FORM.MAX_GRADE_PLACEHOLDER' | translate"
+          ></p-inputNumber>
+          <small class="text-gray-400">{{ 'EXAMS.FORM.MAX_GRADE_HINT' | translate }}</small>
+        </div>
+      }
 
       <!-- Status -->
       <div>

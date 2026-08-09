@@ -302,15 +302,29 @@ export const examsRoutes = {
         classId = classId ?? session.class_id;
       }
 
+      // Homework follows the company's marking mode, whoever creates it. In
+      // RATING mode it is always out of HOMEWORK_RATING_MAX, because that is what
+      // makes the marking screens offer Excellent…Weak instead of a number box —
+      // a homework created out of 100 would silently fall back to numbers. The
+      // session panel already sends 5; enforcing it here means the /exams/create
+      // form, and any other caller, cannot disagree.
+      //
+      // Exams are untouched: the setting is about homework.
+      const isHomework = body.isHomework === true;
+      let maxGrade = body.maxGrade ?? null;
+      if (isHomework && (await isRatingCompany(context.companyId))) {
+        maxGrade = HOMEWORK_RATING_MAX;
+      }
+
       const row = await insert('exams', {
         company_id: context.companyId,
         branch_id: course.branch_id,
         course_id: courseId,
         name: body.name,
         exam_date: body.examDate,
-        max_grade: body.maxGrade ?? null,
+        max_grade: maxGrade,
         status: body.status || 'SCHEDULED',
-        is_homework: body.isHomework === true,
+        is_homework: isHomework,
         class_id: classId,
         session_id: sessionId,
         is_active: true,

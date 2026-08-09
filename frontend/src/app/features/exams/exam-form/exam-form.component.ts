@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -12,6 +12,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../services/exam.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { CompanyService } from '../../../core/services/company.service';
+import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX } from '../homework-rating.util';
 import { toLocalYmd } from '../../../core/utils/date.util';
 
 @Component({
@@ -38,6 +40,7 @@ export class ExamFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
+  private companyService = inject(CompanyService);
 
   form: FormGroup;
   loading = signal(false);
@@ -48,6 +51,28 @@ export class ExamFormComponent implements OnInit {
 
   statusOptions = signal<{ label: string; value: string }[]>([]);
   kindOptions = signal<{ label: string; value: boolean }[]>([]);
+
+  // ── Rating mode (company setting) ───────────────────────────────────────────
+  /** The company marks homework by rating rather than by number. */
+  ratingMode = signal(false);
+  ratingMax = HOMEWORK_RATING_MAX;
+
+  /** Mirrors the kind control, so the template can react to it. */
+  private isHomeworkKind = signal(false);
+
+  /**
+   * Whether THIS row may be a rating one. A homework already stored out of 100
+   * keeps its number box: relabelling a recorded 73 as "Very good" would invent
+   * a meaning nobody gave it — the same rule the marking panel applies. Anything
+   * created from here while the setting is on is out of 5, so it qualifies.
+   */
+  private ratingEligible = signal(true);
+
+  /** Homework, in a rating company, on a row that hasn't already been numbered. */
+  useRating = computed(() => this.ratingMode() && this.isHomeworkKind() && this.ratingEligible());
+
+  /** The scale itself, so the form can show what marking will look like. */
+  ratingLabels = computed(() => HOMEWORK_RATINGS.map((r) => this.translate.instant(r.labelKey)));
 
   constructor() {
     this.rebuildOptions();
@@ -63,6 +88,21 @@ export class ExamFormComponent implements OnInit {
       examDate: [new Date(), [Validators.required]],
       maxGrade: [100, [Validators.min(0)]],
       status: ['SCHEDULED', [Validators.required]],
+    });
+
+    this.form.get('isHomework')!.valueChanges.subscribe((v: boolean) => this.isHomeworkKind.set(v === true));
+
+    // Which marking control this row will get. Read once, like the session panel:
+    // an admin flipping the setting mid-form is not worth polling for.
+    this.companyService.getSettings().subscribe({
+      next: (s) => this.ratingMode.set(s.homeworkGradingMode === 'RATING'),
+      error: () => {}, // stay on the number box if settings can't be read
+    });
+
+    // Keep the stored value honest even though the box is hidden — the server
+    // enforces this on create, but an edit posts whatever is in the form.
+    effect(() => {
+      if (this.useRating()) this.form.get('maxGrade')!.setValue(HOMEWORK_RATING_MAX, { emitEvent: false });
     });
   }
 
@@ -100,6 +140,9 @@ export class ExamFormComponent implements OnInit {
     this.loading.set(true);
     this.service.getById(id).subscribe({
       next: (row) => {
+        // A homework already stored out of something other than the rating scale
+        // stays on the number box, whatever the company setting says.
+        this.ratingEligible.set(row.maxGrade == null || row.maxGrade === HOMEWORK_RATING_MAX);
         this.form.patchValue({
           isHomework: row.isHomework === true,
           courseId: row.courseId,
@@ -134,7 +177,9 @@ export class ExamFormComponent implements OnInit {
       classId: v.classId || null,
       name: v.name?.trim(),
       examDate: this.toIsoDate(v.examDate),
-      maxGrade: v.maxGrade ?? null,
+      // Rating homework is always out of the scale's top mark, so a stored mark
+      // maps back to exactly one label.
+      maxGrade: this.useRating() ? HOMEWORK_RATING_MAX : (v.maxGrade ?? null),
       status: v.status,
     };
     this.loading.set(true);

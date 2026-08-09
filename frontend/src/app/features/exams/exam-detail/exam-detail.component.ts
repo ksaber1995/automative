@@ -9,6 +9,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
+import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
@@ -18,6 +19,8 @@ import { AuthService } from '../../../core/services/auth.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { CompanyService } from '../../../core/services/company.service';
+import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX, ratingLabelKey } from '../homework-rating.util';
 import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
 @Component({
@@ -34,6 +37,7 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
     TagModule,
     TooltipModule,
     DialogModule,
+    SelectModule,
     TranslateModule,
   ],
   templateUrl: './exam-detail.component.html',
@@ -47,6 +51,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   authService = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
+  private companyService = inject(CompanyService);
 
   // Take over the app-wide (USB/keyboard-wedge) scanner while this page is open,
   // so a scan records the exam grade here instead of falling through to the
@@ -99,6 +104,61 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   totalCount = computed(() => this.roster().length);
   isDone = computed(() => this.exam()?.status === 'DONE');
 
+  // ── Rating mode (company setting) ─────────────────────────────────────────
+  /** The company marks homework by rating rather than by number. */
+  ratingMode = signal(false);
+
+  ratingOptions = computed(() =>
+    HOMEWORK_RATINGS.map((r) => ({ label: this.translate.instant(r.labelKey), value: String(r.value) })));
+
+  /**
+   * Whether THIS row is marked by rating — the same three-part test the session
+   * homework panel uses, plus the homework check this screen needs and that one
+   * does not: an EXAM out of 5 is a five-mark exam, not a rating, and must keep
+   * its number box. A homework stored out of anything else predates the setting
+   * and keeps its number too, because relabelling a recorded 73 as "Very good"
+   * would invent a meaning nobody gave it.
+   */
+  useRating = computed(() => {
+    const e = this.exam();
+    return this.ratingMode() && e?.isHomework === true && e?.maxGrade === HOMEWORK_RATING_MAX;
+  });
+
+  /** The label for a stored mark, or '' when it isn't one of the five. */
+  ratingLabel(grade: string | number | null | undefined): string {
+    const key = ratingLabelKey(grade);
+    return key ? this.translate.instant(key) : '';
+  }
+
+  /**
+   * Ratings chosen in this page's dropdowns.
+   *
+   * The roster is only rewritten once a save lands, so without this the select
+   * would snap back to the old label for the length of the request. The numeric
+   * input has no such need — it is bound by `value` and simply keeps what was
+   * typed.
+   */
+  private picked = signal<Record<string, string>>({});
+
+  /** What the row's dropdown should show: the pick if there is one, else stored. */
+  ratingValue(row: ExamResultRow): string | null {
+    const p = this.picked()[row.studentId];
+    const v = p !== undefined ? p : (row.grade ?? '');
+    return v === '' ? null : String(v);
+  }
+
+  /** A rating is picked, not typed, so it saves at once rather than on debounce. */
+  onRatingPick(studentId: string, value: string | null) {
+    this.picked.update((m) => ({ ...m, [studentId]: value ?? '' }));
+    this.pendingGrades.set(studentId, value ?? '');
+    this.flushRowSaveNow(studentId);
+  }
+
+  /** Tapping the chosen rating again clears it, so a mis-tap is one tap to undo. */
+  setCurrentGrade(value: string) {
+    this.currentGrade.set(this.currentGrade() === value ? '' : value);
+  }
+
   // ── Send exam results (click-to-chat) ─────────────────────────────────────
   showResultsDialog = signal(false);
   resultsStudents = signal<{
@@ -114,6 +174,12 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.examId = this.route.snapshot.paramMap.get('id') || '';
     this.globalScan.register(this.scanHandler);
     this.templatesSvc.load().subscribe({ next: () => {}, error: () => {} });
+    // Which marking control this page offers. Read once, as the session homework
+    // panel does — an admin flipping the setting mid-marking is not worth polling.
+    this.companyService.getSettings().subscribe({
+      next: (s) => this.ratingMode.set(s.homeworkGradingMode === 'RATING'),
+      error: () => {}, // stay on the number box if settings can't be read
+    });
     if (!this.examId) { this.loading.set(false); return; }
     this.service.getById(this.examId).subscribe({
       next: (e) => this.exam.set(e),
@@ -125,7 +191,12 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   loadRoster() {
     this.loading.set(true);
     this.service.getResults(this.examId).subscribe({
-      next: (rows) => { this.roster.set(rows.map((r) => ({ ...r }))); this.loading.set(false); },
+      next: (rows) => {
+        this.roster.set(rows.map((r) => ({ ...r })));
+        // Server rows are the truth again, so local picks have nothing to hold.
+        this.picked.set({});
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
@@ -470,6 +541,9 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
           ? { ...s, isAbsent: absent, grade: absent ? null : null, recordedAt: absent ? new Date().toISOString() : null }
           : s)));
         this.pendingGrades.delete(row.studentId);
+        // Marking someone absent wipes their mark, so a stale pick must not keep
+        // showing a rating next to the Absent tag.
+        this.picked.update((m) => { const next = { ...m }; delete next[row.studentId]; return next; });
         this.setRowState(row.studentId, 'saved');
         setTimeout(() => this.setRowState(row.studentId, null), 1500);
       },
