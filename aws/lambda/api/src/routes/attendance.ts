@@ -208,7 +208,12 @@ export async function classDues(
     `SELECT e.id, e.student_id, e.enrollment_date, e.final_price, e.amount_paid, c.price AS course_price
        FROM enrollments e
        JOIN courses c ON c.id = e.course_id
-      WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'`,
+      WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'
+        -- Someone who has left owes nothing further and has no badge to show on
+        -- a roster they are no longer on. Their enrolment is still ACTIVE, so
+        -- without this they reappear in the dues panel the register dropped them
+        -- from — the two would disagree about who is in the class.
+        AND ${studentIsPresentById('e.student_id')}`,
     [classId, context.companyId]
   );
   for (const e of enrollments) {
@@ -242,6 +247,8 @@ export async function classDues(
            JOIN courses c ON c.id = e.course_id
           WHERE e.class_id = $1 AND e.company_id = $2 AND e.status = 'ACTIVE'
             AND c.payment_type = 'MONTHLY_SUBSCRIPTION' AND c.is_active = true
+            -- and no unpaid months are projected for someone who has gone
+            AND ${studentIsPresentById('e.student_id')}
        ),
        periods AS (
          SELECT enr.id AS enrollment_id, enr.student_id, enr.course_id,
@@ -1481,14 +1488,19 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED', 'Access denied to this class');
       }
 
-      // Total enrolled students for this class
+      // Total enrolled students for this class — the denominator every "12 of 18
+      // present" on the class page divides by, so it has to be the same set the
+      // register lists. Counting students who have left would hold the
+      // attendance rate permanently below 100%.
       const totalResult = await queryOne(
         `SELECT COUNT(*) AS total FROM (
           SELECT student_id FROM enrollments
           WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            AND ${studentIsPresentById('student_id')}
           UNION
           SELECT student_id FROM master_class_enrollments
           WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+            AND ${studentIsPresentById('student_id')}
         ) enrolled`,
         [params.classId, context.companyId]
       );
