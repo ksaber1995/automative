@@ -304,13 +304,13 @@ export class AuthService {
   }
 
   /**
-   * An academy that registered on Basic. Events and Reports are part of what
-   * Advanced buys, so they stay hidden for these tenants.
+   * An academy that registered on Basic. Events are part of what Advanced buys,
+   * so they stay hidden for these tenants.
    *
-   * Expenses used to be on that list and no longer is: rent, bills and equipment
-   * are what running an academy costs rather than something to upsell, and the
-   * API never gated them anyway — so a Basic academy had a working page and no
-   * way to reach it.
+   * Expenses and Reports used to be on that list and no longer are: both are
+   * part of running an academy rather than something to upsell, and neither was
+   * ever gated by the API or the route guards — so a Basic academy had working
+   * pages and no way to reach them.
    *
    * Deliberately narrower than canUseCrm/canUseCash: a solo TEACHER keeps these
    * whatever their plan. The restriction is about what an academy's Basic tier

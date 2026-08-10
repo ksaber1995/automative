@@ -342,8 +342,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
       }});
     }
 
-    // Reports (standalone)
-    if (auth.canRead('reports') && !auth.isBasicAcademy()) {
+    // Reports (standalone). Every academy gets them, Basic included — the API
+    // has never gated reports and the route guard checks the permission only, so
+    // this line was the whole restriction.
+    if (auth.canRead('reports')) {
       entries.push({ kind: 'leaf', leaf: {
         labelKey: 'NAV.REPORTS', icon: 'pi pi-chart-bar', routerLink: ['/reports'], visible: true,
       }});
@@ -364,10 +366,18 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // Subjects are academy-only — hidden for teacher accounts (same gate as the
       // /subjects route's notTeacherGuard and the course-form dropdown).
       { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/subjects'], visible: !auth.isTeacher() },
-      // Card Design (the shared back face of the printed ID cards) is off the
-      // sidebar for everyone. It is set up once and then never touched again, so
-      // it earned no place in a menu people read every day. The /card-design
-      // route still works by URL, and the saved design still prints on cards.
+      // Card Design (the shared back face of the printed ID cards) stays off the
+      // sidebar for customers: it is set up once and never touched again, so it
+      // earns no place in a menu people read every day, and /card-design still
+      // works by URL for them.
+      //
+      // The vendor's debug login is the exception — it exists to poke at a
+      // tenant's setup, and typing the URL every time is friction for the one
+      // account that needs it most. Sitting inside this admin group is also what
+      // keeps the link honest: the route guard wants GLOBAL_ADMIN or ADMIN, which
+      // is exactly what gates the group, so the entry cannot appear to someone
+      // the page would then refuse.
+      { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.isDebugUser() },
       // The pool of pre-printed blank QR cards, and which student each one is on.
       // Hidden from customer tenants on request — shown to the vendor's debug login
       // and to the vendor's own test tenants, same check the route guard uses.
