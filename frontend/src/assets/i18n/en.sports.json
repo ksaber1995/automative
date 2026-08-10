@@ -207,7 +207,7 @@
     "EDUCATIONAL_BOOKS": {
       "COURSES_FAILED": "Failed to load sports",
       "COURSE_NOT_FOUND": "Sport not found",
-      "DETAIL_FAILED": "Failed to load sport books"
+      "DETAIL_FAILED": "Failed to load sport equipment"
     },
     "MONTHLY_SUBSCRIPTIONS": {
       "STUDENT_NOT_FOUND": "Trainee not found for this code"
@@ -243,7 +243,8 @@
     "SESSION_HISTORY": "Training History",
     "ATTENDANCE_TEACHERS": "Coach Attendance",
     "EXAMS": "Evaluations & Drills",
-    "EDUCATIONAL_BOOKS_DETAIL": "Sport Books"
+    "EDUCATIONAL_BOOKS": "Equipment",
+    "EDUCATIONAL_BOOKS_DETAIL": "Sport Equipment"
   },
   "SESSION_PAYMENTS": {
     "TITLE": "Training Payments",
@@ -330,6 +331,7 @@
     "STUDENTS": "Trainees",
     "EMPLOYEES": "Employees / Coaches",
     "EXAMS": "Evaluations & Drills",
+    "EDUCATIONAL_BOOKS": "Equipment",
     "FIND_STUDENT": "Find Trainee",
     "QR_STUDENT_NOT_FOUND": "Trainee not found for this QR code.",
     "QR_LOOKING_UP": "Looking up trainee...",
@@ -418,6 +420,7 @@
     "FORM": {
       "CREATE_TITLE": "Add Sport",
       "EDIT_TITLE": "Edit Sport",
+      "NAME_PLACEHOLDER": "e.g., Football",
       "CREATE_SUCCESS": "Sport created",
       "UPDATE_SUCCESS": "Sport updated"
     }
@@ -523,12 +526,14 @@
       "EDIT_SUBTITLE": "Update sport information",
       "CREATE_SUBTITLE": "Create a new sport for your academy",
       "NAME_LABEL": "Sport Name",
+      "NAME_PLACEHOLDER": "e.g., Football",
       "NAME_REQUIRED": "Sport name is required (min 3 characters)",
       "CODE_LABEL": "Sport Code",
+      "CODE_PLACEHOLDER": "e.g., FTB-U12",
       "CODE_REQUIRED": "Sport code is required (min 2 characters)",
       "MAX_STUDENTS_LABEL": "Max Trainees (Optional)",
       "INSTRUCTOR_LABEL": "Coach (Optional)",
-      "INSTRUCTOR_PLACEHOLDER": "Select an coach",
+      "INSTRUCTOR_PLACEHOLDER": "Select a coach",
       "DEFAULT_ROOM_LABEL": "Default Pitch (Optional)",
       "DEFAULT_ROOM_PLACEHOLDER": "Select a default pitch for this sport",
       "DEFAULT_ROOM_HINT": "When starting a training for this sport's groups, this pitch will be pre-selected",
@@ -557,7 +562,8 @@
       "EMPTY": "No price overrides set for this sport"
     },
     "LINKED_PRODUCTS": {
-      "SUBTITLE": "Books and products linked to this sport",
+      "TITLE": "Linked products (equipment)",
+      "SUBTITLE": "Equipment and products linked to this sport",
       "EMPTY": "No products linked to this sport yet",
       "UNLINK_MSG": "Remove \"{{name}}\" from this sport?"
     }
@@ -572,12 +578,13 @@
       "NO_COURSES_IN_BRANCH": "No active sports in this branch",
       "CONTEXT_LABEL": "Creating group for",
       "NAME_LABEL": "Group Name",
-      "NAME_PLACEHOLDER": "e.g., Section A, Morning Group",
+      "NAME_PLACEHOLDER": "e.g., U-12 Group, Morning Group",
       "NAME_REQUIRED": "Group name is required (min 2 characters)",
       "CODE_LABEL": "Group Code",
+      "CODE_PLACEHOLDER": "e.g., FTB-U12-A",
       "CODE_REQUIRED": "Group code is required (min 2 characters)",
       "INSTRUCTOR_LABEL": "Coach",
-      "INSTRUCTOR_PLACEHOLDER": "Select an coach (optional)",
+      "INSTRUCTOR_PLACEHOLDER": "Select a coach (optional)",
       "INSTRUCTOR_HINT": "Defaults to sport coach if not specified",
       "ROOM_LABEL": "Pitch",
       "ROOM_PLACEHOLDER": "Select a pitch",
@@ -597,7 +604,7 @@
       "CHECKING_AVAILABILITY": "Checking coach availability...",
       "TEACHER_CONFLICT_TITLE": "Coach {{name}} is not free at this time",
       "TEACHER_CONFLICT_TITLE_SELF": "You already have a group at this time",
-      "TEACHER_CONFLICT_HINT": "This coach already has the following overlapping group(es). Pick a different time, day, or coach to enable saving.",
+      "TEACHER_CONFLICT_HINT": "This coach already has the following overlapping group(s). Pick a different time, day, or coach to enable saving.",
       "TIME_RANGE_TITLE": "A group must last longer than zero minutes. Fix these days:",
       "MIDNIGHT_TITLE": "This group runs past midnight:"
     },
@@ -612,10 +619,10 @@
       "COL_ROOM": "Pitch",
       "ASSIGN_ROOM": "Assign pitch",
       "ASSIGN_ROOM_TITLE": "Assign a pitch",
-      "ASSIGN_ROOM_HINT": "The pitch will be set on the {{count}} selected group(es).",
+      "ASSIGN_ROOM_HINT": "The pitch will be set on the {{count}} selected group(s).",
       "ASSIGN_ROOM_PLACEHOLDER": "Select a pitch",
       "ASSIGN_ROOM_CLEAR_HINT": "Leave empty to clear the pitch on the selected groups.",
-      "ROOM_ASSIGNED": "Pitch set on {{count}} group(es).",
+      "ROOM_ASSIGNED": "Pitch set on {{count}} group(s).",
       "OVER_CAPACITY_TOOLTIP": "This group is {{over}} trainee(s) over its limit of {{max}}",
       "PAGE_REPORT": "Showing {first} to {last} of {totalRecords} groups",
       "NO_CLASSES": "No groups found",
@@ -727,8 +734,10 @@
     "MSG_MASTER_ENROLLED": "Trainee enrolled in program bundle",
     "ERR_MASTER_ENROLL": "Failed to enroll in program",
     "MSG_ENROLLMENT_CREATED": "Trainee enrolled successfully",
-    "COURSE_BOOKS_TITLE": "Sport books",
-    "COURSE_BOOKS_HINT": "Add the books linked to this sport to the enrollment. Required books are pre-selected.",
+    "COURSE_BOOKS_TITLE": "Sport equipment",
+    "COURSE_BOOKS_HINT": "Add the equipment linked to this sport to the enrollment. Required equipment are pre-selected.",
+    "BOOKS_SELECTED": "{{count}} equipment(s) selected",
+    "BOOKS_TOTAL": "Equipment total",
     "DUE_NOW_HINT": "Collect this amount from the trainee today",
     "SUMMARY_FEE_COURSE": "Sport fee",
     "SUMMARY_FEE_PACKAGE": "Training package",
@@ -748,6 +757,7 @@
     },
     "FORM": {
       "POSITION_PLACEHOLDER": "e.g., Coach, Manager",
+      "DEPARTMENT_PLACEHOLDER": "e.g., Coaching, Administration",
       "SALARY_TYPE_SESSION": "Per training",
       "SALARY_TYPE_UNPAID_HINT": "This coach draws no pay — nothing accrues for them and they never appear on the Salaries page.",
       "SESSION_RATE": "Rate per training",
@@ -929,6 +939,8 @@
       "SESSION_CHARGES": "Training Charges",
       "NO_SESSION_CHARGES": "No training charges yet — they appear as attendance is taken.",
       "SESSION_COL_SESSION": "Training",
+      "BOOKS_TITLE": "Equipment & Products",
+      "NO_BOOKS": "No equipment or product purchases yet",
       "CANCEL_ENROLLMENT_CONFIRM": "End this sport enrolment? If anything has been paid on it, it is cancelled and kept on the Withdrawn tab with its payment history intact. If nothing was ever paid, it is removed completely.",
       "CHANGE_CLASS": "Change Group",
       "CHANGE_CLASS_CURRENT": "Current group",
@@ -956,7 +968,7 @@
   "USERS": {
     "FORM": {
       "ROLE_DESC_ACADEMIC_MANAGER": "Trainees, sports, groups — no financials",
-      "ROLE_DESC_SECRETARY": "Front desk: trainees, enrolments, payments and book sales - cannot browse revenue or reports",
+      "ROLE_DESC_SECRETARY": "Front desk: trainees, enrolments, payments and equipment sales - cannot browse revenue or reports",
       "RESOURCE_ACADEMY_HINT": "Covers Sports, Groups, Programs, Pitches, Trainings, Timetable, Attendance, and Events. Read access also grants read on Trainees and Employees.",
       "RESOURCE_STUDENTS": "Trainees",
       "RESOURCE_EMPLOYEES": "Employees / Coaches"
@@ -1019,6 +1031,11 @@
       "VIEW_STUDENT": "View Trainee"
     }
   },
+  "PRODUCTS": {
+    "LIST": {
+      "CAT_BOOKS": "Equipment"
+    }
+  },
   "ROOM_FREE": {
     "TITLE": "Free pitches",
     "SUBTITLE": "When each pitch is free across the week. Print it, read the gaps, and hand one to a new coach.",
@@ -1071,7 +1088,7 @@
     "ALL_ROOMS": "All Pitches",
     "EMPTY_TITLE": "No groups scheduled",
     "EMPTY_HINT": "No groups match the current filters for this day.",
-    "CLASS_COUNT": "— {{count}} group(es)",
+    "CLASS_COUNT": "— {{count}} group(s)",
     "ROOM_PREFIX": "Pitch {{code}}",
     "NO_TIME_HINT": "These groups run on this day but have no start/end time, so they cannot be placed on the hour grid. Edit the group to add times."
   },
@@ -1274,9 +1291,12 @@
     "QR_NOTE": "QR activation is billed per trainee. Outstanding amounts are settled with Netrofit."
   },
   "EDUCATIONAL_BOOKS": {
-    "SUBTITLE": "Track which enrolled trainees have bought their sport books",
-    "NO_COURSES": "No sports with linked books",
-    "ALL_BOUGHT": "All enrolled trainees have bought this book",
+    "TITLE": "Equipment",
+    "SUBTITLE": "Track which enrolled trainees have bought their sport equipment",
+    "NO_COURSES": "No sports with linked equipment",
+    "LINKED": "Linked equipment",
+    "ALL_BOUGHT": "All enrolled trainees have bought this equipment",
+    "SELL_TITLE": "Record Equipment Payment",
     "COL_STUDENT": "Trainee",
     "COURSE": "Sport",
     "ALL_COURSES": "All sports",
@@ -1286,9 +1306,15 @@
     "SCAN_HINT": "Scan the trainee's barcode, or use a USB reader / manual entry below.",
     "SCAN_LOOKING_UP": "Looking up trainee…",
     "SCAN_NOT_ENROLLED": "This trainee is not enrolled in this sport",
-    "SCAN_ALL_BOUGHT": "{{name}} has already bought every book for this sport",
+    "SCAN_ALL_BOUGHT": "{{name}} has already bought every equipment for this sport",
+    "SCAN_PICK_PRODUCT": "Pick an equipment to sell",
+    "SCAN_PICK_PRODUCT_HINT": "Choose which equipment to record a payment for",
+    "REFUND_TITLE": "Refund Equipment Payment",
+    "RETURN_ITEM": "The equipment",
     "RETURN_ITEM_NO": "Not returned — the trainee keeps it",
-    "DELETE_CONFIRM": "This removes the payment entirely, as if it was never recorded. Use a refund instead if the trainee really did buy the book."
+    "DELETE_TITLE": "Delete Equipment Payment",
+    "DELETE_CONFIRM": "This removes the payment entirely, as if it was never recorded. Use a refund instead if the trainee really did buy the equipment.",
+    "DELETE_SUCCESS": "Payment deleted and the equipment returned to inventory"
   },
   "WHATSAPP": {
     "STUDENT_CODE_LINE": "🔑 Your trainee code: {{code}}\nUse it to check in if you don't have your card with you.",
