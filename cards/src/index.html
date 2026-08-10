@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <!--
+    Required, and its absence is why reloading /client/:id showed a blank page.
+
+    The build emits RELATIVE script tags (<script src="main-XXXX.js">). At `/`
+    the browser resolves that to /main-XXXX.js and the app boots. At
+    /client/<uuid> it resolves to /client/main-XXXX.js, the dev server's SPA
+    fallback answers with index.html, the browser tries to parse HTML as a module
+    and gives up — so nothing ran, and the only way back was to open the client
+    list at `/` and reload from there.
+
+    <base href="/"> pins every relative URL to the site root, whatever the depth
+    of the route. Angular's router also reads it to work out path prefixes.
+  -->
+  <base href="/" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cards · per-client report</title>
 </head>

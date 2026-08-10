@@ -37,10 +37,26 @@ import { ClientTableComponent } from './client-table.component';
             autocomplete="off" spellcheck="false"
             [ngModel]="search()" (ngModelChange)="search.set($event)"
           />
+          <select class="pick" [ngModel]="typeFilter()" (ngModelChange)="typeFilter.set($event)" title="Account type">
+            <option value="ALL">All types</option>
+            <option value="ACADEMY">Academy</option>
+            <option value="TEACHER">Teacher</option>
+          </select>
           <label class="toggle">
             <input type="checkbox" [ngModel]="onlyWithCards()" (ngModelChange)="onlyWithCards.set($event)" />
             Only clients with cards
           </label>
+          <label class="toggle" title="Cards minted but not yet sent to the printer">
+            <input type="checkbox" [ngModel]="needsPrinting()" (ngModelChange)="needsPrinting.set($event)" />
+            Needs printing
+          </label>
+          <label class="toggle" title="Every card in the pool is handed out — they need a new run">
+            <input type="checkbox" [ngModel]="poolExhausted()" (ngModelChange)="poolExhausted.set($event)" />
+            Pool exhausted
+          </label>
+          @if (filtersActive() || search().trim()) {
+            <button class="linkish" (click)="clearFilters()">Clear filters</button>
+          }
           <button class="refresh" [disabled]="loading()" (click)="load()">Refresh</button>
         </div>
       </header>
@@ -82,7 +98,10 @@ import { ClientTableComponent } from './client-table.component';
       } @else if (!shown().length) {
         <div class="state">
           @if (search().trim()) { No clients match “{{ search().trim() }}”. }
-          @else { No clients to show with the current filter. }
+          @else { No clients to show with the current filters. }
+          @if (filtersActive() || search().trim()) {
+            <button class="linkish" (click)="clearFilters()">Clear filters</button>
+          }
         </div>
       }
 
@@ -115,6 +134,17 @@ import { ClientTableComponent } from './client-table.component';
     button.refresh:hover { border-color: var(--muted); }
     button.refresh:disabled { opacity: .5; cursor: default; }
 
+    .pick {
+      font: inherit; color: var(--text); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+    }
+    .pick:focus { outline: none; border-color: var(--linked); }
+    button.linkish {
+      font: inherit; color: var(--linked); background: none; border: none;
+      padding: 0; cursor: pointer; text-decoration: underline;
+    }
+    .state button.linkish { margin-left: 6px; }
+
     .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 26px 0 10px; }
     @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
 
@@ -139,12 +169,40 @@ export class ClientsPageComponent {
 
   protected search = signal('');
   protected onlyWithCards = signal(true);
+  /** 'ALL', or one of the values company_type actually holds. */
+  protected typeFilter = signal<'ALL' | 'ACADEMY' | 'TEACHER'>('ALL');
+  /** Cards minted but not yet sent to the printer — the work queue. */
+  protected needsPrinting = signal(false);
+  /** Whole pool handed out, so the client needs a new run minted. */
+  protected poolExhausted = signal(false);
   protected sort = signal<SortState>({ key: 'total', dir: -1 });
+
+  /** Any filter beyond the default is on — drives the empty-state wording. */
+  protected filtersActive = computed(() =>
+    this.typeFilter() !== 'ALL' || this.needsPrinting() || this.poolExhausted() || !this.onlyWithCards(),
+  );
+
+  protected clearFilters(): void {
+    this.search.set('');
+    this.typeFilter.set('ALL');
+    this.needsPrinting.set(false);
+    this.poolExhausted.set(false);
+    this.onlyWithCards.set(true);
+  }
 
   /** Rows after the filter + search + sort the user has chosen. */
   protected shown = computed(() => {
     const q = this.search().trim().toLowerCase();
     let list = this.onlyWithCards() ? this.rows().filter((r) => r.total > 0) : [...this.rows()];
+
+    const type = this.typeFilter();
+    if (type !== 'ALL') list = list.filter((r) => r.type === type);
+
+    if (this.needsPrinting()) list = list.filter((r) => r.unprinted > 0);
+
+    // A client with no cards at all has not exhausted anything — `total > 0`
+    // keeps an empty pool out of a list that means "mint them some more".
+    if (this.poolExhausted()) list = list.filter((r) => r.total > 0 && r.unlinked === 0);
 
     if (q) {
       list = list.filter((r) =>
