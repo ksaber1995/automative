@@ -218,12 +218,18 @@
             {{ h.studentName }}
             <div class="sm:hidden text-xs font-normal text-gray-500 mt-0.5">
               {{ h.courseName }}
+              @if (h.className) { · <span class="text-blue-600">{{ h.className }}</span> }
               @if (h.holdStartMonth) {
                 · {{ 'MONTHLY_SUBSCRIPTIONS.HELD_SINCE' | translate }} {{ h.holdStartMonth }}/{{ h.holdStartYear }}
               }
             </div>
           </td>
-          <td class="hidden sm:table-cell">{{ h.courseName }}</td>
+          <td class="hidden sm:table-cell">
+            {{ h.courseName }}
+            @if (h.className) {
+              <div class="text-xs text-blue-600">{{ h.className }}</div>
+            }
+          </td>
           @if (!isTeacher) {
           <td class="hidden lg:table-cell">{{ h.branchName }}</td>
           }
@@ -323,13 +329,22 @@
             </div>
             <div class="sm:hidden text-xs font-normal text-gray-500 mt-0.5">
               {{ periodLabel(p) }} · {{ p.courseName }}
+              @if (p.className) { · <span class="text-blue-600">{{ p.className }}</span> }
             </div>
             <div class="sm:hidden text-xs font-normal text-gray-500">
               {{ 'MONTHLY_SUBSCRIPTIONS.AMOUNT_DUE' | translate }}: {{ p.amountDue | amount }}
               · <span class="text-green-600">{{ p.amountPaid | amount }}</span>
             </div>
           </td>
-          <td class="hidden md:table-cell">{{ p.courseName }}</td>
+          <!-- The group under the course: one course runs several, and the group
+               is what identifies who is being chased. Blue so it reads as a
+               separate fact rather than a wrapped course name. -->
+          <td class="hidden md:table-cell">
+            {{ p.courseName }}
+            @if (p.className) {
+              <div class="text-xs text-blue-600">{{ p.className }}</div>
+            }
+          </td>
           @if (!isTeacher) {
           <td class="hidden lg:table-cell">{{ p.branchName }}</td>
           }

@@ -163,11 +163,20 @@
               {{ row.studentName }}
               <div class="sm:hidden text-xs text-gray-500 mt-0.5">
                 {{ row.courseName }}
+                @if (row.className) { · <span class="text-blue-600">{{ row.className }}</span> }
                 · {{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}
                 @if (row.sessionDate) { · {{ row.sessionDate | date:'mediumDate' }} }
               </div>
             </td>
-            <td class="hidden md:table-cell">{{ row.courseName }}</td>
+            <!-- The group sits under the course rather than in a column of its
+                 own: a course runs several, and "who do I chase" is answered by
+                 the group. Blue so it reads as a second fact, not a wrapped name. -->
+            <td class="hidden md:table-cell">
+              {{ row.courseName }}
+              @if (row.className) {
+                <div class="text-xs text-blue-600">{{ row.className }}</div>
+              }
+            </td>
             <td class="hidden sm:table-cell">
               <div class="flex items-center gap-2 flex-wrap">
                 <span>{{ row.sessionNumber != null ? '#' + row.sessionNumber : '—' }}</span>
@@ -248,10 +257,16 @@
                 {{ row.r.studentName }}
                 <div class="sm:hidden text-xs text-gray-500 mt-0.5">
                   {{ row.r.courseName }}
+                  @if (row.r.className) { · <span class="text-blue-600">{{ row.r.className }}</span> }
                   · {{ 'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: row.r.lastSessionsUsed, total: row.r.lastSessionsTotal } }}
                 </div>
               </td>
-              <td class="hidden md:table-cell">{{ row.r.courseName }}</td>
+              <td class="hidden md:table-cell">
+                {{ row.r.courseName }}
+                @if (row.r.className) {
+                  <div class="text-xs text-blue-600">{{ row.r.className }}</div>
+                }
+              </td>
               <td class="hidden sm:table-cell">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span>{{ 'SESSION_PAYMENTS.RENEWAL_USED' | translate: { used: row.r.lastSessionsUsed, total: row.r.lastSessionsTotal } }}</span>

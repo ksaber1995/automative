@@ -1353,6 +1353,10 @@ export const sessionPaymentsRoutes = {
            e.student_id, e.branch_id, e.course_id,
            s.name AS student_name,
            c.name       AS course_name,
+           -- Which group they train with, shown under the course: a course can
+           -- run several, and "who do I chase" is answered by the group, not the
+           -- course. LEFT JOIN because an enrolment need not name one.
+           cl.name      AS class_name,
            c.session_package_size  AS package_size,
            c.session_package_price AS package_price,
            b.name       AS branch_name,
@@ -1368,6 +1372,7 @@ export const sessionPaymentsRoutes = {
          JOIN courses c  ON e.course_id = c.id
          JOIN students s ON e.student_id = s.id
          JOIN branches b ON e.branch_id = b.id
+         LEFT JOIN classes cl ON cl.id = e.class_id
          JOIN LATERAL (
            SELECT * FROM session_packages sp
            WHERE sp.enrollment_id = e.id
@@ -1387,6 +1392,7 @@ export const sessionPaymentsRoutes = {
           courseId: r.course_id,
           studentName: r.student_name,
           courseName: r.course_name,
+          className: r.class_name || null,
           branchName: r.branch_name,
           packageSize: r.package_size != null ? Number(r.package_size) : null,
           packagePrice: r.package_price != null ? parseFloat(r.package_price) : null,

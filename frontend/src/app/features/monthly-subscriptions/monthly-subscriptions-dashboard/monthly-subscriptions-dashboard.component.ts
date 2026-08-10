@@ -912,18 +912,26 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   /**
    * Open WhatsApp (the staff member's own number) pre-filled with the
-   * PAYMENT_DELAY reminder for this unpaid bill, addressed to the student.
+   * PAYMENT_DELAY reminder for this unpaid bill.
+   *
+   * Addressed to the PARENT, falling back to the student only when no parent
+   * number is on file. Money is a parent's business — and these are children —
+   * so a reminder sent to the student's own phone reaches whoever cannot pay it.
+   * This was the one screen doing it the other way round; exam results, absence
+   * follow-ups, retention and the QR share all put the parent first.
    */
   sendPaymentReminder(p: MonthlyPaymentWithDetails): void {
     const text = renderWhatsappTemplate(this.templatesSvc.get('PAYMENT_DELAY'), {
       studentName: `${p.studentName}`,
+      parentName: p.parentName || p.studentName,
       academyName: this.auth.getCompanyName(),
       amount: String(p.amountDue - p.amountPaid),
       currency: '',
       courseName: p.courseName,
+      className: p.className ?? '',
       dueDate: new Date(p.dueDate).toLocaleDateString('en-GB'),
     });
-    const opened = openWhatsappChat(p.studentPhone || p.parentPhone, text);
+    const opened = openWhatsappChat(p.parentPhone || p.studentPhone, text);
     if (!opened) {
       this.notify.info(this.translate.instant('WHATSAPP.NO_PHONE'));
     }

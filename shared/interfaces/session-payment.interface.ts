@@ -55,6 +55,8 @@ export interface PackageRenewalDue {
   courseId: string;
   studentName: string;
   courseName: string;
+  /** The group they train with — shown under the course on the dues tables. */
+  className?: string | null;
   branchName: string;
   packageSize: number | null;
   packagePrice: number | null;
