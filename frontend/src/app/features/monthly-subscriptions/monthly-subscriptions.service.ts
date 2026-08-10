@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+
 import {
   MonthlyPaymentWithDetails,
   MonthlyPaymentSummary,
@@ -13,6 +14,28 @@ import {
   SetPriceOverrideDto,
   HeldSubscription,
 } from '@shared/interfaces/monthly-subscription.interface';
+
+/** One unpaid bill, as the leaving prompt needs to show it. */
+export interface UnpaidBill {
+  id: string;
+  courseName: string;
+  billingYear: number;
+  billingMonth: number;
+  amountDue: number;
+  amountPaid: number;
+  outstanding: number;
+  paymentStatus: string;
+  /** Nothing was ever collected, so this one can be dropped with the student. */
+  clearable: boolean;
+}
+
+export interface UnpaidBillsSummary {
+  bills: UnpaidBill[];
+  clearableCount: number;
+  keepingCount: number;
+  clearableTotal: number;
+  keepingTotal: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class MonthlySubscriptionsService {
@@ -101,6 +124,24 @@ export class MonthlySubscriptionsService {
   /** Every monthly bill for one student (newest month first). */
   listByStudent(studentId: string): Observable<MonthlyPaymentWithDetails[]> {
     return this.http.get<MonthlyPaymentWithDetails[]>(`${this.base}/student/${studentId}`);
+  }
+
+  /**
+   * What this student still owes, split by whether any money was ever collected.
+   * Asked before marking someone as having left, so the prompt can say what
+   * would be dropped and what would be kept.
+   */
+  unpaidForStudent(studentId: string): Observable<UnpaidBillsSummary> {
+    return this.http.get<UnpaidBillsSummary>(`${this.base}/student/${studentId}/unpaid`);
+  }
+
+  /**
+   * Drop the bills nobody will collect. The server refuses unless the student is
+   * already inactive and never touches a part-paid bill, so this cannot be used
+   * to wipe a debt by mistake.
+   */
+  clearUnpaidForStudent(studentId: string): Observable<{ cleared: number }> {
+    return this.http.post<{ cleared: number }>(`${this.base}/student/${studentId}/clear-unpaid`, {});
   }
 
   /** List all price overrides for a course. */

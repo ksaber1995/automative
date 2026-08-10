@@ -1576,6 +1576,73 @@
 </div>
 
 <!-- Add Payment Dialog -->
+<!-- Student leaving: confirm, and settle what to do with bills nobody will collect -->
+<p-dialog
+  [(visible)]="leaveVisible"
+  [header]="'STUDENTS.LEAVE_HEADER' | translate"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+>
+  <p class="text-sm text-gray-600 mb-4">{{ 'STUDENTS.LEAVE_CONFIRM' | translate: { name: student()?.name } }}</p>
+
+  @if (leaveLoadingBills()) {
+    <div class="flex items-center gap-2 text-sm text-gray-400">
+      <i class="pi pi-spin pi-spinner"></i>{{ 'STUDENTS.LEAVE_BILLS_LOADING' | translate }}
+    </div>
+  } @else if (leaveBills(); as b) {
+    @if (b.bills.length) {
+      <div class="border rounded-lg overflow-hidden mb-3">
+        <div class="px-3 py-2 bg-gray-50 text-sm font-medium">
+          {{ 'STUDENTS.LEAVE_BILLS_TITLE' | translate: { count: b.bills.length } }}
+        </div>
+        <div class="max-h-52 overflow-y-auto divide-y">
+          @for (bill of b.bills; track bill.id) {
+            <div class="flex items-center justify-between px-3 py-2 text-sm">
+              <div class="min-w-0">
+                <div class="truncate">{{ bill.courseName }}</div>
+                <div class="text-xs text-gray-400">{{ billPeriod(bill) }}</div>
+              </div>
+              <div class="text-right shrink-0 ps-3">
+                <div class="text-red-600 font-medium">{{ bill.outstanding | amount }}</div>
+                <!-- Part-paid months are called out: money already changed hands
+                     on those, so they are never dropped automatically. -->
+                <div class="text-xs" [class.text-gray-400]="bill.clearable" [class.text-amber-600]="!bill.clearable">
+                  {{ (bill.clearable ? 'STUDENTS.LEAVE_BILL_NOTHING_PAID' : 'STUDENTS.LEAVE_BILL_PART_PAID') | translate }}
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      @if (b.clearableCount) {
+        <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+          <p-checkbox [(ngModel)]="clearBillsOnLeave" [binary]="true" inputId="clearBills"></p-checkbox>
+          <label for="clearBills" class="text-sm cursor-pointer">
+            {{ 'STUDENTS.LEAVE_CLEAR_BILLS' | translate: { count: b.clearableCount } }}
+            <span class="block text-xs text-gray-400">{{ 'STUDENTS.LEAVE_CLEAR_BILLS_HINT' | translate }}</span>
+          </label>
+        </div>
+      }
+      @if (b.keepingCount) {
+        <p class="text-xs text-amber-600 mt-2">
+          <i class="pi pi-info-circle"></i>
+          {{ 'STUDENTS.LEAVE_KEEPING_BILLS' | translate: { count: b.keepingCount } }}
+        </p>
+      }
+    } @else {
+      <p class="text-sm text-green-600"><i class="pi pi-check-circle"></i> {{ 'STUDENTS.LEAVE_NO_BILLS' | translate }}</p>
+    }
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true"
+      [disabled]="leaving()" (onClick)="leaveVisible = false"></p-button>
+    <p-button [label]="'STUDENTS.LEAVE_CONFIRM_BTN' | translate" icon="pi pi-sign-out" severity="warn"
+      [loading]="leaving()" (onClick)="confirmLeave()"></p-button>
+  </ng-template>
+</p-dialog>
+
 <p-dialog
   [(visible)]="showPaymentDialog"
   [header]="('STUDENTS.DETAIL.ADD_PAYMENT_TITLE' | translate) + ' — ' + getCourseName(enrollmentForAction()?.courseId || '')"

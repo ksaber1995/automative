@@ -214,6 +214,10 @@ const router = {
     voidPayment: monthlySubscriptionsRoutes.voidPayment,
     refund: monthlySubscriptionsRoutes.refund,
     listByCourse: monthlySubscriptionsRoutes.listByCourse,
+    // Before listByStudent, matching the contract: these carry an extra path
+    // segment, and this router registers in declaration order.
+    unpaidForStudent: monthlySubscriptionsRoutes.unpaidForStudent,
+    clearUnpaidForStudent: monthlySubscriptionsRoutes.clearUnpaidForStudent,
     listByStudent: monthlySubscriptionsRoutes.listByStudent,
     byToken: monthlySubscriptionsRoutes.byToken,
     setPriceOverride: monthlySubscriptionsRoutes.setPriceOverride,

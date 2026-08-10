@@ -1298,6 +1298,124 @@ export const monthlySubscriptionsRoutes = {
     }
   },
 
+  /**
+   * GET /api/monthly-subscriptions/student/:studentId/unpaid
+   *
+   * What this student still owes, for the prompt shown when they are marked as
+   * having left. Split by whether any money was ever collected, because that is
+   * the line between "a bill nobody should chase" and "a debt someone part-paid":
+   *
+   *   clearable — nothing collected. Safe to drop; nothing is lost but a row
+   *               that was going to sit in the dues report forever.
+   *   keeping   — money changed hands. Never offered for deletion here; writing
+   *               off a part-paid month is a decision with a receipt behind it.
+   */
+  unpaidForStudent: async ({ params, headers }: { params: { studentId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const rows = await query<any>(
+        `SELECT msp.id, msp.billing_year, msp.billing_month, msp.amount_due, msp.amount_paid,
+                msp.payment_status, msp.branch_id,
+                c.name AS course_name
+           FROM monthly_subscription_payments msp
+           JOIN courses c ON c.id = msp.course_id
+          WHERE msp.company_id = $1
+            AND msp.student_id = $2
+            AND msp.amount_due - COALESCE(msp.amount_paid, 0) > 0
+          ORDER BY msp.billing_year, msp.billing_month`,
+        [context.companyId, params.studentId]
+      );
+
+      const visible = rows.filter((r) => canAccessBranch(context, r.branch_id));
+      const money = (v: any) => (v === null || v === undefined ? 0 : parseFloat(v));
+      const bills = visible.map((r) => {
+        const due = money(r.amount_due);
+        const paid = money(r.amount_paid);
+        return {
+          id: r.id,
+          courseName: r.course_name,
+          billingYear: Number(r.billing_year),
+          billingMonth: Number(r.billing_month),
+          amountDue: due,
+          amountPaid: paid,
+          outstanding: Math.round((due - paid) * 100) / 100,
+          paymentStatus: r.payment_status,
+          /** Nothing collected — this one may be cleared with the student. */
+          clearable: paid === 0,
+        };
+      });
+
+      return {
+        status: 200 as const,
+        body: {
+          bills,
+          clearableCount: bills.filter((b) => b.clearable).length,
+          keepingCount: bills.filter((b) => !b.clearable).length,
+          clearableTotal: Math.round(bills.filter((b) => b.clearable).reduce((a, b) => a + b.outstanding, 0) * 100) / 100,
+          keepingTotal: Math.round(bills.filter((b) => !b.clearable).reduce((a, b) => a + b.outstanding, 0) * 100) / 100,
+        },
+      };
+    } catch (error) {
+      console.error('Unpaid for student error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.LIST_FAILED', 'Failed to load unpaid bills');
+    }
+  },
+
+  /**
+   * POST /api/monthly-subscriptions/student/:studentId/clear-unpaid
+   *
+   * Drop the bills nobody will collect, after a student has been marked as left.
+   *
+   * Three guards, all server-side, because this deletes rows and the client is
+   * not the authority on any of them:
+   *   - the student must already be INACTIVE. Clearing bills for someone still
+   *     attending is never right, whatever a caller asks for.
+   *   - only rows with nothing collected. A part-paid month has a receipt behind
+   *     it and is a human's decision, so it cannot be reached from here.
+   *   - company- and branch-scoped like every other read.
+   */
+  clearUnpaidForStudent: async ({ params, headers }: { params: { studentId: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'delete')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const student = await queryOne<any>(
+        `SELECT id, is_active, branch_id FROM students WHERE id = $1 AND company_id = $2`,
+        [params.studentId, context.companyId]
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      if (!canAccessBranch(context, student.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      // The whole point of the prompt is that they have gone. If they are still
+      // active, this is a mis-click or a stale page, not an instruction.
+      if (student.is_active !== false) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.STUDENT_STILL_ACTIVE', 'Student is still active');
+      }
+
+      const deleted = await query<any>(
+        `DELETE FROM monthly_subscription_payments
+          WHERE company_id = $1
+            AND student_id = $2
+            AND COALESCE(amount_paid, 0) = 0
+            AND amount_due - COALESCE(amount_paid, 0) > 0
+          RETURNING id`,
+        [context.companyId, params.studentId]
+      );
+
+      return { status: 200 as const, body: { cleared: deleted.length } };
+    } catch (error) {
+      console.error('Clear unpaid for student error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.VOID_FAILED', 'Failed to clear unpaid bills');
+    }
+  },
+
   // ── Monthly Price Overrides ─────────────────────────────────────────────────
 
   /** POST /api/monthly-subscriptions/price-override

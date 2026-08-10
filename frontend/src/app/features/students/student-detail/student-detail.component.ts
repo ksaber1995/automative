@@ -16,6 +16,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { CheckboxModule } from 'primeng/checkbox';
 import { SelectModule } from 'primeng/select';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
@@ -34,7 +35,7 @@ import { ClassService } from '../../courses/services/class.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
 import { MasterCourseService } from '../../master-courses/services/master-course.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
-import { MonthlySubscriptionsService } from '../../monthly-subscriptions/monthly-subscriptions.service';
+import { MonthlySubscriptionsService, UnpaidBillsSummary } from '../../monthly-subscriptions/monthly-subscriptions.service';
 import { SessionPaymentsService } from '../../session-payments/session-payments.service';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -79,6 +80,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     DatePickerModule,
     TextareaModule,
     RadioButtonModule,
+    CheckboxModule,
     SelectModule,
     ProgressBarModule,
     TabsModule,
@@ -1374,25 +1376,79 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
    * Inactive tab can bring them back. Confirmed because it removes them from
    * rosters and attendance immediately.
    */
+  // ── Leaving: unpaid bills ───────────────────────────────────────────────────
+  /** Shown in the leave dialog so the decision is made with the money in view. */
+  leaveVisible = false;
+  leaveBills = signal<UnpaidBillsSummary | null>(null);
+  leaveLoadingBills = signal(false);
+  leaving = signal(false);
+  /** Drop the uncollected bills along with the student. Only ever offered for
+   *  bills where nothing was paid — the server enforces that too. */
+  clearBillsOnLeave = true;
+
+  /**
+   * Open the leave dialog, and ask what this student still owes while it opens.
+   *
+   * The bills are fetched rather than assumed because the answer changes the
+   * decision: leaving someone with a part-paid month is a different act from
+   * leaving someone carrying a bill nobody will ever collect, and the person
+   * clicking is the only one who knows which it is.
+   */
   markStudentLeft(): void {
     const s = this.student();
     if (!s) return;
-    this.confirmationService.confirm({
-      header: this.translate.instant('STUDENTS.LEAVE_HEADER'),
-      message: this.translate.instant('STUDENTS.LEAVE_CONFIRM', { name: s.name }),
-      icon: 'pi pi-sign-out',
-      accept: () => {
-        this.studentService.deleteStudent(s.id).subscribe({
-          next: () => {
-            this.notificationService.success(this.translate.instant('STUDENTS.LEFT', { name: s.name }));
-            // Re-pull rather than navigate away: the page is still theirs, it
-            // just says Inactive now.
-            this.studentService.getStudentById(s.id).subscribe({
-              next: (updated) => this.student.set(updated),
-            });
-          },
+    this.clearBillsOnLeave = true;
+    this.leaveBills.set(null);
+    this.leaveVisible = true;
+    this.leaveLoadingBills.set(true);
+    this.monthlyService.unpaidForStudent(s.id).subscribe({
+      next: (b) => { this.leaveBills.set(b); this.leaveLoadingBills.set(false); },
+      // A failed lookup must not block the student leaving — the dialog then
+      // simply asks the original question with no money shown.
+      error: () => this.leaveLoadingBills.set(false),
+    });
+  }
+
+  /** Month label for a bill row, e.g. "8/2026". */
+  billPeriod(b: { billingMonth: number; billingYear: number }): string {
+    return `${b.billingMonth}/${b.billingYear}`;
+  }
+
+  confirmLeave(): void {
+    const s = this.student();
+    if (!s || this.leaving()) return;
+    this.leaving.set(true);
+
+    this.studentService.deleteStudent(s.id).subscribe({
+      next: () => {
+        const summary = this.leaveBills();
+        const shouldClear = this.clearBillsOnLeave && (summary?.clearableCount ?? 0) > 0;
+
+        const finish = (cleared: number) => {
+          this.leaving.set(false);
+          this.leaveVisible = false;
+          this.notificationService.success(this.translate.instant('STUDENTS.LEFT', { name: s.name }));
+          if (cleared > 0) {
+            this.notificationService.info(this.translate.instant('STUDENTS.LEAVE_BILLS_CLEARED', { count: cleared }));
+          }
+          // Re-pull rather than navigate away: the page is still theirs, it
+          // just says Inactive now.
+          this.studentService.getStudentById(s.id).subscribe({
+            next: (updated) => this.student.set(updated),
+          });
+        };
+
+        // Only after the student is actually inactive — the endpoint refuses
+        // otherwise, which is the guard working rather than an error to hide.
+        if (!shouldClear) return finish(0);
+        this.monthlyService.clearUnpaidForStudent(s.id).subscribe({
+          next: (r) => finish(r.cleared),
+          // The student HAS left; failing to tidy the bills is not a reason to
+          // report that as a failure. Say what happened and leave them listed.
+          error: () => finish(0),
         });
       },
+      error: () => this.leaving.set(false),
     });
   }
 

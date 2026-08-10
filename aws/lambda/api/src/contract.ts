@@ -7110,6 +7110,51 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // Registered ABOVE listByStudent: these carry an extra path segment, and the
+    // convention in this file is specific-before-param (see sessions'
+    // /next-number and the note in index.ts).
+    //
+    // What a departing student still owes, split by whether any money was ever
+    // collected — the prompt shown when they are marked as having left.
+    unpaidForStudent: {
+      method: 'GET' as const,
+      path: '/api/monthly-subscriptions/student/:studentId/unpaid',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          bills: z.array(z.object({
+            id: UUIDSchema,
+            courseName: z.string(),
+            billingYear: z.number(),
+            billingMonth: z.number(),
+            amountDue: z.number(),
+            amountPaid: z.number(),
+            outstanding: z.number(),
+            paymentStatus: z.string(),
+            clearable: z.boolean(),
+          })),
+          clearableCount: z.number(),
+          keepingCount: z.number(),
+          clearableTotal: z.number(),
+          keepingTotal: z.number(),
+        }),
+        403: ApiErrorSchema,
+      },
+    },
+    // Drop the bills nobody will collect, once the student is already inactive.
+    // Refuses while they are still active, and never touches a part-paid bill.
+    clearUnpaidForStudent: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/student/:studentId/clear-unpaid',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ cleared: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     listByStudent: {
       method: 'GET' as const,
       path: '/api/monthly-subscriptions/student/:studentId',
