@@ -1,6 +1,6 @@
 import { CardDesign } from '@shared/interfaces/card-design.interface';
 import {
-  Ctx, DESIGN_H, DESIGN_W, T, bgTransform, contentTransform, fitText, goldGrad, roundRect, wrap, wrapFit,
+  CARD_CORNER, Ctx, DESIGN_H, DESIGN_W, T, bgTransform, contentTransform, fitText, goldGrad, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -149,7 +149,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
 
   // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 30);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();
 
   // Flat field + a faint lighter dot grid (integer-aligned; see gradient note).

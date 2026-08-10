@@ -55,6 +55,22 @@ type AdjustKey = 'student' | 'pool' | 'poolBack';
   standalone: true,
   imports: [CommonModule, FormsModule, CardModule, TabsModule, TooltipModule, ButtonModule, InputTextModule, TextareaModule, TranslateModule],
   templateUrl: './card-design.component.html',
+  // The section panels lose their outline on this page only.
+  //
+  // This screen is about looking at a card, and five outlined boxes around the
+  // thing you are judging compete with it — the eye reads the page's frames
+  // before the card's own edges. A soft shadow still separates each section from
+  // the background, so the grouping survives without the ruled lines.
+  //
+  // ::ng-deep because .p-card is PrimeNG's own element, outside this component's
+  // emulated encapsulation. Scoped under :host, so it cannot leak to the p-cards
+  // on any other screen.
+  styles: [`
+    :host ::ng-deep .p-card {
+      border: none;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 10px rgba(15, 23, 42, .04);
+    }
+  `],
 })
 export class CardDesignComponent implements OnInit, OnDestroy {
   private companyService = inject(CompanyService);

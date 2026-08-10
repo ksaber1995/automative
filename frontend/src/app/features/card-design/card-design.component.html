@@ -187,10 +187,12 @@
           <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
             {{ 'CARD_DESIGN.PREVIEW_FRONT' | translate }}
           </p>
-          <!-- No CSS border: printed cards have no edge frame, so a grey outline here made
-     the preview promise something the print does not deliver. The shadow still
-     separates the card from the page. -->
-<canvas #previewFront class="w-full h-auto rounded-xl shadow-lg"></canvas>
+          <!-- No CSS border: printed cards have no edge frame, so a grey outline
+               here made the preview promise something the print does not
+               deliver. The shadow still separates the card from the page. -->
+          <!-- Square, like the card it is previewing: rounding the canvas would
+               show curved corners the exported PNG does not have. -->
+          <canvas #previewFront class="w-full h-auto shadow-lg"></canvas>
           <p class="text-xs text-gray-400 mt-2">{{ 'CARD_DESIGN.PREVIEW_FRONT_NOTE' | translate }}</p>
           <p class="text-xs text-gray-400 mt-4">{{ 'CARD_DESIGN.PREVIEW_NOTE' | translate }}</p>
 
@@ -435,7 +437,7 @@
                 are inert for every other design (onArtPointerDown returns early).
               -->
               <canvas #previewPoolFront
-                      class="w-full h-auto rounded-xl shadow-lg border border-gray-200"
+                      class="w-full h-auto rounded-xl shadow-lg"
                       [class.cursor-move]="isCustomPool()"
                       [style.touch-action]="isCustomPool() ? 'none' : null"
                       (pointerdown)="onArtPointerDown($event)"

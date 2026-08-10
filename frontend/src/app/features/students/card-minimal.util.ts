@@ -1,6 +1,6 @@
 import { CardDesign, clampFields } from '@shared/interfaces/card-design.interface';
 import {
-  CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap, wrapFit,
+  CARD_CORNER, CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -36,7 +36,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();
   page(ctx);
 
@@ -227,7 +227,7 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
 
   // Background bleeds to the edge; content is inset by the 0.5 cm safe margin.
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();
   page(ctx);
   spine(ctx);

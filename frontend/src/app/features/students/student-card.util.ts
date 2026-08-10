@@ -118,6 +118,19 @@ export function currentAcademicYear(now: Date = new Date()): string {
   return `${start} - ${start + 1}`;
 }
 
+/**
+ * Corner radius of the card itself, for every student-card face.
+ *
+ * Zero: square corners. The rounding was decoration on an image that gets
+ * printed and then guillotined — the cutter decides the real corner, and a
+ * rounded PNG only leaves pale wedges at the edges of a print sheet.
+ *
+ * Named rather than inlined because four faces clip themselves this way (both
+ * fronts and both backs) and they have to agree — a square front on a rounded
+ * back is a printed pair that does not match.
+ */
+export const CARD_CORNER = 0;
+
 export function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -326,7 +339,7 @@ export function drawContain(ctx: Ctx, img: CanvasImageSource, cx: number, cy: nu
 }
 
 
-type RowIcon = 'user' | 'id' | 'cap' | 'group' | 'cal';
+type RowIcon = 'user' | 'id' | 'cap' | 'school' | 'group' | 'cal';
 
 function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
   ctx.save();
@@ -374,6 +387,36 @@ function rowIcon(ctx: Ctx, kind: RowIcon, cx: number, cy: number): void {
     ctx.moveTo(cx + 13, cy - 3);
     ctx.lineTo(cx + 13, cy + 7);
     ctx.stroke();
+  } else if (kind === 'school') {
+    // A building, deliberately unlike the cap above it.
+    //
+    // The school row used to borrow 'cap', so on a card that shows both a level
+    // and a school the two rows carried the same glyph, one under the other —
+    // which reads as a repeat rather than as two different facts. The cap is a
+    // filled quad with a thin stroke under it; this is a stroked box with a
+    // filled roof, so the two are told apart at a glance and at print size.
+    ctx.beginPath();
+    ctx.moveTo(cx - 13, cy - 2);
+    ctx.lineTo(cx, cy - 11);
+    ctx.lineTo(cx + 13, cy - 2);
+    ctx.closePath();
+    ctx.fill();
+    // Body — stroked, so it reads as an outline against the cap's solid mass.
+    ctx.beginPath();
+    ctx.moveTo(cx - 9.5, cy - 2);
+    ctx.lineTo(cx - 9.5, cy + 11);
+    ctx.lineTo(cx + 9.5, cy + 11);
+    ctx.lineTo(cx + 9.5, cy - 2);
+    ctx.stroke();
+    // Door, filled: gives the glyph a dark centre so it survives being scaled
+    // down to a 46px chip on a printed card.
+    ctx.beginPath();
+    ctx.moveTo(cx - 3, cy + 11);
+    ctx.lineTo(cx - 3, cy + 3.5);
+    ctx.lineTo(cx + 3, cy + 3.5);
+    ctx.lineTo(cx + 3, cy + 11);
+    ctx.closePath();
+    ctx.fill();
   } else if (kind === 'group') {
     ctx.beginPath();
     ctx.arc(cx - 6, cy - 5, 4.6, 0, Math.PI * 2);
@@ -473,7 +516,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
 
   // ── Background: bleeds off all four edges ────────────────────────────────────
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 30);
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();   // clipping is baked in device space, so it survives the transform swap below
 
   // NOTE ON GRADIENTS: large-area gradients are avoided throughout this card.
@@ -545,7 +588,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
     { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
     ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
     ...(f.school && data.school
-      ? [{ icon: 'cap' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
+      ? [{ icon: 'school' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
     ...(f.className && data.group
       ? [{ icon: 'group' as RowIcon, label: 'المجموعة', value: data.group, dir: 'rtl' as Dir }] : []),
     ...(f.year && data.year
