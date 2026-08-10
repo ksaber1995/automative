@@ -92,15 +92,22 @@
 
             <div class="space-y-4">
               <div>
+                <!-- The vocabulary overlay cannot reach this page — it loads once
+                     a tenant exists, and here there is none yet — so the strings
+                     that name education have a sports twin picked by the route. -->
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME' : 'AUTH.REGISTER.COMPANY_NAME') | translate }} <span class="text-red-500">*</span>
+                  {{ (isSports() ? 'AUTH.REGISTER.SPORTS_COMPANY_NAME'
+                      : accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME'
+                      : 'AUTH.REGISTER.COMPANY_NAME') | translate }} <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   formControlName="companyName"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
                   [class.border-red-500]="companyName?.invalid && companyName?.touched"
-                  [placeholder]="(accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME_PLACEHOLDER' : 'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER') | translate" />
+                  [placeholder]="(isSports() ? 'AUTH.REGISTER.SPORTS_COMPANY_NAME_PLACEHOLDER'
+                      : accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME_PLACEHOLDER'
+                      : 'AUTH.REGISTER.COMPANY_NAME_PLACEHOLDER') | translate" />
                 @if (companyName?.invalid && companyName?.touched) {
                   <small class="text-red-500 mt-1 block">
                     @if (companyName?.errors?.['required']) { {{ 'AUTH.REGISTER.COMPANY_NAME_REQUIRED' | translate }} }
@@ -299,7 +306,8 @@
                   formControlName="email"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-primary-500 focus:outline-none transition-colors"
                   [class.border-red-500]="email?.invalid && email?.touched"
-                  [placeholder]="'AUTH.REGISTER.YOUR_EMAIL_PLACEHOLDER' | translate" />
+                  [placeholder]="(isSports() ? 'AUTH.REGISTER.SPORTS_YOUR_EMAIL_PLACEHOLDER'
+                      : 'AUTH.REGISTER.YOUR_EMAIL_PLACEHOLDER') | translate" />
                 @if (email?.invalid && email?.touched) {
                   <small class="text-red-500 mt-1 block">
                     @if (email?.errors?.['required']) { {{ 'AUTH.REGISTER.EMAIL_REQUIRED' | translate }} }
