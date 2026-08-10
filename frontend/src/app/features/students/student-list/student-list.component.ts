@@ -800,9 +800,12 @@ export class StudentListComponent implements OnInit {
           code: formatStudentCode(student.studentCode),
           level: '',
           school: student.schoolName || '',
-          group: '',
+          // The student's live class and course, which the list endpoint now
+          // returns. These were hard-coded blank, so the two rows they feed
+          // printed empty on every card the app has ever produced.
+          group: student.className || '',
           year,
-          subject: '',
+          subject: student.courseName || '',
           qrUrl: `${origin}/p/s/${student.qrToken}`,
         };
         const phone = student.phone ? ` (${student.phone})` : '';

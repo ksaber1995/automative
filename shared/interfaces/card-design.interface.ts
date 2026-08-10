@@ -142,6 +142,51 @@ export const DEFAULT_CARD_ADJUST: CardAdjust = {
   accent: '',
 };
 
+/**
+ * Which rows appear on the student card's FRONT.
+ *
+ * Academies print these for different reasons, so what belongs on the card
+ * differs: one wants the school on it, another the group the child trains with,
+ * a third only a name and a code. Every row still disappears on its own when the
+ * student has no value for it — this decides what is *offered*, the data decides
+ * what is *shown*.
+ *
+ * `code` has no toggle: the card exists to be scanned, and its number is the
+ * fallback when a camera will not read the QR. A card with neither is a blank.
+ */
+export interface CardFields {
+  studentName: boolean;
+  /** The class/group the student trains with. */
+  className: boolean;
+  /** The course/sport they are enrolled on. */
+  courseName: boolean;
+  /** The school the student attends (students.school_name). */
+  school: boolean;
+  /** The academic year footer. */
+  year: boolean;
+}
+
+export const DEFAULT_CARD_FIELDS: CardFields = {
+  studentName: true,
+  className: true,
+  courseName: true,
+  school: true,
+  year: true,
+};
+
+/** Narrow whatever is stored (or missing) into a full set. */
+export function clampFields(f?: Partial<CardFields> | null): CardFields {
+  const d = DEFAULT_CARD_FIELDS;
+  const bool = (v: unknown, dflt: boolean) => (typeof v === 'boolean' ? v : dflt);
+  return {
+    studentName: bool(f?.studentName, d.studentName),
+    className: bool(f?.className, d.className),
+    courseName: bool(f?.courseName, d.courseName),
+    school: bool(f?.school, d.school),
+    year: bool(f?.year, d.year),
+  };
+}
+
 export interface CardDesign {
   /**
    * Which of the three card designs to print. Governs BOTH faces: the shared
@@ -149,6 +194,8 @@ export interface CardDesign {
    * printed pair always matches.
    */
   template: CardTemplateId;
+  /** Which rows the student card's front shows. Absent = all of them. */
+  fields?: CardFields;
   /** Which agnostic design the QR-card pool prints with. */
   agnosticTemplate?: AgnosticTemplateId;
   /** Defaults to the company name when blank. */
@@ -214,6 +261,7 @@ export const CARD_DESIGN_MAX = {
 
 export const DEFAULT_CARD_DESIGN: CardDesign = {
   template: 'navy',
+  fields: { ...DEFAULT_CARD_FIELDS },
   agnosticTemplate: 'aurora',
   teacherName: '',
   teacherTitle: '',

@@ -33,6 +33,15 @@ export interface Student {
   address?: string;
   /** The school the student attends. Optional; null means "not recorded". */
   schoolName?: string | null;
+  /**
+   * The live classes / courses this student is on, comma-separated.
+   *
+   * Filled by the LIST endpoint only, for the printed ID card — which has a line
+   * for each and, until now, nothing to put on it. Undefined therefore means
+   * "this read didn't ask", which is not the same as null ("none").
+   */
+  className?: string | null;
+  courseName?: string | null;
   branchId: string;
   isActive: boolean;
   inactiveDate?: string;

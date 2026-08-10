@@ -11,8 +11,8 @@ import { TextareaModule } from 'primeng/textarea';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { saveAs } from 'file-saver';
 import {
-  CardAdjust, CardDesign, CARD_ADJUST_BOUNDS, CARD_DESIGN_MAX, DEFAULT_CARD_ADJUST, DEFAULT_CARD_DESIGN,
-  DEFAULT_POOL_ART, POOL_ART_SAFE, PoolArtLayout, clampPoolArt,
+  CardAdjust, CardDesign, CardFields, CARD_ADJUST_BOUNDS, CARD_DESIGN_MAX, DEFAULT_CARD_ADJUST,
+  DEFAULT_CARD_DESIGN, DEFAULT_POOL_ART, POOL_ART_SAFE, PoolArtLayout, clampFields, clampPoolArt,
 } from '@shared/interfaces/card-design.interface';
 import { CompanyService } from '../../core/services/company.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -72,10 +72,19 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   design = signal<CardDesign>({ ...DEFAULT_CARD_DESIGN });
   /** Last design the server confirmed — the base for a template-only save. */
   savedDesign = signal<CardDesign | null>(null);
-  /** The chosen template differs from what's stored, so it's worth saving. */
+  /**
+   * The template OR the row checkboxes differ from what's stored, so this block
+   * is worth saving. Both share one Save button, so both have to make it dirty —
+   * otherwise ticking a checkbox leaves the button looking like there is nothing
+   * to save and the change is lost on navigation.
+   */
   templateDirty = computed(() => {
     const saved = this.savedDesign();
-    return !!saved && saved.template !== this.design().template;
+    if (!saved) return false;
+    if (saved.template !== this.design().template) return true;
+    const a = clampFields(saved.fields);
+    const b = clampFields(this.design().fields);
+    return (Object.keys(a) as (keyof CardFields)[]).some((k) => a[k] !== b[k]);
   });
 
   readonly templates = CARD_TEMPLATES;
@@ -250,8 +259,27 @@ export class CardDesignComponent implements OnInit, OnDestroy {
       // design saved before the two pool faces were split placed BOTH logos with
       // `pool`, so the back's sliders have to open where its logo actually is.
       poolBack: { ...DEFAULT_CARD_ADJUST, ...(d.poolBack ?? d.pool ?? {}) },
+      // Same reason as the blocks above: the checkboxes bind straight onto this,
+      // and a design saved before the toggles existed has no `fields` at all.
+      // Absent means every row, which is what those cards already printed.
+      fields: clampFields(d.fields),
     };
   }
+
+  /** Flip one row on or off, then repaint so the change is visible immediately. */
+  toggleField(key: keyof CardFields, on: boolean): void {
+    this.design.update((d) => ({ ...d, fields: { ...clampFields(d.fields), [key]: on } }));
+    this.redraw();
+  }
+
+  /** The checkbox list, in the order the rows appear on the card. */
+  readonly fieldToggles: { key: keyof CardFields; labelKey: string }[] = [
+    { key: 'studentName', labelKey: 'CARD_DESIGN.FIELD_STUDENT_NAME' },
+    { key: 'className', labelKey: 'CARD_DESIGN.FIELD_CLASS' },
+    { key: 'courseName', labelKey: 'CARD_DESIGN.FIELD_COURSE' },
+    { key: 'school', labelKey: 'CARD_DESIGN.FIELD_SCHOOL' },
+    { key: 'year', labelKey: 'CARD_DESIGN.FIELD_YEAR' },
+  ];
 
   /** Any field edit -> patch the model and repaint the preview. */
   set<K extends keyof CardDesign>(key: K, value: CardDesign[K]) {
@@ -638,6 +666,10 @@ export class CardDesignComponent implements OnInit, OnDestroy {
       ...d,
       instructions: d.instructions.map((s) => s.trim()).filter(Boolean),
       highlights: d.highlights.map((s) => s.trim()).filter(Boolean),
+      // Always a complete set. The API's resolveCardDesign() whitelists what it
+      // persists, and a partial object here would come back filled with defaults
+      // — i.e. every checkbox silently ticked again.
+      fields: clampFields(d.fields),
     };
   }
 
@@ -666,7 +698,14 @@ export class CardDesignComponent implements OnInit, OnDestroy {
   saveTemplate() {
     this.savingTemplate.set(true);
     const base = this.savedDesign() ?? this.design();
-    const payload = this.payloadFrom({ ...base, template: this.design().template });
+    // The row checkboxes live in this same block and save with it. Like the
+    // template itself they are posted on top of the last SAVED design, so this
+    // button never commits half-typed back-face edits sitting in the form.
+    const payload = this.payloadFrom({
+      ...base,
+      template: this.design().template,
+      fields: clampFields(this.design().fields),
+    });
     this.companyService.updateCardDesign(payload).subscribe({
       next: (saved) => {
         this.savedDesign.set(saved);

@@ -1,4 +1,4 @@
-import { CardDesign } from '@shared/interfaces/card-design.interface';
+import { CardDesign, clampFields } from '@shared/interfaces/card-design.interface';
 import {
   CardImages, Ctx, DESIGN_H, DESIGN_W, StudentCardData, T, bgTransform, contentTransform, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
@@ -79,13 +79,16 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.stroke();
 
   // ---- detail rows: label above value, hairline rule, no icons ----
+  // A row needs both the academy's toggle and a value on this student — see the
+  // same rule in drawStudentCard. Dropped entirely when blank: a lone "—" on a
+  // printed card reads as a mistake.
+  const f = clampFields(d.fields);
   const rows = [
-    { label: 'اسم الطالب', value: d.name, dir: 'rtl' as const },
-    { label: 'الصف الدراسي', value: d.level, dir: 'rtl' as const },
-    // Dropped entirely when blank: a lone "—" on a printed card reads as a mistake.
-    ...(d.school ? [{ label: 'المدرسة', value: d.school, dir: 'rtl' as const }] : []),
-    { label: 'المجموعة', value: d.group, dir: 'rtl' as const },
-    { label: 'العام الدراسي', value: d.year, dir: 'ltr' as const },
+    ...(f.studentName && d.name ? [{ label: 'اسم الطالب', value: d.name, dir: 'rtl' as const }] : []),
+    ...(d.level ? [{ label: 'الصف الدراسي', value: d.level, dir: 'rtl' as const }] : []),
+    ...(f.school && d.school ? [{ label: 'المدرسة', value: d.school, dir: 'rtl' as const }] : []),
+    ...(f.className && d.group ? [{ label: 'المجموعة', value: d.group, dir: 'rtl' as const }] : []),
+    ...(f.year && d.year ? [{ label: 'العام الدراسي', value: d.year, dir: 'ltr' as const }] : []),
   ];
   const rR = 700;      // right edge of the rows column
   const rL = 300;      // left edge
@@ -118,10 +121,14 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   });
 
   // ---- subject pill ----
-  roundRect(ctx, rL, 528, rR - rL, 58, 12);
-  ctx.fillStyle = T.accent;
-  ctx.fill();
-  fitText(ctx, d.subject || '—', (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', T.onAccent, 'center', 'rtl');
+  // Whole pill goes when the course is off or absent: an accent-filled bar with a
+  // dash in it is worse than the gap it leaves.
+  if (f.courseName && d.subject) {
+    roundRect(ctx, rL, 528, rR - rL, 58, 12);
+    ctx.fillStyle = T.accent;
+    ctx.fill();
+    fitText(ctx, d.subject, (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', T.onAccent, 'center', 'rtl');
+  }
 
   // ---- QR ----
   const qs = 196, qx = 750, qy = 176;

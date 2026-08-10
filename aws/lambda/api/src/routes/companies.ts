@@ -182,8 +182,25 @@ const DEFAULT_POOL_ART: PoolArtLayout = {
   codeX: 235, codeY: 470, codeSize: 34, codeColor: '#111827', codeChip: false,
 };
 
+/**
+ * Which rows the student card's FRONT shows. Mirrors CardFields in
+ * shared/interfaces — the Lambda has no path alias to shared/, so the shape is
+ * repeated here and the two must be kept in step.
+ *
+ * `code` deliberately has no toggle: the card exists to be scanned, and the
+ * number is the fallback when a camera will not read the QR.
+ */
+interface CardFields {
+  studentName: boolean;
+  className: boolean;
+  courseName: boolean;
+  school: boolean;
+  year: boolean;
+}
+
 interface CardDesign {
   template: CardTemplateId;
+  fields: CardFields;
   agnosticTemplate: AgnosticTemplateId;
   teacherName: string;
   teacherTitle: string;
@@ -222,6 +239,7 @@ interface CardDesign {
  */
 export const DEFAULT_CARD_DESIGN: CardDesign = {
   template: 'navy',
+  fields: { studentName: true, className: true, courseName: true, school: true, year: true },
   agnosticTemplate: 'aurora',
   teacherName: '',
   teacherTitle: '',
@@ -312,8 +330,25 @@ function resolveCardDesign(stored: any, companyName: string): CardDesign {
     ? d.agnosticTemplate
     : DEFAULT_CARD_DESIGN.agnosticTemplate;
 
+  // Which rows the student card's front shows. Absent (a design saved before the
+  // toggles existed) means all of them, which is exactly what those cards printed.
+  const fields = (v: any): CardFields => {
+    const f = v && typeof v === 'object' ? v : {};
+    const dflt = DEFAULT_CARD_DESIGN.fields;
+    return {
+      studentName: bool(f.studentName, dflt.studentName),
+      className: bool(f.className, dflt.className),
+      courseName: bool(f.courseName, dflt.courseName),
+      school: bool(f.school, dflt.school),
+      year: bool(f.year, dflt.year),
+    };
+  };
+
   return {
     template,
+    // NAMED HERE ON PURPOSE, like agnosticTemplate below — omit it and every
+    // checkbox validates, vanishes on save, and silently returns to "show all".
+    fields: fields(d.fields),
     agnosticTemplate,
     teacherName: str(d.teacherName, '').trim() || companyName,
     teacherTitle: str(d.teacherTitle, DEFAULT_CARD_DESIGN.teacherTitle),

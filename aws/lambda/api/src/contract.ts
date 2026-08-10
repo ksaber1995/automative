@@ -134,8 +134,19 @@ const PoolArtLayoutSchema = z.object({
   codeChip: z.boolean(),
 });
 
+const CardFieldsSchema = z.object({
+  studentName: z.boolean(),
+  className: z.boolean(),
+  courseName: z.boolean(),
+  school: z.boolean(),
+  year: z.boolean(),
+});
+
 const CardDesignSchema = z.object({
   template: z.enum(['navy', 'maroon', 'minimal', 'portrait']),
+  // Which rows the student card's front shows. Optional so a client that predates
+  // it still validates; absent means every row, which is what it did before.
+  fields: CardFieldsSchema.optional(),
   // The pool cards' design — chosen separately from the personal student cards.
   agnosticTemplate: z.enum(['aurora', 'ribbon', 'mono', 'wave', 'crest', 'custom']).optional(),
   teacherName: z.string().max(80),
@@ -444,6 +455,11 @@ const StudentSchema = z.object({
   studentCode: z.number().nullable().optional(),
   qrToken: z.string().nullable().optional(),
   hasSubscriptions: z.boolean().optional(),
+  // The live classes/courses this student is on, comma-separated. Only the list
+  // query fills them — they exist for the printed ID card, which has a line for
+  // each and had nothing to put there.
+  className: z.string().nullable().optional(),
+  courseName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

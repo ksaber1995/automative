@@ -1,4 +1,4 @@
-import { CardAdjust, DEFAULT_CARD_ADJUST, clampAdjust } from '@shared/interfaces/card-design.interface';
+import { CardAdjust, CardFields, DEFAULT_CARD_ADJUST, clampAdjust, clampFields } from '@shared/interfaces/card-design.interface';
 import { CardTheme, CARD_THEMES } from './card-theme';
 
 /**
@@ -93,6 +93,12 @@ export interface StudentCardData {
   year: string;
   subject: string;
   qrUrl: string;
+  /**
+   * Which rows this academy prints. renderStudentCardPng fills it in from the
+   * saved design, so a caller building card data never has to; absent means
+   * every row, which is what cards printed before the toggles existed.
+   */
+  fields?: CardFields;
 }
 
 export type Ctx = CanvasRenderingContext2D;
@@ -525,13 +531,25 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // --- info rows ---
   // The level row is dropped entirely when no level is set — a lone "—" on a
   // printed card reads as a mistake, so the row reflows away instead.
+  // A row appears only if the academy asked for it AND the student has a value.
+  // Both halves matter: the toggle decides what this academy prints at all, and
+  // the value decides whether THIS card has anything to say — a lone "—" on a
+  // printed card reads as a mistake, so an empty row reflows away instead.
+  //
+  // The code has no toggle on purpose: the card exists to be scanned, and its
+  // number is the fallback when a camera will not read the QR.
+  const f = clampFields(data.fields);
   const rows: { icon: RowIcon; label: string; value: string; dir: Dir; gold?: boolean }[] = [
-    { icon: 'user', label: 'اسم الطالب', value: data.name, dir: 'rtl' },
+    ...(f.studentName && data.name
+      ? [{ icon: 'user' as RowIcon, label: 'اسم الطالب', value: data.name, dir: 'rtl' as Dir }] : []),
     { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
     ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
-    ...(data.school ? [{ icon: 'cap' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
-    { icon: 'group', label: 'المجموعة', value: data.group, dir: 'rtl' },
-    { icon: 'cal', label: 'العام الدراسي', value: data.year, dir: 'ltr' },
+    ...(f.school && data.school
+      ? [{ icon: 'cap' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
+    ...(f.className && data.group
+      ? [{ icon: 'group' as RowIcon, label: 'المجموعة', value: data.group, dir: 'rtl' as Dir }] : []),
+    ...(f.year && data.year
+      ? [{ icon: 'cal' as RowIcon, label: 'العام الدراسي', value: data.year, dir: 'ltr' as Dir }] : []),
   ];
 
   const rx = 300;      // left edge — clears the (now narrower) gold ribbon on the navy panel
@@ -588,31 +606,35 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // of the gold ribbon paints ON TOP of the navy side panel and reads as a dark bar
   // bleeding out of it. BANNER_L therefore lines up with the icon-chip column above
   // (rx = 360) and never crosses the ribbon (which ends at ~364).
-  const BANNER_L = 300;      // lines up with the icon-chip column (rx), left of the narrowed panel's ribbon
-  const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
-  const TEXT_R = BANNER_R - 46;
-  const TEXT_L = 372;        // leaves a gap after the quill
-  ctx.save();
-  roundRect(ctx, BANNER_L, 544, BANNER_R - BANNER_L, 68, 16);
-  ctx.fillStyle = T.panelDark;
-  ctx.fill();
-  ctx.restore();
+  // The whole banner goes when the course is switched off or the student has
+  // none — an empty dark bar with a dash in it is worse than the space it fills.
+  if (f.courseName && data.subject) {
+    const BANNER_L = 300;      // lines up with the icon-chip column (rx), left of the narrowed panel's ribbon
+    const BANNER_R = 762;      // right edge — still clears the footer icons at ~825
+    const TEXT_R = BANNER_R - 46;
+    const TEXT_L = 372;        // leaves a gap after the quill
+    ctx.save();
+    roundRect(ctx, BANNER_L, 544, BANNER_R - BANNER_L, 68, 16);
+    ctx.fillStyle = T.panelDark;
+    ctx.fill();
+    ctx.restore();
 
-  fitText(ctx, data.subject || '—', TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
+    fitText(ctx, data.subject, TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
 
-  ctx.save();
-  ctx.strokeStyle = goldGrad(ctx, 310, 560, 354, 598);
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(312, 596);
-  ctx.quadraticCurveTo(332, 590, 352, 560);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(321, 593);
-  ctx.quadraticCurveTo(341, 592, 350, 569);
-  ctx.stroke();
-  ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = goldGrad(ctx, 310, 560, 354, 598);
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(312, 596);
+    ctx.quadraticCurveTo(332, 590, 352, 560);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(321, 593);
+    ctx.quadraticCurveTo(341, 592, 350, 569);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // --- QR ---
   // qx + qs must leave a real margin to the card edge (DESIGN_W): this is a printed

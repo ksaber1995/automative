@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { CardDesign, composeAdjust } from '@shared/interfaces/card-design.interface';
+import { CardDesign, clampFields, composeAdjust } from '@shared/interfaces/card-design.interface';
 import { CARD_THEMES, CardTemplate, DEFAULT_TEMPLATE, tuneTheme } from './card-theme';
 import {
   CARD_H, CARD_W, CardImages, StudentCardData, drawStudentCard, setCardAdjust, setCardTheme,
@@ -118,9 +118,14 @@ export async function renderStudentCardPng(
   const ctx = prepare(canvas);
   const qr = await qrImage(data.qrUrl);
 
+  // Resolved once, here, rather than by every caller that builds card data —
+  // a batch export and the design preview would otherwise each have to remember,
+  // and one of them forgetting means a card that quietly ignores the checkboxes.
+  const withFields: StudentCardData = { ...data, fields: clampFields(design?.fields) };
+
   arm(design, 'student', template);
-  if (template === 'minimal') drawStudentCardMinimal(ctx, data, qr, images);
-  else drawStudentCard(ctx, data, qr, images);
+  if (template === 'minimal') drawStudentCardMinimal(ctx, withFields, qr, images);
+  else drawStudentCard(ctx, withFields, qr, images);
 
   return canvas.toDataURL('image/png').split(',')[1];
 }

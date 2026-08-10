@@ -130,6 +130,10 @@ function mapStudentFromDB(row: any) {
     studentCode: row.student_code ?? null,
     qrToken: row.qr_token,
     hasSubscriptions: row.has_subscriptions === true,
+    // Only the list query asks for these; every other read leaves them undefined
+    // rather than null, so "not requested" stays distinct from "none".
+    ...(row.class_names !== undefined ? { className: row.class_names || null } : {}),
+    ...(row.course_names !== undefined ? { courseName: row.course_names || null } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -141,6 +145,37 @@ const STUDENT_SUBSCRIPTIONS_EXISTS = `
   EXISTS (SELECT 1 FROM enrollments en WHERE en.student_id = s.id)
   OR EXISTS (SELECT 1 FROM master_enrollments me WHERE me.student_id = s.id)
   OR EXISTS (SELECT 1 FROM event_subscriptions es WHERE es.student_id = s.id)
+`;
+
+/**
+ * The classes (or courses) a student is currently on, as one comma-separated
+ * string — for the printed ID card, which has one line for each.
+ *
+ * DISTINCT because a student can hold two enrolments on the same class through
+ * a master bundle, and a card reading "U-12, U-12" is worse than no card. Live
+ * enrolments only: a dropped one is history and does not belong on a card that
+ * gets printed and carried around for a year.
+ *
+ * Both halves are read — a student can be on a class directly or through a
+ * master-course bundle, and a card that omitted the second kind would be blank
+ * for exactly the students an academy sells the most to.
+ */
+const STUDENT_ENROLLED_NAMES = (nameExpr: string) => `
+  SELECT string_agg(DISTINCT n, ', ')
+  FROM (
+    SELECT ${nameExpr} AS n
+      FROM enrollments en
+      JOIN classes cl ON cl.id = en.class_id
+      JOIN courses co ON co.id = en.course_id
+     WHERE en.student_id = s.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+    UNION
+    SELECT ${nameExpr} AS n
+      FROM master_class_enrollments mce
+      JOIN classes cl ON cl.id = mce.class_id
+      JOIN courses co ON co.id = cl.course_id
+     WHERE mce.student_id = s.id AND mce.status <> 'DROPPED'
+  ) names
+  WHERE n IS NOT NULL AND n <> ''
 `;
 
 export const studentsRoutes = {
@@ -405,7 +440,9 @@ export const studentsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      let sql = `SELECT s.*, (${STUDENT_SUBSCRIPTIONS_EXISTS}) AS has_subscriptions
+      let sql = `SELECT s.*, (${STUDENT_SUBSCRIPTIONS_EXISTS}) AS has_subscriptions,
+                        (${STUDENT_ENROLLED_NAMES('cl.name')}) AS class_names,
+                        (${STUDENT_ENROLLED_NAMES('co.name')}) AS course_names
                  FROM students s WHERE s.company_id = $1`;
       const params: any[] = [context.companyId];
 
