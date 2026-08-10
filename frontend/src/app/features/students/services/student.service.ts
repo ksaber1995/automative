@@ -29,6 +29,25 @@ export interface Enrollment {
   course?: any;
 }
 
+/**
+ * A "you may already have this person" hint, raised while a name is typed.
+ *
+ * EXACT means the names match once Arabic spelling variants and word order are
+ * folded away (أحمد/احمد, فاطمة/فاطمه, "دنيا حجازي"/"حجازي دنيا"). SIMILAR means
+ * they merely read alike, e.g. عمر / عمرو.
+ */
+export interface SimilarStudent {
+  id: string;
+  name: string;
+  studentCode: number | null;
+  phone: string | null;
+  parentPhone: string | null;
+  branchName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  matchType: 'EXACT' | 'SIMILAR';
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -37,6 +56,17 @@ export class StudentService {
 
   getAllStudents(): Observable<Student[]> {
     return this.api.get<Student[]>('students');
+  }
+
+  /**
+   * Existing students whose name reads like this one. Never blocks anything —
+   * two children really can share a name, so this only ever informs.
+   */
+  findSimilar(name: string, excludeId?: string | null): Observable<SimilarStudent[]> {
+    return this.api.get<SimilarStudent[]>('students/similar', {
+      name,
+      ...(excludeId ? { excludeId } : {}),
+    });
   }
 
   getStudentsByBranch(branchId: string): Observable<Student[]> {

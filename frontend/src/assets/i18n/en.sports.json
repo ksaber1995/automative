@@ -869,6 +869,7 @@
       "CREATE_TITLE": "Add New Trainee",
       "STUDENT_SECTION": "Trainee Information",
       "NAME_PLACEHOLDER": "Trainee's full name",
+      "DUPLICATE_CHECKING": "Checking for existing trainees…",
       "STUDENT_EMAIL": "Trainee Email",
       "STUDENT_EMAIL_PLACEHOLDER": "trainee@example.com (optional)",
       "STUDENT_PHONE": "Trainee Phone",

@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
+import { Subject, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, takeUntil, filter, tap } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -9,7 +11,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { StudentService } from '../services/student.service';
+import { StudentService, SimilarStudent } from '../services/student.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -28,12 +30,13 @@ import { toLocalYmd } from '../../../core/utils/date.util';
     TextareaModule,
     SelectModule,
     DatePickerModule,
-    TranslateModule
+    TranslateModule,
+    RouterModule
   ],
   templateUrl: './student-form.component.html',
   styleUrl: './student-form.component.scss'
 })
-export class StudentFormComponent implements OnInit {
+export class StudentFormComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private studentService = inject(StudentService);
   private lookupService = inject(LookupService);
@@ -58,6 +61,27 @@ export class StudentFormComponent implements OnInit {
     { value: 'MALE', label: 'STUDENTS.FORM.GENDER_MALE' },
     { value: 'FEMALE', label: 'STUDENTS.FORM.GENDER_FEMALE' },
   ];
+
+  // ── "Do we already have this person?" ─────────────────────────────────────
+  /**
+   * Existing students whose name reads like the one being typed. Advisory only:
+   * the form saves regardless, because two children really can share a name and
+   * only the person at the desk can tell which case this is.
+   */
+  similarStudents = signal<SimilarStudent[]>([]);
+  checkingSimilar = signal(false);
+
+  /**
+   * Long enough that the lookup fires once the typing stops, not once per
+   * letter — an Arabic full name is typed in bursts, and a request per keystroke
+   * would both flood the API and flash a hint built from half a name.
+   */
+  private static readonly TYPING_PAUSE_MS = 450;
+  /** Below this the name matches half the school; the server enforces it too. */
+  private static readonly MIN_NAME_LENGTH = 3;
+
+  private nameTyped$ = new Subject<string>();
+  private destroy$ = new Subject<void>();
 
   constructor() {
     this.studentForm = this.fb.group({
@@ -84,6 +108,56 @@ export class StudentFormComponent implements OnInit {
       this.isEditMode.set(true);
       this.loadStudent(this.studentId);
     }
+    this.watchNameForDuplicates();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  /**
+   * Ask "do we already have this person?" once the typing settles.
+   *
+   * `switchMap` is the important operator: a slow answer for "دنيا" must never
+   * land after the answer for "دنيا حجازي" and repaint the panel with matches
+   * for a name that is no longer in the box. It cancels the in-flight request on
+   * every new one, so the hint always belongs to what is on screen.
+   */
+  private watchNameForDuplicates() {
+    this.studentForm.get('name')!.valueChanges
+      .pipe(
+        takeUntil(this.destroy$),
+        debounceTime(StudentFormComponent.TYPING_PAUSE_MS),
+        distinctUntilChanged(),
+        tap(() => this.similarStudents.set([])),
+        filter((v) => {
+          const ok = (v ?? '').trim().length >= StudentFormComponent.MIN_NAME_LENGTH;
+          if (!ok) this.checkingSimilar.set(false);
+          return ok;
+        }),
+        tap(() => this.checkingSimilar.set(true)),
+        switchMap((v: string) =>
+          this.studentService.findSimilar(v.trim(), this.studentId).pipe(
+            // A hint that fails is not worth a toast — the form still works.
+            catchError(() => of([] as SimilarStudent[])),
+          ),
+        ),
+      )
+      .subscribe((matches) => {
+        this.checkingSimilar.set(false);
+        this.similarStudents.set(matches);
+      });
+  }
+
+  /** Hide the panel. Editing the name again asks afresh. */
+  dismissSimilar() {
+    this.similarStudents.set([]);
+  }
+
+  /** Any exact match makes the panel a warning rather than a note. */
+  hasExactMatch(): boolean {
+    return this.similarStudents().some((s) => s.matchType === 'EXACT');
   }
 
   loadBranches() {

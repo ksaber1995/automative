@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { ensureQrCardSchema, qrStudentMatch, codeDigits, CARD_SERIAL_BASE, CARD_SERIAL_BASE_V2, CARD_SERIAL_BASE_V3 } from './qr-cards';
 import { insert, update, findById, query, deleteById, queryOne } from '../db/connection';
-import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
+import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter, isAuthError, isSubscriptionError } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
 // 16 random bytes → 32 hex chars. ~128 bits of entropy, matching the
@@ -28,6 +28,84 @@ export function ensureStudentSchoolColumn(): Promise<void> {
     });
   }
   return schoolColumnReady;
+}
+
+// ── Duplicate detection ──────────────────────────────────────────────────────
+
+/**
+ * Fold a name down to what it would be spelled like by someone else.
+ *
+ * Arabic gives the same name many spellings, and staff type whichever comes to
+ * hand: أحمد/احمد, فاطمة/فاطمه, مصطفى/مصطفي, with or without tashkeel or a
+ * tatweel stretching a letter. Comparing raw text would call those different
+ * people and the duplicate would sail through.
+ *
+ * So: hamza forms collapse to bare alef, ة→ه, ى→ي, ؤ→و, ئ→ي, tatweel and every
+ * diacritic are dropped, punctuation becomes a space, runs of space collapse,
+ * and Latin is lowercased. Every function used is IMMUTABLE, which is what lets
+ * the trigram index below be built on this exact expression.
+ */
+const NORMALIZED_NAME = (expr: string) =>
+  `lower(btrim(regexp_replace(translate(${expr}, 'أإآٱىةؤئـًٌٍَُِّْٰ', 'اااايهوي'), '[^[:alnum:]]+', ' ', 'g')))`;
+
+/**
+ * The same name with its words in alphabetical order.
+ *
+ * "دنيا حجازي" and "حجازي دنيا" are one person entered twice, but character
+ * trigrams score the pair below any usable threshold. Comparing sorted words
+ * catches the reordering exactly, with no room for a false positive: it matches
+ * only when the two names are made of the very same words.
+ */
+const SORTED_TOKENS = (expr: string) =>
+  `array_to_string(ARRAY(SELECT unnest(string_to_array(${expr}, ' ')) ORDER BY 1), ' ')`;
+
+/**
+ * How alike two names must read to be worth mentioning.
+ *
+ * Measured against real data rather than guessed. In the largest tenant (2,015
+ * students) the pairs at each score are:
+ *   1.00  دنيا حجازي / دنيا حجازي          — the same person, twice
+ *   0.81  عمر عبد العزيز / عمرو عبد العزيز — different, but worth a second look
+ *   0.69  مروان رمضان / مروة رمضان         — different people
+ *   0.55  ياسين عبد الرحمن / ياسين عبد الحميد — plainly different
+ * and the count of flagged pairs runs 787 at 0.7 against 13,302 at 0.5. Below
+ * 0.7 the hint cries wolf on every third name and stops being read.
+ *
+ * "Shares two or more words" was tried and rejected: عبد alone appears in so
+ * many names that it flagged 13,666 pairs.
+ */
+const NAME_SIMILARITY_THRESHOLD = 0.7;
+
+/** Never show more than this — a hint, not a search result. */
+const SIMILAR_LIMIT = 6;
+
+/**
+ * pg_trgm plus a trigram index over the normalized name.
+ *
+ * Best-effort by design: on a database where the extension cannot be installed
+ * the lookup still answers on exact and reordered matches, which is the part
+ * that catches true duplicates. Losing the fuzzy tier must not take the whole
+ * form down, so a failure here is logged and swallowed.
+ */
+let trigramReady: Promise<boolean> | null = null;
+export function ensureNameSearchSchema(): Promise<boolean> {
+  if (!trigramReady) {
+    trigramReady = (async () => {
+      try {
+        await query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+        await query(
+          `CREATE INDEX IF NOT EXISTS idx_students_name_trgm
+             ON students USING gin ((${NORMALIZED_NAME('name')}) gin_trgm_ops)`
+        );
+        return true;
+      } catch (e) {
+        console.error('Trigram name search unavailable (non-fatal):', e);
+        trigramReady = null;   // let a later request try again
+        return false;
+      }
+    })();
+  }
+  return trigramReady;
 }
 
 function mapStudentFromDB(row: any) {
@@ -66,6 +144,98 @@ const STUDENT_SUBSCRIPTIONS_EXISTS = `
 `;
 
 export const studentsRoutes = {
+  /**
+   * GET /api/students/similar?name=…
+   *
+   * "Is this person already on the books?" — asked while the name is being
+   * typed, answered as a hint. It never blocks a save: two children really can
+   * share a name, and only the person at the desk can tell. That is also why the
+   * answer carries the code, phone, branch and join date — enough to recognise
+   * the row without opening it.
+   *
+   * Inactive students are included deliberately: someone returning after a break
+   * is precisely the duplicate worth catching, and they are the ones staff
+   * cannot find by searching the active list.
+   */
+  similar: async ({ query: queryParams, headers }: {
+    query: { name?: string; excludeId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const raw = (queryParams.name ?? '').trim();
+      // Too short to mean anything: one or two letters match half the school and
+      // would make the hint noise. The client waits for a pause in typing too.
+      if (raw.length < 3) return { status: 200 as const, body: [] };
+
+      const fuzzy = await ensureNameSearchSchema();
+
+      // The fuzzy tier is dropped entirely when pg_trgm is missing, rather than
+      // approximated with LIKE — a half-right hint is worse than an honest one.
+      const fuzzyClause = fuzzy
+        ? `OR similarity(c.sn, q.n) >= ${NAME_SIMILARITY_THRESHOLD}`
+        : '';
+      const fuzzyScore = fuzzy ? `similarity(c.sn, q.n)` : `0::real`;
+
+      const rows = await query<any>(
+        `WITH q AS (SELECT ${NORMALIZED_NAME('$2::text')} AS n),
+         cand AS (
+           SELECT s.id, s.name, s.student_code, s.phone, s.parent_phone,
+                  s.is_active, s.created_at, b.name AS branch_name,
+                  ${NORMALIZED_NAME('s.name')} AS sn
+           FROM students s
+           LEFT JOIN branches b ON b.id = s.branch_id
+           WHERE s.company_id = $1
+             AND ($3::uuid IS NULL OR s.id <> $3::uuid)
+         )
+         SELECT c.id, c.name, c.student_code, c.phone, c.parent_phone,
+                c.is_active, c.created_at, c.branch_name,
+                (c.sn = q.n OR ${SORTED_TOKENS('c.sn')} = ${SORTED_TOKENS('q.n')}) AS is_exact,
+                ${fuzzyScore} AS score
+         FROM cand c CROSS JOIN q
+         WHERE c.sn = q.n
+            OR ${SORTED_TOKENS('c.sn')} = ${SORTED_TOKENS('q.n')}
+            ${fuzzyClause}
+         ORDER BY (c.sn = q.n) DESC, ${fuzzyScore} DESC, c.created_at DESC
+         LIMIT ${SIMILAR_LIMIT}`,
+        [context.companyId, raw, queryParams.excludeId || null]
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          studentCode: r.student_code ?? null,
+          phone: r.phone ?? null,
+          parentPhone: r.parent_phone ?? null,
+          branchName: r.branch_name ?? null,
+          isActive: r.is_active === true,
+          createdAt: r.created_at,
+          // EXACT reads as "this is probably the same person"; SIMILAR as
+          // "check before you add another". The client words them differently.
+          matchType: r.is_exact === true ? ('EXACT' as const) : ('SIMILAR' as const),
+        })),
+      };
+    } catch (error) {
+      console.error('Similar students error:', error);
+      // An expired session or a lapsed subscription has to reach the client as
+      // itself. Swallowed into an empty list it would read as "no duplicates
+      // found", and the frontend's interceptor would never prompt a re-login —
+      // the user would keep typing against a dead session.
+      if (isAuthError(error) || isSubscriptionError(error)) {
+        return mapThrownError(error, 'ERRORS.UNAUTHORIZED', 'Unauthorized', 401);
+      }
+      // Anything else is the lookup itself failing, and a hint that cannot be
+      // produced is no reason to break the form being filled in.
+      return { status: 200 as const, body: [] };
+    }
+  },
+
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       await ensureStudentSchoolColumn();

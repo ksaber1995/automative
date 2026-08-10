@@ -400,6 +400,26 @@ const BulkImportResultSchema = z.object({
   errors: z.array(z.object({ row: z.number(), message: z.string() })),
 });
 
+/**
+ * One "you may already have this person" hint, shown while a name is typed.
+ *
+ * Carries enough to recognise the row without opening it — code, phone, branch,
+ * join date — because the whole point is to answer the question at the desk.
+ * EXACT means the names match once spelling variants and word order are folded
+ * away; SIMILAR means they read alike.
+ */
+const SimilarStudentSchema = z.object({
+  id: UUIDSchema,
+  name: z.string(),
+  studentCode: z.number().nullable(),
+  phone: z.string().nullable(),
+  parentPhone: z.string().nullable(),
+  branchName: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  matchType: z.enum(['EXACT', 'SIMILAR']),
+});
+
 const StudentSchema = z.object({
   id: UUIDSchema,
   companyId: UUIDSchema,
@@ -2070,6 +2090,22 @@ export const contract = c.router({
       }),
       responses: {
         200: z.array(StudentSchema),
+      },
+    },
+    // MUST stay above `getById`: itty-router matches in registration order with
+    // no static-over-param precedence, so `/students/:id` registered first would
+    // swallow `/students/similar` and fail it as "id: Invalid uuid" (same trap
+    // as sessions' /next-number — see the note in index.ts).
+    similar: {
+      method: 'GET',
+      path: '/api/students/similar',
+      query: z.object({
+        name: z.string().optional(),
+        // The student being edited, so a name doesn't flag itself.
+        excludeId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.array(SimilarStudentSchema),
       },
     },
     getById: {

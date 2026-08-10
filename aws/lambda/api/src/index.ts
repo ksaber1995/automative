@@ -73,6 +73,10 @@ const router = {
     resetPassword: authRoutes.resetPassword,
     profile: authRoutes.profile,
   },
+  // `similar` is declared first inside studentsRoutes AND above `getById` in the
+  // contract — the static `/students/similar` has to be registered before
+  // `/students/:id` or it is captured as an id and rejected as an invalid uuid
+  // (same trap as sessions' `/next-number`, see the note further down).
   students: studentsRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,

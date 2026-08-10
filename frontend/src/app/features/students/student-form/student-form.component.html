@@ -24,6 +24,83 @@
                 {{ 'STUDENTS.FORM.NAME_REQUIRED' | translate }}
               </small>
             }
+
+            @if (checkingSimilar()) {
+              <small class="text-gray-400 block mt-1">
+                <i class="pi pi-spin pi-spinner text-xs me-1"></i>{{ 'STUDENTS.FORM.DUPLICATE_CHECKING' | translate }}
+              </small>
+            }
+
+            <!-- Advisory only: two children really can share a name, so this
+                 never blocks the save. An exact match is coloured as a warning,
+                 a merely similar one as a note. -->
+            @if (similarStudents().length) {
+              <div class="mt-2 rounded-lg border p-3"
+                   [class.border-amber-300]="hasExactMatch()"
+                   [class.bg-amber-50]="hasExactMatch()"
+                   [class.border-blue-200]="!hasExactMatch()"
+                   [class.bg-blue-50]="!hasExactMatch()">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle"
+                       [class.text-amber-600]="hasExactMatch()"
+                       [class.text-blue-500]="!hasExactMatch()"></i>
+                    <span class="text-sm font-semibold"
+                          [class.text-amber-900]="hasExactMatch()"
+                          [class.text-blue-900]="!hasExactMatch()">
+                      {{ (hasExactMatch() ? 'STUDENTS.FORM.DUPLICATE_EXACT_TITLE' : 'STUDENTS.FORM.DUPLICATE_SIMILAR_TITLE')
+                         | translate: { count: similarStudents().length } }}
+                    </span>
+                  </div>
+                  <button type="button" class="text-xs text-gray-500 hover:text-gray-700 shrink-0"
+                          (click)="dismissSimilar()">
+                    {{ 'STUDENTS.FORM.DUPLICATE_DISMISS' | translate }}
+                  </button>
+                </div>
+
+                <div class="space-y-1">
+                  @for (s of similarStudents(); track s.id) {
+                    <div class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="text-sm font-medium text-gray-800">{{ s.name }}</span>
+                          @if (s.matchType === 'EXACT') {
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
+                              {{ 'STUDENTS.FORM.DUPLICATE_TAG_EXACT' | translate }}
+                            </span>
+                          }
+                          @if (!s.isActive) {
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700">
+                              {{ 'STUDENTS.FORM.DUPLICATE_TAG_INACTIVE' | translate }}
+                            </span>
+                          }
+                        </div>
+                        <!-- Enough to recognise the row without opening it. -->
+                        <div class="text-[11px] text-gray-500 truncate">
+                          @if (s.studentCode != null) { #{{ s.studentCode }} }
+                          @if (s.phone) { · {{ s.phone }} }
+                          @else if (s.parentPhone) { · {{ s.parentPhone }} }
+                          @if (s.branchName) { · {{ s.branchName }} }
+                          · {{ s.createdAt | date: 'mediumDate' }}
+                        </div>
+                      </div>
+                      <a [routerLink]="['/students', s.id]" target="_blank" rel="noopener"
+                         class="text-xs font-semibold whitespace-nowrap shrink-0"
+                         [class.text-amber-700]="hasExactMatch()"
+                         [class.text-blue-600]="!hasExactMatch()">
+                        {{ 'STUDENTS.FORM.DUPLICATE_OPEN' | translate }}
+                      </a>
+                    </div>
+                  }
+                </div>
+
+                <p class="text-[11px] mt-2"
+                   [class.text-amber-700]="hasExactMatch()"
+                   [class.text-blue-600]="!hasExactMatch()">
+                  {{ 'STUDENTS.FORM.DUPLICATE_HINT' | translate }}
+                </p>
+              </div>
+            }
           </div>
 
           <!-- Date of Birth -->

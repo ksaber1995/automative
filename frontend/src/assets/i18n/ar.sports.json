@@ -781,6 +781,7 @@
       "CREATE_TITLE": "إضافة متدرب جديد",
       "STUDENT_SECTION": "معلومات المتدرب",
       "NAME_PLACEHOLDER": "اسم المتدرب كاملاً",
+      "DUPLICATE_CHECKING": "جارٍ البحث عن متدربين مسجلين…",
       "STUDENT_EMAIL": "بريد المتدرب الإلكتروني",
       "STUDENT_PHONE": "هاتف المتدرب",
       "CHANNEL_HINT": "اختياري — يساعد على تتبع القنوات التي تجلب المتدربين",
