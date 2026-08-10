@@ -304,13 +304,17 @@ export class AuthService {
   }
 
   /**
-   * An academy that registered on Basic. Events, Expenses and Reports are part of
-   * what Advanced buys, so they stay hidden for these tenants.
+   * An academy that registered on Basic. Events and Reports are part of what
+   * Advanced buys, so they stay hidden for these tenants.
    *
-   * Deliberately narrower than canUseCrm/canUseCash: a solo TEACHER keeps all
-   * three whatever their plan. The restriction is about what an academy's Basic
-   * tier includes, not about the feature being unavailable to small tenants —
-   * rent and bills apply to a one-person tenant just the same.
+   * Expenses used to be on that list and no longer is: rent, bills and equipment
+   * are what running an academy costs rather than something to upsell, and the
+   * API never gated them anyway — so a Basic academy had a working page and no
+   * way to reach it.
+   *
+   * Deliberately narrower than canUseCrm/canUseCash: a solo TEACHER keeps these
+   * whatever their plan. The restriction is about what an academy's Basic tier
+   * includes, not about the feature being unavailable to small tenants.
    */
   isBasicAcademy(): boolean {
     return !this.isTeacher() && this.plan() === 'SIMPLE';

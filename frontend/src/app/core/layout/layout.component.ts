@@ -309,7 +309,11 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
       { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
       { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
-      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') && !auth.isBasicAcademy() },
+      // Every academy gets Expenses, Basic included: rent, bills and equipment
+      // are what running one costs, not an Advanced extra. The API never gated
+      // it either — only this line did, so a Basic academy had the page working
+      // and no way to reach it.
+      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
       // Hidden for teachers alongside Employees — a salary is paid to an
       // employee, and a teacher tenant has none. Expenses above stays visible:
       // rent and bills apply to a solo teacher too.
