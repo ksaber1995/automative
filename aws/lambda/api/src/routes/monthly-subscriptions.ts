@@ -8,6 +8,7 @@ import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { issueReceipt, voidReceiptsFor } from '../db/receipts';
+import { studentIsPresent, studentIsPresentById } from '../db/active-students';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -213,6 +214,11 @@ export async function ensureBillsForMonth(
       AND ov.billing_month = $3::int
      WHERE e.company_id = $1
        AND e.status = 'ACTIVE'
+       -- never bill someone who has left. Their enrolment is still ACTIVE —
+       -- marking a student left is the act staff perform, not cancelling their
+       -- enrolments one by one — so without this a fresh bill is raised every
+       -- month against a person who has gone, and the dues report chases it.
+       AND ${studentIsPresentById('e.student_id')}
        AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
        AND c.is_active = true
        -- never bill a month that ended before the student even enrolled
@@ -342,6 +348,9 @@ async function projectBillsForRange(
       AND existing.billing_month = p.billing_month
      WHERE e.company_id = $1
        AND e.status = 'ACTIVE'
+       -- Same rule for the rows shown before they are stored: a month that would
+       -- never be billed must not be displayed as owed either.
+       AND ${studentIsPresent('s')}
        AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
        AND c.is_active = true
        AND (e.enrollment_date IS NULL OR e.enrollment_date <= p.last_day)
@@ -396,6 +405,7 @@ export const monthlySubscriptionsRoutes = {
          AND ov.billing_month = $3
         WHERE e.company_id = $1
           AND e.status = 'ACTIVE'
+          AND ${studentIsPresentById('e.student_id')}
           AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
           AND c.is_active = true
       `;

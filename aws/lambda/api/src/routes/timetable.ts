@@ -8,6 +8,7 @@ import {
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureClassDayTimesSchema } from './classes';
+import { studentIsPresentById } from '../db/active-students';
 
 const DAY_NAMES = [
   'SUNDAY',
@@ -115,12 +116,17 @@ export const timetableRoutes = {
           co.name AS course_name,
           b.name AS branch_name,
           CONCAT(e.first_name, ' ', e.last_name) AS instructor_name,
+          -- Who is expected in the room, which is what the timetable is for.
+          -- Left students keep an ACTIVE enrolment, so counting rows alone would
+          -- promise more heads than the register that opens from here.
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+              AND ${studentIsPresentById('en.student_id')}
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+              AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
           s.id AS session_id,
           s.start_date AS session_start,

@@ -15,6 +15,7 @@ import {
   substitutionCoversLateral,
   substitutionIsOrphanClause,
 } from '../db/substitutions';
+import { studentIsPresent, studentIsPresentById } from '../db/active-students';
 
 /** What the roster panels say about a student's attendance record. */
 export interface AbsenceStats {
@@ -67,11 +68,16 @@ export async function absenceStats(
         LIMIT 20
      ),
      enrolled AS (
+        -- A student who has left is not absent, they are gone. Counting missed
+        -- lessons for them builds a streak that grows forever and buries the
+        -- students the report exists to surface.
         SELECT student_id FROM enrollments
         WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+          AND ${studentIsPresentById('student_id')}
         UNION
         SELECT student_id FROM master_class_enrollments
         WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+          AND ${studentIsPresentById('student_id')}
      ),
      presence AS (
         SELECT e.student_id, r.rn,
@@ -112,11 +118,15 @@ export async function absenceStats(
           AND date_trunc('month', s.start_date) = date_trunc('month', $4::timestamp)
      ),
      enrolled AS (
+        -- Same reason as the streak above: a student who has left stops
+        -- accumulating absences for the month.
         SELECT student_id FROM enrollments
         WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+          AND ${studentIsPresentById('student_id')}
         UNION
         SELECT student_id FROM master_class_enrollments
         WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+          AND ${studentIsPresentById('student_id')}
      )
      SELECT e.student_id,
             COUNT(*) AS session_count,
@@ -384,7 +394,11 @@ export const attendanceRoutes = {
             SELECT student_id FROM master_class_enrollments
             WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
          ) enrolled
-         JOIN students s ON s.id = enrolled.student_id
+         -- Someone who has left is not expected in the room. Their enrolment is
+         -- usually still ACTIVE — marking them left is the act staff perform, not
+         -- cancelling enrolments one by one — so without this they stay on the
+         -- sheet forever and are counted absent for lessons they never had.
+         JOIN students s ON s.id = enrolled.student_id AND ${studentIsPresent('s')}
          LEFT JOIN session_attendance sa ON sa.session_id = $3 AND sa.student_id = s.id
          LEFT JOIN classes hc ON hc.id = sa.home_class_id
          -- Missing from THIS room is not the same as missing the lesson: someone
@@ -1362,11 +1376,16 @@ export const attendanceRoutes = {
          ),
          recent20 AS (SELECT * FROM recent WHERE rn <= 20),
          enrolled AS (
+           -- Dropped here as well as in the final WHERE: a left student's streak
+           -- is meaningless, and computing it for every one of them is work
+           -- thrown away on rows that are filtered out at the end anyway.
            SELECT DISTINCT student_id, class_id FROM enrollments
            WHERE company_id = $1 AND status NOT IN ('DROPPED', 'CANCELLED')
+             AND ${studentIsPresentById('student_id')}
            UNION
            SELECT DISTINCT student_id, class_id FROM master_class_enrollments
            WHERE company_id = $1 AND status != 'DROPPED'
+             AND ${studentIsPresentById('student_id')}
          ),
          presence AS (
            SELECT e.student_id, r.class_id, r.rn, r.start_date,

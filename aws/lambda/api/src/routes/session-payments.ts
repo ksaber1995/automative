@@ -9,6 +9,7 @@ import { ensureQrCardSchema, qrStudentMatch } from './qr-cards';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { issueReceipt, voidReceiptsFor } from '../db/receipts';
+import { studentIsPresent } from '../db/active-students';
 
 // ============================================================
 // Idempotent runtime schema guard (migration 050 self-applied).
@@ -1316,6 +1317,10 @@ export const sessionPaymentsRoutes = {
         `e.company_id = $1`,
         `e.payment_type = 'PER_SESSION'`,
         `e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')`,
+        // A student who has left owes no NEXT package. Their enrolment is still
+        // active — marking them left is what staff do — so without this they sit
+        // on the renewals list permanently.
+        studentIsPresent('s'),
         `c.session_package_size IS NOT NULL AND c.session_package_size > 0`,
         // Students who chose to pay session by session aren't waiting to renew
         // anything, so they don't belong on this list (migration 072).

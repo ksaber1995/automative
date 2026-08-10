@@ -1,6 +1,7 @@
 import { insert, update, findById, query, queryOne, getClient } from '../db/connection';
 import { extractTenantContext, canAccessBranch, checkGranularPermission, isGlobalAdmin, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { studentIsPresent, studentIsPresentById } from '../db/active-students';
 
 /**
  * Moving a class to another course is not one UPDATE.
@@ -696,12 +697,17 @@ export const classesRoutes = {
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
           e.email AS instructor_email,
           r.code AS room_code,
+          -- Headcount of who is still coming, so it matches the list below it.
+          -- Left students keep an ACTIVE enrolment, so counting rows alone would
+          -- show a class fuller than the register it opens.
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+              AND ${studentIsPresentById('en.student_id')}
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+              AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
           EXISTS (
             SELECT 1 FROM sessions s
@@ -767,12 +773,17 @@ export const classesRoutes = {
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
           e.email AS instructor_email,
           r.code AS room_code,
+          -- Headcount of who is still coming, so it matches the list below it.
+          -- Left students keep an ACTIVE enrolment, so counting rows alone would
+          -- show a class fuller than the register it opens.
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+              AND ${studentIsPresentById('en.student_id')}
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+              AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
           EXISTS (
             SELECT 1 FROM sessions s
@@ -972,12 +983,17 @@ export const classesRoutes = {
           CONCAT(e.first_name, ' ', e.last_name) as instructor_name,
           e.email AS instructor_email,
           r.code AS room_code,
+          -- Headcount of who is still coming, so it matches the list below it.
+          -- Left students keep an ACTIVE enrolment, so counting rows alone would
+          -- show a class fuller than the register it opens.
           (
             SELECT COALESCE(COUNT(*), 0) FROM enrollments en
             WHERE en.class_id = c.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
+              AND ${studentIsPresentById('en.student_id')}
           ) + (
             SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
+              AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
           ${DAY_TIMES_SUBQUERY}
         FROM classes c
@@ -1195,7 +1211,11 @@ export const classesRoutes = {
           NULL as master_course_name
         FROM enrollments e
         JOIN students s ON e.student_id = s.id
+        -- Someone who has left the academy is off the class list. Their
+        -- enrolment usually still reads ACTIVE, because marking a student left
+        -- is the act staff perform rather than cancelling each enrolment.
         WHERE e.class_id = $1 AND e.company_id = $2 AND e.status != 'DROPPED'
+          AND ${studentIsPresent('s')}
 
         UNION ALL
 
@@ -1222,6 +1242,7 @@ export const classesRoutes = {
         JOIN master_enrollments me ON mce.master_enrollment_id = me.id
         JOIN master_courses mc ON me.master_course_id = mc.id
         WHERE mce.class_id = $1 AND mce.company_id = $2 AND mce.status != 'DROPPED'
+          AND ${studentIsPresent('s')}
 
         ORDER BY enrollment_date DESC`,
         [params.id, context.companyId]
