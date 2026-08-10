@@ -436,8 +436,11 @@
                 from scrolling the page instead of moving the QR; the pointer events
                 are inert for every other design (onArtPointerDown returns early).
               -->
+              <!-- Square, like the pool card it previews — and it doubles as the
+                   drag surface for placing the QR on custom artwork, so a
+                   rounded edge here would misrepresent where the artwork ends. -->
               <canvas #previewPoolFront
-                      class="w-full h-auto rounded-xl shadow-lg"
+                      class="w-full h-auto shadow-lg"
                       [class.cursor-move]="isCustomPool()"
                       [style.touch-action]="isCustomPool() ? 'none' : null"
                       (pointerdown)="onArtPointerDown($event)"

@@ -1,7 +1,7 @@
 import { CardAdjust, CardDesign } from '@shared/interfaces/card-design.interface';
 import { darken, isDark, lighten, mix, readableOn, tint } from './card-color.util';
 import {
-  A, CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, contentTransform, drawContain, fitText, roundRect, wrap, wrapFit,
+  A, CARD_CORNER, CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, contentTransform, drawContain, fitText, roundRect, wrap, wrapFit,
 } from './student-card.util';
 
 /**
@@ -175,10 +175,13 @@ export interface AgnosticCardData {
 
 // ─────────────────────────── shared bits ─────────────────────────────────────
 
-/** Clip to the card's rounded edge and lay the background. Callers then inset. */
+/** Clip to the card's edge and lay the background. Callers then inset. */
 function field(ctx: Ctx, p: Palette): void {
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
+  // Square, like the student cards: these are printed and guillotined, so the
+  // cutter decides the corner and a rounded PNG only leaves pale wedges on the
+  // print sheet. Shares CARD_CORNER so the two products cannot drift apart.
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();
   ctx.fillStyle = p.bg;
   ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);

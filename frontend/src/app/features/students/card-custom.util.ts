@@ -1,6 +1,6 @@
 import { CardDesign, PoolArtLayout, clampPoolArt } from '@shared/interfaces/card-design.interface';
 import {
-  CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, drawCover, fitText, roundRect,
+  CARD_CORNER, CardImages, Ctx, DESIGN_H, DESIGN_W, bgTransform, drawCover, fitText, roundRect,
 } from './student-card.util';
 
 /**
@@ -40,7 +40,10 @@ function layoutOf(design: CardDesign): PoolArtLayout {
  */
 function layArt(ctx: Ctx, art?: CanvasImageSource | null): boolean {
   bgTransform(ctx);
-  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, 26);
+  // Square, like every other card face — see CARD_CORNER. It matters more here
+  // than anywhere: this clip carries the tenant's OWN full-bleed artwork, and
+  // rounding it quietly shaved the corners off an image they uploaded.
+  roundRect(ctx, 0, 0, DESIGN_W, DESIGN_H, CARD_CORNER);
   ctx.clip();
   if (!art) {
     ctx.fillStyle = '#f1f5f9';
