@@ -415,6 +415,8 @@ const SimilarStudentSchema = z.object({
   phone: z.string().nullable(),
   parentPhone: z.string().nullable(),
   branchName: z.string().nullable(),
+  /** In the branch being registered into. Ranked first; the rest are labelled. */
+  sameBranch: z.boolean(),
   isActive: z.boolean(),
   createdAt: z.string(),
   matchType: z.enum(['EXACT', 'SIMILAR']),
@@ -2103,6 +2105,9 @@ export const contract = c.router({
         name: z.string().optional(),
         // The student being edited, so a name doesn't flag itself.
         excludeId: OptionalUUIDSchema,
+        // The branch on the form. Does NOT narrow the search — the whole company
+        // is searched either way — it only ranks its own branch's matches first.
+        branchId: OptionalUUIDSchema,
       }),
       responses: {
         200: z.array(SimilarStudentSchema),

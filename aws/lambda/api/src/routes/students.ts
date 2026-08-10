@@ -158,7 +158,7 @@ export const studentsRoutes = {
    * cannot find by searching the active list.
    */
   similar: async ({ query: queryParams, headers }: {
-    query: { name?: string; excludeId?: string };
+    query: { name?: string; excludeId?: string; branchId?: string };
     headers: { authorization: string };
   }) => {
     try {
@@ -181,11 +181,16 @@ export const studentsRoutes = {
         : '';
       const fuzzyScore = fuzzy ? `similarity(c.sn, q.n)` : `0::real`;
 
+      // The search stays company-wide — a duplicate sitting in another branch is
+      // exactly the one staff cannot find, and children move between branches.
+      // What the branch does is ORDER the answer: a match in the branch being
+      // registered into is the likelier same person, and ranking it server-side
+      // is what stops it being cut off by LIMIT behind five matches elsewhere.
       const rows = await query<any>(
         `WITH q AS (SELECT ${NORMALIZED_NAME('$2::text')} AS n),
          cand AS (
            SELECT s.id, s.name, s.student_code, s.phone, s.parent_phone,
-                  s.is_active, s.created_at, b.name AS branch_name,
+                  s.is_active, s.created_at, s.branch_id, b.name AS branch_name,
                   ${NORMALIZED_NAME('s.name')} AS sn
            FROM students s
            LEFT JOIN branches b ON b.id = s.branch_id
@@ -195,14 +200,20 @@ export const studentsRoutes = {
          SELECT c.id, c.name, c.student_code, c.phone, c.parent_phone,
                 c.is_active, c.created_at, c.branch_name,
                 (c.sn = q.n OR ${SORTED_TOKENS('c.sn')} = ${SORTED_TOKENS('q.n')}) AS is_exact,
+                ($4::uuid IS NOT NULL AND c.branch_id = $4::uuid) AS same_branch,
                 ${fuzzyScore} AS score
          FROM cand c CROSS JOIN q
          WHERE c.sn = q.n
             OR ${SORTED_TOKENS('c.sn')} = ${SORTED_TOKENS('q.n')}
             ${fuzzyClause}
-         ORDER BY (c.sn = q.n) DESC, ${fuzzyScore} DESC, c.created_at DESC
+         -- How sure we are comes first, then whose branch it is: a same-branch
+         -- SIMILAR is still a weaker signal than an EXACT match one branch over.
+         ORDER BY (c.sn = q.n) DESC,
+                  ($4::uuid IS NOT NULL AND c.branch_id = $4::uuid) DESC,
+                  ${fuzzyScore} DESC,
+                  c.created_at DESC
          LIMIT ${SIMILAR_LIMIT}`,
-        [context.companyId, raw, queryParams.excludeId || null]
+        [context.companyId, raw, queryParams.excludeId || null, queryParams.branchId || null]
       );
 
       return {
@@ -214,6 +225,9 @@ export const studentsRoutes = {
           phone: r.phone ?? null,
           parentPhone: r.parent_phone ?? null,
           branchName: r.branch_name ?? null,
+          // False when no branch was picked yet, which reads correctly: with
+          // nothing to compare against, no match is "this branch".
+          sameBranch: r.same_branch === true,
           isActive: r.is_active === true,
           createdAt: r.created_at,
           // EXACT reads as "this is probably the same person"; SIMILAR as

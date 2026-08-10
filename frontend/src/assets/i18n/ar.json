@@ -3857,6 +3857,7 @@
       "DUPLICATE_EXACT_TITLE": "هذا الاسم مسجل بالفعل ({{count}})",
       "DUPLICATE_SIMILAR_TITLE": "أسماء مشابهة مسجلة بالفعل ({{count}})",
       "DUPLICATE_TAG_EXACT": "نفس الاسم",
+      "DUPLICATE_TAG_OTHER_BRANCH": "في {{branch}}",
       "DUPLICATE_TAG_INACTIVE": "غير نشط",
       "DUPLICATE_OPEN": "فتح",
       "DUPLICATE_DISMISS": "إخفاء",

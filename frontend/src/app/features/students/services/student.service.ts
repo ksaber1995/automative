@@ -43,6 +43,8 @@ export interface SimilarStudent {
   phone: string | null;
   parentPhone: string | null;
   branchName: string | null;
+  /** In the branch being registered into. Others are shown but labelled. */
+  sameBranch: boolean;
   isActive: boolean;
   createdAt: string;
   matchType: 'EXACT' | 'SIMILAR';
@@ -59,13 +61,18 @@ export class StudentService {
   }
 
   /**
-   * Existing students whose name reads like this one. Never blocks anything —
-   * two children really can share a name, so this only ever informs.
+   * Existing students whose name reads like this one, across the whole company.
+   * Never blocks anything — two children really can share a name, so this only
+   * ever informs.
+   *
+   * `branchId` does not narrow the search; it ranks that branch's matches first
+   * so they cannot be pushed out of the result by matches from elsewhere.
    */
-  findSimilar(name: string, excludeId?: string | null): Observable<SimilarStudent[]> {
+  findSimilar(name: string, excludeId?: string | null, branchId?: string | null): Observable<SimilarStudent[]> {
     return this.api.get<SimilarStudent[]>('students/similar', {
       name,
       ...(excludeId ? { excludeId } : {}),
+      ...(branchId ? { branchId } : {}),
     });
   }
 

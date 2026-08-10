@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
-import { Subject, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, catchError, takeUntil, filter, tap } from 'rxjs/operators';
+import { Subject, of, merge } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, takeUntil, filter, tap, map } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -125,11 +125,21 @@ export class StudentFormComponent implements OnInit, OnDestroy {
    * every new one, so the hint always belongs to what is on screen.
    */
   private watchNameForDuplicates() {
-    this.studentForm.get('name')!.valueChanges
+    const name$ = this.studentForm.get('name')!.valueChanges.pipe(
+      debounceTime(StudentFormComponent.TYPING_PAUSE_MS),
+      distinctUntilChanged(),
+    );
+    // Changing the branch re-ranks the answer (its own branch's matches come
+    // first), so the question is asked again — with no debounce, because picking
+    // from a dropdown is one deliberate act, not typing.
+    const branch$ = this.studentForm.get('branchId')!.valueChanges.pipe(
+      distinctUntilChanged(),
+      map(() => this.studentForm.get('name')?.value ?? ''),
+    );
+
+    merge(name$, branch$)
       .pipe(
         takeUntil(this.destroy$),
-        debounceTime(StudentFormComponent.TYPING_PAUSE_MS),
-        distinctUntilChanged(),
         tap(() => this.similarStudents.set([])),
         filter((v) => {
           const ok = (v ?? '').trim().length >= StudentFormComponent.MIN_NAME_LENGTH;
@@ -138,10 +148,12 @@ export class StudentFormComponent implements OnInit, OnDestroy {
         }),
         tap(() => this.checkingSimilar.set(true)),
         switchMap((v: string) =>
-          this.studentService.findSimilar(v.trim(), this.studentId).pipe(
-            // A hint that fails is not worth a toast — the form still works.
-            catchError(() => of([] as SimilarStudent[])),
-          ),
+          this.studentService
+            .findSimilar(v.trim(), this.studentId, this.studentForm.get('branchId')?.value || null)
+            .pipe(
+              // A hint that fails is not worth a toast — the form still works.
+              catchError(() => of([] as SimilarStudent[])),
+            ),
         ),
       )
       .subscribe((matches) => {

@@ -3733,6 +3733,7 @@
       "DUPLICATE_EXACT_TITLE": "This name is already registered ({{count}})",
       "DUPLICATE_SIMILAR_TITLE": "Similar names already registered ({{count}})",
       "DUPLICATE_TAG_EXACT": "same name",
+      "DUPLICATE_TAG_OTHER_BRANCH": "at {{branch}}",
       "DUPLICATE_TAG_INACTIVE": "inactive",
       "DUPLICATE_OPEN": "Open",
       "DUPLICATE_DISMISS": "Dismiss",

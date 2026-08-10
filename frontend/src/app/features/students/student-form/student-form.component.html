@@ -69,6 +69,15 @@
                               {{ 'STUDENTS.FORM.DUPLICATE_TAG_EXACT' | translate }}
                             </span>
                           }
+                          <!-- Same-branch matches are ranked first and carry no
+                               tag; anything from elsewhere says so, because "a
+                               student with this name exists" means something
+                               different when they are at another branch. -->
+                          @if (!s.sameBranch && s.branchName) {
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                              {{ 'STUDENTS.FORM.DUPLICATE_TAG_OTHER_BRANCH' | translate: { branch: s.branchName } }}
+                            </span>
+                          }
                           @if (!s.isActive) {
                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700">
                               {{ 'STUDENTS.FORM.DUPLICATE_TAG_INACTIVE' | translate }}
@@ -80,7 +89,9 @@
                           @if (s.studentCode != null) { #{{ s.studentCode }} }
                           @if (s.phone) { · {{ s.phone }} }
                           @else if (s.parentPhone) { · {{ s.parentPhone }} }
-                          @if (s.branchName) { · {{ s.branchName }} }
+                          <!-- The branch name is already in the tag when it is a
+                               different one; repeating it here would say it twice. -->
+                          @if (s.branchName && s.sameBranch) { · {{ s.branchName }} }
                           · {{ s.createdAt | date: 'mediumDate' }}
                         </div>
                       </div>
