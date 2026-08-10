@@ -12,6 +12,7 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { TabsModule } from 'primeng/tabs';
@@ -64,6 +65,7 @@ interface EnrollmentCounts {
     InputTextModule,
     MultiSelectModule,
     RadioButtonModule,
+    CheckboxModule,
     ProgressBarModule,
     StudentImportDialogComponent
   ],
@@ -663,6 +665,13 @@ export class StudentListComponent implements OnInit {
   zipTeacherOptions = signal<LookupOption[]>([]);
   loadingZipOptions = signal(false);
 
+  /**
+   * Put every card at the root of the ZIP instead of under `Course/Class/`. For a
+   * print run the folder tree is just clicking to do — one folder means one
+   * select-all-and-print.
+   */
+  zipFlat = signal(false);
+
   // Export progress. Rendering and compressing are separate phases — each reports
   // its own 0-100, so the bar never sits parked while work is still happening.
   zipPhase = signal<'render' | 'zip' | null>(null);
@@ -785,6 +794,8 @@ export class StudentListComponent implements OnInit {
       const images = await loadCardImages(design);
 
       const zip = new JSZip();
+      const flat = this.zipFlat();
+      const usedNames = new Set<string>();   // flat mode only — keeps same-named cards apart
       const origin = window.location.origin;
       const companyName = this.authService.getCompanyName();
       const year = currentAcademicYear();
@@ -809,21 +820,23 @@ export class StudentListComponent implements OnInit {
           qrUrl: `${origin}/p/s/${student.qrToken}`,
         };
         const phone = student.phone ? ` (${student.phone})` : '';
-        const fileName = this.sanitizeName(`${card.name}${phone}`) + '.png';
+        const baseName = this.sanitizeName(`${card.name}${phone}`);
 
         const classIds = studentEnrollments.get(student.id) || [];
         if (classIds.length === 0) {
-          zip.file(`Uncategorized/${fileName}`, await renderStudentCardPng(card, canvas, template, images, design), { base64: true });
+          const png = await renderStudentCardPng(card, canvas, template, images, design);
+          const path = flat ? this.uniqueFileName(usedNames, baseName) : `Uncategorized/${baseName}.png`;
+          zip.file(path, png, { base64: true });
         } else {
-          const addedPaths = new Set<string>();
+          const addedFolders = new Set<string>();
           for (const classId of classIds) {
             const classInfo = classMap.get(classId);
             const course = classInfo ? courseMap.get(classInfo.courseId) : undefined;
             const courseName = this.sanitizeName(course?.name || 'Unknown Course');
             const className = this.sanitizeName(classInfo?.name || 'Unknown Class');
-            const path = `${courseName}/${className}/${fileName}`;
-            if (addedPaths.has(path)) continue;
-            addedPaths.add(path);
+            const folder = `${courseName}/${className}`;
+            if (addedFolders.has(folder)) continue;
+            addedFolders.add(folder);
 
             const png = await renderStudentCardPng({
               ...card,
@@ -831,6 +844,12 @@ export class StudentListComponent implements OnInit {
               group: classInfo?.name || '',
               subject: course?.name || '',
             }, canvas, template, images, design);
+            // Flat still means one card per class, so the class name goes into the
+            // filename — with no folders it is the only thing left to tell the
+            // student's two cards apart.
+            const path = flat
+              ? this.uniqueFileName(usedNames, classIds.length > 1 ? `${baseName} - ${className}` : baseName)
+              : `${folder}/${baseName}.png`;
             zip.file(path, png, { base64: true });
           }
         }
@@ -859,6 +878,18 @@ export class StudentListComponent implements OnInit {
       this.downloadingZip.set(false);
       this.zipPhase.set(null);
     }
+  }
+
+  /**
+   * A ZIP entry name is its identity, so a repeat overwrites the earlier card
+   * instead of sitting beside it. Folders normally keep namesakes apart; flat
+   * mode has none, so a clash gets " (2)", " (3)", … instead.
+   */
+  private uniqueFileName(taken: Set<string>, base: string): string {
+    let name = `${base}.png`;
+    for (let n = 2; taken.has(name); n++) name = `${base} (${n}).png`;
+    taken.add(name);
+    return name;
   }
 
   private sanitizeName(name: string): string {

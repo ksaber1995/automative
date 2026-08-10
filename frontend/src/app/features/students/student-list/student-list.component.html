@@ -379,6 +379,15 @@
           }
         </div>
       }
+
+      <!-- For a print run the folder tree is just clicking to do -->
+      <label class="flex items-start gap-2 cursor-pointer mt-4">
+        <p-checkbox [binary]="true" [ngModel]="zipFlat()" (ngModelChange)="zipFlat.set($event)" inputId="zipFlat"></p-checkbox>
+        <span>
+          <span class="text-sm font-medium">{{ 'STUDENTS.LIST.QR_ZIP_FLAT' | translate }}</span>
+          <span class="block text-xs text-gray-400">{{ 'STUDENTS.LIST.QR_ZIP_FLAT_HINT' | translate }}</span>
+        </span>
+      </label>
     }
 
     <ng-template pTemplate="footer">

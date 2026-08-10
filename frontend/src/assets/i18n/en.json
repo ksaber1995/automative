@@ -3732,7 +3732,9 @@
       "QR_ZIP_RENDERING": "Rendering cards… {{done}} / {{total}} students",
       "QR_ZIP_COMPRESSING": "Building the ZIP…",
       "QR_ZIP_WAIT": "Keep this tab open until the download starts.",
-      "QR_ZIP_COMBINE_HINT_NO_TEACHER": "A class is included if you picked it or its course."
+      "QR_ZIP_COMBINE_HINT_NO_TEACHER": "A class is included if you picked it or its course.",
+      "QR_ZIP_FLAT": "Put all cards in one folder",
+      "QR_ZIP_FLAT_HINT": "No course/class subfolders — every card sits at the top of the ZIP, ready to select all and print."
     },
     "FORM": {
       "EDIT_TITLE": "Edit Student",
