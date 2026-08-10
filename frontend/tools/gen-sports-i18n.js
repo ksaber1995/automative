@@ -35,14 +35,26 @@ const EN = (w) => new RegExp(`\\b${w}\\b`, 'g');
 // Order matters: multi-word and longer forms first, so a general rule cannot
 // eat a phrase that has its own translation.
 const EN_RULES = [
-  // Bundles sit ABOVE courses, so they keep a level-name of their own.
-  [EN('Master Courses'), 'Programs'], [EN('Master Course'), 'Program'],
-  [EN('master courses'), 'programs'], [EN('master course'), 'program'],
+  // ── Three levels, three names ─────────────────────────────────────────────
+  //
+  // Subject and Course both used to become "Sport", which put the same word on
+  // two different nav items. They are different things and now read as such:
+  //
+  //   Subject       -> Sport         the discipline itself (Football, Swimming)
+  //   Course        -> Subscription  what a trainee signs up to and is billed for
+  //   Master course -> Package       several subscriptions sold at one price
+  //
+  // Order matters: "Master Course" has to be consumed before the bare "Course"
+  // rule reaches it, or it would come out as "Master Subscription".
+  [EN('Master Courses'), 'Packages'], [EN('Master Course'), 'Package'],
+  [EN('master courses'), 'packages'], [EN('master course'), 'package'],
+  // "this master's branch" — the noun is elided, so the two-word rules miss it.
+  [/\bmaster's\b/g, "package's"], [/\bMaster's\b/g, "Package's"],
   [EN('Classrooms'), 'Pitches'], [EN('Classroom'), 'Pitch'],
   [EN('classrooms'), 'pitches'], [EN('classroom'), 'pitch'],
 
-  [EN('Courses'), 'Sports'], [EN('Course'), 'Sport'],
-  [EN('courses'), 'sports'], [EN('course'), 'sport'],
+  [EN('Courses'), 'Subscriptions'], [EN('Course'), 'Subscription'],
+  [EN('courses'), 'subscriptions'], [EN('course'), 'subscription'],
   [EN('Subjects'), 'Sports'], [EN('Subject'), 'Sport'],
   [EN('subjects'), 'sports'], [EN('subject'), 'sport'],
 
@@ -83,11 +95,30 @@ const EN_RULES = [
 
 // `$1` carries the clitic through (و/ف/ب/ل/ك), so "بالحصة" → "بالتدريب".
 const AR_RULES = [
-  // Course / subject → sport
-  [AR('الكورسات'), '$1الألعاب'], [AR('كورسات'), '$1ألعاب'],
-  [AR('الكورس'), '$1اللعبة'], [AR('كورس'), '$1لعبة'],
-  [AR('الدورات'), '$1الألعاب'], [AR('دورات'), '$1ألعاب'],
-  [AR('الدورة'), '$1اللعبة'], [AR('دورة'), '$1لعبة'],
+  // ── Three levels, three names ─────────────────────────────────────────────
+  // Subject → لعبة (the discipline), course → اشتراك (what is billed), master
+  // course → باقة (several sold together). Multi-word forms first, so
+  // "عروض الكورسات" and "المواد الدراسية" are consumed whole rather than being
+  // half-translated into "عروض الاشتراكات" and "الألعاب الدراسية".
+  [/عروض الكورسات/g, 'الباقات'], [/عرض الكورسات/g, 'الباقة'],
+  // A master course is written "الكورس الرئيسي" / "الدورة الرئيسية". Without
+  // these it fell through to the plain course rule and became "الاشتراك
+  // الرئيسي" — a fourth name for a level that already has one.
+  [/الكورسات الرئيسية/g, 'الباقات'], [/الدورات الرئيسية/g, 'الباقات'],
+  [/الكورس الرئيسي/g, 'الباقة'], [/كورس رئيسي/g, 'باقة'],
+  [/الدورة الرئيسية/g, 'الباقة'], [/دورة رئيسية/g, 'باقة'],
+  // Possessive: "يبيع كورساته" — the suffix hides the word from a boundary.
+  [/كورساته/g, 'اشتراكاتها'], [/كورساتها/g, 'اشتراكاتها'],
+  [/المواد الدراسية/g, 'الألعاب'], [/مادة دراسية/g, 'لعبة'],
+
+  // Course → subscription. اشتراك is masculine, as الكورس was, so demonstratives
+  // and adjectives around it stay correct — which the feminine اللعبة did not.
+  [AR('الكورسات'), '$1الاشتراكات'], [AR('كورسات'), '$1اشتراكات'],
+  [AR('الكورس'), '$1الاشتراك'], [AR('كورس'), '$1اشتراك'],
+  [AR('الدورات'), '$1الاشتراكات'], [AR('دورات'), '$1اشتراكات'],
+  [AR('الدورة'), '$1الاشتراك'], [AR('دورة'), '$1اشتراك'],
+
+  // Subject → sport
   [AR('المواد'), '$1الألعاب'], [AR('مواد'), '$1ألعاب'],
   [AR('المادة'), '$1اللعبة'], [AR('مادة'), '$1لعبة'],
 
@@ -142,14 +173,14 @@ const AR_RULES = [
   [AR('للمدرسين'), 'للمدربين'], [AR('للمدرس'), 'للمدرب'],
   [AR('للحصص'), 'للتدريبات'], [AR('للحصة'), 'للتدريب'],
   [AR('للفصول'), 'للمجموعات'], [AR('للفصل'), 'للمجموعة'],
-  [AR('للكورسات'), 'للألعاب'], [AR('للكورس'), 'للعبة'],
+  [AR('للكورسات'), 'للاشتراكات'], [AR('للكورس'), 'للاشتراك'],
   [AR('للقاعات'), 'للملاعب'], [AR('للقاعة'), 'للملعب'],
 
   // The accusative ends in an alef that blocks a plain word boundary —
   // "اختر مدرساً" and "اختر كورساً" are both dropdown placeholders.
   [AR('مدرسًا'), '$1مدربًا'], [AR('مدرساً'), '$1مدرباً'],
   [AR('طالبًا'), '$1متدربًا'], [AR('طالباً'), '$1متدرباً'],
-  [AR('كورسًا'), '$1لعبة'], [AR('كورساً'), '$1لعبة'],
+  [AR('كورسًا'), '$1اشتراكًا'], [AR('كورساً'), '$1اشتراكاً'],
   [AR('فصلًا'), '$1مجموعة'], [AR('فصلاً'), '$1مجموعة'],
 
   // A shadda sits inside the word, so مدرّس is not مدرس to a regex.
@@ -159,6 +190,17 @@ const AR_RULES = [
 
   // The act, not the person: "التدريس، الإدارة" is a department placeholder.
   [AR('التدريس'), '$1التدريب'], [AR('تدريس'), '$1تدريب'],
+
+  // Levels. The Arabic base calls them المراحل الدراسية — school stages — which
+  // is a school year, not a level. A sports academy groups by age band or
+  // ability, so they are المستويات. Paired forms only: مرحلة on its own means a
+  // phase of anything and appears well outside this feature.
+  //
+  // This also repairs an agreement bug carried over from the base: "بهذا المرحلة
+  // الدراسية" put a masculine demonstrative on a feminine noun. المستوى is
+  // masculine, so "بهذا المستوى" comes out right.
+  [/المراحل الدراسية/g, 'المستويات'], [/مراحل دراسية/g, 'مستويات'],
+  [/المرحلة الدراسية/g, 'المستوى'], [/مرحلة دراسية/g, 'مستوى'],
 
   // Books → equipment. The feature sells items against a course; for a sports
   // academy those are kit, not textbooks.
@@ -222,6 +264,11 @@ const AR_AGREEMENT = [
   // القاعة/الغرفة (f) → الملعب (m)
   [/الملعب لديها/g, 'الملعب لديه'], [/هذه الملعب/g, 'هذا الملعب'],
   [/الملعب غير موجودة/g, 'الملعب غير موجود'], [/الملعب مشغولة/g, 'الملعب مشغول'],
+  // الكورس (m) → الباقة (f) for a master course, so its demonstrative and verb
+  // have to follow.
+  [/هذا الباقة/g, 'هذه الباقة'],
+  [new RegExp(`الباقة يبيع${NOT_AR}`, 'g'), 'الباقة تبيع'],
+  [new RegExp(`الباقة الرئيسي${NOT_AR}`, 'g'), 'الباقة'],
   // المادة (f) → اللعبة (f) is fine; الكورس (m) → اللعبة (f) is not.
   [/هذا اللعبة/g, 'هذه اللعبة'],
   [new RegExp(`اللعبة الرئيسي${NOT_AR}`, 'g'), 'اللعبة الرئيسية'],
@@ -258,7 +305,9 @@ const SKIP_KEYS = new Set([
  * a sport. These win over the rules above.
  */
 const EXPLICIT = {
-  'COURSES.FORM.NAME_PLACEHOLDER':      { en: 'e.g., Football', ar: 'مثال: كرة القدم' },
+  // A subscription is the thing being sold, so it names an age band or term —
+  // the bare sport belongs on the Sports page below.
+  'COURSES.FORM.NAME_PLACEHOLDER':      { en: 'e.g., Football — U-12', ar: 'مثال: كرة قدم — تحت 12' },
   'COURSES.FORM.CODE_PLACEHOLDER':      { en: 'e.g., FTB-U12', ar: 'مثال: FTB-U12' },
   'CLASSES.FORM.NAME_PLACEHOLDER':      { en: 'e.g., U-12 Group, Morning Group', ar: 'مثال: مجموعة تحت 12، مجموعة الصباح' },
   'CLASSES.FORM.CODE_PLACEHOLDER':      { en: 'e.g., FTB-U12-A', ar: 'مثال: FTB-U12-A' },
@@ -267,6 +316,25 @@ const EXPLICIT = {
   'LEVELS.FORM.NAME_PLACEHOLDER':       { en: 'e.g., Beginner', ar: 'مثال: تحت 12 سنة' },
   'EMPLOYEES.FORM.POSITION_PLACEHOLDER': { en: 'e.g., Coach, Manager', ar: 'مثال: مدرب، مدير' },
   'EMPLOYEES.FORM.DEPARTMENT_PLACEHOLDER': { en: 'e.g., Coaching, Administration', ar: 'مثال: التدريب، الإدارة' },
+
+  // ── Where "subscription" collides with itself ─────────────────────────────
+  //
+  // Arabic already spends اشتراك on two other things: a student's enrolment,
+  // and the monthly billing plan. Renaming a course to اشتراك therefore produces
+  // "الاشتراك في الاشتراك" and "الاشتراكات ذات الاشتراك الشهري". These three
+  // are rewritten rather than word-swapped, so the sentence says one thing once.
+  'MONTHLY_SUBSCRIPTIONS.SUBTITLE': {
+    en: 'Manage monthly billing for subscriptions on a monthly plan',
+    ar: 'إدارة الفواتير الشهرية للاشتراكات ذات الدفع الشهري',
+  },
+  'STUDENTS.DETAIL.CANCEL_ENROLLMENT_CONFIRM': {
+    en: 'End this enrolment? If anything has been paid on it, it is cancelled and kept on the Withdrawn tab with its payment history intact. If nothing was ever paid, it is removed completely.',
+    ar: 'هل تريد إنهاء هذا التسجيل؟ إذا كان قد دُفع عليه أي مبلغ، فسيتم إلغاؤه والاحتفاظ به في تبويب «المنسحبون» مع سجل مدفوعاته كاملاً. وإذا لم يُدفع عليه شيء، فسيُحذف نهائيًا.',
+  },
+  'MASTER_COURSES.ADD_COURSE.ONE_TIME_ONLY': {
+    en: 'Only one-time payment subscriptions can be added. A package sells its subscriptions as one bundle for one price, so monthly and per-training ones can\'t join yet.',
+    ar: 'يمكن إضافة الاشتراكات ذات الدفع مرة واحدة فقط. الباقة تبيع اشتراكاتها كباقة واحدة بسعر واحد، لذا لا يمكن إضافة الاشتراكات الشهرية أو اشتراكات الدفع بالتدريب بعد.',
+  },
 };
 
 function apply(value, rules, agreement) {

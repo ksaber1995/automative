@@ -51,13 +51,49 @@ export function toWhatsappNumber(phone: string | null | undefined, dialCode = '2
   return digits;
 }
 
-/** Substitute {placeholder} tokens. Missing/empty values render as ''. */
+/**
+ * What a sports academy calls each template variable, mapped to the canonical
+ * name the code fills in.
+ *
+ * The chips on the messaging page are meant to be copied into the message body,
+ * so whatever is shown there has to substitute. Renaming the chip alone would
+ * hand a coach `{traineeName}` and then render it as an empty string.
+ *
+ * An alias, not a rename: every template already saved says `{studentName}`, and
+ * those bodies keep working untouched. Resolution runs alias → canonical only,
+ * so nothing here can shadow a real variable.
+ */
+export const SPORTS_TEMPLATE_ALIASES: Record<string, string> = {
+  traineeName: 'studentName',
+  sportName: 'courseName',
+  groupName: 'className',
+  trainingNumber: 'sessionNumber',
+  evaluationName: 'examName',
+};
+
+/** The name to SHOW for a variable, given the tenant's vocabulary. */
+export function templateVarLabel(canonical: string, isSports: boolean): string {
+  if (!isSports) return canonical;
+  const alias = Object.entries(SPORTS_TEMPLATE_ALIASES).find(([, c]) => c === canonical);
+  return alias ? alias[0] : canonical;
+}
+
+/**
+ * Substitute {placeholder} tokens. Missing/empty values render as ''.
+ *
+ * A token the caller did not supply is tried again under its canonical name, so
+ * a body written with the sports variables renders from the same data.
+ */
 export function renderWhatsappTemplate(
   body: string,
   vars: Record<string, string | number | null | undefined>,
 ): string {
   return body.replace(/\{(\w+)\}/g, (_, key) => {
-    const v = vars[key];
+    let v = vars[key];
+    if (v === undefined || v === null) {
+      const canonical = SPORTS_TEMPLATE_ALIASES[key];
+      if (canonical) v = vars[canonical];
+    }
     return v === undefined || v === null ? '' : String(v);
   });
 }

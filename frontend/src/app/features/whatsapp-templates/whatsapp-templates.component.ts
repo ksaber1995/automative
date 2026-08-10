@@ -6,10 +6,12 @@ import { ButtonModule } from 'primeng/button';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { WhatsappTemplatesService } from '../../core/services/whatsapp-templates.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { AuthService } from '../../core/services/auth.service';
 import {
   DEFAULT_WHATSAPP_TEMPLATES,
   WHATSAPP_TEMPLATE_TYPES,
   WhatsappTemplateType,
+  templateVarLabel,
 } from '../../core/utils/whatsapp.util';
 
 interface TemplateDef {
@@ -28,6 +30,16 @@ export class WhatsappTemplatesComponent implements OnInit {
   private templatesSvc = inject(WhatsappTemplatesService);
   private notification = inject(NotificationService);
   private translate = inject(TranslateService);
+  private auth = inject(AuthService);
+
+  /**
+   * The chips are named in the tenant's own vocabulary — a coach is offered
+   * {traineeName}, not {studentName}. Both substitute, so a body written either
+   * way renders (see SPORTS_TEMPLATE_ALIASES).
+   */
+  protected varLabel(canonical: string): string {
+    return templateVarLabel(canonical, this.auth.vertical() === 'SPORTS');
+  }
 
   readonly defs: TemplateDef[] = [
     { type: 'QR_STUDENT', placeholders: ['studentName', 'academyName', 'link', 'code'] },
