@@ -148,34 +148,37 @@ const STUDENT_SUBSCRIPTIONS_EXISTS = `
 `;
 
 /**
- * The classes (or courses) a student is currently on, as one comma-separated
- * string — for the printed ID card, which has one line for each.
+ * The class (or course) to print on a student's ID card: the newest one they are
+ * still enrolled on.
  *
- * DISTINCT because a student can hold two enrolments on the same class through
- * a master bundle, and a card reading "U-12, U-12" is worse than no card. Live
- * enrolments only: a dropped one is history and does not belong on a card that
- * gets printed and carried around for a year.
+ * ONE value, not a list. Students really do hold several live enrolments — in
+ * the largest tenant every one of 2,015 does — and aggregating them gives
+ * "group A, المجموعة د, ffffff…", which a 9 x 5.7 cm card can only render by
+ * shrinking the row until nobody can read it. The newest enrolment is the one a
+ * card printed today is about.
  *
- * Both halves are read — a student can be on a class directly or through a
- * master-course bundle, and a card that omitted the second kind would be blank
- * for exactly the students an academy sells the most to.
+ * Live enrolments only: a dropped one is history, and this card gets carried
+ * around for a year. Both halves are read — a student can be on a class directly
+ * or through a master-course bundle, and reading only the first would leave the
+ * card blank for exactly the students an academy sells the most to.
  */
 const STUDENT_ENROLLED_NAMES = (nameExpr: string) => `
-  SELECT string_agg(DISTINCT n, ', ')
-  FROM (
-    SELECT ${nameExpr} AS n
+  SELECT n FROM (
+    SELECT ${nameExpr} AS n, COALESCE(en.enrollment_date::timestamptz, en.created_at) AS at
       FROM enrollments en
       JOIN classes cl ON cl.id = en.class_id
       JOIN courses co ON co.id = en.course_id
      WHERE en.student_id = s.id AND en.status NOT IN ('DROPPED', 'CANCELLED')
-    UNION
-    SELECT ${nameExpr} AS n
+    UNION ALL
+    SELECT ${nameExpr} AS n, mce.created_at AS at
       FROM master_class_enrollments mce
       JOIN classes cl ON cl.id = mce.class_id
       JOIN courses co ON co.id = cl.course_id
      WHERE mce.student_id = s.id AND mce.status <> 'DROPPED'
   ) names
   WHERE n IS NOT NULL AND n <> ''
+  ORDER BY at DESC NULLS LAST
+  LIMIT 1
 `;
 
 export const studentsRoutes = {
