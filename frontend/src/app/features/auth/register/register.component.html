@@ -73,7 +73,12 @@
 
         <!-- Heading -->
         <div class="mb-8">
-          <h1 class="text-3xl font-bold text-gray-900">{{ 'AUTH.REGISTER.TITLE' | translate }}</h1>
+          <!-- An academy (sports or not) creates an Academy account; a solo tutor
+               creates a Teacher one. Neither is a "company" — that word was only
+               ever the database's name for the row. -->
+          <h1 class="text-3xl font-bold text-gray-900">
+            {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_TITLE' : 'AUTH.REGISTER.TITLE') | translate }}
+          </h1>
           <p class="text-gray-500 mt-2">{{ 'AUTH.REGISTER.SUBTITLE' | translate }}</p>
         </div>
 
@@ -96,8 +101,7 @@
                      a tenant exists, and here there is none yet — so the strings
                      that name education have a sports twin picked by the route. -->
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  {{ (isSports() ? 'AUTH.REGISTER.SPORTS_COMPANY_NAME'
-                      : accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME'
+                  {{ (accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_NAME'
                       : 'AUTH.REGISTER.COMPANY_NAME') | translate }} <span class="text-red-500">*</span>
                 </label>
                 <input
@@ -419,7 +423,7 @@
           <button
             pButton
             type="submit"
-            [label]="'AUTH.REGISTER.SUBMIT' | translate"
+            [label]="(accountType() === 'TEACHER' ? 'AUTH.REGISTER.TEACHER_SUBMIT' : 'AUTH.REGISTER.SUBMIT') | translate"
             class="w-full"
             [disabled]="loading()"></button>
 
