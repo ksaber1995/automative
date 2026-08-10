@@ -1,6 +1,16 @@
 import { UserRole } from '../enums/user-role.enum';
 import { UserPermissions } from './permissions.interface';
 
+/**
+ * What kind of academy a tenant is, which decides only what things are CALLED.
+ *
+ * SPORTS is an ordinary ADVANCED academy that speaks of coaches, trainees and
+ * groups instead of teachers, students and classes. It is deliberately separate
+ * from `companyType` and `plan`: every feature gate keys off those, and a sports
+ * academy must pass all of them exactly as a general one does.
+ */
+export type CompanyVertical = 'GENERAL' | 'SPORTS';
+
 export interface User {
   id: string;
   companyId: string;
@@ -26,6 +36,8 @@ export interface SafeUser {
   role: UserRole;
   companyType?: 'ACADEMY' | 'TEACHER'; // Owning company's registration type
   plan?: 'SIMPLE' | 'ADVANCED';      // Feature plan; ADVANCED unlocks CRM & add-ons
+  /** What this academy calls things. Drives the vocabulary overlay, nothing else. */
+  vertical?: CompanyVertical;
   /** The pre-printed QR card pool — sold per academy, off unless we switch it on. */
   qrCardsEnabled?: boolean;
   qrFree?: boolean;                  // Teacher tenant in the free QR-activation launch tier
@@ -87,6 +99,9 @@ export interface RegisterDto {
   type?: 'ACADEMY' | 'TEACHER';
   // Feature plan chosen at signup (academies only).
   plan?: 'SIMPLE' | 'ADVANCED';
+  // Vocabulary chosen by which signup link was used. SPORTS forces an ADVANCED
+  // academy server-side, so it is not a way to get advanced features for free.
+  vertical?: CompanyVertical;
   qrCardsEnabled?: boolean;
   industry?: string;
   timezone?: string;

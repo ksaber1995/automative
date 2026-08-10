@@ -16,6 +16,14 @@ export const AUTH_ROUTES: Routes = [
     data: { accountType: 'TEACHER' },
     loadComponent: () => import('./register/register.component').then(m => m.RegisterComponent)
   },
+  // A sports academy IS an academy on the advanced plan — same features, same
+  // gates. All that differs is the vocabulary it is served, so it rides on the
+  // academy flow with a vertical rather than being an account type of its own.
+  {
+    path: 'register/sports-academy',
+    data: { accountType: 'ACADEMY', vertical: 'SPORTS' },
+    loadComponent: () => import('./register/register.component').then(m => m.RegisterComponent)
+  },
   // Legacy /auth/register → default to the academy flow.
   {
     path: 'register',

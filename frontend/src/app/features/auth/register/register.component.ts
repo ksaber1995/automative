@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -9,7 +9,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { LanguageService } from '../../../core/services/language.service';
 import { RecaptchaService } from '../../../core/services/recaptcha.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { RegisterDto } from '@shared/interfaces/user.interface';
+import { RegisterDto, CompanyVertical } from '@shared/interfaces/user.interface';
 
 @Component({
   selector: 'app-register',
@@ -31,9 +31,16 @@ export class RegisterComponent {
   registerForm: FormGroup;
   loading = signal(false);
   serverError = signal('');
-  // Account type is fixed by the route (/auth/register/academy|teacher), not a
-  // dropdown. The login page links to each entry point separately.
+  // Account type is fixed by the route (/auth/register/academy|teacher|sports-academy),
+  // not a dropdown. The login page links to each entry point separately.
   accountType = signal<'ACADEMY' | 'TEACHER'>('ACADEMY');
+  /**
+   * Which vocabulary this tenant will be created with. SPORTS is an ACADEMY on
+   * the ADVANCED plan that speaks of coaches, trainees and groups — the server
+   * forces both, so this is not a route to advanced features without paying.
+   */
+  vertical = signal<CompanyVertical>('GENERAL');
+  isSports = computed(() => this.vertical() === 'SPORTS');
 
   constructor() {
     this.registerForm = this.fb.group({
@@ -43,6 +50,8 @@ export class RegisterComponent {
       type: ['ACADEMY', [Validators.required]],
       // Feature plan (academies only): SIMPLE (Basic) or ADVANCED. Defaults to Basic.
       plan: ['SIMPLE'],
+      // Vocabulary, set from the route. Never a user choice on the form.
+      vertical: ['GENERAL'],
       // TODO: re-enable later. Hidden for now to simplify onboarding.
       // companyEmail: ['', [Validators.required, Validators.email]],
       // companyCode: [''],
@@ -63,8 +72,15 @@ export class RegisterComponent {
     // (/auth/register/academy, /auth/register/teacher) registers the right kind.
     this.route.data.subscribe((data) => {
       const t = data['accountType'] === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
+      const v: CompanyVertical = data['vertical'] === 'SPORTS' ? 'SPORTS' : 'GENERAL';
       this.accountType.set(t);
+      this.vertical.set(v);
       this.registerForm.get('type')?.setValue(t);
+      this.registerForm.get('vertical')?.setValue(v);
+      // A sports academy is sold as advanced, so there is no plan to pick — the
+      // server sets it regardless, and showing a Basic option that gets ignored
+      // would be a lie on the form.
+      if (v === 'SPORTS') this.registerForm.get('plan')?.setValue('ADVANCED');
     });
   }
 

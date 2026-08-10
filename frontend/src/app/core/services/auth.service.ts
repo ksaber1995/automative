@@ -3,7 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { SafeUser, LoginDto, AuthResponse, RegisterDto, RegisterResponse } from '@shared/interfaces/user.interface';
+import { SafeUser, LoginDto, AuthResponse, RegisterDto, RegisterResponse, CompanyVertical } from '@shared/interfaces/user.interface';
+import { VocabularyService } from './vocabulary.service';
 import { UserRole } from '@shared/enums/user-role.enum';
 import {
   PermissionResource,
@@ -38,6 +39,7 @@ const VENDOR_TEST_COMPANIES = [
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private vocabulary = inject(VocabularyService);
 
   private currentUserSubject = new BehaviorSubject<SafeUser | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
@@ -47,31 +49,39 @@ export class AuthService {
     this.loadUserFromStorage();
   }
 
+  /**
+   * The one place the signed-in user is published.
+   *
+   * Every entry point — restoring from storage, login, OTP verify, refresh —
+   * goes through here, so a tenant's vocabulary is loaded WITH the user instead
+   * of only on whichever path someone remembered to wire it into. Getting that
+   * wrong shows a sports academy the word "student" until the next full reload.
+   */
+  private publishUser(user: SafeUser, cache = true): void {
+    this.currentUser.set(user);
+    this.currentUserSubject.next(user);
+    if (cache) this.setCachedUser(user);
+    void this.vocabulary.use(user.vertical === 'SPORTS' ? 'SPORTS' : 'GENERAL');
+  }
+
   private loadUserFromStorage(): void {
     const token = this.getToken();
     const cachedUser = this.getCachedUser();
 
     if (token && cachedUser) {
-      this.currentUser.set(cachedUser);
-      this.currentUserSubject.next(cachedUser);
+      // Straight from the cache first so the app paints in the right vocabulary
+      // immediately, then corrected by the profile call.
+      this.publishUser(cachedUser, false);
 
       this.getProfile().subscribe({
-        next: (user) => {
-          this.currentUser.set(user);
-          this.currentUserSubject.next(user);
-          this.setCachedUser(user);
-        },
+        next: (user) => this.publishUser(user),
         error: (err) => {
           if (err?.status === 401) this.logout();
         }
       });
     } else if (token && !cachedUser) {
       this.getProfile().subscribe({
-        next: (user) => {
-          this.currentUser.set(user);
-          this.currentUserSubject.next(user);
-          this.setCachedUser(user);
-        },
+        next: (user) => this.publishUser(user),
         error: () => this.logout()
       });
     }
@@ -86,9 +96,7 @@ export class AuthService {
           // clean so nothing of the last account survives into this one.
           this.clearStoredData();
           this.setTokens(response.accessToken, response.refreshToken);
-          this.setCachedUser(response.user);
-          this.currentUser.set(response.user);
-          this.currentUserSubject.next(response.user);
+          this.publishUser(response.user);
           if (response.company?.name) {
             localStorage.setItem('company_name', response.company.name);
           }
@@ -109,9 +117,7 @@ export class AuthService {
           // clean so nothing of the last account survives into this one.
           this.clearStoredData();
           this.setTokens(response.accessToken, response.refreshToken);
-          this.setCachedUser(response.user);
-          this.currentUser.set(response.user);
-          this.currentUserSubject.next(response.user);
+          this.publishUser(response.user);
           if (response.company?.name) {
             localStorage.setItem('company_name', response.company.name);
           }
@@ -135,6 +141,10 @@ export class AuthService {
     this.clearStoredData();
     this.currentUser.set(null);
     this.currentUserSubject.next(null);
+    // The next tenant may speak differently; don't leave this one's words behind.
+    // (The reload below would clear them anyway — this keeps the service honest
+    // for any path that logs out without one.)
+    this.vocabulary.reset();
     // A full document load, not router.navigate: clearing storage does nothing
     // about root-provided singletons, which keep their caches across an in-app
     // navigation. BranchStateService is the one that bit us — it caches the
@@ -173,7 +183,7 @@ export class AuthService {
   /** Re-fetch the signed-in user so plan/permission-driven UI (e.g. CRM nav) updates in place. */
   refreshUser(): void {
     this.getProfile().subscribe({
-      next: (user) => this.currentUser.set(user),
+      next: (user) => this.publishUser(user),
       error: () => {},
     });
   }
@@ -244,6 +254,15 @@ export class AuthService {
   /** Company feature plan; ADVANCED unlocks CRM and future add-ons. */
   plan(): 'SIMPLE' | 'ADVANCED' {
     return this.currentUser()?.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
+  }
+
+  /**
+   * What this academy calls things. Never gate a FEATURE on this — a sports
+   * academy is an advanced academy and must pass every plan check unchanged.
+   * It exists so the vocabulary overlay knows which words to load.
+   */
+  vertical(): CompanyVertical {
+    return this.currentUser()?.vertical === 'SPORTS' ? 'SPORTS' : 'GENERAL';
   }
 
   /** CRM is available to academies (not solo teachers) on the Advanced plan. */

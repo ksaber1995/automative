@@ -7,7 +7,13 @@ import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
 import { getClientIp } from '../utils/request-context';
 import { apiError } from '../utils/api-error';
 import { isCompanyQrFree } from '../utils/qr-pricing';
-import { DEFAULT_CARD_DESIGN, ensureCardDesignColumn, ensureAutoManageSessionsColumn } from './companies';
+import {
+  DEFAULT_CARD_DESIGN,
+  ensureCardDesignColumn,
+  ensureAutoManageSessionsColumn,
+  ensureVerticalColumn,
+  toVertical,
+} from './companies';
 import { ensureQrCardSchema } from './qr-cards';
 
 function generateOtp(): string {
@@ -30,8 +36,10 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
   const trimmed = (identifier || '').trim();
   if (!trimmed) return null;
 
-  // The queries below read c.qr_cards_enabled, so the column has to exist.
+  // The queries below read c.qr_cards_enabled and c.vertical, so both columns
+  // have to exist — a login must never 500 on a database that predates them.
   await ensureQrCardSchema();
+  await ensureVerticalColumn();
 
   if (trimmed.includes('@')) {
     return queryOne<any>(
@@ -41,6 +49,7 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
               c.name as company_name,
               c.type as company_type,
               c.plan as company_plan,
+              c.vertical as company_vertical,
               c.qr_cards_enabled as company_qr_cards
        FROM users u
        JOIN companies c ON u.company_id = c.id
@@ -59,6 +68,7 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.name as company_name,
             c.type as company_type,
             c.plan as company_plan,
+            c.vertical as company_vertical,
             c.qr_cards_enabled as company_qr_cards
      FROM users u
      JOIN companies c ON u.company_id = c.id
@@ -75,6 +85,7 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.name as company_name,
             c.type as company_type,
             c.plan as company_plan,
+            c.vertical as company_vertical,
             c.qr_cards_enabled as company_qr_cards
      FROM users u
      JOIN companies c ON u.company_id = c.id
@@ -101,6 +112,13 @@ async function buildSafeUser(user: any, branchIds: string[]) {
     companyId: user.company_id,
     companyType: user.company_type ?? 'ACADEMY',
     plan: user.company_plan ?? 'SIMPLE',
+    /**
+     * What this academy calls things. The client loads a vocabulary overlay for
+     * anything other than GENERAL — see the sports i18n files. It rides on the
+     * user payload rather than a settings call so the words are right on the
+     * first paint after login, not one request later.
+     */
+    vertical: toVertical(user.company_vertical),
     /** The pre-printed QR card pool is sold per academy; off unless we switch it on. */
     qrCardsEnabled: user.company_qr_cards === true,
     qrFree,
@@ -204,6 +222,7 @@ export const authRoutes = {
       companyName: string;
       type?: 'ACADEMY' | 'TEACHER';
       plan?: 'SIMPLE' | 'ADVANCED';
+      vertical?: 'GENERAL' | 'SPORTS';
       industry?: string;
       firstName: string;
       lastName: string;
@@ -265,9 +284,20 @@ export const authRoutes = {
 
       // Account type chosen at signup; anything other than TEACHER falls back
       // to ACADEMY so a missing/garbage value can't violate the CHECK constraint.
-      const companyType = body.type === 'TEACHER' ? 'TEACHER' : 'ACADEMY';
-      // Feature plan is academy-only; teachers are always SIMPLE.
-      const plan = companyType === 'ACADEMY' && body.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
+      // A sports academy IS an academy — the vertical only renames things — so a
+      // stray type on that signup must not turn it into a teacher account.
+      const vertical = toVertical(body.vertical);
+      const companyType = vertical === 'SPORTS' || body.type !== 'TEACHER' ? 'ACADEMY' : 'TEACHER';
+      // Feature plan is academy-only; teachers are always SIMPLE. A sports
+      // academy is advanced by definition — that is what it was sold as, and the
+      // CRM and Cash pages gate on it — so it is not left to the request body.
+      const plan =
+        vertical === 'SPORTS'
+          ? 'ADVANCED'
+          : companyType === 'ACADEMY' && body.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';
+
+      // The INSERT below names `vertical`, so the column has to exist.
+      await ensureVerticalColumn();
 
       // Every new tenant starts with the default ID-card design already on the row,
       // so the card-design page opens on a real record instead of an implicit
@@ -282,8 +312,9 @@ export const authRoutes = {
         `INSERT INTO companies
           (name, type, industry, subscription_tier, subscription_status,
            subscription_start_date, subscription_end_date, max_branches, max_users,
-           timezone, currency, locale, is_active, onboarding_completed, plan, card_design)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)
+           timezone, currency, locale, is_active, onboarding_completed, plan, card_design,
+           vertical)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17)
          RETURNING *`,
         [
           body.companyName, companyType, body.industry || 'Tech Center',
@@ -291,6 +322,7 @@ export const authRoutes = {
           new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           1, 5, 'Africa/Cairo', 'EGP', 'en-US', true, false, plan,
           JSON.stringify(DEFAULT_CARD_DESIGN),
+          vertical,
         ]
       );
       const company = companyRes.rows[0];
@@ -408,10 +440,12 @@ export const authRoutes = {
       const email = (body.email || '').trim().toLowerCase();
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
-      // Reads c.qr_cards_enabled below, so the column has to exist first.
+      // Reads c.qr_cards_enabled and c.vertical below, so both must exist first.
       await ensureQrCardSchema();
+      await ensureVerticalColumn();
       const user = await queryOne<any>(
         `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type, c.plan as company_plan,
+                c.vertical as company_vertical,
                 c.qr_cards_enabled as company_qr_cards
          FROM users u
          JOIN companies c ON u.company_id = c.id
@@ -652,15 +686,17 @@ export const authRoutes = {
       const decoded = await verifyToken(token);
 
       await ensureQrCardSchema();
+      await ensureVerticalColumn();
       const user = await queryOne<any>(
         `SELECT u.*, c.type as company_type, c.plan as company_plan,
+                c.vertical as company_vertical,
                 c.qr_cards_enabled as company_qr_cards,
                 array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
          FROM users u
          JOIN companies c ON u.company_id = c.id
          LEFT JOIN user_branches ub ON ub.user_id = u.id
          WHERE u.id = $1
-         GROUP BY u.id, c.type, c.plan`,
+         GROUP BY u.id, c.type, c.plan, c.vertical`,
         [decoded.id]
       );
 

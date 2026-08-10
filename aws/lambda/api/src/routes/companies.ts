@@ -38,6 +38,45 @@ export async function ensureHomeworkGradingColumn(): Promise<void> {
 /** The only two values the column may hold; anything else is rejected. */
 const HOMEWORK_GRADING_MODES = ['NUMERIC', 'RATING'] as const;
 
+/**
+ * What kind of academy this is, which decides only what things are CALLED.
+ *
+ * A sports academy is an advanced academy in every respect that matters — same
+ * tables, same permissions, same CRM and cash gating — but its people are
+ * coaches and trainees, not teachers and students, and they train in groups on a
+ * pitch rather than in classes in a room. That is a vocabulary, not a feature,
+ * so it lives here rather than in `type` or `plan`: putting it in `type` would
+ * have switched CRM and Cash OFF, since both gate on `type = 'ACADEMY'`.
+ *
+ * GENERAL is the default, so every existing tenant keeps the wording it has.
+ * Added idempotently at runtime, same as the columns above.
+ */
+let verticalColumnInitPromise: Promise<void> | null = null;
+export async function ensureVerticalColumn(): Promise<void> {
+  if (!verticalColumnInitPromise) {
+    verticalColumnInitPromise = (async () => {
+      try {
+        await query(
+          `ALTER TABLE companies ADD COLUMN IF NOT EXISTS vertical VARCHAR(16) NOT NULL DEFAULT 'GENERAL'`
+        );
+      } catch (e) {
+        verticalColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return verticalColumnInitPromise;
+}
+
+/** The only two verticals; anything else reads as GENERAL. */
+export const COMPANY_VERTICALS = ['GENERAL', 'SPORTS'] as const;
+export type CompanyVertical = (typeof COMPANY_VERTICALS)[number];
+
+/** Narrow whatever is on the row (or missing) to a vertical. */
+export function toVertical(value: unknown): CompanyVertical {
+  return value === 'SPORTS' ? 'SPORTS' : 'GENERAL';
+}
+
 let autoManageColumnInitPromise: Promise<void> | null = null;
 export async function ensureAutoManageSessionsColumn(): Promise<void> {
   if (!autoManageColumnInitPromise) {

@@ -218,6 +218,10 @@ const RegisterRequestSchema = z.object({
   type: z.enum(['ACADEMY', 'TEACHER']).optional(),
   // Feature plan chosen at signup (academies only; teachers are always SIMPLE).
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(),
+  // What the academy calls things. SPORTS registers an ordinary ADVANCED academy
+  // that speaks of coaches, trainees and groups instead of teachers, students and
+  // classes — a vocabulary, not a feature. Optional; absent means GENERAL.
+  vertical: z.enum(['GENERAL', 'SPORTS']).optional(),
   // Industry is hidden in the registration UI but submitted with a default
   // ("Tech Center") so the backend can store it. Optional so future clients
   // that omit it still validate.
@@ -269,6 +273,7 @@ const SafeUserSchema = z.object({
   companyId: UUIDSchema,
   companyType: z.enum(['ACADEMY', 'TEACHER']).optional(),
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(), // Feature plan; ADVANCED unlocks CRM
+  vertical: z.enum(['GENERAL', 'SPORTS']).optional(), // Vocabulary only; drives the i18n overlay
   qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
