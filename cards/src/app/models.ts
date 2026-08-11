@@ -16,6 +16,8 @@ export interface AdminCompany {
   employee_count?: number | null;
   branch_count?: number | null;
   student_count?: number | null;
+  /** Students still on the roll, as opposed to everyone ever enrolled. */
+  active_student_count?: number | null;
   course_count?: number | null;
 }
 
@@ -75,6 +77,11 @@ export interface ClientRow {
   employees: number;
   branches: number;
   students: number;
+  /**
+   * Students still on the roll. The number that says how big a client actually
+   * is — `students` counts every leaver they ever had as well.
+   */
+  activeStudents: number;
   courses: number;
   /** Whether the client's QR card pool is switched on. */
   enabled: boolean;
@@ -92,7 +99,7 @@ export interface ClientRow {
   poolValue: number;
 }
 
-export type SortKey = 'name' | 'type' | 'total' | 'linked' | 'unlinked';
+export type SortKey = 'name' | 'type' | 'activeStudents' | 'total' | 'linked' | 'unlinked';
 
 export interface SortState {
   key: SortKey;

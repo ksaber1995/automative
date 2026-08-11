@@ -5503,6 +5503,8 @@ export const contract = c.router({
             employee_count: z.number(),
             branch_count: z.number(),
             student_count: z.number(),
+            /** Students still on the roll — student_count minus the left ones. */
+            active_student_count: z.number(),
           })
         ),
         500: z.object({ message: z.string() }),

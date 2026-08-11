@@ -43,6 +43,12 @@ const SUBSCRIPTIONS_SQL = `
     (SELECT COUNT(*) FROM employees e WHERE e.company_id = c.id) AS employee_count,
     (SELECT COUNT(*) FROM branches  b WHERE b.company_id = c.id) AS branch_count,
     (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id) AS student_count,
+    -- The roll a client is actually running, as opposed to everyone they have
+    -- ever enrolled. is_active is nullable with DEFAULT true, so an unset flag
+    -- counts as active — the column's own default is the answer for a row
+    -- nobody has touched.
+    (SELECT COUNT(*) FROM students  st WHERE st.company_id = c.id
+       AND COALESCE(st.is_active, true))                        AS active_student_count,
     (SELECT COUNT(*) FROM courses   co WHERE co.company_id = c.id) AS course_count
   FROM companies c
   LEFT JOIN subscriptions s ON s.company_id = c.id
@@ -78,6 +84,7 @@ export const adminSecretRoutes = {
         employee_count: Number(r.employee_count ?? 0),
         branch_count: Number(r.branch_count ?? 0),
         student_count: Number(r.student_count ?? 0),
+        active_student_count: Number(r.active_student_count ?? 0),
         course_count: Number(r.course_count ?? 0),
       }));
       return { status: 200 as const, body };

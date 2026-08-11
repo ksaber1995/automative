@@ -142,6 +142,7 @@ export class CardsService {
       employees: Number(c.employee_count ?? 0),
       branches: Number(c.branch_count ?? 0),
       students: Number(c.student_count ?? 0),
+      activeStudents: Number(c.active_student_count ?? 0),
       courses: Number(c.course_count ?? 0),
       enabled: stats.qr_cards_enabled === true,
       total,
