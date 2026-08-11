@@ -186,10 +186,18 @@ CREATE TABLE master_courses (
     branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    -- The one-off bundle price when ONE_TIME, the monthly fee when
+    -- MONTHLY_SUBSCRIPTION — the same double meaning courses.price carries.
     default_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
     default_duration INTEGER NOT NULL DEFAULT 8,
     default_max_students INTEGER,
     level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
+    -- How the master itself is sold (migration 087). ONE_TIME groups ONE_TIME
+    -- members and sells them as one bundle. MONTHLY_SUBSCRIPTION charges a fee
+    -- each month and covers its members whatever they cost on their own, so it
+    -- is the only kind that can hold monthly and per-session courses.
+    payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'
+        CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION')),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1285,10 +1293,15 @@ GROUP BY b.id, b.name;
 -- =============================================
 CREATE TABLE monthly_subscription_payments (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    enrollment_id    UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    -- A bill has exactly one subject (migration 087): a course enrolment, or a
+    -- master enrolment when the master itself is sold per month. A master bill
+    -- has no single course behind it — it covers every course in the bundle —
+    -- so enrollment_id and course_id are empty on those rows.
+    enrollment_id    UUID REFERENCES enrollments(id) ON DELETE CASCADE,
+    master_enrollment_id UUID REFERENCES master_enrollments(id) ON DELETE CASCADE,
     company_id       UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     student_id       UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    course_id        UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    course_id        UUID REFERENCES courses(id) ON DELETE CASCADE,
     branch_id        UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
     billing_year     INTEGER NOT NULL,
     billing_month    INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
@@ -1301,10 +1314,18 @@ CREATE TABLE monthly_subscription_payments (
     notes            TEXT,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT msp_one_subject CHECK (num_nonnulls(enrollment_id, master_enrollment_id) = 1),
+    -- Course bills stay unique per month. NULLs are not equal in Postgres, so
+    -- master rows fall outside this and get uq_msp_master_month instead.
     UNIQUE (enrollment_id, billing_year, billing_month)
 );
 
+CREATE UNIQUE INDEX uq_msp_master_month
+    ON monthly_subscription_payments(master_enrollment_id, billing_year, billing_month)
+    WHERE master_enrollment_id IS NOT NULL;
+
 CREATE INDEX idx_msp_enrollment_id   ON monthly_subscription_payments(enrollment_id);
+CREATE INDEX idx_msp_master_enrollment ON monthly_subscription_payments(master_enrollment_id);
 CREATE INDEX idx_msp_company_id      ON monthly_subscription_payments(company_id);
 CREATE INDEX idx_msp_student_id      ON monthly_subscription_payments(student_id);
 CREATE INDEX idx_msp_course_id       ON monthly_subscription_payments(course_id);
@@ -1332,9 +1353,11 @@ CREATE TABLE monthly_subscription_installments (
     id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     monthly_payment_id UUID NOT NULL REFERENCES monthly_subscription_payments(id) ON DELETE CASCADE,
     company_id         UUID NOT NULL REFERENCES companies(id)   ON DELETE CASCADE,
-    enrollment_id      UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+    -- Same two possible subjects as the bill this pays off (migration 087).
+    enrollment_id      UUID REFERENCES enrollments(id) ON DELETE CASCADE,
+    master_enrollment_id UUID REFERENCES master_enrollments(id) ON DELETE CASCADE,
     student_id         UUID NOT NULL REFERENCES students(id)    ON DELETE CASCADE,
-    course_id          UUID NOT NULL REFERENCES courses(id)     ON DELETE CASCADE,
+    course_id          UUID REFERENCES courses(id)     ON DELETE CASCADE,
     branch_id          UUID NOT NULL REFERENCES branches(id)    ON DELETE CASCADE,
     amount             DECIMAL(10, 2) NOT NULL,
     payment_date       DATE NOT NULL,
@@ -1342,7 +1365,8 @@ CREATE TABLE monthly_subscription_installments (
     -- TRUE only for a row synthesised from a bill that was already paid when the
     -- ledger was introduced (whole amount_paid on the bill's last paid_date).
     is_backfill        BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT msi_one_subject CHECK (num_nonnulls(enrollment_id, master_enrollment_id) = 1)
 );
 
 CREATE INDEX idx_msi_payment_id   ON monthly_subscription_installments(monthly_payment_id);

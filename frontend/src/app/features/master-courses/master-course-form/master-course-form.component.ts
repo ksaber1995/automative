@@ -13,6 +13,7 @@ import { MasterCourseService } from '../services/master-course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { MasterCoursePaymentType } from '@shared/interfaces/master-course.interface';
 
 @Component({
   selector: 'app-master-course-form',
@@ -41,6 +42,25 @@ export class MasterCourseFormComponent implements OnInit {
 
   form: FormGroup;
   loading = signal(false);
+
+  /**
+   * The two ways a master can be sold. The hint matters more than the label:
+   * which one is picked decides what courses the master is then allowed to hold.
+   */
+  readonly paymentTypeOptions = [
+    {
+      value: 'ONE_TIME' as MasterCoursePaymentType,
+      label: 'MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME',
+      hint: 'MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME_HINT',
+    },
+    {
+      value: 'MONTHLY_SUBSCRIPTION' as MasterCoursePaymentType,
+      label: 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY',
+      hint: 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY_HINT',
+    },
+  ];
+
+  isMonthly = (): boolean => this.form?.get('paymentType')?.value === 'MONTHLY_SUBSCRIPTION';
   isEditMode = signal(false);
   branches = signal<LookupOption[]>([]);
   levels = signal<LookupOption[]>([]);
@@ -52,6 +72,7 @@ export class MasterCourseFormComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(3)]],
       description: [''],
       defaultPrice: [0, [Validators.required, Validators.min(0)]],
+      paymentType: ['ONE_TIME' as MasterCoursePaymentType, Validators.required],
       defaultDuration: [8, [Validators.required, Validators.min(1), Validators.max(52)]],
       defaultMaxStudents: [null],
       levelId: [null],
@@ -87,6 +108,7 @@ export class MasterCourseFormComponent implements OnInit {
           name: row.name,
           description: row.description || '',
           defaultPrice: row.defaultPrice,
+          paymentType: row.paymentType || 'ONE_TIME',
           defaultDuration: row.defaultDuration,
           defaultMaxStudents: row.defaultMaxStudents,
           levelId: row.levelId || null,
@@ -114,6 +136,7 @@ export class MasterCourseFormComponent implements OnInit {
         name: v.name,
         description: v.description?.trim() || undefined,
         defaultPrice: v.defaultPrice,
+        paymentType: v.paymentType,
         defaultDuration: v.defaultDuration,
         defaultMaxStudents: v.defaultMaxStudents || undefined,
         levelId: v.levelId || null,
@@ -134,6 +157,7 @@ export class MasterCourseFormComponent implements OnInit {
         name: v.name,
         description: v.description?.trim() || undefined,
         defaultPrice: v.defaultPrice,
+        paymentType: v.paymentType,
         defaultDuration: v.defaultDuration,
         defaultMaxStudents: v.defaultMaxStudents || undefined,
         levelId: v.levelId || null,

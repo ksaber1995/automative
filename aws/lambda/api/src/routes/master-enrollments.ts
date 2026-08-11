@@ -6,6 +6,7 @@ import {
   checkGranularPermission,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { ensureBillsForMonth } from './monthly-subscriptions';
 
 type AuthHeaders = { authorization: string };
 
@@ -173,21 +174,30 @@ export const masterEnrollmentsRoutes = {
       }
 
       const masterFull = await queryOne(
-        'SELECT default_price FROM master_courses WHERE id = $1',
+        'SELECT default_price, payment_type FROM master_courses WHERE id = $1',
         [body.masterCourseId]
       );
       const defaultPrice = parseFloat(masterFull?.default_price || '0');
+      const isMonthly = masterFull?.payment_type === 'MONTHLY_SUBSCRIPTION';
 
       const originalPrice = typeof body.originalPrice === 'number' ? body.originalPrice : defaultPrice;
       const discountPercent = typeof body.discountPercent === 'number' ? body.discountPercent : 0;
       const discountAmount = typeof body.discountAmount === 'number' ? body.discountAmount : 0;
       const finalPrice = typeof body.finalPrice === 'number' ? body.finalPrice : originalPrice;
-      const paymentMode: 'FULL' | 'INSTALLMENTS' = body.paymentMode === 'INSTALLMENTS' ? 'INSTALLMENTS' : 'FULL';
+
+      // A per-month master is not a sale, so none of the bundle's payment fields
+      // mean anything here: there is no total to split into instalments and
+      // nothing is collected at the desk when they join. final_price is the fee
+      // agreed per month, and the monthly bills carry what is owed and paid.
+      const paymentMode: 'FULL' | 'INSTALLMENTS' =
+        !isMonthly && body.paymentMode === 'INSTALLMENTS' ? 'INSTALLMENTS' : 'FULL';
       const downPayment = paymentMode === 'INSTALLMENTS' ? (typeof body.downPayment === 'number' ? body.downPayment : 0) : 0;
-      const amountPaid = typeof body.amountPaid === 'number'
-        ? body.amountPaid
-        : (paymentMode === 'FULL' ? finalPrice : downPayment);
-      const paymentStatus = computePaymentStatus(finalPrice, amountPaid);
+      const amountPaid = isMonthly
+        ? 0
+        : typeof body.amountPaid === 'number'
+          ? body.amountPaid
+          : (paymentMode === 'FULL' ? finalPrice : downPayment);
+      const paymentStatus = isMonthly ? 'PENDING' : computePaymentStatus(finalPrice, amountPaid);
 
       const row = await insert('master_enrollments', {
         company_id: context.companyId,
@@ -207,6 +217,15 @@ export const masterEnrollmentsRoutes = {
         notes: body.notes || null,
         status: 'ACTIVE',
       });
+
+      // Raise this month's fee straight away rather than waiting for someone to
+      // open the subscriptions page — a student who joined today owes for today's
+      // month, and the desk should see it while they are still standing there.
+      // Idempotent, and scoped to the month they joined in.
+      if (isMonthly) {
+        const joined = new Date(body.enrollmentDate || Date.now());
+        await ensureBillsForMonth(context.companyId, joined.getFullYear(), joined.getMonth() + 1);
+      }
 
       const full = await queryOne(`${SELECT_WITH_PROGRESS} WHERE me.id = $1`, [row.id]);
       return { status: 201 as const, body: mapWithProgress(full || row) };

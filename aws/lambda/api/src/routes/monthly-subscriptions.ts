@@ -23,6 +23,9 @@ function mapPaymentFromDB(row: any) {
   return {
     id: row.id,
     enrollmentId: row.enrollment_id,
+    // Set instead of enrollmentId/courseId when the bill is a per-month master
+    // course's fee — the bundle is the subject, not one of its courses.
+    masterEnrollmentId: row.master_enrollment_id ?? null,
     companyId: row.company_id,
     studentId: row.student_id,
     courseId: row.course_id,
@@ -50,7 +53,9 @@ function mapPaymentWithDetailsFromDB(row: any) {
     // The code, plus what the UI needs to decide whether it may be shown yet:
     // a TEACHER company only reveals it once the student's QR is live.
     studentCode: row.student_code ?? null,
+    // The bundle's name for a master bill, the course's for a course bill.
     courseName: row.course_name,
+    masterCourseId: row.master_course_id ?? null,
     branchName: row.branch_name,
     className: row.class_name || null,
     studentPhone: row.student_phone || null,
@@ -221,12 +226,74 @@ export async function ensureBillsForMonth(
        AND ${studentIsPresentById('e.student_id')}
        AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
        AND c.is_active = true
+       -- Not if this enrolment came in through a per-month master course. There
+       -- the master's own fee is the bill and it covers everything inside it, so
+       -- charging the member course as well would bill the student twice for the
+       -- same month. NOT EXISTS is null-safe: a plain enrolment has no master.
+       AND NOT EXISTS (
+         SELECT 1 FROM master_enrollments me
+         JOIN master_courses mc ON mc.id = me.master_course_id
+         WHERE me.id = e.master_enrollment_id
+           AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
+       )
        -- never bill a month that ended before the student even enrolled
        AND (e.enrollment_date IS NULL OR e.enrollment_date <= period.last_day)
        -- never bill a FUTURE month: a bill for a month that has not started yet is
        -- phantom debt. Nothing is owed before the month begins.
        AND period.first_day <= date_trunc('month', CURRENT_DATE)::date
      ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
+     RETURNING id`,
+    [companyId, billingYear, billingMonth],
+  );
+  const masterRows = await ensureMasterBillsForMonth(companyId, billingYear, billingMonth);
+  return (rows as any[]).length + masterRows;
+}
+
+/**
+ * The same job for a master course sold per month: one bill a month for the
+ * master enrolment itself, whatever the student attends inside it.
+ *
+ * The subject is the master enrolment, not a course enrolment — the whole point
+ * of the bundle is that no single member course is what's being paid for. Priced
+ * off the master enrolment's agreed fee, falling back to the master's list price
+ * for rows that predate an agreed one.
+ *
+ * Every other rule is deliberately the same as the course version — active only,
+ * nothing for a student who has left, nothing for a month that ended before they
+ * joined, nothing for a month that has not started — because they are the same
+ * rules about when money is owed, not rules about courses.
+ */
+async function ensureMasterBillsForMonth(
+  companyId: string,
+  billingYear: number,
+  billingMonth: number,
+): Promise<number> {
+  const rows = await query(
+    `WITH period AS (
+       SELECT make_date($2::int, $3::int, 1)                                  AS first_day,
+              (make_date($2::int, $3::int, 1) + INTERVAL '1 month - 1 day')::date AS last_day
+     )
+     INSERT INTO monthly_subscription_payments
+       (master_enrollment_id, company_id, student_id, branch_id,
+        billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+     SELECT
+       me.id, me.company_id, me.student_id, me.branch_id,
+       $2::int, $3::int,
+       COALESCE(NULLIF(me.final_price, 0), mc.default_price),
+       0, 'PENDING', period.first_day
+     FROM master_enrollments me
+     JOIN master_courses mc ON mc.id = me.master_course_id
+     CROSS JOIN period
+     WHERE me.company_id = $1
+       AND me.status = 'ACTIVE'
+       AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
+       AND mc.is_active = true
+       AND ${studentIsPresentById('me.student_id')}
+       AND (me.enrollment_date IS NULL OR me.enrollment_date <= period.last_day)
+       AND period.first_day <= date_trunc('month', CURRENT_DATE)::date
+     ON CONFLICT (master_enrollment_id, billing_year, billing_month)
+       WHERE master_enrollment_id IS NOT NULL
+       DO NOTHING
      RETURNING id`,
     [companyId, billingYear, billingMonth],
   );
@@ -516,16 +583,22 @@ export const monthlySubscriptionsRoutes = {
            s.phone        AS student_phone,
            s.parent_phone AS parent_phone,
            s.parent_name  AS parent_name,
-           c.name       AS course_name,
+           -- A master bill names the bundle, since no single course is what the
+           -- student is paying for. COALESCE rather than two columns: every
+           -- caller wants "what is this bill for", and the answer is one string.
+           COALESCE(c.name, mc.name) AS course_name,
+           mc.id        AS master_course_id,
            b.name       AS branch_name,
            cl.name      AS class_name,
-           e.status     AS enrollment_status
+           COALESCE(e.status, me.status) AS enrollment_status
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
-         JOIN courses  c  ON msp.course_id  = c.id
          JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN courses c ON msp.course_id = c.id
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
+         LEFT JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+         LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
          WHERE ${conditions.join(' AND ')}
          ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.name`,
         params
@@ -682,9 +755,10 @@ export const monthlySubscriptionsRoutes = {
       // cash already collected does not stop existing because someone left.
       const rows = await query(
         `SELECT msp.student_id, msp.payment_status, msp.due_date, msp.amount_due, msp.amount_paid, msp.refunded_amount,
-                (e.status = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing
+                (COALESCE(e.status, me.status) = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing
          FROM monthly_subscription_payments msp
-         JOIN enrollments e ON e.id = msp.enrollment_id
+         LEFT JOIN enrollments e ON e.id = msp.enrollment_id
+         LEFT JOIN master_enrollments me ON me.id = msp.master_enrollment_id
          JOIN students s ON s.id = msp.student_id
          WHERE ${conditions.join(' AND ')}`,
         params
@@ -1160,15 +1234,17 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           c.name       AS course_name,
+           COALESCE(c.name, mc.name) AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
-         JOIN courses  c  ON msp.course_id  = c.id
          JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN courses c ON msp.course_id = c.id
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
+         LEFT JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+         LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
          WHERE msp.company_id = $1
            AND msp.student_id = $2
            AND msp.payment_status <> 'REFUNDED'
@@ -1224,15 +1300,17 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           c.name       AS course_name,
+           COALESCE(c.name, mc.name) AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
-         JOIN courses  c  ON msp.course_id  = c.id
          JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN courses c ON msp.course_id = c.id
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
+         LEFT JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+         LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
          WHERE ${conditions.join(' AND ')}
          ORDER BY msp.billing_year DESC, msp.billing_month DESC, s.name`,
         sqlParams
@@ -1268,18 +1346,20 @@ export const monthlySubscriptionsRoutes = {
            msp.*,
            s.name AS student_name,
            s.student_code AS student_code,
-           c.name       AS course_name,
+           COALESCE(c.name, mc.name) AS course_name,
            b.name       AS branch_name,
            cl.name      AS class_name
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
-         JOIN courses  c  ON msp.course_id  = c.id
          JOIN branches b  ON msp.branch_id  = b.id
+         LEFT JOIN courses c ON msp.course_id = c.id
          LEFT JOIN enrollments e ON msp.enrollment_id = e.id
          LEFT JOIN classes cl    ON e.class_id = cl.id
+         LEFT JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+         LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
          WHERE msp.company_id = $1
            AND msp.student_id = $2
-         ORDER BY msp.billing_year DESC, msp.billing_month DESC, c.name`,
+         ORDER BY msp.billing_year DESC, msp.billing_month DESC, COALESCE(c.name, mc.name)`,
         [context.companyId, params.studentId]
       );
 
@@ -1320,9 +1400,11 @@ export const monthlySubscriptionsRoutes = {
       const rows = await query<any>(
         `SELECT msp.id, msp.billing_year, msp.billing_month, msp.amount_due, msp.amount_paid,
                 msp.payment_status, msp.branch_id,
-                c.name AS course_name
+                COALESCE(c.name, mc.name) AS course_name
            FROM monthly_subscription_payments msp
-           JOIN courses c ON c.id = msp.course_id
+           LEFT JOIN courses c ON c.id = msp.course_id
+           LEFT JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+           LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
           WHERE msp.company_id = $1
             AND msp.student_id = $2
             AND msp.amount_due - COALESCE(msp.amount_paid, 0) > 0

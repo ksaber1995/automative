@@ -11,6 +11,21 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { issueReceipt, voidReceiptsFor } from '../db/receipts';
 import { studentIsPresent } from '../db/active-students';
 
+/**
+ * The student is not paying for this session: they are in through a master
+ * course sold per month, and that fee covers everything inside the bundle. Their
+ * attendance is still recorded — only the charge is skipped.
+ *
+ * Expects the enrolments table aliased as `e`. Null-safe: an ordinary enrolment
+ * has no master, so NOT EXISTS finds nothing and the charge goes ahead.
+ */
+const NOT_COVERED_BY_MONTHLY_MASTER = `NOT EXISTS (
+  SELECT 1 FROM master_enrollments me
+  JOIN master_courses mc ON mc.id = me.master_course_id
+  WHERE me.id = e.master_enrollment_id
+    AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
+)`;
+
 // ============================================================
 // Idempotent runtime schema guard (migration 050 self-applied).
 // Mirrors ensureAttendanceMagicColumns in sessions.ts: the DDL is additive and
@@ -457,10 +472,11 @@ export async function chargeSessionAttendance(
   const courseFee = parseFloat(course.price || 0);
 
   const enrollments = await query(
-    `SELECT id, student_id, branch_id, course_id, final_price
-     FROM enrollments
-     WHERE class_id = $1 AND company_id = $2 AND student_id = ANY($3::uuid[])
-       AND payment_type = 'PER_SESSION' AND status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')`,
+    `SELECT e.id, e.student_id, e.branch_id, e.course_id, e.final_price
+     FROM enrollments e
+     WHERE e.class_id = $1 AND e.company_id = $2 AND e.student_id = ANY($3::uuid[])
+       AND e.payment_type = 'PER_SESSION' AND e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')
+       AND ${NOT_COVERED_BY_MONTHLY_MASTER}`,
     [session.class_id, companyId, ids]
   );
 
@@ -503,6 +519,7 @@ export async function chargeAbsencesAtSessionEnd(companyId: string, session: any
      FROM enrollments e
      WHERE e.class_id = $1 AND e.company_id = $2 AND e.payment_type = 'PER_SESSION'
        AND e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')
+       AND ${NOT_COVERED_BY_MONTHLY_MASTER}
        AND NOT EXISTS (
          SELECT 1 FROM session_attendance sa WHERE sa.session_id = $3 AND sa.student_id = e.student_id
        )`,

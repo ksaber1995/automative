@@ -141,6 +141,19 @@ export class EnrollmentFormComponent implements OnInit {
     this.selectedCourse()?.paymentType === 'PER_SESSION'
   );
 
+  /**
+   * True when the selected bundle is a master course sold per month.
+   *
+   * Nothing is collected at the desk when someone joins one: the fee is billed
+   * a month at a time from the subscriptions page, so the whole "how are they
+   * paying today" section has no question to ask. The price shown is the agreed
+   * monthly fee, which staff may still change per student.
+   */
+  isMonthlyMaster = computed(() =>
+    this.enrollmentType() === 'MASTER' &&
+    this.selectedMaster()?.paymentType === 'MONTHLY_SUBSCRIPTION'
+  );
+
   // ─── Educational Books: products linked to the selected course ──────────────
   // Linked products for the selected course (COURSE mode only).
   courseBooks = signal<CourseProduct[]>([]);

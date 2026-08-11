@@ -36,9 +36,38 @@
             <input pInputText formControlName="name" class="w-full" />
           </div>
 
+          <!-- How it is sold decides what it may contain, so it is asked before
+               the price, and it is what the price label then means. -->
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ 'MASTER_COURSES.FORM.PAYMENT_TYPE' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <p-select
+              formControlName="paymentType"
+              [options]="paymentTypeOptions"
+              optionLabel="label"
+              optionValue="value"
+              [style]="{ width: '100%' }"
+            >
+              <ng-template let-option pTemplate="item">
+                <div>
+                  <div class="font-medium">{{ option.label | translate }}</div>
+                  <div class="text-xs text-gray-500">{{ option.hint | translate }}</div>
+                </div>
+              </ng-template>
+              <ng-template let-selected pTemplate="selectedItem">{{ selected.label | translate }}</ng-template>
+            </p-select>
+            <small class="text-gray-500 block mt-1">
+              {{ (isMonthly() ? 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY_HINT'
+                              : 'MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME_HINT') | translate }}
+            </small>
+          </div>
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ 'MASTER_COURSES.FORM.DEFAULT_PRICE' | translate }} <span class="text-red-500">*</span>
+              {{ (isMonthly() ? 'MASTER_COURSES.FORM.MONTHLY_FEE'
+                              : 'MASTER_COURSES.FORM.DEFAULT_PRICE') | translate }}
+              <span class="text-red-500">*</span>
             </label>
             <p-inputnumber formControlName="defaultPrice" mode="currency" currency="USD" [min]="0" [style]="{ width: '100%' }"></p-inputnumber>
           </div>

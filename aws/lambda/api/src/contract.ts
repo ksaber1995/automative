@@ -587,6 +587,8 @@ const CreateMasterCourseSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   defaultPrice: z.number(),
+  /** ONE_TIME sells the bundle once; MONTHLY_SUBSCRIPTION charges a fee each month. */
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
   defaultDuration: z.number(),
   defaultMaxStudents: z.number().optional(),
   levelId: OptionalUUIDSchema,
@@ -596,6 +598,8 @@ const UpdateMasterCourseSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   defaultPrice: z.number().optional(),
+  /** ONE_TIME sells the bundle once; MONTHLY_SUBSCRIPTION charges a fee each month. */
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']).optional(),
   defaultDuration: z.number().optional(),
   defaultMaxStudents: z.number().optional(),
   levelId: OptionalUUIDSchema,
@@ -610,6 +614,8 @@ const MasterCourseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   defaultPrice: z.number(),
+  /** ONE_TIME sells the bundle once; MONTHLY_SUBSCRIPTION charges a fee each month. */
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION']),
   defaultDuration: z.number(),
   defaultMaxStudents: z.number().nullable(),
   levelId: UUIDSchema.nullable().optional(),

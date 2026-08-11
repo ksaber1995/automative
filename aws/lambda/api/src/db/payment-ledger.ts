@@ -53,9 +53,12 @@ const defaultExec: Exec = (sql, params) => query(sql, params);
 interface LedgerParent {
   id: string;
   company_id: string;
-  enrollment_id: string;
+  /** Null on a per-month master course's bill — see master_enrollment_id. */
+  enrollment_id: string | null;
+  /** Set instead, when the bill belongs to the bundle rather than one course. */
+  master_enrollment_id?: string | null;
   student_id: string;
-  course_id: string;
+  course_id: string | null;
   branch_id: string;
 }
 
@@ -280,10 +283,13 @@ export async function recordMonthlyInstallment(
   if (!Number.isFinite(amount) || amount <= 0) return;
   await exec(
     `INSERT INTO monthly_subscription_installments
-       (monthly_payment_id, company_id, enrollment_id, student_id, course_id, branch_id,
+       (monthly_payment_id, company_id, enrollment_id, master_enrollment_id, student_id, course_id, branch_id,
         amount, payment_date, notes, recorded_by_user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),$9,$10)`,
-    [bill.id, bill.company_id, bill.enrollment_id, bill.student_id, bill.course_id, bill.branch_id,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::date, CURRENT_DATE),$10,$11)`,
+    // The ledger row carries the same subject as the bill it pays off — one of
+    // the two is always null, which msi_one_subject enforces.
+    [bill.id, bill.company_id, bill.enrollment_id, bill.master_enrollment_id ?? null,
+     bill.student_id, bill.course_id, bill.branch_id,
      cents(amount), paymentDate, notes, recordedBy],
   );
 }

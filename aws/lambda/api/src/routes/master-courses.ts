@@ -15,6 +15,8 @@ function mapMasterCourseFromDB(row: any) {
     name: row.name,
     description: row.description,
     defaultPrice: parseFloat(row.default_price),
+    // The bundle price when ONE_TIME, the monthly fee when MONTHLY_SUBSCRIPTION.
+    paymentType: row.payment_type ?? 'ONE_TIME',
     defaultDuration: row.default_duration,
     defaultMaxStudents: row.default_max_students,
     levelId: row.level_id ?? null,
@@ -37,28 +39,42 @@ function mapWithCounts(row: any) {
   };
 }
 
-/**
- * The only payment type a master course can group, for now.
- *
- * A master sells its members as one bundle for one price (see master_enrollments),
- * which only has meaning if every member is charged the same way. A
- * MONTHLY_SUBSCRIPTION course renews on its own clock and a PER_SESSION course
- * bills off attendance — neither can answer "what does this bundle cost", so a
- * bundle mixing them has no single price to sell.
- *
- * Widening this is the whole job of supporting other types: give a master its own
- * payment_type and require its members to match it, rather than deleting the check.
- *
- * NOTE: enforced for NEW links only. Links made before this rule existed are left
- * alone — a live master with a paid enrolment is not something to rewrite from a
- * deploy. Prod had exactly one such master ("diploma of robotics", all three types)
- * when this landed.
- */
-const BUNDLEABLE_PAYMENT_TYPE = 'ONE_TIME';
+export const MASTER_PAYMENT_TYPES = ['ONE_TIME', 'MONTHLY_SUBSCRIPTION'] as const;
+export type MasterPaymentType = (typeof MASTER_PAYMENT_TYPES)[number];
 
-function isBundleable(paymentType: unknown): boolean {
-  // Legacy rows predate the column's NOT NULL DEFAULT and read as one-time.
-  return (paymentType ?? 'ONE_TIME') === BUNDLEABLE_PAYMENT_TYPE;
+/**
+ * What a master of each kind is allowed to hold.
+ *
+ * A ONE_TIME master sells its members as one bundle for one price (see
+ * master_enrollments), which only has meaning if every member is charged the same
+ * way — a monthly or per-session member cannot answer "what does this bundle
+ * cost". So it groups one-time courses only, as it always has.
+ *
+ * A MONTHLY_SUBSCRIPTION master answers that question differently: it charges its
+ * own fee every month and covers whatever is inside it. A member that bills
+ * monthly, or per session attended, stops billing the student entirely once they
+ * are in through the master — so those are exactly the two kinds worth putting in
+ * one. A one-time member is not: a fee that recurs cannot cover a price that is
+ * paid once, and nothing would ever collect it.
+ *
+ * NOTE: enforced for NEW links only. Links made before these rules existed are
+ * left alone — a live master with a paid enrolment is not something to rewrite
+ * from a deploy. Prod had exactly one such master ("diploma of robotics", all
+ * three types) when the first version of this check landed.
+ */
+const BUNDLEABLE_BY_MASTER_TYPE: Record<MasterPaymentType, readonly string[]> = {
+  ONE_TIME: ['ONE_TIME'],
+  MONTHLY_SUBSCRIPTION: ['MONTHLY_SUBSCRIPTION', 'PER_SESSION'],
+};
+
+/** Legacy rows predate the column's NOT NULL DEFAULT and read as one-time. */
+function masterType(row: any): MasterPaymentType {
+  return (row?.payment_type ?? 'ONE_TIME') as MasterPaymentType;
+}
+
+function isBundleable(coursePaymentType: unknown, master: any): boolean {
+  const allowed = BUNDLEABLE_BY_MASTER_TYPE[masterType(master)] ?? BUNDLEABLE_BY_MASTER_TYPE.ONE_TIME;
+  return allowed.includes((coursePaymentType ?? 'ONE_TIME') as string);
 }
 
 export const masterCoursesRoutes = {
@@ -83,6 +99,7 @@ export const masterCoursesRoutes = {
         name: body.name,
         description: body.description || null,
         default_price: body.defaultPrice,
+        payment_type: MASTER_PAYMENT_TYPES.includes(body.paymentType) ? body.paymentType : 'ONE_TIME',
         default_duration: body.defaultDuration,
         default_max_students: body.defaultMaxStudents || null,
         level_id: body.levelId || null,
@@ -228,6 +245,35 @@ export const masterCoursesRoutes = {
       if (body.defaultMaxStudents !== undefined) updateData.default_max_students = body.defaultMaxStudents;
       if (body.levelId !== undefined) updateData.level_id = body.levelId || null;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
+
+      // Switching how a master is sold changes what it is allowed to hold, and
+      // the members it already has were vetted against the old rule. Refuse
+      // rather than silently leaving a monthly member inside a one-time bundle
+      // that has no way to charge for it — the operator unlinks first, or keeps
+      // the type.
+      if (body.paymentType !== undefined && body.paymentType !== existing.payment_type) {
+        if (!MASTER_PAYMENT_TYPES.includes(body.paymentType)) {
+          return apiError(400, 'ERRORS.MASTER_COURSES.INVALID_PAYMENT_TYPE', 'Unknown payment type');
+        }
+        const allowed = BUNDLEABLE_BY_MASTER_TYPE[body.paymentType as MasterPaymentType];
+        const stragglers = await query(
+          `SELECT c.name
+             FROM master_course_courses mcc
+             JOIN courses c ON c.id = mcc.course_id
+            WHERE mcc.master_course_id = $1
+              AND COALESCE(c.payment_type, 'ONE_TIME') <> ALL($2)
+            ORDER BY c.name`,
+          [params.id, allowed],
+        );
+        if (stragglers.length) {
+          return apiError(
+            400,
+            'ERRORS.MASTER_COURSES.PAYMENT_TYPE_MEMBERS',
+            `Remove these courses first — they cannot be sold this way: ${stragglers.map((r: any) => r.name).join(', ')}`
+          );
+        }
+        updateData.payment_type = body.paymentType;
+      }
 
       const row = await update('master_courses', params.id, updateData);
       if (!row) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
@@ -398,19 +444,22 @@ export const masterCoursesRoutes = {
         return apiError(400, 'ERRORS.MASTER_COURSES.COURSE_BRANCH_MISMATCH', 'Course must be in the same branch as the master course');
       }
 
-      // A master course sells its members as ONE bundle for ONE price, so its
-      // members have to be charged the same way — and today that way is one-time.
-      // A monthly course renews on its own schedule and a per-session course bills
-      // off attendance; neither has an answer to "what did this bundle cost".
-      // Mixing them is what this rejects. See availableCourses, which does not
-      // offer them in the first place — this is the guard that actually holds,
+      // What a master can hold depends on how the master itself is sold — see
+      // BUNDLEABLE_BY_MASTER_TYPE. See availableCourses, which does not offer the
+      // wrong kinds in the first place; this is the guard that actually holds,
       // because the picker is not the only thing that can call this.
-      if (!isBundleable(course.payment_type)) {
-        return apiError(
-          400,
-          'ERRORS.MASTER_COURSES.COURSE_PAYMENT_TYPE',
-          'Only one-time payment courses can be grouped into a master course'
-        );
+      if (!isBundleable(course.payment_type, master)) {
+        return masterType(master) === 'MONTHLY_SUBSCRIPTION'
+          ? apiError(
+              400,
+              'ERRORS.MASTER_COURSES.COURSE_PAYMENT_TYPE_MONTHLY',
+              'A per-month master course takes per-month and per-session courses only'
+            )
+          : apiError(
+              400,
+              'ERRORS.MASTER_COURSES.COURSE_PAYMENT_TYPE',
+              'Only one-time payment courses can be grouped into a master course'
+            );
       }
 
       await query(
@@ -464,7 +513,7 @@ export const masterCoursesRoutes = {
       }
 
       const master = await queryOne(
-        'SELECT id, branch_id FROM master_courses WHERE id = $1 AND company_id = $2',
+        'SELECT id, branch_id, payment_type FROM master_courses WHERE id = $1 AND company_id = $2',
         [params.id, context.companyId]
       );
       if (!master) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
@@ -475,16 +524,17 @@ export const masterCoursesRoutes = {
       // payment_type filtered here as well as in addCourse: this list is what the
       // picker shows, and offering a course that the save would then reject is a
       // worse experience than not offering it. addCourse stays the real guard.
+      const allowed = BUNDLEABLE_BY_MASTER_TYPE[masterType(master)] ?? BUNDLEABLE_BY_MASTER_TYPE.ONE_TIME;
       const rows = await query(
-        `SELECT id, name, price
+        `SELECT id, name, price, payment_type
          FROM courses
          WHERE company_id = $1 AND branch_id = $2 AND is_active = true
-           AND payment_type = $4
+           AND payment_type = ANY($4)
            AND id NOT IN (
              SELECT course_id FROM master_course_courses WHERE master_course_id = $3
            )
          ORDER BY name ASC`,
-        [context.companyId, master.branch_id, master.id, BUNDLEABLE_PAYMENT_TYPE]
+        [context.companyId, master.branch_id, master.id, allowed]
       );
       return {
         status: 200 as const,
