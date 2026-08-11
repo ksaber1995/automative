@@ -1411,6 +1411,35 @@ CREATE TRIGGER update_course_monthly_price_overrides_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
+-- MASTER REVENUE ALLOCATIONS TABLE  (migration 091)
+-- An approved split of a bundle's income: MONEY attributed to a teacher for one
+-- course of one bundle in one month. Not earnings — their own rate is applied
+-- afterwards, as it is to ordinary course money.
+-- =============================================
+CREATE TABLE master_revenue_allocations (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id        UUID NOT NULL REFERENCES companies(id)      ON DELETE CASCADE,
+    master_course_id  UUID NOT NULL REFERENCES master_courses(id) ON DELETE CASCADE,
+    billing_year      INTEGER NOT NULL,
+    billing_month     INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
+    employee_id       UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    course_id         UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+    amount            DECIMAL(12, 2) NOT NULL CHECK (amount >= 0),
+    suggested_amount  DECIMAL(12, 2),
+    policy            VARCHAR(1) NOT NULL DEFAULT 'A' CHECK (policy IN ('A', 'C')),
+    approved_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (master_course_id, billing_year, billing_month, employee_id, course_id)
+);
+
+CREATE INDEX idx_mra_company_month ON master_revenue_allocations(company_id, billing_year, billing_month);
+CREATE INDEX idx_mra_employee      ON master_revenue_allocations(employee_id);
+CREATE INDEX idx_mra_master        ON master_revenue_allocations(master_course_id);
+CREATE INDEX idx_mra_course        ON master_revenue_allocations(course_id);
+
+-- =============================================
 -- EMPLOYEE COURSE PERCENTAGES TABLE  (migration 089)
 -- A PERCENTAGE teacher's rate for one specific course. employees.percentage_rate
 -- remains the global rate and applies to every course without a row here — a row

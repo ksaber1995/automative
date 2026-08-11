@@ -171,6 +171,8 @@ export interface BundleIncomeRow {
   members: BundleMemberLine[];
   /** Why this bundle's money cannot be attributed, if it cannot. */
   blockedReason: 'NO_MEMBER_COURSES' | 'NO_INSTRUCTOR' | 'NOT_PERCENTAGE_PAID' | 'NO_LIST_PRICE' | null;
+  /** A decision already recorded for this bundle and month, if there is one. */
+  approved: Array<{ employeeId: string; courseId: string; amount: number; policy: 'A' | 'C'; approvedAt: string }>;
   policyA: BundlePolicySplit | null;
   policyC: BundlePolicySplit | null;
 }
@@ -270,6 +272,23 @@ export class ExpenseService {
     const body: any = {};
     if (upTo) body.upTo = upTo;
     return this.api.post<BackPayResult>(`expenses/employee/${employeeId}/back-pay`, body);
+  }
+
+  /**
+   * Record who gets what of one bundle's month. Replaces any earlier decision
+   * for that bundle and month; the server refuses a split that would leave the
+   * academy nothing once each teacher's rate is applied.
+   */
+  approveBundleSplit(body: {
+    masterCourseId: string;
+    year: number;
+    month: number;
+    policy: 'A' | 'C';
+    lines: Array<{ employeeId: string; courseId: string; amount: number; suggestedAmount?: number }>;
+  }): Observable<{ approved: number; allocated: number; teacherEarnings: number; academy: number }> {
+    return this.api.post<{ approved: number; allocated: number; teacherEarnings: number; academy: number }>(
+      'expenses/bundle-income/approve', body,
+    );
   }
 
   /**

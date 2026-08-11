@@ -18,7 +18,7 @@ import { DialogModule } from 'primeng/dialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
-import { BundleIncomeReport, BundleIncomeRow, BundlePolicySplit } from '../services/expense.service';
+import { BundleIncomeReport, BundleIncomeRow, BundleMemberLine, BundlePolicySplit } from '../services/expense.service';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { SalaryBreakdownDialogComponent } from './salary-breakdown-dialog.component';
@@ -107,6 +107,96 @@ export class SalariesComponent implements OnInit {
       { label: this.translate.instant('EXPENSES.SALARIES.BUNDLES_POLICY_C'), value: 'C' as const },
     ];
   });
+
+  /**
+   * Amounts the operator has typed over the suggestion, keyed by bundle+course.
+   * A suggestion is a proposal — what gets stored is whatever is on screen when
+   * Approve is pressed.
+   */
+  allocationOverrides = signal<Map<string, number>>(new Map());
+  approvingBundle = signal<string | null>(null);
+
+  private allocKey(masterCourseId: string, courseId: string): string {
+    return `${masterCourseId}:${courseId}`;
+  }
+
+  /** What this line will be approved at: the typed amount, else the suggestion. */
+  allocationAmount(row: BundleIncomeRow, line: BundleMemberLine): number {
+    const typed = this.allocationOverrides().get(this.allocKey(row.masterCourseId, line.courseId));
+    return typed !== undefined ? typed : (line.share ?? 0);
+  }
+
+  setAllocationAmount(row: BundleIncomeRow, line: BundleMemberLine, amount: number): void {
+    this.allocationOverrides.update((m) => {
+      const next = new Map(m);
+      next.set(this.allocKey(row.masterCourseId, line.courseId), amount ?? 0);
+      return next;
+    });
+  }
+
+  /** What the teachers would earn from the amounts currently on screen. */
+  allocationEarnings(row: BundleIncomeRow): number {
+    const split = this.splitFor(row);
+    if (!split) return 0;
+    const total = split.lines.reduce(
+      (sum, l) => sum + this.allocationAmount(row, l) * ((l.rate ?? 0) / 100), 0);
+    return Math.round(total * 100) / 100;
+  }
+
+  /** What is left for the academy. The rule is that this must stay above zero. */
+  allocationAcademy(row: BundleIncomeRow): number {
+    return Math.round((row.collected - this.allocationEarnings(row)) * 100) / 100;
+  }
+
+  /** Money attributed but not yet given to anyone, so the operator can see it. */
+  allocationRemainder(row: BundleIncomeRow): number {
+    const split = this.splitFor(row);
+    if (!split) return 0;
+    const allocated = split.lines.reduce((sum, l) => sum + this.allocationAmount(row, l), 0);
+    return Math.round((row.collected - allocated) * 100) / 100;
+  }
+
+  canApprove(row: BundleIncomeRow): boolean {
+    const split = this.splitFor(row);
+    if (!split || !split.feasible || !split.lines.length) return false;
+    if (this.allocationRemainder(row) < -0.001) return false;   // more than came in
+    return this.allocationAcademy(row) > 0;                     // the academy earns
+  }
+
+  approveSplit(row: BundleIncomeRow): void {
+    const split = this.splitFor(row);
+    const report = this.bundleReport();
+    if (!split || !report || !this.canApprove(row)) return;
+
+    this.approvingBundle.set(row.masterCourseId);
+    this.expenseService.approveBundleSplit({
+      masterCourseId: row.masterCourseId,
+      year: report.year,
+      month: report.month,
+      policy: this.bundlePolicy(),
+      lines: split.lines.map((l) => ({
+        employeeId: l.employeeId as string,
+        courseId: l.courseId,
+        amount: this.allocationAmount(row, l),
+        suggestedAmount: l.share ?? 0,
+      })),
+    }).subscribe({
+      next: (res: { approved: number }) => {
+        this.approvingBundle.set(null);
+        this.notificationService.success(
+          this.translate.instant('EXPENSES.SALARIES.BUNDLES_APPROVED', { count: res.approved }),
+        );
+        // Re-read rather than patch: the server is what decides what was stored.
+        this.loadBundleIncome();
+      },
+      error: (err: any) => {
+        this.approvingBundle.set(null);
+        this.notificationService.error(
+          err?.error?.message || this.translate.instant('EXPENSES.SALARIES.BUNDLES_APPROVE_FAILED'),
+        );
+      },
+    });
+  }
 
   /** The split under the policy being viewed. */
   splitFor(row: BundleIncomeRow): BundlePolicySplit | null {

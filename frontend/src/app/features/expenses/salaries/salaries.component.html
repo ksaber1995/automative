@@ -673,7 +673,14 @@
                           <td class="p-3">{{ line.courseName }}</td>
                           <td class="p-3">{{ line.employeeName }}</td>
                           <td class="p-3 text-end text-gray-500">{{ line.listPrice | amount }}</td>
-                          <td class="p-3 text-end">{{ line.share | amount }}</td>
+                          <td class="p-3 text-end">
+                          <p-inputnumber
+                            [ngModel]="allocationAmount(row, line)"
+                            (ngModelChange)="setAllocationAmount(row, line, $event)"
+                            [min]="0" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="2"
+                            [inputStyle]="{ width: '7rem', textAlign: 'end' }"
+                          ></p-inputnumber>
+                        </td>
                           <td class="p-3 text-end">
                             {{ line.rate }}%
                             @if (line.isCourseRate) {
@@ -682,19 +689,48 @@
                               </span>
                             }
                           </td>
-                          <td class="p-3 text-end font-semibold">{{ line.earning | amount }}</td>
+                          <td class="p-3 text-end font-semibold">
+                          {{ (allocationAmount(row, line) * (line.rate || 0) / 100) | amount }}
+                        </td>
                         </tr>
                       }
                       <tr class="border-t border-gray-200 bg-gray-50 font-semibold">
                         <td class="p-3" colspan="5">{{ 'EXPENSES.SALARIES.BUNDLES_TEACHERS_TOTAL' | translate }}</td>
-                        <td class="p-3 text-end">{{ split.teachersTotal | amount }}</td>
+                        <td class="p-3 text-end">{{ allocationEarnings(row) | amount }}</td>
                       </tr>
-                      <tr class="bg-green-50">
-                        <td class="p-3 text-green-800" colspan="5">{{ 'EXPENSES.SALARIES.BUNDLES_ACADEMY' | translate }}</td>
-                        <td class="p-3 text-end font-bold text-green-800">{{ split.academy | amount }}</td>
+                      <!-- The rule: this stays above zero, or Approve is refused
+                           here and again on the server. -->
+                      <tr [class]="allocationAcademy(row) > 0 ? 'bg-green-50' : 'bg-red-50'">
+                        <td class="p-3" [class]="allocationAcademy(row) > 0 ? 'text-green-800' : 'text-red-700'" colspan="5">
+                          {{ 'EXPENSES.SALARIES.BUNDLES_ACADEMY' | translate }}
+                          @if (allocationRemainder(row) !== 0) {
+                            <span class="text-xs font-normal ms-2 text-gray-500">
+                              {{ 'EXPENSES.SALARIES.BUNDLES_UNALLOCATED' | translate }}: {{ allocationRemainder(row) | amount }}
+                            </span>
+                          }
+                        </td>
+                        <td class="p-3 text-end font-bold"
+                            [class]="allocationAcademy(row) > 0 ? 'text-green-800' : 'text-red-700'">
+                          {{ allocationAcademy(row) | amount }}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
+                </div>
+                <div class="p-3 flex items-center justify-between gap-3 border-t border-gray-100 flex-wrap">
+                  @if (row.approved.length) {
+                    <span class="text-sm text-green-700">
+                      <i class="pi pi-check-circle me-1"></i>
+                      {{ 'EXPENSES.SALARIES.BUNDLES_ALREADY_APPROVED' | translate: { policy: row.approved[0].policy } }}
+                    </span>
+                  } @else {
+                    <span class="text-sm text-gray-400">{{ 'EXPENSES.SALARIES.BUNDLES_NOT_APPROVED' | translate }}</span>
+                  }
+                  <button pButton type="button" icon="pi pi-check"
+                          [label]="(row.approved.length ? 'EXPENSES.SALARIES.BUNDLES_REAPPROVE' : 'EXPENSES.SALARIES.BUNDLES_APPROVE') | translate"
+                          [disabled]="!canApprove(row)"
+                          [loading]="approvingBundle() === row.masterCourseId"
+                          (click)="approveSplit(row)"></button>
                 </div>
               }
             }

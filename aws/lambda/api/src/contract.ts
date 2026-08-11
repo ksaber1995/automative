@@ -4169,6 +4169,34 @@ export const contract = c.router({
      * calculation, and pinning every line here would make the shape harder to
      * change than the thing it describes.
      */
+    approveBundleSplit: {
+      method: 'POST' as const,
+      path: '/api/expenses/bundle-income/approve',
+      body: z.object({
+        masterCourseId: UUIDSchema,
+        year: z.number().int(),
+        month: z.number().int().min(1).max(12),
+        policy: z.enum(['A', 'C']),
+        lines: z.array(z.object({
+          employeeId: UUIDSchema,
+          courseId: UUIDSchema,
+          /** Money attributed, not earnings — the rate is applied afterwards. */
+          amount: z.number().min(0),
+          suggestedAmount: z.number().min(0).optional(),
+        })),
+      }),
+      responses: {
+        200: z.object({
+          approved: z.number(),
+          allocated: z.number(),
+          teacherEarnings: z.number(),
+          academy: z.number(),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     bundleIncome: {
       method: 'GET' as const,
       path: '/api/expenses/bundle-income',

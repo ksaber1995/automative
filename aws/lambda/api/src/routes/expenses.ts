@@ -169,6 +169,98 @@ async function getTeacherPaidByCourse(
   }));
 }
 
+let allocationsTableReady = false;
+/**
+ * Approved bundle splits (migration 091). Self-applying like the other salary
+ * tables, so the endpoint works on a database the migration has not reached.
+ */
+async function ensureAllocationsSchema(): Promise<void> {
+  if (allocationsTableReady) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS master_revenue_allocations (
+      id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id        UUID NOT NULL REFERENCES companies(id)      ON DELETE CASCADE,
+      master_course_id  UUID NOT NULL REFERENCES master_courses(id) ON DELETE CASCADE,
+      billing_year      INTEGER NOT NULL,
+      billing_month     INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
+      employee_id       UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      course_id         UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+      amount            DECIMAL(12, 2) NOT NULL CHECK (amount >= 0),
+      suggested_amount  DECIMAL(12, 2),
+      policy            VARCHAR(1) NOT NULL DEFAULT 'A' CHECK (policy IN ('A', 'C')),
+      approved_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+      approved_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (master_course_id, billing_year, billing_month, employee_id, course_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_mra_company_month ON master_revenue_allocations(company_id, billing_year, billing_month)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_mra_employee ON master_revenue_allocations(employee_id)`);
+  allocationsTableReady = true;
+}
+
+/**
+ * What ONE bundle collected in a month — the ceiling any split has to respect.
+ *
+ * The same three arms the report uses, and for the same reason: almost no bundle
+ * money is a dated payment row. Most of it is the lump taken at the desk when
+ * the student joined, which only the enrolment records.
+ */
+async function masterMonthCollected(
+  context: { companyId: string },
+  year: number,
+  month: number,
+  masterCourseId: string,
+): Promise<{ collected: number }> {
+  const row = await queryOne<any>(
+    `WITH money AS (
+       SELECT GREATEST(
+                COALESCE(me.amount_paid, 0) - COALESCE(me.total_refunded, 0)
+                  - COALESCE((SELECT SUM(mep2.amount) FROM master_enrollment_payments mep2
+                               WHERE mep2.master_enrollment_id = me.id), 0), 0) AS amount
+         FROM master_enrollments me
+        WHERE me.company_id = $1 AND me.master_course_id = $4
+          AND EXTRACT(YEAR FROM me.enrollment_date) = $2
+          AND EXTRACT(MONTH FROM me.enrollment_date) = $3
+       UNION ALL
+       SELECT mep.amount FROM master_enrollment_payments mep
+         JOIN master_enrollments me ON me.id = mep.master_enrollment_id
+        WHERE mep.company_id = $1 AND me.master_course_id = $4
+          AND EXTRACT(YEAR FROM mep.payment_date) = $2
+          AND EXTRACT(MONTH FROM mep.payment_date) = $3
+       UNION ALL
+       SELECT msi.amount FROM monthly_subscription_installments msi
+         JOIN master_enrollments me ON me.id = msi.master_enrollment_id
+        WHERE msi.company_id = $1 AND me.master_course_id = $4
+          AND EXTRACT(YEAR FROM msi.payment_date) = $2
+          AND EXTRACT(MONTH FROM msi.payment_date) = $3
+     )
+     SELECT COALESCE(SUM(amount), 0) AS collected FROM money`,
+    [context.companyId, year, month, masterCourseId],
+  );
+  return { collected: row?.collected != null ? parseFloat(row.collected) : 0 };
+}
+
+/** Bundle money approved to this teacher, by course. Empty until someone approves. */
+async function getAllocatedByCourse(
+  companyId: string,
+  employeeId: string,
+): Promise<Map<string, number>> {
+  const reg = await queryOne<any>(
+    `SELECT to_regclass('public.master_revenue_allocations') IS NOT NULL AS has_table`
+  );
+  if (!reg?.has_table) return new Map();
+  const rows = await query(
+    `SELECT course_id, SUM(amount) AS amount
+       FROM master_revenue_allocations
+      WHERE company_id = $1 AND employee_id = $2
+      GROUP BY course_id`,
+    [companyId, employeeId],
+  );
+  return new Map((rows as any[]).map((r) => [r.course_id as string, parseFloat(r.amount)]));
+}
+
 /** How a teacher is paid for one particular course, when it differs. */
 export interface CoursePayRule {
   payType: 'PERCENTAGE' | 'SESSION_BASED';
@@ -316,10 +408,21 @@ async function getTeacherEarnings(
   employeeId: string,
   globalRate: number,
 ): Promise<{ totalPaid: number; accrued: number; byCourse: TeacherCourseEarning[] }> {
-  const [paidByCourse, rules] = await Promise.all([
+  const [paidCourseRows, rules, allocated] = await Promise.all([
     getTeacherPaidByCourse(companyId, employeeId),
     getCoursePayRules(companyId, employeeId),
+    getAllocatedByCourse(companyId, employeeId),
   ]);
+
+  // Approved bundle money joins the course it was attributed to and is then
+  // treated exactly like money a student paid for that course — same rate, same
+  // rounding. That is the whole point of storing money rather than earnings.
+  const paidByCourse = [...paidCourseRows];
+  for (const [courseId, amount] of allocated) {
+    const existing = paidByCourse.find((c) => c.courseId === courseId);
+    if (existing) existing.paid = Math.round((existing.paid + amount) * 100) / 100;
+    else paidByCourse.push({ courseId, courseName: null, paid: amount });
+  }
 
   let totalPaid = 0;
   let accrued = 0;
@@ -688,6 +791,124 @@ export const expensesRoutes = {
    *   C  teachers fund — the academy keeps the margin list prices would have
    *                      given it, and the rest is split between teachers
    */
+  /**
+   * POST /api/expenses/bundle-income/approve — see masterMonthCollected below
+   * for where the ceiling comes from.
+   *
+   * Records a decision about one bundle's month: who gets how much of what it
+   * collected. Replaces any earlier decision for that bundle and month, so
+   * approving twice corrects rather than pays twice.
+   *
+   * The amounts are MONEY, not earnings — each teacher's own rate is applied
+   * afterwards by the accrual, so this endpoint refuses anything that would
+   * leave the academy with nothing once those rates are applied.
+   */
+  approveBundleSplit: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureAllocationsSchema();
+
+      const year = parseInt(body?.year, 10);
+      const month = parseInt(body?.month, 10);
+      const masterCourseId = body?.masterCourseId;
+      const policy = body?.policy === 'C' ? 'C' : 'A';
+      const lines: Array<{ employeeId: string; courseId: string; amount: number; suggestedAmount?: number }> =
+        Array.isArray(body?.lines) ? body.lines : [];
+
+      if (!masterCourseId || !Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return apiError(400, 'ERRORS.EXPENSES.BAD_MONTH', 'A bundle, a year and a month are required');
+      }
+
+      const master = await queryOne<any>(
+        'SELECT id FROM master_courses WHERE id = $1 AND company_id = $2',
+        [masterCourseId, context.companyId],
+      );
+      if (!master) return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Master course not found');
+
+      // What that bundle actually took this month — the ceiling for any split.
+      const report: any = await masterMonthCollected(context, year, month, masterCourseId);
+      const collected = report.collected;
+
+      let totalAllocated = 0;
+      let totalEarnings = 0;
+      for (const line of lines) {
+        if (!(typeof line.amount === 'number') || line.amount < 0) {
+          return apiError(400, 'ERRORS.EXPENSES.BAD_ALLOCATION', 'An allocated amount cannot be negative');
+        }
+        const emp = await queryOne<any>(
+          `SELECT e.id, e.percentage_rate, ecp.percentage_rate AS course_rate
+             FROM employees e
+             LEFT JOIN employee_course_percentages ecp
+                    ON ecp.employee_id = e.id AND ecp.course_id = $3
+                       AND COALESCE(ecp.pay_type, 'PERCENTAGE') = 'PERCENTAGE'
+            WHERE e.id = $1 AND e.company_id = $2`,
+          [line.employeeId, context.companyId, line.courseId],
+        );
+        if (!emp) return apiError(400, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+        const course = await queryOne<any>(
+          'SELECT id FROM courses WHERE id = $1 AND company_id = $2',
+          [line.courseId, context.companyId],
+        );
+        if (!course) return apiError(400, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+
+        const rate = emp.course_rate != null
+          ? parseFloat(emp.course_rate)
+          : (emp.percentage_rate != null ? parseFloat(emp.percentage_rate) : 0);
+        totalAllocated += line.amount;
+        totalEarnings += line.amount * rate / 100;
+      }
+
+      totalAllocated = Math.round(totalAllocated * 100) / 100;
+      totalEarnings = Math.round(totalEarnings * 100) / 100;
+
+      if (totalAllocated > collected + 0.001) {
+        return apiError(400, 'ERRORS.EXPENSES.ALLOCATION_OVER_COLLECTED',
+          `Cannot attribute more than the bundle collected (${collected})`);
+      }
+      // The rule the academy asked for, enforced here rather than trusted from
+      // the screen: what the teachers earn must leave something behind.
+      if (collected - totalEarnings <= 0) {
+        return apiError(400, 'ERRORS.EXPENSES.ACADEMY_EARNS_NOTHING',
+          'This split leaves the academy nothing once each rate is applied');
+      }
+
+      // Replace the decision for this bundle+month rather than adding to it.
+      await query(
+        `DELETE FROM master_revenue_allocations
+          WHERE company_id = $1 AND master_course_id = $2
+            AND billing_year = $3 AND billing_month = $4`,
+        [context.companyId, masterCourseId, year, month],
+      );
+      for (const line of lines) {
+        if (line.amount <= 0) continue;
+        await query(
+          `INSERT INTO master_revenue_allocations
+             (company_id, master_course_id, billing_year, billing_month, employee_id, course_id,
+              amount, suggested_amount, policy, approved_by, approved_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+          [context.companyId, masterCourseId, year, month, line.employeeId, line.courseId,
+           line.amount, line.suggestedAmount ?? null, policy, context.userId],
+        );
+      }
+
+      return {
+        status: 200 as const,
+        body: {
+          approved: lines.filter((l) => l.amount > 0).length,
+          allocated: totalAllocated,
+          teacherEarnings: totalEarnings,
+          academy: Math.round((collected - totalEarnings) * 100) / 100,
+        },
+      };
+    } catch (error: any) {
+      console.error('Approve bundle split error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.BUNDLE_APPROVE_FAILED', 'Failed to approve the split', 400);
+    }
+  },
+
   bundleIncome: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -789,6 +1010,31 @@ export const expensesRoutes = {
           )
         : [];
 
+      // What has already been decided for these bundles this month, so the
+      // screen can show an approved split instead of proposing one again.
+      await ensureAllocationsSchema();
+      const approvedRows = masterIds.length
+        ? await query(
+            `SELECT master_course_id, employee_id, course_id, amount, policy, approved_at
+               FROM master_revenue_allocations
+              WHERE company_id = $1 AND billing_year = $2 AND billing_month = $3
+                AND master_course_id = ANY($4::uuid[])`,
+            [context.companyId, year, month, masterIds],
+          )
+        : [];
+      const approvedByMaster = new Map<string, any[]>();
+      for (const a of approvedRows as any[]) {
+        const list = approvedByMaster.get(a.master_course_id) ?? [];
+        list.push({
+          employeeId: a.employee_id,
+          courseId: a.course_id,
+          amount: parseFloat(a.amount),
+          policy: a.policy,
+          approvedAt: a.approved_at,
+        });
+        approvedByMaster.set(a.master_course_id, list);
+      }
+
       const membersByMaster = new Map<string, any[]>();
       for (const m of members as any[]) {
         const list = membersByMaster.get(m.master_course_id) ?? [];
@@ -847,6 +1093,7 @@ export const expensesRoutes = {
             academyFloor: 0,
             members: memberLines,
             blockedReason,
+            approved: approvedByMaster.get(row.id) ?? [],
             policyA: null,
             policyC: null,
           };
@@ -886,6 +1133,7 @@ export const expensesRoutes = {
           academyFloor,
           members: memberLines,
           blockedReason: null,
+          approved: approvedByMaster.get(row.id) ?? [],
           policyA: {
             lines: linesA,
             teachersTotal: teachersA,
