@@ -172,25 +172,53 @@ export async function extractTenantContext(authHeader?: string): Promise<TenantC
     }
   }
 
-  // Fetch branch IDs from junction table
+  // Which branches is this user tied to, and how many does the company have?
+  // Both come off one pass over the company's branches — the tie is a flag on
+  // the branch row rather than a second round trip for user_branches.
   let branchIds: string[] = [];
+  let activeBranchIds: string[] = [];
   try {
     const rows = await query<any>(
-      'SELECT branch_id FROM user_branches WHERE user_id = $1 AND company_id = $2',
+      `SELECT b.id, b.is_active,
+              EXISTS (
+                SELECT 1 FROM user_branches ub
+                 WHERE ub.user_id = $1 AND ub.branch_id = b.id
+              ) AS tied
+         FROM branches b
+        WHERE b.company_id = $2`,
       [decoded.id, decoded.companyId]
     );
-    branchIds = rows.map((r: any) => r.branch_id);
+    branchIds = rows.filter((r: any) => r.tied).map((r: any) => r.id);
+    activeBranchIds = rows.filter((r: any) => r.is_active).map((r: any) => r.id);
   } catch {
     if (decoded.branchId) branchIds = [decoded.branchId];
   }
   if (branchIds.length === 0 && decoded.branchId) branchIds = [decoded.branchId];
+
+  // A company with one branch has nothing to isolate — the branch IS the tenant,
+  // so every user of the company belongs to it whatever their token says.
+  //
+  // Without this, a token minted before the user was given their branch (or
+  // pointing at a branch that has since gone) filters every branch-scoped query
+  // down to nothing: the student form shows a required Branch dropdown with no
+  // options in it, and canAccessBranch() then refuses the save. The token only
+  // refreshes on login, so the user cannot clear that state by themselves.
+  //
+  // Multi-branch companies are untouched: there a stale branch is a real
+  // question about which branch the user belongs to, not one with an obvious
+  // answer.
+  let branchId = decoded.branchId;
+  if (activeBranchIds.length === 1) {
+    branchId = activeBranchIds[0];
+    branchIds = [activeBranchIds[0]];
+  }
 
   return {
     userId: decoded.id,
     email: decoded.email,
     role: decoded.role,
     companyId: decoded.companyId,
-    branchId: decoded.branchId,
+    branchId,
     branchIds,
     permissions: (decoded.permissions as UserPermissions) ?? null,
   };
