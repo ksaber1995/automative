@@ -1449,15 +1449,19 @@ const CreateEmployeeSchema = z.object({
   // Optional, and an empty string counts as "not given" — the form always sends
   // the key. Same shape as CreateStudentSchema.email.
   email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
-  phone: z.string().optional(),
-  department: z.string().optional(),
-  position: z.string().optional(),
+  // Nullable, not just optional: every one of these columns is nullable, the GET
+  // returns null for an employee who has none, and the form sends back what it
+  // was given. Accepting null on the way out but refusing it on the way in made
+  // an employee with no department unsaveable — 15 of them in prod.
+  phone: z.string().nullable().optional(),
+  department: z.string().nullable().optional(),
+  position: z.string().nullable().optional(),
   salary: z.number().nullable().optional(),
   // UNPAID: a teacher who draws nothing — a founder or co-founder who teaches.
   salaryType: z.enum(['MONTHLY', 'SESSION_BASED', 'PERCENTAGE', 'UNPAID']).optional(),
   sessionRate: z.number().nullable().optional(),
   percentageRate: z.number().nullable().optional(),
-  hireDate: z.string().optional(),
+  hireDate: z.string().nullable().optional(),
   branchId: OptionalUUIDSchema,
   isGlobal: z.boolean().optional(),
   // A teacher is an employee with this flag (migration 075). Subjects/levels are
