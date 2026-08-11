@@ -4163,6 +4163,33 @@ export const contract = c.router({
         200: z.array(ExpenseSchema),
       },
     },
+    /**
+     * Read-only: what bundles collected this month and how a split between their
+     * teachers would look. Loose object types on purpose — this reports a
+     * calculation, and pinning every line here would make the shape harder to
+     * change than the thing it describes.
+     */
+    bundleIncome: {
+      method: 'GET' as const,
+      path: '/api/expenses/bundle-income',
+      query: z.object({
+        year: z.string(),
+        month: z.string(),
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          year: z.number(),
+          month: z.number(),
+          totalCollected: z.number(),
+          /** Money from bundles nothing could attribute to a teacher. */
+          unattributable: z.number(),
+          bundles: z.array(z.any()),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
     getDue: {
       method: 'GET',
       path: '/api/expenses/due',

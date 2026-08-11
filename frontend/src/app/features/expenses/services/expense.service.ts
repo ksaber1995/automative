@@ -133,6 +133,56 @@ export interface SalaryPaymentBreakdown {
   monthLabel: string;
 }
 
+
+/** One member course of a bundle, and the teacher who would be paid for it. */
+export interface BundleMemberLine {
+  courseId: string;
+  courseName: string;
+  listPrice: number;
+  employeeId: string | null;
+  employeeName: string | null;
+  salaryType: string | null;
+  rate: number | null;
+  /** The rate came from a per-course arrangement rather than the global one. */
+  isCourseRate: boolean;
+  payable: boolean;
+  /** Present on a policy's lines only: the money attributed, and what it earns. */
+  share?: number;
+  earning?: number;
+}
+
+export interface BundlePolicySplit {
+  lines: BundleMemberLine[];
+  teachersTotal: number;
+  academy: number;
+  /** False when the split would leave the academy nothing — never approvable. */
+  feasible: boolean;
+}
+
+export interface BundleIncomeRow {
+  masterCourseId: string;
+  masterCourseName: string;
+  paymentType: string;
+  collected: number;
+  listTotal: number;
+  discount: number;
+  /** The least the bundle can sell for under policy C. */
+  academyFloor: number;
+  members: BundleMemberLine[];
+  /** Why this bundle's money cannot be attributed, if it cannot. */
+  blockedReason: 'NO_MEMBER_COURSES' | 'NO_INSTRUCTOR' | 'NOT_PERCENTAGE_PAID' | 'NO_LIST_PRICE' | null;
+  policyA: BundlePolicySplit | null;
+  policyC: BundlePolicySplit | null;
+}
+
+export interface BundleIncomeReport {
+  year: number;
+  month: number;
+  totalCollected: number;
+  unattributable: number;
+  bundles: BundleIncomeRow[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -220,6 +270,17 @@ export class ExpenseService {
     const body: any = {};
     if (upTo) body.upTo = upTo;
     return this.api.post<BackPayResult>(`expenses/employee/${employeeId}/back-pay`, body);
+  }
+
+  /**
+   * Read-only bundle income for a month: what each master course collected and
+   * how a split between its teachers would look under either policy. Nothing is
+   * stored — see the endpoint.
+   */
+  getBundleIncome(year: number, month: number, branchId?: string): Observable<BundleIncomeReport> {
+    const params: any = { year: String(year), month: String(month) };
+    if (branchId) params.branchId = branchId;
+    return this.api.get<BundleIncomeReport>('expenses/bundle-income', params);
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {

@@ -1594,4 +1594,252 @@ export const expensesRoutes = {
     }
   },
 
+  /**
+   * GET /api/expenses/bundle-income?year=&month=&branchId=
+   *
+   * READ-ONLY. What each master course collected in a month, and what a split
+   * between its teachers WOULD look like. Nothing here is stored and no salary
+   * moves because of it.
+   *
+   * It exists because bundle money reaches no teacher at all today: every
+   * accrual walks money -> enrollment -> class -> instructor, and a bundle's
+   * payment hangs off a master enrolment, which has neither an enrolment nor a
+   * class behind it. The money is not lost, it is invisible — so the first job
+   * of this report is to show how much of it there is.
+   *
+   * Two policies, both of which leave the academy earning:
+   *   A  pro-rata      — the bundle's discount is shared by everyone in proportion
+   *   C  teachers fund — the academy keeps the margin list prices would have
+   *                      given it, and the rest is split between teachers
+   */
+  bundleIncome: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      // Salary money — the same gate the rest of this page uses.
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const year = parseInt(q.year, 10);
+      const month = parseInt(q.month, 10);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return apiError(400, 'ERRORS.EXPENSES.BAD_MONTH', 'A year and a month are required');
+      }
+
+      const params: any[] = [context.companyId, year, month];
+      let branchClause = '';
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        branchClause = ' AND me.branch_id = $4';
+      }
+
+      // What was actually COLLECTED this month, per master course. Money that
+      // arrived, not money that was billed — a salary question is about the
+      // former. Three arms, because bundle money is recorded three ways:
+      //
+      //  1. What was taken at the desk when the student joined. This is the big
+      //     one and it has no payment row of its own: the enrolment carries it
+      //     as a lump in amount_paid (13,550 of the 13,550 in prod), so it is
+      //     dated by the enrolment and reduced by anything itemised below.
+      //  2. Later instalments against a one-off bundle, which are dated rows.
+      //  3. A per-month bundle's monthly instalment ledger.
+      const collected = await query(
+        `WITH money AS (
+           SELECT me.master_course_id,
+                  GREATEST(
+                    COALESCE(me.amount_paid, 0)
+                      - COALESCE(me.total_refunded, 0)
+                      - COALESCE((SELECT SUM(mep2.amount) FROM master_enrollment_payments mep2
+                                   WHERE mep2.master_enrollment_id = me.id), 0),
+                    0
+                  ) AS amount
+             FROM master_enrollments me
+            WHERE me.company_id = $1
+              AND EXTRACT(YEAR FROM me.enrollment_date) = $2
+              AND EXTRACT(MONTH FROM me.enrollment_date) = $3${branchClause}
+           UNION ALL
+           SELECT me.master_course_id, mep.amount
+             FROM master_enrollment_payments mep
+             JOIN master_enrollments me ON me.id = mep.master_enrollment_id
+            WHERE mep.company_id = $1
+              AND EXTRACT(YEAR FROM mep.payment_date) = $2
+              AND EXTRACT(MONTH FROM mep.payment_date) = $3${branchClause}
+           UNION ALL
+           SELECT me.master_course_id, msi.amount
+             FROM monthly_subscription_installments msi
+             JOIN master_enrollments me ON me.id = msi.master_enrollment_id
+            WHERE msi.company_id = $1
+              AND EXTRACT(YEAR FROM msi.payment_date) = $2
+              AND EXTRACT(MONTH FROM msi.payment_date) = $3${branchClause}
+         )
+         SELECT mc.id, mc.name, mc.payment_type, mc.default_price,
+                COALESCE(SUM(money.amount), 0) AS collected
+           FROM money
+           JOIN master_courses mc ON mc.id = money.master_course_id
+          GROUP BY mc.id, mc.name, mc.payment_type, mc.default_price
+         HAVING COALESCE(SUM(money.amount), 0) <> 0
+          ORDER BY SUM(money.amount) DESC`,
+        params,
+      );
+
+      // The member courses of every bundle that took money, with the teacher
+      // behind each and the rate that teacher is on for it. A course may name its
+      // instructor directly; where it does not, one of its classes might.
+      const masterIds = (collected as any[]).map((r) => r.id);
+      const members = masterIds.length
+        ? await query(
+            `SELECT mcc.master_course_id, c.id AS course_id, c.name AS course_name, c.price,
+                    COALESCE(c.instructor_id, (
+                      SELECT cl.instructor_id FROM classes cl
+                       WHERE cl.course_id = c.id AND cl.instructor_id IS NOT NULL
+                       LIMIT 1
+                    )) AS instructor_id,
+                    emp.first_name, emp.last_name, emp.salary_type, emp.percentage_rate,
+                    ecp.percentage_rate AS course_rate
+               FROM master_course_courses mcc
+               JOIN courses c ON c.id = mcc.course_id
+               LEFT JOIN employees emp ON emp.id = COALESCE(c.instructor_id, (
+                      SELECT cl.instructor_id FROM classes cl
+                       WHERE cl.course_id = c.id AND cl.instructor_id IS NOT NULL
+                       LIMIT 1))
+               LEFT JOIN employee_course_percentages ecp
+                      ON ecp.employee_id = emp.id AND ecp.course_id = c.id
+              WHERE mcc.master_course_id = ANY($1::uuid[])
+              ORDER BY c.name`,
+            [masterIds],
+          )
+        : [];
+
+      const membersByMaster = new Map<string, any[]>();
+      for (const m of members as any[]) {
+        const list = membersByMaster.get(m.master_course_id) ?? [];
+        list.push(m);
+        membersByMaster.set(m.master_course_id, list);
+      }
+
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      let unattributable = 0;
+
+      const bundles = (collected as any[]).map((row) => {
+        const collectedAmount = parseFloat(row.collected);
+        const raw = membersByMaster.get(row.id) ?? [];
+
+        // A member can only carry a share if there is somebody to pay, a rate to
+        // pay them at, and a price to weight them by.
+        const memberLines = raw.map((m: any) => {
+          const rate = m.course_rate != null
+            ? parseFloat(m.course_rate)
+            : (m.percentage_rate != null ? parseFloat(m.percentage_rate) : null);
+          const listPrice = m.price != null ? parseFloat(m.price) : 0;
+          return {
+            courseId: m.course_id,
+            courseName: m.course_name,
+            listPrice,
+            employeeId: m.instructor_id ?? null,
+            employeeName: m.first_name ? `${m.first_name} ${m.last_name ?? ''}`.trim() : null,
+            salaryType: m.salary_type ?? null,
+            rate,
+            isCourseRate: m.course_rate != null,
+            payable: !!m.instructor_id && m.salary_type === 'PERCENTAGE' && rate != null && listPrice > 0,
+          };
+        });
+
+        const payable = memberLines.filter((m) => m.payable);
+        const listTotal = round2(payable.reduce((sum, m) => sum + m.listPrice, 0));
+
+        // Why a bundle cannot be split, named in the order an operator would fix it.
+        let blockedReason: string | null = null;
+        if (!memberLines.length) blockedReason = 'NO_MEMBER_COURSES';
+        else if (!payable.length || listTotal <= 0) {
+          if (memberLines.some((m) => !m.employeeId)) blockedReason = 'NO_INSTRUCTOR';
+          else if (memberLines.some((m) => m.salaryType !== 'PERCENTAGE')) blockedReason = 'NOT_PERCENTAGE_PAID';
+          else blockedReason = 'NO_LIST_PRICE';
+        }
+
+        if (blockedReason) {
+          unattributable += collectedAmount;
+          return {
+            masterCourseId: row.id,
+            masterCourseName: row.name,
+            paymentType: row.payment_type ?? 'ONE_TIME',
+            collected: round2(collectedAmount),
+            listTotal,
+            discount: 0,
+            academyFloor: 0,
+            members: memberLines,
+            blockedReason,
+            policyA: null,
+            policyC: null,
+          };
+        }
+
+        // ── Policy A: everyone shares the discount in proportion ──────────────
+        const linesA = payable.map((m) => {
+          const share = round2(collectedAmount * (m.listPrice / listTotal));
+          return { ...m, share, earning: round2(share * (m.rate as number) / 100) };
+        });
+        const teachersA = round2(linesA.reduce((sum, l) => sum + l.earning, 0));
+        const academyA = round2(collectedAmount - teachersA);
+
+        // ── Policy C: the academy keeps what list prices would have left it ───
+        // The floor is the sum of every member's non-teacher slice. Sold below
+        // it there is no pool to pay anyone from, which is reported as
+        // infeasible rather than printed as a negative.
+        const academyFloor = round2(
+          payable.reduce((sum, m) => sum + m.listPrice * (1 - (m.rate as number) / 100), 0),
+        );
+        const poolC = round2(collectedAmount - academyFloor);
+        const linesC = payable.map((m) => ({
+          ...m,
+          share: round2(collectedAmount * (m.listPrice / listTotal)),
+          earning: round2(poolC * (m.listPrice / listTotal)),
+        }));
+        const teachersC = round2(linesC.reduce((sum, l) => sum + l.earning, 0));
+
+        return {
+          masterCourseId: row.id,
+          masterCourseName: row.name,
+          paymentType: row.payment_type ?? 'ONE_TIME',
+          collected: round2(collectedAmount),
+          listTotal,
+          // What the student was given: the gap between the parts and the bundle.
+          discount: round2(listTotal - collectedAmount),
+          academyFloor,
+          members: memberLines,
+          blockedReason: null,
+          policyA: {
+            lines: linesA,
+            teachersTotal: teachersA,
+            academy: academyA,
+            // Only a teacher on 100% can take the academy to nothing here.
+            feasible: academyA > 0,
+          },
+          policyC: {
+            lines: poolC > 0 ? linesC : [],
+            teachersTotal: poolC > 0 ? teachersC : 0,
+            academy: academyFloor,
+            feasible: poolC > 0,
+          },
+        };
+      });
+
+      return {
+        status: 200 as const,
+        body: {
+          year,
+          month,
+          totalCollected: round2(bundles.reduce((sum, b) => sum + b.collected, 0)),
+          unattributable: round2(unattributable),
+          bundles,
+        },
+      };
+    } catch (error: any) {
+      console.error('Bundle income report error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.BUNDLE_INCOME_FAILED', 'Failed to build the bundle income report');
+    }
+  },
+
 };

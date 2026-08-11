@@ -18,6 +18,7 @@ import { DialogModule } from 'primeng/dialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
+import { BundleIncomeReport, BundleIncomeRow, BundlePolicySplit } from '../services/expense.service';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { SalaryBreakdownDialogComponent } from './salary-breakdown-dialog.component';
@@ -84,7 +85,60 @@ export class SalariesComponent implements OnInit {
   selectedIds = signal<Set<string>>(new Set());
   adjustments: Record<string, SalaryAdjustment> = {};
 
-  viewMode = signal<'pending' | 'history'>('pending');
+  viewMode = signal<'pending' | 'history' | 'bundles'>('pending');
+
+  // ── Bundle income (read-only) ────────────────────────────────────────────
+  // Money that came in through master courses, which reaches no teacher's
+  // percentage today: the accrual follows money -> enrolment -> class ->
+  // instructor, and a bundle payment has none of those. This tab shows the
+  // amount and what a split WOULD be; it stores nothing.
+  bundleReport = signal<BundleIncomeReport | null>(null);
+  bundleLoading = signal(false);
+  bundlePolicy = signal<'A' | 'C'>('A');
+
+  /**
+   * The two policies, both of which leave the academy earning. B (academy
+   * absorbs the discount) and D (academy down to zero) are deliberately absent.
+   */
+  policyOptions = computed(() => {
+    this.translate.currentLang;
+    return [
+      { label: this.translate.instant('EXPENSES.SALARIES.BUNDLES_POLICY_A'), value: 'A' as const },
+      { label: this.translate.instant('EXPENSES.SALARIES.BUNDLES_POLICY_C'), value: 'C' as const },
+    ];
+  });
+
+  /** The split under the policy being viewed. */
+  splitFor(row: BundleIncomeRow): BundlePolicySplit | null {
+    return this.bundlePolicy() === 'A' ? row.policyA : row.policyC;
+  }
+
+  /** Bundles whose money nothing can attribute, worst first. */
+  blockedBundles = computed(() =>
+    (this.bundleReport()?.bundles ?? []).filter((b) => !!b.blockedReason),
+  );
+
+  attributableBundles = computed(() =>
+    (this.bundleReport()?.bundles ?? []).filter((b) => !b.blockedReason),
+  );
+
+  loadBundleIncome(): void {
+    this.bundleLoading.set(true);
+    const month = this.selectedMonth;
+    this.expenseService
+      .getBundleIncome(month.getFullYear(), month.getMonth() + 1, this.selectedBranchId || undefined)
+      .subscribe({
+        next: (report) => {
+          this.bundleReport.set(report);
+          this.bundleLoading.set(false);
+        },
+        error: () => {
+          // Interceptor toasted the translated error.
+          this.bundleReport.set(null);
+          this.bundleLoading.set(false);
+        },
+      });
+  }
 
   // History view state
   historyLoading = signal(false);
@@ -175,8 +229,9 @@ export class SalariesComponent implements OnInit {
     this.loadSalaries();
   }
 
-  setViewMode(mode: 'pending' | 'history') {
+  setViewMode(mode: 'pending' | 'history' | 'bundles') {
     this.viewMode.set(mode);
+    if (mode === 'bundles' && !this.bundleReport()) this.loadBundleIncome();
     if (mode === 'history' && this.historyPayments().length === 0) {
       this.loadHistory();
     }
