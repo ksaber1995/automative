@@ -214,7 +214,10 @@ import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-expor
             <div class="panel">
               <h3>Usage</h3>
               <dl class="kv">
-                <dt>Students</dt><dd>{{ c.students | number }}</dd>
+                <!-- The pair, in the same order as the table: the live roll, then
+                     the all-time figure it should be read against. -->
+                <dt>Active students</dt><dd>{{ c.activeStudents | number }}</dd>
+                <dt>Total students</dt><dd>{{ c.students | number }}</dd>
                 <dt>Courses</dt><dd>{{ c.courses | number }}</dd>
                 <dt>Branches</dt><dd>{{ c.branches | number }}</dd>
                 <dt>Employees</dt><dd>{{ c.employees | number }}</dd>
