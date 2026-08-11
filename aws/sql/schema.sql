@@ -1411,6 +1411,28 @@ CREATE TRIGGER update_course_monthly_price_overrides_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
+-- EMPLOYEE COURSE PERCENTAGES TABLE  (migration 089)
+-- A PERCENTAGE teacher's rate for one specific course. employees.percentage_rate
+-- remains the global rate and applies to every course without a row here — a row
+-- is an exception to it, not a replacement, so "X% of everything" is the global
+-- rate with no rows at all.
+-- =============================================
+CREATE TABLE employee_course_percentages (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    employee_id     UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    course_id       UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+    percentage_rate DECIMAL(5, 2) NOT NULL CHECK (percentage_rate >= 0 AND percentage_rate <= 100),
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, course_id)
+);
+
+CREATE INDEX idx_ecp_employee ON employee_course_percentages(employee_id);
+CREATE INDEX idx_ecp_company  ON employee_course_percentages(company_id);
+CREATE INDEX idx_ecp_course   ON employee_course_percentages(course_id);
+
+-- =============================================
 -- SESSION PACKAGES TABLE  (migration 050)
 -- Prepaid credit balance for PER_SESSION courses ("pay X sessions in advance").
 -- One row per package bought upfront; attendance consumes credits.

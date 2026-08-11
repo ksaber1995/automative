@@ -111,6 +111,50 @@
               <small class="text-red-500 block">{{ 'EMPLOYEES.FORM.PERCENTAGE_REQUIRED' | translate }}</small>
             }
           </div>
+
+          <!-- Per-course rates. The global rate above still answers for every
+               course not listed here, so an empty table means "that % of
+               everything" — which is what most teachers are on. -->
+          <div class="field md:col-span-2">
+            <label class="block text-sm font-medium mb-1">{{ 'EMPLOYEES.FORM.COURSE_RATES' | translate }}</label>
+            <small class="text-gray-400 block mb-3">{{ 'EMPLOYEES.FORM.COURSE_RATES_HINT' | translate }}</small>
+
+            @for (row of courseRates(); track $index) {
+              <div class="flex items-center gap-2 mb-2">
+                <p-select
+                  class="flex-1"
+                  styleClass="w-full"
+                  [options]="courseOptions()"
+                  optionLabel="name"
+                  optionValue="id"
+                  [filter]="true"
+                  filterBy="name"
+                  [ngModel]="row.courseId"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="setCourseRateCourse($index, $event)"
+                  [placeholder]="'EMPLOYEES.FORM.COURSE_RATES_PICK' | translate"
+                ></p-select>
+                <p-inputnumber
+                  [ngModel]="row.percentageRate"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="setCourseRateValue($index, $event)"
+                  [min]="0" [max]="100" suffix=" %" mode="decimal"
+                  [minFractionDigits]="0" [maxFractionDigits]="2"
+                  [style]="{ width: '9rem' }"
+                ></p-inputnumber>
+                <button pButton type="button" icon="pi pi-trash" severity="danger" [text]="true"
+                        (click)="removeCourseRate($index)"></button>
+              </div>
+            }
+
+            @if (duplicateCourseRate()) {
+              <small class="text-red-500 block mb-2">{{ 'EMPLOYEES.FORM.COURSE_RATES_DUPLICATE' | translate }}</small>
+            }
+
+            <button pButton type="button" icon="pi pi-plus" [text]="true"
+                    [label]="'EMPLOYEES.FORM.COURSE_RATES_ADD' | translate"
+                    (click)="addCourseRate()"></button>
+          </div>
         }
 
         <!-- Hire Date -->

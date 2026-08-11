@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { EmployeeService } from '../services/employee.service';
+import { CourseService } from '../../courses/services/course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
@@ -23,6 +24,7 @@ import { todayYmd } from '../../../core/utils/date.util';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     CardModule,
     ButtonModule,
     CheckboxModule,
@@ -45,6 +47,7 @@ export class EmployeeFormComponent implements OnInit {
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
   protected authService = inject(AuthService);
+  private courseService = inject(CourseService);
 
   employeeForm: FormGroup;
   loading = signal(false);
@@ -170,11 +173,33 @@ export class EmployeeFormComponent implements OnInit {
     if (this.employeeId) {
       this.isEditMode.set(true);
       this.loadEmployee(this.employeeId);
+      this.loadCourseRates(this.employeeId);
     } else {
       // Create mode — the Add Teacher button is the only thing that sets this.
       this.isTeacher.set(this.route.snapshot.queryParamMap.get('teacher') === '1');
     }
     this.loadTeacherLookups();
+    this.loadCourseOptions();
+  }
+
+  /** Courses a rate can be set against — the whole active catalogue, since a
+   *  teacher may be given a course before they are assigned a class on it. */
+  private loadCourseOptions(): void {
+    this.courseService.getAllCourses().subscribe({
+      next: (courses) => this.courseOptions.set(
+        courses.filter((c: any) => c.isActive !== false).map((c: any) => ({ id: c.id, name: c.name })),
+      ),
+      error: () => this.courseOptions.set([]),
+    });
+  }
+
+  private loadCourseRates(employeeId: string): void {
+    this.employeeService.getCoursePercentages(employeeId).subscribe({
+      next: (rows) => this.courseRates.set(
+        rows.map((r) => ({ courseId: r.courseId, percentageRate: r.percentageRate })),
+      ),
+      error: () => this.courseRates.set([]),
+    });
   }
 
   private loadTeacherLookups() {
@@ -218,11 +243,61 @@ export class EmployeeFormComponent implements OnInit {
     });
   }
 
+  // ── Per-course percentage rates ──────────────────────────────────────────
+  // Edited as a table of {course, rate} rows and saved as one set, because that
+  // is what the endpoint takes and what the arrangement is: a list of exceptions
+  // to the global rate.
+  courseRates = signal<Array<{ courseId: string | null; percentageRate: number | null }>>([]);
+  courseOptions = signal<Array<{ id: string; name: string }>>([]);
+
+  /** Two rows naming the same course would make the payslip a coin toss. */
+  duplicateCourseRate = computed(() => {
+    const ids = this.courseRates().map((r) => r.courseId).filter(Boolean);
+    return new Set(ids).size !== ids.length;
+  });
+
+  addCourseRate(): void {
+    this.courseRates.update((rows) => [...rows, { courseId: null, percentageRate: null }]);
+  }
+
+  removeCourseRate(index: number): void {
+    this.courseRates.update((rows) => rows.filter((_, i) => i !== index));
+  }
+
+  setCourseRateCourse(index: number, courseId: string): void {
+    this.courseRates.update((rows) => rows.map((r, i) => (i === index ? { ...r, courseId } : r)));
+  }
+
+  setCourseRateValue(index: number, percentageRate: number): void {
+    this.courseRates.update((rows) => rows.map((r, i) => (i === index ? { ...r, percentageRate } : r)));
+  }
+
+  /** Only complete rows are worth sending; a half-filled one is not a rate yet. */
+  private completeCourseRates(): Array<{ courseId: string; percentageRate: number }> {
+    return this.courseRates()
+      .filter((r): r is { courseId: string; percentageRate: number } =>
+        !!r.courseId && r.percentageRate !== null && r.percentageRate >= 0)
+      .map((r) => ({ courseId: r.courseId, percentageRate: r.percentageRate }));
+  }
+
+  private saveCourseRates(employeeId: string, done: () => void): void {
+    // Only a percentage teacher has rates; switching away from PERCENTAGE clears
+    // them, so a stale 90% cannot come back if they are switched to it again.
+    const rates = this.employeeForm.value.salaryType === 'PERCENTAGE' ? this.completeCourseRates() : [];
+    this.employeeService.setCoursePercentages(employeeId, rates).subscribe({
+      next: () => done(),
+      // The employee itself saved — say so, and let them retry the rates rather
+      // than losing the whole edit.
+      error: () => done(),
+    });
+  }
+
   onSubmit() {
     if (this.employeeForm.invalid) {
       this.employeeForm.markAllAsTouched();
       return;
     }
+    if (this.duplicateCourseRate()) return;
 
     this.loading.set(true);
     const teacher = this.isTeacher();
@@ -239,8 +314,10 @@ export class EmployeeFormComponent implements OnInit {
     if (this.isEditMode() && this.employeeId) {
       this.employeeService.updateEmployee(this.employeeId, employeeData).subscribe({
         next: () => {
-          this.notificationService.success(this.translate.instant('EMPLOYEES.UPDATED'));
-          this.router.navigate(['/employees']);
+          this.saveCourseRates(this.employeeId!, () => {
+            this.notificationService.success(this.translate.instant('EMPLOYEES.UPDATED'));
+            this.router.navigate(['/employees']);
+          });
         },
         error: () => {
           // Interceptor toasted the translated error.
@@ -249,9 +326,11 @@ export class EmployeeFormComponent implements OnInit {
       });
     } else {
       this.employeeService.createEmployee(employeeData).subscribe({
-        next: () => {
-          this.notificationService.success(this.translate.instant('EMPLOYEES.CREATED'));
-          this.router.navigate(['/employees']);
+        next: (created) => {
+          this.saveCourseRates(created.id, () => {
+            this.notificationService.success(this.translate.instant('EMPLOYEES.CREATED'));
+            this.router.navigate(['/employees']);
+          });
         },
         error: () => {
           // Interceptor toasted the translated error.

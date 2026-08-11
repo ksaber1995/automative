@@ -7,6 +7,32 @@ import { ensureSalaryColumns } from './expenses';
 // same DDL at runtime so a deploy doesn't have to wait on the SQL file, exactly
 // like ensureSalaryColumns.
 let teacherSchemaEnsured = false;
+let coursePercentagesEnsured = false;
+/**
+ * Per-course percentage rates (migration 089). Self-applying like the teacher
+ * tables above, so the endpoint works on a database the migration has not
+ * reached yet.
+ */
+export async function ensureCoursePercentageSchema(): Promise<void> {
+  if (coursePercentagesEnsured) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS employee_course_percentages (
+      id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      employee_id     UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      course_id       UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+      percentage_rate DECIMAL(5, 2) NOT NULL CHECK (percentage_rate >= 0 AND percentage_rate <= 100),
+      created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (employee_id, course_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ecp_employee ON employee_course_percentages(employee_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ecp_company  ON employee_course_percentages(company_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_ecp_course   ON employee_course_percentages(course_id)`);
+  coursePercentagesEnsured = true;
+}
+
 export async function ensureTeacherSchema(): Promise<void> {
   if (teacherSchemaEnsured) return;
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_teacher BOOLEAN NOT NULL DEFAULT false`);
@@ -468,6 +494,115 @@ export const employeesRoutes = {
     } catch (error) {
       console.error('Delete employee error:', error);
       return mapThrownError(error, 'ERRORS.EMPLOYEES.DELETE_FAILED', 'Failed to delete employee', 404);
+    }
+  },
+
+  /**
+   * GET /api/employees/:id/course-percentages
+   * The teacher's per-course rates. An empty list means they are simply on their
+   * global rate for everything.
+   */
+  listCoursePercentages: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCoursePercentageSchema();
+
+      const rows = await query(
+        `SELECT ecp.id, ecp.course_id, ecp.percentage_rate, c.name AS course_name
+           FROM employee_course_percentages ecp
+           JOIN courses c ON c.id = ecp.course_id
+          WHERE ecp.company_id = $1 AND ecp.employee_id = $2
+          ORDER BY c.name`,
+        [context.companyId, params.id],
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          id: r.id,
+          courseId: r.course_id,
+          courseName: r.course_name,
+          percentageRate: parseFloat(r.percentage_rate),
+        })),
+      };
+    } catch (error: any) {
+      console.error('List course percentages error:', error);
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.COURSE_PERCENTAGES_FAILED', 'Failed to load course percentages');
+    }
+  },
+
+  /**
+   * PUT /api/employees/:id/course-percentages
+   * Replace the whole set in one call, because that is how the screen edits it —
+   * a table of rows saved together. An empty array puts the teacher back on
+   * their global rate for every course.
+   */
+  setCoursePercentages: async ({ params, body, headers }: { params: { id: string }; body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'employees', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureCoursePercentageSchema();
+
+      const employee = await queryOne<any>(
+        'SELECT id, branch_id FROM employees WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!employee) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
+
+      const rates: Array<{ courseId: string; percentageRate: number }> = Array.isArray(body?.rates) ? body.rates : [];
+
+      // Every course must be this company's — the id arrives from a client, and
+      // a rate against someone else's course would be silent cross-tenant data.
+      for (const r of rates) {
+        if (!(r.percentageRate >= 0 && r.percentageRate <= 100)) {
+          return apiError(400, 'ERRORS.EMPLOYEES.BAD_PERCENTAGE', 'A rate must be between 0 and 100');
+        }
+        const course = await queryOne<any>(
+          'SELECT id FROM courses WHERE id = $1 AND company_id = $2',
+          [r.courseId, context.companyId],
+        );
+        if (!course) return apiError(400, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      }
+
+      const seen = new Set(rates.map((r) => r.courseId));
+      if (seen.size !== rates.length) {
+        return apiError(400, 'ERRORS.EMPLOYEES.DUPLICATE_COURSE_PERCENTAGE', 'One rate per course');
+      }
+
+      // Drop what is no longer listed, then upsert what is. Not a delete-all +
+      // insert: that would churn ids and created_at on rows nobody touched.
+      if (rates.length) {
+        await query(
+          `DELETE FROM employee_course_percentages
+            WHERE company_id = $1 AND employee_id = $2 AND course_id <> ALL($3::uuid[])`,
+          [context.companyId, params.id, rates.map((r) => r.courseId)],
+        );
+        for (const r of rates) {
+          await query(
+            `INSERT INTO employee_course_percentages
+               (company_id, employee_id, course_id, percentage_rate)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (employee_id, course_id)
+             DO UPDATE SET percentage_rate = EXCLUDED.percentage_rate, updated_at = NOW()`,
+            [context.companyId, params.id, r.courseId, r.percentageRate],
+          );
+        }
+      } else {
+        await query(
+          'DELETE FROM employee_course_percentages WHERE company_id = $1 AND employee_id = $2',
+          [context.companyId, params.id],
+        );
+      }
+
+      return { status: 200 as const, body: { saved: rates.length } };
+    } catch (error: any) {
+      console.error('Set course percentages error:', error);
+      return mapThrownError(error, 'ERRORS.EMPLOYEES.COURSE_PERCENTAGES_FAILED', 'Failed to save course percentages', 400);
     }
   },
 };

@@ -88,10 +88,28 @@ async function getUnpaidSessionIds(
 // is a running monetary sum, not a set of discrete units:
 //   owed = accrued(percentage% of total paid) − base already withdrawn.
 
-// Net amount students have PAID across the employee's classes, summed over all
-// payment models. The per-session tables are optional (created lazily per
-// tenant), so guard them with to_regclass before referencing them.
-async function getTeacherPaidTotal(companyId: string, employeeId: string): Promise<number> {
+/** What one course brought in for this teacher, and the rate that applies to it. */
+export interface TeacherCourseEarning {
+  courseId: string | null;
+  courseName: string | null;
+  paid: number;
+  /** The per-course rate when one is set, otherwise the employee's global rate. */
+  rate: number;
+  /** True when `rate` came from a per-course arrangement rather than the global. */
+  isOverride: boolean;
+  accrued: number;
+}
+
+// Net amount students have PAID for this employee's classes, BROKEN DOWN BY
+// COURSE, summed over all payment models. Per course, because the rate is no
+// longer necessarily one number: a teacher may take 90% of one course and 80% of
+// another (migration 089), so the money has to be attributed before it is
+// multiplied. The per-session tables are optional (created lazily per tenant), so
+// guard them with to_regclass before referencing them.
+async function getTeacherPaidByCourse(
+  companyId: string,
+  employeeId: string,
+): Promise<Array<{ courseId: string | null; courseName: string | null; paid: number }>> {
   const reg = await queryOne<any>(
     `SELECT to_regclass('public.monthly_subscription_payments') IS NOT NULL AS has_msp,
             to_regclass('public.session_payments')            IS NOT NULL AS has_sp,
@@ -100,38 +118,116 @@ async function getTeacherPaidTotal(companyId: string, employeeId: string): Promi
 
   // ONE_TIME enrollments carry class_id directly; refunds net out via total_refunded.
   const parts: string[] = [
-    `COALESCE((SELECT SUM(COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0))
-               FROM enrollments e
-               JOIN classes c ON c.id = e.class_id
-               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`,
+    `SELECT cl.course_id, COALESCE(SUM(COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0)), 0) AS amt
+       FROM enrollments e
+       JOIN classes cl ON cl.id = e.class_id
+      WHERE cl.instructor_id = $2 AND e.company_id = $1
+      GROUP BY cl.course_id`,
   ];
   // MONTHLY_SUBSCRIPTION and PER_SESSION tables lack class_id → reach it through
   // enrollment_id → enrollments.class_id. COVERED session rows carry amount_paid=0
   // (their money sits on the package row), so summing both never double-counts.
   if (reg?.has_msp) {
-    parts.push(`COALESCE((SELECT SUM(COALESCE(msp.amount_paid,0))
-               FROM monthly_subscription_payments msp
-               JOIN enrollments e ON e.id = msp.enrollment_id
-               JOIN classes c ON c.id = e.class_id
-               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+    parts.push(`SELECT cl.course_id, COALESCE(SUM(COALESCE(msp.amount_paid,0)), 0) AS amt
+       FROM monthly_subscription_payments msp
+       JOIN enrollments e ON e.id = msp.enrollment_id
+       JOIN classes cl ON cl.id = e.class_id
+      WHERE cl.instructor_id = $2 AND e.company_id = $1
+      GROUP BY cl.course_id`);
   }
   if (reg?.has_sp) {
-    parts.push(`COALESCE((SELECT SUM(COALESCE(sp.amount_paid,0))
-               FROM session_payments sp
-               JOIN enrollments e ON e.id = sp.enrollment_id
-               JOIN classes c ON c.id = e.class_id
-               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+    parts.push(`SELECT cl.course_id, COALESCE(SUM(COALESCE(sp.amount_paid,0)), 0) AS amt
+       FROM session_payments sp
+       JOIN enrollments e ON e.id = sp.enrollment_id
+       JOIN classes cl ON cl.id = e.class_id
+      WHERE cl.instructor_id = $2 AND e.company_id = $1
+      GROUP BY cl.course_id`);
   }
   if (reg?.has_spkg) {
-    parts.push(`COALESCE((SELECT SUM(COALESCE(spkg.amount_paid,0))
-               FROM session_packages spkg
-               JOIN enrollments e ON e.id = spkg.enrollment_id
-               JOIN classes c ON c.id = e.class_id
-               WHERE c.instructor_id = $2 AND e.company_id = $1), 0)`);
+    parts.push(`SELECT cl.course_id, COALESCE(SUM(COALESCE(spkg.amount_paid,0)), 0) AS amt
+       FROM session_packages spkg
+       JOIN enrollments e ON e.id = spkg.enrollment_id
+       JOIN classes cl ON cl.id = e.class_id
+      WHERE cl.instructor_id = $2 AND e.company_id = $1
+      GROUP BY cl.course_id`);
   }
 
-  const row = await queryOne<any>(`SELECT (${parts.join(' + ')}) AS total`, [companyId, employeeId]);
-  return row && row.total != null ? parseFloat(row.total) : 0;
+  const rows = await query(
+    `WITH paid AS (${parts.join(' UNION ALL ')})
+     SELECT p.course_id, co.name AS course_name, SUM(p.amt) AS paid
+       FROM paid p
+       LEFT JOIN courses co ON co.id = p.course_id
+      GROUP BY p.course_id, co.name
+      HAVING SUM(p.amt) <> 0
+      ORDER BY co.name NULLS LAST`,
+    [companyId, employeeId],
+  );
+  return (rows as any[]).map((r) => ({
+    courseId: r.course_id ?? null,
+    courseName: r.course_name ?? null,
+    paid: parseFloat(r.paid || 0),
+  }));
+}
+
+/** The teacher's per-course rates, keyed by course. Absent = use the global. */
+async function getCoursePercentageRates(
+  companyId: string,
+  employeeId: string,
+): Promise<Map<string, number>> {
+  const reg = await queryOne<any>(
+    `SELECT to_regclass('public.employee_course_percentages') IS NOT NULL AS has_table`
+  );
+  if (!reg?.has_table) return new Map();
+  const rows = await query(
+    `SELECT course_id, percentage_rate FROM employee_course_percentages
+      WHERE company_id = $1 AND employee_id = $2`,
+    [companyId, employeeId],
+  );
+  return new Map((rows as any[]).map((r) => [r.course_id as string, parseFloat(r.percentage_rate)]));
+}
+
+/**
+ * What the teacher has earned, course by course.
+ *
+ * Each course's money is multiplied by its OWN rate — the per-course one where
+ * an arrangement exists, the global rate everywhere else. With no per-course
+ * rows this is exactly the old `total × global%`, which is what keeps every
+ * existing percentage teacher on the same number as before.
+ */
+async function getTeacherEarnings(
+  companyId: string,
+  employeeId: string,
+  globalRate: number,
+): Promise<{ totalPaid: number; accrued: number; byCourse: TeacherCourseEarning[] }> {
+  const [paidByCourse, overrides] = await Promise.all([
+    getTeacherPaidByCourse(companyId, employeeId),
+    getCoursePercentageRates(companyId, employeeId),
+  ]);
+
+  let totalPaid = 0;
+  let accrued = 0;
+  const byCourse: TeacherCourseEarning[] = paidByCourse.map((c) => {
+    const override = c.courseId ? overrides.get(c.courseId) : undefined;
+    const rate = override ?? globalRate;
+    // Rounded per course, so the payslip's lines add up to its total exactly.
+    const courseAccrued = Math.round(c.paid * rate) / 100;
+    totalPaid += c.paid;
+    accrued += courseAccrued;
+    return {
+      courseId: c.courseId,
+      courseName: c.courseName,
+      paid: c.paid,
+      rate,
+      isOverride: override !== undefined,
+      accrued: courseAccrued,
+    };
+  });
+
+  return {
+    totalPaid: Math.round(totalPaid * 100) / 100,
+    accrued: Math.round(accrued * 100) / 100,
+    byCourse,
+  };
 }
 
 // Base salary already withdrawn = the pre-bonus, pre-discount portion of past
@@ -336,13 +432,17 @@ async function getTeacherUnpaidLines(companyId: string, employeeId: string): Pro
 async function getPercentageSummary(
   companyId: string,
   emp: any,
-): Promise<{ percentageRate: number; totalPaid: number; accrued: number; withdrawn: number; owed: number }> {
+): Promise<{
+  percentageRate: number; totalPaid: number; accrued: number; withdrawn: number; owed: number;
+  byCourse: TeacherCourseEarning[];
+}> {
+  // The global rate — still what most teachers are on, and the fallback for any
+  // course they have no separate arrangement for.
   const percentageRate = emp.percentage_rate ? parseFloat(emp.percentage_rate) : 0;
-  const totalPaid = await getTeacherPaidTotal(companyId, emp.id);
-  const accrued = Math.round(totalPaid * percentageRate) / 100; // == (totalPaid * rate/100) to 2dp
+  const { totalPaid, accrued, byCourse } = await getTeacherEarnings(companyId, emp.id, percentageRate);
   const withdrawn = await getWithdrawnSalaryBase(companyId, emp.id);
   const owed = Math.max(0, Math.round((accrued - withdrawn) * 100) / 100);
-  return { percentageRate, totalPaid, accrued, withdrawn, owed };
+  return { percentageRate, totalPaid, accrued, withdrawn, owed, byCourse };
 }
 
 // Total PRESENT sessions for an employee in a month (paid or not) — used for

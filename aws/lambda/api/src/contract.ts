@@ -4738,6 +4738,38 @@ export const contract = c.router({
 
   // Employees routes
   employees: {
+    /** A percentage teacher's per-course rates (migration 089). */
+    listCoursePercentages: {
+      method: 'GET' as const,
+      path: '/api/employees/:id/course-percentages',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          courseId: UUIDSchema,
+          courseName: z.string(),
+          percentageRate: z.number(),
+        })),
+        403: ApiErrorSchema,
+      },
+    },
+    setCoursePercentages: {
+      method: 'PUT' as const,
+      path: '/api/employees/:id/course-percentages',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        rates: z.array(z.object({
+          courseId: UUIDSchema,
+          percentageRate: z.number().min(0).max(100),
+        })),
+      }),
+      responses: {
+        200: z.object({ saved: z.number() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     create: {
       method: 'POST',
       path: '/api/employees',
