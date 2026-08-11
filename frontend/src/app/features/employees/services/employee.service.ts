@@ -3,11 +3,15 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { Employee, EmployeeCreateDto, EmployeeUpdateDto } from '@shared/interfaces/employee.interface';
 
+/** How a teacher is paid for one course, when it differs from their default. */
 export interface EmployeeCoursePercentage {
   id: string;
   courseId: string;
   courseName: string;
-  percentageRate: number;
+  /** Overrides the employee's salary type for this course, not just the rate. */
+  payType: 'PERCENTAGE' | 'SESSION_BASED';
+  percentageRate: number | null;
+  sessionRate: number | null;
 }
 
 @Injectable({
@@ -49,7 +53,12 @@ export class EmployeeService {
   /** Replaces the whole set — the screen edits them as one table. */
   setCoursePercentages(
     employeeId: string,
-    rates: Array<{ courseId: string; percentageRate: number }>,
+    rates: Array<{
+      courseId: string;
+      payType: 'PERCENTAGE' | 'SESSION_BASED';
+      percentageRate?: number | null;
+      sessionRate?: number | null;
+    }>,
   ): Observable<{ saved: number }> {
     return this.api.put<{ saved: number }>(`employees/${employeeId}/course-percentages`, { rates });
   }

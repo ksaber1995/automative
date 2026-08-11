@@ -1422,9 +1422,20 @@ CREATE TABLE employee_course_percentages (
     company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     employee_id     UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     course_id       UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
-    percentage_rate DECIMAL(5, 2) NOT NULL CHECK (percentage_rate >= 0 AND percentage_rate <= 100),
+    -- How this teacher is paid for THIS course (migration 090). Overrides
+    -- employees.salary_type for it — the method as well as the number.
+    pay_type        VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE'
+                        CHECK (pay_type IN ('PERCENTAGE', 'SESSION_BASED')),
+    percentage_rate DECIMAL(5, 2) CHECK (percentage_rate >= 0 AND percentage_rate <= 100),
+    session_rate    DECIMAL(10, 2),
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Whichever method is named, the number it needs must be present.
+    CONSTRAINT ecp_rate_matches_type CHECK (
+      (pay_type = 'PERCENTAGE'    AND percentage_rate IS NOT NULL AND session_rate IS NULL)
+      OR
+      (pay_type = 'SESSION_BASED' AND session_rate    IS NOT NULL AND percentage_rate IS NULL)
+    ),
     UNIQUE (employee_id, course_id)
 );
 

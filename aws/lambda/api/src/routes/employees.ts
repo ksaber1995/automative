@@ -27,6 +27,10 @@ export async function ensureCoursePercentageSchema(): Promise<void> {
       UNIQUE (employee_id, course_id)
     )
   `);
+  // Migration 090 — the arrangement can change the method, not just the rate.
+  await query(`ALTER TABLE employee_course_percentages ADD COLUMN IF NOT EXISTS pay_type VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE'`);
+  await query(`ALTER TABLE employee_course_percentages ADD COLUMN IF NOT EXISTS session_rate DECIMAL(10, 2)`);
+  await query(`ALTER TABLE employee_course_percentages ALTER COLUMN percentage_rate DROP NOT NULL`);
   await query(`CREATE INDEX IF NOT EXISTS idx_ecp_employee ON employee_course_percentages(employee_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_ecp_company  ON employee_course_percentages(company_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_ecp_course   ON employee_course_percentages(course_id)`);
@@ -511,7 +515,8 @@ export const employeesRoutes = {
       await ensureCoursePercentageSchema();
 
       const rows = await query(
-        `SELECT ecp.id, ecp.course_id, ecp.percentage_rate, c.name AS course_name
+        `SELECT ecp.id, ecp.course_id, ecp.percentage_rate, ecp.session_rate,
+                COALESCE(ecp.pay_type, 'PERCENTAGE') AS pay_type, c.name AS course_name
            FROM employee_course_percentages ecp
            JOIN courses c ON c.id = ecp.course_id
           WHERE ecp.company_id = $1 AND ecp.employee_id = $2
@@ -525,7 +530,9 @@ export const employeesRoutes = {
           id: r.id,
           courseId: r.course_id,
           courseName: r.course_name,
-          percentageRate: parseFloat(r.percentage_rate),
+          payType: r.pay_type,
+          percentageRate: r.percentage_rate != null ? parseFloat(r.percentage_rate) : null,
+          sessionRate: r.session_rate != null ? parseFloat(r.session_rate) : null,
         })),
       };
     } catch (error: any) {
@@ -554,13 +561,21 @@ export const employeesRoutes = {
       );
       if (!employee) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
-      const rates: Array<{ courseId: string; percentageRate: number }> = Array.isArray(body?.rates) ? body.rates : [];
+      const rates: Array<{ courseId: string; payType?: string; percentageRate?: number | null; sessionRate?: number | null }> =
+        Array.isArray(body?.rates) ? body.rates : [];
 
       // Every course must be this company's — the id arrives from a client, and
       // a rate against someone else's course would be silent cross-tenant data.
       for (const r of rates) {
-        if (!(r.percentageRate >= 0 && r.percentageRate <= 100)) {
-          return apiError(400, 'ERRORS.EMPLOYEES.BAD_PERCENTAGE', 'A rate must be between 0 and 100');
+        const payType = r.payType === 'SESSION_BASED' ? 'SESSION_BASED' : 'PERCENTAGE';
+        if (payType === 'PERCENTAGE') {
+          if (!(typeof r.percentageRate === 'number' && r.percentageRate >= 0 && r.percentageRate <= 100)) {
+            return apiError(400, 'ERRORS.EMPLOYEES.BAD_PERCENTAGE', 'A rate must be between 0 and 100');
+          }
+        } else if (!(typeof r.sessionRate === 'number' && r.sessionRate > 0)) {
+          // A session arrangement with no fee would pay nothing per session and
+          // look deliberate. Refuse it rather than store it.
+          return apiError(400, 'ERRORS.EMPLOYEES.BAD_SESSION_RATE', 'A session fee must be greater than zero');
         }
         const course = await queryOne<any>(
           'SELECT id FROM courses WHERE id = $1 AND company_id = $2',
@@ -583,13 +598,22 @@ export const employeesRoutes = {
           [context.companyId, params.id, rates.map((r) => r.courseId)],
         );
         for (const r of rates) {
+          const payType = r.payType === 'SESSION_BASED' ? 'SESSION_BASED' : 'PERCENTAGE';
+          // Only the column its method uses is filled — ecp_rate_matches_type
+          // rejects a row carrying both, which is how a half-changed
+          // arrangement is caught rather than silently kept.
           await query(
             `INSERT INTO employee_course_percentages
-               (company_id, employee_id, course_id, percentage_rate)
-             VALUES ($1, $2, $3, $4)
+               (company_id, employee_id, course_id, pay_type, percentage_rate, session_rate)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (employee_id, course_id)
-             DO UPDATE SET percentage_rate = EXCLUDED.percentage_rate, updated_at = NOW()`,
-            [context.companyId, params.id, r.courseId, r.percentageRate],
+             DO UPDATE SET pay_type = EXCLUDED.pay_type,
+                           percentage_rate = EXCLUDED.percentage_rate,
+                           session_rate = EXCLUDED.session_rate,
+                           updated_at = NOW()`,
+            [context.companyId, params.id, r.courseId, payType,
+             payType === 'PERCENTAGE' ? r.percentageRate : null,
+             payType === 'SESSION_BASED' ? r.sessionRate : null],
           );
         }
       } else {

@@ -196,7 +196,12 @@ export class EmployeeFormComponent implements OnInit {
   private loadCourseRates(employeeId: string): void {
     this.employeeService.getCoursePercentages(employeeId).subscribe({
       next: (rows) => this.courseRates.set(
-        rows.map((r) => ({ courseId: r.courseId, percentageRate: r.percentageRate })),
+        rows.map((r) => ({
+          courseId: r.courseId,
+          payType: r.payType ?? 'PERCENTAGE',
+          percentageRate: r.percentageRate ?? null,
+          sessionRate: r.sessionRate ?? null,
+        })),
       ),
       error: () => this.courseRates.set([]),
     });
@@ -247,7 +252,21 @@ export class EmployeeFormComponent implements OnInit {
   // Edited as a table of {course, rate} rows and saved as one set, because that
   // is what the endpoint takes and what the arrangement is: a list of exceptions
   // to the global rate.
-  courseRates = signal<Array<{ courseId: string | null; percentageRate: number | null }>>([]);
+  courseRates = signal<Array<{
+    courseId: string | null;
+    payType: 'PERCENTAGE' | 'SESSION_BASED';
+    percentageRate: number | null;
+    sessionRate: number | null;
+  }>>([]);
+
+  /** How a course can be paid. Recomputed so the labels follow the language. */
+  payTypeOptions = computed(() => {
+    this.translate.currentLang;
+    return [
+      { label: this.translate.instant('EMPLOYEES.FORM.COURSE_RATE_PERCENTAGE'), value: 'PERCENTAGE' as const },
+      { label: this.translate.instant('EMPLOYEES.FORM.COURSE_RATE_SESSION'), value: 'SESSION_BASED' as const },
+    ];
+  });
   courseOptions = signal<Array<{ id: string; name: string }>>([]);
 
   /** Two rows naming the same course would make the payslip a coin toss. */
@@ -257,7 +276,20 @@ export class EmployeeFormComponent implements OnInit {
   });
 
   addCourseRate(): void {
-    this.courseRates.update((rows) => [...rows, { courseId: null, percentageRate: null }]);
+    this.courseRates.update((rows) => [
+      ...rows,
+      { courseId: null, payType: 'PERCENTAGE', percentageRate: null, sessionRate: null },
+    ]);
+  }
+
+  /** Switching method clears the other method's number, so a row never carries both. */
+  setCourseRateType(index: number, payType: 'PERCENTAGE' | 'SESSION_BASED'): void {
+    this.courseRates.update((rows) => rows.map((r, i) =>
+      i === index ? { ...r, payType, percentageRate: null, sessionRate: null } : r));
+  }
+
+  setCourseSessionRate(index: number, sessionRate: number): void {
+    this.courseRates.update((rows) => rows.map((r, i) => (i === index ? { ...r, sessionRate } : r)));
   }
 
   removeCourseRate(index: number): void {
@@ -272,18 +304,28 @@ export class EmployeeFormComponent implements OnInit {
     this.courseRates.update((rows) => rows.map((r, i) => (i === index ? { ...r, percentageRate } : r)));
   }
 
-  /** Only complete rows are worth sending; a half-filled one is not a rate yet. */
-  private completeCourseRates(): Array<{ courseId: string; percentageRate: number }> {
+  /** Only complete rows are worth sending; a half-filled one is not an arrangement yet. */
+  private completeCourseRates(): Array<{
+    courseId: string; payType: 'PERCENTAGE' | 'SESSION_BASED';
+    percentageRate?: number | null; sessionRate?: number | null;
+  }> {
     return this.courseRates()
-      .filter((r): r is { courseId: string; percentageRate: number } =>
-        !!r.courseId && r.percentageRate !== null && r.percentageRate >= 0)
-      .map((r) => ({ courseId: r.courseId, percentageRate: r.percentageRate }));
+      .filter((r) => !!r.courseId && (
+        r.payType === 'PERCENTAGE'
+          ? r.percentageRate !== null && r.percentageRate >= 0
+          : r.sessionRate !== null && r.sessionRate > 0))
+      .map((r) => ({
+        courseId: r.courseId as string,
+        payType: r.payType,
+        percentageRate: r.payType === 'PERCENTAGE' ? r.percentageRate : null,
+        sessionRate: r.payType === 'SESSION_BASED' ? r.sessionRate : null,
+      }));
   }
 
   private saveCourseRates(employeeId: string, done: () => void): void {
     // Only a percentage teacher has rates; switching away from PERCENTAGE clears
     // them, so a stale 90% cannot come back if they are switched to it again.
-    const rates = this.employeeForm.value.salaryType === 'PERCENTAGE' ? this.completeCourseRates() : [];
+    const rates = this.completeCourseRates();
     this.employeeService.setCoursePercentages(employeeId, rates).subscribe({
       next: () => done(),
       // The employee itself saved — say so, and let them retry the rates rather

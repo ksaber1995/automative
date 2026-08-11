@@ -169,21 +169,138 @@ async function getTeacherPaidByCourse(
   }));
 }
 
-/** The teacher's per-course rates, keyed by course. Absent = use the global. */
-async function getCoursePercentageRates(
+/** How a teacher is paid for one particular course, when it differs. */
+export interface CoursePayRule {
+  payType: 'PERCENTAGE' | 'SESSION_BASED';
+  percentageRate: number | null;
+  sessionRate: number | null;
+}
+
+/**
+ * The teacher's per-course arrangements, keyed by course. A course with no entry
+ * falls back to the employee's own salary_type and rate — the row is an
+ * exception to it, and overrides the METHOD as well as the number (migration
+ * 090). So one teacher can take a percentage of one course and a fee per session
+ * on another.
+ */
+async function getCoursePayRules(
   companyId: string,
   employeeId: string,
-): Promise<Map<string, number>> {
+): Promise<Map<string, CoursePayRule>> {
   const reg = await queryOne<any>(
     `SELECT to_regclass('public.employee_course_percentages') IS NOT NULL AS has_table`
   );
   if (!reg?.has_table) return new Map();
   const rows = await query(
-    `SELECT course_id, percentage_rate FROM employee_course_percentages
+    `SELECT course_id, percentage_rate,
+            COALESCE(pay_type, 'PERCENTAGE') AS pay_type,
+            session_rate
+       FROM employee_course_percentages
       WHERE company_id = $1 AND employee_id = $2`,
     [companyId, employeeId],
   );
-  return new Map((rows as any[]).map((r) => [r.course_id as string, parseFloat(r.percentage_rate)]));
+  return new Map((rows as any[]).map((r) => [r.course_id as string, {
+    payType: r.pay_type as 'PERCENTAGE' | 'SESSION_BASED',
+    percentageRate: r.percentage_rate != null ? parseFloat(r.percentage_rate) : null,
+    sessionRate: r.session_rate != null ? parseFloat(r.session_rate) : null,
+  }]));
+}
+
+/**
+ * Unpaid PRESENT sessions this month, grouped by the course behind the class.
+ * Grouped, because which rate applies is now a per-course question. Same rules
+ * as getUnpaidSessionIds — free sessions excluded, and anything already covered
+ * by a previous payment excluded — so the two can never disagree about what has
+ * been paid for.
+ */
+async function getUnpaidSessionsByCourse(
+  companyId: string,
+  employeeId: string,
+  monthStart: string,
+  monthEnd: string,
+): Promise<Array<{ courseId: string | null; courseName: string | null; sessionIds: string[] }>> {
+  await ensureFreeSessionSchema();
+  const rows = await query<any>(
+    `SELECT DISTINCT s.id, cl.course_id, co.name AS course_name
+     FROM session_teacher_attendance sta
+     JOIN sessions s ON s.id = sta.session_id
+     LEFT JOIN classes cl ON cl.id = s.class_id
+     LEFT JOIN courses co ON co.id = cl.course_id
+     WHERE s.company_id = $1
+       AND sta.employee_id = $2
+       AND sta.status = 'PRESENT'
+       AND s.is_free = FALSE
+       AND s.start_date::date >= $3
+       AND s.start_date::date <= $4
+       AND NOT EXISTS (
+         SELECT 1 FROM session_salary_payments ssp
+         WHERE ssp.session_id = s.id AND ssp.employee_id = $2
+       )`,
+    [companyId, employeeId, monthStart, monthEnd],
+  );
+  const byCourse = new Map<string, { courseId: string | null; courseName: string | null; sessionIds: string[] }>();
+  for (const r of rows as any[]) {
+    const key = r.course_id ?? '';
+    const group = byCourse.get(key)
+      ?? { courseId: r.course_id ?? null, courseName: r.course_name ?? null, sessionIds: [] as string[] };
+    group.sessionIds.push(r.id);
+    byCourse.set(key, group);
+  }
+  return [...byCourse.values()];
+}
+
+/** Does this teacher have any course they are paid a percentage of? */
+async function hasPercentageRule(companyId: string, employeeId: string): Promise<boolean> {
+  const rules = await getCoursePayRules(companyId, employeeId);
+  return [...rules.values()].some((r) => r.payType === 'PERCENTAGE');
+}
+
+/**
+ * What this teacher is owed for sessions taught this month, course by course.
+ *
+ * A session is paid per-session when the course says so, or when the teacher
+ * themselves is SESSION_BASED and the course has not been moved onto a
+ * percentage. A session of a percentage-paid course earns nothing here — the
+ * student money behind it is what pays, through the accrual — and that
+ * complement is exactly what stops a mixed teacher being paid twice for one
+ * session.
+ */
+async function getSessionPayForMonth(
+  companyId: string,
+  emp: any,
+  monthStart: string,
+  monthEnd: string,
+): Promise<{ amount: number; sessionIds: string[]; lines: Array<{ courseId: string | null; courseName: string | null; sessions: number; rate: number; amount: number }> }> {
+  const rules = await getCoursePayRules(companyId, emp.id);
+  const employeeIsSessionBased = emp.salary_type === 'SESSION_BASED';
+  const employeeRate = emp.session_rate != null ? parseFloat(emp.session_rate) : 0;
+
+  // Nothing to look up when neither the employee nor any course is session-paid.
+  const anySessionRule = [...rules.values()].some((r) => r.payType === 'SESSION_BASED');
+  if (!employeeIsSessionBased && !anySessionRule) {
+    return { amount: 0, sessionIds: [], lines: [] };
+  }
+
+  const groups = await getUnpaidSessionsByCourse(companyId, emp.id, monthStart, monthEnd);
+  const lines: Array<{ courseId: string | null; courseName: string | null; sessions: number; rate: number; amount: number }> = [];
+  const sessionIds: string[] = [];
+  let amount = 0;
+
+  for (const g of groups) {
+    const rule = g.courseId ? rules.get(g.courseId) : undefined;
+    let rate = 0;
+    if (rule?.payType === 'SESSION_BASED') rate = rule.sessionRate ?? 0;
+    else if (!rule && employeeIsSessionBased) rate = employeeRate;
+    // rule.payType === 'PERCENTAGE' → paid through the accrual, not here.
+    if (rate <= 0) continue;
+
+    const lineAmount = Math.round(g.sessionIds.length * rate * 100) / 100;
+    amount += lineAmount;
+    sessionIds.push(...g.sessionIds);
+    lines.push({ courseId: g.courseId, courseName: g.courseName, sessions: g.sessionIds.length, rate, amount: lineAmount });
+  }
+
+  return { amount: Math.round(amount * 100) / 100, sessionIds, lines };
 }
 
 /**
@@ -199,15 +316,21 @@ async function getTeacherEarnings(
   employeeId: string,
   globalRate: number,
 ): Promise<{ totalPaid: number; accrued: number; byCourse: TeacherCourseEarning[] }> {
-  const [paidByCourse, overrides] = await Promise.all([
+  const [paidByCourse, rules] = await Promise.all([
     getTeacherPaidByCourse(companyId, employeeId),
-    getCoursePercentageRates(companyId, employeeId),
+    getCoursePayRules(companyId, employeeId),
   ]);
 
   let totalPaid = 0;
   let accrued = 0;
-  const byCourse: TeacherCourseEarning[] = paidByCourse.map((c) => {
-    const override = c.courseId ? overrides.get(c.courseId) : undefined;
+  const byCourse: TeacherCourseEarning[] = paidByCourse
+    // A course the teacher is paid per session for earns nothing from student
+    // money — they are paid for turning up, and counting it here as well would
+    // pay them twice for the same teaching.
+    .filter((c) => !(c.courseId && rules.get(c.courseId)?.payType === 'SESSION_BASED'))
+    .map((c) => {
+    const rule = c.courseId ? rules.get(c.courseId) : undefined;
+    const override = rule?.payType === 'PERCENTAGE' ? rule.percentageRate ?? undefined : undefined;
     const rate = override ?? globalRate;
     // Rounded per course, so the payslip's lines add up to its total exactly.
     const courseAccrued = Math.round(c.paid * rate) / 100;
@@ -715,6 +838,11 @@ export const expensesRoutes = {
               ))
              OR (e.salary_type = 'SESSION_BASED' AND e.session_rate > 0)
              OR (e.salary_type = 'PERCENTAGE' AND e.percentage_rate > 0)
+             -- A monthly teacher with a per-course arrangement is owed for that
+             -- course too, and would otherwise never appear on this page.
+             OR (to_regclass('public.employee_course_percentages') IS NOT NULL AND EXISTS (
+                   SELECT 1 FROM employee_course_percentages ecp WHERE ecp.employee_id = e.id
+                 ))
            )`,
         employeeParams
       );
@@ -732,21 +860,35 @@ export const expensesRoutes = {
           templateId: null,
           employeeId: e.id,
         };
-        if (e.salary_type === 'SESSION_BASED') {
-          const rate = e.session_rate ? parseFloat(e.session_rate) : 0;
-          const unpaidIds = await getUnpaidSessionIds(context.companyId, e.id, monthStart, monthEnd);
-          const amount = unpaidIds.length * rate;
-          if (amount > 0) {
-            salaryItems.push({ ...base, amount, salaryType: 'SESSION_BASED', sessionCount: unpaidIds.length, sessionRate: rate });
-          }
-        } else if (e.salary_type === 'PERCENTAGE') {
-          // Owed = accrued (percentage of paid) − already withdrawn; withdraw any time.
-          const { percentageRate, owed } = await getPercentageSummary(context.companyId, e);
-          if (owed > 0) {
-            salaryItems.push({ ...base, amount: owed, salaryType: 'PERCENTAGE', percentageRate });
-          }
-        } else {
+        // The two teaching components are no longer alternatives: a per-course
+        // arrangement can put one teacher on a percentage for one course and a
+        // session fee for another (migration 090), so both are computed and
+        // whichever apply are added together.
+        const sessionPay = await getSessionPayForMonth(context.companyId, e, monthStart, monthEnd);
+        const percentagePay = e.salary_type === 'PERCENTAGE' || (await hasPercentageRule(context.companyId, e.id))
+          ? await getPercentageSummary(context.companyId, e)
+          : null;
+        const percentageOwed = percentagePay && percentagePay.owed > 0 ? percentagePay.owed : 0;
+
+        if (e.salary_type === 'MONTHLY' || !e.salary_type) {
+          // A monthly salary is its own item and keeps its own once-a-month rule.
           salaryItems.push({ ...base, amount: parseFloat(e.salary), salaryType: 'MONTHLY' });
+        }
+
+        const teachingAmount = Math.round((sessionPay.amount + percentageOwed) * 100) / 100;
+        if (teachingAmount > 0) {
+          const mixed = sessionPay.amount > 0 && percentageOwed > 0;
+          salaryItems.push({
+            ...base,
+            amount: teachingAmount,
+            salaryType: mixed ? 'MIXED' : (sessionPay.amount > 0 ? 'SESSION_BASED' : 'PERCENTAGE'),
+            sessionCount: sessionPay.sessionIds.length,
+            sessionRate: sessionPay.lines.length === 1 ? sessionPay.lines[0].rate : null,
+            sessionLines: sessionPay.lines,
+            percentageRate: percentagePay?.percentageRate ?? null,
+            percentageAmount: percentageOwed,
+            sessionAmount: sessionPay.amount,
+          });
         }
       }
 
@@ -1065,15 +1207,18 @@ export const expensesRoutes = {
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
       const isSessionBased = emp.salary_type === 'SESSION_BASED';
       const isPercentage = emp.salary_type === 'PERCENTAGE';
+      // A per-course arrangement can be the ONLY thing a teacher is paid by, so
+      // an employee-level rate of zero is no longer proof that nothing is owed.
+      const hasAnyCourseRule = (await getCoursePayRules(context.companyId, emp.id)).size > 0;
       if (isSessionBased) {
-        if (!emp.session_rate || parseFloat(emp.session_rate) <= 0) {
+        if ((!emp.session_rate || parseFloat(emp.session_rate) <= 0) && !hasAnyCourseRule) {
           return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no session rate configured');
         }
       } else if (isPercentage) {
-        if (!emp.percentage_rate || parseFloat(emp.percentage_rate) <= 0) {
+        if ((!emp.percentage_rate || parseFloat(emp.percentage_rate) <= 0) && !hasAnyCourseRule) {
           return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no percentage rate configured');
         }
-      } else if (!emp.salary || parseFloat(emp.salary) <= 0) {
+      } else if ((!emp.salary || parseFloat(emp.salary) <= 0) && !hasAnyCourseRule) {
         return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Employee has no salary configured');
       }
 
@@ -1088,32 +1233,55 @@ export const expensesRoutes = {
       let baseSalary: number;
       let baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel}`;
       let unpaidSessionIds: string[] = [];
-      if (isSessionBased) {
-        const rate = parseFloat(emp.session_rate);
-        unpaidSessionIds = await getUnpaidSessionIds(context.companyId, emp.id, monthStart, monthEnd);
-        if (unpaidSessionIds.length === 0) {
-          return apiError(400, 'ERRORS.EXPENSES.NO_UNPAID_SESSIONS', 'No unpaid sessions for this month');
-        }
-        baseSalary = unpaidSessionIds.length * rate;
-        baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${unpaidSessionIds.length} sessions × ${rate})`;
-      } else if (isPercentage) {
-        // Withdraw the currently-available balance (accrued − already withdrawn).
-        // No monthly lock: pay out whatever has accrued since the last withdrawal.
-        const { percentageRate, owed } = await getPercentageSummary(context.companyId, emp);
-        if (owed <= 0) {
-          return apiError(400, 'ERRORS.EXPENSES.NO_PERCENTAGE_DUE', 'No percentage earnings available to withdraw');
-        }
-        baseSalary = owed;
-        baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${percentageRate}% revenue share)`;
-      } else {
+
+      // Both teaching components in one payment, because a teacher can be on a
+      // percentage for one course and a session fee for another (migration 090)
+      // and they are owed the sum, not one or the other. Each component is
+      // settled by its own mechanism below: the sessions are stamped paid, and
+      // the percentage's withdrawn base moves by the whole payment.
+      const sessionPay = await getSessionPayForMonth(context.companyId, emp, monthStart, monthEnd);
+      const wantsPercentage = isPercentage || (await hasPercentageRule(context.companyId, emp.id));
+      const percentageSummary = wantsPercentage ? await getPercentageSummary(context.companyId, emp) : null;
+      const percentageOwed = percentageSummary && percentageSummary.owed > 0 ? percentageSummary.owed : 0;
+
+      // A monthly salary is a third component, not an alternative to the other
+      // two: a teacher on a monthly wage who also takes a percentage of one
+      // course is owed both. It keeps its own once-a-month rule — already paid
+      // this month means it contributes nothing, while the teaching components
+      // can still be drawn.
+      const monthlySalary = parseFloat(emp.salary || 0);
+      let monthlyComponent = 0;
+      let monthlyAlreadyPaid = false;
+      if (!isSessionBased && !isPercentage && monthlySalary > 0) {
         const existing = await queryOne(
           `SELECT id FROM expense_payments WHERE company_id = $1 AND employee_id = $2 AND category = 'SALARIES' AND date >= $3 AND date <= $4`,
           [context.companyId, emp.id, monthStart, monthEnd]
         );
-        if (existing) {
-          return apiError(400, 'ERRORS.EXPENSES.SALARY_ALREADY_PAID', `Salary already paid for ${monthLabel}`);
-        }
-        baseSalary = parseFloat(emp.salary);
+        monthlyAlreadyPaid = !!existing;
+        if (!existing) monthlyComponent = monthlySalary;
+      }
+
+      unpaidSessionIds = sessionPay.sessionIds;
+      baseSalary = Math.round((sessionPay.amount + percentageOwed + monthlyComponent) * 100) / 100;
+
+      if (baseSalary <= 0) {
+        // Say which of the three had nothing, rather than a generic refusal.
+        if (isSessionBased) return apiError(400, 'ERRORS.EXPENSES.NO_UNPAID_SESSIONS', 'No unpaid sessions for this month');
+        if (isPercentage) return apiError(400, 'ERRORS.EXPENSES.NO_PERCENTAGE_DUE', 'No percentage earnings available to withdraw');
+        if (monthlyAlreadyPaid) return apiError(400, 'ERRORS.EXPENSES.SALARY_ALREADY_PAID', `Salary already paid for ${monthLabel}`);
+        return apiError(400, 'ERRORS.EXPENSES.NO_SALARY_CONFIGURED', 'Nothing is owed to this employee for this month');
+      }
+
+      const parts: string[] = [];
+      if (sessionPay.amount > 0) {
+        parts.push(sessionPay.lines.length === 1
+          ? `${sessionPay.lines[0].sessions} sessions × ${sessionPay.lines[0].rate}`
+          : `${unpaidSessionIds.length} sessions across ${sessionPay.lines.length} courses`);
+      }
+      if (percentageOwed > 0) parts.push(`${percentageSummary!.percentageRate}% revenue share`);
+      if (monthlyComponent > 0 && parts.length) parts.push('monthly salary');
+      if (parts.length) {
+        baseNote = `Salary: ${emp.first_name} ${emp.last_name} — ${monthLabel} (${parts.join(' + ')})`;
       }
       const bonus = body.bonusAmount || 0;
       const discount = body.discountAmount || 0;

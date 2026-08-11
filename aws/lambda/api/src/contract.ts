@@ -4779,7 +4779,9 @@ export const contract = c.router({
           id: UUIDSchema,
           courseId: UUIDSchema,
           courseName: z.string(),
-          percentageRate: z.number(),
+          payType: z.enum(['PERCENTAGE', 'SESSION_BASED']),
+          percentageRate: z.number().nullable(),
+          sessionRate: z.number().nullable(),
         })),
         403: ApiErrorSchema,
       },
@@ -4791,7 +4793,10 @@ export const contract = c.router({
       body: z.object({
         rates: z.array(z.object({
           courseId: UUIDSchema,
-          percentageRate: z.number().min(0).max(100),
+          /** Defaults to PERCENTAGE, which is what every row meant before 090. */
+          payType: z.enum(['PERCENTAGE', 'SESSION_BASED']).optional(),
+          percentageRate: z.number().min(0).max(100).nullable().optional(),
+          sessionRate: z.number().positive().nullable().optional(),
         })),
       }),
       responses: {

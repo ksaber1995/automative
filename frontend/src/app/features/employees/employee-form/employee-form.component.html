@@ -112,9 +112,10 @@
             }
           </div>
 
-          <!-- Per-course rates. The global rate above still answers for every
-               course not listed here, so an empty table means "that % of
-               everything" — which is what most teachers are on. -->
+          <!-- Per-course arrangements. The salary type and rate above still
+               answer for every course not listed here, so an empty table means
+               the teacher is paid one way for everything — which is what most
+               of them are. A row overrides the method as well as the number. -->
           <div class="field md:col-span-2">
             <label class="block text-sm font-medium mb-1">{{ 'EMPLOYEES.FORM.COURSE_RATES' | translate }}</label>
             <small class="text-gray-400 block mb-3">{{ 'EMPLOYEES.FORM.COURSE_RATES_HINT' | translate }}</small>
@@ -134,14 +135,34 @@
                   (ngModelChange)="setCourseRateCourse($index, $event)"
                   [placeholder]="'EMPLOYEES.FORM.COURSE_RATES_PICK' | translate"
                 ></p-select>
-                <p-inputnumber
-                  [ngModel]="row.percentageRate"
+                <p-select
+                  [options]="payTypeOptions()"
+                  optionLabel="label" optionValue="value"
+                  [ngModel]="row.payType"
                   [ngModelOptions]="{ standalone: true }"
-                  (ngModelChange)="setCourseRateValue($index, $event)"
-                  [min]="0" [max]="100" suffix=" %" mode="decimal"
-                  [minFractionDigits]="0" [maxFractionDigits]="2"
-                  [style]="{ width: '9rem' }"
-                ></p-inputnumber>
+                  (ngModelChange)="setCourseRateType($index, $event)"
+                  [style]="{ width: '11rem' }"
+                ></p-select>
+                @if (row.payType === 'SESSION_BASED') {
+                  <p-inputnumber
+                    [ngModel]="row.sessionRate"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="setCourseSessionRate($index, $event)"
+                    [min]="0" mode="decimal"
+                    [minFractionDigits]="0" [maxFractionDigits]="2"
+                    [placeholder]="'EMPLOYEES.FORM.COURSE_RATE_PER_SESSION' | translate"
+                    [style]="{ width: '9rem' }"
+                  ></p-inputnumber>
+                } @else {
+                  <p-inputnumber
+                    [ngModel]="row.percentageRate"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="setCourseRateValue($index, $event)"
+                    [min]="0" [max]="100" suffix=" %" mode="decimal"
+                    [minFractionDigits]="0" [maxFractionDigits]="2"
+                    [style]="{ width: '9rem' }"
+                  ></p-inputnumber>
+                }
                 <button pButton type="button" icon="pi pi-trash" severity="danger" [text]="true"
                         (click)="removeCourseRate($index)"></button>
               </div>
