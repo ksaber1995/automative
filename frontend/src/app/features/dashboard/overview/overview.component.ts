@@ -38,6 +38,12 @@ export class OverviewComponent implements OnInit {
   isTeacher = (): boolean => this.authService.isTeacher();
   /** Basic academies (and teachers) have no cash drawer — no tile, and no request. */
   canUseCash = (): boolean => this.authService.canUseCash();
+  /**
+   * Salaries and recurring bills are expense data. A role without expenses —
+   * an academic manager, a secretary — got a 403 toast on every dashboard load,
+   * which reads as the whole page failing rather than one card they may not see.
+   */
+  canSeeDueExpenses = (): boolean => this.authService.canRead('expenses');
 
   startDate: Date;
   endDate: Date;
@@ -152,6 +158,7 @@ export class OverviewComponent implements OnInit {
   }
 
   loadDueExpenses() {
+    if (!this.canSeeDueExpenses()) return;
     this.dueLoading.set(true);
     this.expenseService.getDue().subscribe({
       next: (data) => {

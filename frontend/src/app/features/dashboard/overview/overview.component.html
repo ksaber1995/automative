@@ -356,7 +356,8 @@
     </p-card>
     }
 
-    <!-- Due This Month -->
+    <!-- Due This Month — expense data, so only for roles that have expenses -->
+    @if (canSeeDueExpenses()) {
     <div class="mt-8">
       <p-card>
         <ng-template pTemplate="header">
@@ -436,6 +437,7 @@
         }
       </p-card>
     </div>
+    }
 
     <!-- Top Performing Branches -->
     @if (!isTeacher()) {
