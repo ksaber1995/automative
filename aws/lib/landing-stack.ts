@@ -198,13 +198,55 @@ function handler(event) {
     }
 
     // ─── Upload built assets ────────────────────────────────────────────────
-    new deploy.BucketDeployment(this, 'DeployLanding', {
+    //
+    // Two passes, because the files fall into two groups that want opposite
+    // caching, and uploading them with none at all gives the browser no
+    // instructions: it then guesses (heuristic freshness off Last-Modified) and
+    // can sit on a stale index.html for days. CloudFront is invalidated on every
+    // deploy, so this was only ever a problem on the visitor's own machine —
+    // which is exactly the machine we cannot clear.
+    //
+    // 1. Hashed build output (main-AB12CD34.js and friends). The name changes
+    //    whenever the content does, so it can be cached forever.
+    const FOREVER = ['*.html', 'assets/*', 'assets/**/*'];
+    const immutableAssets = new deploy.BucketDeployment(this, 'DeployLanding', {
       sources: [deploy.Source.asset(props.sourcePath)],
       destinationBucket: bucket,
       distribution,
       distributionPaths: ['/*'],
       prune: true,
+      // s3 sync applies these filters to the destination too, so the files the
+      // second pass owns are neither uploaded nor pruned here.
+      exclude: FOREVER,
+      cacheControl: [
+        deploy.CacheControl.setPublic(),
+        deploy.CacheControl.maxAge(cdk.Duration.days(365)),
+        deploy.CacheControl.immutable(),
+      ],
     });
+
+    // 2. The entry point and the runtime-loaded assets — index.html, and the
+    //    i18n JSON the app fetches by a fixed name. These keep their names
+    //    across releases, so a browser holding one holds the old app: index.html
+    //    points at last release's bundles, and a stale en.json is last release's
+    //    wording. They must be revalidated, every time. It costs one conditional
+    //    request each; the answer is a 304 unless we shipped.
+    const revalidated = new deploy.BucketDeployment(this, 'DeployLandingEntryPoint', {
+      sources: [deploy.Source.asset(props.sourcePath)],
+      destinationBucket: bucket,
+      // The first pass already invalidates /*; a second one would just cost time.
+      prune: false,
+      exclude: ['*'],
+      include: FOREVER,
+      cacheControl: [
+        deploy.CacheControl.setPublic(),
+        deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
+        deploy.CacheControl.mustRevalidate(),
+      ],
+    });
+    // Ordered so a release is never briefly half-old: bundles land first, then
+    // the index.html that names them.
+    revalidated.node.addDependency(immutableAssets);
 
     // ─── Outputs ────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'CloudFrontDomain', {
