@@ -99,7 +99,7 @@ export interface ClientRow {
   poolValue: number;
 }
 
-export type SortKey = 'name' | 'type' | 'activeStudents' | 'total' | 'linked' | 'unlinked';
+export type SortKey = 'name' | 'type' | 'activeStudents' | 'students' | 'total' | 'linked' | 'unlinked';
 
 export interface SortState {
   key: SortKey;

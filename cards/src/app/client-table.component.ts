@@ -52,6 +52,7 @@ interface Column {
                   @if (!r.enabled) { <span class="off" title="QR pool disabled"> off</span> }
                 </td>
                 <td class="num">{{ r.activeStudents | number }}</td>
+                <td class="num">{{ r.students | number }}</td>
                 <td class="num">{{ r.total | number }}</td>
                 <td class="num">{{ r.linked | number }}</td>
                 <td class="num">{{ r.unlinked | number }}</td>
@@ -74,6 +75,7 @@ interface Column {
               <td>{{ rows().length }} {{ rows().length === 1 ? 'client' : 'clients' }}</td>
               <td></td>
               <td class="num">{{ totals().activeStudents | number }}</td>
+              <td class="num">{{ totals().students | number }}</td>
               <td class="num">{{ totals().total | number }}</td>
               <td class="num">{{ totals().linked | number }}</td>
               <td class="num">{{ totals().unlinked | number }}</td>
@@ -123,9 +125,11 @@ export class ClientTableComponent {
   protected readonly columns: Column[] = [
     { key: 'name', label: 'Client', numeric: false },
     { key: 'type', label: 'Type', numeric: false },
-    // Before the pool numbers: it says how big the client is, which is what the
-    // card counts beside it are read against.
+    // Before the pool numbers: they say how big the client is, which is what the
+    // card counts beside them are read against. Active first — it is the live
+    // roll, and the all-time total is the context for it.
     { key: 'activeStudents', label: 'Active students', numeric: true },
+    { key: 'students', label: 'Total students', numeric: true },
     { key: 'total', label: 'Total cards', numeric: true },
     { key: 'linked', label: 'Linked', numeric: true },
     { key: 'unlinked', label: 'Unlinked', numeric: true },
@@ -141,11 +145,12 @@ export class ClientTableComponent {
     this.rows().reduce(
       (a, r) => ({
         activeStudents: a.activeStudents + r.activeStudents,
+        students: a.students + r.students,
         total: a.total + r.total,
         linked: a.linked + r.linked,
         unlinked: a.unlinked + r.unlinked,
       }),
-      { activeStudents: 0, total: 0, linked: 0, unlinked: 0 },
+      { activeStudents: 0, students: 0, total: 0, linked: 0, unlinked: 0 },
     ),
   );
 }
