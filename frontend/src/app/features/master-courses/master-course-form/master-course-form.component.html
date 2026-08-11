@@ -44,18 +44,17 @@
             </label>
             <p-select
               formControlName="paymentType"
-              [options]="paymentTypeOptions"
+              [options]="paymentTypeOptions()"
               optionLabel="label"
               optionValue="value"
               [style]="{ width: '100%' }"
             >
               <ng-template let-option pTemplate="item">
                 <div>
-                  <div class="font-medium">{{ option.label | translate }}</div>
-                  <div class="text-xs text-gray-500">{{ option.hint | translate }}</div>
+                  <div class="font-medium">{{ option.label }}</div>
+                  <div class="text-xs text-gray-500">{{ option.hint }}</div>
                 </div>
               </ng-template>
-              <ng-template let-selected pTemplate="selectedItem">{{ selected.label | translate }}</ng-template>
             </p-select>
             <small class="text-gray-500 block mt-1">
               {{ (isMonthly() ? 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY_HINT'

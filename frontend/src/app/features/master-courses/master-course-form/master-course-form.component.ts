@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -8,11 +8,12 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MasterCourseService } from '../services/master-course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { LanguageService } from '../../../core/services/language.service';
 import { MasterCoursePaymentType } from '@shared/interfaces/master-course.interface';
 
 @Component({
@@ -39,6 +40,8 @@ export class MasterCourseFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notifications = inject(NotificationService);
   protected branchState = inject(BranchStateService);
+  private translate = inject(TranslateService);
+  private language = inject(LanguageService);
 
   form: FormGroup;
   loading = signal(false);
@@ -47,18 +50,27 @@ export class MasterCourseFormComponent implements OnInit {
    * The two ways a master can be sold. The hint matters more than the label:
    * which one is picked decides what courses the master is then allowed to hold.
    */
-  readonly paymentTypeOptions = [
-    {
-      value: 'ONE_TIME' as MasterCoursePaymentType,
-      label: 'MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME',
-      hint: 'MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME_HINT',
-    },
-    {
-      value: 'MONTHLY_SUBSCRIPTION' as MasterCoursePaymentType,
-      label: 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY',
-      hint: 'MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY_HINT',
-    },
-  ];
+  /**
+   * Translated here rather than piped in the template, because `optionLabel`
+   * is what p-select falls back to whenever a template does not apply — and a
+   * label holding a translation KEY renders that key on screen. Recomputed on
+   * every language change, since instant() is a snapshot.
+   */
+  readonly paymentTypeOptions = computed(() => {
+    this.language.currentLang();
+    return [
+      {
+        value: 'ONE_TIME' as MasterCoursePaymentType,
+        label: this.translate.instant('MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME'),
+        hint: this.translate.instant('MASTER_COURSES.FORM.PAYMENT_TYPE_ONE_TIME_HINT'),
+      },
+      {
+        value: 'MONTHLY_SUBSCRIPTION' as MasterCoursePaymentType,
+        label: this.translate.instant('MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY'),
+        hint: this.translate.instant('MASTER_COURSES.FORM.PAYMENT_TYPE_MONTHLY_HINT'),
+      },
+    ];
+  });
 
   isMonthly = (): boolean => this.form?.get('paymentType')?.value === 'MONTHLY_SUBSCRIPTION';
   isEditMode = signal(false);
