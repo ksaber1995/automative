@@ -138,6 +138,8 @@ const router = {
   },
   enrollments: enrollmentsRoutes,
   revenues: revenuesRoutes,
+  // Its static paths are declared before `/:id` inside expensesRoutes — see the
+  // note there. Registration follows that object's key order.
   expenses: expensesRoutes,
   crm: crmRoutes,
   qrCards: qrCardsRoutes,
