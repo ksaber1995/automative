@@ -5518,7 +5518,12 @@ export const contract = c.router({
       pathParams: z.object({ companyId: UUIDSchema }),
       body: z.object({ months: z.number().int().positive() }),
       responses: {
-        200: z.object({ success: z.boolean(), end_date: z.string().nullable() }),
+        200: z.object({
+          success: z.boolean(),
+          end_date: z.string().nullable(),
+          /** The state the tenant is in after the extension — EXPIRED is revived. */
+          subscription_type: z.string().nullable().optional(),
+        }),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),

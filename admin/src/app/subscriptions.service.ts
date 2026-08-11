@@ -60,8 +60,11 @@ export class SubscriptionsService {
   }
 
   /** Extend a company's subscription by N months. */
-  extend(companyId: string, months: number): Observable<{ success: boolean; end_date: string | null }> {
-    return this.http.post<{ success: boolean; end_date: string | null }>(
+  extend(
+    companyId: string,
+    months: number,
+  ): Observable<{ success: boolean; end_date: string | null; subscription_type?: string | null }> {
+    return this.http.post<{ success: boolean; end_date: string | null; subscription_type?: string | null }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/extend`,
       { months },
     );

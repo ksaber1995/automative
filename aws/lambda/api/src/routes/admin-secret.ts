@@ -124,9 +124,25 @@ export const adminSecretRoutes = {
       const newEndStr = newEnd.toISOString().split('T')[0];
 
       const col = useSubCol ? 'subscription_end_date' : 'trial_end_date';
-      await query(`UPDATE subscriptions SET ${col} = $2, updated_at = NOW() WHERE id = $1`, [sub.id, newEndStr]);
 
-      return { status: 200 as const, body: { success: true, end_date: newEndStr } };
+      // Extending an expired tenant is how you put them back on. Moving the date
+      // alone left status = 'EXPIRED', so admin went on filing the row under
+      // Expired with an end date a year out — the operator had done the thing
+      // and the screen said it hadn't. Which column we extended says which state
+      // they go back to: a trial date means the trial resumes, a subscription
+      // date means they are a paying tenant again.
+      const revived = sub.status === 'EXPIRED' ? (useSubCol ? 'ACTIVE' : 'TRIAL') : null;
+      await query(
+        revived
+          ? `UPDATE subscriptions SET ${col} = $2, status = $3, updated_at = NOW() WHERE id = $1`
+          : `UPDATE subscriptions SET ${col} = $2, updated_at = NOW() WHERE id = $1`,
+        revived ? [sub.id, newEndStr, revived] : [sub.id, newEndStr],
+      );
+
+      return {
+        status: 200 as const,
+        body: { success: true, end_date: newEndStr, subscription_type: revived ?? sub.status ?? null },
+      };
     } catch (error: any) {
       console.error('karim-admin-secret extend failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Extend failed' } };
