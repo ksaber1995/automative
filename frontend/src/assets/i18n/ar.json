@@ -1099,6 +1099,7 @@
     "OVERRIDE_REMOVED": "تم إزالة تعديل السعر. تم إرجاع {{count}} فاتورة للسعر الأصلي.",
     "OVERRIDE_ERROR": "فشل تحديث تعديل السعر",
     "UPDATE_MONTH_BUTTON": "تحديث شهر محدد",
+    "OVERRIDE_BUNDLE_TAG": "باقة",
     "SELECT_COURSE": "اختر الكورس",
     "SELECT_COURSE_FIRST": "اختر الكورس والسنة والشهر لتحديد السعر."
   },

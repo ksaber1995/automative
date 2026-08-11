@@ -934,7 +934,9 @@ const GenerateMonthlyBillsSchema = z.object({
 
 const CourseMonthlyPriceOverrideSchema = z.object({
   id: UUIDSchema,
-  courseId: UUIDSchema,
+  /** One of these two carries the overridden thing; the other is null. */
+  courseId: UUIDSchema.nullable(),
+  masterCourseId: UUIDSchema.nullable().optional(),
   companyId: UUIDSchema,
   billingYear: z.number(),
   billingMonth: z.number(),
@@ -944,7 +946,9 @@ const CourseMonthlyPriceOverrideSchema = z.object({
 });
 
 const SetPriceOverrideSchema = z.object({
-  courseId: UUIDSchema,
+  /** Exactly one: a monthly course, or a master course sold per month. */
+  courseId: UUIDSchema.optional(),
+  masterCourseId: UUIDSchema.optional(),
   billingYear: z.number().int().min(2020).max(2100),
   billingMonth: z.number().int().min(1).max(12),
   overridePrice: z.number().positive(),
@@ -7214,7 +7218,8 @@ export const contract = c.router({
       method: 'GET' as const,
       path: '/api/monthly-subscriptions/price-override',
       query: z.object({
-        courseId: z.string(),
+        courseId: z.string().optional(),
+        masterCourseId: z.string().optional(),
         billingYear: z.string(),
         billingMonth: z.string(),
       }),

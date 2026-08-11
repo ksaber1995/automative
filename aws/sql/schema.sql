@@ -1384,17 +1384,26 @@ CREATE UNIQUE INDEX uq_msi_backfill
 -- =============================================
 CREATE TABLE course_monthly_price_overrides (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    course_id        UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    -- The overridden thing: a monthly course, or a master course sold per month
+    -- (migration 088). Exactly one, the same pairing the bills themselves use.
+    course_id        UUID REFERENCES courses(id) ON DELETE CASCADE,
+    master_course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE,
     company_id       UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     billing_year     INTEGER NOT NULL,
     billing_month    INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
     override_price   DECIMAL(10, 2) NOT NULL,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT cmpo_one_subject CHECK (num_nonnulls(course_id, master_course_id) = 1),
     UNIQUE (course_id, billing_year, billing_month)
 );
 
+CREATE UNIQUE INDEX uq_cmpo_master_month
+    ON course_monthly_price_overrides(master_course_id, billing_year, billing_month)
+    WHERE master_course_id IS NOT NULL;
+
 CREATE INDEX idx_cmpo_course_id   ON course_monthly_price_overrides(course_id);
+CREATE INDEX idx_cmpo_master_course ON course_monthly_price_overrides(master_course_id);
 CREATE INDEX idx_cmpo_company_id  ON course_monthly_price_overrides(company_id);
 
 CREATE TRIGGER update_course_monthly_price_overrides_updated_at

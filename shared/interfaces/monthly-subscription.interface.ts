@@ -111,7 +111,9 @@ export interface GenerateMonthlyBillsDto {
 
 export interface CourseMonthlyPriceOverride {
   id: string;
-  courseId: string;
+  /** The overridden thing is one of these two — the other is null. */
+  courseId: string | null;
+  masterCourseId?: string | null;
   companyId: string;
   billingYear: number;
   billingMonth: number;
@@ -121,7 +123,9 @@ export interface CourseMonthlyPriceOverride {
 }
 
 export interface SetPriceOverrideDto {
-  courseId: string;
+  /** Exactly one: a monthly course, or a master course sold per month. */
+  courseId?: string;
+  masterCourseId?: string;
   billingYear: number;
   billingMonth: number;
   overridePrice: number;

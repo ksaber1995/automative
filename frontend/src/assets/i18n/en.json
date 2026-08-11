@@ -1099,6 +1099,7 @@
     "OVERRIDE_REMOVED": "Price override removed. {{count}} bill(s) reverted to normal pricing.",
     "OVERRIDE_ERROR": "Failed to update price override",
     "UPDATE_MONTH_BUTTON": "Update Specific Month",
+    "OVERRIDE_BUNDLE_TAG": "bundle",
     "SELECT_COURSE": "Select a course",
     "SELECT_COURSE_FIRST": "Select a course, year and month to set the price."
   },

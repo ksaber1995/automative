@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -22,6 +22,8 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmationService } from 'primeng/api';
 
 import { MonthlySubscriptionsService } from '../monthly-subscriptions.service';
+import { MasterCourseService } from '../../master-courses/services/master-course.service';
+import { MasterCourse } from '@shared/interfaces/master-course.interface';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { SessionService, ActiveSessionInfo } from '../../rooms/services/session.service';
 import { AttendanceService } from '../../rooms/services/attendance.service';
@@ -73,6 +75,23 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   filterForm!: FormGroup;
   branches = signal<LookupOption[]>([]);
   courses = signal<Course[]>([]);
+  /**
+   * Master courses sold per month. They are billed like a monthly course, so the
+   * month override applies to them the same way — one fee, one month, every
+   * student's bill scaled by the fee they agreed.
+   */
+  monthlyMasters = signal<MasterCourse[]>([]);
+
+  /** What the override dialog can be pointed at: monthly courses, then bundles. */
+  overrideSubjects = computed(() => [
+    ...this.courses().map((c) => ({ id: c.id, name: c.name, price: c.price, isMaster: false })),
+    ...this.monthlyMasters().map((m) => ({
+      id: m.id,
+      name: `${m.name} — ${this.translate.instant('MONTHLY_SUBSCRIPTIONS.OVERRIDE_BUNDLE_TAG')}`,
+      price: m.defaultPrice,
+      isMaster: true,
+    })),
+  ]);
 
   // Data — signals so async-loaded data renders without needing a user interaction.
   payments = signal<MonthlyPaymentWithDetails[]>([]);
@@ -191,6 +210,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     private enrollmentService: EnrollmentService,
     private lookupService: LookupService,
     private courseSvc: CourseService,
+    private masterCourseSvc: MasterCourseService,
     private studentSvc: StudentService,
     private notify: NotificationService,
     private auth: AuthService,
@@ -246,8 +266,12 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     forkJoin({
       branches: this.lookupService.branches(),
       courses: this.courseSvc.getAllCourses(),
-    }).pipe(takeUntil(this.destroy$)).subscribe(({ branches, courses }) => {
+      masters: this.masterCourseSvc.getAll(),
+    }).pipe(takeUntil(this.destroy$)).subscribe(({ branches, courses, masters }) => {
       this.branches.set(branches);
+      this.monthlyMasters.set(
+        masters.filter((m) => m.isActive && m.paymentType === 'MONTHLY_SUBSCRIPTION'),
+      );
       // Only show monthly-subscription courses in the filter
       const monthlyCourses = courses.filter((c: Course) => c.paymentType === 'MONTHLY_SUBSCRIPTION');
       this.courses.set(monthlyCourses);
@@ -835,10 +859,10 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       this.overridePrice = null;
       return;
     }
-    const course = this.courses().find(c => c.id === courseId);
+    const course = this.overrideSubjects().find(c => c.id === courseId);
     this.overrideCoursePrice.set(course ? course.price : null);
     this.overrideLoading.set(true);
-    this.svc.getPriceOverride(courseId, this.overrideYear, this.overrideMonth)
+    this.svc.getPriceOverride(courseId, this.overrideYear, this.overrideMonth, !!course?.isMaster)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (ov) => {
@@ -865,9 +889,10 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     const courseId = this.overrideCourseId;
     if (!courseId || !this.overrideYear || !this.overrideMonth || !this.overridePrice || this.overridePrice <= 0) return;
 
+    const subject = this.overrideSubjects().find(c => c.id === courseId);
     this.overrideSaving.set(true);
     this.svc.setPriceOverride({
-      courseId,
+      ...(subject?.isMaster ? { masterCourseId: courseId } : { courseId }),
       billingYear: this.overrideYear,
       billingMonth: this.overrideMonth,
       overridePrice: this.overridePrice,

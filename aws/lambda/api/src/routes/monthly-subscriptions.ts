@@ -69,6 +69,8 @@ function mapOverrideFromDB(row: any) {
   return {
     id: row.id,
     courseId: row.course_id,
+    /** Set instead of courseId when the overridden thing is a per-month bundle. */
+    masterCourseId: row.master_course_id ?? null,
     companyId: row.company_id,
     billingYear: parseInt(row.billing_year, 10),
     billingMonth: parseInt(row.billing_month, 10),
@@ -138,6 +140,71 @@ async function recalcBillsForCourseMonth(
     const amountPaid = parseFloat(bill.amount_paid || 0);
 
     // Determine new status based on recalculated amount
+    let newStatus: string;
+    let paidDate: string | null = null;
+    if (amountPaid >= newAmountDue && newAmountDue > 0) {
+      newStatus = 'PAID';
+      paidDate = new Date().toISOString().split('T')[0];
+    } else if (amountPaid > 0) {
+      newStatus = 'PARTIAL';
+    } else {
+      newStatus = 'PENDING';
+    }
+
+    await query(
+      `UPDATE monthly_subscription_payments
+       SET amount_due = $1, payment_status = $2, paid_date = COALESCE($3, paid_date), updated_at = NOW()
+       WHERE id = $4`,
+      [newAmountDue, newStatus, paidDate, bill.id]
+    );
+    updated++;
+  }
+  return updated;
+}
+
+/**
+ * The same recalculation for a master course sold per month.
+ *
+ * The subject is the bundle, so the ratio is the student's agreed monthly fee
+ * against the master's list price rather than an enrolment's against a course's.
+ * Bills already settled in full are left alone, exactly as the course version
+ * leaves them: money that has changed hands is not repriced by a later decision
+ * about the month.
+ */
+async function recalcBillsForMasterMonth(
+  companyId: string,
+  masterCourseId: string,
+  billingYear: number,
+  billingMonth: number,
+  effectivePrice: number,
+): Promise<number> {
+  const master = await queryOne<any>(
+    'SELECT default_price FROM master_courses WHERE id = $1 AND company_id = $2',
+    [masterCourseId, companyId]
+  );
+  if (!master) return 0;
+  const basePrice = parseFloat(master.default_price);
+  if (basePrice <= 0) return 0;
+
+  const bills = await query(
+    `SELECT msp.id, msp.amount_paid,
+            COALESCE(NULLIF(me.final_price, 0), $5) AS enrollment_fee
+     FROM monthly_subscription_payments msp
+     JOIN master_enrollments me ON msp.master_enrollment_id = me.id
+     WHERE msp.company_id = $1
+       AND me.master_course_id = $2
+       AND msp.billing_year = $3
+       AND msp.billing_month = $4
+       AND msp.payment_status <> 'PAID'`,
+    [companyId, masterCourseId, billingYear, billingMonth, basePrice]
+  );
+
+  let updated = 0;
+  for (const bill of bills) {
+    const ratio = parseFloat(bill.enrollment_fee) / basePrice;
+    const newAmountDue = Math.round(effectivePrice * ratio * 100) / 100;
+    const amountPaid = parseFloat(bill.amount_paid || 0);
+
     let newStatus: string;
     let paidDate: string | null = null;
     if (amountPaid >= newAmountDue && newAmountDue > 0) {
@@ -279,11 +346,23 @@ async function ensureMasterBillsForMonth(
      SELECT
        me.id, me.company_id, me.student_id, me.branch_id,
        $2::int, $3::int,
-       COALESCE(NULLIF(me.final_price, 0), mc.default_price),
+       -- A month's override replaces the fee, scaled by whatever this student
+       -- agreed to pay against the master's list price — the same proportional
+       -- rule course bills use, so a student on a discounted fee keeps their
+       -- discount through an overridden month.
+       CASE
+         WHEN ov.override_price IS NOT NULL AND mc.default_price > 0
+           THEN ROUND(ov.override_price * (COALESCE(NULLIF(me.final_price, 0), mc.default_price) / mc.default_price), 2)
+         ELSE COALESCE(NULLIF(me.final_price, 0), mc.default_price)
+       END,
        0, 'PENDING', period.first_day
      FROM master_enrollments me
      JOIN master_courses mc ON mc.id = me.master_course_id
      CROSS JOIN period
+     LEFT JOIN course_monthly_price_overrides ov
+       ON ov.master_course_id = me.master_course_id
+      AND ov.billing_year = $2::int
+      AND ov.billing_month = $3::int
      WHERE me.company_id = $1
        AND me.status = 'ACTIVE'
        AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
@@ -1511,32 +1590,68 @@ export const monthlySubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
-      const { courseId, billingYear, billingMonth, overridePrice } = body;
+      const { courseId, masterCourseId, billingYear, billingMonth, overridePrice } = body;
 
-      // Verify course exists and belongs to this company
-      const course = await queryOne<any>(
-        'SELECT id, price FROM courses WHERE id = $1 AND company_id = $2',
-        [courseId, context.companyId]
-      );
-      if (!course) {
-        return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      // One subject or the other, never both — the same pairing the bills use.
+      if (!courseId === !masterCourseId) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_SUBJECT',
+          'Give either a course or a master course, not both');
       }
 
-      // Upsert the override
-      const row = await queryOne<any>(
-        `INSERT INTO course_monthly_price_overrides
-           (course_id, company_id, billing_year, billing_month, override_price)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (course_id, billing_year, billing_month)
-         DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()
-         RETURNING *`,
-        [courseId, context.companyId, billingYear, billingMonth, overridePrice]
-      );
+      let row: any;
+      let updatedBills: number;
 
-      // Recalculate all non-PAID bills for this course+month
-      const updatedBills = await recalcBillsForCourseMonth(
-        context.companyId, courseId, billingYear, billingMonth, overridePrice
-      );
+      if (masterCourseId) {
+        // Only a master sold per month has a monthly fee to override; a one-off
+        // bundle has a price paid once and no month to attach this to.
+        const master = await queryOne<any>(
+          `SELECT id, default_price FROM master_courses
+            WHERE id = $1 AND company_id = $2 AND payment_type = 'MONTHLY_SUBSCRIPTION'`,
+          [masterCourseId, context.companyId]
+        );
+        if (!master) {
+          return apiError(404, 'ERRORS.MASTER_COURSES.NOT_FOUND', 'Per-month master course not found');
+        }
+
+        row = await queryOne<any>(
+          `INSERT INTO course_monthly_price_overrides
+             (master_course_id, company_id, billing_year, billing_month, override_price)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (master_course_id, billing_year, billing_month)
+             WHERE master_course_id IS NOT NULL
+           DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()
+           RETURNING *`,
+          [masterCourseId, context.companyId, billingYear, billingMonth, overridePrice]
+        );
+        updatedBills = await recalcBillsForMasterMonth(
+          context.companyId, masterCourseId, billingYear, billingMonth, overridePrice
+        );
+      } else {
+        // Verify course exists and belongs to this company
+        const course = await queryOne<any>(
+          'SELECT id, price FROM courses WHERE id = $1 AND company_id = $2',
+          [courseId, context.companyId]
+        );
+        if (!course) {
+          return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+        }
+
+        // Upsert the override
+        row = await queryOne<any>(
+          `INSERT INTO course_monthly_price_overrides
+             (course_id, company_id, billing_year, billing_month, override_price)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (course_id, billing_year, billing_month)
+           DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()
+           RETURNING *`,
+          [courseId, context.companyId, billingYear, billingMonth, overridePrice]
+        );
+
+        // Recalculate all non-PAID bills for this course+month
+        updatedBills = await recalcBillsForCourseMonth(
+          context.companyId, courseId, billingYear, billingMonth, overridePrice
+        );
+      }
 
       return {
         status: 200 as const,
@@ -1559,11 +1674,13 @@ export const monthlySubscriptionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      const subjectColumn = q.masterCourseId ? 'master_course_id' : 'course_id';
       const row = await queryOne<any>(
         `SELECT * FROM course_monthly_price_overrides
-         WHERE course_id = $1 AND company_id = $2
+         WHERE ${subjectColumn} = $1 AND company_id = $2
            AND billing_year = $3 AND billing_month = $4`,
-        [q.courseId, context.companyId, parseInt(q.billingYear, 10), parseInt(q.billingMonth, 10)]
+        [q.masterCourseId || q.courseId, context.companyId,
+         parseInt(q.billingYear, 10), parseInt(q.billingMonth, 10)]
       );
 
       return {
@@ -1597,18 +1714,30 @@ export const monthlySubscriptionsRoutes = {
       // Delete the override
       await query('DELETE FROM course_monthly_price_overrides WHERE id = $1', [params.id]);
 
-      // Get the course base price to revert bills
-      const course = await queryOne<any>('SELECT price FROM courses WHERE id = $1', [row.course_id]);
-      const basePrice = course ? parseFloat(course.price) : 0;
-
-      // Revert non-PAID bills back to normal pricing
+      // Revert non-PAID bills to the standing price of whichever subject this
+      // override belonged to.
+      const year = parseInt(row.billing_year, 10);
+      const month = parseInt(row.billing_month, 10);
       let updatedBills = 0;
-      if (basePrice > 0) {
-        updatedBills = await recalcBillsForCourseMonth(
-          context.companyId, row.course_id,
-          parseInt(row.billing_year, 10), parseInt(row.billing_month, 10),
-          basePrice
+
+      if (row.master_course_id) {
+        const master = await queryOne<any>(
+          'SELECT default_price FROM master_courses WHERE id = $1', [row.master_course_id]
         );
+        const basePrice = master ? parseFloat(master.default_price) : 0;
+        if (basePrice > 0) {
+          updatedBills = await recalcBillsForMasterMonth(
+            context.companyId, row.master_course_id, year, month, basePrice
+          );
+        }
+      } else {
+        const course = await queryOne<any>('SELECT price FROM courses WHERE id = $1', [row.course_id]);
+        const basePrice = course ? parseFloat(course.price) : 0;
+        if (basePrice > 0) {
+          updatedBills = await recalcBillsForCourseMonth(
+            context.companyId, row.course_id, year, month, basePrice
+          );
+        }
       }
 
       return {

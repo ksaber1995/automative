@@ -156,10 +156,15 @@ export class MonthlySubscriptionsService {
     );
   }
 
-  /** Get the current price override for a course+month (returns null if none). */
-  getPriceOverride(courseId: string, billingYear: number, billingMonth: number): Observable<CourseMonthlyPriceOverride | null> {
+  /**
+   * Get the current price override for a subject+month (returns null if none).
+   * The subject is a monthly course, or a master course sold per month.
+   */
+  getPriceOverride(
+    subjectId: string, billingYear: number, billingMonth: number, isMaster = false,
+  ): Observable<CourseMonthlyPriceOverride | null> {
     const params = new HttpParams()
-      .set('courseId', courseId)
+      .set(isMaster ? 'masterCourseId' : 'courseId', subjectId)
       .set('billingYear', billingYear.toString())
       .set('billingMonth', billingMonth.toString());
     return this.http.get<CourseMonthlyPriceOverride | null>(`${this.base}/price-override`, { params });
