@@ -12,7 +12,7 @@
 
     <!-- Filters -->
     <div class="mb-4 flex flex-wrap gap-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div>
         <label for="branchFilter" class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.LIST.BRANCH_FILTER' | translate }}</label>
         <select

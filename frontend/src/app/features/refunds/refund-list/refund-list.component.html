@@ -20,7 +20,7 @@
       <p-button [label]="'REFUNDS.LIST.RANGE_LAST_12M' | translate" size="small" [outlined]="rangePreset() !== 'LAST_12M'" (onClick)="setRange('LAST_12M')"></p-button>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'REFUNDS.LIST.FILTER_BRANCH' | translate }}</label>
           <p-select

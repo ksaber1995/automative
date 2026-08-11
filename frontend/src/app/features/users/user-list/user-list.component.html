@@ -46,7 +46,7 @@
           (onChange)="applyFilters()">
         </p-select>
       </div>
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div class="min-w-44">
         <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'USERS.LIST.BRANCH_FILTER' | translate }}</label>
         <p-select [options]="branchOptions()" [(ngModel)]="selectedBranchId"

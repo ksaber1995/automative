@@ -32,7 +32,7 @@
           }
         </select>
       </div>
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div class="flex-1 min-w-[200px]">
         <label class="block text-sm font-medium mb-1">{{ 'PRODUCTS.LIST.FILTER_BRANCH' | translate }}</label>
         <p-select

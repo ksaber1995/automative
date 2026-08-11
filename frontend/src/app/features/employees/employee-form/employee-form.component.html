@@ -120,7 +120,7 @@
         </div>
 
         <!-- Is Global Checkbox (pointless when the company has a single branch) -->
-        @if (!branchState.isSingleBranch()) {
+        @if (branchState.showBranchPicker()) {
           <div class="field col-span-2">
             <p-checkbox formControlName="isGlobal" [binary]="true" inputId="isGlobal"></p-checkbox>
             <label for="isGlobal" class="ml-2">{{ 'EMPLOYEES.FORM.GLOBAL_EMPLOYEE' | translate }}</label>
@@ -128,7 +128,7 @@
         }
 
         <!-- Branch Selection -->
-        @if (!isGlobal?.value && !branchState.isSingleBranch()) {
+        @if (!isGlobal?.value && branchState.showBranchPicker()) {
           <div class="field col-span-2">
             <label class="block text-sm font-medium mb-2">{{ 'EMPLOYEES.FORM.BRANCH' | translate }} <span class="text-red-500">*</span></label>
             <p-select formControlName="branchId" [options]="branches()" optionLabel="label" optionValue="id" [placeholder]="'EMPLOYEES.FORM.BRANCH_PLACEHOLDER' | translate" class="w-full"></p-select>

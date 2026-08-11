@@ -12,7 +12,7 @@
 
     <!-- Filters -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div>
         <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
           {{ 'TEACHER_ATTENDANCE.FILTER_BRANCH' | translate }}

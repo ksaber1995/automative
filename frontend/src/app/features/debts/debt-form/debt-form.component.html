@@ -149,7 +149,7 @@
           </p-select>
         </div>
 
-        @if (!branchState.isSingleBranch()) {
+        @if (branchState.showBranchPicker()) {
           <div class="field">
             <label for="branchId" class="block text-sm font-medium mb-2">
               Branch (Optional)

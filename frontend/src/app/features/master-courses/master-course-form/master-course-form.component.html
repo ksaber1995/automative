@@ -10,7 +10,7 @@
     <p-card>
       <form [formGroup]="form" (ngSubmit)="onSubmit()">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          @if (!branchState.isSingleBranch()) {
+          @if (branchState.showBranchPicker()) {
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ 'MASTER_COURSES.FORM.BRANCH' | translate }} <span class="text-red-500">*</span>

@@ -61,7 +61,7 @@
           [style]="{ width: '100%' }"
         ></p-datepicker>
       </div>
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.FILTER_BRANCH' | translate }}</label>
         <p-select
@@ -257,7 +257,7 @@
           [style]="{ width: '100%' }"
         ></p-datepicker>
       </div>
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">{{ 'EXPENSES.SALARIES.HISTORY_BRANCH' | translate }}</label>
         <p-select

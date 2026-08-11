@@ -156,8 +156,10 @@
             }
           </div>
 
-          <!-- Branch -->
-          @if (!branchState.isSingleBranch()) {
+          <!-- Branch. Nothing until the branch list is actually back: an empty
+               list before then is "still loading", and rendering a required
+               picker off it asks for a choice out of no options. -->
+          @if (branchState.showBranchPicker()) {
           <div class="field">
             <label for="branchId" class="block text-sm font-medium mb-2">
               {{ 'STUDENTS.FORM.BRANCH' | translate }} <span class="text-red-500">*</span>

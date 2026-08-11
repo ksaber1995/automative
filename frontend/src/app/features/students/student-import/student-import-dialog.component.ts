@@ -95,6 +95,8 @@ export class StudentImportDialogComponent {
   previewRows = computed(() => this.rows().slice(0, 50));
 
   onDialogShow() {
+    // canImport needs a branch, so an unloaded list blocks the import outright.
+    this.branchState.ensureLoaded();
     this.reset();
   }
 

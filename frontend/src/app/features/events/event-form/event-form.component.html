@@ -43,7 +43,7 @@
             ></p-select>
           </div>
 
-          @if (!branchState.isSingleBranch()) {
+          @if (branchState.showBranchPicker()) {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 {{ 'EVENTS.FORM.BRANCH' | translate }}

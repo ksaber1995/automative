@@ -42,7 +42,7 @@
       </div>
 
       <div class="flex flex-wrap gap-3 items-end">
-        @if (!branchState.isSingleBranch()) {
+        @if (branchState.showBranchPicker()) {
           <div>
             <label class="block text-sm font-medium mb-2">{{ 'REVENUES.LIST.BRANCH' | translate }}</label>
             <select [(ngModel)]="selectedBranchId" (change)="onFilterChange()" class="px-3 py-2 border border-gray-300 rounded-md" style="min-width: 160px;">

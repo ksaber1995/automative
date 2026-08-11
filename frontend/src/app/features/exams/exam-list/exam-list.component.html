@@ -15,7 +15,7 @@
 
   <p-card>
     <div class="flex flex-wrap gap-3 mb-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
         <p-select
           [options]="branches()"
           [ngModel]="selectedBranchId()"
@@ -98,7 +98,7 @@
           <th pSortableColumn="isHomework">{{ 'EXAMS.LIST.COL_KIND' | translate }} <p-sortIcon field="isHomework"></p-sortIcon></th>
           <th pSortableColumn="courseName">{{ 'EXAMS.LIST.COL_COURSE' | translate }} <p-sortIcon field="courseName"></p-sortIcon></th>
           <th pSortableColumn="className">{{ 'EXAMS.LIST.COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
-          @if (!branchState.isSingleBranch()) {
+          @if (branchState.showBranchPicker()) {
             <th pSortableColumn="branchId">{{ 'EXAMS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
           <th pSortableColumn="examDate">{{ 'EXAMS.LIST.COL_DATE' | translate }} <p-sortIcon field="examDate"></p-sortIcon></th>
@@ -119,7 +119,7 @@
           <td>{{ item.courseName || '—' }}</td>
           <!-- No class = course-wide, every class of the course sits it. -->
           <td>{{ item.className || ('EXAMS.LIST.ALL_CLASSES' | translate) }}</td>
-          @if (!branchState.isSingleBranch()) {
+          @if (branchState.showBranchPicker()) {
             <td>{{ getBranchName(item.branchId) }}</td>
           }
           <td>{{ item.examDate | date: 'mediumDate' }}</td>

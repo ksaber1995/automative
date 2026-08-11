@@ -102,6 +102,9 @@ export class StudentFormComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    // Retries if the app-start load never landed — otherwise this form inherits
+    // an empty branch list for the life of the tab.
+    this.branchState.ensureLoaded();
     this.loadBranches();
     this.studentId = this.route.snapshot.paramMap.get('id');
     if (this.studentId) {

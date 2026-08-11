@@ -15,7 +15,7 @@
 
   <p-card>
     <div class="flex flex-wrap gap-3 mb-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
         <p-select
           [options]="branchOptions()"
           [ngModel]="selectedBranchId()"

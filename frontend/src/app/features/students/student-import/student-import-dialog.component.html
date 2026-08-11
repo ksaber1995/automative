@@ -45,7 +45,7 @@
   </div>
 
   <!-- Branch picker (multi-branch companies only) -->
-  @if (!branchState.isSingleBranch() && rows().length > 0 && !result()) {
+  @if (branchState.showBranchPicker() && rows().length > 0 && !result()) {
     <div class="mb-4">
       <label class="block text-sm font-medium mb-2">
         {{ 'STUDENTS.IMPORT.TARGET_BRANCH' | translate }} <span class="text-red-500">*</span>

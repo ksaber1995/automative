@@ -16,7 +16,7 @@
   <!-- Filters -->
   <p-card>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
           <p-select

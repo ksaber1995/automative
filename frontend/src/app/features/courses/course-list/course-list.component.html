@@ -7,7 +7,7 @@
   <p-card>
     <!-- Branch filter (status filter replaced by tabs below) -->
     <div class="flex flex-wrap gap-3 mb-4">
-      @if (!branchState.isSingleBranch()) {
+      @if (branchState.showBranchPicker()) {
       <p-select
         [options]="branchOptions()"
         [ngModel]="selectedBranchId()"
@@ -103,7 +103,7 @@
           <th pSortableColumn="name">{{ 'COURSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <!-- One branch means every course is in it; the column says the same
                thing on every row. Matches the branch filter above. -->
-          @if (!authService.isTeacher() && !branchState.isSingleBranch()) {
+          @if (!authService.isTeacher() && branchState.showBranchPicker()) {
             <th pSortableColumn="branchId">{{ 'COURSES.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
           @if (!authService.isTeacher()) {
@@ -134,7 +134,7 @@
               </span>
             }
           </td>
-          @if (!authService.isTeacher() && !branchState.isSingleBranch()) {
+          @if (!authService.isTeacher() && branchState.showBranchPicker()) {
             <td>{{ getBranchName(course) }}</td>
           }
           @if (!authService.isTeacher()) {
@@ -237,7 +237,7 @@
           <!-- A teacher sees name / price / enrollments / actions; an academy adds
                Level and Teacher on top of those, plus Branch when it has more
                than one. -->
-          <td [attr.colspan]="authService.isTeacher() ? 4 : (branchState.isSingleBranch() ? 6 : 7)" class="text-center py-8">
+          <td [attr.colspan]="authService.isTeacher() ? 4 : (branchState.showBranchPicker() ? 7 : 6)" class="text-center py-8">
             <div class="text-gray-500">
               <i class="pi pi-inbox text-4xl mb-3"></i>
               <p>{{ 'COURSES.LIST.NO_COURSES' | translate }}</p>

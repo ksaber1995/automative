@@ -48,7 +48,7 @@
         </div>
 
         <!-- Branch (only for FIXED and VARIABLE) -->
-        @if (expenseForm.get('type')?.value !== 'SHARED' && !branchState.isSingleBranch()) {
+        @if (expenseForm.get('type')?.value !== 'SHARED' && branchState.showBranchPicker()) {
           <div>
             <label class="block text-sm font-medium mb-2">
               {{ 'EXPENSES.FORM.BRANCH_LABEL' | translate }} <span class="text-red-500">*</span>
