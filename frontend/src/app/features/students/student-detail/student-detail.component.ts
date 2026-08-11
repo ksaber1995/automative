@@ -211,6 +211,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
 
   // Monthly-subscription bills, grouped by enrollmentId (newest month first).
   monthlyByEnrollment = signal<Map<string, MonthlyPaymentWithDetails[]>>(new Map());
+  monthlyByMasterEnrollment = signal<Map<string, MonthlyPaymentWithDetails[]>>(new Map());
 
   // Per-session charges + prepaid packages, grouped by enrollmentId.
   sessionPaymentsByEnrollment = signal<Map<string, SessionPaymentWithDetails[]>>(new Map());
@@ -676,13 +677,20 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
         const now = new Date();
         const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
         const map = new Map<string, MonthlyPaymentWithDetails[]>();
+        // A bill belongs to a course enrolment or to a master enrolment — never
+        // both — so one map keyed by whichever it has serves both tables.
+        const masterMap = new Map<string, MonthlyPaymentWithDetails[]>();
         for (const r of rows) {
           if (!this.isBillVisible(r, currentKey)) continue;
-          const list = map.get(r.enrollmentId) || [];
+          const masterId = (r as any).masterEnrollmentId;
+          const target = masterId ? masterMap : map;
+          const key = masterId || r.enrollmentId;
+          const list = target.get(key) || [];
           list.push(r);
-          map.set(r.enrollmentId, list);
+          target.set(key, list);
         }
         this.monthlyByEnrollment.set(map);
+        this.monthlyByMasterEnrollment.set(masterMap);
       },
       error: () => {
         // Interceptor toasted the translated error.
@@ -697,6 +705,18 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
 
   getMonthlyPayments(enrollmentId: string): MonthlyPaymentWithDetails[] {
     return this.monthlyByEnrollment().get(enrollmentId) || [];
+  }
+
+  /**
+   * A bundle sold per month. Its enrolment carries no price to collect — the
+   * monthly bills do — so the page shows those instead of payment actions.
+   */
+  isMonthlyMaster(me: { masterPaymentType?: string }): boolean {
+    return me?.masterPaymentType === 'MONTHLY_SUBSCRIPTION';
+  }
+
+  getMasterMonthlyPayments(masterEnrollmentId: string): MonthlyPaymentWithDetails[] {
+    return this.monthlyByMasterEnrollment().get(masterEnrollmentId) || [];
   }
 
   /** "March 2026" style label for a billing period. */

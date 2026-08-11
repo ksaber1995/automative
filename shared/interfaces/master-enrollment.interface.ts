@@ -9,6 +9,12 @@ export interface MasterEnrollment {
   studentName?: string;
   masterCourseId: string;
   masterCourseName?: string;
+  /**
+   * How the bundle is sold. A MONTHLY_SUBSCRIPTION one is billed month by month
+   * like a monthly course — it has no up-front price to collect, so the
+   * enrolment's payment fields do not describe what is owed.
+   */
+  masterPaymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION';
   masterCoursePrice?: number;
   branchId: string;
   branchName?: string;

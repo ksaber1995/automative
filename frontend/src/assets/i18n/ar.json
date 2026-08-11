@@ -4149,6 +4149,7 @@
       "SESSION_COL_DUE": "المبلغ المستحق",
       "SESSION_COL_PAID": "المبلغ المدفوع",
       "SESSION_COL_STATUS": "الحالة",
+      "MASTER_PER_MONTH": "شهرياً",
       "MONTHLY_BILLS": "فواتير الاشتراك الشهري",
       "NO_MONTHLY_BILLS": "لم يتم إنشاء فواتير شهرية بعد.",
       "MONTHLY_PERIOD": "الفترة",

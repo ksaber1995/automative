@@ -392,7 +392,12 @@
               </td>
               <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
               <td class="text-right">
-                <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
+                @if (isMonthlyMaster(me)) {
+                  <div class="font-semibold">{{ me.finalPrice | amount }}</div>
+                  <div class="text-xs text-amber-600 mt-0.5">{{ 'STUDENTS.DETAIL.MASTER_PER_MONTH' | translate }}</div>
+                } @else {
+                  <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
+                }
                 @if ((me.totalRefunded || 0) > 0) {
                   <div class="text-xs text-orange-600 mt-0.5">
                     {{ 'STUDENTS.DETAIL.REFUNDED' | translate }}: {{ me.totalRefunded | amount }}
@@ -422,7 +427,9 @@
               </td>
               <td>
                 <div class="flex gap-1 flex-wrap">
-                  @if (me.status !== 'CANCELLED' && (me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
+                  <!-- A per-month bundle has nothing to collect here: its money
+                       arrives as monthly bills, paid from the expanded row. -->
+                  @if (!isMonthlyMaster(me) && me.status !== 'CANCELLED' && (me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                     <p-button
                       icon="pi pi-wallet"
                       [rounded]="true"
@@ -432,7 +439,7 @@
                       [pTooltip]="'STUDENTS.DETAIL.RECORD_PAYMENT_TOOLTIP' | translate"
                     ></p-button>
                   }
-                  @if (me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
+                  @if (!isMonthlyMaster(me) && me.status === 'ACTIVE' && (me.amountPaid - (me.totalRefunded || 0)) > 0) {
                     @if (canRefund()) {
                       <p-button
                         icon="pi pi-undo"
@@ -464,8 +471,62 @@
               <td colspan="7" class="p-0">
                 <div class="px-6 py-4 bg-purple-50/50 border-t border-purple-100">
 
+                  <!-- Monthly bundle: the same bills a monthly course shows, and
+                       the same way of paying one. -->
+                  @if (isMonthlyMaster(me)) {
+                    <div class="mb-5 p-4 rounded-lg bg-amber-50/60 border border-amber-100">
+                      <h4 class="font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                        <i class="pi pi-calendar text-amber-600"></i> {{ 'STUDENTS.DETAIL.MONTHLY_BILLS' | translate }}
+                      </h4>
+                      @if (getMasterMonthlyPayments(me.id).length === 0) {
+                        <p class="text-gray-400 text-sm">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</p>
+                      } @else {
+                        <p-table [value]="getMasterMonthlyPayments(me.id)" responsiveLayout="scroll" dataKey="id" styleClass="p-datatable-sm">
+                          <ng-template pTemplate="header">
+                            <tr>
+                              <th>{{ 'STUDENTS.DETAIL.MONTHLY_PERIOD' | translate }}</th>
+                              <th class="text-right">{{ 'STUDENTS.DETAIL.MONTHLY_AMOUNT_DUE' | translate }}</th>
+                              <th class="text-right">{{ 'STUDENTS.DETAIL.MONTHLY_AMOUNT_PAID' | translate }}</th>
+                              <th>{{ 'STUDENTS.DETAIL.MONTHLY_STATUS' | translate }}</th>
+                              <th>{{ 'STUDENTS.DETAIL.MONTHLY_PAID_ON' | translate }}</th>
+                              <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
+                            </tr>
+                          </ng-template>
+                          <ng-template pTemplate="body" let-m>
+                            <tr>
+                              <td class="font-medium">{{ monthlyPeriodLabel(m) }}</td>
+                              <td class="text-right">{{ m.amountDue | amount }}</td>
+                              <td class="text-right">
+                                <span class="font-semibold text-green-600">{{ (m.amountPaid || 0) | amount }}</span>
+                                @if ((m.amountPaid || 0) < m.amountDue) {
+                                  <div class="text-xs text-red-600">-{{ (m.amountDue - (m.amountPaid || 0)) | amount }} {{ 'STUDENTS.DETAIL.REMAINING_LOWER' | translate }}</div>
+                                }
+                              </td>
+                              <td><p-tag [value]="monthlyStatusLabel(m.paymentStatus)" [severity]="getMonthlyStatusSeverity(m.paymentStatus)"></p-tag></td>
+                              <td class="text-sm text-gray-500">
+                                @if (m.paidDate) { {{ formatDate(m.paidDate) }} } @else { <span class="text-gray-300">&mdash;</span> }
+                              </td>
+                              <td>
+                                @if (m.paymentStatus !== 'PAID') {
+                                  <p-button
+                                    icon="pi pi-wallet"
+                                    [rounded]="true"
+                                    [text]="true"
+                                    severity="success"
+                                    (onClick)="openMonthlyPayDialog(m)"
+                                    [pTooltip]="'STUDENTS.DETAIL.ADD_PAYMENT' | translate"
+                                  ></p-button>
+                                }
+                              </td>
+                            </tr>
+                          </ng-template>
+                        </p-table>
+                      }
+                    </div>
+                  }
+
                   <!-- Installment payment history -->
-                  @if (me.paymentMode === 'INSTALLMENTS') {
+                  @if (!isMonthlyMaster(me) && me.paymentMode === 'INSTALLMENTS') {
                     <div class="mb-5">
                       <div class="flex items-center gap-2 mb-2">
                         <i class="pi pi-credit-card text-green-600"></i>
@@ -618,7 +679,12 @@
                       </td>
                       <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
                       <td class="text-right">
-                        <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
+                        @if (isMonthlyMaster(me)) {
+                  <div class="font-semibold">{{ me.finalPrice | amount }}</div>
+                  <div class="text-xs text-amber-600 mt-0.5">{{ 'STUDENTS.DETAIL.MASTER_PER_MONTH' | translate }}</div>
+                } @else {
+                  <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
+                }
                         @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                           <div class="text-xs text-red-600 font-medium">
                             -{{ (me.finalPrice - me.amountPaid) | amount }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}

@@ -4025,6 +4025,7 @@
       "SESSION_COL_DUE": "Amount Due",
       "SESSION_COL_PAID": "Amount Paid",
       "SESSION_COL_STATUS": "Status",
+      "MASTER_PER_MONTH": "per month",
       "MONTHLY_BILLS": "Monthly Subscription Bills",
       "NO_MONTHLY_BILLS": "No monthly bills generated yet.",
       "MONTHLY_PERIOD": "Period",

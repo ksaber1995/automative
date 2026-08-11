@@ -36,6 +36,8 @@ function mapRow(row: any) {
     studentName: row.student_name ?? null,
     masterCourseId: row.master_course_id,
     masterCourseName: row.master_course_name ?? null,
+    /** ONE_TIME is paid up front; MONTHLY_SUBSCRIPTION is billed every month. */
+    masterPaymentType: row.master_payment_type ?? 'ONE_TIME',
     masterCoursePrice: row.master_course_price !== undefined && row.master_course_price !== null
       ? parseFloat(row.master_course_price) : null,
     branchId: row.branch_id,
@@ -80,6 +82,9 @@ const SELECT_WITH_PROGRESS = `
     s.name AS student_name,
     mc.name AS master_course_name,
     mc.default_price AS master_course_price,
+    -- How the bundle is sold, so the client knows whether this enrolment is
+    -- paid once or billed every month (migration 087).
+    mc.payment_type AS master_payment_type,
     b.name AS branch_name,
     (SELECT COUNT(*) FROM master_course_courses mcc WHERE mcc.master_course_id = me.master_course_id) AS total_courses,
     (SELECT COUNT(*) FROM master_class_enrollments mce
@@ -567,6 +572,7 @@ export const masterEnrollmentsRoutes = {
           masterEnrollmentId: row.master_enrollment_id,
           masterCourseId: row.master_course_id,
           masterCourseName: row.master_course_name,
+    masterPaymentType: row.master_payment_type ?? 'ONE_TIME',
         },
       };
     } catch (error: any) {
