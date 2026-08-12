@@ -49,40 +49,93 @@
       </div>
     </div>
 
-    <!-- Per course: where the money actually comes from -->
+    <!-- Per course: how each one is actually paid — a percentage, a session fee,
+         or bundle money the office attributed. One teacher can hold all three. -->
     <p-card styleClass="mb-6">
-      <h2 class="text-lg font-semibold mb-3">{{ 'EXPENSES.SALARIES.PCT_BY_COURSE' | translate }}</h2>
-      @if (courseRollup().length) {
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <h2 class="text-lg font-semibold">{{ 'EXPENSES.SALARIES.PCT_BY_COURSE' | translate }}</h2>
+        @if (mixedPay()) {
+          <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+            {{ 'EXPENSES.SALARIES.PCT_MIXED_PAY' | translate }}
+          </span>
+        }
+      </div>
+      @if (courseRows().length) {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
               <tr class="text-left text-gray-600">
                 <th class="p-2 font-medium">{{ 'EXPENSES.SALARIES.PCT_COL_COURSE' | translate }}</th>
+                <th class="p-2 font-medium">{{ 'EXPENSES.SALARIES.PCT_COL_METHOD' | translate }}</th>
                 <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_STUDENTS' | translate }}</th>
-                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_PAYMENTS' | translate }}</th>
-                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_REVENUE' | translate }}</th>
-                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_SHARE' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_BASIS' | translate }}</th>
+                <th class="p-2 font-medium text-right">{{ 'EXPENSES.SALARIES.PCT_COL_EARNING' | translate }}</th>
               </tr>
             </thead>
             <tbody>
-              @for (c of courseRollup(); track c.course) {
+              @for (c of courseRows(); track $index) {
                 <tr class="border-t">
-                  <td class="p-2 font-medium">{{ c.course }}</td>
-                  <td class="p-2 text-right">{{ c.students }}</td>
-                  <td class="p-2 text-right text-gray-600">{{ c.payments }}</td>
-                  <td class="p-2 text-right">{{ c.revenue | amount }}</td>
-                  <td class="p-2 text-right font-medium text-green-700">{{ c.share | amount }}</td>
+                  <td class="p-2 font-medium">
+                    {{ c.courseName || '—' }}
+                    @if (c.fromBundle) {
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 ms-1">
+                        {{ 'EXPENSES.SALARIES.PCT_BUNDLE_TAG' | translate }}
+                      </span>
+                    }
+                  </td>
+                  <td class="p-2">
+                    @if (c.method === 'SESSION') {
+                      <span class="inline-flex items-center gap-1">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                          {{ 'EXPENSES.SALARIES.PCT_METHOD_SESSION' | translate }}
+                        </span>
+                        <span class="text-gray-500">{{ c.rate | amount }}/{{ 'EXPENSES.SALARIES.PCT_PER_SESSION' | translate }}</span>
+                      </span>
+                    } @else {
+                      <span class="inline-flex items-center gap-1">
+                        <span class="font-medium">{{ c.rate }}%</span>
+                        @if (c.isOverride) {
+                          <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                            {{ 'EXPENSES.SALARIES.PCT_METHOD_OVERRIDE' | translate }}
+                          </span>
+                        }
+                      </span>
+                    }
+                  </td>
+                  <td class="p-2 text-right text-gray-600">{{ c.students || '—' }}</td>
+                  <td class="p-2 text-right">
+                    @if (c.method === 'SESSION') {
+                      {{ 'EXPENSES.SALARIES.PCT_BASIS_SESSIONS' | translate: { count: c.sessions } }}
+                    } @else {
+                      {{ (c.studentPaid + c.bundleAllocated) | amount }}
+                      @if (c.fromBundle) {
+                        <div class="text-xs text-purple-600">
+                          {{ 'EXPENSES.SALARIES.PCT_INCLUDES_BUNDLE' | translate: { amount: (c.bundleAllocated | amount) } }}
+                        </div>
+                      }
+                    }
+                  </td>
+                  <td class="p-2 text-right font-medium"
+                      [class]="c.method === 'SESSION' ? 'text-amber-700' : 'text-green-700'">
+                    {{ c.earning | amount }}
+                    @if (c.method === 'SESSION') {
+                      <div class="text-[10px] text-gray-400">{{ 'EXPENSES.SALARIES.PCT_THIS_MONTH' | translate }}</div>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
             <tfoot class="bg-gray-50">
               <tr class="border-t font-semibold">
-                <td class="p-2">{{ 'EXPENSES.SALARIES.PCT_TOTAL' | translate }}</td>
-                <td class="p-2 text-right">{{ studentCount() }}</td>
-                <td class="p-2 text-right">{{ lines().length }}</td>
-                <td class="p-2 text-right">{{ d.totalPaid | amount }}</td>
+                <td class="p-2" colspan="4">{{ 'EXPENSES.SALARIES.PCT_ACCRUED' | translate }}</td>
                 <td class="p-2 text-right text-green-700">{{ d.accrued | amount }}</td>
               </tr>
+              @if (sessionCourses().length) {
+                <tr class="border-t">
+                  <td class="p-2 text-gray-500" colspan="4">{{ 'EXPENSES.SALARIES.PCT_SESSION_THIS_MONTH' | translate }}</td>
+                  <td class="p-2 text-right text-amber-700">{{ sessionEarnings() | amount }}</td>
+                </tr>
+              }
             </tfoot>
           </table>
         </div>

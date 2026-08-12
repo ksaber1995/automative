@@ -18,7 +18,7 @@ import { DialogModule } from 'primeng/dialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
-import { BundleIncomeReport, BundleIncomeRow, BundleMemberLine, BundlePolicySplit } from '../services/expense.service';
+import { BundleIncomeReport, BundleIncomeRow, BundleMemberLine, BundleOutstanding, BundlePolicySplit, SessionOutstanding } from '../services/expense.service';
 import { NumberFormatService } from '../../../shared/services/number-format.service';
 import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { SalaryBreakdownDialogComponent } from './salary-breakdown-dialog.component';
@@ -188,6 +188,8 @@ export class SalariesComponent implements OnInit {
         );
         // Re-read rather than patch: the server is what decides what was stored.
         this.loadBundleIncome();
+        // Settling a split changes the all-time backlog, so refresh the alarm too.
+        this.loadBundleOutstanding();
       },
       error: (err: any) => {
         this.approvingBundle.set(null);
@@ -211,6 +213,69 @@ export class SalariesComponent implements OnInit {
   attributableBundles = computed(() =>
     (this.bundleReport()?.bundles ?? []).filter((b) => !b.blockedReason),
   );
+
+  // ── The alarm ────────────────────────────────────────────────────────────
+  // A percentage teacher's dues don't reset at a month boundary, and bundle money
+  // reaches them only once its split is approved. So the alarm is deliberately
+  // ALL-TIME, not tied to the month picker: it totals every bundle month, right
+  // back to the start, that took money and was never split. Loaded on its own,
+  // apart from the month-scoped Bundles tab below.
+  bundleOutstanding = signal<BundleOutstanding | null>(null);
+  // Per-session pay owed for sessions taught in earlier, unsettled months — the
+  // same all-time principle, for teachers paid per session rather than per bundle.
+  sessionOutstanding = signal<SessionOutstanding | null>(null);
+
+  /** Raise the alarm whenever a teacher is owed a bundle share nobody has settled. */
+  bundleAlarm = computed(() => {
+    const o = this.bundleOutstanding();
+    return !!o && (o.outstandingCount > 0 || o.blockedCount > 0);
+  });
+  /** Raise the alarm whenever earlier months' sessions were never paid for. */
+  sessionAlarm = computed(() => {
+    const o = this.sessionOutstanding();
+    return !!o && o.totalOutstanding > 0;
+  });
+  /** Anything overdue at all — drives whether the banner shows. */
+  overdueAlarm = computed(() => this.bundleAlarm() || this.sessionAlarm());
+
+  loadBundleOutstanding(): void {
+    this.expenseService.getBundleIncomeOutstanding(this.selectedBranchId || undefined).subscribe({
+      next: (o) => this.bundleOutstanding.set(o),
+      error: () => this.bundleOutstanding.set(null),
+    });
+  }
+
+  loadSessionOutstanding(): void {
+    this.expenseService.getSessionPayOutstanding(this.selectedBranchId || undefined).subscribe({
+      next: (o) => this.sessionOutstanding.set(o),
+      error: () => this.sessionOutstanding.set(null),
+    });
+  }
+
+  /** Both all-time backlogs, loaded together and apart from the month picker. */
+  loadOverdue(): void {
+    this.loadBundleOutstanding();
+    this.loadSessionOutstanding();
+  }
+
+  /** Jump to a month's pending tab to settle the sessions taught then. */
+  goToSessionPeriod(year: number, month: number): void {
+    this.selectedMonth = new Date(year, month - 1, 1);
+    this.setViewMode('pending');
+    this.loadSalaries();
+  }
+
+  /** "August 2026" for an outstanding period chip. */
+  periodLabel(year: number, month: number): string {
+    return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  /** Jump to a specific outstanding month so its split can be approved. */
+  goToBundlePeriod(year: number, month: number): void {
+    this.selectedMonth = new Date(year, month - 1, 1);
+    this.setViewMode('bundles');
+    this.loadBundleIncome();
+  }
 
   loadBundleIncome(): void {
     this.bundleLoading.set(true);
@@ -317,6 +382,9 @@ export class SalariesComponent implements OnInit {
       next: (e) => this.employees.set(e)
     });
     this.loadSalaries();
+    // The alarm is all-time and independent of the month picker, so it loads once
+    // here and refreshes only when the branch scope changes or something is paid.
+    this.loadOverdue();
   }
 
   setViewMode(mode: 'pending' | 'history' | 'bundles') {
@@ -406,6 +474,14 @@ export class SalariesComponent implements OnInit {
   /** Payment lines, newest first, as the API returned them. */
   pctLines = computed(() => this.pctData()?.lines ?? []);
 
+  /** The per-course earnings, so the quick view can show more than one flat rate. */
+  pctByCourse = computed(() => this.pctData()?.byCourse ?? []);
+  /** True once this teacher is on more than one arrangement — the dialog says so. */
+  pctMixed = computed(() => {
+    const rows = this.pctByCourse();
+    return rows.some((c) => c.method === 'SESSION' || c.isOverride || c.fromBundle);
+  });
+
   /** Distinct students in the history — the headline for "who paid". */
   pctStudentCount = computed(
     () => new Set(this.pctLines().map((l) => l.studentName)).size
@@ -471,6 +547,15 @@ export class SalariesComponent implements OnInit {
 
   onMonthChange() {
     this.loadSalaries();
+    // Only the month-scoped Bundles tab follows the picker; the alarm does not.
+    if (this.viewMode() === 'bundles') this.loadBundleIncome();
+  }
+
+  /** The pending branch filter scopes the alarm and the bundles tab alike. */
+  onPendingBranchChange() {
+    this.loadSalaries();
+    this.loadOverdue();
+    if (this.viewMode() === 'bundles') this.loadBundleIncome();
   }
 
   toggleAll(checked: boolean) {
@@ -517,6 +602,9 @@ export class SalariesComponent implements OnInit {
           this.notificationService.success(this.translate.instant('EXPENSES.SALARIES.PAID_RESULT', { count: completed }));
         }
         this.loadSalaries();
+        // Paying a session-based teacher settles their sessions, so the overdue
+        // backlog shrinks — keep the alarm honest.
+        this.loadSessionOutstanding();
       }
     };
 

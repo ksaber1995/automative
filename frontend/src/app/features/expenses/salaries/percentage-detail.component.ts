@@ -7,17 +7,14 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
-import { ExpenseService, PercentageBreakdown } from '../services/expense.service';
+import { CourseBreakdownLine, ExpenseService, PercentageBreakdown } from '../services/expense.service';
 import { EmployeeService } from '../../employees/services/employee.service';
 import { esc, kpi, openPrintWindow, section, th } from '../../../core/utils/print-report.util';
 
-/** One course's contribution to a percentage teacher's earnings. */
-interface CourseRollup {
-  course: string;
+/** A course row on the report: how it's paid, plus the student/payment counts. */
+interface CourseRow extends CourseBreakdownLine {
   students: number;
   payments: number;
-  revenue: number;
-  share: number;
 }
 
 /**
@@ -54,30 +51,40 @@ export class PercentageDetailComponent implements OnInit {
   /** Heads, not rows — one student can owe for several months at once. */
   unpaidStudentCount = computed(() => new Set(this.unpaid().map((u) => u.studentName)).size);
 
-  /** Revenue and headcount per course, biggest earner first. */
-  courseRollup = computed<CourseRollup[]>(() => {
-    const acc = new Map<string, { students: Set<string>; payments: number; revenue: number; share: number }>();
+  /**
+   * Each course as it is actually paid — the backend already knows whether a
+   * course is a percentage, a session fee, or carries bundle money, so the report
+   * shows that rather than dividing one flat rate across everything. The student
+   * and payment counts are joined on from the payment log for context.
+   */
+  courseRows = computed<CourseRow[]>(() => {
+    const counts = new Map<string, { students: Set<string>; payments: number }>();
     for (const l of this.lines()) {
-      const key = l.courseName || l.className || '—';
-      let row = acc.get(key);
-      if (!row) {
-        row = { students: new Set<string>(), payments: 0, revenue: 0, share: 0 };
-        acc.set(key, row);
-      }
-      row.students.add(l.studentName);
-      row.payments += 1;
-      row.revenue += l.amount;
-      row.share += l.share;
+      const key = l.courseId ?? '';
+      let c = counts.get(key);
+      if (!c) { c = { students: new Set<string>(), payments: 0 }; counts.set(key, c); }
+      c.students.add(l.studentName);
+      c.payments += 1;
     }
-    return [...acc.entries()]
-      .map(([course, r]) => ({
-        course,
-        students: r.students.size,
-        payments: r.payments,
-        revenue: r.revenue,
-        share: r.share,
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
+    return (this.data()?.byCourse ?? []).map((bc) => {
+      const c = counts.get(bc.courseId ?? '');
+      return { ...bc, students: c ? c.students.size : 0, payments: c ? c.payments : 0 };
+    });
+  });
+
+  /** The percentage courses — their earnings are the accrual, the report's figure. */
+  percentageCourses = computed(() => this.courseRows().filter((c) => c.method === 'PERCENTAGE'));
+  /** Session-paid courses, whose earning is this month's fee, not a running total. */
+  sessionCourses = computed(() => this.courseRows().filter((c) => c.method === 'SESSION'));
+  sessionEarnings = computed(() =>
+    Math.round(this.sessionCourses().reduce((s, c) => s + c.earning, 0) * 100) / 100,
+  );
+  /** True once the teacher is on more than one arrangement — the header should say so. */
+  mixedPay = computed(() => {
+    const rows = this.courseRows();
+    return rows.some((c) => c.method === 'SESSION')
+      || rows.some((c) => c.isOverride)
+      || rows.some((c) => c.fromBundle);
   });
 
   ngOnInit() {
@@ -115,13 +122,21 @@ export class PercentageDetailComponent implements OnInit {
     const day = (iso: string | null) => (iso ? new DatePipe('en-US').transform(iso, 'MMM d, y') || '—' : '—');
     const rtl = (this.translate.currentLang || 'en').startsWith('ar');
 
-    const courseRows = this.courseRollup().map((c) => `
+    const methodText = (c: CourseRow) => c.method === 'SESSION'
+      ? t('EXPENSES.SALARIES.PCT_METHOD_SESSION')
+      : `${c.rate}%${c.isOverride ? ` (${t('EXPENSES.SALARIES.PCT_METHOD_OVERRIDE')})` : ''}`;
+    const basisText = (c: CourseRow) => c.method === 'SESSION'
+      ? t('EXPENSES.SALARIES.PCT_BASIS_SESSIONS', { count: c.sessions })
+      : money(c.studentPaid + c.bundleAllocated)
+        + (c.fromBundle ? ` (${t('EXPENSES.SALARIES.PCT_INCLUDES_BUNDLE', { amount: money(c.bundleAllocated) })})` : '');
+
+    const courseRows = this.courseRows().map((c) => `
       <tr>
-        <td>${esc(c.course)}</td>
-        <td class="num">${c.students}</td>
-        <td class="num">${c.payments}</td>
-        <td class="num">${money(c.revenue)}</td>
-        <td class="num">${money(c.share)}</td>
+        <td>${esc(c.courseName || '—')}</td>
+        <td>${esc(methodText(c))}</td>
+        <td class="num">${c.students || '—'}</td>
+        <td class="num">${esc(basisText(c))}</td>
+        <td class="num">${money(c.earning)}</td>
       </tr>`).join('');
 
     const unpaidRows = this.unpaid().map((u) => `
@@ -162,14 +177,18 @@ export class PercentageDetailComponent implements OnInit {
 
           ${section(
             t('EXPENSES.SALARIES.PCT_BY_COURSE'),
-            th([[t('EXPENSES.SALARIES.PCT_COL_COURSE'), false], [t('EXPENSES.SALARIES.PCT_COL_STUDENTS'), true],
-                [t('EXPENSES.SALARIES.PCT_COL_PAYMENTS'), true], [t('EXPENSES.SALARIES.PCT_COL_REVENUE'), true],
-                [t('EXPENSES.SALARIES.PCT_COL_SHARE'), true]]),
+            th([[t('EXPENSES.SALARIES.PCT_COL_COURSE'), false], [t('EXPENSES.SALARIES.PCT_COL_METHOD'), false],
+                [t('EXPENSES.SALARIES.PCT_COL_STUDENTS'), true], [t('EXPENSES.SALARIES.PCT_COL_BASIS'), true],
+                [t('EXPENSES.SALARIES.PCT_COL_EARNING'), true]]),
             courseRows,
             t('EXPENSES.SALARIES.PCT_NO_PAYMENTS'),
-            `<tfoot><tr><td>${esc(t('EXPENSES.SALARIES.PCT_TOTAL'))}</td><td class="num">${this.studentCount()}</td>
-              <td class="num">${this.lines().length}</td><td class="num">${money(d.totalPaid)}</td>
-              <td class="num">${money(d.accrued)}</td></tr></tfoot>`
+            `<tfoot><tr><td colspan="4">${esc(t('EXPENSES.SALARIES.PCT_ACCRUED'))}</td>
+              <td class="num">${money(d.accrued)}</td></tr>${
+              this.sessionCourses().length
+                ? `<tr><td colspan="4">${esc(t('EXPENSES.SALARIES.PCT_SESSION_THIS_MONTH'))}</td>
+                    <td class="num">${money(this.sessionEarnings())}</td></tr>`
+                : ''
+            }</tfoot>`
           )}
 
           ${section(

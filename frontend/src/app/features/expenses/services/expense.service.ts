@@ -58,11 +58,40 @@ export interface PercentageLine {
   studentName: string;
   className: string | null;
   courseName: string | null;
+  courseId: string | null;
   source: 'ENROLLMENT' | 'MONTHLY' | 'SESSION' | 'PACKAGE';
   amount: number;
+  /** The percentage applied to THIS course's money — 0 for a session-paid course. */
+  rate: number;
   /** The teacher's cut of this payment (rounded per line). */
   share: number;
   paidAt: string | null;
+}
+
+/**
+ * One course on a teacher's salary report, in the terms that course is paid on.
+ * One teacher can hold several at once: a percentage of one course, a fee per
+ * session on another, and bundle money attributed to a third.
+ */
+export interface CourseBreakdownLine {
+  courseId: string | null;
+  courseName: string | null;
+  /** PERCENTAGE — a share of money received; SESSION — a fee per session. */
+  method: 'PERCENTAGE' | 'SESSION';
+  /** The percentage (PERCENTAGE) or the per-session fee (SESSION). */
+  rate: number;
+  /** This course carries its own arrangement, apart from the teacher's global one. */
+  isOverride: boolean;
+  /** Student money attributed to this course (the percentage basis). */
+  studentPaid: number;
+  /** Approved bundle money routed to this course, already inside its cut. */
+  bundleAllocated: number;
+  /** Present sessions this month (SESSION rows). */
+  sessions: number;
+  /** PERCENTAGE: the all-time accrual. SESSION: this month's fee. */
+  earning: number;
+  /** Some of this row's money came through a bundle. */
+  fromBundle: boolean;
 }
 
 /**
@@ -86,6 +115,8 @@ export interface PercentageUnpaidLine {
 /** The summary plus the payments behind it, for auditing the accrual. */
 export interface PercentageBreakdown extends PercentageSummary {
   lines: PercentageLine[];
+  /** Earnings course by course, each in the terms that course is paid on. */
+  byCourse: CourseBreakdownLine[];
   /** Total still owed by students who attended. */
   unpaidTotal: number;
   /** percentageRate% of unpaidTotal — the accrual this would unlock. */
@@ -146,6 +177,13 @@ export interface BundleMemberLine {
   /** The rate came from a per-course arrangement rather than the global one. */
   isCourseRate: boolean;
   payable: boolean;
+  /** How this course pays its teacher: a percentage of money, or a fee per session. */
+  payMethod?: 'PERCENTAGE' | 'SESSION' | 'NONE';
+  /** True when the teacher is paid per session for this course — already settled
+   *  in their salary from the class, so NOT paid again out of bundle money. */
+  paidPerSession?: boolean;
+  /** The per-session fee, for a session-paid course. */
+  sessionRate?: number | null;
   /** Present on a policy's lines only: the money attributed, and what it earns. */
   share?: number;
   earning?: number;
@@ -173,6 +211,13 @@ export interface BundleIncomeRow {
   blockedReason: 'NO_MEMBER_COURSES' | 'NO_INSTRUCTOR' | 'NOT_PERCENTAGE_PAID' | 'NO_LIST_PRICE' | null;
   /** A decision already recorded for this bundle and month, if there is one. */
   approved: Array<{ employeeId: string; courseId: string; amount: number; policy: 'A' | 'C'; approvedAt: string }>;
+  /** Member courses whose teacher is paid per session — shown with the bundle
+   *  money that corresponds to them, so it reads as accounted-for, not skipped. */
+  sessionMembers?: BundleMemberLine[];
+  /** Total bundle money that corresponds to session-paid courses. */
+  sessionSettled?: number;
+  /** Every teacher in this bundle is paid per session: nothing to split. */
+  settledPerSession?: boolean;
   policyA: BundlePolicySplit | null;
   policyC: BundlePolicySplit | null;
 }
@@ -183,6 +228,47 @@ export interface BundleIncomeReport {
   totalCollected: number;
   unattributable: number;
   bundles: BundleIncomeRow[];
+}
+
+/** One month with bundle money still owed, for the all-time salaries alarm. */
+export interface BundleOutstandingPeriod {
+  year: number;
+  month: number;
+  /** Unsplit money that can reach a teacher. */
+  outstanding: number;
+  /** Unsplit money that cannot reach any teacher as configured. */
+  blocked: number;
+}
+
+/**
+ * Bundle money owed to teachers across the WHOLE period, not one month — so the
+ * salaries alarm reflects the real backlog no matter where the month picker sits.
+ */
+export interface BundleOutstanding {
+  totalOutstanding: number;
+  outstandingCount: number;
+  totalBlocked: number;
+  blockedCount: number;
+  periods: BundleOutstandingPeriod[];
+}
+
+/** One earlier month with per-session pay still owed. */
+export interface SessionOutstandingPeriod {
+  year: number;
+  month: number;
+  amount: number;
+  sessions: number;
+}
+
+/**
+ * Per-session pay owed for sessions taught in closed months and never settled —
+ * accumulated across the whole period, independent of the month picker.
+ */
+export interface SessionOutstanding {
+  totalOutstanding: number;
+  sessionCount: number;
+  teacherCount: number;
+  periods: SessionOutstandingPeriod[];
 }
 
 @Injectable({
@@ -300,6 +386,26 @@ export class ExpenseService {
     const params: any = { year: String(year), month: String(month) };
     if (branchId) params.branchId = branchId;
     return this.api.get<BundleIncomeReport>('expenses/bundle-income', params);
+  }
+
+  /**
+   * All-time bundle money still owed to teachers — the figure behind the salaries
+   * alarm, deliberately independent of the month picker.
+   */
+  getBundleIncomeOutstanding(branchId?: string): Observable<BundleOutstanding> {
+    const params: any = {};
+    if (branchId) params.branchId = branchId;
+    return this.api.get<BundleOutstanding>('expenses/bundle-income/outstanding', params);
+  }
+
+  /**
+   * All-time per-session pay still owed for sessions taught in closed months —
+   * the figure behind the session half of the salaries alarm.
+   */
+  getSessionPayOutstanding(branchId?: string): Observable<SessionOutstanding> {
+    const params: any = {};
+    if (branchId) params.branchId = branchId;
+    return this.api.get<SessionOutstanding>('expenses/session-pay/outstanding', params);
   }
 
   getDue(month?: string): Observable<{ items: any[]; totalDue: number; month: string }> {

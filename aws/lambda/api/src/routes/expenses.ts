@@ -456,6 +456,137 @@ async function getTeacherEarnings(
   };
 }
 
+/**
+ * One course on a teacher's salary report, told in the terms that course is
+ * actually paid on. A teacher is no longer on one arrangement: migration 090 lets
+ * a course be a percentage of its money or a fee per session, migration 089 lets
+ * two percentage courses carry two different rates, and an approved bundle split
+ * (091) can route bundle money to a course as well. So a report row has to carry
+ * which of those it is, not just a number.
+ */
+export interface CourseBreakdownLine {
+  courseId: string | null;
+  courseName: string | null;
+  /** PERCENTAGE — paid as a share of money received; SESSION — a fee per session. */
+  method: 'PERCENTAGE' | 'SESSION';
+  /** The percentage (PERCENTAGE) or the per-session fee (SESSION). */
+  rate: number;
+  /** True when this course has its own arrangement, apart from the teacher's global one. */
+  isOverride: boolean;
+  /** Student money attributed to this course (the percentage basis). */
+  studentPaid: number;
+  /** Approved bundle money routed to this course, already inside studentPaid's cut. */
+  bundleAllocated: number;
+  /** Present sessions this month (SESSION rows only). */
+  sessions: number;
+  /**
+   * The teacher's cut. For PERCENTAGE this is the all-time accrual, in step with
+   * the report's headline `accrued`. For SESSION it is THIS MONTH's fee — session
+   * pay is a monthly, per-session settlement, not a running balance.
+   */
+  earning: number;
+  /** Convenience for the UI: some of this row's money came through a bundle. */
+  fromBundle: boolean;
+}
+
+/**
+ * The teacher's earnings laid out course by course, each in its own currency of
+ * explanation — a percentage of receipts, a fee per session, or bundle money the
+ * office attributed. The percentage rows add up to the report's `accrued`; the
+ * session rows are this month's, because that is the only window per-session pay
+ * has. Bundle money is folded into the course it was approved against, exactly as
+ * the accrual treats it, and flagged so the reader can see where it came from.
+ */
+async function getTeacherCourseBreakdown(
+  companyId: string,
+  emp: any,
+  globalRate: number,
+  monthStart: string,
+  monthEnd: string,
+): Promise<CourseBreakdownLine[]> {
+  const [paidCourseRows, rules, allocated, sessionPay] = await Promise.all([
+    getTeacherPaidByCourse(companyId, emp.id),
+    getCoursePayRules(companyId, emp.id),
+    getAllocatedByCourse(companyId, emp.id),
+    getSessionPayForMonth(companyId, emp, monthStart, monthEnd),
+  ]);
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const rows = new Map<string, CourseBreakdownLine>();
+  const ensure = (courseId: string | null, courseName: string | null): CourseBreakdownLine => {
+    const key = courseId ?? '';
+    let row = rows.get(key);
+    if (!row) {
+      row = {
+        courseId: courseId ?? null, courseName: courseName ?? null,
+        method: 'PERCENTAGE', rate: globalRate, isOverride: false,
+        studentPaid: 0, bundleAllocated: 0, sessions: 0, earning: 0, fromBundle: false,
+      };
+      rows.set(key, row);
+    } else if (!row.courseName && courseName) {
+      row.courseName = courseName;
+    }
+    return row;
+  };
+
+  for (const c of paidCourseRows) {
+    const row = ensure(c.courseId, c.courseName);
+    row.studentPaid = round2(row.studentPaid + c.paid);
+  }
+  for (const [courseId, amount] of allocated) {
+    const row = ensure(courseId, null);
+    row.bundleAllocated = round2(row.bundleAllocated + amount);
+    row.fromBundle = true;
+  }
+
+  // The arrangement decides the method and rate. A per-course rule overrides both;
+  // otherwise the course inherits the teacher's own percentage.
+  for (const row of rows.values()) {
+    const rule = row.courseId ? rules.get(row.courseId) : undefined;
+    if (rule?.payType === 'SESSION_BASED') {
+      row.method = 'SESSION';
+      row.rate = rule.sessionRate ?? 0;
+      row.isOverride = true;
+    } else if (rule?.payType === 'PERCENTAGE') {
+      row.rate = rule.percentageRate ?? globalRate;
+      row.isOverride = rule.percentageRate != null;
+    }
+  }
+
+  // Sessions actually taught this month, and their fee — this covers a purely
+  // session-based teacher too, whose courses never appear in the money rows above.
+  for (const line of sessionPay.lines) {
+    const row = ensure(line.courseId, line.courseName);
+    row.method = 'SESSION';
+    row.rate = line.rate;
+    row.isOverride = true;
+    row.sessions = line.sessions;
+  }
+
+  // Bundle-only or session-only courses can reach here without a name.
+  const unnamed = [...rows.values()].filter((r) => r.courseId && !r.courseName).map((r) => r.courseId as string);
+  if (unnamed.length) {
+    const names = await query<any>(
+      'SELECT id, name FROM courses WHERE company_id = $1 AND id = ANY($2::uuid[])',
+      [companyId, unnamed],
+    );
+    const byId = new Map((names as any[]).map((n) => [n.id as string, n.name as string]));
+    for (const r of rows.values()) if (r.courseId && !r.courseName) r.courseName = byId.get(r.courseId) ?? null;
+  }
+
+  for (const row of rows.values()) {
+    row.earning = row.method === 'SESSION'
+      ? round2(row.sessions * row.rate)
+      // Bundle money is earned at the same rate as the course's own money.
+      : round2((row.studentPaid + row.bundleAllocated) * row.rate / 100);
+  }
+
+  // Percentage courses first (the accrual), then session courses; each biggest earner first.
+  return [...rows.values()].sort((a, b) =>
+    a.method === b.method ? b.earning - a.earning : a.method === 'PERCENTAGE' ? -1 : 1,
+  );
+}
+
 // Base salary already withdrawn = the pre-bonus, pre-discount portion of past
 // SALARIES payments (amount − bonus + discount). Bonuses don't reduce future
 // accrual; discounts do (they mean less was actually drawn against earnings).
@@ -490,6 +621,7 @@ async function getTeacherPaidLines(
 
   const parts: string[] = [
     `SELECT s.name AS student_name, c.name AS class_name, co.name AS course_name,
+            c.course_id AS course_id,
             'ENROLLMENT' AS source,
             (COALESCE(e.amount_paid,0) - COALESCE(e.total_refunded,0)) AS amount,
             e.enrollment_date::date AS paid_at
@@ -504,7 +636,7 @@ async function getTeacherPaidLines(
   // package row), so the <> 0 filter also keeps them from showing as noise.
   if (reg?.has_msp) {
     parts.push(
-      `SELECT s.name, c.name, co.name, 'MONTHLY', COALESCE(msp.amount_paid,0),
+      `SELECT s.name, c.name, co.name, c.course_id, 'MONTHLY', COALESCE(msp.amount_paid,0),
               COALESCE(msp.paid_date, msp.created_at::date)
          FROM monthly_subscription_payments msp
          JOIN enrollments e ON e.id = msp.enrollment_id
@@ -516,7 +648,7 @@ async function getTeacherPaidLines(
   }
   if (reg?.has_sp) {
     parts.push(
-      `SELECT s.name, c.name, co.name, 'SESSION', COALESCE(sp.amount_paid,0),
+      `SELECT s.name, c.name, co.name, c.course_id, 'SESSION', COALESCE(sp.amount_paid,0),
               COALESCE(sp.paid_date, sp.created_at::date)
          FROM session_payments sp
          JOIN enrollments e ON e.id = sp.enrollment_id
@@ -528,7 +660,7 @@ async function getTeacherPaidLines(
   }
   if (reg?.has_spkg) {
     parts.push(
-      `SELECT s.name, c.name, co.name, 'PACKAGE', COALESCE(spkg.amount_paid,0),
+      `SELECT s.name, c.name, co.name, c.course_id, 'PACKAGE', COALESCE(spkg.amount_paid,0),
               spkg.created_at::date
          FROM session_packages spkg
          JOIN enrollments e ON e.id = spkg.enrollment_id
@@ -994,8 +1126,11 @@ export const expensesRoutes = {
                        WHERE cl.course_id = c.id AND cl.instructor_id IS NOT NULL
                        LIMIT 1
                     )) AS instructor_id,
-                    emp.first_name, emp.last_name, emp.salary_type, emp.percentage_rate,
-                    ecp.percentage_rate AS course_rate
+                    emp.first_name, emp.last_name, emp.salary_type, emp.percentage_rate, emp.session_rate,
+                    ecp.percentage_rate AS course_rate,
+                    ecp.pay_type       AS course_pay_type,
+                    ecp.session_rate   AS course_session_rate,
+                    (ecp.course_id IS NOT NULL) AS has_course_rule
                FROM master_course_courses mcc
                JOIN courses c ON c.id = mcc.course_id
                LEFT JOIN employees emp ON emp.id = COALESCE(c.instructor_id, (
@@ -1049,13 +1184,29 @@ export const expensesRoutes = {
         const collectedAmount = parseFloat(row.collected);
         const raw = membersByMaster.get(row.id) ?? [];
 
-        // A member can only carry a share if there is somebody to pay, a rate to
-        // pay them at, and a price to weight them by.
+        // How each member course pays its teacher. A per-course arrangement wins
+        // over the teacher's global type (migration 090), so the SAME teacher can
+        // be a percentage on one course and a session fee on another.
         const memberLines = raw.map((m: any) => {
-          const rate = m.course_rate != null
+          const listPrice = m.price != null ? parseFloat(m.price) : 0;
+          const hasRule = m.has_course_rule === true;
+          const method = hasRule ? (m.course_pay_type ?? 'PERCENTAGE') : (m.salary_type ?? null);
+          const pctRate = m.course_rate != null
             ? parseFloat(m.course_rate)
             : (m.percentage_rate != null ? parseFloat(m.percentage_rate) : null);
-          const listPrice = m.price != null ? parseFloat(m.price) : 0;
+          const sessionRate = m.course_session_rate != null
+            ? parseFloat(m.course_session_rate)
+            : (m.session_rate != null ? parseFloat(m.session_rate) : null);
+          const hasInstructor = !!m.instructor_id;
+
+          // A course paid PER SESSION is settled in the teacher's salary already,
+          // from the class — it must NOT be paid a second time out of bundle money.
+          const paidPerSession = hasInstructor && method === 'SESSION_BASED';
+          const payMethod: 'PERCENTAGE' | 'SESSION' | 'NONE' =
+            paidPerSession ? 'SESSION'
+            : (hasInstructor && method === 'PERCENTAGE') ? 'PERCENTAGE'
+            : 'NONE';
+
           return {
             courseId: m.course_id,
             courseName: m.course_name,
@@ -1063,20 +1214,44 @@ export const expensesRoutes = {
             employeeId: m.instructor_id ?? null,
             employeeName: m.first_name ? `${m.first_name} ${m.last_name ?? ''}`.trim() : null,
             salaryType: m.salary_type ?? null,
-            rate,
+            rate: pctRate,
             isCourseRate: m.course_rate != null,
-            payable: !!m.instructor_id && m.salary_type === 'PERCENTAGE' && rate != null && listPrice > 0,
+            payMethod,
+            paidPerSession,
+            sessionRate,
+            // Only a percentage course is paid FROM the bundle.
+            payable: payMethod === 'PERCENTAGE' && pctRate != null && listPrice > 0,
           };
         });
 
         const payable = memberLines.filter((m) => m.payable);
-        const listTotal = round2(payable.reduce((sum, m) => sum + m.listPrice, 0));
+        // Session courses still occupy part of the bundle's value: they belong in
+        // the denominator so a percentage teacher is weighted against the WHOLE
+        // bundle, not only its percentage courses — otherwise they'd be handed the
+        // session course's money too. Their own slice simply goes to the academy,
+        // because their teacher was already paid per session.
+        const sessionMembers = memberLines.filter((m) => m.paidPerSession && m.listPrice > 0);
+        const sessionList = round2(sessionMembers.reduce((sum, m) => sum + m.listPrice, 0));
+        const payableList = round2(payable.reduce((sum, m) => sum + m.listPrice, 0));
+        const listTotal = round2(payableList + sessionList);
+
+        // The money that corresponds to session courses — shown so the operator
+        // can see it was accounted for, not forgotten.
+        const sessionLinesOut = sessionMembers.map((m) => ({
+          ...m,
+          share: listTotal > 0 ? round2(collectedAmount * (m.listPrice / listTotal)) : 0,
+          earning: 0,
+        }));
+        const sessionSettled = round2(sessionLinesOut.reduce((sum, l) => sum + l.share, 0));
 
         // Why a bundle cannot be split, named in the order an operator would fix it.
+        // A bundle whose teachers are ALL paid per session is not blocked — it is
+        // already settled, so it is neither split nor counted as unattributable.
         let blockedReason: string | null = null;
         if (!memberLines.length) blockedReason = 'NO_MEMBER_COURSES';
-        else if (!payable.length || listTotal <= 0) {
-          if (memberLines.some((m) => !m.employeeId)) blockedReason = 'NO_INSTRUCTOR';
+        else if (!payable.length || payableList <= 0) {
+          if (sessionMembers.length) blockedReason = null;   // settled per session
+          else if (memberLines.some((m) => !m.employeeId)) blockedReason = 'NO_INSTRUCTOR';
           else if (memberLines.some((m) => m.salaryType !== 'PERCENTAGE')) blockedReason = 'NOT_PERCENTAGE_PAID';
           else blockedReason = 'NO_LIST_PRICE';
         }
@@ -1092,6 +1267,9 @@ export const expensesRoutes = {
             discount: 0,
             academyFloor: 0,
             members: memberLines,
+            sessionMembers: sessionLinesOut,
+            sessionSettled,
+            settledPerSession: false,
             blockedReason,
             approved: approvedByMaster.get(row.id) ?? [],
             policyA: null,
@@ -1099,7 +1277,31 @@ export const expensesRoutes = {
           };
         }
 
+        // Nothing to split, but nothing wrong either: every teacher here is on a
+        // session fee, already paid from their classes. Report it plainly.
+        if (!payable.length) {
+          return {
+            masterCourseId: row.id,
+            masterCourseName: row.name,
+            paymentType: row.payment_type ?? 'ONE_TIME',
+            collected: round2(collectedAmount),
+            listTotal,
+            discount: round2(listTotal - collectedAmount),
+            academyFloor: round2(collectedAmount),
+            members: memberLines,
+            sessionMembers: sessionLinesOut,
+            sessionSettled,
+            settledPerSession: true,
+            blockedReason: null,
+            approved: approvedByMaster.get(row.id) ?? [],
+            policyA: null,
+            policyC: null,
+          };
+        }
+
         // ── Policy A: everyone shares the discount in proportion ──────────────
+        // Weighted by the WHOLE bundle (listTotal), so a percentage course earns
+        // on its own slice only; the session slice falls through to the academy.
         const linesA = payable.map((m) => {
           const share = round2(collectedAmount * (m.listPrice / listTotal));
           return { ...m, share, earning: round2(share * (m.rate as number) / 100) };
@@ -1108,17 +1310,20 @@ export const expensesRoutes = {
         const academyA = round2(collectedAmount - teachersA);
 
         // ── Policy C: the academy keeps what list prices would have left it ───
-        // The floor is the sum of every member's non-teacher slice. Sold below
-        // it there is no pool to pay anyone from, which is reported as
-        // infeasible rather than printed as a negative.
+        // The floor is each percentage course's non-teacher slice PLUS the whole
+        // of every session course (its teacher is paid elsewhere, so all of that
+        // slice is the academy's). Sold below the floor there is no pool to pay
+        // anyone from, reported as infeasible rather than printed as a negative.
         const academyFloor = round2(
-          payable.reduce((sum, m) => sum + m.listPrice * (1 - (m.rate as number) / 100), 0),
+          payable.reduce((sum, m) => sum + m.listPrice * (1 - (m.rate as number) / 100), 0) + sessionList,
         );
         const poolC = round2(collectedAmount - academyFloor);
         const linesC = payable.map((m) => ({
           ...m,
           share: round2(collectedAmount * (m.listPrice / listTotal)),
-          earning: round2(poolC * (m.listPrice / listTotal)),
+          // The pool pays only the percentage courses, split by their weight
+          // among themselves.
+          earning: payableList > 0 ? round2(poolC * (m.listPrice / payableList)) : 0,
         }));
         const teachersC = round2(linesC.reduce((sum, l) => sum + l.earning, 0));
 
@@ -1132,6 +1337,11 @@ export const expensesRoutes = {
           discount: round2(listTotal - collectedAmount),
           academyFloor,
           members: memberLines,
+          // Session courses whose teacher was already paid per session, with the
+          // bundle money that corresponds to them.
+          sessionMembers: sessionLinesOut,
+          sessionSettled,
+          settledPerSession: false,
           blockedReason: null,
           approved: approvedByMaster.get(row.id) ?? [],
           policyA: {
@@ -1163,6 +1373,259 @@ export const expensesRoutes = {
     } catch (error: any) {
       console.error('Bundle income report error:', error);
       return mapThrownError(error, 'ERRORS.EXPENSES.BUNDLE_INCOME_FAILED', 'Failed to build the bundle income report');
+    }
+  },
+
+  /**
+   * GET /api/expenses/bundle-income/outstanding?branchId=
+   *
+   * The same question as bundleIncome, but for the WHOLE period rather than one
+   * month. A bundle pays a teacher only once its split is approved; a percentage
+   * teacher's dues never expire at a month boundary. So this walks every month a
+   * bundle ever collected money, drops the ones already split, and totals what is
+   * still owed — the figure the salaries alarm shows so it cannot go stale when
+   * the month picker moves.
+   */
+  bundleIncomeOutstanding: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureAllocationsSchema();
+
+      const params: any[] = [context.companyId];
+      let branchClause = '';
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        branchClause = ' AND me.branch_id = $2';
+      }
+
+      // How a course pays its teacher decides which bucket a bundle falls in. A
+      // per-course rule wins over the teacher's global type; the rule table is
+      // created lazily, so fall back to the global type where it isn't there.
+      //   • has_percentage → money owed to a percentage teacher (the alarm's job)
+      //   • has_session    → its teacher is paid per session, already settled — no
+      //                      alarm, so these must not read as "blocked"
+      const hasEcp = (await queryOne<any>(
+        `SELECT to_regclass('public.employee_course_percentages') IS NOT NULL AS h`,
+      ))?.h;
+      const effectiveMethod = hasEcp
+        ? `CASE WHEN ecp.course_id IS NOT NULL THEN COALESCE(ecp.pay_type,'PERCENTAGE') ELSE emp.salary_type END`
+        : `emp.salary_type`;
+      const methodExists = (target: 'PERCENTAGE' | 'SESSION_BASED') => `EXISTS (
+        SELECT 1 FROM master_course_courses mcc
+          JOIN courses c ON c.id = mcc.course_id
+          LEFT JOIN employees emp ON emp.id = COALESCE(c.instructor_id, (
+                SELECT cl.instructor_id FROM classes cl
+                 WHERE cl.course_id = c.id AND cl.instructor_id IS NOT NULL LIMIT 1))
+          ${hasEcp ? 'LEFT JOIN employee_course_percentages ecp ON ecp.employee_id = emp.id AND ecp.course_id = c.id' : ''}
+         WHERE mcc.master_course_id = pm.mc
+           AND emp.id IS NOT NULL
+           AND c.price > 0
+           AND (${effectiveMethod}) = '${target}'
+           ${target === 'PERCENTAGE'
+             ? `AND COALESCE(${hasEcp ? 'ecp.percentage_rate, ' : ''}emp.percentage_rate, 0) > 0`
+             : ''}
+      )`;
+
+      // The three arms mirror the per-month report; here they carry the money's
+      // own year and month so it can be grouped and matched against the splits.
+      const rows = await query<any>(
+        `WITH money AS (
+           SELECT me.master_course_id AS mc,
+                  EXTRACT(YEAR  FROM me.enrollment_date)::int AS y,
+                  EXTRACT(MONTH FROM me.enrollment_date)::int AS m,
+                  GREATEST(
+                    COALESCE(me.amount_paid, 0) - COALESCE(me.total_refunded, 0)
+                      - COALESCE((SELECT SUM(mep2.amount) FROM master_enrollment_payments mep2
+                                   WHERE mep2.master_enrollment_id = me.id), 0), 0) AS amount
+             FROM master_enrollments me
+            WHERE me.company_id = $1 AND me.enrollment_date IS NOT NULL${branchClause}
+           UNION ALL
+           SELECT me.master_course_id,
+                  EXTRACT(YEAR FROM mep.payment_date)::int,
+                  EXTRACT(MONTH FROM mep.payment_date)::int, mep.amount
+             FROM master_enrollment_payments mep
+             JOIN master_enrollments me ON me.id = mep.master_enrollment_id
+            WHERE mep.company_id = $1 AND mep.payment_date IS NOT NULL${branchClause}
+           UNION ALL
+           SELECT me.master_course_id,
+                  EXTRACT(YEAR FROM msi.payment_date)::int,
+                  EXTRACT(MONTH FROM msi.payment_date)::int, msi.amount
+             FROM monthly_subscription_installments msi
+             JOIN master_enrollments me ON me.id = msi.master_enrollment_id
+            WHERE msi.company_id = $1 AND msi.payment_date IS NOT NULL${branchClause}
+         ),
+         per_month AS (
+           SELECT mc, y, m, SUM(amount) AS collected
+             FROM money GROUP BY mc, y, m HAVING SUM(amount) > 0
+         )
+         SELECT pm.y, pm.m, pm.collected,
+                (${methodExists('PERCENTAGE')})    AS has_percentage,
+                (${methodExists('SESSION_BASED')}) AS has_session
+           FROM per_month pm
+          WHERE NOT EXISTS (
+                  SELECT 1 FROM master_revenue_allocations a
+                   WHERE a.company_id = $1 AND a.master_course_id = pm.mc
+                     AND a.billing_year = pm.y AND a.billing_month = pm.m)`,
+        params,
+      );
+
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      let totalOutstanding = 0, outstandingCount = 0, totalBlocked = 0, blockedCount = 0;
+      const periodMap = new Map<string, { year: number; month: number; outstanding: number; blocked: number }>();
+      for (const r of rows as any[]) {
+        const collected = parseFloat(r.collected);
+        const key = `${r.y}-${r.m}`;
+        if (r.has_percentage) {
+          // A percentage teacher is owed a share nobody has settled.
+          totalOutstanding += collected; outstandingCount += 1;
+          const p = periodMap.get(key) ?? { year: r.y, month: r.m, outstanding: 0, blocked: 0 };
+          p.outstanding = round2(p.outstanding + collected);
+          periodMap.set(key, p);
+        } else if (r.has_session) {
+          // Every teacher here is paid per session — already settled, no alarm.
+          continue;
+        } else {
+          // Money that reaches no teacher as configured.
+          totalBlocked += collected; blockedCount += 1;
+          const p = periodMap.get(key) ?? { year: r.y, month: r.m, outstanding: 0, blocked: 0 };
+          p.blocked = round2(p.blocked + collected);
+          periodMap.set(key, p);
+        }
+      }
+      const periods = [...periodMap.values()].sort((a, b) => b.year - a.year || b.month - a.month);
+
+      return {
+        status: 200 as const,
+        body: {
+          totalOutstanding: round2(totalOutstanding),
+          outstandingCount,
+          totalBlocked: round2(totalBlocked),
+          blockedCount,
+          periods,
+        },
+      };
+    } catch (error: any) {
+      console.error('Bundle outstanding error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.BUNDLE_INCOME_FAILED', 'Failed to compute outstanding bundle income');
+    }
+  },
+
+  /**
+   * GET /api/expenses/session-pay/outstanding?branchId=
+   *
+   * Per-session pay the academy still owes for sessions taught in CLOSED months
+   * — the session equivalent of the bundle backlog. A per-session teacher is paid
+   * for turning up, month by month; a month that was never settled leaves those
+   * sessions unpaid, and looking only at the picked month hides them. So this
+   * sums every unpaid PRESENT session dated before the current month, at the rate
+   * that applies to it (a per-course session fee, or the teacher's own), and
+   * groups it by the month it was taught so each can be settled from the pending
+   * tab. The current month is deliberately excluded: it isn't overdue until it
+   * closes, and the pending tab already shows it.
+   */
+  sessionPayOutstanding: async ({ query: q, headers }: { query: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'expenses', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureSalaryColumns();
+      await ensureFreeSessionSchema();
+
+      // Overdue is measured against TODAY's month, never the picker — the alarm
+      // must not change with the month being viewed.
+      const now = new Date();
+      const currentMonthStart = fmtDate(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+      const params: any[] = [context.companyId, currentMonthStart];
+      let branchClause = '';
+      if (q.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        // Cross-branch staff (NULL branch) stay in view, as on the pending tab.
+        branchClause = ' AND (e.branch_id = $3 OR e.branch_id IS NULL)';
+      }
+
+      // The rate a session earns follows the same precedence as getSessionPayForMonth:
+      // a per-course rule wins (SESSION_BASED → its fee, PERCENTAGE → nothing, since
+      // that course is paid through the accrual), otherwise the teacher's own rate
+      // if they are session-based, otherwise nothing.
+      const hasEcp = (await queryOne<any>(
+        `SELECT to_regclass('public.employee_course_percentages') IS NOT NULL AS h`,
+      ))?.h;
+      const ecpJoin = hasEcp
+        ? `LEFT JOIN employee_course_percentages ecp
+                  ON ecp.employee_id = sta.employee_id AND ecp.course_id = cl.course_id`
+        : '';
+      const rateExpr = hasEcp
+        ? `CASE
+             WHEN ecp.course_id IS NOT NULL THEN
+               CASE WHEN COALESCE(ecp.pay_type,'PERCENTAGE') = 'SESSION_BASED'
+                    THEN COALESCE(ecp.session_rate, 0) ELSE 0 END
+             ELSE
+               CASE WHEN e.salary_type = 'SESSION_BASED' THEN COALESCE(e.session_rate, 0) ELSE 0 END
+           END`
+        : `CASE WHEN e.salary_type = 'SESSION_BASED' THEN COALESCE(e.session_rate, 0) ELSE 0 END`;
+
+      const rows = await query<any>(
+        `SELECT EXTRACT(YEAR  FROM s.start_date)::int AS y,
+                EXTRACT(MONTH FROM s.start_date)::int AS m,
+                sta.employee_id,
+                (${rateExpr}) AS rate
+           FROM session_teacher_attendance sta
+           JOIN sessions s   ON s.id = sta.session_id
+           JOIN employees e  ON e.id = sta.employee_id
+           LEFT JOIN classes cl ON cl.id = s.class_id
+           ${ecpJoin}
+          WHERE s.company_id = $1
+            AND sta.status = 'PRESENT'
+            AND s.is_free = FALSE
+            AND s.start_date::date < $2
+            AND NOT EXISTS (
+              SELECT 1 FROM session_salary_payments ssp
+               WHERE ssp.session_id = s.id AND ssp.employee_id = sta.employee_id
+            )${branchClause}`,
+        params,
+      );
+
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      let totalOutstanding = 0, sessionCount = 0;
+      const teachers = new Set<string>();
+      const periodMap = new Map<string, { year: number; month: number; amount: number; sessions: number }>();
+      for (const r of rows as any[]) {
+        const rate = r.rate != null ? parseFloat(r.rate) : 0;
+        if (!(rate > 0)) continue;   // a percentage-paid course earns nothing here
+        totalOutstanding += rate;
+        sessionCount += 1;
+        if (r.employee_id) teachers.add(r.employee_id);
+        const key = `${r.y}-${r.m}`;
+        const p = periodMap.get(key) ?? { year: r.y, month: r.m, amount: 0, sessions: 0 };
+        p.amount = round2(p.amount + rate);
+        p.sessions += 1;
+        periodMap.set(key, p);
+      }
+      const periods = [...periodMap.values()].sort((a, b) => b.year - a.year || b.month - a.month);
+
+      return {
+        status: 200 as const,
+        body: {
+          totalOutstanding: round2(totalOutstanding),
+          sessionCount,
+          teacherCount: teachers.size,
+          periods,
+        },
+      };
+    } catch (error: any) {
+      console.error('Session pay outstanding error:', error);
+      return mapThrownError(error, 'ERRORS.EXPENSES.SESSION_OUTSTANDING_FAILED', 'Failed to compute outstanding session pay');
     }
   },
 
@@ -1918,11 +2381,32 @@ export const expensesRoutes = {
       );
       if (!emp) return apiError(404, 'ERRORS.EMPLOYEES.NOT_FOUND', 'Employee not found');
 
+      // Session pay has only a monthly window, so the report's session rows are
+      // this calendar month's — the same month the salaries page settles.
+      const now = new Date();
+      const my = now.getUTCFullYear();
+      const mm = now.getUTCMonth();
+      const monthStart = fmtDate(my, mm, 1);
+      const monthEnd = fmtDate(my, mm, new Date(Date.UTC(my, mm + 1, 0)).getUTCDate());
+
       const summary = await getPercentageSummary(context.companyId, emp);
-      const [rows, unpaidRows] = await Promise.all([
+      const [rows, unpaidRows, byCourse] = await Promise.all([
         getTeacherPaidLines(context.companyId, params.employeeId),
         getTeacherUnpaidLines(context.companyId, params.employeeId),
+        getTeacherCourseBreakdown(context.companyId, emp, summary.percentageRate, monthStart, monthEnd),
       ]);
+
+      // The rate that applies to one payment is a per-course question now: a
+      // course on its own arrangement uses that, a session-paid course earns
+      // nothing from student money (its teacher is paid per session), and
+      // everything else falls back to the global rate.
+      const rateByCourse = new Map<string, number>();
+      for (const c of byCourse) {
+        if (!c.courseId) continue;
+        rateByCourse.set(c.courseId, c.method === 'SESSION' ? 0 : c.rate);
+      }
+      const lineRate = (courseId: string | null): number =>
+        courseId && rateByCourse.has(courseId) ? rateByCourse.get(courseId)! : summary.percentageRate;
 
       const unpaid = unpaidRows.map((r) => {
         const outstanding = r.outstanding != null ? Math.max(0, parseFloat(r.outstanding)) : 0;
@@ -1951,18 +2435,27 @@ export const expensesRoutes = {
           // drift from the sum of the per-line potentialShare column.
           unpaidShare: Math.round(unpaidTotal * summary.percentageRate) / 100,
           unpaid,
+          // Earnings course by course, each in the terms it is paid on — a
+          // percentage, a session fee, or attributed bundle money.
+          byCourse,
           lines: rows.map((r) => {
             const amount = r.amount != null ? parseFloat(r.amount) : 0;
+            const rate = lineRate(r.course_id ?? null);
             return {
               studentName: r.student_name || '',
               className: r.class_name ?? null,
               courseName: r.course_name ?? null,
+              courseId: r.course_id ?? null,
               source: r.source,
               amount,
+              // The rate that applies to THIS course, not one flat number — a
+              // teacher can be on 90% of one course and 80% of another, and a
+              // session-paid course earns nothing from this money at all.
+              rate,
               // The teacher's cut of this one payment. Rounded per line, so the
               // column can drift a cent or two from `accrued` (rounded once on
               // the total) — accrued stays the figure of record.
-              share: Math.round(amount * summary.percentageRate) / 100,
+              share: Math.round(amount * rate) / 100,
               paidAt: r.paid_at ? new Date(r.paid_at).toISOString() : null,
             };
           }),

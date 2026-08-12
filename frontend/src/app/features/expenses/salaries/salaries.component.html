@@ -40,8 +40,83 @@
         : 'border-transparent text-gray-500 hover:text-gray-700'"
       (click)="setViewMode('bundles')">
       <i class="pi pi-gift mr-2"></i>{{ 'EXPENSES.SALARIES.TAB_BUNDLES' | translate }}
+      @if (bundleOutstanding()?.outstandingCount) {
+        <span class="ms-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-bold rounded-full bg-amber-500 text-white">
+          {{ bundleOutstanding()?.outstandingCount }}
+        </span>
+      }
     </button>
   </div>
+
+  <!-- Alarm: teacher dues owed across the WHOLE period, not the selected month.
+       Two kinds, both of which a month picker would otherwise hide: bundle income
+       whose split was never approved, and per-session pay for sessions taught in
+       earlier months that were never settled. -->
+  @if (overdueAlarm()) {
+    <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+      <i class="pi pi-exclamation-triangle text-amber-500 text-xl mt-0.5"></i>
+      <div class="flex-1 min-w-0 space-y-4">
+        <p class="font-semibold text-amber-800">{{ 'EXPENSES.SALARIES.ALARM_TITLE' | translate }}</p>
+
+        <!-- Bundle income never split -->
+        @if (bundleAlarm() && bundleOutstanding(); as o) {
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wider text-amber-700/80 mb-1">
+              {{ 'EXPENSES.SALARIES.ALARM_BUNDLES_LABEL' | translate }}
+            </div>
+            <div class="text-sm text-amber-700 space-y-0.5">
+              @if (o.outstandingCount) {
+                <p>{{ 'EXPENSES.SALARIES.ALARM_UNSPLIT' | translate: { count: o.outstandingCount, amount: (o.totalOutstanding | amount) } }}</p>
+              }
+              @if (o.blockedCount) {
+                <p>{{ 'EXPENSES.SALARIES.ALARM_BLOCKED' | translate: { count: o.blockedCount, amount: (o.totalBlocked | amount) } }}</p>
+              }
+            </div>
+            @if (o.periods.length && viewMode() !== 'bundles') {
+              <div class="flex flex-wrap gap-2 mt-2">
+                @for (p of o.periods; track p.year * 100 + p.month) {
+                  <button type="button"
+                    class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-amber-300 bg-white text-amber-800 hover:bg-amber-100 transition-colors"
+                    (click)="goToBundlePeriod(p.year, p.month)">
+                    <span class="font-medium">{{ periodLabel(p.year, p.month) }}</span>
+                    <span>{{ (p.outstanding + p.blocked) | amount }}</span>
+                    <i class="pi pi-arrow-right text-[10px]"></i>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Per-session pay for earlier months never settled -->
+        @if (sessionAlarm() && sessionOutstanding(); as s) {
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wider text-amber-700/80 mb-1">
+              {{ 'EXPENSES.SALARIES.ALARM_SESSIONS_LABEL' | translate }}
+            </div>
+            <p class="text-sm text-amber-700">
+              {{ 'EXPENSES.SALARIES.ALARM_SESSIONS' | translate: { count: s.sessionCount, amount: (s.totalOutstanding | amount), teachers: s.teacherCount } }}
+            </p>
+            @if (s.periods.length) {
+              <div class="flex flex-wrap gap-2 mt-2">
+                @for (p of s.periods; track p.year * 100 + p.month) {
+                  <button type="button"
+                    class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-amber-300 bg-white text-amber-800 hover:bg-amber-100 transition-colors"
+                    (click)="goToSessionPeriod(p.year, p.month)">
+                    <span class="font-medium">{{ periodLabel(p.year, p.month) }}</span>
+                    <span>{{ p.amount | amount }}</span>
+                    <span class="text-amber-500">·</span>
+                    <span>{{ 'EXPENSES.SALARIES.ALARM_SESSIONS_COUNT' | translate: { count: p.sessions } }}</span>
+                    <i class="pi pi-arrow-right text-[10px]"></i>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
 
   @if (viewMode() === 'pending') {
   <!-- Controls -->
@@ -79,7 +154,7 @@
           optionValue="value"
           [placeholder]="'EXPENSES.SALARIES.ALL_BRANCHES' | translate"
           [style]="{ width: '100%' }"
-          (onChange)="loadSalaries()"
+          (onChange)="onPendingBranchChange()"
         ></p-select>
       </div>
       }
@@ -426,10 +501,40 @@
             <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_TOTAL_PAID' | translate }}</span>
             <span class="font-medium">{{ d.totalPaid | amount }}</span>
           </div>
-          <div class="flex justify-between">
-            <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_RATE' | translate }}</span>
-            <span class="font-medium">{{ d.percentageRate }}%</span>
-          </div>
+          @if (pctMixed()) {
+            <!-- The rate is no longer one number: list each course as it's paid. -->
+            <div class="border-t pt-3 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_BY_COURSE' | translate }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                  {{ 'EXPENSES.SALARIES.PCT_MIXED_PAY' | translate }}
+                </span>
+              </div>
+              @for (c of pctByCourse(); track $index) {
+                <div class="flex justify-between text-xs">
+                  <span class="text-gray-600 truncate me-2">
+                    {{ c.courseName || '—' }}
+                    @if (c.fromBundle) {
+                      <span class="text-purple-600">· {{ 'EXPENSES.SALARIES.PCT_BUNDLE_TAG' | translate }}</span>
+                    }
+                  </span>
+                  <span class="text-gray-500 whitespace-nowrap">
+                    @if (c.method === 'SESSION') {
+                      {{ c.rate | amount }}/{{ 'EXPENSES.SALARIES.PCT_PER_SESSION' | translate }}
+                    } @else {
+                      {{ c.rate }}%
+                    }
+                    · {{ c.earning | amount }}
+                  </span>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="flex justify-between">
+              <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_RATE' | translate }}</span>
+              <span class="font-medium">{{ d.percentageRate }}%</span>
+            </div>
+          }
           <div class="flex justify-between border-t pt-3">
             <span class="text-gray-500">{{ 'EXPENSES.SALARIES.PCT_ACCRUED' | translate }}</span>
             <span class="font-medium">{{ d.accrued | amount }}</span>
@@ -733,6 +838,47 @@
                           (click)="approveSplit(row)"></button>
                 </div>
               }
+            }
+
+            <!-- Whole bundle is taught by per-session teachers: nothing to split. -->
+            @if (row.settledPerSession) {
+              <div class="p-4 bg-blue-50 text-sm text-blue-800 border-t border-blue-200">
+                <i class="pi pi-check-circle me-1"></i>{{ 'EXPENSES.SALARIES.BUNDLES_ALL_SESSION' | translate }}
+              </div>
+            }
+
+            <!-- Courses whose teacher is paid per session: already settled in
+                 their salary from the class, so NOT paid again here — shown with
+                 the bundle money that corresponds to them, for transparency. -->
+            @if (row.sessionMembers?.length) {
+              <div class="p-3 border-t border-gray-100 bg-blue-50/40">
+                <div class="text-xs font-semibold text-blue-800 mb-0.5">
+                  <i class="pi pi-info-circle me-1"></i>{{ 'EXPENSES.SALARIES.BUNDLES_SESSION_TITLE' | translate }}
+                </div>
+                <p class="text-xs text-gray-500 mb-2">{{ 'EXPENSES.SALARIES.BUNDLES_SESSION_HINT' | translate }}</p>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <tbody>
+                      @for (sm of row.sessionMembers; track sm.courseId) {
+                        <tr class="border-t border-blue-100">
+                          <td class="p-2">{{ sm.courseName }}</td>
+                          <td class="p-2 text-gray-600">{{ sm.employeeName }}</td>
+                          <td class="p-2 text-end text-gray-500 whitespace-nowrap">
+                            @if (sm.sessionRate != null) {
+                              {{ sm.sessionRate | amount }}/{{ 'EXPENSES.SALARIES.PCT_PER_SESSION' | translate }}
+                            }
+                          </td>
+                          <td class="p-2 text-end font-medium whitespace-nowrap">{{ sm.share | amount }}</td>
+                        </tr>
+                      }
+                      <tr class="border-t border-blue-200 font-semibold">
+                        <td class="p-2" colspan="3">{{ 'EXPENSES.SALARIES.BUNDLES_SESSION_TOTAL' | translate }}</td>
+                        <td class="p-2 text-end whitespace-nowrap">{{ (row.sessionSettled || 0) | amount }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             }
           </div>
         }

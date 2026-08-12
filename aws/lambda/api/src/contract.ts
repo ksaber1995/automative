@@ -4218,6 +4218,66 @@ export const contract = c.router({
         403: ApiErrorSchema,
       },
     },
+    /**
+     * Bundle money owed to teachers across the WHOLE period, not one month. A
+     * percentage teacher's dues accrue continuously, so the alarm on the salaries
+     * page must not vanish when the month picker moves: this totals every bundle
+     * month that collected money and was never split, all the way back.
+     */
+    bundleIncomeOutstanding: {
+      method: 'GET' as const,
+      path: '/api/expenses/bundle-income/outstanding',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          /** Unsplit bundle money that CAN reach a teacher — the overdue share. */
+          totalOutstanding: z.number(),
+          outstandingCount: z.number(),
+          /** Unsplit money that cannot reach any teacher as configured. */
+          totalBlocked: z.number(),
+          blockedCount: z.number(),
+          /** Each month with something outstanding, newest first, for navigation. */
+          periods: z.array(z.object({
+            year: z.number(),
+            month: z.number(),
+            outstanding: z.number(),
+            blocked: z.number(),
+          })),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    /**
+     * Per-session pay owed for sessions taught in CLOSED months and never settled
+     * — the session sibling of bundleIncomeOutstanding, and, like it, deliberately
+     * independent of the month picker so the salaries alarm can't go stale.
+     */
+    sessionPayOutstanding: {
+      method: 'GET' as const,
+      path: '/api/expenses/session-pay/outstanding',
+      query: z.object({
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          totalOutstanding: z.number(),
+          sessionCount: z.number(),
+          teacherCount: z.number(),
+          /** Each earlier month with unpaid sessions, newest first, for navigation. */
+          periods: z.array(z.object({
+            year: z.number(),
+            month: z.number(),
+            amount: z.number(),
+            sessions: z.number(),
+          })),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
     getDue: {
       method: 'GET',
       path: '/api/expenses/due',
