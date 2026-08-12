@@ -23,6 +23,80 @@ const SUBJECTS_SUBQUERY = `COALESCE((
   WHERE cs2.course_id = c.id
 ), '[]'::json) AS subjects_json`;
 
+/**
+ * Carry a course's new monthly fee to the students already on it.
+ *
+ * A monthly bill is charged at `COALESCE(enrollments.final_price, courses.price)`,
+ * and `final_price` is stamped when the student enrols — so on its own a change to
+ * the course price reaches nobody. Not the bills already materialised, and not next
+ * month's either, since `ensureBillsForMonth` reads the enrolment's frozen fee and
+ * only falls back to the course when there is none.
+ *
+ * Only students who were on the list price are moved. Someone on a negotiated fee
+ * keeps it — that number was agreed with them rather than derived from the course —
+ * and staff can still reprice them one at a time from the enrolment.
+ *
+ * As with a per-student change, settled and refunded months keep what they were
+ * billed and earlier months keep the price they were owed at, so only the current
+ * month and later are repriced. A month carrying a course-wide override stays
+ * scaled to it, using the same maths as `ensureBillsForMonth`.
+ */
+async function cascadeMonthlyFee(
+  companyId: string,
+  courseId: string,
+  oldPrice: number,
+  newPrice: number,
+): Promise<void> {
+  await query(
+    `UPDATE enrollments
+        SET final_price = $4, original_price = $4,
+            discount_amount = 0, discount_percent = 0, updated_at = NOW()
+      WHERE company_id = $1
+        AND course_id = $2
+        AND payment_type = 'MONTHLY_SUBSCRIPTION'
+        AND final_price = $3`,
+    [companyId, courseId, oldPrice, newPrice],
+  );
+
+  await query(
+    `UPDATE monthly_subscription_payments msp
+        SET amount_due = sub.new_due,
+            payment_status = CASE
+              WHEN sub.new_due > 0 AND msp.amount_paid >= sub.new_due THEN 'PAID'
+              WHEN msp.amount_paid > 0 THEN 'PARTIAL'
+              ELSE 'PENDING'
+            END,
+            paid_date = CASE
+              WHEN sub.new_due > 0 AND msp.amount_paid >= sub.new_due THEN COALESCE(msp.paid_date, CURRENT_DATE)
+              ELSE msp.paid_date
+            END,
+            updated_at = NOW()
+       FROM (
+         SELECT b.id,
+                CASE
+                  WHEN ov.override_price IS NOT NULL AND c.price > 0
+                    THEN ROUND(ov.override_price * (e.final_price / c.price), 2)
+                  ELSE e.final_price
+                END AS new_due
+         FROM monthly_subscription_payments b
+         JOIN enrollments e ON e.id = b.enrollment_id
+         JOIN courses c ON c.id = e.course_id
+         LEFT JOIN course_monthly_price_overrides ov
+           ON ov.course_id = e.course_id
+          AND ov.billing_year = b.billing_year
+          AND ov.billing_month = b.billing_month
+         WHERE b.company_id = $1
+           AND b.course_id = $2
+           AND e.final_price = $3
+           AND b.payment_status NOT IN ('PAID', 'REFUNDED')
+           AND (b.billing_year * 12 + b.billing_month)
+               >= (EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int)
+       ) sub
+      WHERE msp.id = sub.id`,
+    [companyId, courseId, newPrice],
+  );
+}
+
 function mapCourseFromDB(row: any) {
   let levels: { id: string; name: string | null }[] = [];
   const raw = row.levels_json;
@@ -389,6 +463,17 @@ export const coursesRoutes = {
 
       if (!course) {
         return apiError(404, 'ERRORS.COURSES.NOT_FOUND', 'Course not found');
+      }
+
+      // Run after the course row is written, so the override maths below reads the
+      // new list price — the same price `ensureBillsForMonth` will read next month.
+      const paymentType = body.paymentType ?? existing.payment_type;
+      if (updateData.price !== undefined && paymentType === 'MONTHLY_SUBSCRIPTION') {
+        const oldPrice = parseFloat(existing.price);
+        const newPrice = Number(updateData.price);
+        if (Number.isFinite(newPrice) && Number.isFinite(oldPrice) && newPrice !== oldPrice) {
+          await cascadeMonthlyFee(context.companyId, params.id, oldPrice, newPrice);
+        }
       }
 
       if (levelsProvided) {
